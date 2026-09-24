@@ -56,6 +56,13 @@ export interface Member {
 
 type Message = CachedMessage;
 
+/** Grouped reaction rows for the timeline's "created a …" cards. */
+export interface ContentReactionRow {
+  content_id: string;
+  kind: string;
+  reactions: Array<{ emoji: string; user_ids: string[] }>;
+}
+
 interface UseChatDataOptions {
   communityId: string;
   currentUserId: string;
@@ -69,6 +76,8 @@ interface UseChatDataOptions {
   onLoadError?: (message: string) => void;
   /** Bump to re-run the mount hydration after a failure (retry). */
   retryToken?: number;
+  /** Receives grouped notification-card reactions from each message page. */
+  onContentReactions?: (rows: ContentReactionRow[]) => void;
 }
 
 export function useChatData({
@@ -80,6 +89,7 @@ export function useChatData({
   onMounted,
   onLoadError,
   retryToken = 0,
+  onContentReactions,
 }: UseChatDataOptions) {
   const [community,           setCommunity]          = useState<Community | null>(null);
   const [members,             setMembers]            = useState<Member[]>([]);
@@ -139,7 +149,6 @@ export function useChatData({
     if (!cachedMsgs?.length) {
       onSeedLastReadAt?.(initialMessages?.length ? null : undefined as unknown as null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Fetch community metadata ──────────────────────────────────────────────
@@ -169,19 +178,20 @@ export function useChatData({
         await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
       }
       const url = after
-        ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}`
-        : `/api/communities/${targetId}/messages`;
+        ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}&withContentReactions=1`
+        : `/api/communities/${targetId}/messages?withContentReactions=1`;
 
       // Incremental (?after=) reads must NEVER be served from cache: the cache
       // can hold an older empty catch-up answer, which would drop the very
       // messages this fetch exists to find. `force` bypasses the stale window.
-      return fetchJsonCached<{ messages?: Message[] }>(
+      return fetchJsonCached<{ messages?: Message[]; content_reactions?: ContentReactionRow[] }>(
         url,
         { staleMs: after ? 0 : 3 * 60_000, force: after ? force || true : force },
         currentUserId,
       )
         .then((d) => {
           if (!d) return;
+          if (d.content_reactions?.length) onContentReactions?.(d.content_reactions);
           const incoming: Message[] = d.messages ?? [];
           if (after) {
             const existing   = msgCache.get(targetId) ?? [];
@@ -227,6 +237,9 @@ export function useChatData({
         })
         .catch(() => {});
     },
+    // onContentReactions is a stable useCallback in CommunityChat; keeping it
+    // out avoids re-creating fetchMessages on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [communityId, currentUserId]
   );
 
@@ -238,13 +251,14 @@ export function useChatData({
       setLoadingOlder(true);
       const targetId = communityId;
       try {
-        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(utcCursor(before))}`;
-        const d = await fetchJsonCached<{ messages?: Message[] }>(
+        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(utcCursor(before))}&withContentReactions=1`;
+        const d = await fetchJsonCached<{ messages?: Message[]; content_reactions?: ContentReactionRow[] }>(
           url,
           { staleMs: 30_000 },
           currentUserId,
         );
         if (communityIdRef.current !== targetId) return;
+        if (d.content_reactions?.length) onContentReactions?.(d.content_reactions);
         const incoming: Message[] = d.messages ?? [];
         if (incoming.length < PAGE_SIZE) setHasMoreAbove(false);
         if (incoming.length === 0) return;
@@ -268,6 +282,9 @@ export function useChatData({
         setLoadingOlder(false);
       }
     },
+    // onContentReactions is a stable useCallback in CommunityChat; keeping it
+    // out avoids re-creating fetchOlderMessages on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [communityId, currentUserId]
   );
 
@@ -278,6 +295,20 @@ export function useChatData({
     setHasMoreAbove(true);
     isFetchingOlderRef.current = false;
     let cancelled = false;
+
+    // Reactions for the timeline's notification cards ride on the message-page
+    // response; the SSR/bootstrap-seeded cached entries carry them too, so
+    // replay them for the freshly mounted community.
+    const replayCachedContentReactions = () => {
+      const cached = getCachedRequest<{ content_reactions?: ContentReactionRow[] }>(
+        `/api/communities/${communityId}/messages`,
+        currentUserId,
+      );
+      if (cached?.content_reactions?.length) {
+        onContentReactions?.(cached.content_reactions);
+      }
+    };
+    replayCachedContentReactions();
 
     const applyCanonicalCache = () => {
       const canonicalMessages = getCachedRequest<{ messages?: Message[] }>(

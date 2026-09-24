@@ -8,7 +8,7 @@ import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/commun
 import type { CachedContentEvent, CachedMessage, CachedThreadEvent, ContentEventKind, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
-import { pickOptimisticMatch } from "./chatUtils";
+import { applyContentCommentCount, pickOptimisticMatch } from "./chatUtils";
 
 type Message = CachedMessage;
 
@@ -98,6 +98,9 @@ export function useRealtimeChat({
           content: string;
           created_at: string;
           reply_to_id: string | null;
+          reply_to_content_id?: string | null;
+          reply_content_kind?: string | null;
+          reply_content_title?: string | null;
           image_url: string | null;
           mentions?: MessageMention[];
           /** Sender display info published by the server (see messages POST route). */
@@ -148,6 +151,7 @@ export function useRealtimeChat({
               : null);
 
           let replyTo: ReplyPreview | null = null;
+          let replyToContent: CachedMessage["reply_to_content"] = null;
           if (newRow.reply_to_id) {
             if (matchedTemp?.reply_to) {
               replyTo = matchedTemp.reply_to;
@@ -182,6 +186,16 @@ export function useRealtimeChat({
             status: "sent",
             reactions: [],
             reply_to: replyTo,
+            // Replies anchored to a content item ("created a …" card) carry
+            // the kind + title straight from the broadcast payload.
+            reply_to_content:
+              newRow.reply_to_content_id && newRow.reply_content_kind
+                ? {
+                    id: newRow.reply_to_content_id,
+                    kind: newRow.reply_content_kind as "thread" | "showcase" | "resource" | "event",
+                    title: newRow.reply_content_title ?? "",
+                  }
+                : null,
             // When this echo replaces the sender's own optimistic bubble, keep
             // showing the blob URL that is already on screen — swapping straight
             // to the uploaded network URL before it has loaded collapses the
@@ -427,6 +441,7 @@ export function useRealtimeChat({
           kind?: ContentEventKind;
           title?: string;
           created_at?: string;
+          meta?: CachedContentEvent["meta"];
         };
         if (!row.id || !row.user_id || !row.created_at || !row.kind) return;
         const senderMember = membersRef.current.find((m) => m.user_id === row.user_id);
@@ -437,6 +452,7 @@ export function useRealtimeChat({
           kind: row.kind,
           title: row.title ?? "",
           created_at: row.created_at,
+          meta: row.meta ?? null,
           users: senderMember?.users ?? null,
         };
         setContentEvents((prev) => {
@@ -453,6 +469,90 @@ export function useRealtimeChat({
         const row = data as { id?: string };
         if (!row.id) return;
         setContentEvents((prev) => prev.filter((e) => e.id !== row.id));
+      }),
+    );
+
+    // ── Content-notification reactions (the "created a …" cards) ───────────
+    // The toggle API broadcasts insert/update/delete transitions; applying
+    // them to the cached card keeps every member's pills in sync.
+    const applyContentReaction = (
+      contentId: string,
+      kind: ContentEventKind,
+      userId: string,
+      emoji: string | null,
+      previousEmoji?: string | null,
+    ) => {
+      setContentEvents((prev) => prev.map((event) => {
+        if (event.id !== contentId || event.kind !== kind) return event;
+        let reactions = [...(event.reactions ?? [])];
+        if (previousEmoji) {
+          reactions = applyReactionDelete(reactions, previousEmoji, userId);
+        }
+        if (emoji) {
+          reactions = applyReactionInsert(reactions, emoji, userId);
+        }
+        return { ...event, reactions };
+      }));
+    };
+
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "content-reaction-insert", (data) => {
+        const row = data as { content_id?: string; kind?: ContentEventKind; user_id?: string; emoji?: string };
+        if (!row.content_id || !row.kind || !row.user_id || !row.emoji) return;
+        applyContentReaction(row.content_id, row.kind, row.user_id, row.emoji);
+      }),
+    );
+
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "content-reaction-update", (data) => {
+        const row = data as {
+          old?: { content_id?: string; kind?: ContentEventKind; user_id?: string; emoji?: string };
+          new?: { content_id?: string; kind?: ContentEventKind; user_id?: string; emoji?: string };
+        };
+        const oldRow = row.old;
+        const newRow = row.new;
+        if (!oldRow?.content_id || !oldRow.kind || !oldRow.user_id || !newRow?.emoji) return;
+        applyContentReaction(oldRow.content_id, oldRow.kind, oldRow.user_id, newRow.emoji, oldRow.emoji);
+      }),
+    );
+
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "content-reaction-delete", (data) => {
+        const row = data as { content_id?: string; kind?: ContentEventKind; user_id?: string; emoji?: string };
+        if (!row.content_id || !row.kind || !row.user_id || !row.emoji) return;
+        applyContentReaction(row.content_id, row.kind, row.user_id, null, row.emoji);
+      }),
+    );
+
+    // ── Comment counts on the cards ────────────────────────────────────────
+    // Comment APIs recount the item and broadcast the absolute total (plus the
+    // newest commenters) into the chat room, so a card's "💬 n" grows — and its
+    // byline changes hands — while members sit in the chat instead of waiting
+    // for the next page load.
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "content-comment", (data) => {
+        const row = data as {
+          content_id?: string;
+          kind?: ContentEventKind;
+          comment_count?: number;
+          comment_users?: string[];
+        };
+        if (!row.content_id || typeof row.comment_count !== "number") return;
+        const id = row.content_id;
+        const count = row.comment_count;
+        const commenters = Array.isArray(row.comment_users) ? row.comment_users : undefined;
+
+        setContentEvents(
+          (prev) => applyContentCommentCount(prev, id, count, commenters) ?? prev,
+        );
+        // Threads created while this client was connected live in the legacy
+        // thread array rather than the content-event one, so a thread card needs
+        // the same treatment (kind is the only way to tell them apart).
+        if (row.kind === "thread") {
+          setThreadEvents(
+            (prev) => applyContentCommentCount(prev, id, count, commenters) ?? prev,
+          );
+        }
       }),
     );
 

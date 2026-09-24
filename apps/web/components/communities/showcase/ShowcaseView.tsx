@@ -303,6 +303,10 @@ export function ShowcaseView({
                 kind: "showcase",
                 title: post.title,
                 created_at: post.created_at,
+                meta: {
+                  image_url: post.image_url ?? post.attachments.find((a) => a.type.startsWith("image/"))?.url ?? null,
+                  video_poster: post.attachments.find((a) => a.type.startsWith("video/"))?.poster ?? null,
+                },
               },
             });
           }}

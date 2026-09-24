@@ -7,17 +7,32 @@ import {
   MessageCircle,
   Lightbulb,
   Flag,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTimeAgo } from "./chatUtils";
+import { fmtTime, formatCommenters } from "./chatUtils";
+import { MessageBubbleTail } from "./MessageBubbleTail";
+import {
+  NotificationHoverActions,
+  NotificationReactionPills,
+} from "./NotificationHoverActions";
+import { userColorVar } from "@/lib/communities/user-color";
 import type { CachedThreadEvent } from "@/lib/communities/cache";
 import { THREAD_CATEGORIES } from "@/components/communities/threads/types";
+import {
+  KIND_THEME,
+  firstLine,
+} from "@/lib/communities/content-notifications";
 
 interface ThreadNotificationBubbleProps {
   event: CachedThreadEvent;
   communityId: string;
   currentUserId: string;
+  /** Toggle/replace the current user's emoji reaction on this card. */
+  onReaction?: (emoji: string) => void;
+  /** Open the composer with this card as the reply anchor. */
+  onReply?: () => void;
 }
 
 function categoryLabel(value: string): string {
@@ -42,10 +57,21 @@ function thumbnailUrl(event: CachedThreadEvent): string | null {
   return img?.url ?? null;
 }
 
+/** First video attachment's poster frame, if any. */
+function videoPosterUrl(event: CachedThreadEvent): string | null {
+  return event.attachments.find((a) => a.type.startsWith("video/"))?.poster ?? null;
+}
+
+/**
+ * The thread variant of the timeline's "created a …" card — same bubble-wrapped
+ * rich card as ContentNotificationBubble, plus the thread's category badge.
+ */
 export function ThreadNotificationBubble({
   event,
   communityId,
   currentUserId,
+  onReaction,
+  onReply,
 }: ThreadNotificationBubbleProps) {
   const sender  = event.users;
   const isMe    = event.user_id === currentUserId;
@@ -54,72 +80,230 @@ export function ThreadNotificationBubble({
   // own threads instead of their initials.
   const senderName = sender?.name ?? "Someone";
   const name    = isMe ? "You" : senderName;
-  const timeAgo = fmtTimeAgo(event.created_at);
   const imgUrl  = thumbnailUrl(event);
+  const posterUrl = imgUrl ? null : videoPosterUrl(event);
   const label   = categoryLabel(event.category);
   const href    = `/dashboard/communities/${communityId}/threads/${event.id}`;
   const CatIcon = CATEGORY_ICON[event.category] ?? HelpCircle;
+  const theme   = KIND_THEME.thread;
+  // Discussion on the thread's own page — the count and whoever spoke last,
+  // updating live as comments arrive (same footer as the other three kinds).
+  const commentCount = Math.max(0, event.meta?.comment_count ?? 0);
+  const commenterNames = formatCommenters(event.meta?.comment_users);
 
   return (
-    <div className="flex items-start gap-2 w-full px-5 mt-3">
-      {/* Avatar column */}
-      <div className="w-7 shrink-0 mt-0.5">
-        {sender && (
-          <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
-        )}
-      </div>
+    <div
+      data-content-id={event.id}
+      className={`group flex w-full items-start gap-2 px-5 mt-2 ${
+        isMe ? "justify-end" : "justify-start"
+      }`}
+    >
+      {/* Avatar column — own notifications skip it, matching message bubbles */}
+      {!isMe && (
+        <div className="w-7 shrink-0 mt-0.5">
+          {sender && (
+            <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
+          )}
+        </div>
+      )}
 
-      {/* Content column */}
-      <div className="flex-1 min-w-0">
-        {/* Header line */}
-        <p className="font-body text-[11px] text-foreground-muted mb-1.5 ml-0.5">
-          <span className="font-semibold text-foreground">{name}</span>
-          {" created a new thread"}
-          <span className="mx-1.5 opacity-40">·</span>
-          {timeAgo}
-        </p>
+      {/* Bubble column — bubble + hover actions live in one inner row, exactly
+          like MessageBubble: actions sit to the RIGHT of other members'
+          bubbles and to the LEFT of own (right-aligned) bubbles. */}
+      <div className="min-w-0 max-w-[65%]">
+        <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
+          <div className="relative min-w-0">
+        <div
+          className={`relative select-none rounded-[10px] px-3 pt-2 pb-1.5 shadow-sm ${
+            isMe
+              ? "rounded-tr-none bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
+              : "rounded-tl-none bg-surface-raised"
+          }`}
+        >
+          <MessageBubbleTail
+            side={isMe ? "right" : "left"}
+            className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
+          />
 
-        {/* Card row */}
-        <div className="flex items-center gap-3">
-          {/* Thread card — a Next <Link>, not a raw <a>: the raw anchor caused
-              a full page reload, which threw away every module-level cache
+          {/* Header line — "You created a thread" */}
+          <p
+            className={`font-body text-[11px] mb-1.5 ${
+              isMe ? "text-accent-foreground" : "text-foreground-muted"
+            }`}
+          >
+            <span
+              className="font-semibold"
+              style={!isMe ? { color: userColorVar(event.user_id) } : undefined}
+            >
+              {name}
+            </span>
+            {" created a thread"}
+          </p>
+
+          {/* Card row — a Next <Link>, not a raw <a>: the raw anchor caused a
+              full page reload, which threw away every module-level cache
               (messages, sidebar, request cache) and forced the whole app to
               refetch after merely viewing a thread. */}
-          <Link
-            href={href}
-            className="flex items-center gap-3 flex-1 min-w-0 rounded-xl bg-surface-raised border border-white/[0.06] px-3 py-2.5 hover:bg-white/[0.06] transition-colors group"
-          >
-            {/* Thumbnail */}
-            <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden flex items-center justify-center bg-white/[0.06]">
-              {imgUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={imgUrl}
-                  alt={event.title}
-                  className="h-full w-full object-cover"
+          <div className="flex items-stretch gap-2">
+            <Link
+              href={href}
+              className={`flex items-stretch gap-2.5 flex-1 min-w-0 rounded-xl border overflow-hidden transition-colors ${
+                isMe
+                  ? "bg-black/20 border-white/15 hover:bg-black/30"
+                  : "bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:border-white/[0.08] dark:hover:bg-white/[0.08]"
+              }`}
+            >
+              {/* Thumbnail — image, video poster, or tinted category tile.
+                  Stretches to the card's full height (min 64px). */}
+              <div className="relative w-[64px] min-h-[64px] shrink-0 overflow-hidden">
+                {imgUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imgUrl}
+                    alt={event.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                  />
+                ) : posterUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={posterUrl}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                      loading="lazy"
+                      draggable={false}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white">
+                        <Video size={12} strokeWidth={2.5} />
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    className="flex h-full w-full items-center justify-center"
+                    style={{
+                      backgroundColor: isMe ? "rgba(255,255,255,0.10)" : theme.tileBg,
+                    }}
+                  >
+                    <CatIcon
+                      size={24}
+                      strokeWidth={2.5}
+                      style={{
+                        color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0 py-1.5 pr-1">
+                <span
+                  className={`flex items-center gap-1.5 font-body text-[10px] font-bold tracking-[0.08em] uppercase ${
+                    isMe ? "text-accent-foreground" : ""
+                  }`}
+                  style={{ color: isMe ? undefined : theme.accent }}
+                >
+                  <MessageCircle size={12} strokeWidth={2.5} />
+                  Thread
+                </span>
+                <p
+                  className={`font-body text-sm font-semibold line-clamp-1 leading-snug mt-0.5 ${
+                    isMe ? "text-accent-foreground" : "text-foreground"
+                  }`}
+                >
+                  {event.title}
+                </p>
+                {event.attachments.length > 0 && (
+                  <p
+                    className={`font-body text-[11px] line-clamp-1 leading-snug mt-0.5 ${
+                      isMe ? "text-accent-foreground/80" : "text-foreground-muted"
+                    }`}
+                  >
+                    {event.attachments.length} attachment{event.attachments.length > 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+
+              {/* Chevron affordance */}
+              <div className="flex items-center pr-2.5">
+                <ChevronRight
+                  size={14}
+                  strokeWidth={2.5}
+                  className={isMe ? "text-accent-foreground/60" : "text-foreground-muted"}
                 />
-              ) : (
-                <CatIcon size={22} strokeWidth={2.5} className="text-foreground-muted" />
-              )}
-            </div>
+              </div>
+            </Link>
 
-            {/* Text */}
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-sm font-medium text-foreground line-clamp-2 leading-snug">
-                {event.title}
-              </p>
-              <p className="font-body text-xs text-accent mt-1.5 flex items-center gap-0.5 group-hover:underline">
-                View Thread
-                <ChevronRight size={12} strokeWidth={2.5} />
-              </p>
-            </div>
-          </Link>
+            {/* Category badge */}
+            <span
+              className={`shrink-0 self-center font-body text-[11px] rounded-full px-2.5 py-1 whitespace-nowrap border ${
+                isMe
+                  ? "text-accent-foreground border-white/20 bg-black/20"
+                  : "text-foreground-muted border-black/[0.08] bg-black/[0.03] dark:border-white/[0.10] dark:bg-white/[0.04]"
+              }`}
+            >
+              {label}
+            </span>
+          </div>
 
-          {/* Category badge */}
-          <span className="shrink-0 font-body text-xs text-foreground-muted border border-white/[0.12] rounded-full px-3 py-1 bg-surface-raised whitespace-nowrap">
-            {label}
-          </span>
+          {/* Bottom row: the discussion sits bottom-LEFT of the bubble, the
+              timestamp bottom-right, exactly like a message bubble's footer. */}
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {commentCount > 0 && (
+              <span
+                className={`flex min-w-0 items-center gap-1 font-body text-[10px] leading-none ${
+                  isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
+                }`}
+                title={
+                  commenterNames
+                    ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"} · ${commenterNames}`
+                    : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
+                }
+              >
+                <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
+                <span className="shrink-0 tabular-nums">{commentCount}</span>
+                {commenterNames && (
+                  <span className="truncate">
+                    <span className="opacity-60">·&nbsp;</span>
+                    {commenterNames}
+                  </span>
+                )}
+              </span>
+            )}
+            <span
+              className={`ml-auto shrink-0 font-mono text-[10px] ${
+                isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"
+              }`}
+            >
+              {fmtTime(event.created_at)}
+            </span>
+          </div>
+
+          {/* Reaction pills overlap the bubble's bottom edge, like messages */}
+          <NotificationReactionPills
+            reactions={event.reactions ?? []}
+            currentUserId={currentUserId}
+            onReaction={(emoji) => onReaction?.(emoji)}
+          />
+            </div>
+          </div>
+
+            {/* Hover actions — emoji reaction + reply only (no delete/edit). */}
+            {onReaction && onReply ? (
+              <NotificationHoverActions
+                reactions={event.reactions ?? []}
+                currentUserId={currentUserId}
+                onReaction={onReaction}
+                onReply={onReply}
+                isOwn={isMe}
+              />
+            ) : null}
         </div>
+        {(event.reactions?.length ?? 0) > 0 && <div className="h-4" />}
       </div>
     </div>
   );

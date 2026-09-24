@@ -4,6 +4,7 @@ import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 import {
   contentIsNewerThanLastMessage,
   formatContentPreview,
+  formatMessagePreview,
 } from "./sidebar-content";
 
 function content(overrides: Partial<Parameters<typeof formatContentPreview>[0]> = {}) {
@@ -41,15 +42,15 @@ test("content preview uses the author's first name", () => {
 });
 
 test("own content previews as You with the kind noun", () => {
-  for (const [kind, noun] of [
-    ["thread", "thread"],
-    ["showcase", "showcase"],
-    ["resource", "resource"],
-    ["event", "event"],
+  for (const [kind, article, noun] of [
+    ["thread", "a", "thread"],
+    ["showcase", "a", "showcase"],
+    ["resource", "a", "resource"],
+    ["event", "an", "event"],
   ] as const) {
     assert.deepEqual(
       formatContentPreview(content({ kind, isOwn: true, firstName: "sachin" })),
-      { prefix: "You", text: `created a ${noun}` },
+      { prefix: "You", text: `created ${article} ${noun}` },
     );
   }
 });
@@ -70,4 +71,70 @@ test("a newer message wins the preview back", () => {
 
 test("content shows when the community has no messages yet", () => {
   assert.equal(contentIsNewerThanLastMessage(content(), community(null)), true);
+});
+
+function message(
+  overrides: Partial<Parameters<typeof formatMessagePreview>[0]> = {},
+): Parameters<typeof formatMessagePreview>[0] {
+  return {
+    id: "m1",
+    content: "hi",
+    created_at: "2026-09-17T10:00:00Z",
+    user: { name: "john doe" },
+    ...overrides,
+  };
+}
+
+test("message preview uses the sender's first name", () => {
+  assert.deepEqual(formatMessagePreview(message()), { prefix: "john", text: "hi" });
+});
+
+test("own messages preview as You", () => {
+  assert.deepEqual(formatMessagePreview(message({ is_own: true })), {
+    prefix: "You",
+    text: "hi",
+  });
+});
+
+test("a reply previews the person it answers", () => {
+  assert.deepEqual(
+    formatMessagePreview(message({ is_reply: true, reply_to_user: "sachin" })),
+    { prefix: "john", text: "replied to sachin: hi" },
+  );
+});
+
+test("a reply anchored to a content card names the kind, not a person", () => {
+  for (const [kind, article] of [
+    ["thread", "a"],
+    ["showcase", "a"],
+    ["resource", "a"],
+    ["event", "an"],
+  ] as const) {
+    assert.deepEqual(
+      formatMessagePreview(
+        message({
+          content: "nice one",
+          is_own: true,
+          is_reply: true,
+          reply_to_user: null,
+          reply_to_content_kind: kind,
+        }),
+      ),
+      { prefix: "You", text: `replied to ${article} ${kind}: nice one` },
+    );
+  }
+});
+
+test("an image-only message previews as a photo", () => {
+  assert.deepEqual(
+    formatMessagePreview(message({ content: "", has_image: true })),
+    { prefix: "john", text: "📷 Photo" },
+  );
+});
+
+test("a deleted message never leaks its body", () => {
+  assert.deepEqual(
+    formatMessagePreview(message({ is_deleted: true })),
+    { prefix: "john", text: "Message deleted" },
+  );
 });

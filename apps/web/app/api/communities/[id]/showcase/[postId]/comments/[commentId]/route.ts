@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string; commentId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
@@ -14,6 +15,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (error) return NextResponse.json({ error: "Failed to delete comment." }, { status: 500 });
   after(() => {
     void publishRealtimeBatch([{ room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: authorId } }]);
+    // Republish the remaining total so the chat card's "💬 n" shrinks too.
+    void publishContentCommentCount(db, id, postId, "showcase");
   });
   return new NextResponse(null, { status: 204 });
 }

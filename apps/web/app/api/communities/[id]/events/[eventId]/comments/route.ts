@@ -5,6 +5,7 @@ import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
@@ -128,6 +129,10 @@ export async function POST(
       href,
     });
   }
+
+  // The chat timeline's "created an event" card shows this event's comment
+  // count — broadcast the new total so open chats update without a reload.
+  void publishContentCommentCount(db, communityId, eventId, "event");
 
   const [authored] = await attachCommentReactions(
     db,

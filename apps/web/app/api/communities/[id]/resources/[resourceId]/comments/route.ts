@@ -8,6 +8,7 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -164,6 +165,9 @@ export async function POST(
   void publishRealtimeBatch([
     { room: realtimeRooms.resourceComments(resourceId), topic: "comment", data: { user_id: userId } },
   ]);
+  // The chat timeline's "created a resource" card shows this resource's comment
+  // count — broadcast the new total so open chats update without a reload.
+  void publishContentCommentCount(db, communityId, resourceId, "resource");
   deferNotification({
     userId: resource.user_id,
     actorId: userId,

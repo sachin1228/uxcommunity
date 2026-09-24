@@ -10,6 +10,7 @@ import {
   setCachedRequest,
 } from "@/lib/request-cache";
 import type { MessageMention } from "./mentions";
+import type { ContentEventMeta } from "./content-notifications";
 
 export type { MessageMention } from "./mentions";
 
@@ -26,8 +27,19 @@ export interface ReplyPreview {
   /** Parent author's id when known — drives the reply-name color. History
    * rows built by the SQL RPC omit it (the RPC only embeds the name). */
   user_id?: string | null;
+  /** Set when the reply anchors to a content item (a "created a …" card)
+   * instead of a chat message — `id` is then the content item's id. */
+  content_kind?: ContentEventKind | null;
+  /** Card title for content-anchored replies (rendered in the composer chip). */
+  content_title?: string | null;
 }
 
+/** Preview of a content item being replied to (a "created a …" card). */
+export interface ContentReplyPreview {
+  id: string;
+  kind: ContentEventKind;
+  title: string;
+}
 export interface CachedMessage {
   id: string;
   content: string;
@@ -37,6 +49,8 @@ export interface CachedMessage {
   status?: "sending" | "sent" | "failed";
   reactions?: MessageReaction[];
   reply_to?: ReplyPreview | null;
+  /** Set when the reply anchors to a content item instead of a message. */
+  reply_to_content?: ContentReplyPreview | null;
   image_url?: string | null;
   deleted_at?: string | null;
   edited_at?: string | null;
@@ -51,9 +65,14 @@ export interface CachedThreadEvent {
   user_id: string;
   title: string;
   category: string;
-  attachments: Array<{ name: string; url: string; type: string; size: number }>;
+  attachments: Array<{ name: string; url: string; type: string; size: number; poster?: string }>;
   created_at: string;
   users: { name: string; avatar_url: string | null } | null;
+  /** Discussion on the thread's detail page (count + newest commenters), so
+   * the thread card can show it like the other three kinds. */
+  meta?: ContentEventMeta | null;
+  /** Emoji reactions left on the card (grouped, message-reaction shape). */
+  reactions?: MessageReaction[];
 }
 
 /**
@@ -76,6 +95,10 @@ export interface CachedContentEvent {
   title: string;
   created_at: string;
   users: { name: string; avatar_url: string | null } | null;
+  /** Optional rich fields (thumbnail, description, schedule…) the card renders. */
+  meta?: ContentEventMeta | null;
+  /** Emoji reactions left on the card (grouped, message-reaction shape). */
+  reactions?: MessageReaction[];
 }
 
 /** Effective community-management grants for the current user. */
@@ -116,7 +139,7 @@ export interface CachedMeta {
 // ─── Sidebar joined-communities cache ─────────────────────────────────────────
 
 export interface SidebarLastReaction {
-  /** Message that received the reaction. */
+  /** Message that received the reaction — or the content card's id. */
   messageId: string;
   emoji: string;
   /** Used to ignore delayed realtime responses for older reactions. */
@@ -126,6 +149,9 @@ export interface SidebarLastReaction {
   isOwn: boolean;
   /** Content snippet of the message that was reacted to. */
   messagePreview: string;
+  /** Set when the reaction was left on a "created a …" card (thread /
+   * showcase / resource / event) instead of a chat message. */
+  contentKind?: ContentEventKind | null;
 }
 
 export interface CachedSidebarCommunity {
@@ -169,6 +195,9 @@ export interface CachedSidebarCommunity {
     is_reply?: boolean;
     /** First name of the user whose message was replied to. */
     reply_to_user?: string | null;
+    /** Set when the reply anchors to a "created a …" card instead of a
+     * message — the sidebar previews "replied to a thread: …". */
+    reply_to_content_kind?: ContentEventKind | null;
     /** Unique emoji strings that have been reacted to this message. */
     reactions?: string[];
   } | null;
@@ -549,7 +578,7 @@ export const CONTENT_EVENT_CHANGED_EVENT = "uxcommunity:content-event-changed";
  */
 export function notifyContentEvent(
   detail:
-    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string } }
+    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string; meta?: ContentEventMeta | null } }
     | { kind: "delete"; event: { id: string; community_id: string; kind: ContentEventKind } },
 ): void {
   if (typeof window === "undefined") return;

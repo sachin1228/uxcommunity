@@ -33,6 +33,11 @@ type ActivityRow = {
     sender_name: string | null;
     reply_to_id: string | null;
     reply_sender_name: string | null;
+    /** Set when the reply anchors to a "created a …" card instead of a message. */
+    reply_to_content_id?: string | null;
+    /** Absent until the sidebar content-reply migration is applied. */
+    reply_to_content_kind?: "thread" | "showcase" | "resource" | "event" | null;
+    reply_to_content_title?: string | null;
     deleted_at: string | null;
     has_image: boolean;
   };
@@ -42,8 +47,11 @@ type ActivityRow = {
     emoji: string;
     created_at: string;
     reactor_name: string | null;
+    /** Message body, or the content card's title for card reactions. */
     message_content: string | null;
     has_image: boolean;
+    /** Absent until the sidebar content-reaction migration is applied. */
+    content_kind?: "thread" | "showcase" | "resource" | "event" | null;
   };
 };
 
@@ -137,8 +145,10 @@ export async function getSidebarCommunities(userId: string) {
         is_own: message.user_id === userId,
         has_image: message.has_image,
         is_deleted: Boolean(message.deleted_at),
-        is_reply: Boolean(message.reply_to_id),
+        // A reply anchors to either a chat message or a "created a …" card.
+        is_reply: Boolean(message.reply_to_id || message.reply_to_content_id),
         reply_to_user: message.reply_sender_name?.split(" ")[0] ?? null,
+        reply_to_content_kind: message.reply_to_content_kind ?? null,
       } : null,
       lastReaction: reaction ? {
         messageId: reaction.message_id,
@@ -146,9 +156,12 @@ export async function getSidebarCommunities(userId: string) {
         createdAt: reaction.created_at,
         firstName: reaction.user_id === userId ? "You" : reaction.reactor_name?.split(" ")[0] ?? "Someone",
         isOwn: reaction.user_id === userId,
+        contentKind: reaction.content_kind ?? null,
         messagePreview: reaction.message_content
           ? `"${reaction.message_content.slice(0, 40)}${reaction.message_content.length > 40 ? "…" : ""}"`
-          : reaction.has_image ? "Photo" : "a message",
+          : reaction.content_kind
+            ? `${/^[aeiou]/i.test(reaction.content_kind) ? "an" : "a"} ${reaction.content_kind}`
+            : reaction.has_image ? "Photo" : "a message",
       } : null,
     };
   }).sort((a, b) => (b.last_message?.created_at ?? "").localeCompare(a.last_message?.created_at ?? ""));

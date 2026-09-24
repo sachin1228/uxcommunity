@@ -68,6 +68,10 @@ interface MessageListProps {
   onRetrySend: (msgId: string) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
+  /** Toggle a reaction on a "created a …" notification card. */
+  onContentReaction?: (event: CachedContentEvent, emoji: string) => void;
+  /** Open the composer replying to a "created a …" notification card. */
+  onContentReply?: (event: CachedContentEvent) => void;
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
@@ -107,6 +111,8 @@ export const MessageList = memo(function MessageList({
   onRetrySend,
   onReaction,
   onReply,
+  onContentReaction,
+  onContentReply,
   onEdit,
   onCopy,
   onDelete,
@@ -305,25 +311,52 @@ export const MessageList = memo(function MessageList({
               if (item.kind === "thread") {
                 // Thread notifications break the "same author" run for messages.
                 prevItem = null;
+                const contentEvent: CachedContentEvent = { ...item.event, kind: "thread" };
                 return (
-                  <ThreadNotificationBubble
+                  <div
                     key={`thread-${item.event.id}`}
-                    event={item.event}
-                    communityId={communityId}
-                    currentUserId={currentUserId}
-                  />
+                    className={highlightedMsgId === item.event.id ? "rounded-[10px]" : undefined}
+                    style={
+                      highlightedMsgId === item.event.id
+                        ? { backgroundColor: "color-mix(in srgb, var(--ds-blue-800) 25%, transparent)" }
+                        : undefined
+                    }
+                  >
+                    <ThreadNotificationBubble
+                      event={item.event}
+                      communityId={communityId}
+                      currentUserId={currentUserId}
+                      onReaction={
+                        onContentReaction
+                          ? (emoji) => onContentReaction(contentEvent, emoji)
+                          : undefined
+                      }
+                      onReply={onContentReply ? () => onContentReply(contentEvent) : undefined}
+                    />
+                  </div>
                 );
               }
 
               if (item.kind === "content") {
                 prevItem = null;
                 return (
-                  <ContentNotificationBubble
+                  <div
                     key={`content-${item.event.kind}-${item.event.id}`}
-                    event={item.event}
-                    communityId={communityId}
-                    currentUserId={currentUserId}
-                  />
+                    className={highlightedMsgId === item.event.id ? "rounded-[10px]" : undefined}
+                    style={
+                      highlightedMsgId === item.event.id
+                        ? { backgroundColor: "color-mix(in srgb, var(--ds-blue-800) 25%, transparent)" }
+                        : undefined
+                    }
+                  >
+                    <ContentNotificationBubble
+                      event={item.event}
+                      communityId={communityId}
+                      currentUserId={currentUserId}
+                      onReaction={onContentReaction ? (emoji) => onContentReaction(item.event, emoji) : undefined}
+                      onReply={onContentReply ? () => onContentReply(item.event) : undefined}
+                    />
+                  </div>
                 );
               }
 

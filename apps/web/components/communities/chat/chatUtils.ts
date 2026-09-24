@@ -105,6 +105,58 @@ export function pickOptimisticMatch<
   );
 }
 
+/**
+ * Applies a broadcast comment summary to the timeline card it belongs to.
+ *
+ * Totals are always absolute (never deltas): a comment API recounts the item
+ * before publishing, so a dropped, replayed, or out-of-order event can never
+ * drift the number, and deleting a parent comment (which cascades to its
+ * replies) stays correct. The newest commenters ride along so the card can name
+ * them without a second request; omitting them keeps whatever the card had.
+ *
+ * Returns `null` when nothing would change, so callers can keep the previous
+ * array identity and skip a re-render.
+ */
+export function applyContentCommentCount<
+  T extends {
+    id: string;
+    meta?: { comment_count?: number | null; comment_users?: string[] | null } | null;
+  },
+>(events: readonly T[], contentId: string, count: number, commenters?: readonly string[]): T[] | null {
+  let changed = false;
+  const next = events.map((event) => {
+    if (event.id !== contentId) return event;
+
+    const sameCount = (event.meta?.comment_count ?? 0) === count;
+    const nextNames = commenters ? [...commenters] : null;
+    const sameNames =
+      !nextNames ||
+      (event.meta?.comment_users ?? []).join("\u0000") === nextNames.join("\u0000");
+    if (sameCount && sameNames) return event;
+
+    changed = true;
+    return {
+      ...event,
+      meta: {
+        ...(event.meta ?? {}),
+        comment_count: count,
+        ...(nextNames ? { comment_users: nextNames } : {}),
+      },
+    };
+  });
+  return changed ? next : null;
+}
+
+/**
+ * The byline beside a card's comment count: the people who spoke most recently,
+ * newest first (the server caps the list). Returns `null` when there is nobody
+ * to name — the card then shows the bare count.
+ */
+export function formatCommenters(commenters: readonly string[] | null | undefined): string | null {
+  const names = (commenters ?? []).map((name) => name.trim()).filter(Boolean);
+  return names.length ? names.join(", ") : null;
+}
+
 export function fmtDate(iso: string): string {
   const d = new Date(iso);
   const today = new Date();

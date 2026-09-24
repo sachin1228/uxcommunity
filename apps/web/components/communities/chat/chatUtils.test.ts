@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  applyContentCommentCount,
+  formatCommenters,
   pickOptimisticMatch,
   scrollChatToBottom,
   type OptimisticLike,
@@ -129,4 +131,84 @@ test("confirmed and failed rows are not replaced by a new echo", () => {
     pickOptimisticMatch(rows, { user_id: ME, content: "already sent" }),
     null,
   );
+});
+
+// ─── Live comment counts on the "created a …" cards ──────────────────────
+
+function card(id: string, commentCount?: number | null, commentUsers?: string[]) {
+  return {
+    id,
+    title: "card",
+    meta:
+      commentCount === undefined
+        ? null
+        : { comment_count: commentCount, ...(commentUsers ? { comment_users: commentUsers } : {}) },
+  };
+}
+
+test("a broadcast comment total lands on the card it belongs to", () => {
+  const events = [card("a", 0), card("b", 3)];
+
+  const next = applyContentCommentCount(events, "b", 4);
+
+  assert.equal(next?.[1]?.meta?.comment_count, 4);
+  // Untouched cards keep their identity, so only one row re-renders.
+  assert.equal(next?.[0], events[0]);
+  assert.deepEqual(next?.map((e) => e.id), ["a", "b"]);
+});
+
+test("a deleted comment shrinks the count and a zero hides it", () => {
+  const next = applyContentCommentCount([card("a", 1)], "a", 0);
+
+  assert.equal(next?.[0]?.meta?.comment_count, 0);
+});
+
+test("an unchanged total returns null so the caller keeps its state", () => {
+  assert.equal(applyContentCommentCount([card("a", 2)], "a", 2), null);
+});
+
+test("a card with no meta yet still accepts a count", () => {
+  const next = applyContentCommentCount([card("a")], "a", 1);
+
+  assert.equal(next?.[0]?.meta?.comment_count, 1);
+});
+
+test("a count for a card outside the loaded window is ignored", () => {
+  const events = [card("a", 1)];
+
+  assert.equal(applyContentCommentCount(events, "missing", 5), null);
+});
+
+// ─── Newest commenters on the card ────────────────────────────────────────
+
+test("the newest commenters ride along with the broadcast total", () => {
+  const next = applyContentCommentCount([card("a", 1, ["Ava"])], "a", 2, ["John", "Ava"]);
+
+  assert.equal(next?.[0]?.meta?.comment_count, 2);
+  assert.deepEqual(next?.[0]?.meta?.comment_users, ["John", "Ava"]);
+});
+
+test("a broadcast without names keeps the ones already on the card", () => {
+  assert.equal(applyContentCommentCount([card("a", 1, ["Ava"])], "a", 1), null);
+
+  const next = applyContentCommentCount([card("a", 1, ["Ava"])], "a", 2);
+  assert.deepEqual(next?.[0]?.meta?.comment_users, ["Ava"]);
+});
+
+test("a deleted comment drops the commenter who left it", () => {
+  const next = applyContentCommentCount([card("a", 2, ["Ava", "John"])], "a", 1, ["Ava"]);
+
+  assert.equal(next?.[0]?.meta?.comment_count, 1);
+  assert.deepEqual(next?.[0]?.meta?.comment_users, ["Ava"]);
+});
+
+test("renaming the same people does not re-render the card", () => {
+  assert.equal(applyContentCommentCount([card("a", 2, ["Ava", "John"])], "a", 2, ["Ava", "John"]), null);
+});
+
+test("the byline joins the names and blanks out when there are none", () => {
+  assert.equal(formatCommenters(["Ava", "John"]), "Ava, John");
+  assert.equal(formatCommenters([]), null);
+  assert.equal(formatCommenters(undefined), null);
+  assert.equal(formatCommenters(["  ", "Ava"]), "Ava");
 });

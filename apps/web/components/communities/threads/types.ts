@@ -35,6 +35,8 @@ export interface ThreadAttachment {
   url: string;
   type: string;
   size: number;
+  /** First-frame JPEG shown while the video streams in (videos only). */
+  poster?: string;
 }
 
 export interface CommunityThread {

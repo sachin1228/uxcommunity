@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 export async function DELETE(
   _req: NextRequest,
@@ -47,6 +48,10 @@ export async function DELETE(
       data: { user_id: comment.user_id },
     },
   ]);
+
+  // Deleting a comment (possibly a parent, taking its replies with it) changes
+  // the count the timeline card shows — republish the true total.
+  void publishContentCommentCount(db, communityId, threadId, "thread");
 
   return NextResponse.json({ ok: true });
 }

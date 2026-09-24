@@ -97,6 +97,27 @@ export function useSidebarRealtime({
 
     type ReactionRow = { community_id: string; message_id: string; user_id: string; emoji: string; created_at?: string };
     type ReactionMessage = { content?: string | null; image_url?: string | null };
+    /** A reaction left on a "created a …" card (thread / showcase / resource / event). */
+    type ContentReactionRow = {
+      community_id?: string;
+      content_id?: string;
+      kind?: SidebarLastContent["kind"];
+      user_id?: string;
+      emoji?: string;
+      /** Card title, published with the event so the preview can name it. */
+      title?: string | null;
+      created_at?: string;
+    };
+
+    /** "\"ui vs ux\"", "a thread" — mirrors the server's reaction preview. */
+    function contentReactionPreview(row: ContentReactionRow): string {
+      if (row.title) {
+        return `"${row.title.slice(0, 40)}${row.title.length > 40 ? "…" : ""}"`;
+      }
+      return row.kind
+        ? `${/^[aeiou]/i.test(row.kind) ? "an" : "a"} ${row.kind}`
+        : "a post";
+    }
 
     async function resolveName(commId: string, uid: string): Promise<string | null> {
       if (resolvedNames.has(uid)) return resolvedNames.get(uid)!;
@@ -154,7 +175,7 @@ export function useSidebarRealtime({
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "message", (data) => {
-          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
+          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; reply_to_content_id?: string | null; reply_content_kind?: SidebarLastContent["kind"] | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
           if (!joinedCommunityIds.has(row.community_id)) return;
           const isOwn = row.user_id === userId;
           const isActive = row.community_id === activeCommunityIdRef.current;
@@ -173,7 +194,7 @@ export function useSidebarRealtime({
           setCommunities((prev) =>
             applyUpdate(prev, row.community_id, (c) => ({
               ...c, is_archived: false, lastReaction: null,
-              last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!row.reply_to_id, is_deleted: false, reactions: [] },
+              last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!(row.reply_to_id || row.reply_to_content_id), reply_to_content_kind: row.reply_content_kind ?? null, is_deleted: false, reactions: [] },
               message_count: !isOwn && !isActive ? c.message_count + 1 : c.message_count,
               mention_count: mentionsMe && !isOwn && !isActive ? (c.mention_count ?? 0) + 1 : c.mention_count,
               // A new message is newer activity than any content preview.
@@ -347,6 +368,80 @@ export function useSidebarRealtime({
             const current = c.lastReaction;
             if (!current) return c;
             if (current.messageId === reactionMessageId && current.emoji === reactionEmoji && (!current.createdAt || !reactionCreatedAt || current.createdAt === reactionCreatedAt)) return { ...c, lastReaction: null };
+            return c;
+          }));
+        }),
+      );
+
+      // ── Reactions on the timeline's "created a …" cards ────────────────────
+      // Card reactions live in content_reactions, so they arrive on their own
+      // topics. They confirm in the sidebar exactly like message reactions do
+      // ("john reacted 🔥 to: \"ui vs ux\""), previewing the card's title.
+      const applyContentReaction = (row: ContentReactionRow) => {
+        if (!row.community_id || !row.content_id || !row.user_id || !row.emoji) return;
+        if (!joinedCommunityIds.has(row.community_id)) return;
+        const isOwn = row.user_id === userId;
+        if (isOwn && shouldSuppressReactionEcho(row.community_id, row.content_id, row.user_id)) return;
+        const knownReactor = resolvedNames.get(row.user_id)?.split(" ")[0] ?? null;
+        setCommunities((prev) =>
+          applyUpdate(prev, row.community_id!, (c) => {
+            if (c.lastReaction?.createdAt && row.created_at && c.lastReaction.createdAt > row.created_at) return c;
+            return {
+              ...c,
+              lastReaction: {
+                messageId: row.content_id!,
+                createdAt: row.created_at,
+                emoji: row.emoji!,
+                firstName: isOwn ? "You" : knownReactor ?? "Someone",
+                isOwn,
+                contentKind: row.kind ?? null,
+                messagePreview: contentReactionPreview(row),
+              },
+            };
+          }),
+        );
+        if (!isOwn && !knownReactor) {
+          const commId = row.community_id;
+          const uid = row.user_id;
+          const contentId = row.content_id;
+          const emoji = row.emoji;
+          resolveName(commId, uid).then((name) => {
+            if (!name) return;
+            setCommunities((prev) => applyUpdate(prev, commId, (c) => {
+              if (!c.lastReaction || c.lastReaction.messageId !== contentId || c.lastReaction.emoji !== emoji) return c;
+              return { ...c, lastReaction: { ...c.lastReaction, firstName: name.split(" ")[0] } };
+            }));
+          });
+        }
+      };
+
+      unsubscribes.push(
+        realtimeClient.on(chatRoom, "content-reaction-insert", (data) => applyContentReaction(data as ContentReactionRow)),
+      );
+
+      unsubscribes.push(
+        realtimeClient.on(chatRoom, "content-reaction-update", (data) => {
+          const row = data as { new?: ContentReactionRow };
+          if (row.new) applyContentReaction(row.new);
+        }),
+      );
+
+      unsubscribes.push(
+        realtimeClient.on(chatRoom, "content-reaction-delete", (data) => {
+          const row = data as ContentReactionRow;
+          if (!row.community_id || !row.content_id || !row.user_id || !row.emoji) return;
+          if (!joinedCommunityIds.has(row.community_id)) return;
+          if (row.user_id === userId && shouldSuppressReactionEcho(row.community_id, row.content_id, row.user_id)) return;
+          const reactionCommunityId = row.community_id;
+          const reactionContentId = row.content_id;
+          const reactionEmoji = row.emoji;
+          const reactionCreatedAt = row.created_at;
+          setCommunities((prev) => applyUpdate(prev, reactionCommunityId, (c) => {
+            const current = c.lastReaction;
+            if (!current) return c;
+            if (current.messageId === reactionContentId && current.emoji === reactionEmoji && (!current.createdAt || !reactionCreatedAt || current.createdAt === reactionCreatedAt)) {
+              return { ...c, lastReaction: null };
+            }
             return c;
           }));
         }),
