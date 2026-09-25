@@ -8,6 +8,7 @@ import { ToggleRow } from "../threads/ThreadComposerControls";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
+import { localInputToIso } from "@/lib/communities/event-time";
 
 interface CreateEventModalProps {
   communityId?: string;
@@ -74,9 +75,13 @@ export function CreateEventModal({
     }
   }
 
+  /**
+   * The viewer's wall time, stated in their own zone. The old naive
+   * concatenation (`${date}T${time}:00`) carried no zone, so Postgres's session
+   * zone (UTC) claimed it and a typed 12:10 displayed as 17:40 IST.
+   */
   function buildIso(date: string, time: string) {
-    if (!date) return null;
-    return time ? `${date}T${time}:00` : `${date}T00:00:00`;
+    return localInputToIso(date, time);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -84,17 +89,20 @@ export function CreateEventModal({
     if (!title.trim()) { setError("Title is required."); return; }
     if (!eventDate) { setError("Event date is required."); return; }
     if (!eventTime) { setError("Event time is required."); return; }
+    if (!buildIso(eventDate, eventTime)) { setError("Start time is not a valid time of day."); return; }
 
     setSaving(true);
     setError(null);
     try {
+      const startDate = buildIso(eventDate, eventTime);
+      if (!startDate) { setError("Start time is not a valid time of day."); return; }
       const res = await fetch(`/api/communities/${communityId}/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
-          event_date: buildIso(eventDate, eventTime),
+          event_date: startDate,
           end_date: endDate ? buildIso(endDate, endTime) : null,
           is_online: isOnline,
           location: location.trim() || null,

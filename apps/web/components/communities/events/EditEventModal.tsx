@@ -8,6 +8,7 @@ import { ToggleRow } from "../threads/ThreadComposerControls";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
+import { localInputToIso, isoToLocalInput } from "@/lib/communities/event-time";
 
 interface EditEventModalProps {
   event: CommunityEvent;
@@ -16,20 +17,12 @@ interface EditEventModalProps {
   onUpdated: (event: CommunityEvent) => void;
 }
 
-function toDateInput(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const yyyy = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mo}-${dd}`;
-}
-function toTimeInput(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+/**
+ * The stored instant as the viewer's own wall time, in date/time-input shape —
+ * the same conversion the create form reverses on submit.
+ */
+function toLocalInputs(iso: string | null | undefined) {
+  return isoToLocalInput(iso) ?? { date: "", time: "" };
 }
 
 export function EditEventModal({ event, communityId, onClose, onUpdated }: EditEventModalProps) {
@@ -38,10 +31,10 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [description, setDescription] = useState(event.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(event.cover_image_url ?? null);
   const [imageUploading, setImageUploading] = useState(false);
-  const [eventDate, setEventDate] = useState(toDateInput(event.event_date));
-  const [eventTime, setEventTime] = useState(toTimeInput(event.event_date));
-  const [endDate, setEndDate] = useState(toDateInput(event.end_date));
-  const [endTime, setEndTime] = useState(toTimeInput(event.end_date));
+  const [eventDate, setEventDate] = useState(() => toLocalInputs(event.event_date).date);
+  const [eventTime, setEventTime] = useState(() => toLocalInputs(event.event_date).time);
+  const [endDate, setEndDate] = useState(() => toLocalInputs(event.end_date).date);
+  const [endTime, setEndTime] = useState(() => toLocalInputs(event.end_date).time);
   const [isOnline, setIsOnline] = useState(event.is_online);
   const [location, setLocation] = useState(event.location ?? "");
   const [meetLink, setMeetLink] = useState(event.meet_link ?? "");
@@ -81,26 +74,33 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     }
   }
 
+  /**
+   * The viewer's wall time, stated in their own zone. The old naive
+   * concatenation (`${date}T${time}:00`) carried no zone, so Postgres's session
+   * zone (UTC) claimed it and a typed 12:10 displayed as 17:40 IST.
+   */
   function buildIso(date: string, time: string) {
-    if (!date) return null;
-    return time ? `${date}T${time}:00` : `${date}T00:00:00`;
+    return localInputToIso(date, time);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError("Title is required."); return; }
     if (!eventDate || !eventTime) { setError("Event date and time are required."); return; }
+    if (!buildIso(eventDate, eventTime)) { setError("Start time is not a valid time of day."); return; }
 
     setSaving(true);
     setError(null);
     try {
+      const startDate = buildIso(eventDate, eventTime);
+      if (!startDate) { setError("Start time is not a valid time of day."); return; }
       const res = await fetch(`/api/communities/${communityId}/events/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
-          event_date: buildIso(eventDate, eventTime),
+          event_date: startDate,
           end_date: endDate ? buildIso(endDate, endTime) : null,
           is_online: isOnline,
           location: location.trim() || null,
