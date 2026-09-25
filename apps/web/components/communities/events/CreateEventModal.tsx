@@ -245,32 +245,36 @@ export function CreateEventModal({
                 </div>
               </label>
 
-              {/* One date selector: the event happens on this day, and the
-                  start and end times place it inside it. */}
+              {/* One date selector on its own row: the event happens on this
+                  day, and the start and end times beneath it place it inside
+                  it. */}
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                  <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                </span>
+                <input
+                  type="date"
+                  value={eventDate}
+                  min={minDate}
+                  onChange={(e) => {
+                    setEventDate(e.target.value);
+                    // Switching onto today must not keep a time that day
+                    // has already gone past.
+                    if (
+                      e.target.value === minDate &&
+                      eventTime &&
+                      eventTime < minStartTime
+                    ) {
+                      setEventTime("");
+                    }
+                  }}
+                  className="field w-full"
+                />
+              </label>
+
+              {/* Start and end times share the row beneath the date — the end
+                  rides the start's day, so there is no second date field. */}
               <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
-                  </span>
-                  <input
-                    type="date"
-                    value={eventDate}
-                    min={minDate}
-                    onChange={(e) => {
-                      setEventDate(e.target.value);
-                      // Switching onto today must not keep a time that day
-                      // has already gone past.
-                      if (
-                        e.target.value === minDate &&
-                        eventTime &&
-                        eventTime < minStartTime
-                      ) {
-                        setEventTime("");
-                      }
-                    }}
-                    className="field w-full"
-                  />
-                </label>
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                     <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
@@ -288,13 +292,6 @@ export function CreateEventModal({
                     className="field w-full"
                   />
                 </label>
-              </div>
-
-              {/* End time — same day as the start, so no second date field. */}
-              <div className="grid grid-cols-2 gap-3">
-                <p className="self-end pb-2.5 font-body text-[11px] leading-snug text-foreground-subtle">
-                  Same day as the start. Leave blank for an open-ended event.
-                </p>
                 <label className="block">
                   <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                     End time <span className="font-normal text-foreground-subtle">(optional)</span>
@@ -308,6 +305,9 @@ export function CreateEventModal({
                   />
                 </label>
               </div>
+              <p className="font-body text-[11px] leading-snug text-foreground-subtle">
+                Both times are on the chosen day. Leave the end blank for an open-ended event.
+              </p>
             </div>
           </div>
 
