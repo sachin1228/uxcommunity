@@ -17,6 +17,7 @@ import {
   nowTimeInput,
   startMovedByEdit,
   todayDateInput,
+  viewerZoneLabel,
 } from "@/lib/communities/event-time";
 
 interface EditEventModalProps {
@@ -63,6 +64,8 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   // so untouched edits don't fail submit-time validation.
   const minDate = startIsPast ? undefined : todayDateInput();
   const [minStartTime] = useState(() => nowTimeInput());
+  // Named once per mount: the zone the typed times mean, beside the picker.
+  const [zoneLabel] = useState(() => viewerZoneLabel());
   const [isOnline, setIsOnline] = useState(event.is_online);
   const [location, setLocation] = useState(event.location ?? "");
   const [meetLink, setMeetLink] = useState(event.meet_link ?? "");
@@ -267,6 +270,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                  <span className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle">{zoneLabel}</span>
                 </span>
                 <input
                   type="date"

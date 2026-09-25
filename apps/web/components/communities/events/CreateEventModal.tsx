@@ -13,6 +13,7 @@ import {
   localInputToIso,
   nowTimeInput,
   todayDateInput,
+  viewerZoneLabel,
 } from "@/lib/communities/event-time";
 
 interface CreateEventModalProps {
@@ -46,6 +47,8 @@ export function CreateEventModal({
   // submit check re-reads the clock, so time still can't slip through.
   const [minDate] = useState(() => todayDateInput());
   const [minStartTime] = useState(() => nowTimeInput());
+  // Named once per mount: the zone the typed times mean, beside the picker.
+  const [zoneLabel] = useState(() => viewerZoneLabel());
   const [isOnline, setIsOnline] = useState(false);
   const [location, setLocation] = useState("");
   const [meetLink, setMeetLink] = useState("");
@@ -251,6 +254,7 @@ export function CreateEventModal({
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                  <span className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle">{zoneLabel}</span>
                 </span>
                 <input
                   type="date"

@@ -11,6 +11,7 @@ import {
   daysBetweenDateInputs,
   isPastStart,
   startMovedByEdit,
+  viewerZoneLabel,
 } from "./event-time";
 
 /**
@@ -152,4 +153,32 @@ test("an unmodified stored start does not count as moved by an edit", () => {
   // Garbage on either side must not silently unlock the past.
   assert.equal(startMovedByEdit("not a date", iso), true);
   assert.equal(startMovedByEdit(iso, ""), true);
+});
+
+test("the zone label pairs the abbreviation with this date's offset", () => {
+  withZone("America/New_York", () => {
+    // Summer is EDT at UTC-4, winter EST at UTC-5 — the date decides.
+    assert.equal(viewerZoneLabel(new Date("2026-07-15T12:00:00Z")), "EDT · UTC-4:00");
+    assert.equal(viewerZoneLabel(new Date("2026-01-15T12:00:00Z")), "EST · UTC-5:00");
+  });
+});
+
+test("zones without a real abbreviation show the offset alone", () => {
+  withZone("Asia/Kolkata", () => {
+    // CLDR refuses "IST" here (it is ambiguous — Ireland, Israel), rendering
+    // "GMT+5:30" instead; the offset alone says it without the duplication.
+    assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC+5:30");
+  });
+});
+
+test("a UTC viewer reads a plain UTC, not UTC · UTC", () => {
+  withZone("UTC", () => {
+    assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC");
+  });
+});
+
+test("half-hour offsets keep their minutes", () => {
+  withZone("Asia/Kathmandu", () => {
+    assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC+5:45");
+  });
 });

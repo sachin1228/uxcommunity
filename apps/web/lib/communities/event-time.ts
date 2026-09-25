@@ -163,6 +163,37 @@ export function daysBetweenDateInputs(from: string, to: string): number {
 }
 
 /**
+ * What the viewer's own zone is called, for the small label beside the event
+ * form's date picker — the times they type mean this zone, and the label says
+ * so the way wall clocks do: the abbreviation when the runtime has one
+ * ("EDT"), and the offset for this exact date ("UTC+5:30"), which is what
+ * carries half-hour zones and DST. A zone without a real abbreviation (CLDR
+ * deliberately refuses ambiguous ones, so India renders "GMT+5:30") shows the
+ * offset alone — and the IANA name is skipped on purpose: runtimes disagree
+ * on its spelling (Kolkata is still "Asia/Calcutta" in some ICU builds), and
+ * a label that changes between browsers reads as two different zones.
+ */
+export function viewerZoneLabel(now: Date = new Date()): string {
+  // getTimezoneOffset counts minutes west of UTC (IST is -330); the label
+  // wants the familiar east-positive shape.
+  const minutes = now.getTimezoneOffset();
+  const abs = Math.abs(minutes);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const offset = minutes === 0
+    ? "UTC"
+    : `UTC${minutes < 0 ? "+" : "-"}${Math.floor(abs / 60)}:${pad(abs % 60)}`;
+
+  // A real abbreviation ("EDT") adds something the offset can't; a GMT-style
+  // one ("GMT+5:30") is the offset again under another name.
+  const named = new Intl.DateTimeFormat("en", { timeZoneName: "short" })
+    .formatToParts(now)
+    .find((part) => part.type === "timeZoneName")?.value ?? null;
+  const abbrev = named && !/^(GMT|UTC)/.test(named) ? named : null;
+
+  return abbrev ? `${abbrev} · ${offset}` : offset;
+}
+
+/**
  * A start instant that has already happened (with the minute of grace above).
  * Unparseable input counts as past: every caller has already validated the
  * shape, and failing closed here can only refuse a date, never move one.
