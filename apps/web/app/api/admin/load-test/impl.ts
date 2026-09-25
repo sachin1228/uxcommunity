@@ -9,6 +9,17 @@
  * (e.g. "/abs/apps/web/../../k6/scripts/seed-users.js") that Turbopack does
  * NOT recognise as a server-relative module path. At runtime Node/spawn
  * normalises the path transparently.
+ *
+ * That trick stops Turbopack mis-reading the path as a module, but it does not
+ * stop Turbopack from *tracing* it: an unanalysable spawn() makes the bundler
+ * assume any file in the project might be executed at runtime, so it copies the
+ * entire repository — every .ts/.tsx source file, the docs, the READMEs — into
+ * the build's server output (183 MB / 4.5k files before the directive below,
+ * 47 MB / 2.2k after). Those copies never reach the deployed script, because
+ * the Worker is bundled from its entry point, but they cost build time and disk
+ * on every deploy and they are the exact situation Turbopack's size-limit
+ * warning describes. The spawn below therefore carries Turbopack's own opt-out
+ * directive, which is the part that actually keeps the trace narrow.
  */
 import { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth/session";
@@ -232,7 +243,15 @@ export async function handlePost(req: NextRequest): Promise<Response> {
         send("");
       }
 
-      const child = spawn(cmd, args, {
+      // `turbopackIgnore` is Turbopack's documented escape hatch for a call it
+      // cannot analyse (see the "Dynamic filesystem access causes tracing of
+      // the whole project" warning). Without it, `cmd`/`args`/`cwd` being
+      // computed strings is enough for the bundler to copy the whole repository
+      // — 549 .ts/.tsx files of it — into the server output. Nothing here needs
+      // tracing: k6 and node are resolved by the OS at runtime, and this route
+      // only runs against a local checkout, where a spawned binary has to exist
+      // as a real file anyway.
+      const child = spawn(/* turbopackIgnore: true */ cmd, args, {
         cwd: repoRoot,
         env,
         stdio: ["ignore", "pipe", "pipe"],
