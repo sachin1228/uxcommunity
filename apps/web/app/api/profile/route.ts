@@ -5,6 +5,7 @@ import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
+import type { Database } from "@/lib/supabase/database.types";
 
 export async function GET() {
   let session: Awaited<ReturnType<typeof requireSession>>;
@@ -89,7 +90,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   // Update profile fields if provided
-  const profilePatch: Record<string, string | null> = {};
+  const profilePatch: Database["public"]["Tables"]["designer_profiles"]["Update"] = {};
   if (typeof body.bio === "string") {
     const bio = body.bio.trim();
     if (bio) {

@@ -690,13 +690,15 @@ export class DesignersRoom {
         if (this.disposed) return;
 
         const park = gltf.scene;
-        let spawn: THREE.Vector3 | null = null;
-        let bella: THREE.Object3D | null = null;
+        // Collected through an array rather than assigned to a `let`: TypeScript
+        // assumes a variable that is only assigned inside a callback still holds
+        // its initial value, which narrowed `spawn` to `null` and made its
+        // `.x`/`.y`/`.z` unreadable.
+        const characters: THREE.Object3D[] = [];
 
         park.traverse((child) => {
           if (child.name === "Character") {
-            spawn = child.getWorldPosition(new THREE.Vector3());
-            bella = child;
+            characters.push(child);
           }
           if (child instanceof THREE.Mesh) {
             child.castShadow = true;
@@ -706,6 +708,12 @@ export class DesignersRoom {
           // controller, but should not appear in the shared room.
           if (child.name === "Ground_Collider") child.visible = false;
         });
+
+        // A model may carry more than one Character node; the last one wins,
+        // matching the previous behaviour. The world position is read before
+        // the model is parented into the room's scene.
+        const bella = characters[characters.length - 1] ?? null;
+        const spawn = bella ? bella.getWorldPosition(new THREE.Vector3()) : null;
 
         this.scene.add(park);
 

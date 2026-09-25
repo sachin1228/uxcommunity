@@ -1,4 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
+
+/** Service-role client typed with the generated database schema. */
+export type ServiceClient = SupabaseClient<Database>;
 
 /**
  * Service-role Supabase client.
@@ -7,8 +11,12 @@ import { createClient } from "@supabase/supabase-js";
  *
  * Module-level singleton: reused across warm serverless invocations so we
  * don't pay client-construction overhead on every request.
+ *
+ * The generated `Database` type is passed explicitly. Without it the
+ * `Schema` generic of `SupabaseClient` collapses to `never`, which made every
+ * `.from(...)`/`.update(...)` call in the codebase typecheck as `never`.
  */
-let _client: ReturnType<typeof createClient> | null = null;
+let _client: ServiceClient | null = null;
 
 export function createServiceClient() {
   if (_client) return _client;
@@ -22,7 +30,7 @@ export function createServiceClient() {
     );
   }
 
-  _client = createClient(url, key, {
+  _client = createClient<Database>(url, key, {
     auth: { persistSession: false },
   });
 

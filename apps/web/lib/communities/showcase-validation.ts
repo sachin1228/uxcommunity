@@ -10,7 +10,12 @@ export { SHOWCASE_CATEGORIES_SET };
 export const SHOWCASE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm", "video/quicktime"]);
 export const SHOWCASE_MEDIA_MAX = 5;
 
-export interface ShowcaseAttachmentInput {
+/**
+ * Declared as a type alias rather than an interface on purpose: only object
+ * *type aliases* get an implicit index signature, which is what makes the shape
+ * assignable to the `Json` column type it is persisted into.
+ */
+export type ShowcaseAttachmentInput = {
   name: string;
   url: string;
   type: string;
@@ -23,7 +28,7 @@ export interface ShowcaseAttachmentInput {
   status?: string;
   /** Encode strategy chosen for this upload (informational, videos only). */
   strategy?: string;
-}
+};
 
 export const VIDEO_ATTACHMENT_STATUSES = new Set(["ready", "failed"]);
 const MEDIA_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

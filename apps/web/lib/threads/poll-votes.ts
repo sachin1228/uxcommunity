@@ -53,8 +53,10 @@ export async function attachPollVotes(
   }
   for (const vote of voteRows ?? []) {
     const counts = tally[vote.thread_id];
-    if (counts && Number.isInteger(vote.option_index) && vote.option_index >= 0 && vote.option_index < counts.length) {
-      counts[vote.option_index] += 1;
+    const optionIndex = vote.option_index;
+    // option_index is nullable in the schema; a row with no index is not a vote.
+    if (counts && optionIndex !== null && optionIndex >= 0 && optionIndex < counts.length) {
+      counts[optionIndex] += 1;
     }
   }
 

@@ -25,7 +25,7 @@ export const DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES: MessageNotificationPrefer
 const PREFERENCES_EVENT = "uxcommunity:message-notification-preferences";
 const seenMessageIds = new Set<string>();
 let audioContext: AudioContext | null = null;
-let permissionRequest: Promise<NotificationPermission> | null = null;
+let permissionRequest: Promise<NotificationPermission | "unsupported"> | null = null;
 
 function storageKey(userId: string) {
   return `uxcommunity:message-notifications:${userId}`;

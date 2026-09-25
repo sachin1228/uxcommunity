@@ -13,7 +13,7 @@ import {
   TABLE_LOOKUP,
 } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "./dp";
-import { withShowcaseColumn } from "./showcase-flag";
+import { canStoreShowcaseFlag } from "./showcase-flag";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
@@ -54,17 +54,22 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   const db = createServiceClient();
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
     db.from("community_members").select("joined_at, role").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    // showcase_enabled is appended only once the showcase-toggle migration has
+    // showcase_enabled is read only once the showcase-toggle migration has
     // added the column; the row is spread into the response, so an explicit
-    // list matters here.
-    db
-      .from("communities")
-      .select(
-        await withShowcaseColumn(
-          db,
-          "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format",
-        ),
-      )
+    // list matters here. Each branch keeps its column list a single string
+    // literal: the query builder parses that literal into a row type, and a
+    // union of column lists collapses into a parse error.
+    (await canStoreShowcaseFlag(db)
+      ? db
+          .from("communities")
+          .select(
+            "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format, showcase_enabled",
+          )
+      : db
+          .from("communities")
+          .select(
+            "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format",
+          ))
       .eq("id", communityId)
       .eq("is_active", true)
       .maybeSingle(),
@@ -184,8 +189,16 @@ export async function isCommunityMember(
 async function enrichAuthoredRows(
   rows: Array<Record<string, unknown>>,
   currentUserId: string,
-  aggregateRpc: "get_event_list_aggregates" | "get_thread_list_aggregates" | "get_resource_list_aggregates",
-  idsArgument: "p_event_ids" | "p_thread_ids" | "p_resource_ids",
+  aggregateRpc: string,
+  // Each aggregate RPC takes its own ids argument (p_event_ids / p_thread_ids /
+  // p_resource_ids). Passing the RPC name and its argument as two parallel
+  // variables loses that pairing, so the caller supplies the call itself and
+  // keeps the name and the argument together.
+  loadAggregates: (
+    db: ReturnType<typeof createServiceClient>,
+    userId: string,
+    ids: string[],
+  ) => Promise<{ data: Array<{ id: string }> | null; error: unknown }>,
 ) {
   if (!rows.length) return [];
   const db = createServiceClient();
@@ -194,7 +207,7 @@ async function enrichAuthoredRows(
   const [{ data: users }, { data: profiles }, aggregateResult] = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-    callPerformanceRpc(db, aggregateRpc, { p_user_id: currentUserId, [idsArgument]: ids }),
+    loadAggregates(db, currentUserId, ids),
   ]);
   if (aggregateResult.error) throw new Error(`Failed to load ${aggregateRpc} read model.`);
   const userMap = Object.fromEntries((users ?? []).map((user) => [user.id, user.name]));
@@ -210,11 +223,14 @@ async function enrichAuthoredRows(
 }
 
 export const enrichCommunityEvents = (rows: Array<Record<string, unknown>>, userId: string) =>
-  enrichAuthoredRows(rows, userId, "get_event_list_aggregates", "p_event_ids");
+  enrichAuthoredRows(rows, userId, "get_event_list_aggregates", (db, currentUserId, ids) =>
+    callPerformanceRpc(db, "get_event_list_aggregates", { p_user_id: currentUserId, p_event_ids: ids }));
 export const enrichCommunityThreads = (rows: Array<Record<string, unknown>>, userId: string) =>
-  enrichAuthoredRows(rows, userId, "get_thread_list_aggregates", "p_thread_ids");
+  enrichAuthoredRows(rows, userId, "get_thread_list_aggregates", (db, currentUserId, ids) =>
+    callPerformanceRpc(db, "get_thread_list_aggregates", { p_user_id: currentUserId, p_thread_ids: ids }));
 export const enrichCommunityResources = (rows: Array<Record<string, unknown>>, userId: string) =>
-  enrichAuthoredRows(rows, userId, "get_resource_list_aggregates", "p_resource_ids");
+  enrichAuthoredRows(rows, userId, "get_resource_list_aggregates", (db, currentUserId, ids) =>
+    callPerformanceRpc(db, "get_resource_list_aggregates", { p_user_id: currentUserId, p_resource_ids: ids }));
 
 export async function loadCommunityThreads(
   communityId: string,

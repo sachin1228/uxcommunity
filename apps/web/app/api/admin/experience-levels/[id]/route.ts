@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { z } from "zod";
 import { cleanupMasterDataMedia, collectMasterMediaUrls } from "@/lib/r2-cleanup";
+import type { Database } from "@/lib/supabase/database.types";
 
 const patchSchema = z.object({
   name:      z.string().min(1).max(100).optional(),
@@ -51,7 +52,7 @@ export async function PATCH(
   }
 
   const { name, image_url, is_active } = parsed.data;
-  const updateData: Record<string, unknown> = {};
+  const updateData: Database["public"]["Tables"]["experience_levels"]["Update"] = {};
   if (name      !== undefined) updateData.name      = name;
   if (image_url !== undefined) updateData.image_url = image_url;
   if (is_active !== undefined) updateData.is_active = is_active;

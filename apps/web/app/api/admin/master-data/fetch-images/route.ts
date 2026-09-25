@@ -9,21 +9,21 @@ import { shouldAutoFetchImage } from "@/lib/master-data/eligibility";
 import { MASTER_TABLES, type MasterTable } from "@/lib/master-data/master-tables";
 import { findWikipediaImage } from "@/lib/master-data/wikipedia-image";
 
-const TABLES: Record<MasterTable, { table: string }> = {
+// `as const` keeps each table name a string literal: the Supabase query
+// builder types a table as a literal, so a `Record<..., { table: string }>`
+// makes every query built from this map untypeable.
+const TABLES = {
   cities: { table: "cities" },
   design_sectors: { table: "design_sectors" },
   design_interests: { table: "design_interests" },
   experience_levels: { table: "experience_levels" },
   job_titles: { table: "job_titles" },
-};
+} as const satisfies Record<MasterTable, { table: string }>;
 
 function isMasterTable(value: unknown): value is MasterTable {
   return typeof value === "string" && (MASTER_TABLES as readonly string[]).includes(value);
 }
 
-// The repo's untyped supabase-js client resolves table rows/updates to `never`
-// (pre-existing repo-wide baseline). Cast results to the actual shape so this
-// route stays type-clean.
 interface MasterRow {
   id: string;
   name: string;
@@ -119,8 +119,7 @@ export async function POST(request: NextRequest) {
 
   const { data: updated, error: updateError } = await db
     .from(TABLES[body.table].table)
-    // Cast matches the client's broken `never` payload type (repo baseline).
-    .update({ image_url: url } as never)
+    .update({ image_url: url })
     .eq("id", row.id)
     .select("id, name, image_url, is_active, created_at, updated_at")
     .single();

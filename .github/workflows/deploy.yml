@@ -76,8 +76,10 @@ jobs:
           # environment — wrangler.toml [vars] only reach the worker at
           # runtime (server-side), never the client JS. Mirror them from
           # wrangler.toml into .env.production.local so the client bundle
-          # (realtime WebSocket URL, Supabase URL/anon key, app URL) is built
-          # with the same values the worker gets at runtime.
+          # (app URL, realtime WebSocket URL, Supabase project URL) is built
+          # with the same values the worker gets at runtime. Supabase is
+          # reached only through the server-side service-role client, so
+          # there is no anon key to inline.
           cat > .env.production.local <<EOF
           SESSION_SECRET=${{ secrets.SESSION_SECRET }}
           EOF
@@ -116,7 +118,7 @@ jobs:
         run: |
           missing=0
           for name in NEXT_PUBLIC_APP_URL NEXT_PUBLIC_SUPABASE_URL \
-            NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_REALTIME_URL; do
+            NEXT_PUBLIC_REALTIME_URL; do
             value=$(grep "^${name}=" .env.production.local | head -1 | cut -d= -f2-)
             if [ -z "$value" ]; then
               echo "::error::Missing client build-time var: ${name} (absent from .env.production.local)"
@@ -135,12 +137,17 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npx opennextjs-cloudflare build
 
-      # Sanity-check the existing unit tests. Non-blocking for now so a flaky
-      # test can't silently block deploys — remove continue-on-error once the
-      # suite is stable.
+      # Blocking: a type error or a failing unit test must stop the deploy.
+      # `next build` already fails on type errors (next.config.js no longer
+      # sets typescript.ignoreBuildErrors), but running tsc first reports the
+      # file/line instead of a bundler stack trace, and catches errors in
+      # files the build tree does not reach.
+      - name: Type check
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
       - name: Run unit tests
         working-directory: apps/web
-        continue-on-error: true
         run: |
           npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
           npx tsx --test lib/request-cache.test.ts

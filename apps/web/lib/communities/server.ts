@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_ENABLED_TABS } from "./areas";
-import { withShowcaseColumn } from "./showcase-flag";
+import { canStoreShowcaseFlag } from "./showcase-flag";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
 import type { CachedMeta } from "./cache";
@@ -29,16 +29,20 @@ export async function fetchCommunityMetaSSR(
 
   const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    // showcase_enabled is appended only once the showcase-toggle migration has
-    // added the column, so the first paint works before it is applied.
-    db
-      .from("communities")
-      .select(
-        await withShowcaseColumn(
-          db,
-          "id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id",
-        ),
-      )
+    // showcase_enabled is read only once the showcase-toggle migration has
+    // added the column, so the first paint works before it is applied. Each
+    // branch keeps a single string literal (see read-models.ts).
+    (await canStoreShowcaseFlag(db)
+      ? db
+          .from("communities")
+          .select(
+            "id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id, showcase_enabled",
+          )
+      : db
+          .from("communities")
+          .select(
+            "id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id",
+          ))
       .eq("id", communityId)
       .maybeSingle(),
     db.from("users").select("name").eq("id", userId).maybeSingle(),

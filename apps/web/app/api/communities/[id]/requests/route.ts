@@ -28,16 +28,25 @@ export async function GET(
     return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
   }
 
-  // The optional request note ships only once its migration is applied.
-  const columns = (await canStoreJoinRequestMessage(db))
-    ? "id, user_id, requested_at, request_message"
-    : "id, user_id, requested_at";
-  const { data: requests, error } = await db
-    .from("community_join_requests")
-    .select(columns)
-    .eq("community_id", communityId)
-    .eq("status", "pending")
-    .order("requested_at", { ascending: true });
+  // The optional request note ships only once its migration is applied. Each
+  // branch keeps its column list a single string literal — the query builder
+  // parses that literal into a row type, and passing a variable makes the
+  // result a parse error.
+  const { data: requests, error } = await (
+    (await canStoreJoinRequestMessage(db))
+      ? db
+          .from("community_join_requests")
+          .select("id, user_id, requested_at, request_message")
+          .eq("community_id", communityId)
+          .eq("status", "pending")
+          .order("requested_at", { ascending: true })
+      : db
+          .from("community_join_requests")
+          .select("id, user_id, requested_at")
+          .eq("community_id", communityId)
+          .eq("status", "pending")
+          .order("requested_at", { ascending: true })
+  );
 
   if (error) return NextResponse.json({ error: "Failed to fetch requests." }, { status: 500 });
   if (!requests?.length) return NextResponse.json({ requests: [] });
@@ -58,7 +67,8 @@ export async function GET(
       requested_at:    r.requested_at,
       name:            userMap[r.user_id]    ?? "Unknown",
       avatar_url:      profileMap[r.user_id] ?? null,
-      request_message: (r as { request_message?: string | null }).request_message ?? null,
+      request_message:
+        "request_message" in r ? r.request_message ?? null : null,
     })),
   });
 }

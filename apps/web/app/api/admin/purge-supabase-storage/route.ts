@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { attachmentUrls, selectDynamicColumn } from "@/lib/r2-cleanup";
 
 export interface PurgeResult {
   bucket: string;
@@ -109,12 +110,15 @@ async function findSupabaseStorageReferences(db: ReturnType<typeof createService
     ["community_showcase_posts", "image_url"],
   ] as const;
 
+  // The (table, column) pairs above are a reviewed whitelist, so the dynamic
+  // pair goes through the one whitelisted helper (see lib/r2-cleanup).
   for (const [table, column] of columns) {
-    const { data, error } = await db.from(table).select(`id, ${column}`).not(column, "is", null);
+    const { rows, error } = await selectDynamicColumn(db, table, column);
     if (error) throw new Error(`Reference check failed for ${table}.${column}: ${error.message}`);
-    for (const row of data ?? []) {
-      if (typeof row?.[column] === "string" && row[column].includes("/storage/v1/object/")) {
-        references.push(`${table}.${column}:${row.id}`);
+    for (const row of rows) {
+      const value = row[column];
+      if (typeof value === "string" && value.includes("/storage/v1/object/")) {
+        references.push(`${table}.${column}:${String(row.id)}`);
       }
     }
   }
@@ -122,8 +126,7 @@ async function findSupabaseStorageReferences(db: ReturnType<typeof createService
   const { data: threads, error: threadError } = await db.from("community_threads").select("id, attachments").not("attachments", "is", null);
   if (threadError) throw new Error(`Reference check failed for community_threads.attachments: ${threadError.message}`);
   for (const row of threads ?? []) {
-    const attachments = Array.isArray(row?.attachments) ? row.attachments : [];
-    if (attachments.some((attachment) => attachment && typeof attachment === "object" && typeof attachment.url === "string" && attachment.url.includes("/storage/v1/object/"))) {
+    if (attachmentUrls(row.attachments).some((url) => url.includes("/storage/v1/object/"))) {
       references.push(`community_threads.attachments:${row.id}`);
     }
   }

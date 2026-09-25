@@ -56,7 +56,8 @@
     "test:content-sync": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/content-sync.test.ts",
     "test:push-budget": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/push/chat.test.ts",
     "test:feed-scope": "tsx --test apps/web/lib/feeds/home-feed-options.test.ts",
-    "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql"
+    "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql",
+    "test:security": "npx supabase test db --file supabase/tests/public_read_exposure.test.sql"
   },
   "engines": {
     "node": ">=22.0.0",

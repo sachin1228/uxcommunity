@@ -9,6 +9,7 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { publishChatEvent } from "@/lib/realtime/server";
+import { contentTableFor } from "@/lib/communities/content-tables";
 import { sendChatMessagePush } from "@/lib/push/chat";
 import { createServerTimer } from "@/lib/server-timing";
 import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
@@ -148,13 +149,6 @@ export async function POST(
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  const CONTENT_TABLES: Record<string, string> = {
-    thread: "community_threads",
-    showcase: "community_showcase_posts",
-    resource: "community_resources",
-    event: "community_events",
-  };
-
   let content: string;
   let reply_to_id: string | null = null;
   let replyToContent: { id: string; kind: string } | null = null;
@@ -228,17 +222,17 @@ export async function POST(
   // Validate the content-reply anchor: the item must exist in this community.
   // A message anchors to EITHER a message or a content item — message wins.
   let reply_to_content_id: string | null = null;
-  if (replyToContent && !reply_to_id) {
-    const table = CONTENT_TABLES[replyToContent.kind];
+  const replyContentTable = replyToContent ? contentTableFor(replyToContent.kind) : null;
+  if (replyToContent && replyContentTable && !reply_to_id) {
     const { data: contentRow } = await db
-      .from(table)
+      .from(replyContentTable)
       .select("id, title")
       .eq("id", replyToContent.id)
       .eq("community_id", communityId)
       .maybeSingle();
     if (contentRow) {
       reply_to_content_id = replyToContent.id;
-      replyContentTitle = (contentRow as { title?: string }).title ?? null;
+      replyContentTitle = contentRow.title ?? null;
     }
   }
 

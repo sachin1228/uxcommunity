@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import type { Json } from "@/lib/supabase/database.types";
 
 /**
  * The notification types the app still generates: engagement on the user's own
@@ -34,7 +35,8 @@ interface NotificationInput {
   title: string;
   body?: string | null;
   href: string;
-  metadata?: Record<string, unknown>;
+  /** Arbitrary JSON stored on the notification row (see the `metadata` column). */
+  metadata?: Json;
 }
 
 type DeferredNotificationInput = Omit<NotificationInput, "title"> & {

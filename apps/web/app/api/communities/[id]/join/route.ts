@@ -69,6 +69,12 @@ export async function POST(
       );
     }
 
+    // event_id is nullable on the community row, but an event-type community
+    // always has one; without it there is no chat to join.
+    if (!community.event_id) {
+      return NextResponse.json({ error: "Event not found." }, { status: 404 });
+    }
+
     const { data: eventRow } = await db
       .from("community_events")
       .select("id, community_id, is_public")

@@ -84,7 +84,9 @@ export async function loadThreadDetail(options: LoadOptions) {
       [thread as unknown as Record<string, unknown>],
       options.userId,
     )
-    threadWithVotes = (attached ?? thread) as CommunityThread
+    // attachPollVotes returns the input rows with the poll fields spread in, so
+    // the first row is the thread row plus its vote tally.
+    threadWithVotes = (attached?.[0] ?? thread) as unknown as CommunityThread
   }
   return { db, thread: threadWithVotes, comments }
 }

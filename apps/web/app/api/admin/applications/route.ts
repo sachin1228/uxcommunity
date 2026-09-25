@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
+/** Values of the `application_status` enum, in the order the admin UI offers them. */
+const APPLICATION_STATUSES = ["pending", "approved", "rejected"] as const;
+
+type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+function isApplicationStatus(value: string): value is ApplicationStatus {
+  return (APPLICATION_STATUSES as readonly string[]).includes(value);
+}
+
 export async function GET(request: NextRequest) {
   try {
     await requireSession("admin");
@@ -33,7 +42,9 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
 
-  if (status && status !== "all") {
+  // An unknown status is ignored rather than sent to the enum column, where it
+  // would make PostgREST reject the whole request.
+  if (status && status !== "all" && isApplicationStatus(status)) {
     query = query.eq("status", status);
   }
 

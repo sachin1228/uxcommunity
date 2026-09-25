@@ -12,7 +12,7 @@ import { uploadLottieFile, saveLottieSetting, deleteLottieSetting } from "@/comp
 const TYPE_CONFIG: {
   key: string;
   label: string;
-  Icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  Icon: React.ComponentType<{ size?: number | string; strokeWidth?: number | string; className?: string }>;
 }[] = [
   { key: "sector",           label: "Industry",   Icon: Layers     },
   { key: "interest",         label: "Interest",   Icon: Sparkles   },

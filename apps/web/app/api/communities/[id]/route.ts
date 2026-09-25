@@ -10,7 +10,8 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { loadCommunityReadModel } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
-import { canStoreShowcaseFlag, withShowcaseColumn } from "@/lib/communities/showcase-flag";
+import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
+import type { Database } from "@/lib/supabase/database.types";
 import {
   getExperienceLevelNameMap,
   getMasterImageMap,
@@ -64,20 +65,30 @@ export async function PATCH(
   const isOwner = managerStatus.isOwner;
 
   // Snapshot the current values so the activity trail records what changed.
-  // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
   // showcase_enabled is read only once the showcase-toggle migration has added
-  // the column, so the request does not fail without it.
-  const beforeColumns = await withShowcaseColumn(
-    db,
-    "name, description, image_url, is_private, enabled_tabs",
-  );
-  const { data: before } = (await db
-    .from("communities")
-    .select(beforeColumns)
-    .eq("id", id)
-    .maybeSingle()) as unknown as {
-    data: { name: string | null; description: string | null; image_url: string | null; is_private: boolean; enabled_tabs: string[]; showcase_enabled?: boolean | null } | null;
-  };
+  // the column, so the request does not fail without it. Each branch keeps a
+  // single string literal, because the query builder parses that literal into a
+  // row type and a union of column lists collapses into a parse error.
+  const { data: beforeRow } = await (
+    await canStoreShowcaseFlag(db)
+      ? db
+          .from("communities")
+          .select("name, description, image_url, is_private, enabled_tabs, showcase_enabled")
+          .eq("id", id)
+      : db
+          .from("communities")
+          .select("name, description, image_url, is_private, enabled_tabs")
+          .eq("id", id)
+  ).maybeSingle();
+  // Normalise both branches to one shape: the pre-migration row has no
+  // showcase_enabled key at all, which reads as "the flag is on".
+  const before = beforeRow
+    ? {
+        ...beforeRow,
+        showcase_enabled:
+          "showcase_enabled" in beforeRow ? beforeRow.showcase_enabled : null,
+      }
+    : null;
 
   // Accept FormData (multipart, used when image may be included)
   let formData: FormData;
@@ -89,7 +100,7 @@ export async function PATCH(
   };
 
   const changed: string[] = [];
-  const updates: Record<string, unknown> = {};
+  const updates: Database["public"]["Tables"]["communities"]["Update"] = {};
 
   const name = getString("name");
   if (name !== null) {

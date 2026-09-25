@@ -83,7 +83,9 @@ export async function moderateImageBuffer(
 
   try {
     const form = new FormData();
-    form.set("file", new Blob([buffer], { type: realMime }), "upload");
+    // Wrap the Buffer in a Uint8Array: a Node Buffer is backed by
+    // ArrayBufferLike, which TS does not accept as a BlobPart.
+    form.set("file", new Blob([new Uint8Array(buffer)], { type: realMime }), "upload");
     const response = await fetch(`${config.images.serviceUrl.replace(/\/$/, "")}/moderate`, {
       method: "POST",
       body: form,

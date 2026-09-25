@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deleteFromR2, deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { resolveCommunityDp } from "@/lib/communities/dp";
+import type { Database } from "@/lib/supabase/database.types";
 
 const MAX_IMAGE_BYTES  = 5 * 1024 * 1024; // 5 MB — same as master-data uploads
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
@@ -95,8 +96,10 @@ export async function POST(
     contentType = file.type;
   }
 
-  let communityUpdate: Record<string, string | null> = {};
-  let masterUpdate: Record<string, string | null> = {};
+  const communityUpdate: Database["public"]["Tables"]["communities"]["Update"] = {};
+  // The master row lives in whichever master table the community mirrors
+  // (MASTER_TABLE), so this patch stays a plain record.
+  const masterUpdate: Record<string, string | null> = {};
 
   let url: string;
   try {

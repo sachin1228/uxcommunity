@@ -1,0 +1,97 @@
+name: CI
+
+# Quality gate for the web app. Before this workflow the repository had no
+# check on types at all: the only CI was the two deploy workflows, and
+# `next build` was told to ignore type errors, so a broken type or a failing
+# unit test could reach production unnoticed.
+#
+# Jobs are deliberately separate so a failure names the broken concern.
+# TypeScript and the unit tests are blocking; ESLint is advisory until the
+# pre-existing ruleset debt is cleared (see the note on the lint job).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Blocking. The generated database types in
+      # apps/web/lib/supabase/database.types.ts are what let this pass: without
+      # them the SupabaseClient schema generic collapses to `never` and every
+      # query in the app fails to type-check.
+      - name: Type check
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Blocking. Runs the whole web unit suite; build output is pruned so a
+      # stale `next build` in the workspace cannot add or hide tests.
+      - name: Run unit tests
+        working-directory: apps/web
+        run: |
+          FILES=$(find . \( -name node_modules -o -name .next -o -name .open-next \) -prune -o -name '*.test.ts' -print | sort)
+          echo "running $(( $(echo "$FILES" | wc -l) )) test files"
+          npx tsx --tsconfig tsconfig.json --test $FILES
+
+  lint:
+    name: ESLint (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Advisory, not blocking. The repository has 43 pre-existing source
+      # errors from rules that arrived with `eslint-plugin-react-hooks` v6,
+      # pulled in by `eslint-config-next: "latest"`:
+      #   react-hooks/set-state-in-effect (28), react/no-unescaped-entities (6),
+      #   react-hooks/refs (5), react-hooks/immutability (4)
+      # They are unrelated to the change this gate was added for, and fixing
+      # them means restructuring React effects across ~30 components, so they
+      # belong in a dedicated cleanup. Flip `continue-on-error` to false (and
+      # pin eslint-config-next to a fixed version) once that lands.
+      - name: Lint
+        working-directory: apps/web
+        continue-on-error: true
+        env:
+          # eslint on this tree needs more heap than the default on a 2-core
+          # runner, or it crashes instead of reporting.
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npx eslint .
