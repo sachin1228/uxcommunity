@@ -111,12 +111,18 @@ function useEventRoomDetails(communityId: string, currentUserId: string) {
 
     const eventsRoom = realtimeRooms.events(communityId);
     const unsubRsvp = realtimeClient.on(eventsRoom, "rsvp", () => void load(true));
+    // The event itself changing — an edit, or the delete that takes the room's
+    // link away — has to reach this card too: its reader is looking at the
+    // room, not at the event page where the change was made. A deleted event
+    // answers 404, which is the same "no section" the load already handles.
+    const unsubEvent = realtimeClient.on(eventsRoom, "event", () => void load(true));
     const unsubRoom = realtimeClient.subscribe(eventsRoom);
     realtimeClient.connect();
 
     return () => {
       cancelled = true;
       unsubRsvp();
+      unsubEvent();
       unsubRoom();
     };
   }, [communityId, currentUserId, isVisible, url]);

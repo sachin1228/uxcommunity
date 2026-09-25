@@ -1,6 +1,7 @@
 "use client";
 
 import { eventDateBadge } from "@/lib/communities/event-date";
+import { useNowTick } from "./events/useNowTick";
 
 /**
  * A community display picture wearing the calendar badge for its event's date.
@@ -19,7 +20,14 @@ import { eventDateBadge } from "@/lib/communities/event-date";
  * fixed size (nothing reflows — the badge is absolutely positioned over the
  * DP); only the month abbreviation is fitted to the width the circle
  * actually has. LIVE and ENDED take the red text and ring so "on right now"
- * and "just finished" read at a glance across a full sidebar.
+ * and "just finished" read at a glance across a full sidebar, and LIVE drops
+ * the day number for a pulse that runs while the window is open: the date the
+ * room belongs to has stopped being the news at that point, and a heartbeat
+ * reads across the sidebar the way a word can't.
+ *
+ * The badge reads the clock on its own tick (see EVENT_BADGE_TICK_MS), so the
+ * states arrive and leave with the event's window rather than with the next
+ * page load.
  */
 const MONTH_RATIO = 0.28;
 const DAY_RATIO = 0.45;
@@ -32,6 +40,17 @@ const MONO_ADVANCE = 0.58;
  * the badge, so the two "now" states read at one consistent size everywhere.
  */
 const TODAY_FONT_PX = 5;
+
+/**
+ * How often the badge re-reads the clock. The circle announces a moment — a
+ * window opening or closing — so it has to notice one arriving on its own:
+ * every state it can wear is decided against "now", and a value captured at
+ * render would keep saying LIVE long after the event ended. The tick is per
+ * badge and cheap (no work unless the state actually changed), and a quarter
+ * minute is close enough that a member watching the room sees the circle turn
+ * without touching anything.
+ */
+const EVENT_BADGE_TICK_MS = 15_000;
 
 /** Badge diameter for a DP of this size — the same proportion in every surface. */
 function badgeSizeFor(dpSize: number, isToday: boolean): number {
@@ -61,8 +80,9 @@ export function DpWithEventDate({
   date?: string | null;
   /**
    * The event's end, ISO — what turns the tile red and says LIVE between start
-   * and end. Callers hand over the sidebar's `pinned_until`, which is the
-   * event's end for as long as the event could still be running.
+   * and end. Callers hand over the room's `event_end` (the deadline whether it
+   * is ahead or past), falling back to the sidebar's `pinned_until`, which is
+   * the same instant while the event could still be running.
    */
   endsAt?: string | null;
   /** Diameter of the DP inside, which the badge scales itself from. */
@@ -71,7 +91,8 @@ export function DpWithEventDate({
   className?: string;
   children: React.ReactNode;
 }) {
-  const badge = eventDateBadge(date, { endsAt });
+  const now = useNowTick(EVENT_BADGE_TICK_MS);
+  const badge = eventDateBadge(date, { endsAt, now: new Date(now) });
   // The tile wears the date for every event still to come, trades it for
   // TODAY/LIVE as the day arrives, says ENDED for a day after the window
   // closes, and only then comes down — the room and its history stay. The
@@ -79,6 +100,10 @@ export function DpWithEventDate({
   // state itself: an event weeks out must keep its plain date circle.
   const visible = Boolean(badge && (!badge.isPast || badge.isEnded));
   const isEnded = Boolean(badge?.isEnded);
+  // While the event is under way the tile is a word and a pulse, not a date:
+  // the day it belongs to is no longer the useful fact (everyone can see it is
+  // today), the window being open is — see the pulse below.
+  const isLive = Boolean(badge?.isLive);
   const badgeSize = visible && badge ? badgeSizeFor(dpSize, badge.isToday || isEnded) : 0;
   const word = badge
     ? badge.isLive
@@ -121,16 +146,26 @@ export function DpWithEventDate({
                 ? TODAY_FONT_PX
                 : topLineFontSize(badgeSize, word.length),
           }}
-          className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center rounded-full font-mono font-bold uppercase leading-none tracking-tight ring-2 ${
+          className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center overflow-hidden rounded-full font-mono font-bold uppercase leading-none tracking-tight ring-2 ${
             badge.isLive || isEnded
               ? "bg-accent text-[var(--ds-red-700)] ring-[var(--ds-red-700)]"
               : "bg-accent text-accent-foreground ring-background"
           }`}
         >
-          {word}
-          {!isEnded && (
+          {/* The live pulse: a red fill that swells and fades on repeat,
+              clipped by the circle so it reads as the badge itself breathing
+              rather than a halo bleeding over the DP behind it. Members who
+              asked for less motion keep the word, without the movement. */}
+          {isLive && (
             <span
-              className="mt-px font-display"
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-full bg-[var(--ds-red-700)] opacity-40 animate-ping motion-reduce:animate-none"
+            />
+          )}
+          <span className="relative">{word}</span>
+          {!isEnded && !isLive && (
+            <span
+              className="relative mt-px font-display"
               style={{ fontSize: Math.round(badgeSize * DAY_RATIO) }}
             >
               {badge.day}

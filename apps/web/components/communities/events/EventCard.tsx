@@ -19,7 +19,13 @@ import {
   formatEventTimeRange,
   hostScheduleForViewer,
 } from "@/lib/communities/event-display";
-import { invalidateOnJoin, invalidateOnLeave } from "@/lib/communities/cache";
+import {
+  invalidateCommunitiesList,
+  invalidateOnJoin,
+  invalidateOnLeave,
+  metaCache,
+} from "@/lib/communities/cache";
+import { invalidateRequest } from "@/lib/request-cache";
 import { showUndoToast } from "@/lib/undo-toast";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
@@ -286,7 +292,28 @@ export function EventCard({
 
   const { run: runDelete, pending: deleting } = usePendingMutation(async () => {
     const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
-    if (response.ok) onDeleted(event.id);
+    if (!response.ok) return;
+
+    // Deleting the event keeps its group chat (see the delete route) — what it
+    // takes away is the date circle on the room's DP and the Event card beside
+    // its chat, both of which are computed server-side out of the room's link
+    // to the event. So every cache that link reaches has to let go of it here,
+    // or the room keeps announcing an event that no longer exists until its
+    // next reload: the sidebar list (the badge and the pin) plus this
+    // community's and the room's own read models.
+    const roomId = ((await response.json().catch(() => null)) as { chat_community_id?: string | null } | null)
+      ?.chat_community_id ?? null;
+    invalidateCommunitiesList();
+    invalidateRequest(`/api/communities/${communityId}/bootstrap`);
+    invalidateRequest(`/api/communities/${communityId}/event`);
+    if (roomId) {
+      // The room's meta is read through its bootstrap (which carries the
+      // event fields) and its members keep their own copy in metaCache.
+      metaCache.delete(roomId);
+      invalidateRequest(`/api/communities/${roomId}/bootstrap`);
+      invalidateRequest(`/api/communities/${roomId}/event`);
+    }
+    onDeleted(event.id);
   });
 
   async function handleDelete() {
@@ -786,7 +813,7 @@ export function EventCard({
       <ConfirmDialog
         open={confirmDelete}
         title="Delete event?"
-        message="This will permanently remove this event. This cannot be undone."
+        message="This will permanently remove this event. The group chat it created stays — it just stops showing the event's date badge and details."
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
       />
