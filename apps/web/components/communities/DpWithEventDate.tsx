@@ -13,13 +13,13 @@ import { eventDateBadge } from "@/lib/communities/event-date";
  * exactly as it was.
  *
  * On the event's own day the tile says TODAY, while it runs it says LIVE,
- * and for a day after it wraps a small red ENDED pill sits on the DP's
- * corner — then that comes down too and the room reverts to a plain face,
- * the conversation itself untouched. The word states are pinned to one fixed
- * size (nothing reflows — the badge is absolutely positioned over the DP);
- * only the month abbreviation is fitted to the width the circle actually
- * has. LIVE takes the red ring so "on right now" reads at a glance; ENDED
- * trades the circle for a red word on the accent ink.
+ * and for a day after it wraps the circle says ENDED in red — the word
+ * alone, no date — then the tile comes down and the room reverts to a plain
+ * face, the conversation itself untouched. The word states are pinned to one
+ * fixed size (nothing reflows — the badge is absolutely positioned over the
+ * DP); only the month abbreviation is fitted to the width the circle
+ * actually has. LIVE and ENDED take the red text and ring so "on right now"
+ * and "just finished" read at a glance across a full sidebar.
  */
 const MONTH_RATIO = 0.28;
 const DAY_RATIO = 0.45;
@@ -79,7 +79,7 @@ export function DpWithEventDate({
   // state itself: an event weeks out must keep its plain date circle.
   const visible = Boolean(badge && (!badge.isPast || badge.isEnded));
   const isEnded = Boolean(badge?.isEnded);
-  const badgeSize = visible && badge && !isEnded ? badgeSizeFor(dpSize, badge.isToday) : 0;
+  const badgeSize = visible && badge ? badgeSizeFor(dpSize, badge.isToday || isEnded) : 0;
   const word = badge
     ? badge.isLive
       ? "Live"
@@ -94,55 +94,50 @@ export function DpWithEventDate({
     <div className={`relative shrink-0 ${className}`}>
       {children}
 
-      {isEnded && badge ? (
-        /* Not a tile but a pill: the event is over, so the corner carries the
-           word in red and lets the DP be a face again. The full date is in
-           the accessible name and the tooltip, one hover away. */
-        <span
-          role="img"
-          aria-label={`Event ended, ${badge.label}`}
-          title={badge.label}
-          className="pointer-events-none absolute -bottom-1.5 -right-1.5 rounded-full bg-accent px-1 py-px font-mono text-[5px] font-bold uppercase leading-none tracking-tight text-[var(--ds-red-700)] ring-1 ring-[var(--ds-red-700)]"
-        >
-          Ended
-        </span>
-      ) : visible && badge ? (
+      {visible && badge && (
         /* A wall-calendar tile: month over day, in the accent ink so it reads
            against any DP. Decorative for scanning, but the full date is in the
            accessible name and the tooltip, so the year the tile drops is still
            one hover (or screen reader) away — and on the day itself the tile
-           trades the month for TODAY or LIVE while the real date stays one
-           hover away. */
+           trades the month for TODAY, LIVE while the event is under way, or
+           ENDED (red, no date) for the day after. */
         <span
           role="img"
           aria-label={
             badge.isLive
               ? `Event live now, ${badge.label}`
-              : badge.isToday
-                ? `Event today, ${badge.label}`
-                : `Event on ${badge.label}`
+              : isEnded
+                ? `Event ended, ${badge.label}`
+                : badge.isToday
+                  ? `Event today, ${badge.label}`
+                  : `Event on ${badge.label}`
           }
           title={badge.isLive ? `Live now · ${badge.label}` : badge.label}
           style={{
             width: badgeSize,
             height: badgeSize,
-            fontSize: badge.isToday || badge.isLive ? TODAY_FONT_PX : topLineFontSize(badgeSize, word.length),
+            fontSize:
+              badge.isToday || badge.isLive || isEnded
+                ? TODAY_FONT_PX
+                : topLineFontSize(badgeSize, word.length),
           }}
           className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center rounded-full font-mono font-bold uppercase leading-none tracking-tight ring-2 ${
-            badge.isLive
+            badge.isLive || isEnded
               ? "bg-accent text-[var(--ds-red-700)] ring-[var(--ds-red-700)]"
               : "bg-accent text-accent-foreground ring-background"
           }`}
         >
           {word}
-          <span
-            className="mt-px font-display"
-            style={{ fontSize: Math.round(badgeSize * DAY_RATIO) }}
-          >
-            {badge.day}
-          </span>
+          {!isEnded && (
+            <span
+              className="mt-px font-display"
+              style={{ fontSize: Math.round(badgeSize * DAY_RATIO) }}
+            >
+              {badge.day}
+            </span>
+          )}
         </span>
-      ) : null}
+      )}
     </div>
   );
 }
