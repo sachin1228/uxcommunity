@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, View,
@@ -13,6 +13,17 @@ import {
   ThreadAttachment, contentLabel, createCommunityContent,
   updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
+import {
+  deviceClockReading,
+  deviceOffsetMinutes,
+  deviceTimeZone,
+  timeZoneChoices,
+  timeZoneIsSupported,
+  wallClockInZone,
+  wallClockToIso,
+  zoneOffsetMinutes,
+} from '@/lib/eventTimezone';
+import { TimeZonePickerSheet } from './TimeZonePickerSheet';
 
 interface Props {
   visible: boolean;
@@ -42,6 +53,9 @@ const DEFAULT_TYPE: Partial<Record<ContentKind, string>> = {
 export function CommunityContentEditor({ visible, communityId, kind, item, onClose, onSaved }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  // Read once: a phone's zone doesn't change mid-compose, and this is the
+  // value every label and hint is compared against.
+  const [deviceZone] = useState(() => deviceTimeZone());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState(DEFAULT_TYPE[kind] ?? 'question');
@@ -49,6 +63,12 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [url, setUrl] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // Which clock those two fields are read on. A phone is usually right about
+  // its own zone, so that is the default; the picker exists for the two cases
+  // it isn't — a device set to the wrong zone, and a host scheduling for
+  // somewhere they aren't.
+  const [hostZone, setHostZone] = useState<string | null>(null);
+  const [zonePickerOpen, setZonePickerOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const [location, setLocation] = useState('');
   const [meetLink, setMeetLink] = useState('');
@@ -84,8 +104,23 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       setType(item && 'category' in item ? item.category : 'product_design');
       setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
     } else {
-      setEventDate(item && 'event_date' in item ? toLocalDateTime(item.event_date) : '');
-      setEndDate(item && 'end_date' in item && item.end_date ? toLocalDateTime(item.end_date) : '');
+      // The zone starts as the one the event was created in, and the phone's
+      // own for a new event. Prefilling from anywhere else would read the times
+      // back in another zone and shift the event on an untouched save.
+      const zone = (item && 'host_timezone' in item ? item.host_timezone : null) || deviceZone;
+      setHostZone(zone);
+      const inZone = (iso: string | null | undefined) =>
+        iso && zone ? wallClockInZone(iso, zone) : null;
+      setEventDate(
+        item && 'event_date' in item
+          ? inZone(item.event_date) ?? toLocalDateTime(item.event_date)
+          : '',
+      );
+      setEndDate(
+        item && 'end_date' in item && item.end_date
+          ? inZone(item.end_date) ?? toLocalDateTime(item.end_date)
+          : '',
+      );
       setIsOnline(Boolean(item && 'is_online' in item && item.is_online));
       setLocation(item && 'location' in item ? item.location ?? '' : '');
       setMeetLink(item && 'meet_link' in item ? item.meet_link ?? '' : '');
@@ -94,7 +129,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       );
     }
     setError(null);
-  }, [item, kind, visible]);
+  }, [item, kind, visible, deviceZone]);
 
   const pickImage = async () => {
     if (attachments.length >= mediaLimit) {
@@ -175,8 +210,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       };
     } else {
       if (!title.trim()) return setError('Title is required.');
-      const start = parseDateTime(eventDate);
-      const end = endDate.trim() ? parseDateTime(endDate) : null;
+      const zone = hostZone ?? deviceZone;
+      const start = toInstant(eventDate, zone);
+      const end = endDate.trim() ? toInstant(endDate, zone) : null;
       if (!start) return setError('Use YYYY-MM-DD HH:MM for the event date.');
       if (endDate.trim() && !end) return setError('Use YYYY-MM-DD HH:MM for the end date.');
       // The start must not be in the past — matching the web form. An existing
@@ -202,6 +238,12 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         max_attendees: maxAttendees ? Number(maxAttendees) : null,
         cover_image_url: item && 'cover_image_url' in item ? item.cover_image_url : null,
         is_public: isPublic,
+        // The host's own side of the schedule, so a card can later show the
+        // time they actually set beside each member's reading of it. The offset
+        // is that zone's at the event's instant, and the fallback when another
+        // browser cannot resolve the name.
+        host_timezone: zone,
+        host_utc_offset_minutes: startOffsetMinutes(start, zone),
       };
     }
 
@@ -227,6 +269,27 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const choices = OPTIONS[kind] ?? [];
   const label = contentLabel(kind);
   const isShowcase = kind === 'showcase';
+
+  // The zone the two time fields are read on, what it is called, and — when
+  // that isn't the phone's own zone — what the typed start lands on in the
+  // host's own clock, which is the check that catches a wrong pick.
+  const canPickZone = timeZoneIsSupported();
+  const zone = hostZone ?? deviceZone;
+  const zoneAnchor = useMemo(() => {
+    const typed = eventDate.trim().slice(0, 10);
+    const noon = new Date(`${typed}T12:00:00Z`);
+    // No day typed yet: label the list for today rather than nothing.
+    return Number.isNaN(noon.getTime()) ? new Date() : noon;
+  }, [eventDate]);
+  const zoneRows = useMemo(
+    () => timeZoneChoices(zoneAnchor, [zone, deviceZone]),
+    [zoneAnchor, zone, deviceZone],
+  );
+  const zoneSummary = zoneRows.find((row) => row.zone === zone)?.label ?? zone ?? 'Pick a timezone';
+  const zoneCity = zoneSummary.split(' · ')[0];
+  const overriding = Boolean(zone && deviceZone && zone !== deviceZone);
+  const zoneStartIso = eventDate.trim() ? toInstant(eventDate, zone) : null;
+  const zoneReading = overriding && zoneStartIso ? deviceClockReading(zoneStartIso, eventDate) : null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
@@ -411,6 +474,42 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               <Field label="Ends (optional)">
                 <TextInput value={endDate} onChangeText={setEndDate} style={inputStyle} placeholder="2026-08-15 20:00" placeholderTextColor={colors.foregroundSubtle} />
               </Field>
+              {/* Which clock the two fields above are read on. Hidden outright
+                  where the runtime cannot resolve a zone: offering a picker
+                  the app cannot honour is how a host ends up publishing an
+                  event hours from the time they meant. */}
+              {canPickZone ? (
+                <Field label="Timezone">
+                  <Pressable
+                    onPress={() => setZonePickerOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Timezone, ${zoneSummary}`}
+                    style={[
+                      styles.input,
+                      styles.zoneTrigger,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.borderSubtle },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.zoneTriggerText, { color: colors.foreground }]}
+                      numberOfLines={1}
+                    >
+                      {zoneSummary}
+                    </Text>
+                    <Feather name="chevron-down" size={18} color={colors.foregroundMuted} />
+                  </Pressable>
+                  <Text style={[styles.zoneHint, { color: colors.foregroundMuted }]}>
+                    {overriding
+                      ? `Times are read in ${zoneCity} time. Everyone else sees the same moment on their own clock.`
+                      : "Times are in this phone's timezone. Everyone else sees the same moment on their own clock."}
+                  </Text>
+                  {zoneReading ? (
+                    <Text style={[styles.zoneHint, { color: colors.foregroundMuted }]}>
+                      {`On your own clock that's ${zoneReading}.`}
+                    </Text>
+                  ) : null}
+                </Field>
+              ) : null}
               <Toggle label="Online event" value={isOnline} onValueChange={setIsOnline} colors={colors} />
               <Field label={isOnline ? 'Meeting link' : 'Location'}>
                 <TextInput
@@ -444,6 +543,22 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* A page sheet over the composer: the list is long enough that opening
+          it inline would fight the keyboard and the form's scroll position. */}
+      {canPickZone ? (
+        <TimeZonePickerSheet
+          visible={zonePickerOpen}
+          choices={zoneRows}
+          value={zone}
+          deviceZone={deviceZone}
+          onSelect={(next) => {
+            setHostZone(next);
+            setZonePickerOpen(false);
+          }}
+          onClose={() => setZonePickerOpen(false)}
+        />
+      ) : null}
     </Modal>
   );
 }
@@ -519,6 +634,22 @@ function parseDateTime(value: string) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/**
+ * The typed wall clock as the instant it names in the chosen zone. Falling back
+ * to the phone's own reading keeps an event editable where the runtime cannot
+ * resolve a zone at all — which is exactly what this did before the host's zone
+ * was recordable.
+ */
+function toInstant(wall: string, zone: string | null): string | null {
+  return (zone ? wallClockToIso(wall, zone) : null) ?? parseDateTime(wall);
+}
+
+/** The offset to store beside the host's zone, or the phone's own as a fallback. */
+function startOffsetMinutes(startIso: string, zone: string | null): number {
+  const instant = new Date(startIso);
+  return (zone ? zoneOffsetMinutes(zone, instant) : null) ?? deviceOffsetMinutes(instant);
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
@@ -546,6 +677,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 124, paddingTop: 13 },
+  zoneTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  zoneTriggerText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 15 },
+  zoneHint: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
   chipText: { fontFamily: 'Geist_500Medium', fontSize: 13, textTransform: 'capitalize' },

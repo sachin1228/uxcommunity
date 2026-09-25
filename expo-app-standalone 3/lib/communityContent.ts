@@ -58,6 +58,11 @@ export interface CommunityThread extends BaseContent {
 export interface CommunityEvent extends BaseContent {
   event_date: string;
   end_date: string | null;
+  /**
+   * The zone the host set the event in. Null on events that predate the
+   * column, and on any create that could not name a zone.
+   */
+  host_timezone: string | null;
   is_online: boolean;
   location: string | null;
   meet_link: string | null;
