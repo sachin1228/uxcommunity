@@ -19,7 +19,7 @@ import {
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { HostTimeZoneField } from "./HostTimeZoneField";
-import { useNowTick } from "./useNowTick";
+import { useNowTick } from "@/lib/use-now-tick";
 
 interface CreateEventModalProps {
   communityId?: string;

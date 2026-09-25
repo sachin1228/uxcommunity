@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compareByRecentActivity, isPinned } from "./sidebar-order";
+import { compareByRecentActivity, expiredPinIds, isPinned } from "./sidebar-order";
 
 /** The exact shape the comparator takes — no restating of fields. */
 type Ordered = Parameters<typeof compareByRecentActivity>[0];
@@ -16,6 +16,7 @@ function community(
   overrides: Partial<Ordered> = {},
 ): Ordered {
   return {
+    id: name,
     name,
     joined_at: lastMessageAt,
     pinned_until: null,
@@ -67,6 +68,21 @@ test("isPinned only reads the flag, so an expired pin is not a pin", () => {
   assert.equal(isPinned(community("A", null, { pinned_until: "2026-10-03T18:30:00Z" })), true);
   assert.equal(isPinned(community("A", null, { pinned_until: null })), false);
   assert.equal(isPinned(community("A", null)), false);
+});
+
+test("a pin past its deadline is expired, and only then", () => {
+  // The client's clock is the caller's, so the answer is exact at the boundary:
+  // the deadline instant itself is over, one millisecond before it is not.
+  const room = community("Designup decade", null, { id: "a", pinned_until: "2026-09-25T13:30:00Z" });
+  const unpinned = community("General", "2026-09-24T18:20:00Z", { id: "b" });
+  const deadline = Date.parse("2026-09-25T13:30:00Z");
+
+  assert.deepEqual(expiredPinIds([room, unpinned], deadline - 1), []);
+  assert.deepEqual(expiredPinIds([room, unpinned], deadline), ["a"]);
+  assert.deepEqual(expiredPinIds([room, unpinned], deadline + 1), ["a"]);
+  // Unreadable or missing deadlines are not expirations: bad data must never
+  // cost a row its pin.
+  assert.deepEqual(expiredPinIds([community("Odd", null, { id: "c", pinned_until: "not a date" })], deadline), []);
 });
 
 test("the event somebody just RSVPed to is at the very top of the pinned group", () => {

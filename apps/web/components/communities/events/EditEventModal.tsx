@@ -24,7 +24,7 @@ import {
 } from "@/lib/communities/event-time";
 import { wallTimeInputsInZone } from "@/lib/communities/timezone";
 import { HostTimeZoneField } from "./HostTimeZoneField";
-import { useNowTick } from "./useNowTick";
+import { useNowTick } from "@/lib/use-now-tick";
 
 interface EditEventModalProps {
   event: CommunityEvent;

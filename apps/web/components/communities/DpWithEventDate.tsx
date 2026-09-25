@@ -1,7 +1,7 @@
 "use client";
 
 import { eventDateBadge } from "@/lib/communities/event-date";
-import { useNowTick } from "./events/useNowTick";
+import { useNowTick } from "@/lib/use-now-tick";
 
 /**
  * A community display picture wearing the calendar badge for its event's date.
@@ -45,10 +45,10 @@ const TODAY_FONT_PX = 5;
  * How often the badge re-reads the clock. The circle announces a moment — a
  * window opening or closing — so it has to notice one arriving on its own:
  * every state it can wear is decided against "now", and a value captured at
- * render would keep saying LIVE long after the event ended. The tick is per
- * badge and cheap (no work unless the state actually changed), and a quarter
- * minute is close enough that a member watching the room sees the circle turn
- * without touching anything.
+ * render would keep saying LIVE long after the event ended. A quarter minute
+ * is close enough that a member watching the room sees the circle turn without
+ * touching anything, and the clock itself is shared with every other surface
+ * that reads one (see use-now-tick), so the cadence costs a single timer.
  */
 const EVENT_BADGE_TICK_MS = 15_000;
 

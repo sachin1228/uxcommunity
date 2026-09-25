@@ -2,8 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, MapPin, Users, Video } from "lucide-react";
+import { ArrowRight, CalendarDays, MapPin, Settings, Users, Video } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { openCommunitySettings } from "@/lib/communities/cache";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { fetchJsonCached } from "@/lib/request-cache";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
@@ -129,6 +131,60 @@ function useEventRoomDetails(communityId: string, currentUserId: string) {
 
   const loading = !answer || answer.communityId !== communityId;
   return { details: loading ? null : answer.details, loading };
+}
+
+/**
+ * What the info card becomes once the room has outlived its event.
+ *
+ * Deleting an event keeps its group chat (see the event delete route), which
+ * leaves a room that is still wearing all three of the event's things: its
+ * name is the event's title, its description says "group chat for this event",
+ * and its picture is the event's cover. Those are exactly the fields the room's
+ * own settings edit, so this card is only the door — the info panel is where a
+ * member notices the event is over, and nothing else would tell the owner that
+ * the room is theirs to keep.
+ *
+ * Rendered for the room's owner alone; every other member sees the room exactly
+ * as it is (see CommunityRightSidebar, which only draws this when the community
+ * is an event's chat with no event behind it).
+ */
+export function EventRoomGoneSection({ communityId }: { communityId: string }) {
+  const router = useGuardedRouter();
+
+  function openSettings() {
+    if (openCommunitySettings(communityId)) return;
+    // Nothing took the request: the chat view that owns the settings modal is
+    // not mounted at this route. Send the owner to the room itself, where the
+    // same card's button does open it.
+    router.push(`/dashboard/communities/${communityId}`);
+  }
+
+  return (
+    <section
+      aria-labelledby="sidebar-room-event-heading"
+      className="border-t border-border px-5 py-5"
+    >
+      <h2
+        id="sidebar-room-event-heading"
+        className="font-display text-[15px] font-semibold text-foreground"
+      >
+        Event
+      </h2>
+      <p className="mt-3 text-pretty font-body text-sm leading-relaxed text-foreground-muted">
+        This room has outlived its event. The people in it and everything they said are still
+        here — give the room a name, a description and a picture of its own and it carries on
+        as a community.
+      </p>
+      <button
+        type="button"
+        onClick={openSettings}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <Settings strokeWidth={2.5} size={14} aria-hidden="true" />
+        Make this room your own
+      </button>
+    </section>
+  );
 }
 
 export function EventRoomSection({
