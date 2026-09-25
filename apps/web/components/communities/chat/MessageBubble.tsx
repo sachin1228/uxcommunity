@@ -879,7 +879,7 @@ function DeletedBubble({
         </span>
       </div>
       <div className="mt-0 flex items-center justify-end gap-1">
-        <span className={`font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
+        <span className={`text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
           {fmtTime(createdAt)}
         </span>
       </div>
@@ -1157,13 +1157,13 @@ export const MessageBubble = memo(function MessageBubble({
                     </div>
                   )}
                   {!imageOnly && (
-                    <div className={`flex items-center justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
+                    <div className={`flex items-center ml-4 justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
                       {msg.edited_at && (
                         <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
                           edited
                         </span>
                       )}
-                      <span className={`font-mono text-[10px] ${
+                      <span className={`text-[10px] ${
                         isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
                       }`}>
                         {fmtTime(msg.created_at)}
