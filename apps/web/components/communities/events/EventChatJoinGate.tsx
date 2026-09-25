@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Check, MapPin, MessageSquare, Users, Video } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
+import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";
+import type { EventJoinAnswers } from "@/lib/communities/event-join-questions";
 import {
   eventZoneLabel,
   eventZoneTooltip,
@@ -63,14 +64,17 @@ export function EventChatJoinGate({
 }: EventChatJoinGateProps) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // The host's compulsory questions open after the confirm dialog, and the
+  // join is sent only from there — answers in hand.
+  const [questionsOpen, setQuestionsOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleJoin() {
+  async function handleJoin(answers: EventJoinAnswers) {
     setJoining(true);
     setError(null);
     try {
-      await joinEventChatFromClient(communityId);
+      await joinEventChatFromClient(communityId, answers);
       setConfirmOpen(false);
       // Same URL, now a member: the server render flips to the real chat.
       router.refresh();
@@ -178,15 +182,32 @@ export function EventChatJoinGate({
           </button>
           <button
             type="button"
-            onClick={() => void handleJoin()}
+            onClick={() => {
+              setConfirmOpen(false);
+              setQuestionsOpen(true);
+            }}
             disabled={joining}
             className="modal-btn modal-btn-primary"
           >
-            {joining ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
-            {joining ? "Joining…" : "Join chat"}
+            <Check strokeWidth={2.5} size={15} />
+            Continue
           </button>
         </div>
       </Modal>
+
+      <EventJoinQuestionsModal
+        open={questionsOpen}
+        onClose={() => {
+          if (joining) return;
+          setQuestionsOpen(false);
+        }}
+        onSubmit={(answers) => void handleJoin(answers)}
+        eventTitle={event.title}
+        communityName={communityName}
+        pending={joining}
+        error={error}
+        confirmLabel="Join chat"
+      />
     </div>
   );
 }

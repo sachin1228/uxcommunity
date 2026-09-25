@@ -13,9 +13,11 @@ import {
   joinEventChat,
   leaveEventChat,
 } from "@/lib/communities/event-chat";
+import { joinAnswersPayload } from "@/lib/communities/event-join-questions";
+import { storeEventJoinResponse } from "@/lib/communities/event-join-responses";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; eventId: string }> },
 ) {
   let session;
@@ -25,6 +27,14 @@ export async function POST(
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
+
+  // The host's compulsory join questions, answered in the confirm modal (the
+  // web app always sends them; older clients may not). Recorded with the
+  // membership below so the host reads them back in the members tab.
+  const body = (await req.json().catch(() => null)) as
+    | { answers?: Record<string, unknown> }
+    | null;
+  const answers = joinAnswersPayload(body?.answers ?? {});
 
   let eventQuery = db
     .from("community_events")
@@ -117,7 +127,17 @@ export async function POST(
         },
         event.user_id,
       );
-      if (chatCommunityId) await joinEventChat(db, chatCommunityId, userId);
+      if (chatCommunityId) {
+        await joinEventChat(db, chatCommunityId, userId);
+        // Record the answers the modal collected. Best-effort (see
+        // storeEventJoinResponse) — and only when they came in complete: a
+        // client that RSVPs without them (e.g. the undo-toast restore, or the
+        // mobile app's one-tap RSVP) simply has no new answers to store, and
+        // any answers recorded on the member's earlier join stand.
+        if (answers) {
+          await storeEventJoinResponse(db, chatCommunityId, userId, answers);
+        }
+      }
     }
   } catch (error) {
     console.error("[event RSVP] group chat join failed:", error);

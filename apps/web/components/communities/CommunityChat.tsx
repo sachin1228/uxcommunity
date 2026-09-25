@@ -1546,6 +1546,7 @@ export function CommunityChat({
             isOwner={isOwner}
             canManageMembers={canManageMembers}
             isPrivate={displayCommunity?.is_private ?? false}
+            isEventChat={displayCommunity?.type === "event"}
           />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">

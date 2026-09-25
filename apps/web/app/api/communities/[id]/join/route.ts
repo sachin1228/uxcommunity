@@ -5,6 +5,8 @@ import { requireSession } from "@/lib/auth/session";
 import { SUGGESTED_COMMUNITIES_TAG } from "@/lib/home/home-rail-cache";
 import { canJoinEventChat } from "@/lib/communities/event-chat";
 import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
+import { joinAnswersPayload } from "@/lib/communities/event-join-questions";
+import { storeEventJoinResponse } from "@/lib/communities/event-join-responses";
 
 /**
  * POST /api/communities/[id]/join
@@ -29,7 +31,9 @@ export async function POST(
 
   // Optional note accompanying a private-community request (the homepage
   // preview asks for one). Ignored everywhere else.
-  const body = (await req.json().catch(() => null)) as { message?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as
+    | { message?: unknown; answers?: Record<string, unknown> }
+    | null;
   const rawMessage = typeof body?.message === "string" ? body.message.trim() : "";
   const requestMessage = rawMessage ? rawMessage.slice(0, 500) : null;
 
@@ -50,8 +54,21 @@ export async function POST(
   // 1b. An event's group chat: joining it is the confirmation. It is open to
   // everyone who can see the event — the members of the event's own community,
   // and everybody when the event is public. There is no approval step: the
-  // caller has already confirmed in the UI (RSVP, or the group's join gate).
+  // caller has already confirmed in the UI (RSVP, or the group's join gate) —
+  // and answered the host's compulsory questions, which are recorded here so
+  // the host reads them back in the members tab.
   if (community.type === "event") {
+    // The questions are compulsory: the modal will not send without all four
+    // answered, but the server is the referee — a join without answers is
+    // refused rather than waved through.
+    const answers = joinAnswersPayload(body?.answers ?? {});
+    if (!answers) {
+      return NextResponse.json(
+        { error: "Please answer all the host's questions to join." },
+        { status: 400 },
+      );
+    }
+
     const { data: eventRow } = await db
       .from("community_events")
       .select("id, community_id, is_public")
@@ -79,6 +96,10 @@ export async function POST(
     if (error) {
       return NextResponse.json({ error: "Failed to join the event chat." }, { status: 500 });
     }
+
+    // Best-effort by design (see storeEventJoinResponse): a logging failure
+    // must not flip a successful join into an error the member would retry.
+    await storeEventJoinResponse(db, communityId, userId, answers);
 
     return NextResponse.json({ success: true });
   }
