@@ -2,6 +2,8 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_ENABLED_TABS } from "./areas";
 import { withShowcaseColumn } from "./showcase-flag";
+import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
+import { loadEventRoomMeta } from "./event-chat";
 import type { CachedMeta } from "./cache";
 
 /**
@@ -11,7 +13,9 @@ import type { CachedMeta } from "./cache";
  * from the request cache (revisits) or a fresh bootstrap fetch, so navigation
  * never blocks on secondary data.
  *
- * Latency profile: exactly TWO database round trips, issued in parallel.
+ * Latency profile: exactly TWO database round trips, issued in parallel — plus
+ * a best-effort pair more, and only for an event's group chat, for the date
+ * and pin deadline its header DP wears (see loadEventRoomMeta).
  * The pre-slim version ran ~10 queries across four sequential waves
  * (top-member profiles → experience levels → manager status) and embedded the
  * Lottie animation payload into the RSC response; all of that arrives with the
@@ -42,6 +46,15 @@ export async function fetchCommunityMetaSSR(
 
   if (!membership || !community) return null;
 
+  // An event group chat's DP carries its event's date from the first paint, so
+  // the header never shows a badge-less face first and then grows one — and the
+  // pin deadline comes with it, so a room that is on right now already reads
+  // LIVE before the client fetches anything. (The cast matches this file's
+  // untyped supabase-js baseline.)
+  const eventRoom = (community as any).type === EVENT_CHAT_COMMUNITY_TYPE
+    ? await loadEventRoomMeta(db, communityId).catch(() => null)
+    : null;
+
   const meta: CachedMeta = {
     community: {
       id: community.id, name: community.name, type: community.type,
@@ -56,6 +69,8 @@ export async function fetchCommunityMetaSSR(
       enabled_tabs: (community as any).enabled_tabs ?? [...DEFAULT_ENABLED_TABS],
       // Absent pre-migration; the tab bar reads that as "Showcase is on".
       showcase_enabled: (community as any).showcase_enabled ?? null,
+      event_date: eventRoom?.eventDate ?? null,
+      pinned_until: eventRoom?.pinnedUntil ?? null,
       // Role/permissions are not fetched server-side any more; bootstrap
       // overwrites them client-side moments later.
       current_user_role: null,

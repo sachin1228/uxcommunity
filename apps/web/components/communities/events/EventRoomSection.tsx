@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { CalendarDays, MapPin, Users, Video } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CalendarDays, MapPin, Users, Video } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { fetchJsonCached } from "@/lib/request-cache";
 import { realtimeClient } from "@/lib/realtime/client";
@@ -22,6 +23,11 @@ import { goingPreview, toGoingEntries } from "./going-list";
  * Rendered by CommunityRightSidebar, between Members and About, and only for
  * communities of type `event`: every other community answers null here and
  * draws nothing.
+ *
+ * The card ends with the door back out of the room: the event's own page, the
+ * one the home feed's event card opens (/dashboard/events/[eventId]), where the
+ * full description, the discussion and the Join chat row live. The room is the
+ * conversation about the event, not the event itself.
  */
 
 const REQUEST_STALE_MS = 60_000;
@@ -236,6 +242,15 @@ export function EventRoomSection({
           </p>
         )}
       </div>
+
+      {/* ── The event's own page ─────────────────────────────────────── */}
+      <Link
+        href={`/dashboard/events/${event.id}`}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        View event
+        <ArrowRight strokeWidth={2.5} size={14} aria-hidden="true" />
+      </Link>
     </section>
   );
 }

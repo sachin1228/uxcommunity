@@ -131,56 +131,95 @@ export async function syncEventChatCommunity(
 }
 
 /**
- * Which of these communities are event group chats that should still be pinned
- * to the top of the sidebar, mapped to the deadline they stay there until —
- * the event's end (or its start, when it has no end).
+ * What the sidebar needs to know about the event behind a group chat: the day
+ * the room is for (the date badge on its DP) and the deadline it stays pinned
+ * to the top of the list until — the event's end, or its start when it has no
+ * end.
+ */
+export interface EventChatSidebarMeta {
+  /** The event's own start, ISO — which day's room this is. */
+  eventDate: string | null;
+  /** Only set while the deadline is still ahead, so the sort tests presence. */
+  pinnedUntil: string | null;
+}
+
+/**
+ * The event metadata for these communities, for the ones that are event group
+ * chats (anything else is simply absent from the map).
  *
  * Only future deadlines come back, so the client sort tests presence instead of
- * carrying a clock. A lookup that fails (an environment that has not applied
- * the event-chat migration has no such column) returns nothing to pin rather
- * than breaking the sidebar.
+ * carrying a clock; the date comes back regardless of whether the event has
+ * passed, because the room's DP keeps saying which day it is for. A lookup that
+ * fails (an environment that has not applied the event-chat migration has no
+ * such column) returns nothing rather than breaking the sidebar.
  */
-export async function loadEventPinDeadlines(
+export async function loadEventChatSidebarMeta(
   db: Db,
   communityIds: string[],
   now: Date = new Date(),
-): Promise<Map<string, string>> {
-  const pins = new Map<string, string>();
+): Promise<Map<string, EventChatSidebarMeta>> {
+  const meta = new Map<string, EventChatSidebarMeta>();
   const ids = [...new Set(communityIds)];
-  if (!ids.length) return pins;
+  if (!ids.length) return meta;
 
   const { data: links, error } = await db
     .from("communities")
     .select("id, event_id")
     .in("id", ids)
     .not("event_id", "is", null);
-  if (error) return pins;
+  if (error) return meta;
 
   const eventRooms = (links ?? []) as Array<{ id: string; event_id: string | null }>;
   const eventIds = [...new Set(eventRooms.flatMap((room) => room.event_id ?? []))];
-  if (!eventIds.length) return pins;
+  if (!eventIds.length) return meta;
 
   const { data: events } = await db
     .from("community_events")
     .select("id, event_date, end_date")
     .in("id", eventIds);
-  const deadlines = new Map(
+  const byEventId = new Map(
     ((events ?? []) as Array<{ id: string; event_date: string; end_date: string | null }>).map(
-      (event) => [event.id, event.end_date ?? event.event_date],
+      (event) => [event.id, event],
     ),
   );
 
   const nowMs = now.getTime();
   for (const room of eventRooms) {
-    const deadline = room.event_id ? deadlines.get(room.event_id) : null;
-    if (!deadline) continue;
+    const event = room.event_id ? byEventId.get(room.event_id) : null;
+    if (!event) continue;
+
+    const deadline = event.end_date ?? event.event_date;
     // An unparseable deadline is treated as still ahead: better to leave the
     // room where the member expects it than to drop the pin over bad data.
-    const deadlineMs = Date.parse(deadline);
-    if (Number.isNaN(deadlineMs) || deadlineMs >= nowMs) pins.set(room.id, deadline);
+    const deadlineMs = deadline ? Date.parse(deadline) : Number.NaN;
+    meta.set(room.id, {
+      eventDate: event.event_date ?? null,
+      pinnedUntil: !deadline || Number.isNaN(deadlineMs) || deadlineMs >= nowMs ? deadline : null,
+    });
   }
 
-  return pins;
+  return meta;
+}
+
+/**
+ * What one event's group chat needs about its event: the day the room is for
+ * (the date badge on its DP) and the deadline it stays pinned until — which is
+ * the event's end, and therefore also the moment the badge should stop saying
+ * LIVE (see DpWithEventDate).
+ *
+ * Same loader as the sidebar, so a room's header and its row in the list can
+ * never disagree about which day it is for or whether it is still pinned.
+ * Best-effort by design: a community that is not an event's room, or an
+ * environment that has not applied the event-chat migration, simply has no
+ * event, and that must cost the badge rather than the page it is on.
+ */
+export async function loadEventRoomMeta(
+  db: Db,
+  communityId: string,
+  now: Date = new Date(),
+): Promise<EventChatSidebarMeta> {
+  const meta = await loadEventChatSidebarMeta(db, [communityId], now);
+  return meta.get(communityId) ?? { eventDate: null, pinnedUntil: null };
 }
 
 /** Whether this member is already in the event's group chat. */

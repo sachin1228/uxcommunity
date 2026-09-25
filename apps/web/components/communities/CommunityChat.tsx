@@ -1403,6 +1403,11 @@ export function CommunityChat({
           enabled_tabs: sidebarEntry.enabled_tabs,
           showcase_enabled: sidebarEntry.showcase_enabled,
           owner_id: sidebarEntry.owner_id,
+          // The sidebar already knows an event room's date and when its pin
+          // expires, so the header can wear its badge — and say LIVE — while
+          // the meta fetch is still in flight.
+          event_date: sidebarEntry.event_date,
+          pinned_until: sidebarEntry.pinned_until,
         }
       : null),
     [community, sidebarEntry, communityId],

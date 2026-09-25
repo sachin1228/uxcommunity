@@ -15,6 +15,8 @@ import {
 import { resolveCommunityDp } from "./dp";
 import { withShowcaseColumn } from "./showcase-flag";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
+import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
+import { loadEventRoomMeta } from "./event-chat";
 // One shared experience-level label cleaner — see ./comment-authors.ts.
 import { cleanDesignation } from "./comment-authors";
 
@@ -73,6 +75,17 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
 
   // Resolve the caller's community role + effective permissions (owners hold
   // every capability; platform-appointed admins hold their configured grants).
+  // An event group chat's DP wears its event's date, and says LIVE while the
+  // event is under way (see DpWithEventDate), so the header knows both the day
+  // the room is for and the deadline it stops being live at. Read only for
+  // event rooms, one wave later, and best-effort — an environment without the
+  // event-chat migration loses the badge, never the read model. The cast
+  // matches the repo-wide untyped supabase-js baseline used by the lines below.
+  const communityType = (community as unknown as { type?: string | null }).type;
+  const eventRoom = communityType === EVENT_CHAT_COMMUNITY_TYPE
+    ? await loadEventRoomMeta(db, communityId).catch(() => null)
+    : null;
+
   const isOwner = community.owner_id === userId || membership.role === "owner";
   const currentUserRole = isOwner ? "owner" : (membership.role === "admin" ? "admin" : "member");
   let currentUserPermissions: CommunityPermissions = NO_COMMUNITY_PERMISSIONS;
@@ -138,6 +151,8 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     data: {
       community: {
         ...community,
+        event_date: eventRoom?.eventDate ?? null,
+        pinned_until: eventRoom?.pinnedUntil ?? null,
         image_url: dp.image_url,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,
