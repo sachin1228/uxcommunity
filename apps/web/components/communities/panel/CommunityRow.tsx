@@ -112,9 +112,9 @@ export const CommunityRow = memo(function CommunityRow({
           name={c.name}
           type={c.type}
           eventDate={c.event_date}
-          // The pin deadline is the event's end for as long as it can still be
-          // running, so the badge turns to LIVE over exactly that window.
-          eventEnd={c.pinned_until}
+          // The full window deadline, ahead or past: LIVE while it runs, ENDED
+          // for the day after, then no badge at all.
+          eventEnd={c.event_end ?? c.pinned_until}
         />
 
         <div className="flex-1 min-w-0">

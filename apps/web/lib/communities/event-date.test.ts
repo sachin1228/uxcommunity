@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { eventDateBadge } from "./event-date";
+import { eventDateBadge, hasEventEnded } from "./event-date";
 
 /** A local wall-clock time, ISO-encoded the way the API hands one over. */
 function at(year: number, month: number, day: number, hour: number, minute = 0): string {
@@ -68,6 +68,36 @@ test("the clock defaults to now rather than requiring one", () => {
 
 // ─── The live window: [start, end) ───────────────────────────────────────────
 
+test("an event with no known end ends immediately", () => {
+  // The sidebar's pin deadline is the event's end, or its start when it has
+  // none — a window nobody recorded closes the moment it opens rather than
+  // running all day. Before its start: today's room, not live, not ended.
+  const badge = eventDateBadge(at(2026, 8, 25, 10, 30), { now: new Date(2026, 8, 25, 9) });
+  assert.equal(badge?.isLive, false);
+  assert.equal(badge?.isEnded, false);
+  assert.equal(badge?.isToday, true);
+  // From its start on, it reads as over.
+  const past = eventDateBadge(at(2026, 8, 25, 10, 30), { now: new Date(2026, 8, 25, 11) });
+  assert.equal(past?.isLive, false);
+  assert.equal(past?.isEnded, true);
+});
+
+test("a room whose event just wrapped reads ENDED, not TODAY", () => {
+  // The lifecycle beats the calendar: a wrapped window outranks its own day.
+  const badge = eventDateBadge(at(2026, 8, 25, 12, 10), {
+    now: new Date(2026, 8, 25, 13, 15),
+    endsAt: at(2026, 8, 25, 13, 10),
+  });
+  assert.equal(badge?.isEnded, true);
+  assert.equal(badge?.isToday, true);
+});
+
+test("a long-past event still names its month, without ENDED", () => {
+  const badge = eventDateBadge(at(2026, 8, 25, 10, 30), { now: new Date(2026, 8, 27, 12) });
+  assert.equal(badge?.month, "SEPT");
+  assert.equal(badge?.isEnded, false);
+});
+
 test("an event between its start and end is live", () => {
   const badge = eventDateBadge(at(2026, 8, 25, 10, 30), {
     now: new Date(2026, 8, 25, 10, 45),
@@ -102,14 +132,58 @@ test("the window is half-open, so it opens at the start and closes at the end", 
   assert.equal(eventDateBadge(start, { now: new Date(2026, 8, 25, 12), endsAt: end })?.isLive, false);
 });
 
-test("an event with no known end is never announced as live", () => {
-  // The sidebar's pin deadline is the event's end, or its start when it has
-  // none — so a window nobody recorded reads as closed, not as endlessly on.
+test("an unparseable end never marks the event live or ended", () => {
   const now = new Date(2026, 8, 25, 10, 45);
-  assert.equal(eventDateBadge(at(2026, 8, 25, 10, 30), { now, endsAt: null })?.isLive, false);
-  assert.equal(eventDateBadge(at(2026, 8, 25, 10, 30), { now })?.isLive, false);
-  assert.equal(
-    eventDateBadge(at(2026, 8, 25, 10, 30), { now, endsAt: "not a date" })?.isLive,
-    false,
-  );
+  const badge = eventDateBadge(at(2026, 8, 25, 10, 30), { now, endsAt: "not a date" });
+  assert.equal(badge?.isLive, false);
+  assert.equal(badge?.isEnded, false);
+});
+
+// ─── The day after: ENDED, then the tile comes down ──────────────────────────
+
+test("a just-ended event reads ENDED for a day, then the badge drops", () => {
+  const end = at(2026, 8, 25, 11);
+  const start = at(2026, 8, 25, 10);
+  const atEnd = eventDateBadge(start, { now: new Date(2026, 8, 25, 11), endsAt: end });
+  assert.equal(atEnd?.isLive, false);
+  assert.equal(atEnd?.isEnded, true);
+
+  // Late on the event's own day, the lifecycle has already moved past TODAY:
+  // once the window closes, ENDED is the more useful fact even before midnight.
+  const laterToday = eventDateBadge(start, { now: new Date(2026, 8, 25, 23), endsAt: end });
+  assert.equal(laterToday?.isEnded, true);
+  assert.equal(laterToday?.isToday, true);
+
+  const nextDay = eventDateBadge(start, { now: new Date(2026, 8, 26, 9), endsAt: end });
+  assert.equal(nextDay?.isEnded, true);
+  assert.equal(nextDay?.isToday, false);
+
+  const nextMorning = eventDateBadge(start, { now: new Date(2026, 8, 26, 10, 59), endsAt: end });
+  assert.equal(nextMorning?.isEnded, true);
+
+  // One minute past the day: the tile has served its purpose.
+  const after = eventDateBadge(start, { now: new Date(2026, 8, 26, 11, 1), endsAt: end });
+  assert.equal(after?.isEnded, false);
+});
+
+test("the just-ended tile still names the day it was for", () => {
+  const badge = eventDateBadge(at(2026, 8, 25, 10), {
+    now: new Date(2026, 8, 25, 12),
+    endsAt: at(2026, 8, 25, 11),
+  });
+  assert.equal(badge?.month, "SEPT");
+  assert.equal(badge?.day, "25");
+  assert.equal(badge?.isEnded, true);
+});
+
+test("hasEventEnded reads the same deadline the badge does", () => {
+  const start = at(2026, 8, 25, 10);
+  assert.equal(hasEventEnded(start, at(2026, 8, 25, 11), new Date(2026, 8, 25, 10, 59)), false);
+  assert.equal(hasEventEnded(start, at(2026, 8, 25, 11), new Date(2026, 8, 25, 11)), true);
+  // No recorded end: the window closes when it opens.
+  assert.equal(hasEventEnded(start, null, new Date(2026, 8, 25, 9)), false);
+  assert.equal(hasEventEnded(start, null, new Date(2026, 8, 25, 10)), true);
+  // No usable date: nothing to be over.
+  assert.equal(hasEventEnded(null, at(2026, 8, 25, 11), new Date(2026, 8, 26)), false);
+  assert.equal(hasEventEnded("not a date", null, new Date(2026, 8, 26)), false);
 });

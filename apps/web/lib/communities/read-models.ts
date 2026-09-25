@@ -153,6 +153,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         ...community,
         event_date: eventRoom?.eventDate ?? null,
         pinned_until: eventRoom?.pinnedUntil ?? null,
+        event_end: eventRoom?.eventEnd ?? null,
         image_url: dp.image_url,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,

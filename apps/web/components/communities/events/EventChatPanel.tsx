@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DpWithEventDate } from "../DpWithEventDate";
+import { hasEventEnded } from "@/lib/communities/event-date";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
 
@@ -66,7 +67,13 @@ export function EventChatPanel({
     }
   }
 
-  if (!chatCommunityId) return null;
+  // The door closes when the event does. The badge keeps saying ENDED for a
+  // day, but the banner is a call to action — join, or be in the room now —
+  // and once the window has passed there is nothing left to be on time for.
+  // The room itself keeps its history either way.
+  const hasEnded = hasEventEnded(eventDate, eventEnd);
+
+  if (!chatCommunityId || hasEnded) return null;
 
   return (
     <>

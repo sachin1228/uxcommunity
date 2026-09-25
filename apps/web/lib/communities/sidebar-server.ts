@@ -156,6 +156,9 @@ export async function getSidebarCommunities(userId: string) {
       reference_name: names[community.id] ?? null,
       event_date: eventRoom?.eventDate ?? null,
       pinned_until: eventRoom?.pinnedUntil ?? null,
+      // The deadline whether ahead or past — the badge says ENDED for a day
+      // after the event, which is beyond the pin's life.
+      event_end: eventRoom?.eventEnd ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,
       mention_count: row.unread_mention_count ?? 0,

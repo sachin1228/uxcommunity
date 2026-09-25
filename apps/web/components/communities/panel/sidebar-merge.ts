@@ -48,6 +48,7 @@ export function mergeStaleServerList(
       // date badge rides the room's own event, see lib/communities/event-date).
       event_date: incoming.event_date ?? null,
       pinned_until: incoming.pinned_until ?? null,
+      event_end: incoming.event_end ?? null,
       // Keep a locally-known reaction preview when the server row predates it
       // (reactions are also patched client-side from realtime).
       lastReaction: previous.lastReaction && (!incoming.lastReaction || (previous.lastReaction.createdAt ?? "") >= (incoming.lastReaction.createdAt ?? ""))

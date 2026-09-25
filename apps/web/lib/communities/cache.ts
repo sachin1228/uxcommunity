@@ -137,6 +137,8 @@ export interface CachedMeta {
      * like the sidebar row's field of the same name.
      */
     pinned_until?: string | null;
+    /** That deadline whether ahead or past — the badge's ENDED day reads it. */
+    event_end?: string | null;
     /** "owner" | "admin" | "member" — the current user's role in this community. */
     current_user_role?: string | null;
     /** Effective permission grants (owners: everything; admins: configured toggles). */
@@ -202,6 +204,13 @@ export interface CachedSidebarCommunity {
    * passed, so ordering only has to test presence (see sidebar-order.ts).
    */
   pinned_until?: string | null;
+  /**
+   * That same deadline whether ahead or past — the event's end, or its start
+   * when it has none. Outlives the pin so the DP's badge can say ENDED for a
+   * day after the event wraps (see lib/communities/event-date). Absent on
+   * every other kind of community.
+   */
+  event_end?: string | null;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;

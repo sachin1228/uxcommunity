@@ -12,14 +12,14 @@ import { eventDateBadge } from "@/lib/communities/event-date";
  * only when there is a date to show, which keeps every other community's DP
  * exactly as it was.
  *
- * On the event's own day the tile says TODAY, and while the event is actually
- * running it says LIVE — one word deeper into "now" each time. Those words are
- * longer than any month abbreviation, so the today chip grows a little
- * (nothing reflows — the badge is absolutely positioned over the DP), both are
- * pinned to one fixed size so the two states read alike in every surface, and
- * the month alone is capped to the width the circle actually has. LIVE also
- * drops the page-coloured ring for the red one, so "on right now" reads even
- * at a glance across a full sidebar.
+ * On the event's own day the tile says TODAY, while it runs it says LIVE, and
+ * for a day after it wraps it says ENDED — then the tile comes down and the
+ * room reverts to a plain face, the conversation itself untouched. The word
+ * states are pinned to one fixed size (nothing reflows — the badge is
+ * absolutely positioned over the DP); only the month abbreviation is fitted
+ * to the width the circle actually has. LIVE drops the page-coloured ring for
+ * the red one so "on right now" reads at a glance; ENDED stays in the accent
+ * ink like the calendar states, a quiet closing note rather than an alarm.
  */
 const MONTH_RATIO = 0.28;
 const DAY_RATIO = 0.45;
@@ -72,35 +72,53 @@ export function DpWithEventDate({
   children: React.ReactNode;
 }) {
   const badge = eventDateBadge(date, { endsAt });
-  const badgeSize = badge ? badgeSizeFor(dpSize, badge.isToday) : 0;
-  const word = badge ? (badge.isLive ? "Live" : badge.isToday ? "Today" : badge.month) : "";
+  // A day after the event the announcement has served its purpose and the DP
+  // goes back to being just a DP — the room and its history stay. On the
+  // event's own day the states read as one lifecycle: the date up top until
+  // the day arrives, TODAY while it is still to come, LIVE while it runs,
+  // ENDED once it wraps — each the most useful fact at that moment, so a
+  // room whose event just finished never lingers on TODAY.
+  const visible = Boolean(badge && (badge.isToday || badge.isLive || badge.isEnded));
+  const badgeSize = visible && badge ? badgeSizeFor(dpSize, badge.isToday) : 0;
+  const word = badge
+    ? badge.isLive
+      ? "Live"
+      : badge.isEnded
+        ? "Ended"
+        : badge.isToday
+          ? "Today"
+          : badge.month
+    : "";
 
   return (
     <div className={`relative shrink-0 ${className}`}>
       {children}
 
-      {badge && (
+      {visible && badge && (
         /* A wall-calendar tile: month over day, in the accent ink so it reads
            against any DP. Decorative for scanning, but the full date is in the
            accessible name and the tooltip, so the year the tile drops is still
            one hover (or screen reader) away — and on the day itself the tile
-           trades the month for TODAY, or for LIVE while the event is under
-           way, while the real date stays one hover away. */
+           trades the month for TODAY, for LIVE while the event is under way,
+           or ENDED for the day after, while the real date stays one hover
+           away. */
         <span
           role="img"
           aria-label={
             badge.isLive
               ? `Event live now, ${badge.label}`
-              : badge.isToday
-                ? `Event today, ${badge.label}`
-                : `Event on ${badge.label}`
+              : badge.isEnded
+                ? `Event ended, ${badge.label}`
+                : badge.isToday
+                  ? `Event today, ${badge.label}`
+                  : `Event on ${badge.label}`
           }
           title={badge.isLive ? `Live now · ${badge.label}` : badge.label}
           style={{
             width: badgeSize,
             height: badgeSize,
             fontSize:
-              badge.isToday || badge.isLive
+              badge.isToday || badge.isLive || badge.isEnded
                 ? TODAY_FONT_PX
                 : topLineFontSize(badgeSize, word.length),
           }}

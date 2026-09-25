@@ -132,26 +132,33 @@ export async function syncEventChatCommunity(
 
 /**
  * What the sidebar needs to know about the event behind a group chat: the day
- * the room is for (the date badge on its DP) and the deadline it stays pinned
- * to the top of the list until — the event's end, or its start when it has no
- * end.
+ * the room is for (the date badge on its DP), the deadline it stays pinned to
+ * the top of the list until — the event's end, or its start when it has no
+ * end — and that same deadline regardless of whether it has passed, so the
+ * badge can keep saying ENDED for a day after the event wraps (the pin
+ * itself must still drop the instant it passes, which is why presence alone
+ * cannot carry this).
  */
 export interface EventChatSidebarMeta {
   /** The event's own start, ISO — which day's room this is. */
   eventDate: string | null;
   /** Only set while the deadline is still ahead, so the sort tests presence. */
   pinnedUntil: string | null;
+  /** The deadline whether ahead or past — what the badge's ENDED day reads. */
+  eventEnd: string | null;
 }
 
 /**
  * The event metadata for these communities, for the ones that are event group
  * chats (anything else is simply absent from the map).
  *
- * Only future deadlines come back, so the client sort tests presence instead of
- * carrying a clock; the date comes back regardless of whether the event has
- * passed, because the room's DP keeps saying which day it is for. A lookup that
- * fails (an environment that has not applied the event-chat migration has no
- * such column) returns nothing rather than breaking the sidebar.
+ * Only `pinnedUntil` is gated on the deadline being ahead — the client sort
+ * tests presence instead of carrying a clock. The date comes back regardless
+ * of whether the event has passed, because the room's DP keeps saying which
+ * day it is for (and ENDED for a day after); `eventEnd` is that deadline
+ * whether ahead or past, for the same reason. A lookup that fails (an
+ * environment that has not applied the event-chat migration has no such
+ * column) returns nothing rather than breaking the sidebar.
  */
 export async function loadEventChatSidebarMeta(
   db: Db,
@@ -195,6 +202,7 @@ export async function loadEventChatSidebarMeta(
     meta.set(room.id, {
       eventDate: event.event_date ?? null,
       pinnedUntil: !deadline || Number.isNaN(deadlineMs) || deadlineMs >= nowMs ? deadline : null,
+      eventEnd: deadline ?? null,
     });
   }
 
@@ -219,7 +227,7 @@ export async function loadEventRoomMeta(
   now: Date = new Date(),
 ): Promise<EventChatSidebarMeta> {
   const meta = await loadEventChatSidebarMeta(db, [communityId], now);
-  return meta.get(communityId) ?? { eventDate: null, pinnedUntil: null };
+  return meta.get(communityId) ?? { eventDate: null, pinnedUntil: null, eventEnd: null };
 }
 
 /** Whether this member is already in the event's group chat. */

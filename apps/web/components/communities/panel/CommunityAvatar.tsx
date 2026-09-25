@@ -14,8 +14,9 @@ interface CommunityAvatarProps {
    */
   eventDate?: string | null;
   /**
-   * That event's end. Present while the event could still be running, which is
-   * what makes the badge say LIVE instead of just naming the day.
+   * That event's end (or its start when it has none), whether ahead or past —
+   * what makes the badge say LIVE while the event runs and ENDED for the day
+   * after it wraps.
    */
   eventEnd?: string | null;
   lottieUrl?: string | null;

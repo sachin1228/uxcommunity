@@ -27,6 +27,8 @@ interface Community {
   event_date?: string | null;
   /** Its event's end while still ahead — what makes the badge say LIVE. */
   pinned_until?: string | null;
+  /** That deadline whether ahead or past — what makes the badge say ENDED. */
+  event_end?: string | null;
 }
 
 interface ChatHeaderProps {
@@ -218,7 +220,7 @@ export const ChatHeader = memo(function ChatHeader({
                     and says LIVE while the event is under way. */}
                 <DpWithEventDate
                   date={community.event_date}
-                  endsAt={community.pinned_until}
+                  endsAt={community.event_end ?? community.pinned_until}
                   dpSize={44}
                 >
                   <CommunityDp
