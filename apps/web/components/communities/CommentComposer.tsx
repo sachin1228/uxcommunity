@@ -9,6 +9,7 @@ import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { splitCommentText } from "@/lib/communities/comment-text";
+import { loadCurrentUserSummary } from "@/lib/current-user";
 
 /**
  * Matches a full emoji grapheme cluster (base + skin tone + keycap + ZWJ
@@ -92,22 +93,6 @@ export function Avatar({
   );
 }
 
-// Module-level cache for the current user's avatar — every composer (detail
-// pages, lightbox, reply boxes) can share a single /api/auth/me round trip.
-let cachedMe: { name: string; avatar_url: string | null } | null | undefined;
-
-async function fetchCurrentUser(): Promise<{ name: string; avatar_url: string | null } | null> {
-  if (cachedMe !== undefined) return cachedMe;
-  try {
-    const res = await fetch("/api/auth/me");
-    const data = (await res.json().catch(() => null)) as { user?: { name?: string; avatar_url?: string | null } } | null;
-    cachedMe = data?.user?.name ? { name: data.user.name, avatar_url: data.user.avatar_url ?? null } : null;
-  } catch {
-    cachedMe = null;
-  }
-  return cachedMe;
-}
-
 /**
  * The shared comment composer used by every comment section (threads,
  * resources, showcase, events).
@@ -172,7 +157,9 @@ export function CommentComposer<C = unknown>({
 
   useEffect(() => {
     let cancelled = false;
-    void fetchCurrentUser().then((user) => {
+    // Shared, session-scoped memo — one /api/auth/me round trip per session for
+    // every composer on the page (see lib/current-user.ts).
+    void loadCurrentUserSummary().then((user) => {
       if (!cancelled) setCurrentUser(user);
     });
     return () => {

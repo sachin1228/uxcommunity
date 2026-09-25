@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -9,8 +8,6 @@ import { BrandLogo } from "@/components/ui/BrandLogo";
 import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
 
 export default function LoginPage() {
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,14 +38,17 @@ export default function LoginPage() {
       }
       setShowApplyLink(false);
 
-      // Leave the full-screen "Logging in" state up until the navigation
-      // unmounts this page — no flash back to the form mid-redirect.
-      if (data.redirect) {
-        router.push(data.redirect);
-        return;
-      }
-
-      router.push("/dashboard");
+      // Drop the previous session's caches, then leave with a FULL document
+      // navigation (not router.push). Next's client Router Cache is keyed by
+      // URL and never sees the session cookie, so a client-side navigation to
+      // /dashboard is served the payload rendered for whoever was signed in
+      // before — the "second account shows the first account's data until you
+      // refresh" bug. A hard navigation always renders for the cookie the
+      // browser now holds. The "Logging in" overlay stays up until the new
+      // document paints, so there is still no flash back to the form.
+      const { resetClientSessionCaches } = await import("@/lib/session-cache");
+      resetClientSessionCaches();
+      window.location.assign(data.redirect ?? "/dashboard");
     } catch {
       setError("Network error. Please check your connection.");
       setLoading(false);
