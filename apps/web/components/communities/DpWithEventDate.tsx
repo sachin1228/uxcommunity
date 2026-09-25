@@ -21,9 +21,9 @@ import { useNowTick } from "@/lib/use-now-tick";
  * DP); only the month abbreviation is fitted to the width the circle
  * actually has. LIVE and ENDED take the red text and ring so "on right now"
  * and "just finished" read at a glance across a full sidebar, and LIVE drops
- * the day number for a pulse that runs while the window is open: the date the
- * room belongs to has stopped being the news at that point, and a heartbeat
- * reads across the sidebar the way a word can't.
+ * the day number for a pulsing dot beside the word that runs while the window
+ * is open: the date the room belongs to has stopped being the news at that
+ * point, and a heartbeat reads across the sidebar the way a word can't.
  *
  * The badge reads the clock on its own tick (see EVENT_BADGE_TICK_MS), so the
  * states arrive and leave with the event's window rather than with the next
@@ -40,6 +40,15 @@ const MONO_ADVANCE = 0.58;
  * the badge, so the two "now" states read at one consistent size everywhere.
  */
 const TODAY_FONT_PX = 5;
+/**
+ * The live dot beside the word, as a fraction of the badge — big enough to
+ * carry the pulse on a sidebar row, small enough to leave the word its room.
+ * The gap follows it, and both are floored so a small badge keeps a dot that
+ * is still a dot.
+ */
+const LIVE_DOT_RATIO = 0.22;
+const MIN_LIVE_DOT_PX = 3;
+const LIVE_DOT_GAP_RATIO = 0.08;
 
 /**
  * How often the badge re-reads the clock. The circle announces a moment — a
@@ -105,6 +114,8 @@ export function DpWithEventDate({
   // today), the window being open is — see the pulse below.
   const isLive = Boolean(badge?.isLive);
   const badgeSize = visible && badge ? badgeSizeFor(dpSize, badge.isToday || isEnded) : 0;
+  const liveDotSize = Math.max(MIN_LIVE_DOT_PX, Math.round(badgeSize * LIVE_DOT_RATIO));
+  const liveDotGap = Math.max(1, Math.round(badgeSize * LIVE_DOT_GAP_RATIO));
   const word = badge
     ? badge.isLive
       ? "Live"
@@ -152,17 +163,29 @@ export function DpWithEventDate({
               : "bg-accent text-accent-foreground ring-background"
           }`}
         >
-          {/* The live pulse: a red fill that swells and fades on repeat,
-              clipped by the circle so it reads as the badge itself breathing
-              rather than a halo bleeding over the DP behind it. Members who
-              asked for less motion keep the word, without the movement. */}
-          {isLive && (
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-full bg-[var(--ds-red-700)] opacity-40 animate-ping motion-reduce:animate-none"
-            />
+          {/* The live pulse, as a dot beside the word: one span swells and
+              fades on repeat, the dot it leaves from holds steady inside it —
+              the beat the word names, legible at a glance across a sidebar of
+              rooms. Riding beside the word rather than filling the circle
+              behind it keeps the badge readable while it moves, and the dot is
+              sized off the badge so the swell stays its own mark instead of a
+              wash over the tile. Members who asked for less motion keep the
+              dot, without the swell. */}
+          {isLive ? (
+            <span className="relative flex items-center" style={{ gap: liveDotGap }}>
+              <span
+                aria-hidden="true"
+                className="relative inline-flex shrink-0"
+                style={{ width: liveDotSize, height: liveDotSize }}
+              >
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--ds-red-700)] opacity-75 motion-reduce:animate-none" />
+                <span className="relative inline-flex h-full w-full rounded-full bg-[var(--ds-red-700)]" />
+              </span>
+              <span className="relative">{word}</span>
+            </span>
+          ) : (
+            <span className="relative">{word}</span>
           )}
-          <span className="relative">{word}</span>
           {!isEnded && !isLive && (
             <span
               className="relative mt-px font-display"
