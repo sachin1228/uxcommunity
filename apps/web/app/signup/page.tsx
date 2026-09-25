@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { compressAvatarClient } from "@/lib/image-client";
@@ -45,7 +45,6 @@ function joinNameParts(firstName: string, lastName: string): string {
 }
 
 function SignupInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   // Resume link emailed from Admin → Incomplete Signups (no invitation token).
@@ -290,8 +289,16 @@ function SignupInner() {
     }
   }
 
-  function goToDashboard() {
-    router.push("/dashboard");
+  async function goToDashboard() {
+    // Signup ends by establishing a session (see /api/signup/avatar), so it is
+    // a session boundary like login: drop the previous session's caches and
+    // leave with a full document navigation, or Next's URL-keyed client Router
+    // Cache would serve the payload rendered for whoever was signed in here
+    // before (see app/login/page.tsx).
+    const { resetClientSessionCaches } = await import("@/lib/session-cache");
+    resetClientSessionCaches();
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full document load: `router.push` reuses the previous session's cached RSC payload.
+    window.location.assign("/dashboard");
   }
 
   // Back navigation: every step's answers stay in state, and the step-1

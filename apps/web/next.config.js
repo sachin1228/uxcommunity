@@ -20,6 +20,13 @@ const nextConfig = {
     // half a minute reuses the cached RSC payload and renders instantly.
     // Freshness of the DATA inside is unaffected: the chat still catch-up
     // fetches over realtime/cache on mount.
+    //
+    // AUTH INVARIANT: this cache is keyed by URL (pathname + search) and never
+    // sees the session cookie, so a *client-side* navigation can render the
+    // previous session's server payload. Every session boundary — login,
+    // signup completion, logout — must leave with a full document navigation
+    // (`window.location.assign/replace`), not `router.push`. See
+    // app/login/page.tsx, app/signup/page.tsx and components/ui/useLogout.ts.
     staleTimes: {
       dynamic: 30,
     },
