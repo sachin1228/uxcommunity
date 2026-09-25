@@ -37,6 +37,7 @@ import {
   prettyUrl,
   splitBody,
 } from "@/lib/communities/content-notifications";
+import { eventZoneLabel, eventZoneTooltip } from "@/lib/communities/event-display";
 
 interface ContentNotificationBubbleProps {
   event: CachedContentEvent;
@@ -153,7 +154,11 @@ export function ContentNotificationBubble({
     title = split.title;
     subtitle = split.subtitle ?? (event.kind === "showcase" && meta?.description ? firstLine(meta.description, 80) : null);
   } else if (event.kind === "event") {
-    subtitle = meta?.event_date ? fmtEventSchedule(meta.event_date) : null;
+    // The chat card is often the first place a member meets an event, so the
+    // time it shows names the zone it was read in — see event-display.
+    subtitle = meta?.event_date
+      ? `${fmtEventSchedule(meta.event_date)} (${eventZoneLabel(meta.event_date)})`
+      : null;
   } else if (event.kind === "resource") {
     subtitle = meta?.url ? prettyUrl(meta.url) : null;
   }
@@ -293,6 +298,11 @@ export function ContentNotificationBubble({
                   className={`font-body text-[11px] line-clamp-2 leading-snug mt-0.5 ${
                     isMe ? "text-accent-foreground/80" : "text-foreground-muted"
                   }`}
+                  title={
+                    event.kind === "event" && meta?.event_date
+                      ? eventZoneTooltip(meta.event_date)
+                      : undefined
+                  }
                 >
                   {subtitle}
                 </p>

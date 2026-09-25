@@ -11,10 +11,12 @@ import { compressImage, compressedFile } from "@/lib/image-client";
 import {
   isPastStart,
   localInputToIso,
+  minutesUntilStart,
   nowTimeInput,
   todayDateInput,
-  viewerZoneLabel,
+  zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
+import { useNowTick } from "./useNowTick";
 
 interface CreateEventModalProps {
   communityId?: string;
@@ -47,8 +49,15 @@ export function CreateEventModal({
   // submit check re-reads the clock, so time still can't slip through.
   const [minDate] = useState(() => todayDateInput());
   const [minStartTime] = useState(() => nowTimeInput());
-  // Named once per mount: the zone the typed times mean, beside the picker.
-  const [zoneLabel] = useState(() => viewerZoneLabel());
+  // The zone the typed times mean, beside the picker. Derived from the chosen
+  // day so an event on the far side of a DST change still names the offset it
+  // will actually run at, and the tick keeps the countdown below honest.
+  const zoneLabel = zoneLabelForDateInput(eventDate);
+  const nowTick = useNowTick();
+  const startsInMinutes = minutesUntilStart(
+    eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
+    new Date(nowTick),
+  );
   const [isOnline, setIsOnline] = useState(false);
   const [location, setLocation] = useState("");
   const [meetLink, setMeetLink] = useState("");
@@ -254,7 +263,12 @@ export function CreateEventModal({
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
-                  <span className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle">{zoneLabel}</span>
+                  <span
+                    className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
+                    title={`The times you enter are in your timezone (${zoneLabel})`}
+                  >
+                    {zoneLabel}
+                  </span>
                 </span>
                 <input
                   type="date"
@@ -309,9 +323,22 @@ export function CreateEventModal({
                   />
                 </label>
               </div>
-              <p className="font-body text-[11px] leading-snug text-foreground-subtle">
-                Both times are on the chosen day. Leave the end blank for an open-ended event.
-              </p>
+              <div className="font-body text-[11px] leading-snug text-foreground-subtle">
+                <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
+                {/* The host types their own wall time; everyone else reads the
+                    same instant on their own clock. Saying so here is what
+                    keeps a 3 PM booking from reading as a wrong time abroad. */}
+                <p className="mt-1">
+                  Everyone sees this in their own timezone — the same moment everywhere.
+                </p>
+                {startsInMinutes !== null && (
+                  <p className="mt-1 font-medium text-accent">
+                    {startsInMinutes === 1
+                      ? "Starts in about a minute."
+                      : `Starts in about ${startsInMinutes} minutes.`}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

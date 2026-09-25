@@ -194,6 +194,38 @@ export function viewerZoneLabel(now: Date = new Date()): string {
 }
 
 /**
+ * The viewer's zone label as of a chosen date (see viewerZoneLabel) — an event
+ * sitting on the far side of a DST change must name the offset it will actually
+ * run at, not today's. Noon anchors the lookup: a date input can only name a
+ * day, and noon is never inside a transition.
+ */
+export function zoneLabelForDateInput(date: string, fallback: Date = new Date()): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return viewerZoneLabel(fallback);
+  return viewerZoneLabel(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+}
+
+/** How close to the start the event form starts calling it "starting soon". */
+export const STARTS_SOON_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Whole minutes until the start, when it falls inside that window — null when
+ * it is further out, has already begun, or cannot be read. Rounded up, so half
+ * a minute away reads "in 1 minute" rather than "in 0 minutes".
+ */
+export function minutesUntilStart(
+  startIso: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (!startIso) return null;
+  const start = Date.parse(startIso);
+  if (!Number.isFinite(start)) return null;
+  const delta = start - now.getTime();
+  if (delta <= 0 || delta > STARTS_SOON_WINDOW_MS) return null;
+  return Math.max(1, Math.ceil(delta / 60_000));
+}
+
+/**
  * A start instant that has already happened (with the minute of grace above).
  * Unparseable input counts as past: every caller has already validated the
  * shape, and failing closed here can only refuse a date, never move one.

@@ -12,6 +12,9 @@ import {
   isPastStart,
   startMovedByEdit,
   viewerZoneLabel,
+  zoneLabelForDateInput,
+  minutesUntilStart,
+  STARTS_SOON_WINDOW_MS,
 } from "./event-time";
 
 /**
@@ -181,4 +184,36 @@ test("half-hour offsets keep their minutes", () => {
   withZone("Asia/Kathmandu", () => {
     assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC+5:45");
   });
+});
+
+test("the form's zone label follows the chosen date across a DST change", () => {
+  withZone("America/New_York", () => {
+    // The same viewer, two events either side of the change: the label must
+    // name the offset the event will actually run at.
+    assert.equal(zoneLabelForDateInput("2026-07-15"), "EDT · UTC-4:00");
+    assert.equal(zoneLabelForDateInput("2026-01-15"), "EST · UTC-5:00");
+  });
+});
+
+test("an empty or malformed date falls back to the viewer's current zone", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(zoneLabelForDateInput(""), "UTC+5:30");
+    assert.equal(zoneLabelForDateInput("25/09/2026"), "UTC+5:30");
+  });
+});
+
+test("minutes until the start only counts inside the last hour", () => {
+  const now = new Date("2026-09-25T12:00:00Z");
+  assert.equal(minutesUntilStart("2026-09-25T12:42:00Z", now), 42);
+  // Rounded up, so half a minute is "in 1 minute", never "in 0".
+  assert.equal(minutesUntilStart("2026-09-25T12:00:30Z", now), 1);
+  // The window is a full hour, and one second past it is out.
+  assert.equal(minutesUntilStart("2026-09-25T13:00:00Z", now), 60);
+  assert.equal(minutesUntilStart("2026-09-25T13:00:01Z", now), null);
+  // Already begun, missing, or unreadable never claims to be starting soon.
+  assert.equal(minutesUntilStart("2026-09-25T11:59:00Z", now), null);
+  assert.equal(minutesUntilStart(null, now), null);
+  assert.equal(minutesUntilStart("not a date", now), null);
+  // The window the constant names is the one the helper uses.
+  assert.equal(STARTS_SOON_WINDOW_MS, 60 * 60 * 1000);
 });

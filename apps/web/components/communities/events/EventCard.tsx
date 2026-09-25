@@ -13,6 +13,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import {
+  eventZoneLabel,
+  eventZoneTooltip,
+  formatEventTimeRange,
+} from "@/lib/communities/event-display";
 import { invalidateOnJoin, invalidateOnLeave } from "@/lib/communities/cache";
 import { showUndoToast } from "@/lib/undo-toast";
 import { usePendingMutation } from "@/lib/use-mutation";
@@ -109,9 +114,6 @@ function fmtEventDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
-}
 
 /**
  * True when an accent is so light that white text on it would wash out — the
@@ -536,9 +538,18 @@ export function EventCard({
               <Calendar strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
               {fmtEventDate(event.event_date)}
             </span>
-            <span className="inline-flex items-center gap-1.5">
+            {/* The viewer's own clock, with the zone named beside it: the host
+                set this time somewhere, and everyone else is reading it in
+                theirs — the label is what stops the two being confused. */}
+            <span
+              className="inline-flex items-center gap-1.5"
+              title={eventZoneTooltip(event.event_date)}
+            >
               <Clock strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
-              {fmtTime(event.event_date)}{event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
+              {formatEventTimeRange(event.event_date, event.end_date)}
+              <span className="font-mono text-[10px] text-stone-400">
+                ({eventZoneLabel(event.event_date)})
+              </span>
             </span>
             {(event.is_online || event.location) && (
               <span className="inline-flex min-w-0 items-center gap-1.5">
