@@ -6,8 +6,8 @@ import {
   eventZoneLabel,
   eventZoneTooltip,
   hostScheduleForViewer,
-  zoneOffsetMinutes,
 } from "./event-display";
+import { zoneOffsetMinutes } from "./timezone";
 
 /**
  * Runs the assertions with the browser's zone frozen to a fixed offset, so the

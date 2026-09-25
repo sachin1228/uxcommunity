@@ -1,8 +1,12 @@
+import { viewerOffsetMinutes, viewerZoneLabel } from "./event-time";
 import {
+  canonicalZoneId,
   formatUtcOffsetMinutes,
-  viewerOffsetMinutes,
-  viewerZoneLabel,
-} from "./event-time";
+  wallTimeAtOffset,
+  wallTimeInZone,
+  zoneLabelInZone,
+  zoneOffsetMinutes,
+} from "./timezone";
 
 /**
  * How an event's times read to the member looking at them.
@@ -69,83 +73,6 @@ export interface HostZonedEvent {
   host_utc_offset_minutes?: number | null;
 }
 
-/** Whether this runtime can format in the named zone at all. */
-function zoneIsUsable(timeZone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone });
-    return true;
-  } catch {
-    return false; // an unknown or legacy name must never throw into a render
-  }
-}
-
-/** Minutes east of UTC for a named zone at an instant, or null if unusable. */
-export function zoneOffsetMinutes(timeZone: string, instant: Date): number | null {
-  if (!zoneIsUsable(timeZone)) return null;
-  const part = new Intl.DateTimeFormat("en", { timeZone, timeZoneName: "longOffset" })
-    .formatToParts(instant)
-    .find((entry) => entry.type === "timeZoneName")?.value ?? "";
-  const match = /^GMT([+-])(\d{2}):(\d{2})$/.exec(part);
-  if (!match) return part === "GMT" || part === "UTC" ? 0 : null;
-  const sign = match[1] === "-" ? -1 : 1;
-  return sign * (Number(match[2]) * 60 + Number(match[3]));
-}
-
-/** The zone's own abbreviation at an instant ("EDT"), when it has a real one. */
-export function zoneAbbreviation(timeZone: string, instant: Date): string | null {
-  if (!zoneIsUsable(timeZone)) return null;
-  const named = new Intl.DateTimeFormat("en", { timeZone, timeZoneName: "short" })
-    .formatToParts(instant)
-    .find((entry) => entry.type === "timeZoneName")?.value ?? null;
-  // A GMT-style name is the offset under another label; not worth repeating.
-  return named && !/^(GMT|UTC)/.test(named) ? named : null;
-}
-
-/** "EDT · UTC-4:00" for a named zone at an instant, or null if unusable. */
-export function zoneLabelInZone(timeZone: string, instant: Date): string | null {
-  const minutes = zoneOffsetMinutes(timeZone, instant);
-  if (minutes === null) return null;
-  const offset = formatUtcOffsetMinutes(minutes);
-  const abbrev = zoneAbbreviation(timeZone, instant);
-  return abbrev ? `${abbrev} · ${offset}` : offset;
-}
-
-/**
- * The wall clock a moment reads as in a named zone — the host's own time, said
- * the way their clock says it.
- */
-function wallTimeInZone(iso: string, timeZone: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date
-    .toLocaleTimeString("en-IN", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone,
-    })
-    .toUpperCase();
-}
-
-/**
- * A moment shifted by a stored offset and read as UTC — the host's wall clock
- * reconstructed without needing their zone name. This is the fallback that
- * keeps the host's time visible when a browser cannot resolve the stored zone.
- */
-function wallTimeAtOffset(iso: string, minutesEast: number): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const shifted = new Date(date.getTime() + minutesEast * 60_000);
-  return shifted
-    .toLocaleTimeString("en-IN", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: "UTC",
-    })
-    .toUpperCase();
-}
-
 export interface HostSchedule {
   /** "3:00 PM – 5:00 PM" — the wall clock the host set, in their own zone. */
   range: string;
@@ -173,7 +100,7 @@ export function hostScheduleForViewer(event: HostZonedEvent): HostSchedule | nul
   const start = new Date(event.event_date);
   if (Number.isNaN(start.getTime())) return null;
 
-  const named = zone && zoneIsUsable(zone) ? zone : null;
+  const named = zone ? canonicalZoneId(zone) : null;
   // The zone's own offset wins where it can be read (it carries the DST in
   // force on the event's date); the offset the host's browser stored at the
   // time is the fallback, which is the whole reason it is stored.

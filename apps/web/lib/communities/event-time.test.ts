@@ -217,3 +217,38 @@ test("minutes until the start only counts inside the last hour", () => {
   // The window the constant names is the one the helper uses.
   assert.equal(STARTS_SOON_WINDOW_MS, 60 * 60 * 1000);
 });
+
+test("a chosen zone, not the device's, decides what a typed clock means", () => {
+  withZone("America/New_York", () => {
+    // A host whose device says New York but who is scheduling in Kolkata: the
+    // typed 12:10 belongs to the zone they picked, not to their own clock.
+    assert.equal(localInputToIso("2026-09-25", "12:10", "Asia/Kolkata"), "2026-09-25T12:10:00+05:30");
+    // Unchanged without a zone: the device's own reading of the same input.
+    assert.equal(localInputToIso("2026-09-25", "12:10"), "2026-09-25T12:10:00-04:00");
+    // The legacy spelling this runtime reports is the same zone.
+    assert.equal(localInputToIso("2026-09-25", "12:10", "Asia/Calcutta"), "2026-09-25T12:10:00+05:30");
+  });
+});
+
+test("a chosen zone follows its own DST, and an unusable one falls back to the device", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(localInputToIso("2026-01-15", "09:30", "America/New_York"), "2026-01-15T09:30:00-05:00");
+    assert.equal(localInputToIso("2026-07-15", "09:30", "America/New_York"), "2026-07-15T09:30:00-04:00");
+    // A name the runtime cannot resolve must not invent a zone — the device's
+    // own reading is the only honest one left.
+    assert.equal(localInputToIso("2026-09-25", "12:10", "Not/AZone"), "2026-09-25T12:10:00+05:30");
+    assert.equal(localInputToIso("2026-09-25", "12:10", null), "2026-09-25T12:10:00+05:30");
+    // The calendar-overflow guard applies to the zone path too.
+    assert.equal(localInputToIso("2026-02-30", "12:10", "America/New_York"), null);
+  });
+});
+
+test("the form's zone label names the chosen zone, not the reader's", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(zoneLabelForDateInput("2026-07-15", "America/New_York"), "EDT · UTC-4:00");
+    assert.equal(zoneLabelForDateInput("2026-01-15", "America/New_York"), "EST · UTC-5:00");
+    assert.equal(zoneLabelForDateInput("2026-07-15"), "UTC+5:30");
+    // An unusable name labels the reader's own zone rather than nothing.
+    assert.equal(zoneLabelForDateInput("2026-07-15", "Not/AZone"), "UTC+5:30");
+  });
+});

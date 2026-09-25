@@ -11,17 +11,19 @@ import { compressImage, compressedFile } from "@/lib/image-client";
 import {
   addDaysToDateInput,
   daysBetweenDateInputs,
+  hostOffsetMinutes,
   isPastStart,
-  localInputToIso,
   isoToLocalInput,
+  localInputToIso,
   minutesUntilStart,
   nowTimeInput,
   startMovedByEdit,
   todayDateInput,
-  viewerOffsetMinutes,
   viewerTimeZoneName,
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
+import { wallTimeInputsInZone } from "@/lib/communities/timezone";
+import { HostTimeZoneField } from "./HostTimeZoneField";
 import { useNowTick } from "./useNowTick";
 
 interface EditEventModalProps {
@@ -32,10 +34,18 @@ interface EditEventModalProps {
 }
 
 /**
- * The stored instant as the viewer's own wall time, in date/time-input shape —
- * the same conversion the create form reverses on submit.
+ * The stored instant as the wall time of the zone it belongs to, in
+ * date/time-input shape — the same conversion the create form reverses on
+ * submit. Prefilling the fields from the device's clock instead would make an
+ * untouched save read the printed times back in another zone and move the
+ * event; the device's own reading is only the fallback for a zone this runtime
+ * cannot resolve.
  */
-function toLocalInputs(iso: string | null | undefined) {
+function toLocalInputs(iso: string | null | undefined, timeZone: string | null) {
+  if (timeZone) {
+    const inZone = wallTimeInputsInZone(iso, timeZone);
+    if (inZone) return inZone;
+  }
   return isoToLocalInput(iso) ?? { date: "", time: "" };
 }
 
@@ -45,8 +55,15 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [description, setDescription] = useState(event.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(event.cover_image_url ?? null);
   const [imageUploading, setImageUploading] = useState(false);
-  const storedStart = toLocalInputs(event.event_date);
-  const storedEnd = toLocalInputs(event.end_date);
+  // The zone the times are read in starts as the one the event was created in,
+  // so an edit made from another country shows the host's own clock and hands
+  // that same zone back. The create form defaults to the device instead.
+  const [deviceZone] = useState(() => viewerTimeZoneName());
+  const [hostZone, setHostZone] = useState<string | null>(
+    () => event.host_timezone?.trim() || deviceZone,
+  );
+  const storedStart = toLocalInputs(event.event_date, hostZone);
+  const storedEnd = toLocalInputs(event.end_date, hostZone);
   const [eventDate, setEventDate] = useState(storedStart.date);
   const [eventTime, setEventTime] = useState(storedStart.time);
   const [endTime, setEndTime] = useState(storedEnd.time);
@@ -71,7 +88,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   // The zone the typed times mean, beside the picker. Derived from the chosen
   // day so an event on the far side of a DST change still names the offset it
   // will actually run at, and the tick keeps the countdown below honest.
-  const zoneLabel = zoneLabelForDateInput(eventDate);
+  const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
   const nowTick = useNowTick();
   const startsInMinutes = minutesUntilStart(
     eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
@@ -122,7 +139,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
    * zone (UTC) claimed it and a typed 12:10 displayed as 17:40 IST.
    */
   function buildIso(date: string, time: string) {
-    return localInputToIso(date, time);
+    return localInputToIso(date, time, hostZone);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -172,11 +189,12 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           cover_image_url: coverImageUrl,
           accent_color: accentColor,
           is_public: isPublic,
-          // Sent on every save; the API keeps the stored zone unless the
-          // schedule itself moved, so editing a description from another
-          // country cannot relabel the time the host chose.
-          host_timezone: viewerTimeZoneName(),
-          host_utc_offset_minutes: viewerOffsetMinutes(new Date(startDate)),
+          // The zone the times above were read in — the event's own unless the
+          // editor changed it. The API keeps what is stored unless the schedule
+          // itself moved, so editing a description from another country cannot
+          // relabel the time the host chose.
+          host_timezone: hostZone,
+          host_utc_offset_minutes: hostOffsetMinutes(startDate, hostZone),
         }),
       });
       const data = await res.json();
@@ -288,7 +306,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
                   <span
                     className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
-                    title={`The times you enter are in your timezone (${zoneLabel})`}
+                    title={`The times you enter are read in ${zoneLabel}`}
                   >
                     {zoneLabel}
                   </span>
@@ -352,12 +370,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               </div>
               <div className="font-body text-[11px] leading-snug text-foreground-subtle">
                 <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
-                {/* The host types their own wall time; everyone else reads the
-                    same instant on their own clock. Saying so here is what
-                    keeps a 3 PM booking from reading as a wrong time abroad. */}
-                <p className="mt-1">
-                  Everyone sees this in their own timezone — the same moment everywhere.
-                </p>
                 {startsInMinutes !== null && (
                   <p className="mt-1 font-medium text-accent">
                     {startsInMinutes === 1
@@ -366,6 +378,16 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   </p>
                 )}
               </div>
+
+              {/* Which clock the times above are on — the event's own zone
+                  unless this editor says otherwise. */}
+              <HostTimeZoneField
+                value={hostZone}
+                onChange={setHostZone}
+                deviceZone={deviceZone}
+                dateInput={eventDate}
+                startIso={eventDate && eventTime ? buildIso(eventDate, eventTime) : null}
+              />
             </div>
           </div>
 

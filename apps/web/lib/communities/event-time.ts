@@ -11,6 +11,7 @@
  * "yyyy/mm/dd HH:mm:ss" — no day names, no suffixes — so the parts are parsed
  * back out of it and reassembled with offsets to a canonical ISO string.
  */
+import { formatUtcOffsetMinutes, isKnownTimeZone, zoneLabelInZone, zoneOffsetMinutes } from "./timezone";
 const ZONELESS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 const zoneFormatter = new Intl.DateTimeFormat("en-ZA", {
@@ -43,11 +44,38 @@ function zoneStamp(date: Date): string {
 
 /**
  * A browser wall-time input ("2026-09-25" + "12:10") as the real instant it
- * names in the viewer's zone, ISO-encoded — "2026-09-25T06:40:00.000Z" for a
- * UTC+5:30 viewer. Inputs in the future or from another zone render back
- * through toISOString, so what leaves the browser is always exact.
+ * names — in the viewer's own zone, or in a zone they explicitly chose. Either
+ * way the wall clock is stated with the offset it means, so what leaves the
+ * browser is an exact instant rather than a clock time hoping for a zone.
  */
-export function localInputToIso(date: string, time: string): string | null {
+/**
+ * The instant a typed wall clock names inside a named zone, as an
+ * offset-suffixed ISO string ("2026-09-25T12:10:00+05:30"). An offset only
+ * means something at a moment, so the zone's offset is read at the wall time
+ * and then re-read at the instant that implies — a clock time on the far side
+ * of a DST change needs that second pass to land on the right side of it.
+ */
+function zoneWallClockToIso(date: string, time: string, timeZone: string): string | null {
+  const [y, mo, d] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const wallAsUtc = Date.UTC(y, mo - 1, d, hour, minute);
+  const asUtc = new Date(wallAsUtc);
+  // The same overflow guard the device path below applies: 2026-02-30 rolls
+  // into March rather than failing.
+  if (asUtc.getUTCMonth() !== mo - 1 || asUtc.getUTCDate() !== d) return null;
+
+  let minutes = zoneOffsetMinutes(timeZone, asUtc);
+  if (minutes === null) return null;
+  const settled = zoneOffsetMinutes(timeZone, new Date(wallAsUtc - minutes * 60_000));
+  if (settled !== null && settled !== minutes) minutes = settled;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const abs = Math.abs(minutes);
+  // The wall clock the member typed, stated with the zone it means.
+  return `${date}T${pad(hour)}:${pad(minute)}:00${minutes < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
+export function localInputToIso(date: string, time: string, timeZone?: string | null): string | null {
   if (!date || !time) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(time);
@@ -58,6 +86,10 @@ export function localInputToIso(date: string, time: string): string | null {
   const hour = Number(hh);
   const minute = Number(mm);
   if (hour > 23 || minute > 59) return null;
+  // A chosen zone changes what the typed clock means: 3 PM in Kolkata is not
+  // 3 PM in New York. Without one, the device's own zone is the only honest
+  // reading of a wall clock the member just typed.
+  if (timeZone && isKnownTimeZone(timeZone)) return zoneWallClockToIso(date, time, timeZone);
   // Constructed in the viewer's zone by design: the hour they typed is the
   // hour their neighbours will see, wherever the server sits.
   const local = new Date(Number(y), Number(mo) - 1, Number(d), hour, minute);
@@ -186,22 +218,22 @@ export function viewerZoneLabel(now: Date = new Date()): string {
   return abbrev ? `${abbrev} · ${offset}` : offset;
 }
 
-/**
- * Minutes east of UTC written as a label — "UTC+5:30" for IST (330), "UTC-4:00"
- * for EDT (-240), plain "UTC" at zero. One convention across the app: minutes
- * east, the same sign the ISO offsets the API receives already carry.
- */
-export function formatUtcOffsetMinutes(minutesEast: number): string {
-  if (minutesEast === 0) return "UTC";
-  const abs = Math.abs(minutesEast);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `UTC${minutesEast < 0 ? "-" : "+"}${Math.floor(abs / 60)}:${pad(abs % 60)}`;
-}
-
 /** The viewer's offset at an instant, in minutes east of UTC (IST is 330). */
 export function viewerOffsetMinutes(instant: Date = new Date()): number {
   // getTimezoneOffset counts minutes *west* of UTC.
   return -instant.getTimezoneOffset();
+}
+
+/**
+ * The offset to store beside the host's zone: that zone's own offset at the
+ * event's start, or the device's reading of the instant when there is no
+ * usable name. Stored so a browser that cannot resolve the name can still
+ * rebuild the host's wall clock out of minutes alone.
+ */
+export function hostOffsetMinutes(startIso: string, timeZone: string | null): number {
+  const instant = new Date(startIso);
+  const named = timeZone ? zoneOffsetMinutes(timeZone, instant) : null;
+  return named ?? viewerOffsetMinutes(instant);
 }
 
 /**
@@ -218,15 +250,38 @@ export function viewerTimeZoneName(): string | null {
 }
 
 /**
- * The viewer's zone label as of a chosen date (see viewerZoneLabel) — an event
- * sitting on the far side of a DST change must name the offset it will actually
- * run at, not today's. Noon anchors the lookup: a date input can only name a
- * day, and noon is never inside a transition.
+ * The zone label as of a chosen date — an event sitting on the far side of a
+ * DST change must name the offset it will actually run at, not today's. Noon
+ * UTC anchors the lookup: a date input can only name a day, noon is never
+ * inside a transition, and pinning it to UTC keeps a reader's own zone from
+ * dragging the lookup across a transition for the zone being labelled.
+ *
+ * Without a zone this labels the viewer's own (see viewerZoneLabel); with one
+ * it labels the zone the host said the times belong to.
  */
-export function zoneLabelForDateInput(date: string, fallback: Date = new Date()): string {
+export function zoneLabelForDateInput(
+  date: string,
+  timeZone?: string | null,
+  fallback: Date = new Date(),
+): string {
+  const noon = noonUtcForDateInput(date, fallback);
+  if (timeZone && isKnownTimeZone(timeZone)) {
+    return zoneLabelInZone(timeZone, noon) ?? viewerZoneLabel(noon);
+  }
+  return viewerZoneLabel(noon);
+}
+
+/**
+ * Noon UTC on a date input, as an instant — the anchor for anything labelled
+ * from a day rather than a moment. A date input can only name a day, noon is
+ * never inside a DST transition, and pinning it to UTC keeps the reader's own
+ * zone from dragging the lookup across one for the zone being labelled. A
+ * date that doesn't parse hands back the fallback untouched.
+ */
+export function noonUtcForDateInput(date: string, fallback: Date = new Date()): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!match) return viewerZoneLabel(fallback);
-  return viewerZoneLabel(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  if (!match) return fallback;
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
 }
 
 /** How close to the start the event form starts calling it "starting soon". */

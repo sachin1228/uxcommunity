@@ -9,15 +9,16 @@ import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 import {
+  hostOffsetMinutes,
   isPastStart,
   localInputToIso,
   minutesUntilStart,
   nowTimeInput,
   todayDateInput,
-  viewerOffsetMinutes,
   viewerTimeZoneName,
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
+import { HostTimeZoneField } from "./HostTimeZoneField";
 import { useNowTick } from "./useNowTick";
 
 interface CreateEventModalProps {
@@ -51,10 +52,16 @@ export function CreateEventModal({
   // submit check re-reads the clock, so time still can't slip through.
   const [minDate] = useState(() => todayDateInput());
   const [minStartTime] = useState(() => nowTimeInput());
-  // The zone the typed times mean, beside the picker. Derived from the chosen
-  // day so an event on the far side of a DST change still names the offset it
-  // will actually run at, and the tick keeps the countdown below honest.
-  const zoneLabel = zoneLabelForDateInput(eventDate);
+  // The zone the typed times mean. It starts as the device's own — what a wall
+  // clock the member just typed almost always means — and the picker below
+  // overrides it for a device set to the wrong zone, or for a host scheduling
+  // somewhere they aren't.
+  const [deviceZone] = useState(() => viewerTimeZoneName());
+  const [hostZone, setHostZone] = useState<string | null>(deviceZone);
+  // Derived from the chosen day so an event on the far side of a DST change
+  // still names the offset it will actually run at, and the tick keeps the
+  // countdown below honest.
+  const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
   const nowTick = useNowTick();
   const startsInMinutes = minutesUntilStart(
     eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
@@ -100,12 +107,12 @@ export function CreateEventModal({
   }
 
   /**
-   * The viewer's wall time, stated in their own zone. The old naive
+   * The typed wall time, stated in the zone it belongs to. The old naive
    * concatenation (`${date}T${time}:00`) carried no zone, so Postgres's session
    * zone (UTC) claimed it and a typed 12:10 displayed as 17:40 IST.
    */
   function buildIso(date: string, time: string) {
-    return localInputToIso(date, time);
+    return localInputToIso(date, time, hostZone);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -149,11 +156,11 @@ export function CreateEventModal({
           is_public: isPublic,
           // The host's own side of the schedule, so the card can show the time
           // they actually set beside each viewer's reading of it. The offset is
-          // the device's at the event's instant, which is what the wall time
+          // that zone's at the event's instant, which is what the wall time
           // above was typed in — and the fallback if the name cannot be
           // resolved on someone else's browser later.
-          host_timezone: viewerTimeZoneName(),
-          host_utc_offset_minutes: viewerOffsetMinutes(new Date(startDate)),
+          host_timezone: hostZone,
+          host_utc_offset_minutes: hostOffsetMinutes(startDate, hostZone),
         }),
       });
       const data = await res.json();
@@ -274,7 +281,7 @@ export function CreateEventModal({
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
                   <span
                     className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
-                    title={`The times you enter are in your timezone (${zoneLabel})`}
+                    title={`The times you enter are read in ${zoneLabel}`}
                   >
                     {zoneLabel}
                   </span>
@@ -334,12 +341,6 @@ export function CreateEventModal({
               </div>
               <div className="font-body text-[11px] leading-snug text-foreground-subtle">
                 <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
-                {/* The host types their own wall time; everyone else reads the
-                    same instant on their own clock. Saying so here is what
-                    keeps a 3 PM booking from reading as a wrong time abroad. */}
-                <p className="mt-1">
-                  Everyone sees this in their own timezone — the same moment everywhere.
-                </p>
                 {startsInMinutes !== null && (
                   <p className="mt-1 font-medium text-accent">
                     {startsInMinutes === 1
@@ -348,6 +349,18 @@ export function CreateEventModal({
                   </p>
                 )}
               </div>
+
+              {/* Which clock the times above are on. It defaults to the
+                  device's own and is the host's only way to say otherwise —
+                  and the one place that says everyone else reads the same
+                  moment on their own clock. */}
+              <HostTimeZoneField
+                value={hostZone}
+                onChange={setHostZone}
+                deviceZone={deviceZone}
+                dateInput={eventDate}
+                startIso={eventDate && eventTime ? buildIso(eventDate, eventTime) : null}
+              />
             </div>
           </div>
 
