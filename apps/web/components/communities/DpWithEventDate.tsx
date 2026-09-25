@@ -15,8 +15,9 @@ import { eventDateBadge } from "@/lib/communities/event-date";
  * On the event's own day the tile says TODAY, and while the event is actually
  * running it says LIVE — one word deeper into "now" each time. Those words are
  * longer than any month abbreviation, so the today chip grows a little
- * (nothing reflows — the badge is absolutely positioned over the DP) and every
- * word is capped to the width the circle actually has. LIVE also drops the
+ * (nothing reflows — the badge is absolutely positioned over the DP) and the
+ * month and LIVE words are capped to the width the circle actually has; TODAY
+ * itself is pinned to a fixed size instead of scaling. LIVE also drops the
  * page-coloured ring for the red one, so "on right now" reads even at a glance
  * across a full sidebar.
  */
@@ -26,6 +27,8 @@ const DAY_RATIO = 0.45;
 const MIN_MONTH_PX = 6;
 /** Advance width of one mono glyph relative to the font size, with tracking. */
 const MONO_ADVANCE = 0.58;
+/** The TODAY word is pinned to this size rather than scaling with the badge. */
+const TODAY_FONT_PX = 5;
 
 /** Badge diameter for a DP of this size — the same proportion in every surface. */
 function badgeSizeFor(dpSize: number, isToday: boolean): number {
@@ -93,7 +96,7 @@ export function DpWithEventDate({
           style={{
             width: badgeSize,
             height: badgeSize,
-            fontSize: topLineFontSize(badgeSize, word.length),
+            fontSize: badge.isToday ? TODAY_FONT_PX : topLineFontSize(badgeSize, word.length),
           }}
           className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center rounded-full bg-accent font-mono font-bold uppercase leading-none tracking-tight text-accent-foreground ring-2 ${
             badge.isLive ? "ring-[var(--ds-red-700)]" : "ring-background"
