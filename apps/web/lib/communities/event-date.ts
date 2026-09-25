@@ -33,6 +33,12 @@ export interface EventDateBadge {
    * Past the day it is false and the caller drops the tile entirely.
    */
   isEnded: boolean;
+  /**
+   * The event's window has closed (now at or past the end). The caller keeps
+   * the tile only while this is false or isEnded is true — everything else is
+   * an event still to come, which must keep wearing its date.
+   */
+  isPast: boolean;
 }
 
 export interface EventDateBadgeOptions {
@@ -115,5 +121,6 @@ export function eventDateBadge(
       Number.isFinite(endMs) &&
       nowMs >= endMs &&
       nowMs < endMs + EVENT_ENDED_GRACE_MS,
+    isPast: Number.isFinite(nowMs) && Number.isFinite(endMs) && nowMs >= endMs,
   };
 }

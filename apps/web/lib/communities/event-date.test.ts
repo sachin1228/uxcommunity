@@ -96,6 +96,19 @@ test("a long-past event still names its month, without ENDED", () => {
   const badge = eventDateBadge(at(2026, 8, 25, 10, 30), { now: new Date(2026, 8, 27, 12) });
   assert.equal(badge?.month, "SEPT");
   assert.equal(badge?.isEnded, false);
+  assert.equal(badge?.isPast, true);
+});
+
+test("an event weeks out keeps its plain date circle", () => {
+  // The regression this guards: a future event wears none of the special
+  // states, and the tile must still show — the date is the whole point.
+  const badge = eventDateBadge(at(2026, 9, 2, 18), { now: new Date(2026, 8, 25, 13) });
+  assert.equal(badge?.month, "OCT");
+  assert.equal(badge?.day, "2");
+  assert.equal(badge?.isToday, false);
+  assert.equal(badge?.isLive, false);
+  assert.equal(badge?.isEnded, false);
+  assert.equal(badge?.isPast, false);
 });
 
 test("an event between its start and end is live", () => {

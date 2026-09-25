@@ -72,13 +72,12 @@ export function DpWithEventDate({
   children: React.ReactNode;
 }) {
   const badge = eventDateBadge(date, { endsAt });
-  // A day after the event the announcement has served its purpose and the DP
-  // goes back to being just a DP — the room and its history stay. On the
-  // event's own day the states read as one lifecycle: the date up top until
-  // the day arrives, TODAY while it is still to come, LIVE while it runs,
-  // ENDED once it wraps — each the most useful fact at that moment, so a
-  // room whose event just finished never lingers on TODAY.
-  const visible = Boolean(badge && (badge.isToday || badge.isLive || badge.isEnded));
+  // The tile wears the date for every event still to come, trades it for
+  // TODAY/LIVE as the day arrives, says ENDED for a day after the window
+  // closes, and only then comes down — the room and its history stay. The
+  // gate is "has the window closed and the grace day passed", never the
+  // state itself: an event weeks out must keep its plain date circle.
+  const visible = Boolean(badge && (!badge.isPast || badge.isEnded));
   const isEnded = Boolean(badge?.isEnded);
   const badgeSize = visible && badge && !isEnded ? badgeSizeFor(dpSize, badge.isToday) : 0;
   const word = badge
@@ -116,7 +115,13 @@ export function DpWithEventDate({
            hover away. */
         <span
           role="img"
-          aria-label={badge.isLive ? `Event live now, ${badge.label}` : `Event today, ${badge.label}`}
+          aria-label={
+            badge.isLive
+              ? `Event live now, ${badge.label}`
+              : badge.isToday
+                ? `Event today, ${badge.label}`
+                : `Event on ${badge.label}`
+          }
           title={badge.isLive ? `Live now · ${badge.label}` : badge.label}
           style={{
             width: badgeSize,
