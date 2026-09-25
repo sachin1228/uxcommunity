@@ -17,6 +17,7 @@ import {
 } from "@/lib/communities/cache";
 import {
   CONTENT_EVENT_CHANGED_EVENT,
+  registerCommunitySettingsOpener,
   type CachedMessage,
   type CachedMeta,
   type CachedContentEvent,
@@ -1440,6 +1441,14 @@ export function CommunityChat({
     handleTabChange(tab);
   }, [handleTabChange]);
   const handleSettingsClick = useCallback(() => setShowSettings(true), []);
+
+  // The room's info card sits outside this component (it is mounted by the
+  // communities layout), so it asks for the settings modal through the
+  // registry in lib/communities/cache rather than by routing: this view owns
+  // the modal, and it is simply not mounted where the request is not ours.
+  useEffect(() => {
+    return registerCommunitySettingsOpener(communityId, () => setShowSettings(true));
+  }, [communityId]);
 
   if (!loading && !displayCommunity) {
     return (

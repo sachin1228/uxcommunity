@@ -291,17 +291,33 @@ export function useSidebarRealtime({
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "content-delete", (data) => {
-          const row = data as { id?: string; community_id?: string };
+          const row = data as { id?: string; community_id?: string; kind?: SidebarLastContent["kind"] };
           const deleteId = row.id;
           const deleteCommunityId = row.community_id;
           if (!deleteId || !deleteCommunityId || !joinedCommunityIds.has(deleteCommunityId)) return;
+          // An event's own group chat stays when the event is deleted (see the
+          // event delete route) — what comes down with it is the date badge on
+          // the room's DP and the Event card beside its chat, both of which
+          // ride on fields only the sidebar fetch computes. The route publishes
+          // this topic on the room's chat too, so the circle goes without the
+          // member having to reload the room.
+          const eventGone = row.kind === "event";
           setCommunities((prev) =>
             applyUpdate(prev, deleteCommunityId, (c) => {
-              if (c.last_content?.id !== deleteId) return c;
+              const clearsPreview = c.last_content?.id === deleteId;
+              // Nothing about this row changed — hand back the same object so
+              // the memoized row above it doesn't re-render for someone else's
+              // deleted post.
+              if (!eventGone && !clearsPreview) return c;
               return {
                 ...c,
-                last_content: null,
-                unread_content_count: Math.max(0, (c.unread_content_count ?? 0) - 1),
+                ...(eventGone ? { event_date: null, pinned_until: null, event_end: null } : null),
+                ...(clearsPreview
+                  ? {
+                      last_content: null,
+                      unread_content_count: Math.max(0, (c.unread_content_count ?? 0) - 1),
+                    }
+                  : null),
               };
             }),
           );

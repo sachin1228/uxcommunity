@@ -96,11 +96,18 @@ export function EventOptionsMenu({
           <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
             <Share2 strokeWidth={2.5} size={11} /> {shared ? "Copied!" : "Share"}
           </button>
-          {isOwner && !past && onEdit && onDelete && (
+          {/* Edit is the host's while the event is still ahead: its start has
+              gone by, so there is nothing left to reschedule (the form refuses
+              a past start). Delete is not the same decision — it stays for an
+              event that has already happened, because taking a finished event
+              down is exactly when a host wants it. */}
+          {isOwner && onDelete && (
             <>
-              <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                <Pencil strokeWidth={2.5} size={11} /> Edit
-              </button>
+              {!past && onEdit && (
+                <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                  <Pencil strokeWidth={2.5} size={11} /> Edit
+                </button>
+              )}
               <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
                 {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
                 {deleting ? "Deleting…" : "Delete"}

@@ -31,7 +31,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
-import { EventRoomSection } from "./events/EventRoomSection";
+import { EventRoomGoneSection, EventRoomSection } from "./events/EventRoomSection";
 
 type Community = CachedMeta["community"] & {
   reference_name?: string | null;
@@ -95,6 +95,10 @@ function useCommunityMeta(communityId: string | null) {
     const cached = metaCache.get(communityId);
     if (cached) return cached.community as Community;
     const sidebarEntry = sidebarStore.data?.communities.find((c) => c.id === communityId);
+    // The event fields ride along with the preview: an event room's card already
+    // knows whether the room still has an event (and who owns it) from the
+    // sidebar fetch, so the "your room outlived its event" panel can't flash
+    // for a room whose event is very much on.
     return sidebarEntry
       ? {
           id: sidebarEntry.id,
@@ -104,6 +108,11 @@ function useCommunityMeta(communityId: string | null) {
           image_url: sidebarEntry.image_url,
           reference_name: sidebarEntry.reference_name ?? null,
           created_at: sidebarEntry.created_at ?? undefined,
+          owner_id: sidebarEntry.owner_id ?? null,
+          // Passed through, not defaulted: a row that never carried the field
+          // means we do not know, and the panel reading it is strictly a test
+          // for `null` (see the Event section below).
+          event_date: sidebarEntry.event_date,
         }
       : null;
   });
@@ -139,6 +148,8 @@ function useCommunityMeta(communityId: string | null) {
               image_url: sidebarEntry.image_url,
               reference_name: sidebarEntry.reference_name ?? null,
               created_at: sidebarEntry.created_at ?? undefined,
+              owner_id: sidebarEntry.owner_id ?? null,
+              event_date: sidebarEntry.event_date,
             }
           : null,
       );
@@ -335,7 +346,18 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
 
         {/* ── Event (an event's group chat only) ──────────────────────── */}
         {type === "event" && (
-          <EventRoomSection communityId={communityId} currentUserId={currentUserId} />
+          <>
+            <EventRoomSection communityId={communityId} currentUserId={currentUserId} />
+            {/* The room has outlived its event: deleting the event clears the
+                room's link to it (see the delete route), so the event's day is
+                gone while its name, description and picture are not. Strictly
+                `null` — a meta that never carried the field means we do not
+                know, and telling a member their event is over is not a guess
+                worth making. */}
+            {community && community.event_date === null && community.owner_id === currentUserId && (
+              <EventRoomGoneSection communityId={communityId} />
+            )}
+          </>
         )}
 
         {/* ── About ───────────────────────────────────────────────────── */}

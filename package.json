@@ -51,6 +51,7 @@
     "test:event-timezone": "tsx --test \"expo-app-standalone 3/lib/eventTimezone.test.ts\"",
     "test:home-rail": "tsx --test apps/web/lib/home/suggested.test.ts",
     "test:community-badges": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/community-badges.test.ts",
+    "test:community-settings": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/community-settings.test.ts",
     "test:content-sync": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/content-sync.test.ts",
     "test:push-budget": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/push/chat.test.ts",
     "test:feed-scope": "tsx --test apps/web/lib/feeds/home-feed-options.test.ts",

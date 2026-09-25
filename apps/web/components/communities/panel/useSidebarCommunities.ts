@@ -18,6 +18,7 @@ import {
   fetchJsonCached,
   getCachedRequest,
   initRequestCache,
+  patchCachedRequest,
   setCachedRequest,
 } from "@/lib/request-cache";
 import { initReadManager, scheduleMarkRead } from "@/lib/communities/read-manager";
@@ -25,6 +26,16 @@ import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { useSidebarRealtime, SIDEBAR_REALTIME_LIMIT } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
 import { mergeStaleServerList } from "./sidebar-merge";
+import { expiredPinIds } from "./sidebar-order";
+import { subscribeToNowTick } from "@/lib/use-now-tick";
+
+/**
+ * How often the sidebar checks whether a pin has run out. The deadline is the
+ * event's start-to-end instant, so a coarse beat is enough to see a room come
+ * back down with its neighbours the moment its event does — and the clock is
+ * shared, so this costs nothing beyond the badge's own (see use-now-tick).
+ */
+const PIN_TICK_MS = 15_000;
 
 type Community = CachedSidebarCommunity;
 
@@ -123,6 +134,45 @@ export function useSidebarCommunities(userId: string) {
     }, SIDEBAR_STALE_MS);
     return () => window.clearInterval(timer);
   }, [overRealtimeLimit, load]);
+
+  // ── Pins whose deadline has passed ────────────────────────────────────────
+  // `pinned_until` is an instant (the event's end), and the server only sends
+  // it while that instant is ahead — but the value it already sent stays in the
+  // store until the next fetch replaces it. So a room outlived its own pin: it
+  // kept the mark and its place above busier communities until a refetch
+  // happened to land. Expiring it here, on the shared clock, is what makes the
+  // pin turn over with the event rather than with the next request — and it is
+  // a write to the store, not to component state, because the store is what
+  // every consumer reads (the rows, the ordering, the chat's own fallback).
+  // That is also why the work hangs off the clock's callback rather than off a
+  // render: same shape as the realtime handlers below.
+  useEffect(
+    () =>
+      subscribeToNowTick((nowMs) => {
+        const expired = expiredPinIds(sidebarStore.data?.communities ?? [], nowMs);
+        if (!expired.length) return;
+        const expiredSet = new Set(expired);
+        const clearPin = (c: Community): Community =>
+          expiredSet.has(c.id) ? { ...c, pinned_until: null } : c;
+
+        // The store and the request cache are cleared together, like the
+        // message and reaction patches above: mirroring it keeps a stale-window
+        // replay of /api/communities from restoring a pin that has run out.
+        if (sidebarStore.data) {
+          sidebarStore.data = {
+            ...sidebarStore.data,
+            communities: sidebarStore.data.communities.map(clearPin),
+          };
+        }
+        patchCachedRequest<{ communities: Community[] }>(
+          "/api/communities",
+          (current) => ({ communities: current.communities.map(clearPin) }),
+          userId,
+        );
+        setCommunities(sidebarStore.data?.communities ?? []);
+      }, PIN_TICK_MS),
+    [userId],
+  );
 
   // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
   useEffect(() => {

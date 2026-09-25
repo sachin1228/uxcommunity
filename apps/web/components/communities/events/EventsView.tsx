@@ -19,8 +19,16 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import { invalidateCommunitiesList, notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
+import { useNowTick } from "@/lib/use-now-tick";
 
 const EVENTS_STALE_MS = 60_000;
+/**
+ * How often the Upcoming/Past split re-reads the clock. An event finishing
+ * while the tab is open has to cross that line on its own — otherwise it sits
+ * under "Upcoming" (and its card keeps offering the RSVP it can no longer
+ * take) until the next reload.
+ */
+const EVENTS_SPLIT_TICK_MS = 30_000;
 
 function mergeUniqueEvents(events: CommunityEvent[]) {
   const byId = new Map<string, CommunityEvent>();
@@ -226,8 +234,11 @@ export function EventsView({
     publishContentChange({ kind: "event", id: eventId, patch: { user_saved: saved, save_count: count } });
   }
 
-  // Split into upcoming and past
-  const now = new Date();
+  // Split into upcoming and past, against a clock that keeps moving: the
+  // boundary is a moment, so both lists (and the cards inside them, which
+  // decide their own ended state from this same `now`) turn over on their own.
+  const nowMs = useNowTick(EVENTS_SPLIT_TICK_MS);
+  const now = new Date(nowMs);
   const upcoming = events.filter((e) => new Date(e.end_date ?? e.event_date) >= now);
   const past = events.filter((e) => new Date(e.end_date ?? e.event_date) < now);
 

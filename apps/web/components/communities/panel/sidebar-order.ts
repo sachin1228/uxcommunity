@@ -2,19 +2,43 @@ import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 type Community = Pick<
   CachedSidebarCommunity,
-  "last_message" | "last_content" | "joined_at" | "name" | "pinned_until"
+  "id" | "last_message" | "last_content" | "joined_at" | "name" | "pinned_until"
 >;
 
 /**
  * An event's group chat rides at the top of the sidebar until its event date.
  *
- * Presence is the whole test: the server sends `pinned_until` only while the
- * event is still ahead, so nothing here has to compare against a clock (a
- * comparator that reads time is neither pure nor stable inside a sort). The
- * pin expires on the next sidebar fetch once the event has passed.
+ * Presence is the whole test, and stays that way: the server sends
+ * `pinned_until` only while the event is still ahead, and the one deadline the
+ * client is still holding when it passes is cleared out of the store (see
+ * expiredPinIds and useSidebarCommunities) rather than compared here. A
+ * comparator that reads the clock is neither pure nor stable inside a sort.
  */
 export function isPinned(community: Pick<Community, "pinned_until">): boolean {
   return Boolean(community.pinned_until);
+}
+
+/**
+ * The rows whose pin deadline has passed, by id — the clock is the caller's,
+ * so this stays a pure question about the data.
+ *
+ * `pinned_until` is the event's end, and the server only sends it while it is
+ * ahead — but a client that was handed the value keeps it until its next
+ * fetch, which left a room pinned above communities that talk more (and wearing
+ * a pin mark) for as long as it took that fetch to land. The sidebar expires
+ * the deadline itself, on its own clock, and hands the ids back to be cleared.
+ * Unreadable values are not expired: bad data must not cost a row its pin.
+ */
+export function expiredPinIds(
+  communities: ReadonlyArray<Pick<Community, "id" | "pinned_until">>,
+  nowMs: number,
+): string[] {
+  return communities
+    .filter((community) => {
+      const deadline = community.pinned_until ? Date.parse(community.pinned_until) : Number.NaN;
+      return Number.isFinite(deadline) && deadline <= nowMs;
+    })
+    .map((community) => community.id);
 }
 
 /**
