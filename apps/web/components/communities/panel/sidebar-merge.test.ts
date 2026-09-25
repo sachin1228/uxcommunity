@@ -148,6 +148,25 @@ test("a locally cached content preview without an author name is healed from the
   assert.equal(merged[0]?.last_content?.firstName, "sachin");
 });
 
+test("the ended deadline rides the server row like the pin does", () => {
+  // event_end must survive the merge even when the local row is the preview
+  // winner — the DP's ENDED day reads it after the pin has already dropped.
+  const server = [
+    community("a", "A", "2026-09-14T14:00:00Z", {
+      event_date: "2026-09-13T10:00:00Z",
+      pinned_until: null,
+      event_end: "2026-09-13T11:00:00Z",
+    }),
+  ];
+  const local = [
+    community("a", "A", "2026-09-14T14:30:00Z"),
+  ];
+  const merged = mergeStaleServerList(local, server);
+  assert.equal(merged[0]?.event_date, "2026-09-13T10:00:00Z");
+  assert.equal(merged[0]?.pinned_until, null);
+  assert.equal(merged[0]?.event_end, "2026-09-13T11:00:00Z");
+});
+
 test("a realtime content preview with a name is not clobbered by an older server row", () => {
   const server = [
     community("a", "A", "2026-09-14T14:00:00Z", {

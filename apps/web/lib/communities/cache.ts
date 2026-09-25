@@ -123,6 +123,22 @@ export interface CachedMeta {
     invite_token?: string | null;
     description?: string | null;
     created_at?: string;
+    /**
+     * An event group chat's own event date — the day the room is for, worn as
+     * the calendar badge on its DP (see components/communities/DpWithEventDate).
+     * Absent on every other kind of community. Matches the sidebar row's field
+     * of the same name so a header painting before the meta arrives can borrow
+     * the sidebar entry's copy.
+     */
+    event_date?: string | null;
+    /**
+     * The deadline an event room stops being pinned at — its event's end, which
+     * is also when its badge stops saying LIVE. Sent only while still ahead,
+     * like the sidebar row's field of the same name.
+     */
+    pinned_until?: string | null;
+    /** That deadline whether ahead or past — the badge's ENDED day reads it. */
+    event_end?: string | null;
     /** "owner" | "admin" | "member" — the current user's role in this community. */
     current_user_role?: string | null;
     /** Effective permission grants (owners: everything; admins: configured toggles). */
@@ -177,11 +193,24 @@ export interface CachedSidebarCommunity {
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
   /**
+   * An event group chat's own event date — the day the room is for. Rendered as
+   * the date badge on its sidebar DP (see lib/communities/event-date), and kept
+   * after the event has passed. Absent on every other kind of community.
+   */
+  event_date?: string | null;
+  /**
    * Set on an event's group chat while its event is still ahead: the room is
    * pinned to the top of the sidebar until then. Absent once the event has
    * passed, so ordering only has to test presence (see sidebar-order.ts).
    */
   pinned_until?: string | null;
+  /**
+   * That same deadline whether ahead or past — the event's end, or its start
+   * when it has none. Outlives the pin so the DP's badge can say ENDED for a
+   * day after the event wraps (see lib/communities/event-date). Absent on
+   * every other kind of community.
+   */
+  event_end?: string | null;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;

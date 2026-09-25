@@ -44,8 +44,11 @@ export function mergeStaleServerList(
       last_read_at: incoming.last_read_at,
       member_count: incoming.member_count,
       is_archived: incoming.is_archived,
-      // The pin (an event chat's event date) is only ever computed server-side.
+      // The event date and the pin are only ever computed server-side (the
+      // date badge rides the room's own event, see lib/communities/event-date).
+      event_date: incoming.event_date ?? null,
       pinned_until: incoming.pinned_until ?? null,
+      event_end: incoming.event_end ?? null,
       // Keep a locally-known reaction preview when the server row predates it
       // (reactions are also patched client-side from realtime).
       lastReaction: previous.lastReaction && (!incoming.lastReaction || (previous.lastReaction.createdAt ?? "") >= (incoming.lastReaction.createdAt ?? ""))

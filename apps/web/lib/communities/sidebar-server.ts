@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import { withShowcaseColumn } from "./showcase-flag";
-import { loadEventPinDeadlines } from "./event-chat";
+import { loadEventChatSidebarMeta } from "./event-chat";
 
 type ActivityRow = {
   community_id: string;
@@ -137,9 +137,10 @@ export async function getSidebarCommunities(userId: string) {
   }));
 
   // An event's group chat stays pinned to the top of the sidebar until its
-  // event date; only the rooms still ahead of that door come back, so the
-  // client orders on the presence of `pinned_until` alone.
-  const pinnedUntil = await loadEventPinDeadlines(
+  // event date (only the rooms still ahead of that door come back, so the
+  // client orders on the presence of `pinned_until` alone) and always carries
+  // the date itself, which its DP wears as a badge.
+  const eventRooms = await loadEventChatSidebarMeta(
     db,
     communityRows.filter((community) => community.type === "event").map((community) => community.id),
   );
@@ -148,11 +149,16 @@ export async function getSidebarCommunities(userId: string) {
     const row = activityById.get(community.id)!;
     const message = row.last_message;
     const reaction = row.last_reaction;
+    const eventRoom = eventRooms.get(community.id);
     return {
       ...community,
       image_url: images[community.id] ?? community.image_url ?? null,
       reference_name: names[community.id] ?? null,
-      pinned_until: pinnedUntil.get(community.id) ?? null,
+      event_date: eventRoom?.eventDate ?? null,
+      pinned_until: eventRoom?.pinnedUntil ?? null,
+      // The deadline whether ahead or past — the badge says ENDED for a day
+      // after the event, which is beyond the pin's life.
+      event_end: eventRoom?.eventEnd ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,
       mention_count: row.unread_mention_count ?? 0,

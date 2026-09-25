@@ -8,6 +8,7 @@ import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
 import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
+import { requireZoneAwareIso } from "@/lib/communities/event-time";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -142,13 +143,18 @@ export async function POST(
     return NextResponse.json({ error: "Description is too long (max 5000 characters)." }, { status: 422 });
   }
 
-  const eventDate = typeof body.event_date === "string" ? body.event_date : null;
-  if (!eventDate || isNaN(Date.parse(eventDate))) {
+  // A timestamp with no zone would be read in the database session's zone
+  // (UTC), landing hours from what the member typed — so one is required. The
+  // event form sends the viewer's own offset explicitly (see event-time.ts).
+  const eventDate = typeof body.event_date === "string" ? requireZoneAwareIso(body.event_date) : null;
+  if (!eventDate) {
     return NextResponse.json({ error: "A valid event date is required." }, { status: 422 });
   }
 
-  const endDate = typeof body.end_date === "string" && body.end_date ? body.end_date : null;
-  if (endDate && isNaN(Date.parse(endDate))) {
+  const endDate = typeof body.end_date === "string" && body.end_date
+    ? requireZoneAwareIso(body.end_date)
+    : null;
+  if (typeof body.end_date === "string" && body.end_date && !endDate) {
     return NextResponse.json({ error: "Invalid end date." }, { status: 422 });
   }
   if (endDate && new Date(endDate) <= new Date(eventDate)) {

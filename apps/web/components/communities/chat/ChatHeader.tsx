@@ -8,6 +8,7 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
+import { DpWithEventDate } from "../DpWithEventDate";
 import { CommunityNameBadges } from "../CommunityBadges";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 
@@ -22,6 +23,12 @@ interface Community {
   /** Absent on rows that predate the flag; reads as on. */
   showcase_enabled?: boolean | null;
   owner_id?: string | null;
+  /** An event group chat's own event date — its DP wears it as a badge. */
+  event_date?: string | null;
+  /** Its event's end while still ahead — what makes the badge say LIVE. */
+  pinned_until?: string | null;
+  /** That deadline whether ahead or past — what makes the badge say ENDED. */
+  event_end?: string | null;
 }
 
 interface ChatHeaderProps {
@@ -208,12 +215,21 @@ export const ChatHeader = memo(function ChatHeader({
           <>
             <div className="flex items-center justify-between pb-3">
               <div className="flex items-center gap-3">
-                <CommunityDp
-                  imageUrl={community.image_url}
-                  name={community.name}
-                  size={44}
-                  className="bg-surface-raised"
-                />
+                {/* The event's group chat wears its date here too: the room's
+                    name is the event's name, so the day belongs beside it —
+                    and says LIVE while the event is under way. */}
+                <DpWithEventDate
+                  date={community.event_date}
+                  endsAt={community.event_end ?? community.pinned_until}
+                  dpSize={44}
+                >
+                  <CommunityDp
+                    imageUrl={community.image_url}
+                    name={community.name}
+                    size={44}
+                    className="bg-surface-raised"
+                  />
+                </DpWithEventDate>
                 <div>
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
                     <span className="inline-flex items-center gap-1.5">

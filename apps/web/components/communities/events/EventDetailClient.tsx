@@ -189,6 +189,8 @@ export function EventDetailClient({
           chatMemberCount={chatMemberCount}
           joined={chatCommunityJoined}
           eventTitle={event.title}
+          eventDate={event.event_date}
+          eventEnd={event.end_date}
         />
 
         {/* ── Discussion ─────────────────────────────────────────── */}

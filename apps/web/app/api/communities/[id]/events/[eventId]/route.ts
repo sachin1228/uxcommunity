@@ -6,6 +6,7 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
+import { requireZoneAwareIso } from "@/lib/communities/event-time";
 
 export async function GET(
   _req: NextRequest,
@@ -75,13 +76,18 @@ export async function PATCH(
     patch.description = typeof body.description === "string" && body.description.trim() ? body.description.trim() : null;
     if (patch.description && (patch.description as string).length > 5000) return NextResponse.json({ error: "Description too long." }, { status: 422 });
   }
+  // A timestamp with no zone would be read in the database session's zone
+  // (UTC), landing hours from what the member typed — so one is required. The
+  // event form sends the viewer's own offset explicitly (see event-time.ts).
   if (typeof body.event_date === "string") {
-    if (isNaN(Date.parse(body.event_date))) return NextResponse.json({ error: "Invalid event date." }, { status: 422 });
-    patch.event_date = body.event_date;
+    const ed = requireZoneAwareIso(body.event_date);
+    if (!ed) return NextResponse.json({ error: "Invalid event date." }, { status: 422 });
+    patch.event_date = ed;
   }
   if ("end_date" in body) {
-    const ed = typeof body.end_date === "string" && body.end_date ? body.end_date : null;
-    if (ed && isNaN(Date.parse(ed))) return NextResponse.json({ error: "Invalid end date." }, { status: 422 });
+    const raw = typeof body.end_date === "string" && body.end_date ? body.end_date : null;
+    const ed = raw ? requireZoneAwareIso(raw) : null;
+    if (raw && !ed) return NextResponse.json({ error: "Invalid end date." }, { status: 422 });
     patch.end_date = ed;
   }
   if (typeof body.is_online === "boolean") patch.is_online = body.is_online;

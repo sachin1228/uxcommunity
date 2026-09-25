@@ -5,6 +5,8 @@ import { Check, MessageSquare } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { DpWithEventDate } from "../DpWithEventDate";
+import { hasEventEnded } from "@/lib/communities/event-date";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
 
@@ -22,6 +24,8 @@ export function EventChatPanel({
   chatMemberCount,
   joined,
   eventTitle,
+  eventDate,
+  eventEnd,
 }: {
   /** Null while the group has not been created yet (it is created on demand). */
   chatCommunityId: string | null;
@@ -33,6 +37,10 @@ export function EventChatPanel({
   chatMemberCount?: number;
   joined: boolean;
   eventTitle: string;
+  /** The event's start — its group chat's DP wears it as a calendar badge. */
+  eventDate?: string | null;
+  /** The event's end — what makes that badge say LIVE while it is under way. */
+  eventEnd?: string | null;
 }) {
   const router = useGuardedRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -59,17 +67,27 @@ export function EventChatPanel({
     }
   }
 
-  if (!chatCommunityId) return null;
+  // The door closes when the event does. The badge keeps saying ENDED for a
+  // day, but the banner is a call to action — join, or be in the room now —
+  // and once the window has passed there is nothing left to be on time for.
+  // The room itself keeps its history either way.
+  const hasEnded = hasEventEnded(eventDate, eventEnd);
+
+  if (!chatCommunityId || hasEnded) return null;
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5">
-        <AvatarImg
-          url={chatCommunityImage ?? null}
-          name={chatCommunityName ?? eventTitle}
-          size={32}
-          className="shrink-0 rounded-full object-cover"
-        />
+        {/* The room belongs to this event and the page knows its date, so the
+            DP says which day it is for. */}
+        <DpWithEventDate date={eventDate} endsAt={eventEnd} dpSize={32}>
+          <AvatarImg
+            url={chatCommunityImage ?? null}
+            name={chatCommunityName ?? eventTitle}
+            size={32}
+            className="shrink-0 rounded-full object-cover"
+          />
+        </DpWithEventDate>
         <div className="min-w-0 flex-1">
           <p className="truncate font-body text-sm font-medium text-foreground">{chatCommunityName ?? "Event chat"}</p>
           <p className="text-pretty font-body text-xs text-foreground-muted">

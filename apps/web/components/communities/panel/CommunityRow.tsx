@@ -111,6 +111,10 @@ export const CommunityRow = memo(function CommunityRow({
           imageUrl={c.image_url}
           name={c.name}
           type={c.type}
+          eventDate={c.event_date}
+          // The full window deadline, ahead or past: LIVE while it runs, ENDED
+          // for the day after, then no badge at all.
+          eventEnd={c.event_end ?? c.pinned_until}
         />
 
         <div className="flex-1 min-w-0">
@@ -122,7 +126,8 @@ export const CommunityRow = memo(function CommunityRow({
             <CommunityNameBadges type={c.type} isPrivate={c.is_private} />
             {/* An event's chat stays pinned to the top of the list until its
                 event date (see sidebar-order); the mark says why it's up
-                there instead of leaving it a mystery. */}
+                there instead of leaving it a mystery. The DP carries that
+                same date as a calendar badge. */}
             {c.pinned_until && (
               <span
                 role="img"
