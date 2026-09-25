@@ -18,6 +18,8 @@ import {
   nowTimeInput,
   startMovedByEdit,
   todayDateInput,
+  viewerOffsetMinutes,
+  viewerTimeZoneName,
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { useNowTick } from "./useNowTick";
@@ -170,6 +172,11 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           cover_image_url: coverImageUrl,
           accent_color: accentColor,
           is_public: isPublic,
+          // Sent on every save; the API keeps the stored zone unless the
+          // schedule itself moved, so editing a description from another
+          // country cannot relabel the time the host chose.
+          host_timezone: viewerTimeZoneName(),
+          host_utc_offset_minutes: viewerOffsetMinutes(new Date(startDate)),
         }),
       });
       const data = await res.json();

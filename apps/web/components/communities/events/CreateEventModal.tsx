@@ -14,6 +14,8 @@ import {
   minutesUntilStart,
   nowTimeInput,
   todayDateInput,
+  viewerOffsetMinutes,
+  viewerTimeZoneName,
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { useNowTick } from "./useNowTick";
@@ -145,6 +147,13 @@ export function CreateEventModal({
           cover_image_url: coverImageUrl,
           accent_color: accentColor,
           is_public: isPublic,
+          // The host's own side of the schedule, so the card can show the time
+          // they actually set beside each viewer's reading of it. The offset is
+          // the device's at the event's instant, which is what the wall time
+          // above was typed in — and the fallback if the name cannot be
+          // resolved on someone else's browser later.
+          host_timezone: viewerTimeZoneName(),
+          host_utc_offset_minutes: viewerOffsetMinutes(new Date(startDate)),
         }),
       });
       const data = await res.json();

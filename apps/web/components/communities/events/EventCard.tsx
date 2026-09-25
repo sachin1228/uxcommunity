@@ -17,6 +17,7 @@ import {
   eventZoneLabel,
   eventZoneTooltip,
   formatEventTimeRange,
+  hostScheduleForViewer,
 } from "@/lib/communities/event-display";
 import { invalidateOnJoin, invalidateOnLeave } from "@/lib/communities/cache";
 import { showUndoToast } from "@/lib/undo-toast";
@@ -397,6 +398,11 @@ export function EventCard({
 
   // Per-event accent color: drives the big date, going button, glow, and the
   // stub's tinted gradient (accent mixed into dark, ~12% at top fading to 0).
+  // The host's own reading of the schedule, shown only when it differs from
+  // this viewer's clock (and only for events young enough to carry a zone) —
+  // see hostScheduleForViewer.
+  const hostSchedule = hostScheduleForViewer(event);
+
   const accent = event.accent_color ?? "#e8e14a";
   const accentStyle = {
     ["--accent" as string]: accent,
@@ -551,6 +557,16 @@ export function EventCard({
                 ({eventZoneLabel(event.event_date)})
               </span>
             </span>
+            {/* The other half of the same moment: what the host typed, in their
+                own zone. Indented to sit under the time above it. */}
+            {hostSchedule && (
+              <span
+                className="inline-flex items-center gap-1.5 pl-[19px] text-[11px] font-normal text-stone-400"
+                title={`The time the host set, in their own zone (${hostSchedule.zone}).`}
+              >
+                Host time: {hostSchedule.range} ({hostSchedule.zone})
+              </span>
+            )}
             {(event.is_online || event.location) && (
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 {event.is_online ? (

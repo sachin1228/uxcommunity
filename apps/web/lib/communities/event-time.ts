@@ -174,14 +174,7 @@ export function daysBetweenDateInputs(from: string, to: string): number {
  * a label that changes between browsers reads as two different zones.
  */
 export function viewerZoneLabel(now: Date = new Date()): string {
-  // getTimezoneOffset counts minutes west of UTC (IST is -330); the label
-  // wants the familiar east-positive shape.
-  const minutes = now.getTimezoneOffset();
-  const abs = Math.abs(minutes);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const offset = minutes === 0
-    ? "UTC"
-    : `UTC${minutes < 0 ? "+" : "-"}${Math.floor(abs / 60)}:${pad(abs % 60)}`;
+  const offset = formatUtcOffsetMinutes(viewerOffsetMinutes(now));
 
   // A real abbreviation ("EDT") adds something the offset can't; a GMT-style
   // one ("GMT+5:30") is the offset again under another name.
@@ -191,6 +184,37 @@ export function viewerZoneLabel(now: Date = new Date()): string {
   const abbrev = named && !/^(GMT|UTC)/.test(named) ? named : null;
 
   return abbrev ? `${abbrev} · ${offset}` : offset;
+}
+
+/**
+ * Minutes east of UTC written as a label — "UTC+5:30" for IST (330), "UTC-4:00"
+ * for EDT (-240), plain "UTC" at zero. One convention across the app: minutes
+ * east, the same sign the ISO offsets the API receives already carry.
+ */
+export function formatUtcOffsetMinutes(minutesEast: number): string {
+  if (minutesEast === 0) return "UTC";
+  const abs = Math.abs(minutesEast);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `UTC${minutesEast < 0 ? "-" : "+"}${Math.floor(abs / 60)}:${pad(abs % 60)}`;
+}
+
+/** The viewer's offset at an instant, in minutes east of UTC (IST is 330). */
+export function viewerOffsetMinutes(instant: Date = new Date()): number {
+  // getTimezoneOffset counts minutes *west* of UTC.
+  return -instant.getTimezoneOffset();
+}
+
+/**
+ * The viewer's IANA zone name ("Asia/Kolkata"), or null where the runtime
+ * cannot say. Sent with an event so the card can later show another member the
+ * wall time the host actually set.
+ */
+export function viewerTimeZoneName(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
