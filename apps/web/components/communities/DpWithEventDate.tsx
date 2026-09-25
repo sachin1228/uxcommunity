@@ -16,10 +16,11 @@ import { useNowTick } from "@/lib/use-now-tick";
  * On the event's own day the tile says TODAY, while it runs it says LIVE,
  * and for a day after it wraps the circle says ENDED in red — the word
  * alone, no date — then the tile comes down and the room reverts to a plain
- * face, the conversation itself untouched. The word states are pinned to one
- * fixed size (nothing reflows — the badge is absolutely positioned over the
- * DP); only the month abbreviation is fitted to the width the circle
- * actually has. LIVE and ENDED take the red text and ring so "on right now"
+ * face, the conversation itself untouched. Every line scales with the badge
+ * and is fitted to the width the circle actually has (nothing reflows — the
+ * badge is absolutely positioned over the DP), so the header's large tile
+ * reads at the same weight as a sidebar row's small one. LIVE and ENDED take
+ * the red text and ring so "on right now"
  * and "just finished" read at a glance across a full sidebar, and LIVE drops
  * the day number for a pulsing dot beside the word that runs while the window
  * is open: the date the room belongs to has stopped being the news at that
@@ -36,10 +37,14 @@ const MIN_MONTH_PX = 6;
 /** Advance width of one mono glyph relative to the font size, with tracking. */
 const MONO_ADVANCE = 0.58;
 /**
- * The TODAY and LIVE words are pinned to this size rather than scaling with
- * the badge, so the two "now" states read at one consistent size everywhere.
+ * The word states' height, as a fraction of the badge — the same proportion
+ * everywhere, so the header's large tile reads at the same weight as a
+ * sidebar row's small one. Floored at the size the smallest badge ships with,
+ * and still width-fitted (see wordFontSize) so the word cannot bleed through
+ * the ring.
  */
-const TODAY_FONT_PX = 5;
+const WORD_RATIO = 0.24;
+const MIN_WORD_PX = 4;
 /**
  * The live dot beside the word, as a fraction of the badge — big enough to
  * carry the pulse on a sidebar row, small enough to leave the word its room.
@@ -68,14 +73,28 @@ function badgeSizeFor(dpSize: number, isToday: boolean): number {
 
 /**
  * The top line's size for a month abbreviation: the word is trimmed to the
- * circle's inner width rather than allowed to bleed through the ring. TODAY
- * and LIVE never go through here — they hold their own fixed size.
+ * circle's inner width rather than allowed to bleed through the ring. The
+ * word states go through wordFontSize, which also reserves the pulse dot's
+ * width for LIVE.
  */
 function topLineFontSize(badgeSize: number, glyphs: number): number {
   const monthPx = Math.max(MIN_MONTH_PX, Math.round(badgeSize * MONTH_RATIO));
   // 2px of ring-adjacent breathing room on each side of the text.
   const fitsPx = Math.floor((badgeSize - 4) / (glyphs * MONO_ADVANCE));
   return Math.min(monthPx, fitsPx);
+}
+
+/**
+ * The word states' size: one proportion of the badge everywhere, trimmed to
+ * the circle's inner width like the month is. LIVE reserves the dot's width
+ * (and the gap to the word) from that budget, so dot and word always fit as
+ * one line and neither reaches the ring.
+ */
+function wordFontSize(badgeSize: number, glyphs: number, reservedPx = 0): number {
+  const heightPx = Math.max(MIN_WORD_PX, Math.round(badgeSize * WORD_RATIO));
+  // 2px of ring-adjacent breathing room on each side of the line.
+  const fitsPx = Math.floor((badgeSize - 4 - reservedPx) / (glyphs * MONO_ADVANCE));
+  return Math.min(heightPx, Math.max(MIN_WORD_PX, fitsPx));
 }
 
 export function DpWithEventDate({
@@ -125,6 +144,14 @@ export function DpWithEventDate({
           ? "Today"
           : badge.month
     : "";
+  // One top line, three looks: the word states scale as their own proportion
+  // (LIVE reserving room for the dot beside it), the month keeps its own.
+  const wordPx =
+    visible && badge
+      ? badge.isToday || badge.isLive || isEnded
+        ? wordFontSize(badgeSize, word.length, isLive ? liveDotSize + liveDotGap : 0)
+        : topLineFontSize(badgeSize, word.length)
+      : 0;
 
   return (
     <div className={`relative shrink-0 ${className}`}>
@@ -152,10 +179,7 @@ export function DpWithEventDate({
           style={{
             width: badgeSize,
             height: badgeSize,
-            fontSize:
-              badge.isToday || badge.isLive || isEnded
-                ? TODAY_FONT_PX
-                : topLineFontSize(badgeSize, word.length),
+            fontSize: wordPx,
           }}
           className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center overflow-hidden rounded-full font-mono font-bold uppercase leading-none tracking-tight ring-2 ${
             badge.isLive || isEnded
