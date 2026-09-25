@@ -108,6 +108,85 @@ export function isoToLocalInput(iso: string | null | undefined): { date: string;
 }
 
 /**
+ * How long a start can sit behind the clock and still count as upcoming: a
+ * member picking "right now" needs the seconds it takes to reach the submit
+ * button, but yesterday must never pass.
+ */
+const PAST_START_GRACE_MS = 60_000;
+
+/**
+ * Today as a `<input type="date">` value ("2026-09-25"), in the viewer's own
+ * zone — the `min` that keeps the event form's date picker on days that have
+ * not happened yet. The picker only constrains the day, so submit-time checks
+ * still catch today-with-an-earlier-hour via isPastStart.
+ */
+export function todayDateInput(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * The current wall clock as a `<input type="time">` value ("14:05") — the
+ * `min` for a start time on today's date, so the picker can't offer an hour
+ * that has already gone by.
+ */
+export function nowTimeInput(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+/**
+ * A date input shifted by whole days ("2026-09-25" + 2 → "2026-09-27"), pure
+ * UTC calendar math on the string so zones and DST cannot touch it. The edit
+ * form needs this to carry a legacy multi-day end (end on a later date than
+ * the start) that the single date selector can no longer show.
+ */
+export function addDaysToDateInput(date: string, days: number): string {
+  const [, y, m, d] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) ?? [];
+  if (!y) return date;
+  const shifted = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d) + days));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+/**
+ * Whole days from one date input to another (to − from). A legacy event whose
+ * end lands a day or more after its start stores that distance here so the
+ * end keeps riding the start's date through edits.
+ */
+export function daysBetweenDateInputs(from: string, to: string): number {
+  const day = (d: string) => {
+    const [, y, m, dd] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d) ?? [];
+    return y ? Date.UTC(Number(y), Number(m) - 1, Number(dd)) / 86_400_000 : NaN;
+  };
+  return day(to) - day(from);
+}
+
+/**
+ * A start instant that has already happened (with the minute of grace above).
+ * Unparseable input counts as past: every caller has already validated the
+ * shape, and failing closed here can only refuse a date, never move one.
+ */
+export function isPastStart(iso: string, now: Date = new Date()): boolean {
+  const time = Date.parse(iso);
+  return !Number.isFinite(time) || time < now.getTime() - PAST_START_GRACE_MS;
+}
+
+/**
+ * Whether a rebuilt start differs from the stored one by more than the form's
+ * minute granularity — i.e. the member actually moved it, rather than handing
+ * the stored value back. Untouched past starts must keep editing other fields
+ * (a description fix on an event that already happened), so the past guard
+ * only bites when this says the start itself changed.
+ */
+export function startMovedByEdit(rebuiltIso: string, storedIso: string): boolean {
+  const rebuilt = Date.parse(rebuiltIso);
+  const stored = Date.parse(storedIso);
+  if (!Number.isFinite(rebuilt) || !Number.isFinite(stored)) return true;
+  return Math.abs(rebuilt - stored) >= 60_000;
+}
+
+/**
  * Server-side guard: reject a timestamp that carries no zone at all
  * ("2026-09-25T12:10:00"), the shape that caused the shift — a naive value
  * would be read in the database session's zone (UTC) and land hours away from

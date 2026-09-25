@@ -8,7 +8,16 @@ import { ToggleRow } from "../threads/ThreadComposerControls";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { localInputToIso, isoToLocalInput } from "@/lib/communities/event-time";
+import {
+  addDaysToDateInput,
+  daysBetweenDateInputs,
+  isPastStart,
+  localInputToIso,
+  isoToLocalInput,
+  nowTimeInput,
+  startMovedByEdit,
+  todayDateInput,
+} from "@/lib/communities/event-time";
 
 interface EditEventModalProps {
   event: CommunityEvent;
@@ -31,10 +40,29 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [description, setDescription] = useState(event.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(event.cover_image_url ?? null);
   const [imageUploading, setImageUploading] = useState(false);
-  const [eventDate, setEventDate] = useState(() => toLocalInputs(event.event_date).date);
-  const [eventTime, setEventTime] = useState(() => toLocalInputs(event.event_date).time);
-  const [endDate, setEndDate] = useState(() => toLocalInputs(event.end_date).date);
-  const [endTime, setEndTime] = useState(() => toLocalInputs(event.end_date).time);
+  const storedStart = toLocalInputs(event.event_date);
+  const storedEnd = toLocalInputs(event.end_date);
+  const [eventDate, setEventDate] = useState(storedStart.date);
+  const [eventTime, setEventTime] = useState(storedStart.time);
+  const [endTime, setEndTime] = useState(storedEnd.time);
+  // The stored end as a whole-day offset from the stored start, so the single
+  // date selector keeps multi-day ends correct through edits: the end always
+  // rides the start's date at this many days' distance. Most events are 0.
+  const [endDayOffset] = useState(() =>
+    storedEnd.date && storedStart.date
+      ? daysBetweenDateInputs(storedStart.date, storedEnd.date)
+      : 0,
+  );
+  // Whether the event's start has already gone by. Editing the start of a past
+  // event is locked: letting it through would either recreate the past or
+  // silently shove a shared event into the future. Everything else stays
+  // editable — a description fix must not require a future date.
+  const startIsPast = isPastStart(event.event_date);
+  // The past is off the table for the picker: today is the earliest day. Only
+  // set when the start is still upcoming — a past event keeps its stored date
+  // so untouched edits don't fail submit-time validation.
+  const minDate = startIsPast ? undefined : todayDateInput();
+  const [minStartTime] = useState(() => nowTimeInput());
   const [isOnline, setIsOnline] = useState(event.is_online);
   const [location, setLocation] = useState(event.location ?? "");
   const [meetLink, setMeetLink] = useState(event.meet_link ?? "");
@@ -87,13 +115,34 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     e.preventDefault();
     if (!title.trim()) { setError("Title is required."); return; }
     if (!eventDate || !eventTime) { setError("Event date and time are required."); return; }
-    if (!buildIso(eventDate, eventTime)) { setError("Start time is not a valid time of day."); return; }
+    const startIso = buildIso(eventDate, eventTime);
+    if (!startIso) { setError("Start time is not a valid time of day."); return; }
+    // A start that was left untouched keeps its original past (fixing the
+    // description of an event that already happened is allowed); one the
+    // member actually moved must land in the future.
+    if (
+      !startIsPast &&
+      startMovedByEdit(startIso, event.event_date) &&
+      isPastStart(startIso)
+    ) {
+      setError("Start time can't be in the past. Pick a time from now onward.");
+      return;
+    }
+    // Same single-day rule as the create form: the end rides the start's date
+    // (offset kept for legacy multi-day ends), so only an end time after the
+    // start makes sense.
+    let endIso: string | null = null;
+    if (endTime) {
+      const endDate = addDaysToDateInput(eventDate, endDayOffset);
+      endIso = buildIso(endDate, endTime);
+      if (!endIso) { setError("End time is not a valid time of day."); return; }
+      if (endIso <= startIso) { setError("End time must be after the start time."); return; }
+    }
 
     setSaving(true);
     setError(null);
     try {
-      const startDate = buildIso(eventDate, eventTime);
-      if (!startDate) { setError("Start time is not a valid time of day."); return; }
+      const startDate = startIso;
       const res = await fetch(`/api/communities/${communityId}/events/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -101,7 +150,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           title: title.trim(),
           description: description.trim() || null,
           event_date: startDate,
-          end_date: endDate ? buildIso(endDate, endTime) : null,
+          end_date: endIso,
           is_online: isOnline,
           location: location.trim() || null,
           meet_link: meetLink.trim() || null,
@@ -214,37 +263,71 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 </div>
               </label>
 
+              {/* One date selector, matching the create form: the end rides
+                  the start's date, so only the two times are picked. */}
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
+                    <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
                   </span>
-                  <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)}
-                    className="field w-full" />
+                  <input
+                    type="date"
+                    value={eventDate}
+                    min={minDate}
+                    disabled={startIsPast}
+                    title={startIsPast ? "The start of an event that has already happened can't be changed" : undefined}
+                    onChange={(e) => {
+                      setEventDate(e.target.value);
+                      // Switching onto today must not keep a time that day
+                      // has already gone past.
+                      if (
+                        minDate !== undefined &&
+                        e.target.value === minDate &&
+                        eventTime &&
+                        eventTime < minStartTime
+                      ) {
+                        setEventTime("");
+                      }
+                    }}
+                    className="field w-full"
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                     <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
                   </span>
-                  <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)}
-                    className="field w-full" />
+                  <input
+                    type="time"
+                    value={eventTime}
+                    min={eventDate === minDate ? minStartTime : undefined}
+                    disabled={startIsPast}
+                    title={startIsPast ? "The start of an event that has already happened can't be changed" : undefined}
+                    onChange={(e) => {
+                      // Typing can bypass the picker's min — refuse a past
+                      // time on today's date rather than accepting it here.
+                      if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
+                      setEventTime(e.target.value);
+                    }}
+                    className="field w-full"
+                  />
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                    End date <span className="font-normal text-foreground-subtle">(optional)</span>
-                  </span>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                    className="field w-full" />
-                </label>
+                <p className="self-end pb-2.5 font-body text-[11px] leading-snug text-foreground-subtle">
+                  Same day as the start. Leave blank for an open-ended event.
+                </p>
                 <label className="block">
                   <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                     End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full" />
+                  <input
+                    type="time"
+                    value={endTime}
+                    min={eventTime || undefined}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="field w-full"
+                  />
                 </label>
               </div>
             </div>

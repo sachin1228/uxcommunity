@@ -8,7 +8,12 @@ import { ToggleRow } from "../threads/ThreadComposerControls";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { localInputToIso } from "@/lib/communities/event-time";
+import {
+  isPastStart,
+  localInputToIso,
+  nowTimeInput,
+  todayDateInput,
+} from "@/lib/communities/event-time";
 
 interface CreateEventModalProps {
   communityId?: string;
@@ -34,8 +39,13 @@ export function CreateEventModal({
   const [imageUploading, setImageUploading] = useState(false);
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
+  // The past is off the table: today (in the viewer's zone) is the earliest
+  // day the picker offers, and today's clock the earliest time on that day.
+  // Captured once per mount so re-renders don't shuffle bounds mid-edit; the
+  // submit check re-reads the clock, so time still can't slip through.
+  const [minDate] = useState(() => todayDateInput());
+  const [minStartTime] = useState(() => nowTimeInput());
   const [isOnline, setIsOnline] = useState(false);
   const [location, setLocation] = useState("");
   const [meetLink, setMeetLink] = useState("");
@@ -89,13 +99,25 @@ export function CreateEventModal({
     if (!title.trim()) { setError("Title is required."); return; }
     if (!eventDate) { setError("Event date is required."); return; }
     if (!eventTime) { setError("Event time is required."); return; }
-    if (!buildIso(eventDate, eventTime)) { setError("Start time is not a valid time of day."); return; }
+    const startIso = buildIso(eventDate, eventTime);
+    if (!startIso) { setError("Start time is not a valid time of day."); return; }
+    // The date picker can only block past days, so an hour that has already
+    // gone by on today's date is caught here (a minute of grace covers
+    // picking "now" and reaching the button).
+    if (isPastStart(startIso)) { setError("Start time can't be in the past. Pick a time from now onward."); return; }
+    // The end rides the start's date — one date selector covers both — so
+    // only an end time after the start makes sense here.
+    let endIso: string | null = null;
+    if (endTime) {
+      endIso = buildIso(eventDate, endTime);
+      if (!endIso) { setError("End time is not a valid time of day."); return; }
+      if (endIso <= startIso) { setError("End time must be after the start time."); return; }
+    }
 
     setSaving(true);
     setError(null);
     try {
-      const startDate = buildIso(eventDate, eventTime);
-      if (!startDate) { setError("Start time is not a valid time of day."); return; }
+      const startDate = startIso;
       const res = await fetch(`/api/communities/${communityId}/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,7 +125,7 @@ export function CreateEventModal({
           title: title.trim(),
           description: description.trim() || null,
           event_date: startDate,
-          end_date: endDate ? buildIso(endDate, endTime) : null,
+          end_date: endIso,
           is_online: isOnline,
           location: location.trim() || null,
           meet_link: meetLink.trim() || null,
@@ -223,15 +245,29 @@ export function CreateEventModal({
                 </div>
               </label>
 
+              {/* One date selector: the event happens on this day, and the
+                  start and end times place it inside it. */}
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
+                    <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
                   </span>
                   <input
                     type="date"
                     value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
+                    min={minDate}
+                    onChange={(e) => {
+                      setEventDate(e.target.value);
+                      // Switching onto today must not keep a time that day
+                      // has already gone past.
+                      if (
+                        e.target.value === minDate &&
+                        eventTime &&
+                        eventTime < minStartTime
+                      ) {
+                        setEventTime("");
+                      }
+                    }}
                     className="field w-full"
                   />
                 </label>
@@ -242,25 +278,23 @@ export function CreateEventModal({
                   <input
                     type="time"
                     value={eventTime}
-                    onChange={(e) => setEventTime(e.target.value)}
+                    min={eventDate === minDate ? minStartTime : undefined}
+                    onChange={(e) => {
+                      // Typing can bypass the picker's min — refuse a past
+                      // time on today's date rather than accepting it here.
+                      if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
+                      setEventTime(e.target.value);
+                    }}
                     className="field w-full"
                   />
                 </label>
               </div>
 
-              {/* End date + time */}
+              {/* End time — same day as the start, so no second date field. */}
               <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                    End date <span className="font-normal text-foreground-subtle">(optional)</span>
-                  </span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="field w-full"
-                  />
-                </label>
+                <p className="self-end pb-2.5 font-body text-[11px] leading-snug text-foreground-subtle">
+                  Same day as the start. Leave blank for an open-ended event.
+                </p>
                 <label className="block">
                   <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                     End time <span className="font-normal text-foreground-subtle">(optional)</span>
@@ -268,6 +302,7 @@ export function CreateEventModal({
                   <input
                     type="time"
                     value={endTime}
+                    min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
                     className="field w-full"
                   />

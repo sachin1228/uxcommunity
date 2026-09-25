@@ -179,6 +179,18 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       const end = endDate.trim() ? parseDateTime(endDate) : null;
       if (!start) return setError('Use YYYY-MM-DD HH:MM for the event date.');
       if (endDate.trim() && !end) return setError('Use YYYY-MM-DD HH:MM for the end date.');
+      // The start must not be in the past — matching the web form. An existing
+      // event whose start was left untouched stays editable, so fixing a typo
+      // in the description doesn't require inventing a new date.
+      const untouchedStart =
+        item && 'event_date' in item &&
+        Math.abs(new Date(item.event_date).getTime() - new Date(start).getTime()) < 60_000;
+      if (!untouchedStart && new Date(start).getTime() < Date.now() - 60_000) {
+        return setError("The event start can't be in the past.");
+      }
+      if (end && new Date(end).getTime() <= new Date(start).getTime()) {
+        return setError('The end must be after the start.');
+      }
       body = {
         title: title.trim(),
         description: description.trim() || null,

@@ -8,7 +8,7 @@ import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
 import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
-import { requireZoneAwareIso } from "@/lib/communities/event-time";
+import { isPastStart, requireZoneAwareIso } from "@/lib/communities/event-time";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -149,6 +149,12 @@ export async function POST(
   const eventDate = typeof body.event_date === "string" ? requireZoneAwareIso(body.event_date) : null;
   if (!eventDate) {
     return NextResponse.json({ error: "A valid event date is required." }, { status: 422 });
+  }
+  // The form refuses past starts too; this is the backstop for anything that
+  // skips it (scripts, stale tabs, the other room). A minute of grace covers
+  // the clock gap between a member picking "now" and the request landing.
+  if (isPastStart(eventDate)) {
+    return NextResponse.json({ error: "The event start can't be in the past." }, { status: 422 });
   }
 
   const endDate = typeof body.end_date === "string" && body.end_date
