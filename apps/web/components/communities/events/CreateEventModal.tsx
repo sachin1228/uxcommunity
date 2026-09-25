@@ -8,7 +8,18 @@ import { ToggleRow } from "../threads/ThreadComposerControls";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { localInputToIso } from "@/lib/communities/event-time";
+import {
+  hostOffsetMinutes,
+  isPastStart,
+  localInputToIso,
+  minutesUntilStart,
+  nowTimeInput,
+  todayDateInput,
+  viewerTimeZoneName,
+  zoneLabelForDateInput,
+} from "@/lib/communities/event-time";
+import { HostTimeZoneField } from "./HostTimeZoneField";
+import { useNowTick } from "./useNowTick";
 
 interface CreateEventModalProps {
   communityId?: string;
@@ -34,8 +45,28 @@ export function CreateEventModal({
   const [imageUploading, setImageUploading] = useState(false);
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
+  // The past is off the table: today (in the viewer's zone) is the earliest
+  // day the picker offers, and today's clock the earliest time on that day.
+  // Captured once per mount so re-renders don't shuffle bounds mid-edit; the
+  // submit check re-reads the clock, so time still can't slip through.
+  const [minDate] = useState(() => todayDateInput());
+  const [minStartTime] = useState(() => nowTimeInput());
+  // The zone the typed times mean. It starts as the device's own — what a wall
+  // clock the member just typed almost always means — and the picker below
+  // overrides it for a device set to the wrong zone, or for a host scheduling
+  // somewhere they aren't.
+  const [deviceZone] = useState(() => viewerTimeZoneName());
+  const [hostZone, setHostZone] = useState<string | null>(deviceZone);
+  // Derived from the chosen day so an event on the far side of a DST change
+  // still names the offset it will actually run at, and the tick keeps the
+  // countdown below honest.
+  const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
+  const nowTick = useNowTick();
+  const startsInMinutes = minutesUntilStart(
+    eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
+    new Date(nowTick),
+  );
   const [isOnline, setIsOnline] = useState(false);
   const [location, setLocation] = useState("");
   const [meetLink, setMeetLink] = useState("");
@@ -76,12 +107,12 @@ export function CreateEventModal({
   }
 
   /**
-   * The viewer's wall time, stated in their own zone. The old naive
+   * The typed wall time, stated in the zone it belongs to. The old naive
    * concatenation (`${date}T${time}:00`) carried no zone, so Postgres's session
    * zone (UTC) claimed it and a typed 12:10 displayed as 17:40 IST.
    */
   function buildIso(date: string, time: string) {
-    return localInputToIso(date, time);
+    return localInputToIso(date, time, hostZone);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -89,13 +120,25 @@ export function CreateEventModal({
     if (!title.trim()) { setError("Title is required."); return; }
     if (!eventDate) { setError("Event date is required."); return; }
     if (!eventTime) { setError("Event time is required."); return; }
-    if (!buildIso(eventDate, eventTime)) { setError("Start time is not a valid time of day."); return; }
+    const startIso = buildIso(eventDate, eventTime);
+    if (!startIso) { setError("Start time is not a valid time of day."); return; }
+    // The date picker can only block past days, so an hour that has already
+    // gone by on today's date is caught here (a minute of grace covers
+    // picking "now" and reaching the button).
+    if (isPastStart(startIso)) { setError("Start time can't be in the past. Pick a time from now onward."); return; }
+    // The end rides the start's date — one date selector covers both — so
+    // only an end time after the start makes sense here.
+    let endIso: string | null = null;
+    if (endTime) {
+      endIso = buildIso(eventDate, endTime);
+      if (!endIso) { setError("End time is not a valid time of day."); return; }
+      if (endIso <= startIso) { setError("End time must be after the start time."); return; }
+    }
 
     setSaving(true);
     setError(null);
     try {
-      const startDate = buildIso(eventDate, eventTime);
-      if (!startDate) { setError("Start time is not a valid time of day."); return; }
+      const startDate = startIso;
       const res = await fetch(`/api/communities/${communityId}/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,7 +146,7 @@ export function CreateEventModal({
           title: title.trim(),
           description: description.trim() || null,
           event_date: startDate,
-          end_date: endDate ? buildIso(endDate, endTime) : null,
+          end_date: endIso,
           is_online: isOnline,
           location: location.trim() || null,
           meet_link: meetLink.trim() || null,
@@ -111,6 +154,13 @@ export function CreateEventModal({
           cover_image_url: coverImageUrl,
           accent_color: accentColor,
           is_public: isPublic,
+          // The host's own side of the schedule, so the card can show the time
+          // they actually set beside each viewer's reading of it. The offset is
+          // that zone's at the event's instant, which is what the wall time
+          // above was typed in — and the fallback if the name cannot be
+          // resolved on someone else's browser later.
+          host_timezone: hostZone,
+          host_utc_offset_minutes: hostOffsetMinutes(startDate, hostZone),
         }),
       });
       const data = await res.json();
@@ -223,18 +273,42 @@ export function CreateEventModal({
                 </div>
               </label>
 
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
+              {/* One date selector on its own row: the event happens on this
+                  day, and the start and end times beneath it place it inside
+                  it. */}
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                  <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                  <span
+                    className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
+                    title={`The times you enter are read in ${zoneLabel}`}
+                  >
+                    {zoneLabel}
                   </span>
-                  <input
-                    type="date"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    className="field w-full"
-                  />
-                </label>
+                </span>
+                <input
+                  type="date"
+                  value={eventDate}
+                  min={minDate}
+                  onChange={(e) => {
+                    setEventDate(e.target.value);
+                    // Switching onto today must not keep a time that day
+                    // has already gone past.
+                    if (
+                      e.target.value === minDate &&
+                      eventTime &&
+                      eventTime < minStartTime
+                    ) {
+                      setEventTime("");
+                    }
+                  }}
+                  className="field w-full"
+                />
+              </label>
+
+              {/* Start and end times share the row beneath the date — the end
+                  rides the start's day, so there is no second date field. */}
+              <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                     <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
@@ -242,22 +316,13 @@ export function CreateEventModal({
                   <input
                     type="time"
                     value={eventTime}
-                    onChange={(e) => setEventTime(e.target.value)}
-                    className="field w-full"
-                  />
-                </label>
-              </div>
-
-              {/* End date + time */}
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                    End date <span className="font-normal text-foreground-subtle">(optional)</span>
-                  </span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    min={eventDate === minDate ? minStartTime : undefined}
+                    onChange={(e) => {
+                      // Typing can bypass the picker's min — refuse a past
+                      // time on today's date rather than accepting it here.
+                      if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
+                      setEventTime(e.target.value);
+                    }}
                     className="field w-full"
                   />
                 </label>
@@ -268,11 +333,34 @@ export function CreateEventModal({
                   <input
                     type="time"
                     value={endTime}
+                    min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
                     className="field w-full"
                   />
                 </label>
               </div>
+              <div className="font-body text-[11px] leading-snug text-foreground-subtle">
+                <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
+                {startsInMinutes !== null && (
+                  <p className="mt-1 font-medium text-accent">
+                    {startsInMinutes === 1
+                      ? "Starts in about a minute."
+                      : `Starts in about ${startsInMinutes} minutes.`}
+                  </p>
+                )}
+              </div>
+
+              {/* Which clock the times above are on. It defaults to the
+                  device's own and is the host's only way to say otherwise —
+                  and the one place that says everyone else reads the same
+                  moment on their own clock. */}
+              <HostTimeZoneField
+                value={hostZone}
+                onChange={setHostZone}
+                deviceZone={deviceZone}
+                dateInput={eventDate}
+                startIso={eventDate && eventTime ? buildIso(eventDate, eventTime) : null}
+              />
             </div>
           </div>
 

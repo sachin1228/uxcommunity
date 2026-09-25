@@ -8,7 +8,32 @@ import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
 import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
-import { requireZoneAwareIso } from "@/lib/communities/event-time";
+import { isPastStart, requireZoneAwareIso } from "@/lib/communities/event-time";
+
+/**
+ * An IANA zone name the runtime can actually resolve, or null. The stored name
+ * is only ever used to re-derive a wall clock on someone else's browser, so an
+ * unrecognised value is dropped (its offset fallback still tells the story)
+ * rather than rejecting the event over metadata.
+ */
+function validTimeZone(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  if (!name || name.length > 64) return null;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: name });
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+/** The host's offset in minutes east of UTC, or null when it isn't a sane one. */
+function validOffsetMinutes(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  // UTC-14 … UTC+14: outside that, the value is a bug rather than a zone.
+  return Math.abs(value) <= 840 ? value : null;
+}
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -150,6 +175,12 @@ export async function POST(
   if (!eventDate) {
     return NextResponse.json({ error: "A valid event date is required." }, { status: 422 });
   }
+  // The form refuses past starts too; this is the backstop for anything that
+  // skips it (scripts, stale tabs, the other room). A minute of grace covers
+  // the clock gap between a member picking "now" and the request landing.
+  if (isPastStart(eventDate)) {
+    return NextResponse.json({ error: "The event start can't be in the past." }, { status: 422 });
+  }
 
   const endDate = typeof body.end_date === "string" && body.end_date
     ? requireZoneAwareIso(body.end_date)
@@ -160,6 +191,13 @@ export async function POST(
   if (endDate && new Date(endDate) <= new Date(eventDate)) {
     return NextResponse.json({ error: "End time must be after the start time." }, { status: 422 });
   }
+
+  // The host's own zone, so the card can later show what they actually set
+  // ("3:00 PM") beside what each viewer reads. Best-effort metadata: an
+  // unusable name is dropped to null rather than failing the create, and the
+  // offset rides along as the fallback for browsers that cannot resolve it.
+  const hostTimezone = validTimeZone(body.host_timezone);
+  const hostOffsetMinutes = validOffsetMinutes(body.host_utc_offset_minutes);
 
   const isOnline = body.is_online === true;
   const location = typeof body.location === "string" && body.location.trim() ? body.location.trim() : null;
@@ -198,6 +236,8 @@ export async function POST(
       cover_image_url: rawCoverImageUrl,
       accent_color: accentColor,
       is_public: isPublic,
+      host_timezone: hostTimezone,
+      host_utc_offset_minutes: hostOffsetMinutes,
     })
     .select(EVENT_CARD_COLUMNS)
     .single();

@@ -8,6 +8,12 @@ import { fetchJsonCached } from "@/lib/request-cache";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import {
+  eventZoneLabel,
+  eventZoneTooltip,
+  formatEventTimeRange,
+  hostScheduleForViewer,
+} from "@/lib/communities/event-display";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { goingPreview, toGoingEntries } from "./going-list";
 
@@ -50,15 +56,8 @@ function fmtEventDate(iso: string) {
   });
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso)
-    .toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
-    .toUpperCase();
-}
-
 function fmtSchedule(event: CommunityEvent) {
-  const start = `${fmtEventDate(event.event_date)} · ${fmtTime(event.event_date)}`;
-  return event.end_date ? `${start} – ${fmtTime(event.end_date)}` : start;
+  return `${fmtEventDate(event.event_date)} · ${formatEventTimeRange(event.event_date, event.end_date)}`;
 }
 
 function Row({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -166,6 +165,9 @@ export function EventRoomSection({
     attended,
   );
   const spotsLeft = event.max_attendees !== null ? event.max_attendees - attended : null;
+  // The host's own reading of the schedule — null unless it differs from this
+  // viewer's clock, so the row stays silent when there is nothing to compare.
+  const hostSchedule = hostScheduleForViewer(event);
 
   return (
     <section
@@ -192,8 +194,31 @@ export function EventRoomSection({
 
       <div className="mt-3 flex flex-col gap-2">
         {/* One row carries the whole schedule — the card does the same, so a
-            multi-day event reads the same in both places. */}
-        <Row icon={<CalendarDays strokeWidth={2.5} size={16} />}>{fmtSchedule(event)}</Row>
+            multi-day event reads the same in both places. The times are the
+            viewer's own clock, so the zone rides along with them. */}
+        <Row icon={<CalendarDays strokeWidth={2.5} size={16} />}>
+          <span>
+            <span
+              className="block"
+              title={eventZoneTooltip(event.event_date)}
+            >
+              {fmtSchedule(event)}{" "}
+              <span className="font-mono text-[11px] text-foreground-subtle">
+                ({eventZoneLabel(event.event_date)})
+              </span>
+            </span>
+            {/* What the host set, in their own zone — the same moment, other
+                clock. Shown only when the two readings actually differ. */}
+            {hostSchedule && (
+              <span
+                className="mt-0.5 block text-xs text-foreground-subtle"
+                title={`The time the host set, in their own zone (${hostSchedule.zone}).`}
+              >
+                Host time: {hostSchedule.range} ({hostSchedule.zone})
+              </span>
+            )}
+          </span>
+        </Row>
         <Row icon={event.is_online ? <Video strokeWidth={2.5} size={16} /> : <MapPin strokeWidth={2.5} size={16} />}>
           {event.is_online ? "Online event" : event.location ?? "Location shared by the host"}
         </Row>

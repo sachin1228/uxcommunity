@@ -7,6 +7,11 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
+import {
+  eventZoneLabel,
+  eventZoneTooltip,
+  formatEventTimeRange,
+} from "@/lib/communities/event-display";
 import { communityFeedLayout } from "../feed-layout";
 
 /**
@@ -29,15 +34,8 @@ function fmtEventDate(iso: string) {
   });
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso)
-    .toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
-    .toUpperCase();
-}
-
 function fmtSchedule(startsAt: string, endsAt: string | null) {
-  const start = `${fmtEventDate(startsAt)} · ${fmtTime(startsAt)}`;
-  return endsAt ? `${start} – ${fmtTime(endsAt)}` : start;
+  return `${fmtEventDate(startsAt)} · ${formatEventTimeRange(startsAt, endsAt)}`;
 }
 
 export interface EventChatJoinGateProps {
@@ -111,7 +109,14 @@ export function EventChatJoinGate({
             <dl className="mt-5 flex flex-col gap-2.5 font-body text-sm text-foreground-muted">
               <div className="flex items-center gap-2">
                 <CalendarDays strokeWidth={2.5} size={14} className="shrink-0 text-foreground-subtle" />
-                <span>{fmtSchedule(event.event_date, event.end_date)}</span>
+                {/* The viewer's own clock, named — a host in another zone set
+                    this time, and this is what it is here. */}
+                <span title={eventZoneTooltip(event.event_date)}>
+                  {fmtSchedule(event.event_date, event.end_date)}{" "}
+                  <span className="font-mono text-[11px] text-foreground-subtle">
+                    ({eventZoneLabel(event.event_date)})
+                  </span>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 {event.is_online ? (

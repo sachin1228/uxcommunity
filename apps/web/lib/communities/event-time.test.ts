@@ -1,6 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { localInputToIso, isoToLocalInput, isZoneAwareIso, requireZoneAwareIso } from "./event-time";
+import {
+  localInputToIso,
+  isoToLocalInput,
+  isZoneAwareIso,
+  requireZoneAwareIso,
+  todayDateInput,
+  nowTimeInput,
+  addDaysToDateInput,
+  daysBetweenDateInputs,
+  isPastStart,
+  startMovedByEdit,
+  viewerZoneLabel,
+  zoneLabelForDateInput,
+  minutesUntilStart,
+  STARTS_SOON_WINDOW_MS,
+} from "./event-time";
 
 /**
  * Runs the conversion with the browser's zone frozen to a fixed offset, so the
@@ -81,4 +96,159 @@ test("requireZoneAwareIso guards and normalises in one step", () => {
   assert.equal(requireZoneAwareIso("2026-09-25T12:10:00"), null);
   assert.equal(requireZoneAwareIso("2026-09-25T12:10:00+05:30"), "2026-09-25T06:40:00.000Z");
   assert.equal(requireZoneAwareIso("not a date"), null);
+});
+
+test("todayDateInput is the viewer's calendar day, not UTC's", () => {
+  // 2026-09-25 01:10 IST is still 2026-09-24 in UTC — the zone decides the day.
+  const now = new Date("2026-09-25T01:10:00+05:30");
+  withZone("Asia/Kolkata", () => {
+    assert.equal(todayDateInput(now), "2026-09-25");
+  });
+  withZone("America/Los_Angeles", () => {
+    // That same instant is the previous afternoon in Los Angeles.
+    assert.equal(todayDateInput(now), "2026-09-24");
+  });
+});
+
+test("a start that already happened is past, with a minute of grace", () => {
+  const now = new Date("2026-09-25T12:00:00Z");
+  // A minute ago still counts as about-to-start…
+  assert.equal(isPastStart("2026-09-25T11:59:30Z", now), false);
+  // …an hour ago does not.
+  assert.equal(isPastStart("2026-09-25T11:00:00Z", now), true);
+  // Anything from here on is upcoming.
+  assert.equal(isPastStart("2026-09-25T12:00:00Z", now), false);
+  assert.equal(isPastStart("2099-12-31T18:00:00Z", now), false);
+});
+
+test("an unparseable start counts as past — fail closed on dates", () => {
+  assert.equal(isPastStart("not a date"), true);
+  assert.equal(isPastStart(""), true);
+});
+
+test("nowTimeInput reads the viewer's wall clock, minutes only", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(nowTimeInput(new Date("2026-09-25T14:05:00+05:30")), "14:05");
+    assert.equal(nowTimeInput(new Date("2026-09-25T08:00:00+05:30")), "08:00");
+  });
+});
+
+test("addDaysToDateInput shifts whole days on the string's own calendar", () => {
+  assert.equal(addDaysToDateInput("2026-09-25", 2), "2026-09-27");
+  assert.equal(addDaysToDateInput("2026-09-30", 1), "2026-10-01");
+  assert.equal(addDaysToDateInput("2026-03-01", -1), "2026-02-28");
+  assert.equal(addDaysToDateInput("2024-03-01", -1), "2024-02-29"); // leap year
+  assert.equal(addDaysToDateInput("nonsense", 1), "nonsense");
+});
+
+test("daysBetweenDateInputs counts the gap between two date strings", () => {
+  assert.equal(daysBetweenDateInputs("2026-09-25", "2026-09-25"), 0);
+  assert.equal(daysBetweenDateInputs("2026-09-25", "2026-09-27"), 2);
+  assert.equal(daysBetweenDateInputs("2026-09-27", "2026-09-25"), -2);
+});
+
+test("an unmodified stored start does not count as moved by an edit", () => {
+  const iso = "2026-09-25T06:40:00.000Z";
+  assert.equal(startMovedByEdit(iso, iso), false);
+  // Sub-minute differences are the form's own rounding, not a change.
+  assert.equal(startMovedByEdit("2026-09-25T06:40:30.000Z", "2026-09-25T06:40:00.000Z"), false);
+  assert.equal(startMovedByEdit("2026-09-26T06:40:00.000Z", iso), true);
+  // Garbage on either side must not silently unlock the past.
+  assert.equal(startMovedByEdit("not a date", iso), true);
+  assert.equal(startMovedByEdit(iso, ""), true);
+});
+
+test("the zone label pairs the abbreviation with this date's offset", () => {
+  withZone("America/New_York", () => {
+    // Summer is EDT at UTC-4, winter EST at UTC-5 — the date decides.
+    assert.equal(viewerZoneLabel(new Date("2026-07-15T12:00:00Z")), "EDT · UTC-4:00");
+    assert.equal(viewerZoneLabel(new Date("2026-01-15T12:00:00Z")), "EST · UTC-5:00");
+  });
+});
+
+test("zones without a real abbreviation show the offset alone", () => {
+  withZone("Asia/Kolkata", () => {
+    // CLDR refuses "IST" here (it is ambiguous — Ireland, Israel), rendering
+    // "GMT+5:30" instead; the offset alone says it without the duplication.
+    assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC+5:30");
+  });
+});
+
+test("a UTC viewer reads a plain UTC, not UTC · UTC", () => {
+  withZone("UTC", () => {
+    assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC");
+  });
+});
+
+test("half-hour offsets keep their minutes", () => {
+  withZone("Asia/Kathmandu", () => {
+    assert.equal(viewerZoneLabel(new Date("2026-09-25T12:00:00Z")), "UTC+5:45");
+  });
+});
+
+test("the form's zone label follows the chosen date across a DST change", () => {
+  withZone("America/New_York", () => {
+    // The same viewer, two events either side of the change: the label must
+    // name the offset the event will actually run at.
+    assert.equal(zoneLabelForDateInput("2026-07-15"), "EDT · UTC-4:00");
+    assert.equal(zoneLabelForDateInput("2026-01-15"), "EST · UTC-5:00");
+  });
+});
+
+test("an empty or malformed date falls back to the viewer's current zone", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(zoneLabelForDateInput(""), "UTC+5:30");
+    assert.equal(zoneLabelForDateInput("25/09/2026"), "UTC+5:30");
+  });
+});
+
+test("minutes until the start only counts inside the last hour", () => {
+  const now = new Date("2026-09-25T12:00:00Z");
+  assert.equal(minutesUntilStart("2026-09-25T12:42:00Z", now), 42);
+  // Rounded up, so half a minute is "in 1 minute", never "in 0".
+  assert.equal(minutesUntilStart("2026-09-25T12:00:30Z", now), 1);
+  // The window is a full hour, and one second past it is out.
+  assert.equal(minutesUntilStart("2026-09-25T13:00:00Z", now), 60);
+  assert.equal(minutesUntilStart("2026-09-25T13:00:01Z", now), null);
+  // Already begun, missing, or unreadable never claims to be starting soon.
+  assert.equal(minutesUntilStart("2026-09-25T11:59:00Z", now), null);
+  assert.equal(minutesUntilStart(null, now), null);
+  assert.equal(minutesUntilStart("not a date", now), null);
+  // The window the constant names is the one the helper uses.
+  assert.equal(STARTS_SOON_WINDOW_MS, 60 * 60 * 1000);
+});
+
+test("a chosen zone, not the device's, decides what a typed clock means", () => {
+  withZone("America/New_York", () => {
+    // A host whose device says New York but who is scheduling in Kolkata: the
+    // typed 12:10 belongs to the zone they picked, not to their own clock.
+    assert.equal(localInputToIso("2026-09-25", "12:10", "Asia/Kolkata"), "2026-09-25T12:10:00+05:30");
+    // Unchanged without a zone: the device's own reading of the same input.
+    assert.equal(localInputToIso("2026-09-25", "12:10"), "2026-09-25T12:10:00-04:00");
+    // The legacy spelling this runtime reports is the same zone.
+    assert.equal(localInputToIso("2026-09-25", "12:10", "Asia/Calcutta"), "2026-09-25T12:10:00+05:30");
+  });
+});
+
+test("a chosen zone follows its own DST, and an unusable one falls back to the device", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(localInputToIso("2026-01-15", "09:30", "America/New_York"), "2026-01-15T09:30:00-05:00");
+    assert.equal(localInputToIso("2026-07-15", "09:30", "America/New_York"), "2026-07-15T09:30:00-04:00");
+    // A name the runtime cannot resolve must not invent a zone — the device's
+    // own reading is the only honest one left.
+    assert.equal(localInputToIso("2026-09-25", "12:10", "Not/AZone"), "2026-09-25T12:10:00+05:30");
+    assert.equal(localInputToIso("2026-09-25", "12:10", null), "2026-09-25T12:10:00+05:30");
+    // The calendar-overflow guard applies to the zone path too.
+    assert.equal(localInputToIso("2026-02-30", "12:10", "America/New_York"), null);
+  });
+});
+
+test("the form's zone label names the chosen zone, not the reader's", () => {
+  withZone("Asia/Kolkata", () => {
+    assert.equal(zoneLabelForDateInput("2026-07-15", "America/New_York"), "EDT · UTC-4:00");
+    assert.equal(zoneLabelForDateInput("2026-01-15", "America/New_York"), "EST · UTC-5:00");
+    assert.equal(zoneLabelForDateInput("2026-07-15"), "UTC+5:30");
+    // An unusable name labels the reader's own zone rather than nothing.
+    assert.equal(zoneLabelForDateInput("2026-07-15", "Not/AZone"), "UTC+5:30");
+  });
 });

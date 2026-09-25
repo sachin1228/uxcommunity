@@ -14,7 +14,7 @@ import { enrichCommunityEvents } from "./read-models";
  * faces) is filled in by `enrichEventCards`.
  */
 export const EVENT_CARD_COLUMNS =
-  "id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at";
+  "id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, accent_color, host_timezone, host_utc_offset_minutes, created_at, updated_at";
 
 /** How many attendee faces the card's avatar stack shows. */
 const ATTENDEE_PREVIEW_LIMIT = 5;

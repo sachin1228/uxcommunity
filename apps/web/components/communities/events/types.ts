@@ -15,6 +15,14 @@ export interface CommunityEvent {
   cover_image_url: string | null;
   accent_color?: string | null;
   is_public?: boolean;
+  /**
+   * The zone the host set the event in, and their offset at that instant in
+   * minutes east of UTC. Both null on events created before this was recorded
+   * (and on rows where the browser could not name its zone), which is what
+   * lets a card omit the host's line entirely instead of guessing one.
+   */
+  host_timezone?: string | null;
+  host_utc_offset_minutes?: number | null;
   created_at: string;
   updated_at: string;
   // enriched

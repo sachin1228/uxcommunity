@@ -11,6 +11,7 @@
  * "yyyy/mm/dd HH:mm:ss" — no day names, no suffixes — so the parts are parsed
  * back out of it and reassembled with offsets to a canonical ISO string.
  */
+import { formatUtcOffsetMinutes, isKnownTimeZone, zoneLabelInZone, zoneOffsetMinutes } from "./timezone";
 const ZONELESS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 const zoneFormatter = new Intl.DateTimeFormat("en-ZA", {
@@ -43,11 +44,38 @@ function zoneStamp(date: Date): string {
 
 /**
  * A browser wall-time input ("2026-09-25" + "12:10") as the real instant it
- * names in the viewer's zone, ISO-encoded — "2026-09-25T06:40:00.000Z" for a
- * UTC+5:30 viewer. Inputs in the future or from another zone render back
- * through toISOString, so what leaves the browser is always exact.
+ * names — in the viewer's own zone, or in a zone they explicitly chose. Either
+ * way the wall clock is stated with the offset it means, so what leaves the
+ * browser is an exact instant rather than a clock time hoping for a zone.
  */
-export function localInputToIso(date: string, time: string): string | null {
+/**
+ * The instant a typed wall clock names inside a named zone, as an
+ * offset-suffixed ISO string ("2026-09-25T12:10:00+05:30"). An offset only
+ * means something at a moment, so the zone's offset is read at the wall time
+ * and then re-read at the instant that implies — a clock time on the far side
+ * of a DST change needs that second pass to land on the right side of it.
+ */
+function zoneWallClockToIso(date: string, time: string, timeZone: string): string | null {
+  const [y, mo, d] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const wallAsUtc = Date.UTC(y, mo - 1, d, hour, minute);
+  const asUtc = new Date(wallAsUtc);
+  // The same overflow guard the device path below applies: 2026-02-30 rolls
+  // into March rather than failing.
+  if (asUtc.getUTCMonth() !== mo - 1 || asUtc.getUTCDate() !== d) return null;
+
+  let minutes = zoneOffsetMinutes(timeZone, asUtc);
+  if (minutes === null) return null;
+  const settled = zoneOffsetMinutes(timeZone, new Date(wallAsUtc - minutes * 60_000));
+  if (settled !== null && settled !== minutes) minutes = settled;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const abs = Math.abs(minutes);
+  // The wall clock the member typed, stated with the zone it means.
+  return `${date}T${pad(hour)}:${pad(minute)}:00${minutes < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
+export function localInputToIso(date: string, time: string, timeZone?: string | null): string | null {
   if (!date || !time) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(time);
@@ -58,6 +86,10 @@ export function localInputToIso(date: string, time: string): string | null {
   const hour = Number(hh);
   const minute = Number(mm);
   if (hour > 23 || minute > 59) return null;
+  // A chosen zone changes what the typed clock means: 3 PM in Kolkata is not
+  // 3 PM in New York. Without one, the device's own zone is the only honest
+  // reading of a wall clock the member just typed.
+  if (timeZone && isKnownTimeZone(timeZone)) return zoneWallClockToIso(date, time, timeZone);
   // Constructed in the viewer's zone by design: the hour they typed is the
   // hour their neighbours will see, wherever the server sits.
   const local = new Date(Number(y), Number(mo) - 1, Number(d), hour, minute);
@@ -105,6 +137,195 @@ export function isoToLocalInput(iso: string | null | undefined): { date: string;
     date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
     time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
   };
+}
+
+/**
+ * How long a start can sit behind the clock and still count as upcoming: a
+ * member picking "right now" needs the seconds it takes to reach the submit
+ * button, but yesterday must never pass.
+ */
+const PAST_START_GRACE_MS = 60_000;
+
+/**
+ * Today as a `<input type="date">` value ("2026-09-25"), in the viewer's own
+ * zone — the `min` that keeps the event form's date picker on days that have
+ * not happened yet. The picker only constrains the day, so submit-time checks
+ * still catch today-with-an-earlier-hour via isPastStart.
+ */
+export function todayDateInput(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * The current wall clock as a `<input type="time">` value ("14:05") — the
+ * `min` for a start time on today's date, so the picker can't offer an hour
+ * that has already gone by.
+ */
+export function nowTimeInput(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+/**
+ * A date input shifted by whole days ("2026-09-25" + 2 → "2026-09-27"), pure
+ * UTC calendar math on the string so zones and DST cannot touch it. The edit
+ * form needs this to carry a legacy multi-day end (end on a later date than
+ * the start) that the single date selector can no longer show.
+ */
+export function addDaysToDateInput(date: string, days: number): string {
+  const [, y, m, d] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) ?? [];
+  if (!y) return date;
+  const shifted = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d) + days));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+/**
+ * Whole days from one date input to another (to − from). A legacy event whose
+ * end lands a day or more after its start stores that distance here so the
+ * end keeps riding the start's date through edits.
+ */
+export function daysBetweenDateInputs(from: string, to: string): number {
+  const day = (d: string) => {
+    const [, y, m, dd] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d) ?? [];
+    return y ? Date.UTC(Number(y), Number(m) - 1, Number(dd)) / 86_400_000 : NaN;
+  };
+  return day(to) - day(from);
+}
+
+/**
+ * What the viewer's own zone is called, for the small label beside the event
+ * form's date picker — the times they type mean this zone, and the label says
+ * so the way wall clocks do: the abbreviation when the runtime has one
+ * ("EDT"), and the offset for this exact date ("UTC+5:30"), which is what
+ * carries half-hour zones and DST. A zone without a real abbreviation (CLDR
+ * deliberately refuses ambiguous ones, so India renders "GMT+5:30") shows the
+ * offset alone — and the IANA name is skipped on purpose: runtimes disagree
+ * on its spelling (Kolkata is still "Asia/Calcutta" in some ICU builds), and
+ * a label that changes between browsers reads as two different zones.
+ */
+export function viewerZoneLabel(now: Date = new Date()): string {
+  const offset = formatUtcOffsetMinutes(viewerOffsetMinutes(now));
+
+  // A real abbreviation ("EDT") adds something the offset can't; a GMT-style
+  // one ("GMT+5:30") is the offset again under another name.
+  const named = new Intl.DateTimeFormat("en", { timeZoneName: "short" })
+    .formatToParts(now)
+    .find((part) => part.type === "timeZoneName")?.value ?? null;
+  const abbrev = named && !/^(GMT|UTC)/.test(named) ? named : null;
+
+  return abbrev ? `${abbrev} · ${offset}` : offset;
+}
+
+/** The viewer's offset at an instant, in minutes east of UTC (IST is 330). */
+export function viewerOffsetMinutes(instant: Date = new Date()): number {
+  // getTimezoneOffset counts minutes *west* of UTC.
+  return -instant.getTimezoneOffset();
+}
+
+/**
+ * The offset to store beside the host's zone: that zone's own offset at the
+ * event's start, or the device's reading of the instant when there is no
+ * usable name. Stored so a browser that cannot resolve the name can still
+ * rebuild the host's wall clock out of minutes alone.
+ */
+export function hostOffsetMinutes(startIso: string, timeZone: string | null): number {
+  const instant = new Date(startIso);
+  const named = timeZone ? zoneOffsetMinutes(timeZone, instant) : null;
+  return named ?? viewerOffsetMinutes(instant);
+}
+
+/**
+ * The viewer's IANA zone name ("Asia/Kolkata"), or null where the runtime
+ * cannot say. Sent with an event so the card can later show another member the
+ * wall time the host actually set.
+ */
+export function viewerTimeZoneName(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The zone label as of a chosen date — an event sitting on the far side of a
+ * DST change must name the offset it will actually run at, not today's. Noon
+ * UTC anchors the lookup: a date input can only name a day, noon is never
+ * inside a transition, and pinning it to UTC keeps a reader's own zone from
+ * dragging the lookup across a transition for the zone being labelled.
+ *
+ * Without a zone this labels the viewer's own (see viewerZoneLabel); with one
+ * it labels the zone the host said the times belong to.
+ */
+export function zoneLabelForDateInput(
+  date: string,
+  timeZone?: string | null,
+  fallback: Date = new Date(),
+): string {
+  const noon = noonUtcForDateInput(date, fallback);
+  if (timeZone && isKnownTimeZone(timeZone)) {
+    return zoneLabelInZone(timeZone, noon) ?? viewerZoneLabel(noon);
+  }
+  return viewerZoneLabel(noon);
+}
+
+/**
+ * Noon UTC on a date input, as an instant — the anchor for anything labelled
+ * from a day rather than a moment. A date input can only name a day, noon is
+ * never inside a DST transition, and pinning it to UTC keeps the reader's own
+ * zone from dragging the lookup across one for the zone being labelled. A
+ * date that doesn't parse hands back the fallback untouched.
+ */
+export function noonUtcForDateInput(date: string, fallback: Date = new Date()): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return fallback;
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+}
+
+/** How close to the start the event form starts calling it "starting soon". */
+export const STARTS_SOON_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Whole minutes until the start, when it falls inside that window — null when
+ * it is further out, has already begun, or cannot be read. Rounded up, so half
+ * a minute away reads "in 1 minute" rather than "in 0 minutes".
+ */
+export function minutesUntilStart(
+  startIso: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (!startIso) return null;
+  const start = Date.parse(startIso);
+  if (!Number.isFinite(start)) return null;
+  const delta = start - now.getTime();
+  if (delta <= 0 || delta > STARTS_SOON_WINDOW_MS) return null;
+  return Math.max(1, Math.ceil(delta / 60_000));
+}
+
+/**
+ * A start instant that has already happened (with the minute of grace above).
+ * Unparseable input counts as past: every caller has already validated the
+ * shape, and failing closed here can only refuse a date, never move one.
+ */
+export function isPastStart(iso: string, now: Date = new Date()): boolean {
+  const time = Date.parse(iso);
+  return !Number.isFinite(time) || time < now.getTime() - PAST_START_GRACE_MS;
+}
+
+/**
+ * Whether a rebuilt start differs from the stored one by more than the form's
+ * minute granularity — i.e. the member actually moved it, rather than handing
+ * the stored value back. Untouched past starts must keep editing other fields
+ * (a description fix on an event that already happened), so the past guard
+ * only bites when this says the start itself changed.
+ */
+export function startMovedByEdit(rebuiltIso: string, storedIso: string): boolean {
+  const rebuilt = Date.parse(rebuiltIso);
+  const stored = Date.parse(storedIso);
+  if (!Number.isFinite(rebuilt) || !Number.isFinite(stored)) return true;
+  return Math.abs(rebuilt - stored) >= 60_000;
 }
 
 /**

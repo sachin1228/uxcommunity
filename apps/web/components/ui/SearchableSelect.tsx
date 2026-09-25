@@ -2,6 +2,28 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 
+/** Roughly what the dropdown occupies (search row + the list's max height). */
+const DROPDOWN_HEIGHT = 248;
+
+/**
+ * Whether the list would run past the bottom of whatever scrolls this trigger.
+ * The forms that use this field are long, so a picker sitting near the bottom
+ * edge would otherwise open into space the member cannot see; when there is
+ * room above instead, the list opens upward.
+ */
+function opensUpward(node: HTMLElement | null): boolean {
+  if (!node) return false;
+  const trigger = node.getBoundingClientRect();
+  let below = window.innerHeight - 8;
+  for (let el = node.parentElement; el; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    if (/(auto|scroll|hidden)/.test(style.overflowY)) {
+      below = Math.min(below, el.getBoundingClientRect().bottom - 8);
+    }
+  }
+  return trigger.bottom + DROPDOWN_HEIGHT > below && trigger.top - DROPDOWN_HEIGHT > 8;
+}
+
 interface Option {
   value: string;
   label: string;
@@ -33,6 +55,7 @@ export function SearchableSelect({
   disabled = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,10 +96,11 @@ export function SearchableSelect({
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  // Focus input when opened
+  // Focus input when opened. preventScroll keeps a list opened upward from
+  // yanking the form around as the field takes focus.
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 10);
+      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
     }
   }, [open]);
 
@@ -101,7 +125,10 @@ export function SearchableSelect({
         disabled={disabled}
         className={triggerClass}
         onClick={() => {
-          if (!disabled) setOpen((o) => !o);
+          if (disabled) return;
+          const next = !open;
+          if (next) setDropUp(opensUpward(containerRef.current));
+          setOpen(next);
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -141,7 +168,12 @@ export function SearchableSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-surface-raised shadow-md overflow-hidden">
+        <div
+          className={
+            "absolute z-50 w-full rounded-md border border-border bg-surface-raised shadow-md overflow-hidden " +
+            (dropUp ? "bottom-full mb-1" : "mt-1")
+          }
+        >
           {/* Search input */}
             <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">

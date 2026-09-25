@@ -8,6 +8,28 @@ import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-ca
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
 import { requireZoneAwareIso } from "@/lib/communities/event-time";
 
+/**
+ * An IANA zone name the runtime can resolve, or null — the same best-effort
+ * rule the create route applies, since this is display metadata.
+ */
+function validTimeZone(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  if (!name || name.length > 64) return null;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: name });
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+/** The host's offset in minutes east of UTC, or null when it isn't a sane one. */
+function validOffsetMinutes(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  return Math.abs(value) <= 840 ? value : null;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; eventId: string }> },
@@ -51,8 +73,9 @@ export async function PATCH(
   let existingQuery = db
     .from("community_events")
     // cover_image_url is fetched so replaced/removed covers can be cleaned up
-    // from R2 after the update.
-    .select("id, user_id, cover_image_url")
+    // from R2 after the update; event_date is fetched so a move can be told
+    // from an untouched schedule (see the host-zone note below).
+    .select("id, user_id, cover_image_url, event_date")
     .eq("id", eventId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
@@ -83,6 +106,18 @@ export async function PATCH(
     const ed = requireZoneAwareIso(body.event_date);
     if (!ed) return NextResponse.json({ error: "Invalid event date." }, { status: 422 });
     patch.event_date = ed;
+    // The host's zone belongs to the moment the schedule was set, so it is only
+    // rewritten when the schedule itself moved. A host who edits a description
+    // from another country must not silently relabel the time they chose, and
+    // an untouched start hands back the same instant — see startMovedByEdit.
+    const stored = (existing as unknown as { event_date?: string | null }).event_date ?? null;
+    const moved = !stored || Math.abs(Date.parse(ed) - Date.parse(stored)) >= 60_000;
+    if (moved) {
+      if ("host_timezone" in body) patch.host_timezone = validTimeZone(body.host_timezone);
+      if ("host_utc_offset_minutes" in body) {
+        patch.host_utc_offset_minutes = validOffsetMinutes(body.host_utc_offset_minutes);
+      }
+    }
   }
   if ("end_date" in body) {
     const raw = typeof body.end_date === "string" && body.end_date ? body.end_date : null;
