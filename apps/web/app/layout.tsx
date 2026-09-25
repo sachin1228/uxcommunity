@@ -1,19 +1,36 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
 import "./globals.css";
 
-const geist = Geist({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+/**
+ * Geist ships as two vendored variable fonts in ./fonts instead of through
+ * `next/font/google`. That path downloads the stylesheet from Google during
+ * `next build`, and when the request misbehaves Turbopack fails the whole
+ * build — which silently leaves production on the previous deploy, because the
+ * "Deploy web worker" step never runs (see fonts/README.md). Reading the files
+ * from disk keeps the build offline and deterministic.
+ *
+ * `weight` is the variable axis the files carry, so `font-medium`,
+ * `font-semibold` and `font-bold` keep resolving to real weights. The CSS
+ * variable names are unchanged — `--font-display` / `--font-mono` are consumed
+ * by globals.css and tailwind.config.ts.
+ */
+const geist = localFont({
+  src: "./fonts/geist-latin.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
   variable: "--font-display",
 });
 
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
   variable: "--font-mono",
 });
 
