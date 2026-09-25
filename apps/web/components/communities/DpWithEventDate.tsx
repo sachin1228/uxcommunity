@@ -13,13 +13,13 @@ import { eventDateBadge } from "@/lib/communities/event-date";
  * exactly as it was.
  *
  * On the event's own day the tile says TODAY, while it runs it says LIVE, and
- * for a day after it wraps it says ENDED — then the tile comes down and the
- * room reverts to a plain face, the conversation itself untouched. The word
- * states are pinned to one fixed size (nothing reflows — the badge is
- * absolutely positioned over the DP); only the month abbreviation is fitted
- * to the width the circle actually has. LIVE drops the page-coloured ring for
- * the red one so "on right now" reads at a glance; ENDED stays in the accent
- * ink like the calendar states, a quiet closing note rather than an alarm.
+ * for a day after it wraps it says ENDED in red — the word alone, no date —
+ * then the tile comes down and the room reverts to a plain face, the
+ * conversation itself untouched. The word states are pinned to one fixed size
+ * (nothing reflows — the badge is absolutely positioned over the DP); only
+ * the month abbreviation is fitted to the width the circle actually has.
+ * LIVE and ENDED both take the red treatment so "on right now" and "just
+ * finished" read at a glance across a full sidebar.
  */
 const MONTH_RATIO = 0.28;
 const DAY_RATIO = 0.45;
@@ -122,17 +122,21 @@ export function DpWithEventDate({
                 ? TODAY_FONT_PX
                 : topLineFontSize(badgeSize, word.length),
           }}
-          className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center rounded-full bg-accent font-mono font-bold uppercase leading-none tracking-tight text-accent-foreground ring-2 ${
-            badge.isLive ? "ring-[var(--ds-red-700)]" : "ring-background"
+          className={`pointer-events-none absolute -bottom-1 -right-1 flex flex-col items-center justify-center rounded-full font-mono font-bold uppercase leading-none tracking-tight ring-2 ${
+            badge.isLive || badge.isEnded
+              ? "bg-accent text-[var(--ds-red-700)] ring-[var(--ds-red-700)]"
+              : "bg-accent text-accent-foreground ring-background"
           }`}
         >
           {word}
-          <span
-            className="mt-px font-display"
-            style={{ fontSize: Math.round(badgeSize * DAY_RATIO) }}
-          >
-            {badge.day}
-          </span>
+          {!badge.isEnded && (
+            <span
+              className="mt-px font-display"
+              style={{ fontSize: Math.round(badgeSize * DAY_RATIO) }}
+            >
+              {badge.day}
+            </span>
+          )}
         </span>
       )}
     </div>
