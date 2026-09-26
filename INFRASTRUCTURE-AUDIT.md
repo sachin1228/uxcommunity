@@ -530,7 +530,7 @@ Total: 0 HTTP, 0 DB queries, 5 new WebSocket, 5 close
 - **`dedupe-fetch.ts`**: Client-side in-flight dedup + settle replay. Two modes: `exact` (750ms) and `url` (600ms for toggles).
 - **`request-cache.ts`**: Server-side fetch cache with community bootstrap hydration. 15-min stale for bootstrap data.
 - **`cache.ts`**: Module-level `msgCache`/`metaCache` with bounded LRU (25 communities max).
-- **`realtimePool.ts`**: WebSocket connection pooling with 5-min idle timeout.
+- **`lib/realtime/pool.ts`**: WebSocket connection pooling with 5-min idle timeout.
 
 ### Potential Duplicate Requests
 1. **Community bootstrap hydration**: `fetchAndHydrateCommunityBootstrap()` pre-populates the request cache. If a component calls `fetchJsonCached()` for the same URL simultaneously, the dedupe layer collapses them. ✅ Well-handled.

@@ -1,0 +1,114 @@
+{
+  "$comment": [
+    "Exemptions for scripts/audit-comments.mjs (npm run audit:comments).",
+    "",
+    "Every entry needs a `reason`, because an unexplained exemption is how an",
+    "allowlist rots. An entry that stops matching anything is reported as a stale",
+    "exemption so it gets deleted instead of accumulating.",
+    "",
+    "`files`     — whole files the audit skips (generated/vendored content only).",
+    "`allow`     — one entry per finding that is correct as written. `match` is a",
+    "              substring of the reported token or message; `file` (optional)",
+    "              narrows it to a path glob.",
+    "`envAllow`  — env names supplied by the platform rather than the repository.",
+    "`bannedPhrases` — phrases that describe behaviour the app no longer has.",
+    "              `except` names the files allowed to use the phrase because they",
+    "              are explicitly narrating its removal, or predate it as history."
+  ],
+
+  "files": [
+    "apps/web/lib/supabase/database.types.ts"
+  ],
+
+  "envAllow": [
+    "GITHUB_ACTIONS",
+    "GITHUB_TOKEN",
+    "GITHUB_REF_NAME",
+    "CI",
+    "NODE_OPTIONS",
+    "NODE_ENV",
+    "NPM_CONFIG_CACHE",
+    "CF_ACCOUNT_ID",
+    "CF_API_TOKEN"
+  ],
+
+  "bannedPhrases": [
+    {
+      "phrase": "polling fallback",
+      "reason": "there is no poll loop to fall back to — catch-up happens on reconnect, on tab return, and via the sidebar refetch when a user is over the live-socket cap"
+    },
+    {
+      "phrase": "falls back to polling",
+      "reason": "same: realtime degradation is reconnect-based, not poll-based"
+    },
+    {
+      "phrase": "runs Sharp compression",
+      "reason": "there is no server-side image processing — the browser compresses before upload and the server validates the signature"
+    },
+    {
+      "phrase": "Supabase Realtime",
+      "reason": "both clients run on Cloudflare Durable Objects; the phrase is allowed only where a file is explicitly narrating the retired publication or is a historical migration",
+      "except": [
+        "supabase/migrations/**",
+        "supabase/tests/**",
+        "INFRASTRUCTURE-AUDIT.md"
+      ]
+    }
+  ],
+
+  "allow": [
+    {
+      "rule": "dead-symbol",
+      "match": "Schema",
+      "file": "apps/web/lib/supabase/service.ts",
+      "reason": "names the `Schema` type parameter of SupabaseClient — an external type, not a repository symbol"
+    },
+    {
+      "rule": "dead-symbol",
+      "match": "Schema",
+      "file": "apps/web/next.config.js",
+      "reason": "same: the Supabase client's `Schema` generic, which is what the generated database types fill in"
+    },
+    {
+      "rule": "dead-symbol",
+      "match": "middlewareClientMaxBodySize",
+      "file": "apps/web/next.config.js",
+      "reason": "the comment names the legacy option that was removed (a body-size middleware it warns against re-adding), so the name is deliberately gone from the code"
+    },
+    {
+      "rule": "dead-symbol",
+      "match": "turbopackIgnore",
+      "file": "apps/web/app/api/admin/load-test/impl.ts",
+      "reason": "a Turbopack directive recognised by the bundler, not an identifier in this codebase"
+    },
+    {
+      "rule": "dead-symbol",
+      "match": "createAssetAsync",
+      "file": "expo-app-standalone 3/lib/deviceMedia.ts",
+      "reason": "Expo MediaLibrary's API, named to explain why `saveToLibraryAsync` was chosen instead"
+    },
+    {
+      "rule": "dead-symbol",
+      "match": "postgres_changes",
+      "file": "supabase/migrations/**",
+      "reason": "historical migration describing the retired Supabase Realtime publication"
+    },
+    {
+      "rule": "stale-path",
+      "match": "test-users.json",
+      "reason": "written by k6/scripts/seed-users.js into a gitignored directory, so it exists only while a load test is running"
+    },
+    {
+      "rule": "stale-path",
+      "match": "markReadOnServer.ts",
+      "file": "docs/architecture-refactor.md",
+      "reason": "the 'before' columns of this document name the files the refactor deleted — that is the point of the table"
+    },
+    {
+      "rule": "banned-phrase",
+      "match": "Supabase Realtime",
+      "file": "expo-app-standalone 3/hooks/useCommunities.ts",
+      "reason": "the header states the migration away from Supabase Realtime; the phrase is the contrast, not a claim"
+    }
+  ]
+}

@@ -283,7 +283,6 @@ worker directly; they need `SESSION_SECRET` and, for publishing,
 | `node k6/loadtest-5k.mjs` | Opens 5,000 authenticated WebSockets against production, subscribes to rooms and measures a single fan-out |
 | `node k6/staging-smoke-test.mjs` | Connect → join → subscribe → publish → receive against the staging worker |
 | `node k6/staging-loadtest-5k.mjs` | The 5k realtime test pointed at the staging worker |
-| `node k6/staging-direct-proof.mjs`, `node k6/staging-diagnostic.mjs` | Room-routing / delivery diagnostics |
 | `node k6/scripts/rsvp-regression-test.mjs` | Reproduces the home-feed "I'm going" revert flow against a live environment |
 
 Each script documents its own env vars in its header comment.

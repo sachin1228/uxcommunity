@@ -124,20 +124,20 @@ The request proceeds through membership/community lookup, reference/member queri
 **Expected improvement:** Fewer network round trips and better tail latency.
 **Tradeoff:** Query complexity and larger joined rows if projections are not kept narrow.
 
-### 8. Image upload work is synchronous and memory intensive
+### 8. Upload routes buffer the request body in the Worker
 
-**Severity:** Medium to high
+**Severity:** Medium
 **Evidence:**
 
-- `apps/web/lib/image-utils.ts`
+- `apps/web/lib/image-utils.ts` — signature sniffing only; there is no server-side image processing
 - community create/update upload flows
 
-The critical path buffers the image, validates it, runs Sharp compression, uploads to storage, and writes database metadata. Large files increase serverless memory usage and timeout exposure.
+Compression is client-side (`lib/image-client.ts`), so the server's remaining job is to sniff the real type from the bytes and write them to R2. It still does that over a fully buffered body (`file.arrayBuffer()` before `uploadToR2`), and large uploads pay for that buffering in Worker memory. The video path already avoids it: it asks `showcase/upload-ticket` for a presigned PUT (`presignR2Put`) and the bytes go straight to R2, falling back to a proxied upload only when presigning is unavailable.
 
-**Recommendation:** Keep validation blocking, but move non-critical work (storage and database writes) after the response where policy allows. Enforce strict dimensions/bytes before expensive processing, avoid repeated buffering, and consider direct-to-storage uploads with a quarantined state if the security model permits.
+**Recommendation:** Move the remaining multipart uploads onto the same presigned direct-to-storage path, keeping signature validation blocking on the resulting object before it is referenced. Enforce strict dimensions/bytes before upload so the client never sends something the server will reject.
 
-**Expected improvement:** Lower upload latency and timeout probability.
-**Tradeoff:** Asynchronous processing requires explicit pending/failed states and careful validation guarantees.
+**Expected improvement:** Lower upload latency and no request-sized memory spike in the Worker.
+**Tradeoff:** Direct uploads need an explicit pending/quarantine state, and validation moves from the request to the stored object.
 
 ## Database recommendations
 
