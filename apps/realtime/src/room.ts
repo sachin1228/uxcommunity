@@ -3,6 +3,14 @@ import type { Env } from "./env";
 import type { PublishRequest } from "./types";
 import { RealtimeMetrics } from "./metrics";
 import {
+  PublishRateLimiter,
+  SOCKET_PUBLISH_BURST,
+  SOCKET_PUBLISH_REFILL_PER_SECOND,
+  USER_PUBLISH_BURST,
+  USER_PUBLISH_REFILL_PER_SECOND,
+  guardClientPublish,
+} from "./client-publish";
+import {
   TopicSocketIndex,
   buildPresenceSnapshot,
   presenceSignature,
@@ -43,6 +51,10 @@ import {
  * Authorization:
  *   - WebSocket upgrade requires x-realtime-uid header (set by Worker after JWT auth)
  *   - Membership checked via internal API (fail-closed) with a bounded cache
+ *   - Client publishes are restricted by an explicit topic allow-list, a minimal
+ *     payload validator and per-socket/per-user token buckets (client-publish.ts).
+ *     Every persisted room event is server-authored and arrives over the
+ *     secret-authenticated POST /publish path instead.
  *
  * Event classification:
  *   - EPHEMERAL (typing, presence): drop on delivery failure, no retry
@@ -96,6 +108,21 @@ export class Room extends DurableObject<Env> {
   /** Bounded membership authorization cache (in-memory LRU + pruned storage). */
   private membershipCache = new Map<string, { ok: boolean; ts: number }>();
   private membershipStorageWrites = 0;
+
+  /**
+   * Client-publish rate limits. Both are keyed by things that already live in
+   * this DO — one bucket per socket, one per user with sockets in the room —
+   * and are released with the socket/users that own them, so neither map can
+   * grow with traffic.
+   */
+  private socketPublishLimit = new PublishRateLimiter<WebSocket>(
+    SOCKET_PUBLISH_BURST,
+    SOCKET_PUBLISH_REFILL_PER_SECOND,
+  );
+  private userPublishLimit = new PublishRateLimiter<string>(
+    USER_PUBLISH_BURST,
+    USER_PUBLISH_REFILL_PER_SECOND,
+  );
 
   readonly metrics = new RealtimeMetrics();
 
@@ -294,6 +321,7 @@ export class Room extends DurableObject<Env> {
 
     this.subscriptions.removeSocket(ws);
     this.wsToUser.delete(ws);
+    this.socketPublishLimit.release(ws);
 
     if (userId !== undefined) {
       const sockets = this.userSockets.get(userId);
@@ -302,6 +330,8 @@ export class Room extends DurableObject<Env> {
         if (sockets.size === 0) {
           this.userSockets.delete(userId);
           this.userMeta.delete(userId);
+          // Last socket for this user in this room — its shared budget goes too.
+          this.userPublishLimit.release(userId);
         }
       }
     }
@@ -347,11 +377,38 @@ export class Room extends DurableObject<Env> {
   }
 
   private async handleWsPublish(ws: WebSocket, userId: string, topic: string, data: unknown): Promise<void> {
+    // This is the only way a member can inject data into a room, so it is the
+    // security boundary: an explicit allow-list of client-publishable topics
+    // and a minimal payload shape (client-publish.ts), evaluated BEFORE any
+    // fan-out. Server-owned events never travel this path — they arrive over
+    // the secret-authenticated POST /publish handler below.
+    const decision = guardClientPublish(topic, data, {
+      userId,
+      name: this.userMeta.get(userId)?.name,
+    });
+    if (!decision.ok) {
+      if (decision.reason === "topic") this.metrics.clientPublishRejectedTopic += 1;
+      else this.metrics.clientPublishRejectedPayload += 1;
+      return;
+    }
+
     // Only a socket subscribed to the topic may publish into it.
     if (!this.subscriptions.socketTopics(ws)?.has(topic)) return;
 
-    // Broadcast to all subscribers (sender excluded).
-    this.broadcastByTopic(topic, data, userId, userId);
+    // One bucket per socket (a tab cannot flood) and one per user across all
+    // their sockets/devices (many tabs cannot flood together). A socket that is
+    // already over its own budget does not consume the user's shared budget.
+    const now = Date.now();
+    if (!this.socketPublishLimit.allow(ws, now) || !this.userPublishLimit.allow(userId, now)) {
+      this.metrics.clientPublishRateLimited += 1;
+      return;
+    }
+
+    this.metrics.clientPublishesAccepted += 1;
+
+    // Broadcast to all subscribers (sender excluded) — the guarded payload, not
+    // the client's object.
+    this.broadcastByTopic(topic, decision.data, userId, userId);
   }
 
   // ── Subscriber index reconstruction after hibernation ────────────────

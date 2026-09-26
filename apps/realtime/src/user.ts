@@ -1,6 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import { RealtimeMetrics } from "./metrics";
+import {
+  PublishRateLimiter,
+  SOCKET_PUBLISH_BURST,
+  SOCKET_PUBLISH_REFILL_PER_SECOND,
+  guardClientPublish,
+} from "./client-publish";
 import { TopicSocketIndex } from "./subscriptions";
 
 /**
@@ -21,6 +27,13 @@ import { TopicSocketIndex } from "./subscriptions";
  *   client and test its subscription map" was already small — but it still cost
  *   O(all sockets) per event and retried dead sockets forever. The index makes
  *   it O(recipients) and failed sends evict the socket immediately.
+ *
+ * Authorization:
+ *   User-scoped rooms (notifications:, profile:) carry events the SERVER
+ *   publishes over POST /publish after the API routes have authorized the
+ *   write. A client publish frame is therefore subject to the same allow-list,
+ *   payload validation and per-socket rate limit as a community room
+ *   (client-publish.ts): nothing a member's own socket may publish here.
  */
 
 interface ClientState {
@@ -45,6 +58,12 @@ export class UserDO extends DurableObject<Env> {
   /** (room, topic) → sockets, for targeted delivery. */
   private subscriptions = new TopicSocketIndex<WebSocket>();
   private reconstructed = false;
+
+  /** One client-publish bucket per socket; released when the socket goes. */
+  private socketPublishLimit = new PublishRateLimiter<WebSocket>(
+    SOCKET_PUBLISH_BURST,
+    SOCKET_PUBLISH_REFILL_PER_SECOND,
+  );
 
   readonly metrics = new RealtimeMetrics();
 
@@ -190,7 +209,7 @@ export class UserDO extends DurableObject<Env> {
       this.handleUnsubscribe(state, ws, msg.room, msg.topic);
       this.persist(ws, state);
     } else if (msg.t === "publish" && msg.room && msg.topic) {
-      this.handlePublish(state, msg.room, msg.topic, msg.data);
+      this.handlePublish(state, ws, msg.room, msg.topic, msg.data);
     }
   }
 
@@ -198,6 +217,7 @@ export class UserDO extends DurableObject<Env> {
     this.ensureReconstructed();
     this.clients.delete(ws);
     this.subscriptions.removeSocket(ws);
+    this.socketPublishLimit.release(ws);
     this.metrics.connectionsClosed += 1;
   }
 
@@ -213,6 +233,7 @@ export class UserDO extends DurableObject<Env> {
   private evictSocket(ws: WebSocket): void {
     this.clients.delete(ws);
     this.subscriptions.removeSocket(ws);
+    this.socketPublishLimit.release(ws);
     this.metrics.connectionsClosed += 1;
     this.metrics.sendFailures += 1;
     try {
@@ -293,14 +314,30 @@ export class UserDO extends DurableObject<Env> {
     this.subscriptions.remove(subscriptionKey(room, topic), ws);
   }
 
-  private handlePublish(state: ClientState, room: string, topic: string, data: unknown): void {
+  private handlePublish(state: ClientState, ws: WebSocket, room: string, topic: string, data: unknown): void {
+    // Same boundary as the community DO: a member cannot publish a topic or a
+    // payload the server owns. Identity is stamped from the authenticated
+    // socket, never echoed from the frame.
+    const decision = guardClientPublish(topic, data, { userId: state.userId });
+    if (!decision.ok) {
+      if (decision.reason === "topic") this.metrics.clientPublishRejectedTopic += 1;
+      else this.metrics.clientPublishRejectedPayload += 1;
+      return;
+    }
+
     if (!state.subscriptions.get(room)?.has(topic)) return;
+    if (!this.socketPublishLimit.allow(ws)) {
+      this.metrics.clientPublishRateLimited += 1;
+      return;
+    }
+
+    this.metrics.clientPublishesAccepted += 1;
 
     const eventMsg = JSON.stringify({
       t: "event",
       room,
       topic,
-      data,
+      data: decision.data,
       sender: state.userId,
     });
 

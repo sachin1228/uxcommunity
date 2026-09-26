@@ -72,6 +72,11 @@ export interface UnsubscribeMessage {
 export interface PublishMessage {
   t: "publish";
   room: string;
+  /**
+   * Only topics listed in CLIENT_PUBLISHABLE_TOPICS are accepted from a socket
+   * (currently `typing`); everything else a client receives is server-authored
+   * and delivered through POST /publish — see client-publish.ts.
+   */
   topic: string;
   data: unknown;
 }
