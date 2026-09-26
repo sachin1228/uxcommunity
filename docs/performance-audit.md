@@ -1,5 +1,13 @@
 # Performance Audit
 
+> **Revision note (2026-09-26).** Two findings from the original audit were
+> re-verified against the current tree and resolved by later work: the sidebar no
+> longer opens one channel per joined community (it subscribes to at most
+> `SIDEBAR_REALTIME_LIMIT` = 15 community chat rooms, most-recently-active first),
+> and the home feed no longer subscribes to global event-like/save changes. Both
+> entries below are annotated rather than deleted. The remaining findings still
+> describe the code as it is; the `apps/web` paths were checked and exist.
+
 ## Scope
 
 This is a read-only, evidence-based audit of the existing Next.js and Supabase application. No Supabase resources were configured, no remote SQL was executed, and no application behavior was changed.
@@ -37,31 +45,28 @@ The endpoint fetches all memberships, member rows for joined communities, up to 
 **Expected improvement:** Potentially orders-of-magnitude lower row transfer for mature communities.
 **Tradeoff:** More SQL/RPC complexity and additional aggregate-query tests.
 
-### 2. Sidebar opens one Realtime channel per joined community
+### 2. Sidebar keeps up to 15 community chat sockets open (bounded)
 
-**Severity:** Critical at scale
-**Evidence:** `apps/web/components/communities/panel/useSidebarRealtime.ts`
+**Severity:** Medium (was Critical; bounded since the original audit)
+**Evidence:** `apps/web/components/communities/panel/useSidebarRealtime.ts`, `useSidebarTyping.ts`
 
-The sidebar creates one channel containing multiple message and reaction handlers for every joined community. A user in 50 communities can create roughly 50 channels and hundreds of change handlers before active-chat and notification subscriptions are counted.
+The sidebar subscribes to `chat:${cid}` for the 15 most-recently-active communities (`SIDEBAR_REALTIME_LIMIT`) and relies on a periodic refetch beyond that. `realtimeClient` ref-counts rooms and shares the socket with an open chat view, so the sidebar alone does not create a socket per membership; typing follows the same cap.
 
 Cleanup is present, so this is amplification rather than a memory leak.
 
-**Recommendation:** Consolidate sidebar subscriptions where supported, subscribe only to visible/recent communities, or use a server-maintained lightweight sidebar projection.
+**Recommendation:** If power users with dozens of active communities show up in telemetry, consider a single multiplexed community socket or a server-maintained lightweight sidebar projection.
 
 **Expected improvement:** Fewer concurrent sockets/channels and lower client event-processing overhead.
 **Tradeoff:** More complex subscription routing and potentially less immediate updates for inactive communities.
 
-### 3. Global event interactions can trigger seven-query feed refreshes
+### 3. ~~Global event interactions can trigger seven-query feed refreshes~~ Resolved
 
-**Severity:** Critical at scale
+**Severity:** Resolved
 **Evidence:** `apps/web/app/dashboard/HomeFeed.tsx`
 
-The home feed subscribes without a row-level filter to global `event_likes` and `event_saves` changes. Each event interaction can force revalidation of `/api/home/feed`; that route performs seven database calls per refresh.
+The original audit found the feed subscribed without a row-level filter to global `event_likes` and `event_saves` changes, so any event interaction could force `/api/home/feed` to revalidate (seven database calls). The feed no longer opens those global subscriptions; it refreshes on mount and on focus/visibility catch-up, while optimistic interactions patch only the affected item.
 
-**Recommendation:** Patch only the affected event from the Realtime payload, restrict subscriptions to displayed item IDs where practical, or remove these global subscriptions while retaining optimistic updates and periodic/focus refresh.
-
-**Expected improvement:** Removes a major request-storm multiplier during high interaction volume.
-**Tradeoff:** The feed may need explicit reconciliation after missed events.
+**Follow-up:** keep the focus/visibility refetch the only automatic reconciliation path — re-adding a broad subscription would bring the request storm back.
 
 ### 4. List APIs transfer interaction rows and aggregate in Node.js
 
@@ -188,11 +193,11 @@ A notable portion of the application still uses direct `fetch()` calls. The most
 
 ## Realtime assessment
 
-- Active chat cleanup correctly removes channels.
+- Active chat cleanup correctly unsubscribes rooms/topics.
 - Notification subscriptions clean up correctly.
-- Active chat combines multiple handlers on one channel.
-- Sidebar channel fan-out is the main connection-volume concern.
-- Home-feed global subscriptions are the largest refetch amplifier.
+- Active chat combines multiple handlers on one room.
+- Sidebar fan-out is capped at 15 communities; the remaining volume concern is one community socket per active community.
+- Home-feed global subscriptions are gone; focus/visibility catch-up is the reconciliation path.
 - Reconnect/focus catch-up is debounced.
 
 ## Mutation assessment
@@ -226,9 +231,8 @@ These checks validate application buildability and targeted utility behavior; th
 
 The largest risks are:
 
-1. Realtime connection and handler fan-out for users with many community memberships.
-2. Global feed subscriptions producing refetch storms during high event-interaction volume.
-3. Node-side aggregation of ever-growing interaction row sets.
+1. Realtime sockets for users with many simultaneously active communities (bounded at 15 by the sidebar cap).
+2. Node-side aggregation of ever-growing interaction row sets (previously: global feed subscriptions; that path is gone).
 4. Unbounded community reaction retrieval.
 5. Synchronous notification fan-out during write requests.
 6. Serverless memory and timeout pressure from synchronous image validation and transformation.

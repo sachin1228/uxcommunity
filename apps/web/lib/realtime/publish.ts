@@ -46,9 +46,9 @@ export async function publishRealtime(payload: PublishPayload): Promise<void> {
 }
 
 /**
- * Publish several events in one request. The Worker fans each out to its own
- * room's Durable Object, so a single fan-out (e.g. one chat message → the chat
- * room + every member's sidebar panel room) costs one HTTP call.
+ * Publish several events in one request. The Worker routes each event to its
+ * room's Durable Object (community rooms to that community's `Room`, user rooms
+ * to the recipient's `UserDO`), so a batch spanning many rooms costs one HTTP call.
  */
 export async function publishRealtimeBatch(events: PublishPayload[]): Promise<void> {
   if (!events.length) return;

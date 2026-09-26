@@ -18,11 +18,11 @@ function getSnapshot() {
 /**
  * Tracks whether the browser tab is visible and focused.
  *
- * Realtime hooks depend on this so they can tear their channels down when the
- * tab is hidden. A background tab still holds a Supabase Realtime websocket
- * connection and keeps consuming postgres_changes events for zero user value —
- * on the free tier that wastes one of the 200 concurrent connections and burns
- * the 2M message/month quota. Suspending channels while hidden frees both.
+ * Realtime hooks depend on this so they can tear their room subscriptions down
+ * when the tab is hidden. A background tab otherwise keeps its WebSocket to the
+ * Cloudflare Durable Object open, consuming broadcasts and Durable Object time
+ * for zero user value. Dropping the subscriptions while hidden frees both, and
+ * the catch-up hooks refetch what was missed on return.
  */
 export function useDocumentVisible(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, () => true);

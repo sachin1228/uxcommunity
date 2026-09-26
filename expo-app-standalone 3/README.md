@@ -8,7 +8,7 @@ React Native (Expo) mobile app for the UX Community platform.
 
 Make sure you have these installed on your machine:
 
-- **Node.js** 20+ — https://nodejs.org
+- **Node.js** 22+ — https://nodejs.org
 - **npm** 10+
 - **Expo CLI** — `npm install -g expo-cli`
 - **Android Studio** (for local Android builds) — https://developer.android.com/studio
@@ -138,31 +138,45 @@ Download the APK from the link EAS provides when the build finishes.
 
 ```
 expo-app-standalone 3/
-├── app/                  Expo Router screens
-│   ├── (auth)/           Login screen
-│   ├── (tabs)/           Main tab screens
-│   └── community/        Community chat screen
-├── components/           Reusable UI components
-├── context/              Auth context (session management)
-├── hooks/                Custom hooks (chat, communities, etc.)
+├── app/                      Expo Router screens
+│   ├── (auth)/               Login screen
+│   ├── (tabs)/               Main tabs: home, communities, explore, jobs
+│   ├── community/[id].tsx    Community chat screen
+│   ├── settings/             Notification settings + push diagnostics
+│   └── index.tsx             Auth-based entry redirect
+├── components/               UI components (chat/, communities/, community/, shared)
+│   ├── PushNotificationsBridge.tsx   Headless push mount point
+│   └── ErrorBoundary.tsx     App-wide error boundary
+├── context/AuthContext.tsx   Auth context (session management)
+├── hooks/                    useChatMessages, useCommunities, useCommunityContent,
+│                             useSendMessage, useTypingPresence, usePushNotifications, …
 ├── lib/
-│   ├── api.ts            Base fetch client (reads EXPO_PUBLIC_API_URL)
-│   ├── auth.ts           Login / logout / getMe
-│   ├── communities.ts    Community data fetching
-│   └── eventTimezone.ts  Event timezone helpers
-├── constants/            Colors and theme constants
-├── assets/               Images and fonts
-├── app.json              Expo app config
-├── eas.json              EAS build profiles (env vars included)
-└── .env                  Local env vars (not committed)
+│   ├── api.ts                Base fetch client (reads EXPO_PUBLIC_API_URL)
+│   ├── auth.ts               Login / logout / getMe
+│   ├── realtime.ts           Multiplexed Cloudflare WebSocket client (port of the web client)
+│   ├── communities.ts        Community data fetching
+│   ├── communityContent.ts   Threads / events / resources / showcase content
+│   ├── push.ts               Push registration, channels, badge, diagnostics
+│   └── eventTimezone.ts      Event timezone helpers
+├── constants/                Colors and theme constants
+├── scripts/                  Push doctor + google-services sync helpers
+├── assets/                   Images and fonts
+├── app.json                  Expo app config
+├── eas.json                  EAS build profiles (env vars included)
+└── .env                      Local env vars (not committed)
 ```
+
+For routing, auth gating, realtime and push internals, see
+[`docs/mobile-architecture.md`](../docs/mobile-architecture.md).
 
 ---
 
 ## Notes
 
 - **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`uxcommunity_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. It talks to the API only — no Supabase client and no Supabase Auth.
-- **Rate limiting:** Login is rate-limited on the server (Upstash Redis). If you hit too many attempts, wait a few minutes.
+- **Realtime:** chat, typing, presence, comments and content updates arrive over the Cloudflare Durable Object worker (`apps/realtime`) through `lib/realtime.ts`; the same JWT authenticates the WebSocket.
+- **Push notifications:** Expo push (see `docs/mobile-architecture.md`), with Android FCM wired through `google-services.json` and diagnostics on the notification settings screen.
+- **Rate limiting:** Login and content writes are rate-limited on the server (Upstash Redis). If you hit too many attempts, wait a few minutes.
 - **`EXPO_PUBLIC_*` vars** are baked into the JS bundle at build time. Changing them requires a rebuild.
 
 

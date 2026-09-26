@@ -7,8 +7,10 @@ Performance and stress tests for the UX Community API, written with [k6](https:/
 ```
 k6/
 ├── config.js               # Shared options, thresholds, base URL
+├── data/                   # Gitignored fixtures (test-users.json) + .gitkeep
 ├── lib/
-│   └── fixture.js          # Shape + validation rules for generated test users
+│   ├── fixture.js          # Shape + validation rules for generated test users
+│   └── fixture.test.mjs    # Unit test for the fixture rules (npm run test:k6-fixtures)
 ├── utils/
 │   ├── auth.js             # Login / logout helpers
 │   ├── checks.js           # Reusable check factories
@@ -21,12 +23,22 @@ k6/
 │   ├── 05_threads.js       # threads, likes, comments
 │   ├── 06_events.js        # events, rsvp, event comments
 │   ├── 07_profile.js       # profile get/patch, interests, link-preview
-│   └── 08_admin.js         # admin panel read + light write smoke
-└── scenarios/
-    ├── smoke.js            # 1 VU × 1 iter — sanity check
-    ├── load.js             # Ramp to 50 VUs, hold 5 min — steady-state load
-    ├── stress.js           # Spike to 200 VUs — find the breaking point
-    └── soak.js             # 20 VUs × 30 min — detect resource leaks
+│   ├── 08_admin.js         # admin panel read + light write smoke
+│   └── 09_chat_messages.js # deep chat coverage: pagination, replies, reactions, delete, read
+├── scenarios/              # k6 entry points
+│   ├── smoke.js            # 1 VU × 1 iter — sanity check
+│   ├── load.js             # Ramp to 50 VUs, hold 5 min — steady-state load
+│   ├── stress.js           # Spike to 200 VUs — find the breaking point
+│   ├── soak.js             # 20 VUs × 30 min — detect resource leaks
+│   ├── chat_load.js        # 20 VUs steady + 100 VU chat spike (one real account)
+│   ├── chat_concurrent.js  # Distinct seeded user per VU (login → send → react → read)
+│   └── chat_flood.js       # Raw POST /messages throughput with pre-signed JWTs
+├── scripts/
+│   ├── seed-users.js       # Creates k6user_* fixtures + writes k6/data/test-users.json
+│   ├── cleanup-users.js    # Deletes seeded users and the fixture
+│   └── rsvp-regression-test.mjs  # Live home-feed RSVP revert regression
+├── loadtest-5k.mjs         # 5,000-socket production realtime load test (node, not k6)
+└── staging-*.mjs           # Realtime staging smoke / diagnostic / 5k helpers
 ```
 
 ## Prerequisites
@@ -245,6 +257,37 @@ k6 run k6/scenarios/soak.js \
   -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID"
 ```
 
+### Chat flood (raw write throughput)
+
+Uses pre-signed JWTs from the seeded fixture — no login calls, so the IP rate
+limiter is not involved:
+
+```bash
+k6 run k6/scenarios/chat_flood.js \
+  -e BASE_URL="$BASE_URL" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID" \
+  -e FLOOD_VUS=100 \
+  -e FLOOD_DURATION=5m
+```
+
+---
+
+## Realtime and regression helpers
+
+These are plain Node scripts (not k6) and talk to the Cloudflare realtime
+worker directly; they need `SESSION_SECRET` and, for publishing,
+`REALTIME_PUBLISH_SECRET` of the target environment.
+
+| Script | What it does |
+|---|---|
+| `node k6/loadtest-5k.mjs` | Opens 5,000 authenticated WebSockets against production, subscribes to rooms and measures a single fan-out |
+| `node k6/staging-smoke-test.mjs` | Connect → join → subscribe → publish → receive against the staging worker |
+| `node k6/staging-loadtest-5k.mjs` | The 5k realtime test pointed at the staging worker |
+| `node k6/staging-direct-proof.mjs`, `node k6/staging-diagnostic.mjs` | Room-routing / delivery diagnostics |
+| `node k6/scripts/rsvp-regression-test.mjs` | Reproduces the home-feed "I'm going" revert flow against a live environment |
+
+Each script documents its own env vars in its header comment.
+
 ---
 
 ## Thresholds
@@ -269,13 +312,17 @@ The stress scenario relaxes the error-rate threshold to 15 % — the goal there 
 | Public data | `/api/data/cities`, `/api/data/sectors`, `/api/data/interests`, `/api/data/experience-levels`, `/api/giphy` |
 | Auth | `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/reset-request` |
 | Applications | `POST /api/applications` |
-| Communities | `/api/communities`, `/api/communities/all`, `/api/communities/:id`, `/api/communities/:id/messages`, `/api/communities/:id/messages/:id/reactions`, `/api/communities/:id/read` |
-| Threads | `/api/communities/:id/threads`, `/api/communities/:id/threads/:id`, `/api/communities/:id/threads/:id/like`, `/api/communities/:id/threads/:id/comments` |
-| Events | `/api/communities/:id/events`, `/api/communities/:id/events/:id`, `/api/communities/:id/events/:id/rsvp`, `/api/communities/:id/events/:id/rsvp/list`, `/api/communities/:id/events/:id/comments` |
-| Profile | `/api/profile`, `/api/profile/interests`, `/api/lottie-settings`, `/api/link-preview` |
+| Home feed | `/api/home/feed` (used by the RSVP regression script) |
+| Communities | `/api/communities`, `/api/communities/all`, `/api/communities/:id`, `/api/communities/:id/messages`, `/api/communities/:id/messages/:msgId/reactions`, `/api/communities/:id/read` |
+| Threads | `/api/communities/:id/threads`, `/api/communities/:id/threads/:threadId`, `/api/communities/:id/threads/:threadId/like`, `/api/communities/:id/threads/:threadId/comments`, `/api/communities/:id/threads/:threadId/comments/:commentId` |
+| Events | `/api/communities/:id/events`, `/api/communities/:id/events/:eventId`, `/api/communities/:id/events/:eventId/rsvp`, `/api/communities/:id/events/:eventId/rsvp/list`, `/api/communities/:id/events/:eventId/comments` |
+| Profile | `/api/profile`, `/api/profile/avatar`, `/api/profile/interests`, `/api/lottie-settings`, `/api/link-preview` |
 | Admin (read) | `/api/admin/applications`, `/api/admin/users`, `/api/admin/communities`, `/api/admin/cities`, `/api/admin/sectors`, `/api/admin/interests`, `/api/admin/tags` |
-| Chat (deep) | `GET /api/communities/:id/messages` (list + pagination), `POST` (text, reply, burst), `GET /api/communities/:id/messages/:id` (single), `POST /api/communities/:id/messages/:id/reactions` (add, toggle, switch), `DELETE` (soft-delete), `PATCH /api/communities/:id/read` |
-| Admin (write, smoke only) | `POST /api/admin/cities`, `POST /api/admin/interests` |
+| Admin (write, smoke only) | `POST /api/admin/cities`, `POST /api/admin/interests`, `POST /api/admin/upload` |
+| Chat (deep, `09_chat_messages.js`) | `GET /api/communities/:id/messages` (list + pagination), `POST` (text, reply, rate-limit burst), `GET /api/communities/:id/messages/:msgId` (single), `POST /api/communities/:id/messages/:msgId/reactions` (add, toggle, switch), `DELETE /api/communities/:id/messages/:msgId` (soft-delete), `PATCH /api/communities/:id/read` |
+
+Not covered: thread/event/resource/showcase **uploads**, push registration, and the
+realtime WebSocket protocol (the node scripts below cover that instead).
 
 ---
 
