@@ -114,8 +114,8 @@ export function useSidebarCommunities(userId: string) {
     void load();
   }, [load]);
 
-  // Realtime channels are suspended while the tab is hidden (see
-  // useSidebarRealtime) and the panel room doesn't replay missed events, so a
+  // Realtime subscriptions are suspended while the tab is hidden (see
+  // useSidebarRealtime) and the sockets don't replay missed events, so a
   // regain must refetch to catch up unread counts and previews missed while
   // hidden (force bypasses the 60s stale window). useHiddenCatchUp fires this
   // only after a real absence — rapid alt-tabbing no longer issues a refetch

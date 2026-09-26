@@ -2,7 +2,7 @@
  * Shared chat helpers — a React Native port of the web chat modules:
  *
  *   apps/web/components/communities/chat/chatUtils.ts   (fmtTime, fmtDate, MAX_MESSAGE_CHARS, pickOptimisticMatch)
- *   apps/web/lib/communities/user-color.ts              (userColorIndex, userNameColor)
+ *   apps/web/lib/communities/user-color.ts              (userColorIndex, userColorVar — ported here as userNameColor)
  *   apps/web/lib/communities/message-edit.ts            (canEditMessage, MESSAGE_EDIT_WINDOW_MS)
  *   apps/web/lib/communities/mentions.ts                (MessageMention, splitContentByMentions)
  *

@@ -15,17 +15,6 @@ import {
 } from "@/lib/communities/event-display";
 import { communityFeedLayout } from "../feed-layout";
 
-/**
- * Shown instead of the chat when a non-member opens an event's group chat.
- *
- * The room itself is gated server-side — the community read model and the
- * message route both refuse non-members — so this page cannot paint a
- * read-only preview or a composer. What it can do is the one thing the member
- * actually needs: show them the event and take their confirmation. Joining is
- * compulsory to take part, which is why the button opens a confirm dialog and
- * nothing happens until it is answered.
- */
-
 function fmtEventDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", {
     weekday: "short",
@@ -55,6 +44,16 @@ export interface EventChatJoinGateProps {
   };
 }
 
+/**
+ * Shown instead of the chat when a non-member opens an event's group chat.
+ *
+ * The room itself is gated server-side — the community read model and the
+ * message route both refuse non-members — so this page cannot paint a
+ * read-only preview or a composer. What it can do is the one thing the member
+ * actually needs: show them the event and take their confirmation. Joining is
+ * compulsory to take part, which is why the button opens a confirm dialog and
+ * nothing happens until it is answered.
+ */
 export function EventChatJoinGate({
   communityId,
   communityName,

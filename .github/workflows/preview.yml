@@ -9,7 +9,8 @@ name: Preview Deploy (PR)
 #   REALTIME_URL / REALTIME_PUBLISH_SECRET are NOT set on the preview worker,
 #   so it can never broadcast to the production realtime service, and the
 #   session cookie (scoped to .uxcommunity.in) isn't sent to workers.dev hosts.
-#   Chat still works via polling fallback.
+#   Chat still loads and refetches over the REST API (load/focus); only the
+#   live push of new messages/typing/presence is absent.
 # - Secrets are only available for PRs from branches in this repo (not forks).
 on:
   pull_request:

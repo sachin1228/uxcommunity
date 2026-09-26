@@ -1,8 +1,12 @@
 # Architecture Refactor — Assessment & Report
 
-Scope: `apps/web` (Next.js app, 130 API route files, ~65 `lib/communities` modules),
-`apps/realtime` (Cloudflare Durable Object fan-out), `packages/shared`,
+Scope: `apps/web` (Next.js app, 129 `app/api` route handlers, ~50 `lib/communities`
+modules), `apps/realtime` (Cloudflare Durable Object fan-out), `packages/shared`,
 `packages/design-system`, `supabase/`, `k6/`, and the standalone Expo app.
+
+All paths are current as of the 2026-09-26 verification. The "before" columns in
+the tables name pre-refactor locations on purpose — they are the historical record
+of what moved, not stale references.
 
 Refactoring principle: **responsibility boundaries and dependency direction
 first, line count second.** No product behaviour, API contract, schema,

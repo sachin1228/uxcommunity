@@ -1,6 +1,16 @@
 # FULL PRODUCTION INFRASTRUCTURE AUDIT
 ## UX Community — Complete Architecture Analysis
 
+> **Revision note (2026-09-26).** First generated 2026-08-31. The structural
+> claims below were re-verified against the current tree and corrected where the
+> code had moved or changed: the realtime worker now runs **two** Durable Object
+> classes (`Room` per community + `UserDO` per user), the **mobile app uses the
+> same Cloudflare realtime path as the web app** (Supabase Realtime is gone), a
+> chat message publishes **one** room event plus an optional Expo push fan-out,
+> notifications are engagement-only and deferred via `after()`, and `lib/` is the
+> domain layer (`lib/communities/models/*`, `membership.ts`, `mark-read.ts`).
+> Estimates that were not re-measured are still marked ESTIMATE.
+
 ---
 
 # EXECUTIVE SUMMARY
@@ -9,23 +19,23 @@
 
 1. **Dual deployment architecture** — The app runs on both Cloudflare Workers (via OpenNext) and Vercel. The current active deployment is Cloudflare Workers. The Vercel dashboard numbers reflect the alternate deployment path.
 
-2. **Massive realtime fan-out per message** — Sending ONE chat message triggers 1 database INSERT + 1 database query (member IDs) + 1 HTTP publish to Cloudflare + N Durable Object forwards (one per member) + N WebSocket broadcasts. At 1,000 members this is 1,000+ WebSocket deliveries per message.
+2. **Chat fan-out is one room event plus push** — Sending ONE chat message triggers 1 database INSERT, 1 realtime publish to the community's `chat:${id}` room (the DO broadcasts to every socket in that room), and a deferred Expo push fan-out to members who are not connected. There is no per-member Durable Object forward or per-member notification row anymore; the cost that remains is the push fan-out, which is chunked and bounded (`PUSH_MAX_DELIVERIES`, `PUSH_TIME_BUDGET_MS`).
 
-3. **18+ concurrent WebSocket connections per user on web** — A single active user maintains separate WebSocket connections for: chat, presence, typing, panel (sidebar), notifications, threads, thread-comments, events, resources, resource-comments, showcase, rules, and profile rooms.
+3. **Sidebar caps live sockets** — `SIDEBAR_REALTIME_LIMIT` (15) bounds the community chat sockets the sidebar keeps open, most-recently-active first; anything beyond that is caught up by a periodic sidebar refetch. Active chat, presence, typing, and tab rooms add a handful more (typically 3-8 concurrent sockets per user).
 
-4. **Mobile app uses Supabase Realtime (different from web)** — The Expo app uses Supabase `postgres_changes` and `broadcast` channels instead of the Cloudflare Durable Object system. This creates a completely separate realtime path with different scaling characteristics.
+4. **One realtime system for web and mobile** — Both clients connect to the Cloudflare Durable Object worker (`apps/realtime`) with the same JWT and room/topic model. Supabase Realtime is not used for chat/content updates on either client; mobile differs only in OS-level socket liveness handling.
 
 5. **Service-role key used for ALL database queries** — Every API route and Server Component uses the Supabase service-role key, bypassing RLS. This is intentional (custom JWT auth, not Supabase Auth) but means database security depends entirely on API route validation.
 
 6. **No Supabase Auth** — Authentication is fully custom (JWT via `jose`, bcrypt password hashing). Supabase Auth is not used.
 
-7. **100+ API routes** — The web app has approximately 100 Next.js API route handlers, all running as serverless functions on Cloudflare Workers. Each involves a DB query.
+7. **129 API route handlers** — The web app has 129 Next.js route handlers under `app/api/`, all running as serverless functions on Cloudflare Workers. Each involves a DB query.
 
 8. **Well-implemented caching** — Sophisticated client-side caching: `request-cache.ts`, `cache.ts` (module-level community/message cache), `msgCache`/`metaCache` (bounded LRU maps), `master-data-cache.ts` (1-hour cached master data), `dedupe-fetch.ts`.
 
-9. **Rate limiting exists but is generous** — Global rate limit: 20 requests/10s burst, 120/60s sustained. Per-user or per-IP. No per-endpoint rate limiting.
+9. **Rate limiting is layered** — Global guard: 20 requests/10s burst, 120/60s sustained per user or IP. On top of that, per-route limits cover login (IP + email), applications, password reset, sign-up steps, chat sends (5/10s + 20/60s), content creation, comments, and reactions (`lib/auth/rate-limit.ts`).
 
-10. **Chat messages API has special timeout handling** — `maxDuration: 10` in `vercel.json` for the messages endpoint. It calls the `get_community_message_page` RPC.
+10. **Chat messages API has special timeout handling** — `maxDuration: 10` in `vercel.json` for the messages endpoint. It calls the `get_community_message_page` RPC, then publishes one realtime event and the push fan-out from an `after()` block.
 
 ---
 
@@ -42,29 +52,32 @@ User (Browser)
   |                  |                      |--- PUT/DELETE -----> Cloudflare R2 (images)
   |                  |                      |--- POST -----------> Resend (email)
   |                  |                      |--- POST -----------> GIPHY API
-  |                  |                      |--- POST -----------> Image Moderation Service
+  |                  |                      |--- POST -----------> Expo Push Service
   |                  |                      |--- POST -----------> Cloudflare Realtime (/publish)
   |                  |
   |                  |--- SSR/ISR ---> Server Components (data fetching)
   |
   |--- WSS ----> Cloudflare Realtime Worker (rt.uxcommunity.in)
                     |
-                    |--- WebSocket ---> Room Durable Object (per room)
+                    |--- WebSocket ---> Room DO (per community: chat, threads, events, …)
+                    |--- WebSocket ---> UserDO (per user: notifications, profile)
                                           |
-                                          |--- SQLite storage (presence)
-                                          |--- Broadcast to all sockets
+                                          |--- SQLite storage (presence / subscriptions)
+                                          |--- Broadcast to subscribed sockets
 
 User (Mobile/Expo)
   |
   |--- HTTPS ---> Same Cloudflare Workers (API routes)
-  |--- WSS ----> Supabase Realtime (postgres_changes + broadcast)
+  |--- WSS ----> Same Cloudflare Realtime Worker (Room DO / UserDO)
 ```
 
 ### Deployment Stack
 - **Primary**: Cloudflare Workers via OpenNext (`apps/web/wrangler.toml`)
 - **Alternate**: Vercel (`apps/web/vercel.json`, region: syd1)
-- **Realtime**: Separate Cloudflare Worker (`apps/realtime/wrangler.toml`)
-- **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`)
+- **Realtime**: Separate Cloudflare Worker (`apps/realtime/wrangler.toml`, root `wrangler.toml` mirrors it)
+- **Durable Objects**: `Room` (per community, migration v1) and `UserDO` (per user, migration v2)
+- **CI**: GitHub Actions — `ci.yml` (types + unit tests), `preview.yml` (per-PR worker)
+- **CD**: `.github/workflows/deploy.yml` on push to `main`
 
 ### Technology Inventory
 
@@ -72,35 +85,36 @@ User (Mobile/Expo)
 |---|---|---|---|
 | Frontend | Next.js 14 (App Router) + React 18 | OpenNext/Cloudflare | Web application |
 | Mobile | Expo SDK 54 + React Native | EAS Build | Mobile app |
-| Backend | Next.js API Routes (~100 routes) | Cloudflare Workers | Serverless API |
+| Backend | Next.js API Routes (129 handlers) | Cloudflare Workers | Serverless API |
 | Database | PostgreSQL | Supabase | Primary data store |
 | Realtime (Web) | Cloudflare Durable Objects + WebSocket Hibernation | Cloudflare | Chat, presence, typing |
-| Realtime (Mobile) | Supabase Realtime (postgres_changes) | Supabase | Chat, content updates |
+| Realtime (Mobile) | Same Cloudflare Durable Object worker, via the RN WebSocket client | Cloudflare | Chat, typing, content updates |
+| Push | Expo Push Service (+ FCM/APNs) | Expo | Background chat notifications |
 | Authentication | Custom JWT (jose) + bcrypt | Application | User sessions |
 | Storage | Cloudflare R2 (S3-compatible) | Cloudflare | Image/file storage |
 | CDN | Cloudflare | Cloudflare | Static assets, edge |
 | Rate Limiting | Upstash Redis | Upstash | Request throttling |
 | Email | Resend | Resend | Transactional email |
-| Image Processing | Sharp (server) + Canvas API (client) | Application | Image compression |
+| Image Processing | Canvas API (web), expo-image-manipulator (mobile) + signature validation (server) | Application | Image compression |
 | GIF Search | GIPHY API | GIPHY | GIF search |
 | Validation | Zod | Application | Input validation |
 
 ### Infrastructure Services Used
 - ✅ Vercel (alternate deployment)
-- ✅ Supabase (PostgreSQL + Realtime for mobile)
+- ✅ Supabase (PostgreSQL)
 - ✅ Cloudflare (Workers, Durable Objects, R2, CDN)
 - ✅ PostgreSQL (via Supabase)
-- ✅ Supabase Realtime (mobile only)
+- ✅ Expo Push Service (chat notifications)
 - ✅ Vercel Functions (alternate deployment)
 - ✅ Vercel Edge Functions (middleware on Vercel)
 - ✅ Cloudflare Workers (primary deployment)
-- ✅ Cloudflare Durable Objects (realtime)
+- ✅ Cloudflare Durable Objects (realtime: `Room` + `UserDO`)
 - ❌ Redis (Upstash used for rate limiting only, not caching)
 - ❌ Queues (no job queues)
 - ❌ Cron Jobs (only Vercel keep-warm cron)
 - ✅ WebSockets (Cloudflare Durable Objects)
 - ❌ Server-Sent Events
-- ❌ Polling (typing sweep timers are local-only, no API calls)
+- ⚠️ Polling (only the sidebar when a user has more communities than the 15 live-socket cap; everything else catches up on reconnect/focus)
 - ❌ Webhooks (no inbound webhooks)
 
 ---
@@ -116,14 +130,13 @@ Total: 1 HTTP request, 1 DB query
 
 ## B. Loading Application (Dashboard)
 ```
-1. GET / (redirect)                  → Middleware: JWT verify (no DB)
+1. GET / (redirect)                  → Middleware: JWT verify + global rate limit (no DB)
 2. GET /dashboard                    → Server Component: 2 DB SELECT (users, designer_profiles)
 3. GET /api/communities              → 1 RPC (get_sidebar_activity) + 3 DB SELECT + cache lookup
 4. GET /api/notifications            → 2 DB SELECT (notifications count + list)
-5. WebSocket: panel:${userId}        → 1 WSS upgrade to Durable Object
-6. WebSocket: notifications:${userId} → 1 WSS upgrade to Durable Object
-7. WebSocket: typing:${communityIds} → Up to 8 WSS upgrades (one per community)
-Total: ~5 HTTP requests, ~7 DB queries, 3-10 WebSocket connections
+5. WebSocket: notifications:${userId} → 1 WSS upgrade to the user's UserDO (shared user socket)
+6. WebSocket: chat:${cid}            → 1 WSS per community, capped at SIDEBAR_REALTIME_LIMIT (15)
+Total: ~4 HTTP requests, ~7 DB queries, 2-16 WebSocket connections
 ```
 
 ## C. Loading Home/Feed
@@ -177,15 +190,17 @@ Total: 0-1 HTTP requests, 0-2 DB queries
 ## G. Sending a Chat Message
 ```
 1. POST /api/communities/[id]/messages
-   → DB: 1 SELECT (membership check)
+   → DB: 1 SELECT (membership check, lib/communities/membership.ts)
    → DB: 1 INSERT (message row)
-   → Realtime: loadCommunityMemberUserIds() → 1 DB SELECT (all member user_ids)
-   → Realtime: publishChatFanout() → 1 HTTP POST to Cloudflare /publish
-     → Worker fans out to: chat:${id} + N × panel:${memberId}
-     → N WebSocket broadcasts
-2. Optimistic UI: message appears immediately (0 HTTP)
-3. Sidebar: patchSidebarLastMessage() → 0 HTTP (local cache update)
-Total: 1 HTTP request, 3 DB queries, 1 realtime publish → N+1 WebSocket deliveries
+2. after() — runs once the response is on the wire:
+   → Realtime: publishChatEvent() → ONE event to chat:${id}; the Room DO
+     broadcasts to every socket subscribed to that room (no per-member forwards)
+   → Push: sendChatMessagePush() → chunked member lookup (500/query) + Expo push;
+     audible pushes bounded to 3/minute per member, delivery capped at
+     PUSH_MAX_DELIVERIES within PUSH_TIME_BUDGET_MS
+3. Optimistic UI: message appears immediately (0 HTTP)
+4. Sidebar: the same chat event patches the local sidebar cache (0 HTTP)
+Total: 1 HTTP request, 2 DB queries in the request path + deferred publish/push work
 ```
 
 ## H. Receiving a Chat Message
@@ -193,26 +208,26 @@ Total: 1 HTTP request, 3 DB queries, 1 realtime publish → N+1 WebSocket delive
 1. WebSocket: chat:${id} receives "event" message → 0 HTTP
 2. Client: dispatch to useRealtimeChat handlers → 0 HTTP
 3. If user unknown: 1 HTTP to resolve profile → 0-1 HTTP
-4. Sidebar: panel:${userId} receives "message:${cid}" event → 0 HTTP
+4. Sidebar: the same event updates the cached community preview → 0 HTTP
 Total: 0-1 HTTP requests, 0 DB queries (all via realtime)
 ```
 
 ## I. Sending a Post (Thread/Event/Resource)
 ```
-1. POST /api/communities/[id]/threads (or events/resources)
+1. POST /api/communities/[id]/threads (or events/resources/showcase)
    → DB: 1 SELECT (membership check)
    → DB: 1 INSERT (new row)
-   → Realtime: 1 publish to threads:${id} + N × panel:${memberId}
-2. Notifications: deferCommunityNotification()
-   → DB: 1 SELECT (all member user_ids except actor)
-   → DB: 1 INSERT (bulk notifications, N rows)
-   → Realtime: N × publish to notifications:${userId}
-Total: 1 HTTP, 3-4 DB queries, 1+N realtime publishes
+   → Realtime: 1 publish to threads:${id} (events:${id} / resources:${id} / showcase:${postId})
+2. Engagement notifications: deferNotification() → after() → createNotification()
+   → One row per (user, entity) — re-interactions bump the existing unread row's
+     metadata.count instead of inserting again
+   → Realtime: 1 publish to notifications:${userId} (UserDO)
+Total: 1 HTTP, ~2-3 DB queries, 1 realtime publish
 ```
 
 ## J. Loading Comments
 ```
-1. GET /api/communities/[id]/[feature]/[itemId]/comments
+1. GET /api/communities/[id]/threads/[threadId]/comments (also resources/[resourceId]/, events/[eventId]/, showcase/[postId]/)
    → DB: 1 SELECT (comments with pagination)
    → DB: 1 SELECT (author info)
    → DB: 1 SELECT (aggregate counts)
@@ -276,26 +291,39 @@ Total: 1 HTTP, 0 DB queries
 
 | # | Room Pattern | File | When Created | When Destroyed | Cleanup? |
 |---|---|---|---|---|---|
-| 1 | `chat:${cid}` | `useRealtimeChat.ts` via `realtimePool` | Community open | 5 min idle after last subscriber | ✅ Pool manages lifecycle |
-| 2 | `presence:${cid}` | `useOnlinePresence.ts` | Community open | Community switch (useEffect cleanup) | ✅ client.close() |
-| 3 | `typing:${cid}` (active) | `useTypingPresence.ts` | Community open | Community switch | ✅ client.close() |
-| 4 | `typing:${cid}` (sidebar, up to 8) | `useSidebarTyping.ts` | Dashboard mount | Logout / visibility hidden | ✅ clients.forEach(close) |
-| 5 | `panel:${userId}` | `useSidebarRealtime.ts` | Dashboard mount | Logout | ✅ client.close() |
-| 6 | `threads:${cid}` | `ThreadsView.tsx` | Threads tab open | Tab switch / unmount | ✅ client.close() |
-| 7 | `thread-comments:${tid}` | `ThreadDetailClient.tsx` | Thread detail open | Navigate away | ✅ client.close() |
-| 8 | `events:${cid}` | `EventsView.tsx` | Events tab open | Tab switch | ✅ client.close() |
-| 9 | `resources:${cid}` | `ResourcesView.tsx` | Resources tab open | Tab switch | ✅ client.close() |
-| 10 | `resource-comments:${rid}` | `ResourceDetailClient.tsx` | Resource detail open | Navigate away | ✅ client.close() |
-| 11 | `showcase:${postId}` | `ShowcaseDetailClient.tsx` | Showcase detail open | Navigate away | ✅ client.close() |
-| 12 | `rules:${cid}` | `CommunityInfoPanel.tsx` | Info panel open | Panel close | ✅ client.close() |
-| 13 | `notifications:${userId}` | `NotificationBell.tsx` | Dashboard mount | Logout | ✅ client.close() |
+| 1 | `chat:${cid}` | `components/communities/chat/useRealtimeChat.ts` via `realtimePool` | Community open | 5 min idle after last subscriber | ✅ Pool manages lifecycle |
+| 2 | `chat:${cid}` (presence handlers) | `chat/useOnlinePresence.ts` | Community open | Community switch (effect cleanup) | ✅ unsubscribes; shares socket #1 |
+| 3 | `chat:${cid}` (typing topic) | `chat/useTypingPresence.ts` | Community open | Community switch | ✅ unsubscribes; shares socket #1 |
+| 4 | `chat:${cid}` × ≤15 (typing) | `panel/useSidebarTyping.ts` | Dashboard mount | Logout / visibility hidden | ✅ unsubscribes |
+| 5 | `chat:${cid}` × ≤15 | `panel/useSidebarRealtime.ts` | Dashboard mount | Logout / list shrinks | ✅ unsubscribes (room ref-counted, shared with #1) |
+| 6 | `threads:${cid}` | `threads/ThreadsView.tsx` | Threads tab open | Tab switch / unmount | ✅ unsubscribes |
+| 7 | `thread-comments:${tid}` | `threads/ThreadDetailClient.tsx` | Thread detail open | Navigate away | ✅ unsubscribes |
+| 8 | `events:${cid}` | `events/EventsView.tsx` | Events tab open | Tab switch | ✅ unsubscribes |
+| 9 | `resources:${cid}` | `resources/ResourcesView.tsx` | Resources tab open | Tab switch | ✅ unsubscribes |
+| 10 | `resource-comments:${rid}` | `resources/ResourceDetailClient.tsx` | Resource detail open | Navigate away | ✅ unsubscribes |
+| 11 | `showcase:${postId}` | `showcase/ShowcaseDetailClient.tsx` | Showcase detail open | Navigate away | ✅ unsubscribes |
+| 12 | `rules:${cid}` | `CommunityRightSidebar.tsx` | Right sidebar open | Panel close | ✅ unsubscribes |
+| 13 | `notifications:${userId}` | `lib/use-notifications.ts` | Dashboard mount | Logout | ✅ unsubscribes (user socket) |
+| 14 | `profile:${userId}` | reserved in `lib/realtime/rooms.ts` | — | — | no current subscriber |
 
-**Maximum concurrent connections per user**: ~13 (if all rooms open simultaneously)
-**Typical concurrent connections**: 3-5 (panel + typing for sidebar + 1 active community rooms)
+Note: the live hooks above use the community's `chat:${cid}` room (presence via
+`onPresence`, typing via the `typing` topic) instead of dedicated per-feature rooms,
+so they do not create additional sockets. `realtimeRooms.presence()` remains in
+`lib/realtime/rooms.ts` as an unused helper name; the server still understands
+`presence:` rooms (`apps/realtime/__tests__/room-routing.test.ts`), but no web hook
+subscribes to one today.
+
+**Sockets, not rooms, are the unit of connection**: `realtimeClient` multiplexes every
+room over a per-community socket (or the single user socket for `notifications:*` /
+`profile:*`), and ref-counts subscriptions, so two hooks on the same room share one
+socket. The sidebar's own subscriptions are capped at 15 communities, most-recently
+active first.
+**Maximum concurrent connections per user**: bounded by open tabs/details plus ≤1 user socket and ≤15 sidebar community sockets; all 15 sidebar sockets only exist when that many distinct communities are active.
+**Typical concurrent connections**: 2-6 (user socket + one active community's chat/presence/typing + a tab room).
 
 ### Server-Side Presence Tracking
-- **File**: `apps/realtime/src/room.ts`
-- **Storage**: Durable Object SQLite (MEMBERS_KEY = "members")
+- **Community rooms**: `apps/realtime/src/room.ts` — storage in Durable Object SQLite (MEMBERS_KEY = "members")
+- **User rooms**: `apps/realtime/src/user.ts` (`UserDO`) — subscriptions only, routed by `room-routing.ts` (`USER_ROOM_PREFIXES = notifications:`, `profile:`)
 - **Mechanism**: `join()` increments `connections` counter, `leave()` decrements. At 0, user removed.
 - **Broadcast**: Full member list sent to all sockets on every join/leave.
 - **Cleanup**: `webSocketClose` and `webSocketError` handlers call `leave(userId)`.
@@ -306,29 +334,38 @@ Total: 1 HTTP, 0 DB queries
 - **Tab visibility gating**: All realtime hooks check `isVisible` before connecting, tearing down WebSocket when hidden
 - **Catch-up on reconnect**: `useRealtimeChat` runs debounced `fetchMessages()` with `?after=` cursor on fresh subscription
 
-## Mobile App: Supabase Realtime System
+## Mobile App: Same Cloudflare Durable Object System
 
-### Per-Community Channels
+`lib/realtime.ts` is a port of `apps/web/lib/realtime/client.ts`: one multiplexed
+`realtimeClient`, ref-counted rooms/topics, community rooms on their own socket to
+the community's `Room` DO, user rooms (`notifications:*`, `profile:*`) sharing the
+recipient's `UserDO`. See `docs/mobile-architecture.md` for the full design.
 
-| # | Channel Pattern | File | Tables Monitored | Cleanup? |
-|---|---|---|---|---|
-| 1 | `chat:${cid}` | `useChatMessages.ts` | community_messages (INSERT, UPDATE), message_reactions (*) | ✅ removeChannel |
-| 2 | `panel:${cid}` | `useCommunities.ts` | community_messages (INSERT, UPDATE), message_reactions (INSERT, UPDATE, DELETE) | ✅ removeChannel |
-| 3 | `community-typing:${cid}` | `useTypingPresence.ts` | broadcast only | ✅ removeChannel |
-| 4 | `mobile-${kind}-${cid}` | `useCommunityContent.ts` | community_threads/events/resources + interaction tables | ✅ removeChannel |
+### Subscriptions per surface
 
-**Mobile creates 3 channels per community** (panel + typing + content), vs web's 7-14 separate WebSocket connections.
+| Surface | File | Rooms / topics | Cleanup? |
+|---|---|---|---|
+| Active chat | `hooks/useChatMessages.ts` | `chat:${cid}` — `message`, `message-edit`, `message-delete`, reactions | ✅ unsubscribes on unmount |
+| Typing | `hooks/useTypingPresence.ts` | `chat:${cid}` — `typing` topic | ✅ unsubscribes |
+| Community list / unread | `hooks/useCommunities.ts` | `chat:${cid}` for the listed communities | ✅ unsubscribes |
+| Content tabs | `hooks/useCommunityContent.ts` | `threads:${cid}`, `events:${cid}`, `resources:${cid}`, `showcase:*` | ✅ unsubscribes |
+| Notifications | `lib/push.ts` + app screens | `notifications:${userId}` over the user socket | ✅ unsubscribes |
+
+**Liveness is the mobile-specific part**: a 25s heartbeat (`ping`/`pong` auto-response),
+an AppState probe on foreground, and 1s→15s reconnect backoff with replayed
+subscriptions. None of that exists because the transport differs — it exists because
+mobile OSes silently kill sockets while `readyState` still reports OPEN.
 
 ### Mobile vs Web Realtime Differences
 | Aspect | Web | Mobile |
 |---|---|---|
-| Transport | Raw WebSocket via Cloudflare DO | Supabase Realtime (postgres_changes) |
-| Auth | JWT cookie on WS handshake | Supabase anon key (no auth on channel) |
-| Message delivery | Server push via /publish endpoint | PostgreSQL replication |
-| Typing | Cloudflare broadcast | Supabase broadcast |
-| Presence | Durable Object storage + broadcast | Not implemented |
-| Connection model | 1 WebSocket per room | 1 channel per subscription |
-| Scaling | DO per room, N connections per DO | Supabase connection pool |
+| Transport | Raw WebSocket via Cloudflare DO | Same, via the React Native WebSocket API |
+| Auth | JWT in the WS handshake | JWT in the `token` query param (RN cannot set WS headers) |
+| Message delivery | Server push via /publish endpoint | Same |
+| Typing | Cloudflare room event | Same |
+| Presence | Durable Object storage + broadcast | Same rooms; UI surfaces presence where implemented |
+| Connection model | 1 socket per community + 1 user socket (multiplexed, ref-counted) | Same |
+| Liveness | Tab-visibility gating | Heartbeat + AppState probe + backoff |
 
 ---
 
@@ -346,35 +383,35 @@ User A types message
 [CLIENT] POST /api/communities/[cid]/messages
   |
   v
-[SERVER] middleware.ts: JWT verify (no DB), rate limit check (Upstash Redis × 2)
+[SERVER] middleware.ts: JWT verify (no DB), global rate limit (Upstash Redis)
   |
   v
-[SERVER] messages/route.ts:
-  1. DB: SELECT community_members WHERE community_id = ? AND user_id = ? (membership check)
-  2. DB: INSERT INTO community_messages (content, user_id, community_id, reply_to_id)
-  3. DB: SELECT community_members WHERE community_id = ? (load ALL member user_ids)
+[SERVER] messages/route.ts (request path):
+  1. DB: membership check (lib/communities/membership.ts)
+  2. DB: INSERT INTO community_messages
+  3. response is sent — everything below runs in after()
   |
   v
-[SERVER] publishChatFanout():
-  4. HTTP POST to Cloudflare Realtime /publish with events[] array:
-     - Event 1: room=chat:${cid}, topic=message
-     - Events 2..N+1: room=panel:${memberId}, topic=message:${cid} (one per member)
+[SERVER] after() block:
+  4. publishChatEvent() → ONE HTTP POST to Cloudflare Realtime /publish:
+     room=chat:${cid}, topic=message
+  5. sendChatMessagePush() → keyset-paginated member lookup (500/query),
+     per-member preference + audible-budget checks, Expo push per device
   |
   v
-[CLOUDFLARE WORKER] index.ts handlePublish():
-  5. For each event in events[]:
-     - idFromName(room) → Durable Object ID
-     - stub.fetch() → forward to Room DO
+[CLOUDFLARE WORKER] index.ts + room-routing.ts:
+  6. Community-scoped rooms → idFromName(chat:${cid}) → Community Room DO
+     User-scoped rooms (notifications:, profile:) → user:${userId} → UserDO
   |
   v
 [CLOUDFLARE DO - Room] room.ts publish():
-  6. For each WebSocket in room:
-     - ws.send(JSON.stringify({t:"event", room, topic, data, sender}))
+  7. For each socket subscribed to the room's topic:
+     ws.send(JSON.stringify({t:"event", room, topic, data}))
   |
   v
 [CLIENTS] Receive WebSocket message:
   - Chat window: append to messages[]
-  - Sidebar panel: update community preview + unread count
+  - Sidebar: patch cached community preview + unread count
 ```
 
 ### Operation Count
@@ -382,27 +419,33 @@ User A types message
 | Operation | Count | Notes |
 |---|---|---|
 | HTTP requests (client→server) | 1 | POST /messages |
-| DB queries (server) | 3 | membership check + INSERT + member list |
+| DB queries in the request path | 2 | membership check + INSERT |
 | DB writes (server) | 1 | INSERT message |
-| HTTP requests (server→realtime) | 1 | POST /publish (batched) |
-| DO forwards (Worker→DO) | N+1 | 1 chat room + N panel rooms |
-| WebSocket broadcasts | N+1 | 1 to chat room + 1 per panel room |
-| Notifications DB writes | M | Bulk insert for M community members (deferred via `after()`) |
-| Notification realtime publishes | M | One per notified user |
+| HTTP requests (server→realtime) | 1 | POST /publish, single room |
+| DO forwards (Worker→DO) | 1 | chat room only |
+| WebSocket broadcasts | S | S = sockets currently subscribed to the room |
+| Deferred push recipients | ≤ N-1, hard-capped | chunked lookups; `PUSH_MAX_DELIVERIES` / `PUSH_TIME_BUDGET_MS` |
+| Notification rows | 0 | Chat does not create notification rows |
 
-**Total per message**: 2 HTTP, 4+ DB operations, 1 batched publish, N+1 WebSocket deliveries, M notification inserts
+**Total per message**: 1 HTTP from the sender, 2 DB queries in the request path,
+one realtime publish, and a deferred bounded push fan-out. The old revision of this
+audit recorded N+1 DO forwards and N notification inserts per message; the fan-out
+and broadcast layer has since been collapsed to a single room event, and community
+broadcast notifications were removed entirely.
 
 ### Scale Model for Chat Messages
 
-| Community Size | DB ops/message | DO forwards | WebSocket deliveries | Notification inserts |
+| Community Size | Request-path DB ops | DO forwards | WebSocket deliveries | Push recipients (bounded) |
 |---|---|---|---|---|
-| 10 users | 4 | 11 | 11 | 9 |
-| 100 users | 4 | 101 | 101 | 99 |
-| 1,000 users | 4 | 1,001 | 1,001 | 999 |
-| 10,000 users | 4 | 10,001 | 10,001 | 9,999 |
-| 100,000 users | 4 | 100,001 | 100,001 | 99,999 |
+| 10 users | 2 | 1 | ≤ 10 (sockets in the room) | ≤ 9 |
+| 100 users | 2 | 1 | ≤ 100 | ≤ 99 |
+| 1,000 users | 2 | 1 | ≤ 1,000 online | ≤ 999 |
+| 10,000 users | 2 | 1 | ≤ 10,000 online | ≤ 9,999 |
+| 100,000 users | 2 | 1 | ≤ 100,000 online | ≤ 10,000 (hard cap) |
 
-**CRITICAL**: At 10,000 members, ONE message creates 10,000+ WebSocket deliveries and 10,000 notification inserts.
+**Remaining linear cost**: the Expo push fan-out. It is deferred, chunked, time-boxed,
+and capped at 10,000 deliveries per message, and unread counts are derived from the
+database on next app open — so a member who misses a push still sees the correct state.
 
 ---
 
@@ -464,30 +507,30 @@ Total: 0 HTTP, 0 DB queries, 5 new WebSocket, 5 close
 ### useEffect with API calls
 | File | Dependencies | Request | Frequency |
 |---|---|---|---|
-| `useChatData.ts:264` | `[communityId]` | Bootstrap + messages + meta | Per community switch |
-| `useRealtimeChat.ts:65` | `[communityId, debouncedCatchUp]` | Catch-up fetch on reconnect | Per reconnection |
-| `useSidebarCommunities.ts:90` | `[load]` | `/api/communities` | On mount + on SIDEBAR_CHANGED_EVENT |
-| `NotificationBell.tsx:101` | `[fetchNotifications]` | `/api/notifications` | On mount |
-| `HomeFeed.tsx:68` | `[fetchFeed, refreshToken]` | `/api/home/feed` | On mount |
+| `components/communities/chat/useChatData.ts` | `[communityId]` | Bootstrap + messages + meta | Per community switch |
+| `components/communities/chat/useRealtimeChat.ts` | `[communityId, debouncedCatchUp]` | Catch-up fetch on reconnect | Per reconnection |
+| `components/communities/panel/useSidebarCommunities.ts` | `[load]` | `/api/communities` | On mount + SIDEBAR_CHANGED_EVENT |
+| `lib/use-notifications.ts` | `[userId]` | `/api/notifications` | On mount + focus/visibility catch-up |
+| `app/dashboard/HomeFeed.tsx` | `[fetchFeed, refreshToken]` | `/api/home/feed` | On mount + focus/visibility |
 
 ### useEffect with WebSocket connections
 | File | Dependencies | Connection | Frequency |
 |---|---|---|---|
-| `useRealtimeChat.ts:65` | `[communityId, ...]` | chat:${cid} via pool | Per community |
-| `useOnlinePresence.ts:23` | `[communityId, ...]` | presence:${cid} | Per community |
-| `useTypingPresence.ts:120` | `[communityId, ...]` | typing:${cid} | Per community |
-| `useSidebarRealtime.ts:72` | `[communityIds, userId]` | panel:${userId} + typing:${cid} ×8 | On mount |
-| `useSidebarTyping.ts:44` | `[communityIds, ...]` | typing:${cid} ×8 | Per sidebar |
-| `NotificationBell.tsx:124` | `[userId, isVisible]` | notifications:${userId} | On mount |
-| `ThreadsView.tsx:83` | `[communityId]` | threads:${cid} | Per tab |
-| `EventsView.tsx:69` | `[communityId]` | events:${cid} | Per tab |
-| `ResourcesView.tsx:86` | `[communityId]` | resources:${cid} | Per tab |
+| `chat/useRealtimeChat.ts` | `[communityId, ...]` | chat:${cid} via the realtime client/pool | Per community |
+| `chat/useOnlinePresence.ts` | `[communityId, ...]` | presence:${cid} | Per community |
+| `chat/useTypingPresence.ts` | `[communityId, ...]` | typing:${cid} | Per community |
+| `panel/useSidebarRealtime.ts` | `[communityIds, userId]` | chat:${cid} × ≤15 (most-recently active) | On mount / list change |
+| `panel/useSidebarTyping.ts` | `[communityIds, ...]` | typing:${cid} × ≤15 | Per sidebar |
+| `lib/use-notifications.ts` | `[userId, isVisible]` | notifications:${userId} (user socket) | On mount |
+| `threads/ThreadsView.tsx` | `[communityId]` | threads:${cid} | Per tab |
+| `events/EventsView.tsx` | `[communityId]` | events:${cid} | Per tab |
+| `resources/ResourcesView.tsx` | `[communityId]` | resources:${cid} | Per tab |
 
 ### Request Deduplication
 - **`dedupe-fetch.ts`**: Client-side in-flight dedup + settle replay. Two modes: `exact` (750ms) and `url` (600ms for toggles).
 - **`request-cache.ts`**: Server-side fetch cache with community bootstrap hydration. 15-min stale for bootstrap data.
 - **`cache.ts`**: Module-level `msgCache`/`metaCache` with bounded LRU (25 communities max).
-- **`realtimePool.ts`**: WebSocket connection pooling with 5-min idle timeout.
+- **`lib/realtime/pool.ts`**: WebSocket connection pooling with 5-min idle timeout.
 
 ### Potential Duplicate Requests
 1. **Community bootstrap hydration**: `fetchAndHydrateCommunityBootstrap()` pre-populates the request cache. If a component calls `fetchJsonCached()` for the same URL simultaneously, the dedupe layer collapses them. ✅ Well-handled.
@@ -495,9 +538,9 @@ Total: 0 HTTP, 0 DB queries, 5 new WebSocket, 5 close
 3. **Notification fetch + realtime**: Notifications are fetched on mount and updated via WebSocket. The realtime handler patches local state, no refetch needed. ✅ No duplicates.
 
 ### Worst Offenders for Unnecessary Requests
-1. **`useSidebarTyping.ts`**: Creates up to 8 `RealtimeClient` instances (one per joined community) on every dashboard mount. Each is a separate WebSocket. Could be consolidated into a single multiplexed connection.
-2. **`useSidebarRealtime.ts`**: Creates 1 `RealtimeClient` for the panel room. The panel room receives events for ALL communities, so this is efficient.
-3. **`useRealtimeChat.ts`**: On reconnection, runs `fetchMessages()` with `?after=` cursor. This is a catch-up mechanism, not a duplicate — it fills gaps from missed realtime events.
+1. **`panel/useSidebarTyping.ts` + `panel/useSidebarRealtime.ts`**: Up to 15 communities each hold a live chat socket (typing and message subscriptions share the room via ref-counting), capped by `SIDEBAR_REALTIME_LIMIT` most-recently-active first; beyond the cap a periodic refetch catches the list up. Lowering the cap or multiplexing those community rooms onto fewer sockets is the remaining win.
+2. **`components/communities/panel/useSidebarCommunities.ts`**: still the source of the sidebar fetch on mount + `SIDEBAR_CHANGED_EVENT`; the request-cache layer dedupes the overlap.
+3. **`chat/useRealtimeChat.ts`**: On reconnection, runs `fetchMessages()` with `?after=` cursor. This is a catch-up mechanism, not a duplicate — it fills gaps from missed realtime events.
 
 ---
 
@@ -506,48 +549,52 @@ Total: 0 HTTP, 0 DB queries, 5 new WebSocket, 5 close
 ## Architecture
 - **Framework**: Expo SDK 54 + React Native 0.81 + expo-router
 - **Data fetching**: React Query (`@tanstack/react-query`)
-- **Realtime**: Supabase Realtime (NOT Cloudflare DO)
-- **Auth**: Cookie-based via web backend API
+- **Realtime**: Cloudflare Durable Objects via `lib/realtime.ts` — a port of `apps/web/lib/realtime/client.ts`
+- **Auth**: Cookie-based via web backend API (HttpOnly JWT captured from `Set-Cookie` and replayed from AsyncStorage)
 - **State**: React Context (AuthContext) + React Query cache
+- **Push**: Expo push (`lib/push.ts`, `components/PushNotificationsBridge.tsx`)
 
 ## API Requests
 All mobile API calls go through `lib/api.ts` which wraps `fetch()` with session cookie management.
 
 | Hook | Requests | Trigger |
 |---|---|---|
-| `useCommunities.ts` | GET `/api/communities` | Mount + AppState active |
-| `useChatMessages.ts` | GET `/api/communities/:id/messages` | Mount + pagination |
-| `useSendMessage.ts` | POST `/api/communities/:id/messages/upload` + POST `/api/communities/:id/messages` | User sends message |
-| `useCommunityContent.ts` | GET via `getCommunityContent()` | Mount + realtime invalidation |
-| `AuthContext.tsx` | GET `/api/auth/me` | Mount |
+| `hooks/useCommunities.ts` | GET `/api/communities` | Mount + AppState active |
+| `hooks/useChatMessages.ts` | GET `/api/communities/:id/messages` | Mount + pagination |
+| `hooks/useSendMessage.ts` | POST `/api/communities/:id/messages/upload` + POST `/api/communities/:id/messages` | User sends message |
+| `hooks/useCommunityContent.ts` | GET via `lib/communityContent.ts` | Mount + realtime invalidation |
+| `hooks/usePushNotifications.ts` | POST/DELETE `/api/push/register`, GET/PATCH `/api/push/settings` | Sign-in, foreground, logout |
+| `context/AuthContext.tsx` | GET `/api/auth/me` | Mount |
 
 ## Realtime Connections (Mobile)
-| Channel | Tables | Trigger |
-|---|---|---|
-| `panel:${cid}` × N communities | community_messages, message_reactions | Background |
-| `community-typing:${cid}` × N communities | broadcast only | Background |
-| `chat:${cid}` | community_messages, message_reactions | Chat open |
-| `mobile-${kind}-${cid}` | content tables | Content tab open |
+| Surface | File | Rooms / topics | Trigger |
+|---|---|---|---|
+| Active chat | `hooks/useChatMessages.ts` | `chat:${cid}` — `message`, `message-edit`, `message-delete`, reactions | Chat open |
+| Community list | `hooks/useCommunities.ts` | `chat:${cid}` for listed communities | List mounted |
+| Typing | `hooks/useTypingPresence.ts` | `chat:${cid}` — `typing` | Chat open |
+| Content tabs | `hooks/useCommunityContent.ts` | `threads:${cid}`, `events:${cid}`, `resources:${cid}`, `showcase:*` | Content tab open |
+| Notifications | `lib/push.ts` + screens | `notifications:${userId}` (user socket) | Signed in |
 
-**Mobile creates 2N+1 channels** (2 per community in background + 1 for active chat).
+Mobile multiplexes all of these over per-community sockets (or the single user
+socket), exactly like the web client — there is no separate channel-per-table layer.
 
 ## Mobile vs Web Differences
 | Aspect | Web | Mobile |
 |---|---|---|
-| Realtime transport | Cloudflare Durable Objects | Supabase Realtime |
-| Connection model | 1 WebSocket per room (pooled) | 1 channel per subscription |
+| Realtime transport | Cloudflare Durable Objects | Same (RN WebSocket client) |
+| Connection model | 1 socket per community + 1 user socket, ref-counted | Same |
 | Caching | Module-level Maps + request-cache | React Query |
-| Optimistic UI | Yes (messages, likes, saves) | Yes (messages) |
-| Image compression | Canvas API (client-side WebP) | None (uploads as-is) |
-| Background behavior | Tab visibility gating | AppState reconciliation |
-| Notification delivery | WebSocket | No push notifications yet |
+| Optimistic UI | Yes (messages, likes, saves) | Yes (messages, reactions) |
+| Image compression | Canvas API (client-side WebP) | `expo-image-manipulator` before upload |
+| Background behavior | Tab visibility gating | Heartbeat + AppState probe + reconnect backoff |
+| Notification delivery | Browser notifications + in-app realtime | Expo push (foreground suppression, per-community mute, quiet hours) |
 
 ---
 
 # IMAGE / FILE AUDIT
 
 ## Upload Flow
-1. **Client compression**: `compressChatImageClient()` → Canvas → WebP, max 1200×1200, quality 0.65
+1. **Client compression**: `compressImage()` / `compressAvatarClient()` (`lib/image-client.ts`) → Canvas → WebP, with `MAX_DIMENSION` and `IMAGE_QUALITY` bounds
 2. **Upload**: POST multipart to `/api/communities/[id]/messages/upload`
 3. **Server**: Membership check → image validation → R2 PutObject → INSERT with image_url
 4. **R2 public URL**: `https://pub-xxxx.r2.dev/<key>`
@@ -662,15 +709,20 @@ Logout:
 
 ## Durable Objects
 
-| DO Class | File | Instances | Storage | Purpose |
-|---|---|---|---|---|
-| `Room` | `apps/realtime/src/room.ts` | 1 per room name | SQLite | WebSocket hub + presence |
+| DO Class | Binding | File | Instances | Storage | Purpose |
+|---|---|---|---|---|---|
+| `Room` | `COMMUNITY_DO` | `apps/realtime/src/room.ts` | 1 per community (`chat:${cid}`, `threads:${cid}`, … rooms share it) | SQLite | Community WebSocket hub + presence |
+| `UserDO` | `USER_DO` | `apps/realtime/src/user.ts` | 1 per user (`user:${userId}`) | SQLite | User-scoped rooms (`notifications:*`, `profile:*`) |
+
+Routing between the two is owned by `apps/realtime/src/room-routing.ts`
+(`USER_ROOM_PREFIXES`), and the migrations in `wrangler.toml` are `v1` (Room),
+`v2` (UserDO), `v3` (no-op compatibility marker).
 
 ### Room DO Details
 - **WebSocket Hibernation**: Uses `acceptWebSocket()` + `serializeAttachment()` for eviction survival
 - **Storage**: `MEMBERS_KEY = "members"` → JSON object in SQLite with `{userId: {name, avatar, connections}}`
 - **Message limit**: 8192 bytes per message (MAX_MESSAGE_BYTES)
-- **Fan-out**: Worker processes `/publish` in chunks of 40 (under 50-subrequest cap)
+- **Fan-out**: the Worker resolves each event through `room-routing.ts` and dispatches publishes with bounded concurrency (`FANOUT_CONCURRENCY = 40`, under the subrequest cap)
 
 ## R2 Storage
 | Bucket | Purpose | Public URL |
@@ -999,17 +1051,17 @@ The provided Vercel dashboard data shows:
 
 ## 🔴 CRITICAL
 
-### 1. Chat Message Fan-Out Scales Linearly with Community Size
-- **File**: `apps/web/lib/realtime/server.ts:publishChatFanout()`
-- **Problem**: Every chat message creates N+1 WebSocket deliveries where N = community member count. At 10K members, one message = 10,001 DO forwards + 10,001 WebSocket broadcasts.
-- **Impact**: CPU time on the realtime Worker, bandwidth, Durable Object storage
+### 1. Chat Push Fan-Out Scales Linearly with Community Size
+- **File**: `apps/web/lib/push/chat.ts:sendChatMessagePush()` (called from `app/api/communities/[id]/messages/route.ts`)
+- **Problem**: Realtime delivery is now one room event, but the deferred Expo push fan-out still targets every member except the sender. At 10K members, one message can queue ~10K device pushes (chunked 500/query, capped at `PUSH_MAX_DELIVERIES = 10,000` inside `PUSH_TIME_BUDGET_MS = 20s`).
+- **Impact**: Expo push quota, deferred CPU on the sending worker, DB reads for member/preference/token lookups
 - **Scale at which it matters**: 1,000+ members in a single community
 
-### 2. Bulk Notification Insert Scales Linearly
-- **File**: `apps/web/lib/notifications.ts:notifyCommunityMembers()`
-- **Problem**: Creating a thread/event/resource inserts N notification rows (one per member except actor). At 10K members, one post = 9,999 notification INSERTs + 9,999 realtime publishes.
-- **Impact**: Database write amplification, storage growth
-- **Scale at which it matters**: 1,000+ members in a single community
+### 2. Notification Work Is Deferred but Still Per-Engagement
+- **File**: `apps/web/lib/notifications.ts:deferNotification()` / `createNotification()`
+- **Problem**: Community broadcast notifications were removed, so a post no longer inserts N rows. What remains is one deferred create/update per engagement event (comment, reply, like, RSVP), deduped per `(user, entity)` with `metadata.count`.
+- **Impact**: Small, bounded DB writes per interaction; realtime publish per notification row
+- **Scale at which it matters**: High comment/like volume on popular content
 
 ### 3. Supabase Connection Pool Exhaustion Risk
 - **Problem**: Every API route and Server Component opens a DB connection via service-role. With ~100 routes each doing 1-5 DB queries, concurrent requests could exhaust the connection pool.
@@ -1023,15 +1075,15 @@ The provided Vercel dashboard data shows:
 - **Impact**: Long API response times for write operations
 - **Scale at which it matters**: 10K+ users with active communities
 
-### 5. Dual Realtime Systems (Web + Mobile)
-- **Problem**: Web uses Cloudflare Durable Objects, mobile uses Supabase Realtime. They don't share state. A message sent from web appears on mobile via Supabase replication, but typing indicators and presence don't cross systems.
-- **Impact**: Inconsistent user experience, duplicated infrastructure
-- **Scale at which it matters**: Always (architecture issue, not scaling issue)
+### 5. Socket-per-Community Connection Model
+- **Problem**: Both web and mobile use the same Cloudflare DO system now, but each community room still needs its own socket to that community's `Room` DO (multiplexed rooms, ref-counted, sidebar capped at 15). A power user with many communities open keeps one socket per active community.
+- **Impact**: DO instance count and per-user socket memory grow with the number of open communities
+- **Scale at which it matters**: Users active in dozens of communities simultaneously
 
-### 6. 18+ WebSocket Connections Per Web User
-- **Problem**: Each room (chat, presence, typing, panel, notifications, threads, thread-comments, events, resources, resource-comments, showcase, rules, profile) creates a separate WebSocket to a separate Durable Object.
+### 6. Many WebSocket Connections Per Web User
+- **Problem**: The rooms (chat, presence, typing, notifications, threads, thread-comments, events, resources, resource-comments, showcase, rules, profile) are multiplexed over one socket per community plus one user socket — not one socket per room. The sidebar's own chat/typing subscriptions are capped at `SIDEBAR_REALTIME_LIMIT` (15).
 - **Impact**: Memory on Cloudflare Workers, DO instance count
-- **Scale at which it matters**: 10K+ concurrent users = 100K+ DO instances
+- **Scale at which it matters**: 10K+ concurrent users in many distinct communities
 
 ### 7. `get_sidebar_activity` RPC Unbounded by Community Count
 - **File**: `apps/web/lib/communities/sidebar-server.ts:37`
@@ -1046,15 +1098,15 @@ The provided Vercel dashboard data shows:
 - **Impact**: Connection pool churn on cold starts
 - **Scale at which it matters**: 100+ concurrent requests on cold starts
 
-### 9. `notifyCommunityMembers` Does N Individual SELECT + INSERT
-- **File**: `apps/web/lib/notifications.ts:80-176`
-- **Problem**: First queries all member IDs, then inserts notifications. The member query returns ALL user_ids, and the insert creates N rows. No batching.
-- **Impact**: O(N) DB operations per community notification event
-- **Scale at which it matters**: Communities with 500+ members
+### 9. Engagement Notifications Are Deduped, Not Batched
+- **File**: `apps/web/lib/notifications.ts` (`createNotification`)
+- **Problem**: Each engagement event does a lookup for an existing unread row on the same entity, then an UPDATE or INSERT, plus a realtime publish. The lookup is per event, not batched across events.
+- **Impact**: A few extra DB round trips per comment/like/RSVP; no O(N) fan-out anymore
+- **Scale at which it matters**: Very high interaction volume on one entity
 
-### 10. Image Uploads Not Compressed on Server
-- **File**: `apps/web/app/api/communities/[id]/messages/upload/route.ts`
-- **Problem**: Server-side Sharp is unavailable on Cloudflare Workers. Client-side compression is used instead. But showcase, thread, and event image uploads go through different routes that may not compress.
+### 10. Image Compression Depends on the Client
+- **File**: `apps/web/lib/image-client.ts` + the upload routes
+- **Problem**: There is no server-side image processing (Sharp is gone; Cloudflare Workers cannot run it here). The browser compresses before upload and the server validates the signature, but every upload route depends on the client having compressed first.
 - **Impact**: Larger uploads, more R2 storage, more bandwidth
 - **Scale at which it matters**: Always (cost impact)
 
@@ -1067,8 +1119,8 @@ The provided Vercel dashboard data shows:
 ## 🟢 LOW
 
 ### 12. Typing Sweep Timers Run Per-Community
-- **Files**: `useTypingPresence.ts`, `useSidebarTyping.ts`
-- **Problem**: 1-second `setInterval` per community for stale typing cleanup. Purely local, no API calls.
+- **Files**: `components/communities/chat/useTypingPresence.ts`, `components/communities/panel/useSidebarTyping.ts`
+- **Problem**: A local sweep timer per subscribed community for stale typing cleanup (sidebar capped at 15). Purely local, no API calls.
 - **Impact**: Minimal CPU usage
 - **Scale at which it matters**: 50+ communities open simultaneously (unlikely)
 
@@ -1093,11 +1145,11 @@ At 10K registered users with ~2,100 daily active, peak concurrent requests of ~5
 
 **Second to break: Realtime fan-out for large communities**
 
-If any community grows to 1,000+ members, a single chat message triggers 1,000+ DO forwards. The Cloudflare Worker's 50-subrequest limit is handled by chunking (CHUNK=40), but the total CPU time per publish could exceed Worker limits.
+If any community grows to 1,000+ members, a single chat message still queues a deferred Expo push for every member except the sender. The fan-out is chunked and capped (`PUSH_MAX_DELIVERIES`, `PUSH_TIME_BUDGET_MS`), but it is the remaining size-linear cost per message.
 
-**Third to break: Notification storage**
+**Third to break: Push quota and deferred work**
 
-Each post in a 1,000-member community creates 999 notification rows. With 10 posts/day in active communities, that's 10,000 notification rows/day. The `notifications` table grows linearly with no cleanup/archival.
+At 1,000 members, one message can mean ~999 device pushes. Busy communities multiply that; the audible budget (3/minute/member) protects users, but the delivery quota and the sending worker's deferred CPU are the pressure points, not notification rows — community broadcast notifications were removed and engagement notifications dedupe into one row per entity.
 
 ## At 100,000 Users
 
@@ -1107,7 +1159,7 @@ Each post in a 1,000-member community creates 999 notification rows. With 10 pos
 
 **Second to break: Cloudflare Durable Object instance count**
 
-100K users × 14 rooms = potentially 1.4M DO instances. While not all rooms are open simultaneously, the connection pool keeps chat connections warm for 5 minutes. Peak concurrent DO instances could reach 100K+.
+Each active community holds one `Room` DO and each signed-in user holds one `UserDO`; the sidebar caps its own community sockets at 15 and idle community sockets close after 5 minutes. Peak concurrent DO instances therefore track *open* communities and users, not users × room count.
 
 **Third to break: R2 storage and bandwidth**
 
@@ -1121,7 +1173,7 @@ At 1M users, the database handles millions of daily writes across messages, noti
 
 **Second to break: Realtime message throughput**
 
-A community with 10K members sending 100 messages/day = 1M WebSocket deliveries/day for that community alone. Across all communities, this could reach 100M+ WebSocket deliveries/day.
+A community with 10K *connected* members receiving 100 messages/day = 1M WebSocket deliveries/day for that community alone. Delivery is per socket actually subscribed to the room, so offline members cost a (capped) push instead of a socket write.
 
 **Third to break: Supabase plan limits**
 
@@ -1133,18 +1185,18 @@ The database storage, bandwidth, and compute would exceed any reasonable Supabas
 
 | # | Issue | Impact | Effort | Expected Benefit |
 |---|---|---|---|---|
-| 1 | Batch notification inserts (use bulk INSERT, not per-member) | 🔴 Critical at scale | Low | 10-100x reduction in notification DB writes |
-| 2 | Add background job queue for fan-out + notifications | 🔴 Critical at scale | Medium | Remove write amplification from request path |
-| 3 | Consolidate WebSocket connections (multiplex rooms) | 🟠 High | High | 5-10x reduction in DO instance count |
+| 1 | Narrow the chat push fan-out (skip members active in the room before pushing) | 🔴 Critical at scale | Medium | Cuts the remaining O(N) work per message |
+| 2 | Add background job queue for the deferred publish + push work | 🔴 Critical at scale | Medium | Removes deferred work from the request lifecycle |
+| 3 | Consolidate community sockets further (share one socket across communities) | 🟠 High | High | Lower DO instance count per power user |
 | 4 | Add connection pooling (PgBouncer or external pooler) | 🟠 High | Medium | Prevent connection exhaustion at 1K+ concurrent |
-| 5 | Cache community member list (invalidate on membership change) | 🟡 Medium | Low | Remove O(N) member query per message |
+| 5 | Cache community member/user lists where realtime already invalidates them | 🟡 Medium | Low | Fewer member lookups inside the push fan-out |
 | 6 | Add pagination to /members endpoint | 🟡 Medium | Low | Prevent unbounded responses |
 | 7 | Implement notification archival/cleanup | 🟡 Medium | Low | Prevent unbounded table growth |
 | 8 | Move to Supabase Auth (eliminate custom JWT) | 🟡 Medium | High | Reduce auth code, enable RLS policies |
-| 9 | Add per-endpoint rate limiting | 🟡 Medium | Medium | Prevent brute-force and abuse |
+| 9 | ~~Add per-endpoint rate limiting~~ **Done** | — | — | Login, signup, chat sends, content creation, comments and reactions all have dedicated limits now |
 | 10 | Cache GIPHY responses | 🟢 Low | Low | Reduce external API calls |
-| 11 | Unify realtime systems (web + mobile) | 🟢 Low | Very High | Consistent cross-platform experience |
-| 12 | Add image compression for all upload types | 🟢 Low | Low | Reduce storage and bandwidth costs |
+| 11 | ~~Unify realtime systems (web + mobile)~~ **Done** | — | — | Both clients share the Cloudflare Durable Object worker |
+| 12 | Enforce client compression on every upload route (web + mobile) | 🟢 Low | Low | Reduce storage and bandwidth costs without server-side image processing |
 
 ---
 
@@ -1153,26 +1205,25 @@ The database storage, bandwidth, and compute would exceed any reasonable Supabas
 ## Critical (scale blockers)
 | File | Issue |
 |---|---|
-| `apps/web/lib/realtime/server.ts` | O(N) fan-out per message (loadCommunityMemberUserIds) |
-| `apps/web/lib/notifications.ts` | O(N) notification inserts per community event |
-| `apps/web/app/api/communities/[id]/messages/route.ts` | Synchronous fan-out in request path |
+| `apps/web/lib/push/chat.ts` | O(N) deferred Expo push fan-out per chat message (capped and chunked) |
 | `apps/web/lib/communities/sidebar-server.ts` | Unbounded get_sidebar_activity RPC |
 | `apps/web/lib/supabase/service.ts` | No connection pooling strategy |
+| `apps/web/app/api/communities/[id]/messages/route.ts` | Push + publish run in `after()`, so failures are only logged |
 
 ## High priority
 | File | Issue |
 |---|---|
-| `apps/web/components/communities/panel/useSidebarTyping.ts` | 8 WebSocket connections for typing |
-| `apps/web/components/communities/panel/useSidebarRealtime.ts` | Panel room could be consolidated |
+| `apps/web/components/communities/panel/useSidebarTyping.ts` | Up to 15 community typing subscriptions (room ref-counted, capped) |
+| `apps/web/components/communities/panel/useSidebarRealtime.ts` | Up to 15 community chat sockets; shareable across communities |
 | `apps/web/app/api/communities/[id]/members/route.ts` | No pagination |
-| `apps/web/lib/auth/session.ts` | 15s liveness cache for blocked users |
+| `apps/web/lib/auth/session.ts` | 15s liveness cache for blocked users (`lib/auth/user-status-cache.ts`) |
 
 ## Medium priority
 | File | Issue |
 |---|---|
 | `apps/web/app/api/giphy/route.ts` | No response caching |
 | `apps/web/lib/r2.ts` | No upload size validation at SDK level |
-| `apps/web/app/api/communities/[id]/[feature]/[itemId]/comments/route.ts` | N+1 author lookups |
+| `apps/web/app/api/communities/[id]/threads/[threadId]/comments/route.ts` | N+1 author lookups (same pattern in resources/events/showcase comment routes) |
 
 ---
 
@@ -1210,8 +1261,8 @@ Performance-focused PostgreSQL functions that do complex joins/aggregations in t
 | # | RPC/Table | Operation | Risk |
 |---|---|---|---|
 | 1 | `get_sidebar_activity` | Aggregates across ALL user communities | 🔴 Unbounded |
-| 2 | `notifyCommunityMembers` | SELECT all members + bulk INSERT | 🔴 O(N) |
-| 3 | `loadCommunityMemberUserIds` | SELECT all member IDs | 🔴 O(N) per message |
+| 2 | `sendChatMessagePush` | Chunked member/preference/token SELECTs + Expo push | 🔴 O(N), deferred and capped |
+| 3 | `get_sidebar_activity` + sidebar chat subscriptions | Sidebar RPC + ≤15 live community sockets | 🟠 Bounded by the cap |
 | 4 | `get_community_message_page` | Complex multi-join RPC | 🟡 Complex but bounded |
 | 5 | `get_home_feed_page` | Cross-community feed query | 🟡 Complex |
 | 6 | `get_thread_list_page` | Thread list with aggregates | 🟡 Complex |
@@ -1222,8 +1273,8 @@ Performance-focused PostgreSQL functions that do complex joins/aggregations in t
 
 ---
 
-*Report generated by infrastructure audit on 2026-08-31.*
-*All file paths are relative to `/Users/sachin/Documents/GitHub/uxcommunity/`.*
+*Report generated by infrastructure audit on 2026-08-31; structure re-verified 2026-09-26.*
+*All file paths are relative to the repository root.*
 *ESTIMATE = based on code analysis and reasonable assumptions.*
 *FACT = directly observable from source code.*
 *ASSUMPTION = explicitly noted when code does not provide evidence.*

@@ -107,15 +107,15 @@ export function useNotifications(userId: string) {
     };
   }, [fetchNotifications]);
 
-  // Catch up when the tab returns after a real absence — the realtime channel
-  // is suspended while hidden, so notifications created during that window
-  // would otherwise be missed until the next 30s refetch.
+  // Catch up when the tab returns after a real absence — the realtime room is
+  // unsubscribed while hidden, so notifications created during that window
+  // would otherwise be missed until the next fetch after the 30s stale window.
   useHiddenCatchUp(() => void fetchNotifications(true).catch(() => {}));
 
   // Instantly sync every hook instance (sidebar badge, notifications page):
   // when one instance patches the shared cache (mark read, realtime event,
   // refetch), the others re-read it immediately instead of waiting on the
-  // realtime worker or the next 30s refetch.
+  // realtime worker or a later fetch that clears the 30s stale window.
   useEffect(() => {
     return subscribeToRequest(
       "/api/notifications",

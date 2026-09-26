@@ -14,7 +14,7 @@ const DEFAULT_HIDDEN_THRESHOLD_MS = 5_000;
  * Fires `onReturn` when the tab becomes visible/focused again after being
  * hidden for at least `thresholdMs`.
  *
- * Realtime channels are suspended while the tab is hidden (see
+ * Realtime subscriptions are suspended while the tab is hidden (see
  * useDocumentVisible) and the Cloudflare rooms don't replay missed events on
  * reconnect, so components need a refetch to catch up after an absence. This
  * hook throttles that to genuine away periods instead of firing a request on

@@ -6,8 +6,9 @@ name: CI
 # unit test could reach production unnoticed.
 #
 # Jobs are deliberately separate so a failure names the broken concern.
-# TypeScript and the unit tests are blocking; ESLint is advisory until the
-# pre-existing ruleset debt is cleared (see the note on the lint job).
+# TypeScript, the unit tests and the comment audit are blocking; ESLint is
+# advisory until the pre-existing ruleset debt is cleared (see the note on the
+# lint job).
 on:
   pull_request:
   push:
@@ -63,6 +64,26 @@ jobs:
           FILES=$(find . \( -name node_modules -o -name .next -o -name .open-next \) -prune -o -name '*.test.ts' -print | sort)
           echo "running $(( $(echo "$FILES" | wc -l) )) test files"
           npx tsx --tsconfig tsconfig.json --test $FILES
+
+  comments:
+    name: Comment audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No install step: the audit reads tracked files with Node builtins only,
+      # so it costs a few seconds and cannot be blocked by a dependency problem.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Blocking. Comments are the one artefact nothing else checks: a moved
+      # file, a renamed symbol, or a doc block left above the wrong helper is
+      # invisible to tsc and to ESLint. Every rule is provable against the
+      # working tree, so a failure is always real. Exemptions live in
+      # scripts/comment-audit.allow.json and must carry a reason.
+      - name: Audit comments
+        run: node scripts/audit-comments.mjs
 
   lint:
     name: ESLint (advisory)

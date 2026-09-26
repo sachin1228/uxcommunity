@@ -19,25 +19,6 @@ import {
 import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import { goingPreview, toGoingEntries } from "./going-list";
 
-/**
- * The "Event" section of the community info card, for an event's group chat.
- *
- * A room's members are not the same list as the people going to its event: the
- * room is where they talk, the RSVPs are who is coming. This section answers the
- * two questions the chat itself can't — what the event is (when, where, how
- * full) and who is going — without making the reader leave the room (see
- * /api/communities/[id]/event, which resolves that answer server-side).
- *
- * Rendered by CommunityRightSidebar, between Members and About, and only for
- * communities of type `event`: every other community answers null here and
- * draws nothing.
- *
- * The card ends with the door back out of the room: the event's own page, the
- * one the home feed's event card opens (/dashboard/events/[eventId]), where the
- * full description, the discussion and the Join chat row live. The room is the
- * conversation about the event, not the event itself.
- */
-
 const REQUEST_STALE_MS = 60_000;
 /** Rows in the going list before it becomes a count. */
 const VISIBLE_GOING = 6;
@@ -187,6 +168,24 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
   );
 }
 
+/**
+ * The "Event" section of the community info card, for an event's group chat.
+ *
+ * A room's members are not the same list as the people going to its event: the
+ * room is where they talk, the RSVPs are who is coming. This section answers the
+ * two questions the chat itself can't — what the event is (when, where, how
+ * full) and who is going — without making the reader leave the room (see
+ * /api/communities/[id]/event, which resolves that answer server-side).
+ *
+ * Rendered by CommunityRightSidebar, between Members and About, and only for
+ * communities of type `event`: every other community answers null here and
+ * draws nothing.
+ *
+ * The card ends with the door back out of the room: the event's own page, the
+ * one the home feed's event card opens (/dashboard/events/[eventId]), where the
+ * full description, the discussion and the Join chat row live. The room is the
+ * conversation about the event, not the event itself.
+ */
 export function EventRoomSection({
   communityId,
   currentUserId,
