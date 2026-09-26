@@ -50,7 +50,7 @@ export interface VideoActivity {
 /**
  * Media intake for the "Share your work" composer.
  *
- * Images keep the existing flow (client-side WebP compression + moderated
+ * Images keep the existing flow (client-side WebP compression + validated
  * upload). Videos are PLAIN FILE UPLOADS:
  *
  *   analyzing → uploading → ready

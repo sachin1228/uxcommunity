@@ -1,11 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { extensionForMime } from "@/lib/image-utils";
+import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
-import { validateAndModerateImage } from "@/lib/moderation/image";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
 import { rateLimit } from "@/lib/auth/rate-limit";
 
 const MAX_BYTES = 3 * 1024 * 1024;
@@ -15,7 +11,7 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
  * POST /api/signup/picture
  *
  * First real step of the welcome signup sequence when a profile picture was
- * chosen: moderate the image and upload it to R2. The returned avatar_url is
+ * chosen: validate the image and upload it to R2. The returned avatar_url is
  * then passed to /api/signup/avatar (which only accepts URLs that live on our
  * own R2 bucket) when the account is created.
  */
@@ -50,17 +46,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Image must be under 3 MB." }, { status: 422 });
   }
 
-  const db = createServiceClient();
-  const moderation = await validateAndModerateImage(file);
-  await logModerationDecision(db, { contentType: "image_upload", decision: moderation.decision });
-  if (!moderation.decision.allowed || !moderation.buffer) {
-    return moderationFailureResponse(moderation.decision);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const storedMime = detectImageMime(buffer);
+  if (!storedMime) {
+    return NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 });
   }
 
-  const storedMime = moderation.mime ?? file.type;
   const key = `avatars/pending/${randomUUID()}.${extensionForMime(storedMime)}`;
   try {
-    const avatarUrl = await uploadToR2(key, moderation.buffer, storedMime);
+    const avatarUrl = await uploadToR2(key, buffer, storedMime);
     return NextResponse.json({ success: true, avatar_url: avatarUrl });
   } catch (error) {
     console.error("[signup/picture] R2 upload error:", error);

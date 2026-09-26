@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { moderateText } from "@/lib/moderation/text";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique } from "@/lib/r2";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
-import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
@@ -181,13 +177,6 @@ export async function PATCH(
 
   if (!title || title.length > THREAD_TITLE_MAX_LENGTH) return NextResponse.json({ error: `Title is required and must be ${THREAD_TITLE_MAX_LENGTH} characters or fewer.` }, { status: 422 });
   if (!CATEGORIES.has(category) || !tags || !links || !attachments || !normalizedPoll) return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
-
-  const text = title;
-  const decision = await moderateText({ content: text, contentType: "post", userId });
-  if (!decision.allowed) {
-    await logModerationDecision(db, { userId, contentType: "post", contentHash: contentHash(text), decision });
-    return moderationFailureResponse(decision);
-  }
 
   const { data: updated, error } = await db
     .from("community_threads")

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { moderateText } from "@/lib/moderation/text";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
-import { contentHash } from "@/lib/moderation/normalize";
 import type { Database } from "@/lib/supabase/database.types";
 
 export async function GET() {
@@ -73,15 +69,6 @@ export async function PATCH(request: NextRequest) {
     if (!trimmed) {
       return NextResponse.json({ error: "Name cannot be empty." }, { status: 422 });
     }
-    const decision = await moderateText({ content: trimmed, contentType: "username", userId });
-    await logModerationDecision(db, {
-      userId,
-      contentType: "username",
-      contentHash: contentHash(trimmed),
-      decision,
-    });
-    if (!decision.allowed) return moderationFailureResponse(decision);
-
     const { error } = await db.from("users").update({ name: trimmed }).eq("id", userId);
     if (error) {
       console.error("[profile PATCH] name update error:", error);
@@ -93,16 +80,6 @@ export async function PATCH(request: NextRequest) {
   const profilePatch: Database["public"]["Tables"]["designer_profiles"]["Update"] = {};
   if (typeof body.bio === "string") {
     const bio = body.bio.trim();
-    if (bio) {
-      const decision = await moderateText({ content: bio, contentType: "user_bio", userId });
-      await logModerationDecision(db, {
-        userId,
-        contentType: "user_bio",
-        contentHash: contentHash(bio),
-        decision,
-      });
-      if (!decision.allowed) return moderationFailureResponse(decision);
-    }
     profilePatch.bio = bio || null;
   }
   if (typeof body.linkedin_url === "string") profilePatch.linkedin_url = body.linkedin_url.trim() || null;

@@ -21,7 +21,6 @@
     "@jsquash/webp": "^1.5.0",
     "@lottiefiles/dotlottie-react": "^0.19.16",
     "@supabase/supabase-js": "^2.45.4",
-    "@types/three": "^0.185.4",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "@uxcommunity/shared": "*",
@@ -35,7 +34,6 @@
     "react-dom": "^18.3.1",
     "react-truncate-markup": "^5.1.2",
     "resend": "^4.0.0",
-    "three": "^0.185.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -82,7 +82,6 @@ User (Mobile/Expo)
 | Rate Limiting | Upstash Redis | Upstash | Request throttling |
 | Email | Resend | Resend | Transactional email |
 | Image Processing | Sharp (server) + Canvas API (client) | Application | Image compression |
-| Moderation | NudeNet (external service) | External | Image moderation |
 | GIF Search | GIPHY API | GIPHY | GIF search |
 | Validation | Zod | Application | Input validation |
 
@@ -225,11 +224,10 @@ Total: 1 HTTP, 3 DB queries
 1. Client-side: compressChatImageClient() → Canvas API (0 HTTP)
 2. POST /api/communities/[id]/messages/upload
    → DB: 1 SELECT (membership check)
-   → External: image moderation service → 1 HTTP POST
    → Storage: R2 PutObject → 1 S3 API call
    → DB: 1 INSERT (message with image_url)
    → Realtime: 1 publish (same as G)
-Total: 1 HTTP (client), 1 external HTTP (moderation), 1 R2 write, 3 DB queries
+Total: 1 HTTP (client), 1 R2 write, 3 DB queries
 ```
 
 ## L. Notifications
@@ -551,7 +549,7 @@ All mobile API calls go through `lib/api.ts` which wraps `fetch()` with session 
 ## Upload Flow
 1. **Client compression**: `compressChatImageClient()` → Canvas → WebP, max 1200×1200, quality 0.65
 2. **Upload**: POST multipart to `/api/communities/[id]/messages/upload`
-3. **Server**: Membership check → moderation service → R2 PutObject → INSERT with image_url
+3. **Server**: Membership check → image validation → R2 PutObject → INSERT with image_url
 4. **R2 public URL**: `https://pub-xxxx.r2.dev/<key>`
 
 ## Storage Locations
@@ -992,9 +990,8 @@ The provided Vercel dashboard data shows:
 ## Potential Security Issues
 1. **No CSRF protection**: The app relies on SameSite=Lax cookies + JWT. No CSRF tokens. LOW RISK because Lax prevents cross-site POST.
 2. **No request signing on /publish**: The realtime publish endpoint uses a static secret header. If leaked, anyone can inject events.
-3. **Image moderation fallback**: If the moderation service is down, images are allowed after local validation only (MIME check + size check). This is documented as intentional.
-4. **No brute-force protection on login**: Rate limiting is global (20/10s burst), not endpoint-specific. An attacker could try 20 passwords per 10 seconds.
-5. **Admin credentials in env vars**: `ADMIN_EMAIL` and `ADMIN_PASSWORD` are environment variables, not a separate auth system.
+3. **No brute-force protection on login**: Rate limiting is global (20/10s burst), not endpoint-specific. An attacker could try 20 passwords per 10 seconds.
+4. **Admin credentials in env vars**: `ADMIN_EMAIL` and `ADMIN_PASSWORD` are environment variables, not a separate auth system.
 
 ---
 
@@ -1022,7 +1019,7 @@ The provided Vercel dashboard data shows:
 ## 🟠 HIGH
 
 ### 4. No Background Job Processing
-- **Problem**: Notifications, moderation logging, and fan-out all happen synchronously in the API request path. The `after()` helper defers notification delivery but still executes within the request lifecycle.
+- **Problem**: Notifications and fan-out all happen synchronously in the API request path. The `after()` helper defers notification delivery but still executes within the request lifecycle.
 - **Impact**: Long API response times for write operations
 - **Scale at which it matters**: 10K+ users with active communities
 

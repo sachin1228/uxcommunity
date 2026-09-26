@@ -14,6 +14,4 @@ export const realtimeRooms = {
   resourceComments: (resourceId: string) => `resource-comments:${resourceId}`,
   showcase: (postId: string) => `showcase:${postId}`,
   rules: (communityId: string) => `rules:${communityId}`,
-  /** 3D designer studio — one shared room for everyone. */
-  designers: () => "designers-studio",
 } as const;

@@ -3,7 +3,7 @@
  * tokenizer / matcher logic is unit-testable with `tsx --test`.
  *
  * Storage contract: a message's text keeps the raw `@Name` token (so copy,
- * search, moderation, sidebar previews and the mobile client see plain text),
+ * search, sidebar previews and the mobile client see plain text),
  * while `community_messages.mentions` stores `{ user_id, name }[]` for the
  * members actually mentioned (authoritative at send time). Rendering and
  * send-time resolution both scan the text against those records.

@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
-import { extensionForMime } from "@/lib/image-utils";
+import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { MASTER_IMAGE_LOOKUPS } from "@/lib/r2-cleanup";
-import { validateAndModerateImage } from "@/lib/moderation/image";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
 import { loadCommunityReadModel } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
@@ -159,15 +156,14 @@ export async function PATCH(
     if (file.size > MAX_IMAGE_BYTES) {
       return NextResponse.json({ error: "Community picture must be under 10 MB." }, { status: 422 });
     }
-    const moderation = await validateAndModerateImage(file);
-    await logModerationDecision(db, { userId, contentType: "image_upload", decision: moderation.decision });
-    if (!moderation.decision.allowed || !moderation.buffer) {
-      return moderationFailureResponse(moderation.decision);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const storedMime = detectImageMime(buffer);
+    if (!storedMime) {
+      return NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 });
     }
     try {
-      const storedMime = moderation.mime ?? file.type;
       const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
-      imageUrlResult = await uploadToR2(key, moderation.buffer, storedMime);
+      imageUrlResult = await uploadToR2(key, buffer, storedMime);
     } catch (err) {
       console.error("[community-settings] image upload failed:", err);
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });

@@ -31,7 +31,6 @@
     "test:preview-text": "tsx --test apps/web/lib/communities/preview-text.test.ts",
     "test:comment-tree": "tsx --test apps/web/lib/communities/comment-tree.test.ts",
     "test:user-color": "tsx --test apps/web/lib/communities/user-color.test.ts",
-    "test:moderation-image": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/moderation/image.test.ts apps/web/lib/moderation/http.test.ts",
     "test:r2-lifecycle": "tsx --test apps/web/lib/r2-lifecycle.test.ts",
     "test:read-manager": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/read-manager.test.ts",
     "test:sidebar-merge": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/panel/sidebar-merge.test.ts",

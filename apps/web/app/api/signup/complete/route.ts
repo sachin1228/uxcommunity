@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { signupStep1Schema } from "@/lib/validations";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { moderateText } from "@/lib/moderation/text";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
-import { contentHash } from "@/lib/moderation/normalize";
 import { recordSignupAttempt } from "@/lib/signup-attempts";
 
 export async function POST(request: NextRequest) {
@@ -40,13 +36,6 @@ export async function POST(request: NextRequest) {
 
   const { name, email, token } = parsed.data;
   const db = createServiceClient();
-  const nameDecision = await moderateText({ content: name, contentType: "username" });
-  await logModerationDecision(db, {
-    contentType: "username",
-    contentHash: contentHash(name),
-    decision: nameDecision,
-  });
-  if (!nameDecision.allowed) return moderationFailureResponse(nameDecision);
 
   const { data: invitation } = await db
     .from("invitations")

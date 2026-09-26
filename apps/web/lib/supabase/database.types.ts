@@ -1371,65 +1371,6 @@ export type Database = {
           },
         ];
       };
-      moderation_events: {
-        Row: {
-          confidence: number;
-          content_hash: string | null;
-          content_ref_id: string | null;
-          content_type: Database["public"]["Enums"]["moderation_content_type"];
-          created_at: string;
-          duration_ms: number;
-          id: string;
-          moderator_notes: string | null;
-          provider: string;
-          reason: string | null;
-          scores: NonNullable<Json>;
-          status: Database["public"]["Enums"]["moderation_status"];
-          triggered_rules: NonNullable<Json>;
-          user_id: string | null;
-        };
-        Insert: {
-          confidence?: number;
-          content_hash?: string | null;
-          content_ref_id?: string | null;
-          content_type: Database["public"]["Enums"]["moderation_content_type"];
-          created_at?: string;
-          duration_ms?: number;
-          id?: string;
-          moderator_notes?: string | null;
-          provider: string;
-          reason?: string | null;
-          scores?: NonNullable<Json>;
-          status: Database["public"]["Enums"]["moderation_status"];
-          triggered_rules?: NonNullable<Json>;
-          user_id?: string | null;
-        };
-        Update: {
-          confidence?: number;
-          content_hash?: string | null;
-          content_ref_id?: string | null;
-          content_type?: Database["public"]["Enums"]["moderation_content_type"];
-          created_at?: string;
-          duration_ms?: number;
-          id?: string;
-          moderator_notes?: string | null;
-          provider?: string;
-          reason?: string | null;
-          scores?: NonNullable<Json>;
-          status?: Database["public"]["Enums"]["moderation_status"];
-          triggered_rules?: NonNullable<Json>;
-          user_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "moderation_events_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       notification_preferences: {
         Row: {
           chat_push_enabled: boolean;
@@ -2575,15 +2516,6 @@ export type Database = {
     };
     Enums: {
       application_status: "pending" | "approved" | "rejected";
-      moderation_content_type:
-        | "chat_message"
-        | "post"
-        | "comment"
-        | "username"
-        | "user_bio"
-        | "community_name"
-        | "image_upload";
-      moderation_status: "approved" | "review" | "rejected";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -2700,16 +2632,6 @@ export const Constants = {
   public: {
     Enums: {
       application_status: ["pending", "approved", "rejected"],
-      moderation_content_type: [
-        "chat_message",
-        "post",
-        "comment",
-        "username",
-        "user_bio",
-        "community_name",
-        "image_upload",
-      ],
-      moderation_status: ["approved", "review", "rejected"],
     },
   },
 } as const;

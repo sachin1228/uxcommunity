@@ -12,7 +12,7 @@ This is a read-only, evidence-based audit of the existing Next.js and Supabase a
 4. Audit frontend consumers for duplicate fetches, cache bypasses, broad invalidations, navigation waterfalls, remounts, and `router.refresh()` use.
 5. Trace Realtime channels and cleanup to identify duplicate subscriptions, leaks, and event-driven refetch amplification.
 6. Trace likes, saves, comments, messages, and event mutations for optimistic updates, races, duplicate calls, and overly broad invalidation.
-7. Trace image uploads through preprocessing, validation, moderation, storage, and database writes.
+7. Trace image uploads through preprocessing, validation, storage, and database writes.
 8. Run available read-only tests, lint, and production build checks, distinguishing measured results from code-derived estimates.
 
 ## Executive summary
@@ -124,16 +124,15 @@ The request proceeds through membership/community lookup, reference/member queri
 **Severity:** Medium to high
 **Evidence:**
 
-- `apps/web/lib/moderation/image.ts`
 - `apps/web/lib/image-utils.ts`
 - community create/update upload flows
 
-The critical path buffers the image, calls remote moderation, writes moderation logs, runs Sharp compression, uploads to storage, and writes database metadata. Large files increase serverless memory usage and timeout exposure.
+The critical path buffers the image, validates it, runs Sharp compression, uploads to storage, and writes database metadata. Large files increase serverless memory usage and timeout exposure.
 
-**Recommendation:** Keep validation and moderation blocking, but move non-critical logging after the response where policy allows. Enforce strict dimensions/bytes before expensive processing, avoid repeated buffering, and consider direct-to-storage uploads with a quarantined state if the security model permits.
+**Recommendation:** Keep validation blocking, but move non-critical work (storage and database writes) after the response where policy allows. Enforce strict dimensions/bytes before expensive processing, avoid repeated buffering, and consider direct-to-storage uploads with a quarantined state if the security model permits.
 
 **Expected improvement:** Lower upload latency and timeout probability.
-**Tradeoff:** Asynchronous processing requires explicit pending/failed states and careful moderation guarantees.
+**Tradeoff:** Asynchronous processing requires explicit pending/failed states and careful validation guarantees.
 
 ## Database recommendations
 
@@ -232,7 +231,7 @@ The largest risks are:
 3. Node-side aggregation of ever-growing interaction row sets.
 4. Unbounded community reaction retrieval.
 5. Synchronous notification fan-out during write requests.
-6. Serverless memory and timeout pressure from synchronous image moderation and transformation.
+6. Serverless memory and timeout pressure from synchronous image validation and transformation.
 
 ## Suggested implementation order
 

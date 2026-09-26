@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { extensionForMime } from "@/lib/image-utils";
+import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, deleteR2AssetIfUnreferenced, uploadToR2 } from "@/lib/r2";
-import { validateAndModerateImage } from "@/lib/moderation/image";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
 
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -45,14 +42,10 @@ export async function POST(request: NextRequest) {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const moderation = await validateAndModerateImage(file);
-  await logModerationDecision(db, {
-    userId,
-    contentType: "image_upload",
-    decision: moderation.decision,
-  });
-  if (!moderation.decision.allowed || !moderation.buffer) {
-    return moderationFailureResponse(moderation.decision);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mime = detectImageMime(buffer);
+  if (!mime) {
+    return NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 });
   }
 
   const { data: currentProfile, error: profileReadError } = await db
@@ -74,12 +67,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to load the current banner." }, { status: 500 });
   }
 
-  const storedMime = moderation.mime ?? file.type;
+  const storedMime = mime;
   const key = `banners/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
 
   let publicUrl: string;
   try {
-    publicUrl = await uploadToR2(key, moderation.buffer, storedMime);
+    publicUrl = await uploadToR2(key, buffer, storedMime);
   } catch (error) {
     console.error("[profile/banner] R2 upload error:", error);
     return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });

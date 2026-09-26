@@ -234,8 +234,8 @@ function normaliseMimeType(raw: string): string {
  * Uses React Native's multipart FormData object format { uri, type, name }.
  * Returns the permanent CDN URL to embed in the message payload.
  *
- * Throws a human-readable Error if the server rejects the image or if the
- * moderation service does not return a URL (e.g. content flagged for review).
+ * Throws a human-readable Error if the server rejects the image or the upload
+ * completes without returning a CDN URL.
  */
 export async function uploadChatImage(
   communityId: string,
@@ -261,8 +261,7 @@ export async function uploadChatImage(
   );
 
   if (!data.url) {
-    // Server returned 2xx but without a URL — happens when moderation flags the
-    // image for review (HTTP 202) or in other partial-success scenarios.
+    // Server returned 2xx but without a URL — the upload could not be stored.
     throw new Error(data.error ?? 'Image could not be uploaded. Please try a different image.');
   }
 

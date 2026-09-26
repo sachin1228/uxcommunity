@@ -8,7 +8,6 @@
  *   GET /api/admin/cities
  *   GET /api/admin/sectors
  *   GET /api/admin/interests
- *   GET /api/admin/moderation
  *   GET /api/admin/tags
  *
  * Write paths (create city/sector/interest) are exercised once in the
@@ -28,7 +27,6 @@ const READ_ENDPOINTS = [
   { name: 'admin/cities',        path: '/api/admin/cities' },
   { name: 'admin/sectors',       path: '/api/admin/sectors' },
   { name: 'admin/interests',     path: '/api/admin/interests' },
-  { name: 'admin/moderation',    path: '/api/admin/moderation?status=pending&page=1' },
   { name: 'admin/tags',          path: '/api/admin/tags' },
 ];
 

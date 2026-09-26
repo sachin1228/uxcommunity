@@ -273,7 +273,7 @@ The stress scenario relaxes the error-rate threshold to 15 % — the goal there 
 | Threads | `/api/communities/:id/threads`, `/api/communities/:id/threads/:id`, `/api/communities/:id/threads/:id/like`, `/api/communities/:id/threads/:id/comments` |
 | Events | `/api/communities/:id/events`, `/api/communities/:id/events/:id`, `/api/communities/:id/events/:id/rsvp`, `/api/communities/:id/events/:id/rsvp/list`, `/api/communities/:id/events/:id/comments` |
 | Profile | `/api/profile`, `/api/profile/interests`, `/api/lottie-settings`, `/api/link-preview` |
-| Admin (read) | `/api/admin/applications`, `/api/admin/users`, `/api/admin/communities`, `/api/admin/cities`, `/api/admin/sectors`, `/api/admin/interests`, `/api/admin/moderation`, `/api/admin/tags` |
+| Admin (read) | `/api/admin/applications`, `/api/admin/users`, `/api/admin/communities`, `/api/admin/cities`, `/api/admin/sectors`, `/api/admin/interests`, `/api/admin/tags` |
 | Chat (deep) | `GET /api/communities/:id/messages` (list + pagination), `POST` (text, reply, burst), `GET /api/communities/:id/messages/:id` (single), `POST /api/communities/:id/messages/:id/reactions` (add, toggle, switch), `DELETE` (soft-delete), `PATCH /api/communities/:id/read` |
 | Admin (write, smoke only) | `POST /api/admin/cities`, `POST /api/admin/interests` |
 
