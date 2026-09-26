@@ -108,9 +108,10 @@ jobs:
           EOF
 
       # Fail the build if any NEXT_PUBLIC_* var the client needs is missing
-      # from the build env — a missing var silently degrades realtime to
-      # polling (no WebSocket ever connects). Check the generated
-      # .env.production.local so the guard sits right before next build.
+      # from the build env — a missing var silently disables realtime (no
+      # WebSocket ever connects, so messages only appear on load/focus).
+      # Check the generated .env.production.local so the guard sits right
+      # before next build.
       - name: Verify client build-time env vars
         working-directory: apps/web
         shell: bash
@@ -125,7 +126,7 @@ jobs:
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "::error::Client bundle would be built without required NEXT_PUBLIC_* vars, so realtime and other client features would silently degrade to polling. Fix wrangler.toml [vars] or the workflow, then re-run."
+            echo "::error::Client bundle would be built without required NEXT_PUBLIC_* vars, so realtime would be silently disabled. Fix wrangler.toml [vars] or the workflow, then re-run."
             exit 1
           fi
 

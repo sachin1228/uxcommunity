@@ -110,7 +110,7 @@ create index if not exists push_throttle_window_idx
 -- ------------------------------------------------------------
 -- Unread totals for the app icon badge
 --
--- Mirrors `get_community_sidebar_activity`'s unread definition
+-- Mirrors `get_sidebar_activity`'s unread definition
 -- exactly (own messages excluded, everything since joined_at or
 -- last_read_at, whichever is later) so the icon badge can never
 -- disagree with the count the member sees in the app. Takes a list of

@@ -75,8 +75,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
     };
   }, [fetchFeed, refreshToken]);
 
-  // Refetch when returning after a real absence (no realtime channel keeps the
-  // feed current); brief alt-tabs no longer fire a request each.
+  // Refetch when returning after a real absence (no realtime subscription keeps
+  // the feed current); brief alt-tabs no longer fire a request each.
   useHiddenCatchUp(() => void fetchFeed(true));
 
   /**

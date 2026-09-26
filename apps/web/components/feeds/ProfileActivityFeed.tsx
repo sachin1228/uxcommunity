@@ -131,7 +131,7 @@ function ProfileActivityScope({
     return () => window.clearTimeout(initialFetch);
   }, [fetchItems]);
 
-  // The profile has no realtime channel; long absences miss nothing here but
+  // The profile has no realtime subscription; long absences miss nothing here but
   // short ones do (a save made in another window), so refetch on return.
   useHiddenCatchUp(() => void fetchItems(true));
 

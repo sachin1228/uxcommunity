@@ -174,9 +174,9 @@ API_SECRET=<any value — must match the web app's>
 
 The worker uses `API_URL` + `API_SECRET` for its internal membership checks, so both files must agree on `API_SECRET` as well.
 
-> The worker verifies WebSocket handshakes with the same JWT the web app signs. If `SESSION_SECRET` differs between the two files, the worker rejects every connection with a silent 401 and all realtime features fall back to polling.
+> The worker verifies WebSocket handshakes with the same JWT the web app signs. If `SESSION_SECRET` differs between the two files, the worker rejects every connection with a silent 401: nothing arrives live, and chat/notifications only catch up on load, focus, or the next sidebar fetch.
 
-**Troubleshooting:** if messages, typing, and reactions only update with a delay (polling), the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
+**Troubleshooting:** if messages, typing, and reactions only appear after a reload or tab focus, the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
 
 In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `apps/web/wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
 

@@ -114,7 +114,7 @@ User (Mobile/Expo)
 - ❌ Cron Jobs (only Vercel keep-warm cron)
 - ✅ WebSockets (Cloudflare Durable Objects)
 - ❌ Server-Sent Events
-- ❌ Polling (typing sweep timers are local-only, no API calls)
+- ⚠️ Polling (only the sidebar when a user has more communities than the 15 live-socket cap; everything else catches up on reconnect/focus)
 - ❌ Webhooks (no inbound webhooks)
 
 ---
@@ -306,10 +306,12 @@ Total: 1 HTTP, 0 DB queries
 | 13 | `notifications:${userId}` | `lib/use-notifications.ts` | Dashboard mount | Logout | ✅ unsubscribes (user socket) |
 | 14 | `profile:${userId}` | reserved in `lib/realtime/rooms.ts` | — | — | no current subscriber |
 
-Note: `presence:${cid}` and `typing:${cid}` still exist as helper names in
-`lib/realtime/rooms.ts`, but the live hooks above use the community's `chat:${cid}`
-room (presence via `onPresence`, typing via the `typing` topic), so they do not create
-additional sockets.
+Note: the live hooks above use the community's `chat:${cid}` room (presence via
+`onPresence`, typing via the `typing` topic) instead of dedicated per-feature rooms,
+so they do not create additional sockets. `realtimeRooms.presence()` remains in
+`lib/realtime/rooms.ts` as an unused helper name; the server still understands
+`presence:` rooms (`apps/realtime/__tests__/room-routing.test.ts`), but no web hook
+subscribes to one today.
 
 **Sockets, not rooms, are the unit of connection**: `realtimeClient` multiplexes every
 room over a per-community socket (or the single user socket for `notifications:*` /

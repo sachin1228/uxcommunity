@@ -203,7 +203,7 @@ export async function PATCH(
   if (chatCommunityId) {
     // The room's own members are looking at the Event card beside their chat,
     // not at the event page the edit was made on — the same row goes out on
-    // the room's events channel so that card follows the change.
+    // the room's events topic so that card follows the change.
     announcements.push({ room: realtimeRooms.events(chatCommunityId), topic: "event", data });
   }
   void publishRealtimeBatch(announcements);

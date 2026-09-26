@@ -274,7 +274,8 @@ export async function POST(
   // ── Realtime publish after the response is sent ─────────────────────────
   // Publish ONE event to the community chat room. Connected clients receive it
   // directly. Sidebar state is derived client-side from chat events.
-  // Fire-and-forget: missed events are corrected by the client's next poll/catch-up.
+  // Fire-and-forget: missed events are corrected by the client's next catch-up
+  // fetch (reconnect, tab return) or the next message-page load.
   // sender_name rides along on the event: without it every receiving client
   // rendered "Someone: …" in the sidebar preview (and an anonymous sender row
   // in the chat) until its per-user profile fetch round-tripped — the
