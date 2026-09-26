@@ -78,8 +78,11 @@ set joined_at = now() - interval '10 days',
 where community_id = (select community_a from fixture_membership)
   and user_id = (select viewer_id from fixture_membership);
 
+-- Community A enables ONLY the threads area (no events, no resources).
+-- 'chat' has to stay in the array: communities_enabled_tabs_check requires
+-- `'chat' = any(enabled_tabs)`, so a threads-only value cannot be stored.
 update public.communities
-set enabled_tabs = '{threads}',
+set enabled_tabs = '{chat,threads}',
     showcase_enabled = true
 where id = (select community_a from fixture_membership);
 
@@ -108,16 +111,19 @@ from public.community_messages m
 where m.community_id = (select community_a from fixture_membership)
   and m.content = 'newest message';
 
-insert into public.community_threads (community_id, user_id, title, created_at)
+-- `category` is NOT NULL with no default on community_threads.
+insert into public.community_threads (community_id, user_id, title, category, created_at)
 values ((select community_a from fixture_membership), (select author_id from fixture_author),
-        'unread thread', now() - interval '90 minutes');
+        'unread thread', 'discussion', now() - interval '90 minutes');
 
 -- A resource is deliberately newer than the thread: community A has only the
 -- threads area enabled, so it must not raise the unread content count or take
 -- over last_content.
-insert into public.community_resources (community_id, user_id, title, created_at)
+-- `resource_type` and `url` are NOT NULL with no defaults on community_resources.
+insert into public.community_resources (community_id, user_id, title, resource_type, url, created_at)
 values ((select community_a from fixture_membership), (select author_id from fixture_author),
-        'ignored resource', now() - interval '80 minutes');
+        'ignored resource', 'article', 'https://example.test/ignored-resource',
+        now() - interval '80 minutes');
 
 -- ─── Community B: archived membership with an unread message ────────────────
 

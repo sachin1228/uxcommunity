@@ -95,6 +95,23 @@ cp apps/web/.env.example apps/web/.env.local
 npm run dev
 ```
 
+### SQL tests
+
+`supabase/tests/*.test.sql` are pgTAP files. Run them against a local database
+built from the **whole migration history** — not from `supabase/schema.sql`
+alone, which is a partial snapshot and is missing constraints that later
+migrations add, so a fixture can look green locally and fail in the SQL editor:
+
+```bash
+bash supabase/tests/run-local.sh                      # every test file
+bash supabase/tests/run-local.sh supabase/tests/sidebar_scan_bounds.test.sql
+```
+
+The script boots a throwaway PostgreSQL in `/tmp` (unix socket only, no Docker,
+no Supabase CLI, nothing left behind), applies `schema.sql` and every migration
+in order, and reports each assertion. See the header of the script for the limits
+of the pgTAP stand-ins and the Supabase-only objects it cannot create.
+
 Open **http://localhost:3000**.
 
 ### Realtime locally (chat, typing indicator, reactions)
