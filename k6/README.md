@@ -7,9 +7,12 @@ Performance and stress tests for the UX Community API, written with [k6](https:/
 ```
 k6/
 ├── config.js               # Shared options, thresholds, base URL
+├── lib/
+│   └── fixture.js          # Shape + validation rules for generated test users
 ├── utils/
 │   ├── auth.js             # Login / logout helpers
-│   └── checks.js           # Reusable check factories
+│   ├── checks.js           # Reusable check factories
+│   └── test-users.js       # Loads the local, gitignored seeded-user fixture
 ├── tests/                  # Domain-specific test modules (imported by scenarios)
 │   ├── 01_public_data.js   # GET /api/data/* and /api/giphy
 │   ├── 02_auth.js          # login, logout, me, reset-request
@@ -71,8 +74,73 @@ winget install k6 --source winget
 | `TEST_COMMUNITY_ID` | Yes* | UUID of a community the test user belongs to |
 | `TEST_THREAD_ID` | No | UUID of an existing thread (used for read-only thread tests when no creation is desired) |
 | `TEST_EVENT_ID` | No | UUID of an existing event |
+| `SESSION_SECRET` | Seeding only | JWT signing secret of the target environment. Must match it, otherwise the seeded sessions are rejected |
+| `SUPABASE_URL` | Seeding only | Supabase project URL used by `npm run k6:seed` / `npm run k6:cleanup` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Seeding only | Service-role key; server-side only, never exposed to clients |
+| `K6_USER_COUNT` | No | How many seeded users to create (default: 200) |
+| `K6_USER_PASSWORD` | No | Password for the seeded users. Reused from the local fixture or generated when omitted |
+| `K6_USER_PREFIX` | No | Email prefix for seeded users (default: `k6user`) |
+| `CONCURRENT_VUS`, `FLOOD_VUS`, `FLOOD_DURATION` | No | VU counts / duration for the seeded-user chat scenarios |
 
-> \* Required for authenticated test groups; tests will still run and report 404/401 if omitted.
+> \* Required for authenticated test groups. Scenarios that need a real account
+> (e.g. `smoke`) stop with an explicit `<VAR> is not set` message instead of
+> logging in with a placeholder; the seeded-user chat scenarios stop with the
+> exact command that generates the fixture. Never commit values for any of
+> these — no credential material belongs in the repository.
+
+---
+
+## Test users and generated fixtures
+
+Credentials are **never committed**. Everything in `k6/data/` except
+`.gitkeep` is gitignored (see the `k6/data/*` rule in `.gitignore`), and
+`npm run test:k6-fixtures` fails if any credential material is tracked under
+`k6/`.
+
+Two kinds of users are involved:
+
+| Kind | Where it comes from | Used by |
+|---|---|---|
+| **Your accounts** (`TEST_USER_EMAIL`, `ADMIN_EMAIL`, …) | env vars you export locally | `smoke`, `load`, `stress`, `soak`, `chat_load` |
+| **Seeded users** (`k6user_NNNN@k6test.invalid`) | `npm run k6:seed` → `k6/data/test-users.json` | `chat_concurrent`, `chat_flood` |
+
+### Seeded users (for the concurrent chat and flood scenarios)
+
+```bash
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+TEST_COMMUNITY_ID=<community-uuid> \
+SESSION_SECRET=<same secret as the target environment> \
+K6_USER_COUNT=500 \
+K6_USER_PASSWORD=<pick a throwaway password> \
+  npm run k6:seed
+```
+
+What the seeder does:
+
+- creates `k6user_NNNN@k6test.invalid` users plus `designer_profiles` rows and
+  community memberships (idempotent — existing users are reused);
+- signs a 7-day session JWT per user with `SESSION_SECRET`, exactly like the app
+  does on login (`apps/web/lib/auth/session.ts`), and writes it to the local,
+  **untracked** `k6/data/test-users.json`;
+- refuses to run if `k6/data/test-users.json` would not be gitignored;
+- validates every record before writing, so the file can never contain an empty
+  password or token.
+
+`K6_USER_PASSWORD` is optional: when you omit it the seeder reuses the password
+recorded in the existing local fixture, or generates a random one for this run.
+There is no default password in the repository.
+
+Sessions only work against an environment whose `SESSION_SECRET` matches the one
+you seeded with — a locally signed JWT is **not** a Supabase Auth session.
+
+Remove the users and the fixture when you are done:
+
+```bash
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+  npm run k6:cleanup
+```
 
 ---
 
@@ -80,33 +148,50 @@ winget install k6 --source winget
 
 Always run the **smoke test first** to confirm the app is up and all routes respond before applying heavy load.
 
+Export your own test accounts once per shell — these are real accounts on the
+environment you are testing, so keep them out of git (there is no committed
+default):
+
+```bash
+export BASE_URL=https://your-app.example
+export TEST_COMMUNITY_ID=<community-uuid>
+export TEST_USER_EMAIL=member@example.com      # an approved member you control
+export TEST_USER_PASSWORD='<member-password>'  # never commit this
+export ADMIN_EMAIL=admin@example.com           # smoke / admin tests only
+export ADMIN_PASSWORD='<admin-password>'       # never commit this
+```
+
+Every scenario also accepts the same values as `-e KEY=value` flags. Missing
+values surface as explicit `✗ MISSING` / `ERROR:` messages rather than a silent
+404 or 401.
+
 ### Smoke test
 ```bash
 k6 run k6/scenarios/smoke.js \
-  -e BASE_URL=https://app.uxcommunity.in \
-  -e ADMIN_EMAIL=admin@uxcommunity.in \
-  -e ADMIN_PASSWORD=sachingalaxy1228@ \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e BASE_URL="$BASE_URL" \
+  -e ADMIN_EMAIL="$ADMIN_EMAIL" \
+  -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  -e TEST_USER_EMAIL="$TEST_USER_EMAIL" \
+  -e TEST_USER_PASSWORD="$TEST_USER_PASSWORD" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID"
 ```
 
 ### Load test (steady-state)
 ```bash
 k6 run k6/scenarios/load.js \
-  -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e BASE_URL="$BASE_URL" \
+  -e TEST_USER_EMAIL="$TEST_USER_EMAIL" \
+  -e TEST_USER_PASSWORD="$TEST_USER_PASSWORD" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID"
 ```
 
 ### Stress test (spike to 200 VUs)
 ```bash
 k6 run k6/scenarios/stress.js \
-  -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e BASE_URL="$BASE_URL" \
+  -e TEST_USER_EMAIL="$TEST_USER_EMAIL" \
+  -e TEST_USER_PASSWORD="$TEST_USER_PASSWORD" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID"
 ```
 
 ### Concurrent chat with thousands of distinct users
@@ -114,13 +199,12 @@ k6 run k6/scenarios/stress.js \
 This is the big one. Each VU logs in as a **different real user**, so rate
 limits don't interfere across VUs.
 
-**Step 1 — seed users into your DB (run once):**
+**Step 1 — seed users into your DB (run once):** see
+[Seeded users](#seeded-users-for-the-concurrent-chat-and-flood-scenarios) above,
+or in short:
+
 ```bash
-SUPABASE_URL=https://xxx.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJ... \
-TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859 \
-K6_USER_COUNT=500 \
-node k6/scripts/seed-users.js
+K6_USER_COUNT=500 npm run k6:seed
 ```
 
 This creates 500 users with profiles + community membership and writes
@@ -129,8 +213,8 @@ This creates 500 users with profiles + community membership and writes
 **Step 2 — run the concurrent chat scenario:**
 ```bash
 k6 run k6/scenarios/chat_concurrent.js \
-  -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859 \
+  -e BASE_URL="$BASE_URL" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID" \
   -e CONCURRENT_VUS=500
 ```
 
@@ -138,31 +222,27 @@ Each VU: login → poll messages → send message → reply (40%) → react → 
 
 Custom metrics tracked: `chat_messages_sent`, `chat_rate_limit_hits`, `chat_reactions_sent`, `chat_message_send_ms`, `chat_poll_ms`.
 
-**Step 3 — clean up after testing:**
-```bash
-SUPABASE_URL=https://xxx.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJ... \
-node k6/scripts/cleanup-users.js
-```
+**Step 3 — clean up after testing:** `npm run k6:cleanup`
+(deletes the `@k6test.invalid` users and the local fixture).
 
 ---
 
 ### Chat load test (20 VUs steady + 100 VU spike)
 ```bash
 k6 run k6/scenarios/chat_load.js \
-  -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=member@example.com \
-  -e TEST_USER_PASSWORD=your-user-password \
-  -e TEST_COMMUNITY_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  -e BASE_URL="$BASE_URL" \
+  -e TEST_USER_EMAIL="$TEST_USER_EMAIL" \
+  -e TEST_USER_PASSWORD="$TEST_USER_PASSWORD" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID"
 ```
 
 ### Soak test (30 minutes)
 ```bash
 k6 run k6/scenarios/soak.js \
-  -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e BASE_URL="$BASE_URL" \
+  -e TEST_USER_EMAIL="$TEST_USER_EMAIL" \
+  -e TEST_USER_PASSWORD="$TEST_USER_PASSWORD" \
+  -e TEST_COMMUNITY_ID="$TEST_COMMUNITY_ID"
 ```
 
 ---
@@ -199,8 +279,34 @@ The stress scenario relaxes the error-rate threshold to 15 % — the goal there 
 
 ---
 
+## Verifying the fixture plumbing
+
+```bash
+npm run test:k6-fixtures    # shape/validation rules + "no credentials tracked" guards
+npm run k6:seed             # writes k6/data/test-users.json (untracked)
+k6 inspect k6/scenarios/chat_concurrent.js   # proves the scenarios can load it
+```
+
+The unit test needs no network, database, or k6 binary. Running a scenario that
+uses seeded users without the fixture fails with the exact command to fix it:
+
+```
+k6/data/test-users.json was not found.
+Generate it locally with: npm run k6:seed
+  Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TEST_COMMUNITY_ID, SESSION_SECRET
+  SESSION_SECRET must match the target environment so the generated
+  sessions are accepted there.
+```
+
+---
+
 ## Notes
 
+- **Generated fixtures are secrets** — `k6/data/test-users.json` holds plaintext
+  passwords and valid session cookies for the seeded `@k6test.invalid` users on
+  the environment you seeded into. Keep it local, and `npm run k6:cleanup` when
+  you are done. If such a file was ever committed, treat those sessions as
+  leaked: delete the users and rotate the environment's `SESSION_SECRET`.
 - **Rate-limited endpoints** (`/api/auth/login`, `/api/applications`, `/api/auth/reset-request`) intentionally accept `429 Too Many Requests` as a passing response — the limiter working correctly is the expected behaviour under load.
 - **Upload endpoints** (`/api/profile/avatar`, `/api/admin/upload`, `/api/communities/:id/messages/upload`, etc.) are not covered here — multipart file upload with realistic payloads is out of scope for API stress tests.
 - **Destructive admin operations** (approve/reject application, block user, delete user) are excluded from load and stress scenarios to avoid corrupting test data.

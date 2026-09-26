@@ -7,12 +7,15 @@
  * serving user_rsvped:false, so the button reverted after refresh.
  *
  * Uses a k6 seed test user (avatar temporarily set so login succeeds, then
- * restored). Env vars are read but never printed.
+ * restored). The password is never hardcoded: it comes from K6_USER_PASSWORD,
+ * the local gitignored k6 fixture, or a throwaway value generated for this run.
+ * Env vars are read but never printed.
  *
  * Run from repo root:  node k6/scripts/rsvp-regression-test.mjs
  */
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,8 +47,28 @@ if (!SB_URL || !SB_KEY) {
 }
 const db = createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
 
-const EMAIL = "k6user_01@k6test.invalid";
-const PASSWORD = "K6testPass123!";
+// A k6 seed user (see k6/README.md). Email and password are resolved from the
+// environment or the local gitignored fixture — no credential lives in git.
+const PREFIX = process.env.K6_USER_PREFIX || "k6user";
+const EMAIL = process.env.K6_RSVP_TEST_EMAIL || `${PREFIX}_0001@k6test.invalid`;
+
+function readFixturePassword(email) {
+  try {
+    const users = JSON.parse(readFileSync(path.join(ROOT, "k6/data/test-users.json"), "utf8"));
+    if (!Array.isArray(users)) return null;
+    const match = users.find(
+      (user) => user && user.email === email && typeof user.password === "string" && user.password,
+    );
+    return match ? match.password : null;
+  } catch {
+    return null;
+  }
+}
+
+const PASSWORD =
+  process.env.K6_USER_PASSWORD ||
+  readFixturePassword(EMAIL) ||
+  randomBytes(18).toString("base64url");
 
 let failures = 0;
 function check(name, ok, detail = "") {
@@ -68,7 +91,11 @@ async function waitForServer(proc) {
 
 async function main() {
   // ── Fixture: make sure the test user can log in (avatar is required) ──
-  let { data: user } = await db.from("users").select("id").eq("email", EMAIL).maybeSingle();
+  let { data: user } = await db
+    .from("users")
+    .select("id, password_hash")
+    .eq("email", EMAIL)
+    .maybeSingle();
   let createdUser = false;
   if (!user) {
     const bcrypt = (await import("bcryptjs")).default;
@@ -81,6 +108,26 @@ async function main() {
     if (error) throw new Error(`cannot create test user: ${error.message}`);
     user = data;
     createdUser = true;
+  } else {
+    // The account already exists, so make the resolved password work for it
+    // rather than assuming a committed one. Only ever touch @k6test.invalid.
+    const bcrypt = (await import("bcryptjs")).default;
+    const matches = user.password_hash
+      ? await bcrypt.compare(PASSWORD, user.password_hash)
+      : false;
+    if (!matches) {
+      if (!EMAIL.endsWith("@k6test.invalid")) {
+        throw new Error(
+          `${EMAIL} exists but its password does not match the resolved k6 password.\n` +
+          "  Set K6_USER_PASSWORD to that account's password, or point K6_RSVP_TEST_EMAIL at a seeded k6 user.",
+        );
+      }
+      const { error } = await db
+        .from("users")
+        .update({ password_hash: await bcrypt.hash(PASSWORD, 10) })
+        .eq("id", user.id);
+      if (error) throw new Error(`cannot re-hash test user password: ${error.message}`);
+    }
   }
   const userId = user.id;
 

@@ -45,7 +45,7 @@ export default function LoadTestPage() {
   const [floodVus,       setFloodVus]       = useState(500);
   const [floodDuration,  setFloodDuration]  = useState("3m");
   const [testUserEmail,  setTestUserEmail]  = useState("k6user001@k6test.invalid");
-  const [testUserPass,   setTestUserPass]   = useState("K6testPass123!");
+  const [testUserPass,   setTestUserPass]   = useState("");
   const [adminEmail,     setAdminEmail]     = useState("");
   const [adminPass,      setAdminPass]      = useState("");
 
@@ -295,7 +295,7 @@ export default function LoadTestPage() {
                       label="Test User Password"
                       value={testUserPass}
                       onChange={setTestUserPass}
-                      placeholder="K6testPass123!"
+                      placeholder="Password used when seeding the users"
                     />
                     <Field
                       label="Admin Email"
