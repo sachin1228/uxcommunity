@@ -83,7 +83,12 @@ async function connectBatch(
   const conns: Array<{ ws: WebSocket; messages: any[]; close: () => void }> = [];
   for (let i = 0; i < count; i++) {
     const token = await createToken(`${prefix}_${i}`);
-    const conn = connectWs(`user:${prefix}_${i}`, token);
+    // Each subscriber connects to the COMMUNITY room it is measuring.
+    // Connecting to `user:${id}` (as an earlier revision did, back when the
+    // worker fanned a publish out over per-user rooms) attaches the socket to
+    // a Durable Object the community publish never targets, so the test would
+    // silently measure zero deliveries.
+    const conn = connectWs(room, token);
     conns.push(conn);
     await waitForOpen(conn.ws);
     conn.ws.send(JSON.stringify({

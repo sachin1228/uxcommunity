@@ -1,215 +1,233 @@
 /**
- * Synthetic subscriber index benchmark — tests the dual-index data structure
- * directly without WebSocket connections.
+ * Subscriber index benchmark — measures the CommunityDO's topic index directly
+ * through real WebSocket subscribers and asserts exact recipient counts.
  *
- * Verifies:
- *   1. subscriptionsByTopic.get("chat") does not scan unrelated users
- *   2. O(1) lookup time
- *   3. O(active subscribers) broadcast preparation
- *   4. 10K and 100K subscription scale
+ * WHAT WAS WRONG
+ *   The previous revision populated the "index" by having each synthetic user
+ *   open a socket to `user:${userId}` and then send `subscribe { room: "chat:…" }`.
+ *   Those subscriptions land in that user's UserDO — a different Durable Object
+ *   than the one `chat:…` publishes target — so the benchmark measured an index
+ *   nobody publishes to, `/publish` delivered to nothing, and nothing was
+ *   asserted. It also reported the HTTP `/publish` round-trip as if it measured
+ *   fan-out; since `/publish` now enqueues the fan-out in `ctx.waitUntil()`,
+ *   that number is an ack, not a delivery.
+ *
+ * WHAT IT MEASURES NOW
+ *   1. head-to-head index sizes — 10K vs 100K indexed subscription refs — with
+ *      the SAME 100 active chat recipients, so the only variable is index size;
+ *   2. that a publish reaches exactly those 100 recipients (no full scan, no
+ *      cross-topic delivery), asserted from client receipt AND from the DO's own
+ *      `deliverAttempts` counter;
+ *   3. end-to-end delivery latency for both, which is the number that would
+ *      blow up if lookup were O(index) instead of O(1) + O(recipients).
  *
  * Run: npx vitest run __tests__/perf-index-benchmark.test.ts --reporter=verbose
  */
 
-import { describe, it, beforeAll, afterAll } from "vitest";
-import { unstable_dev } from "wrangler";
-import type { UnstableDevWorker } from "wrangler";
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import {
+  startHarness,
+  type Harness,
+  type Conn,
+  sleep,
+  measureDeliveries,
+  countForeignEvents,
+  measureFanout,
+  percentile,
+} from "./helpers/realtime-harness";
 
-const devVars = readFileSync(resolve(__dirname, "../.dev.vars"), "utf-8");
-const vars = Object.fromEntries(
-  devVars.split("\n").filter(Boolean).map((l) => {
-    const [k, ...v] = l.split("=");
-    return [k.trim(), v.join("=").trim()];
-  })
-);
-const PUBLISH_SECRET = vars.REALTIME_PUBLISH_SECRET;
-
-let worker: UnstableDevWorker;
-let baseUrl: string;
+let harness: Harness;
 
 beforeAll(async () => {
-  worker = await unstable_dev("src/index.ts", {
-    configPath: "wrangler.toml",
-    experimentalExcludeMiniflareV1: true,
-
-  });
-  baseUrl = `http://127.0.0.1:${worker.port}`;
+  harness = await startHarness();
 }, 30_000);
 
 afterAll(async () => {
-  await worker?.stop();
+  await harness?.stop();
 });
 
-/**
- * Populate a CommunityDO with N subscriptions by subscribing users via HTTP publish.
- * Since HTTP publish bypasses the subscriber index (it uses fetch-based broadcast),
- * we instead populate the subscriber index by calling the /publish endpoint N times
- * and relying on the CommunityDO's internal state.
- *
- * Actually, HTTP publish doesn't populate the subscriber index — it broadcasts
- * directly via stub.fetch. To populate the index, we need users to subscribe.
- *
- * For the synthetic benchmark, we'll test the CommunityDO directly by creating
- * many user DOs that subscribe to the same community. This is the only way
- * to populate the dual-index subscriber store.
- */
-async function populateSubscriptions(
-  communityId: string,
-  count: number,
-  topic: string,
-): Promise<number> {
-  const { SignJWT } = await import("jose");
-  const secret = new TextEncoder().encode(vars.SESSION_SECRET);
+// ── Benchmark parameters ────────────────────────────────────────────────────
 
-  let subscribed = 0;
-  // Batch in groups of 50 to avoid overwhelming miniflare
-  const BATCH = 50;
-  for (let batch = 0; batch < count; batch += BATCH) {
-    const end = Math.min(batch + BATCH, count);
-    const promises: Promise<void>[] = [];
+const SOCKETS = 500;
+const ACTIVE_CHAT = 100;
+const PUBLISH_CYCLES = 10;
+const CHAT_TOPIC = "chat";
+const bulkTopic = (j: number) => `bulk_${j}`;
 
-    for (let i = batch; i < end; i++) {
-      const userId = `idx_user_${i}`;
-      const token = await new SignJWT({ userId })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .sign(secret);
+interface BenchResult {
+  room: string;
+  indexRefs: number;
+  indexedTopics: number;
+  recipients: number;
+  delivered: number;
+  duplicates: number;
+  leaked: number;
+  attempts: number;
+  /** `false` if a DO instance replacement landed inside the measurement window. */
+  sameInstance: boolean;
+  instanceIds: string;
+  setupMs: number;
+  publishMs: number;
+  httpLatencies: number[];
+  deliveryLatencies: number[];
+}
 
-      const wsUrl = `${baseUrl}/ws?room=user:${encodeURIComponent(userId)}&token=${token}`;
-      const WebSocket = (await import("ws")).default;
-      const ws = new WebSocket(wsUrl);
-      const messages: any[] = [];
+async function runBenchmark(
+  prefix: string,
+  room: string,
+  topicsPerSocket: number,
+  refTimeoutMs: number,
+): Promise<BenchResult> {
+  const setupStart = performance.now();
+  const conns: Conn[] = [];
 
-      const p = new Promise<void>((resolve) => {
-        ws.on("message", (data) => {
-          try { messages.push(JSON.parse(String(data))); } catch { /* ignore */ }
-        });
-        ws.on("open", () => {
-          ws.send(JSON.stringify({
-            t: "join", user: { id: userId, name: `U${i}`, avatar: null },
-          }));
-          // Wait for hello, then subscribe
-          const checkHello = setInterval(() => {
-            if (messages.some((m) => m.t === "hello")) {
-              clearInterval(checkHello);
-              ws.send(JSON.stringify({ t: "subscribe", room: `chat:${communityId}`, topic }));
-              // Wait for subscribe ack or timeout, then close
-              setTimeout(() => {
-                try { ws.close(); } catch { /* ignore */ }
-                resolve();
-              }, 200);
-            }
-          }, 50);
-          // Timeout safety
-          setTimeout(() => {
-            try { ws.close(); } catch { /* ignore */ }
-            resolve();
-          }, 5000);
-        });
-        ws.on("error", () => resolve());
-      });
-      promises.push(p);
-    }
-
-    await Promise.all(promises);
-    subscribed += end - batch;
-    process.stdout.write(`  Populated ${subscribed}/${count} subscriptions\r`);
+  for (let i = 0; i < SOCKETS; i++) {
+    const conn = await harness.connect(room, `${prefix}_${i}`);
+    const isChatSubscriber = i < ACTIVE_CHAT;
+    if (isChatSubscriber) harness.subscribe(conn, room, CHAT_TOPIC);
+    const bulkCount = topicsPerSocket - (isChatSubscriber ? 1 : 0);
+    for (let j = 0; j < bulkCount; j++) harness.subscribe(conn, room, bulkTopic(j));
+    conns.push(conn);
   }
-  console.log(`  Populated ${subscribed}/${count} subscriptions`);
-  return subscribed;
+
+  const expectedRefs = SOCKETS * topicsPerSocket;
+  const ready = await harness.waitForRefs(room, expectedRefs, refTimeoutMs);
+  // Let the coalesced presence flush settle so it cannot pollute the metrics delta.
+  await sleep(1000);
+  const setupMs = performance.now() - setupStart;
+
+  const chatSubscribers = conns.slice(0, ACTIVE_CHAT);
+  const otherSockets = conns.slice(ACTIVE_CHAT);
+
+  const httpLatencies: number[] = [];
+
+  // All cycles publish inside ONE tight measurement window (baseline → publish
+  // cycles → counters), then arrivals are sampled. Reading the counters after a
+  // long gap is a different measurement: they belong to a DO instance, and a
+  // replacement reports a delta of 0 for a fan-out that did happen.
+  const win = await measureFanout(harness, room, CHAT_TOPIC, async (publish) => {
+    for (let cycle = 0; cycle < PUBLISH_CYCLES; cycle++) {
+      const { status, ms } = await publish({ cycle });
+      httpLatencies.push(ms);
+      expect(status).toBe(200);
+      await sleep(300);
+    }
+  });
+  const publishMs = win.publishedAt[win.publishedAt.length - 1] - win.publishedAt[0];
+
+  const deliveryLatencies: number[] = [];
+  let delivered = 0;
+  let duplicates = 0;
+  let leaked = 0;
+  for (let cycle = 0; cycle < PUBLISH_CYCLES; cycle++) {
+    const report = measureDeliveries(
+      chatSubscribers,
+      (m) => m.data?._run === win.runTag && m.data?.cycle === cycle,
+      win.publishedAt[cycle],
+    );
+    delivered += report.delivered;
+    duplicates += report.duplicates;
+    leaked += countForeignEvents(
+      otherSockets,
+      (m) => m.data?._run === win.runTag && m.data?.cycle === cycle,
+    );
+    deliveryLatencies.push(...report.latencies);
+  }
+
+  const attempts = win.attempts;
+  const sameInstance = win.sameInstance;
+  const instanceIds = `${win.before.instanceId} → ${win.after.instanceId}`;
+
+  for (const conn of conns) conn.close();
+  await sleep(500);
+
+  return {
+    room,
+    indexRefs: ready.subscriptionRefs,
+    indexedTopics: ready.topics ?? 0,
+    recipients: ACTIVE_CHAT,
+    delivered,
+    duplicates,
+    leaked,
+    attempts,
+    sameInstance,
+    instanceIds,
+    setupMs,
+    publishMs,
+    httpLatencies,
+    deliveryLatencies,
+  };
+}
+
+function reportBenchmark(label: string, r: BenchResult, expectedRefs: number): void {
+  const sortLat = [...r.deliveryLatencies].sort((a, b) => a - b);
+  const sortHttp = [...r.httpLatencies].sort((a, b) => a - b);
+  console.log("\n═══════════════════════════════════════════════════════════");
+  console.log(`  ${label}`);
+  console.log("═══════════════════════════════════════════════════════════");
+  console.log(`  Room: ${r.room}`);
+  console.log(`  Live sockets: ${SOCKETS}   Topics per socket: ${expectedRefs / SOCKETS}`);
+  console.log(`  Indexed subscriptions: ${r.indexRefs}/${expectedRefs} across ${r.indexedTopics} topics`);
+  console.log(`  Setup (connect + subscribe + index build): ${r.setupMs.toFixed(0)}ms`);
+  console.log(`  Active chat recipients: ${r.recipients}`);
+  console.log(`  Publish cycles: ${PUBLISH_CYCLES}`);
+  console.log(
+    `  Delivered: ${r.delivered}/${r.recipients * PUBLISH_CYCLES}  duplicates: ${r.duplicates}  leaked: ${r.leaked}`,
+  );
+  console.log(
+    `  DO deliverAttempts: ${r.attempts} (exactly ${r.recipients} per publish, no full-room scan)`,
+  );
+  console.log(
+    `  DO instance across the measurement window: ${r.instanceIds} (one instance: ${r.sameInstance})`,
+  );
+  console.log(
+    `  End-to-end delivery latency: P50=${percentile(sortLat, 50).toFixed(1)}ms  P95=${percentile(sortLat, 95).toFixed(1)}ms  max=${(sortLat[sortLat.length - 1] ?? 0).toFixed(1)}ms`,
+  );
+  console.log(
+    `  HTTP /publish ack latency:    P50=${percentile(sortHttp, 50).toFixed(1)}ms  P95=${percentile(sortHttp, 95).toFixed(1)}ms`,
+  );
+  console.log("═══════════════════════════════════════════════════════════");
 }
 
 // ============================================================================
-// BENCHMARK 1: 10K subscriptions, 100 active chat subscribers
+// BENCHMARK 1: 10K subscription refs, 100 active chat recipients
 // ============================================================================
 
 describe("Index benchmark: 10K subscriptions", () => {
-  it("10K subscriptions in index, 100 active chat subscribers", async () => {
-    const TOTAL_SUBS = 10_000;
-    const ACTIVE_CHAT = 100;
-    const communityId = "bench_10k";
+  it("10K indexed subscriptions, 100 active chat recipients", async () => {
+    const expectedRefs = 10_000;
+    const result = await runBenchmark("idx10k", "chat:bench_10k", expectedRefs / SOCKETS, 120_000);
+    reportBenchmark("Index benchmark: 10K subscription refs, 100 active chat", result, expectedRefs);
 
-    console.log("\n═══════════════════════════════════════════════════════════");
-    console.log("  Index benchmark: 10K subscriptions, 100 active chat");
-    console.log("═══════════════════════════════════════════════════════════");
-
-    const populateStart = performance.now();
-    await populateSubscriptions(communityId, TOTAL_SUBS, "chat");
-    const populateMs = performance.now() - populateStart;
-    console.log(`  Populate time: ${populateMs.toFixed(0)}ms`);
-
-    // Measure publish latency — the CommunityDO does:
-    //   1. O(1) lookup: subscriptionsByTopic.get("chat") → Set of userIds
-    //   2. O(N) broadcast: iterate ctx.getWebSockets(), send via ws.send() for each
-    const publishTs = performance.now();
-    const httpStart = performance.now();
-    await fetch(`${baseUrl}/publish`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-realtime-publish-secret": PUBLISH_SECRET,
-      },
-      body: JSON.stringify({
-        room: `chat:${communityId}`,
-        topic: "chat",
-        data: { seq: 1, ts: publishTs },
-      }),
-    });
-    const httpLatency = performance.now() - httpStart;
-    const totalLatency = performance.now() - publishTs;
-
-    console.log(`  HTTP /publish response: ${httpLatency.toFixed(1)}ms`);
-    console.log(`  Total publish cycle: ${totalLatency.toFixed(1)}ms`);
-    console.log(`  Subscriber lookup: O(1) via subscriptionsByTopic.get("chat")`);
-    console.log(`  Broadcast: O(${ACTIVE_CHAT}) — only active subscribers`);
-    console.log(`  Index size: ${TOTAL_SUBS} subscriptions across all topics`);
-    console.log("═══════════════════════════════════════════════════════════\n");
-  }, 300_000);
+    expect(result.indexRefs).toBe(expectedRefs);
+    expect(result.delivered).toBe(ACTIVE_CHAT * PUBLISH_CYCLES);
+    expect(result.duplicates).toBe(0);
+    expect(result.leaked).toBe(0);
+    expect(result.attempts).toBe(ACTIVE_CHAT * PUBLISH_CYCLES);
+    expect(result.sameInstance).toBe(true);
+  }, 600_000);
 });
 
 // ============================================================================
-// BENCHMARK 2: 100K subscriptions, 1K active chat subscribers
+// BENCHMARK 2: 100K subscription refs, 100 active chat recipients
 // ============================================================================
 
 describe("Index benchmark: 100K subscriptions", () => {
-  it("100K subscriptions in index, 1K active chat subscribers", async () => {
-    const TOTAL_SUBS = 100_000;
-    const communityId = "bench_100k";
+  it("100K indexed subscriptions, same 100 active chat recipients", async () => {
+    const expectedRefs = 100_000;
+    const result = await runBenchmark("idx100k", "chat:bench_100k", expectedRefs / SOCKETS, 300_000);
+    reportBenchmark("Index benchmark: 100K subscription refs, 100 active chat", result, expectedRefs);
 
-    console.log("\n═══════════════════════════════════════════════════════════");
-    console.log("  Index benchmark: 100K subscriptions, 1K active chat");
-    console.log("═══════════════════════════════════════════════════════════");
+    expect(result.indexRefs).toBe(expectedRefs);
+    expect(result.delivered).toBe(ACTIVE_CHAT * PUBLISH_CYCLES);
+    expect(result.duplicates).toBe(0);
+    expect(result.leaked).toBe(0);
+    expect(result.attempts).toBe(ACTIVE_CHAT * PUBLISH_CYCLES);
+    expect(result.sameInstance).toBe(true);
 
-    const populateStart = performance.now();
-    await populateSubscriptions(communityId, TOTAL_SUBS, "chat");
-    const populateMs = performance.now() - populateStart;
-    console.log(`  Populate time: ${populateMs.toFixed(0)}ms`);
-
-    const publishTs = performance.now();
-    const httpStart = performance.now();
-    await fetch(`${baseUrl}/publish`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-realtime-publish-secret": PUBLISH_SECRET,
-      },
-      body: JSON.stringify({
-        room: `chat:${communityId}`,
-        topic: "chat",
-        data: { seq: 1, ts: publishTs },
-      }),
-    });
-    const httpLatency = performance.now() - httpStart;
-    const totalLatency = performance.now() - publishTs;
-
-    console.log(`  HTTP /publish response: ${httpLatency.toFixed(1)}ms`);
-    console.log(`  Total publish cycle: ${totalLatency.toFixed(1)}ms`);
-    console.log(`  Subscriber lookup: O(1)`);
-    console.log(`  Broadcast: O(${TOTAL_SUBS}) — only active subscribers`);
-    console.log(`  Index size: ${TOTAL_SUBS} subscriptions`);
-    console.log("═══════════════════════════════════════════════════════════\n");
-  }, 600_000);
+    // Tripwire, not a target: if lookup or fan-out were proportional to the
+    // 100K index instead of its 100 recipients, one publish would take seconds.
+    const sorted = [...result.deliveryLatencies].sort((a, b) => a - b);
+    expect(percentile(sorted, 50)).toBeLessThan(2000);
+  }, 900_000);
 });

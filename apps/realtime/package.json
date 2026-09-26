@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "dry-run": "wrangler deploy --dry-run --outdir dist",
     "test": "vitest run",
-    "test:ws": "vitest run __tests__/ws-ownership.test.ts --reporter=verbose"
+    "test:ws": "vitest run __tests__/ws-ownership.test.ts --reporter=verbose",
+    "test:perf": "vitest run __tests__/perf-duplicates.test.ts __tests__/perf-light.test.ts __tests__/perf-latency-burst.test.ts __tests__/perf-hot-communities.test.ts __tests__/perf-large-index.test.ts __tests__/perf-index-benchmark.test.ts __tests__/perf-fanout-final.test.ts __tests__/performance.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
     "jose": "^6.2.9"
