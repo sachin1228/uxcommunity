@@ -1,11 +1,8 @@
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { extensionForMime } from "@/lib/image-utils";
+import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
-import { moderateImageBuffer } from "@/lib/moderation/image";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
 import { createServerTimer } from "@/lib/server-timing";
 
 const MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB raw upload limit
@@ -75,34 +72,19 @@ export async function POST(
     return finish(NextResponse.json({ error: "Failed to read image." }, { status: 422 }));
   }
 
-  // The client compresses the image to WebP before upload; moderation is the
-  // only remaining server-side step and gates the R2 write.
-  const moderation = await timer.measure("moderation_request", () => moderateImageBuffer(source, file.type));
-
-  const moderationDecision = moderation.decision;
-  after(async () => {
-    try {
-      await logModerationDecision(createServiceClient(), {
-        userId,
-        contentType: "image_upload",
-        decision: moderationDecision,
-      });
-    } catch (error) {
-      console.error("[chat-image-upload] deferred moderation audit failed:", error);
-    }
-  });
-
-  if (!moderation.decision.allowed || !moderation.buffer) {
-    return finish(moderationFailureResponse(moderation.decision));
+  // The client compresses the image to WebP before upload; sniffing the file
+  // signature is the only remaining server-side step before the R2 write.
+  const storedMime = detectImageMime(source);
+  if (!storedMime) {
+    return finish(NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 }));
   }
-  const storedMime = moderation.mime ?? file.type;
-  timer.record("output_bytes", moderation.buffer.byteLength);
+  timer.record("output_bytes", source.byteLength);
 
   const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
 
   try {
     const url = await timer.measure("r2_upload", () =>
-      uploadToR2(key, moderation.buffer!, storedMime),
+      uploadToR2(key, source, storedMime),
     );
 
     if (typeof url !== "string" || !url.trim()) {

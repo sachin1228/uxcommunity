@@ -73,7 +73,7 @@ export const completeSignupSchema = z.object({
   profile: signupStep2Schema,
   token: z.string().min(1).optional(),
   avatar_source: z.literal("upload").optional(),
-  // Picture pre-uploaded via /api/signup/picture (moderated + on R2).
+  // Picture pre-uploaded via /api/signup/picture (validated + on R2).
   avatar_url: z.string().url().optional(),
 });
 

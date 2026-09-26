@@ -67,7 +67,7 @@ export async function POST(
     let storedSize: number;
 
     if (isImage) {
-      // Images are compressed client-side; store the moderated bytes as-is.
+      // Images are compressed client-side; store the uploaded bytes as-is.
       body = Buffer.from(await file.arrayBuffer());
       contentType = file.type;
       key = `threads/${communityId}/${session.userId}/${slug}.${extensionForMime(file.type)}`;

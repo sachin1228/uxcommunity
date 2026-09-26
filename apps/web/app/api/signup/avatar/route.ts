@@ -3,13 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { sendWelcomeEmail } from "@/lib/email";
-import { extensionForMime } from "@/lib/image-utils";
+import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
-import { validateAndModerateImage } from "@/lib/moderation/image";
-import { moderateText } from "@/lib/moderation/text";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
-import { contentHash } from "@/lib/moderation/normalize";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
@@ -91,15 +86,8 @@ export async function POST(request: NextRequest) {
   }
 
   const db = createServiceClient();
-  const nameDecision = await moderateText({ content: identity.name, contentType: "username" });
-  await logModerationDecision(db, {
-    contentType: "username",
-    contentHash: contentHash(identity.name),
-    decision: nameDecision,
-  });
-  if (!nameDecision.allowed) return moderationFailureResponse(nameDecision);
 
-  // A picture uploaded earlier via /api/signup/picture (already moderated)
+  // A picture uploaded earlier via /api/signup/picture (already validated)
   // skips the file path below.
   let profilePictureUrl: string | null = preUploadedUrl;
   let uploadedKey: string | null = file
@@ -116,16 +104,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Image must be under 3 MB." }, { status: 422 });
     }
 
-    const moderation = await validateAndModerateImage(file);
-    await logModerationDecision(db, { contentType: "image_upload", decision: moderation.decision });
-    if (!moderation.decision.allowed || !moderation.buffer) {
-      return moderationFailureResponse(moderation.decision);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const storedMime = detectImageMime(buffer);
+    if (!storedMime) {
+      return NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 });
     }
 
-    const storedMime = moderation.mime ?? file.type;
     uploadedKey = `avatars/pending/${randomUUID()}.${extensionForMime(storedMime)}`;
     try {
-      profilePictureUrl = await uploadToR2(uploadedKey, moderation.buffer, storedMime);
+      profilePictureUrl = await uploadToR2(uploadedKey, buffer, storedMime);
     } catch (error) {
       console.error("[signup/avatar] R2 upload error:", error);
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });

@@ -2,11 +2,8 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { extensionForMime } from "@/lib/image-utils";
+import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
-import { validateAndModerateImage } from "@/lib/moderation/image";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
@@ -86,20 +83,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Community picture must be under 10 MB." }, { status: 422 });
     }
 
-    const moderation = await validateAndModerateImage(file);
-    await logModerationDecision(db, {
-      userId,
-      contentType: "image_upload",
-      decision: moderation.decision,
-    });
-    if (!moderation.decision.allowed || !moderation.buffer) {
-      return moderationFailureResponse(moderation.decision);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const storedMime = detectImageMime(buffer);
+    if (!storedMime) {
+      return NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 });
     }
 
     try {
-      const storedMime = moderation.mime ?? file.type;
       const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
-      imageUrl = await uploadToR2(key, moderation.buffer, storedMime);
+      imageUrl = await uploadToR2(key, buffer, storedMime);
     } catch (err) {
       console.error("[community-create] image upload failed:", err);
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });

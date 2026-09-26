@@ -44,7 +44,6 @@ These columns are `on delete set null` so history is not silently rewritten:
 | Column | Effect |
 | --- | --- |
 | `communities.owner_id` | **was the bug** — see below |
-| `moderation_events.user_id` | moderation record keeps its verdict |
 | `notifications.actor_id` | notification survives its actor |
 | `community_join_requests.decided_by` | who approved/declined is lost, the request is not |
 | `community_admin_permissions.granted_by` | grant survives, granter does not |

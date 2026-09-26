@@ -3,10 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { moderateText } from "@/lib/moderation/text";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
-import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityThreads } from "@/lib/communities/read-models";
@@ -244,18 +240,6 @@ export async function POST(
     return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
   }
 
-  const text = title;
-  const decision = await moderateText({ content: text, contentType: "post", userId });
-  if (!decision.allowed) {
-    await logModerationDecision(db, {
-      userId,
-      contentType: "post",
-      contentHash: contentHash(text),
-      decision,
-    });
-    return moderationFailureResponse(decision);
-  }
-
   const { data: inserted, error } = await db
     .from("community_threads")
     .insert({
@@ -298,14 +282,6 @@ export async function POST(
       data: contentEventPayload(inserted as Record<string, unknown>, "thread"),
     },
   ]);
-
-  await logModerationDecision(db, {
-    userId,
-    contentType: "post",
-    contentRefId: inserted.id,
-    contentHash: contentHash(text),
-    decision,
-  });
 
   const enriched = (await withAuthorAndLikes(db, [inserted as Record<string, unknown>], userId))[0];
   return NextResponse.json({ thread: enriched }, { status: 201 });

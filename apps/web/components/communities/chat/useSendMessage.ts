@@ -445,16 +445,6 @@ export function useSendMessage({
 
         // Sent successfully — clear retry data
         failedRetryDataRef.current.delete(tempId);
-      } else if (res.status === 202) {
-        setMessages((prev) => {
-          const next = prev.filter((m) => m.id !== tempId);
-          msgCache.set(communityId, next);
-          return next;
-        });
-        rollbackSidebar();
-
-        setError(data.error ?? "Your message has been sent for moderator review.");
-        failedRetryDataRef.current.delete(tempId);
       } else {
         setMessages((prev) => {
           const next = prev.map((m) =>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, ShieldCheck, Gauge, UserX } from "lucide-react";
+import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -101,20 +101,6 @@ export function AdminSidebar() {
       >
         <MessagesSquare strokeWidth={2.5} size={16} className={active("/admin/communities") ? "text-accent" : ""} />
         Communities
-      </Link>
-
-      {/* Moderation */}
-      <Link
-        href="/admin/moderation"
-        onClick={() => setPendingHref("/admin/moderation")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
-          active("/admin/moderation")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
-        }`}
-      >
-        <ShieldCheck strokeWidth={2.5} size={16} className={active("/admin/moderation") ? "text-accent" : ""} />
-        Moderation
       </Link>
 
       {/* Tools */}

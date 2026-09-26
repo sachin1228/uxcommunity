@@ -3,7 +3,7 @@ import type { Env } from "./env";
 
 /**
  * User Durable Object — ONE per user. Owns the single client WebSocket
- * for user-scoped rooms (notifications, designers-studio).
+ * for user-scoped rooms (notifications).
  *
  * Community-scoped rooms (chat, threads, events, resources, showcase, rules)
  * are handled by CommunityDO directly — 0 RPCs.

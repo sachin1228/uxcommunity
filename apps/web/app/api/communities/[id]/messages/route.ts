@@ -3,11 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityMessagePage } from "@/lib/communities/read-models";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { moderateText } from "@/lib/moderation/text";
-import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
-import { moderationFailureResponse } from "@/lib/moderation/http";
-import { logModerationDecision } from "@/lib/moderation/log";
-import { contentHash } from "@/lib/moderation/normalize";
 import { publishChatEvent } from "@/lib/realtime/server";
 import { contentTableFor } from "@/lib/communities/content-tables";
 import { sendChatMessagePush } from "@/lib/push/chat";
@@ -95,8 +90,8 @@ export async function POST(
   const [rateResult, membershipResult, senderProfileResult] = await Promise.all([
     timer.measure("rate_limits", () =>
       Promise.all([
-        rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
-        rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
+        rateLimit(`chat:send:${userId}:10s`, 5, 10),
+        rateLimit(`chat:send:${userId}:60s`, 20, 60),
       ]),
     ),
     timer.measure("membership_query", async () =>
@@ -107,7 +102,7 @@ export async function POST(
         .eq("user_id", userId)
         .maybeSingle(),
     ),
-    // Sender display info for the realtime payload (see Phase 4 below).
+    // Sender display info for the realtime payload published below.
     timer.measure("sender_profile", async () =>
       await Promise.all([
         db.from("users").select("name").eq("id", userId).maybeSingle(),
@@ -190,23 +185,6 @@ export async function POST(
 
   // Mentions only make sense when there is text to mention someone in.
   if (!content) mentionUserIds = [];
-
-  // ── Phase 1: synchronous local-rules check (<1 ms) ───────────────────────
-  // This is the only blocking moderation gate. It catches clear-cut violations
-  // (phishing, spam links, banned keywords) before the DB insert so malicious
-  // content never lands in the database at all.
-  const localDecision = content
-    ? moderateWithLocalTextRules({ content, contentType: "chat_message", userId })
-    : null;
-  if (localDecision && !localDecision.allowed) {
-    await logModerationDecision(db, {
-      userId,
-      contentType: "chat_message",
-      contentHash: contentHash(content),
-      decision: localDecision,
-    });
-    return moderationFailureResponse(localDecision);
-  }
 
   // Validate reply_to_id belongs to this community (if provided)
   if (reply_to_id) {
@@ -293,53 +271,7 @@ export async function POST(
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
 
-  // ── Phase 2: AI moderation after the response is sent ────────────────────
-  // `after()` runs the callback once the HTTP response has been flushed,
-  // keeping POST latency to <100 ms even when the AI provider is slow.
-  // If the AI rejects the message it is soft-deleted via a Realtime UPDATE,
-  // which the existing UPDATE handler in useRealtimeChat already processes.
-  if (content) {
-    const capturedId      = inserted.id;
-    const capturedContent = content;
-    const capturedUserId  = userId;
-    after(async () => {
-      try {
-        const aiDecision = await moderateText({
-          content: capturedContent,
-          contentType: "chat_message",
-          userId: capturedUserId,
-        });
-        if (!aiDecision.allowed) {
-          // Soft-delete triggers a Realtime message-delete → client removes the bubble.
-          const moderationDb = createServiceClient();
-          const deletedAt = new Date().toISOString();
-          await Promise.all([
-            moderationDb
-              .from("community_messages")
-              .update({ deleted_at: deletedAt })
-              .eq("id", capturedId),
-            logModerationDecision(moderationDb, {
-              userId: capturedUserId,
-              contentType: "chat_message",
-              contentRefId: capturedId,
-              contentHash: contentHash(capturedContent),
-              decision: aiDecision,
-            }),
-          ]);
-          // Propagate the soft-delete to the community chat room.
-          await publishChatEvent({
-            communityId,
-            topic: "message-delete",
-            data: { id: capturedId, deleted_at: deletedAt },
-          });
-        }
-      } catch (err) {
-        console.error("[POST message] after() AI moderation error:", err);
-      }
-    });
-  }
-
-  // ── Phase 4: realtime publish after the response is sent ──────────────────
+  // ── Realtime publish after the response is sent ─────────────────────────
   // Publish ONE event to the community chat room. Connected clients receive it
   // directly. Sidebar state is derived client-side from chat events.
   // Fire-and-forget: missed events are corrected by the client's next poll/catch-up.
@@ -391,11 +323,6 @@ export async function POST(
       // Wake every other member's device. Realtime only reaches an app that is
       // running — once the OS suspends it the socket dies — so background
       // delivery has to go through Expo's push service.
-      //
-      // The local text rules already ran synchronously before the insert, so a
-      // push can only reach a message that passed moderation; the slower AI
-      // pass is the one that runs later, and it is rare enough that a stale
-      // notification beats delaying every message behind an AI call.
       await sendChatMessagePush({
         communityId,
         messageId: inserted.id,

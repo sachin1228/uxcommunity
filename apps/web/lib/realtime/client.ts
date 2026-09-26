@@ -100,7 +100,7 @@ interface ConnectionState {
  *
  * Manages multiple WebSockets:
  *   - One per active community (for community-scoped rooms)
- *   - One for user-scoped rooms (notifications, designers-studio)
+ *   - One for user-scoped rooms (notifications)
  *
  * Reference-counted lifecycle:
  *   on(room, topic, handler)  → increments topic refcount, subscribes if first
