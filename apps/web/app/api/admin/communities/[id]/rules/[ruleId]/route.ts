@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import type { Database } from "@/lib/supabase/database.types";
 
 // ── PUT /api/admin/communities/[id]/rules/[ruleId] ───────────────────────────
 // Updates rule_text and/or order_index for a single rule.
@@ -15,7 +16,7 @@ export async function PUT(
   let body: { rule_text?: string; order_index?: number };
   try { body = await request.json(); } catch { body = {}; }
 
-  const update: Record<string, unknown> = {};
+  const update: Database["public"]["Tables"]["community_rules"]["Update"] = {};
   if (typeof body.rule_text === "string") {
     const text = body.rule_text.trim();
     if (!text) return NextResponse.json({ error: "rule_text cannot be empty." }, { status: 422 });

@@ -9,10 +9,12 @@ import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { RsvpConfirmDialog, type RsvpConfirmMode } from "./RsvpConfirmDialog";
+import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import type { EventJoinAnswers } from "@/lib/communities/event-join-questions";
 import {
   eventZoneLabel,
   eventZoneTooltip,
@@ -268,6 +270,12 @@ export function EventCard({
    * (see RsvpConfirmDialog).
    */
   const [rsvpConfirm, setRsvpConfirm] = useState<RsvpConfirmMode | null>(null);
+  /**
+   * The host's compulsory join questions, asked after the RSVP confirm dialog
+   * when the member is joining (never when withdrawing). The request fires
+   * only once all four are answered.
+   */
+  const [questionsOpen, setQuestionsOpen] = useState(false);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -326,9 +334,10 @@ export function EventCard({
     if (rsvpPending || past) return;
 
     // Neither direction is sent straight off the button. Going also puts the
-    // member in the event's group chat, and withdrawing takes them back out of
-    // it and off their sidebar, so both open the dialog that says so and only
-    // its confirm button sends the request.
+    // member in the event's group chat — and asks the host's questions first —
+    // while withdrawing takes them back out of it and off their sidebar, so
+    // both open the dialog that says so and only its confirm button sends the
+    // request.
     setRsvpError(null);
     setRsvpConfirm(event.user_rsvped ? "leave" : "join");
   }
@@ -342,8 +351,11 @@ export function EventCard({
    * answer is adopted instead, and a failure is thrown rather than reported
    * here so the toast can keep the offer on screen.
    */
-  async function restoreRsvp() {
-    const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+  async function restoreRsvp(answers?: EventJoinAnswers) {
+    const response = await dedupeFetch(
+      `/api/communities/${communityId}/events/${event.id}/rsvp`,
+      { method: "POST", body: answers ? JSON.stringify({ answers }) : undefined, headers: answers ? { "Content-Type": "application/json" } : undefined },
+    );
     const data = await response.json().catch(() => null);
     if (!response.ok) throw new Error(data?.error ?? "Failed to RSVP.");
 
@@ -355,7 +367,7 @@ export function EventCard({
     await onRsvpSettled?.();
   }
 
-  async function commitRsvp() {
+  async function commitRsvp(answers?: EventJoinAnswers) {
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
     const newCount = Math.max(0, event.rsvp_count + (newRsvped ? 1 : -1));
@@ -363,7 +375,10 @@ export function EventCard({
     setRsvpPending(true);
     setRsvpError(null);
     try {
-      const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/events/${event.id}/rsvp`,
+        { method: "POST", body: answers ? JSON.stringify({ answers }) : undefined, headers: answers ? { "Content-Type": "application/json" } : undefined },
+      );
       if (response.ok) {
         const data = await response.json();
         onRsvpChanged(event.id, data.rsvped, data.rsvp_count);
@@ -376,6 +391,10 @@ export function EventCard({
           else invalidateOnLeave(chatCommunityId);
         }
         setRsvpConfirm(null);
+        // The questions modal stays up (showing its spinner) while the request
+        // runs; a confirmed join closes it, a failure keeps it open with the
+        // error rendered inside.
+        setQuestionsOpen(false);
         // Withdrawing did two things the member would have to rebuild by hand:
         // it removed the room from their sidebar (and its pin) and dropped
         // them out of the chat. Offer the way back while the decision is still
@@ -821,12 +840,34 @@ export function EventCard({
         mode={rsvpConfirm ?? "join"}
         open={rsvpConfirm !== null}
         onClose={() => setRsvpConfirm(null)}
-        onConfirm={() => void commitRsvp()}
+        onConfirm={() => {
+          // Joining asks the host's compulsory questions before anything is
+          // sent; withdrawing needs nothing and goes straight out.
+          if ((rsvpConfirm ?? "join") === "join") {
+            setRsvpConfirm(null);
+            setQuestionsOpen(true);
+          } else {
+            void commitRsvp();
+          }
+        }}
         eventTitle={event.title}
         eventDate={event.event_date}
         isOwner={isOwner}
         pending={rsvpPending}
         error={rsvpError}
+      />
+      <EventJoinQuestionsModal
+        open={questionsOpen}
+        onClose={() => {
+          if (rsvpPending) return;
+          setQuestionsOpen(false);
+        }}
+        onSubmit={(answers) => void commitRsvp(answers)}
+        eventTitle={event.title}
+        communityName={communityName}
+        pending={rsvpPending}
+        error={rsvpError}
+        confirmLabel="Confirm RSVP"
       />
     </div>
     </>

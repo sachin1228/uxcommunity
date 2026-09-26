@@ -1486,7 +1486,11 @@ export function CommunityChat({
               isOwner={isOwner}
               onClose={() => setShowSettings(false)}
               onSaved={(updated) => {
-                setCommunity((prev) => prev ? { ...prev, ...updated } : prev);
+                // `type` is nullable on the settings payload but never changes,
+                // so keep the known value when the patch omits it.
+                setCommunity((prev) =>
+                  prev ? { ...prev, ...updated, type: updated.type ?? prev.type } : prev,
+                );
                 // Patch the sidebar store in-place so the logo/name update
                 // immediately without requiring a page refresh.
                 import("@/lib/communities/cache").then(({ patchSidebarCommunity }) => {
@@ -1546,6 +1550,7 @@ export function CommunityChat({
             isOwner={isOwner}
             canManageMembers={canManageMembers}
             isPrivate={displayCommunity?.is_private ?? false}
+            isEventChat={displayCommunity?.type === "event"}
           />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">

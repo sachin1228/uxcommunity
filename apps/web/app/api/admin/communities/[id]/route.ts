@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
+import type { Database } from "@/lib/supabase/database.types";
 
 // ── GET /api/admin/communities/[id] ─────────────────────────────────────────
 export async function GET(
@@ -124,7 +125,7 @@ export async function PATCH(
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { body = {}; }
 
-  const update: Record<string, unknown> = {};
+  const update: Database["public"]["Tables"]["communities"]["Update"] = {};
   if (typeof body.name === "string") {
     const name = body.name.trim();
     if (!name) return NextResponse.json({ error: "Name cannot be empty." }, { status: 422 });

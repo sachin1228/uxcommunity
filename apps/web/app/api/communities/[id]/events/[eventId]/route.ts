@@ -7,6 +7,7 @@ import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePr
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
 import { requireZoneAwareIso } from "@/lib/communities/event-time";
+import type { Database } from "@/lib/supabase/database.types";
 
 /**
  * An IANA zone name the runtime can resolve, or null — the same best-effort
@@ -88,7 +89,7 @@ export async function PATCH(
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
 
-  const patch: Record<string, unknown> = {};
+  const patch: Database["public"]["Tables"]["community_events"]["Update"] = {};
 
   if (typeof body.title === "string") {
     const title = body.title.trim();

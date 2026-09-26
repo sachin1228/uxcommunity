@@ -32,13 +32,12 @@ const nextConfig = {
     },
   },
 
-  // Supabase-js has no generated types file in this project, which causes
-  // tsc to infer `never` on every query result across the codebase. These
-  // are pre-existing schema-inference issues — not runtime bugs — and are
-  // fixed properly by running `supabase gen types typescript`. Until then,
-  // skip TS type-checking at build time so deployments are not blocked.
+  // Type errors fail the build. The generated database types in
+  // lib/supabase/database.types.ts are what make that possible: without them
+  // SupabaseClient's `Schema` generic collapses to `never`, every query in the
+  // app type-checks as `never`, and this flag was the only way to ship.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   // Prevent k6 scripts from being pulled into Next.js file tracing.

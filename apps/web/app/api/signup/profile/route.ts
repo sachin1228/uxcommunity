@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { error } = await db.from("designer_profiles").insert({
-    user_id: session.userId,
+    user_id: session.userId!,
     city_id,
     sector_id,
     experience_level,

@@ -3,17 +3,12 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { MessageReaction } from "@/lib/communities/cache";
 import { publishChatEvent } from "@/lib/realtime/server";
+import { contentTableFor } from "@/lib/communities/content-tables";
 
 interface Params {
   params: Promise<{ id: string; contentId: string }>;
 }
 
-const CONTENT_TABLES: Record<string, string> = {
-  thread: "community_threads",
-  showcase: "community_showcase_posts",
-  resource: "community_resources",
-  event: "community_events",
-};
 
 /**
  * Toggle/replace the current user's one reaction on a community content item
@@ -46,7 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const table = CONTENT_TABLES[kind];
+  const table = contentTableFor(kind);
   if (!table) {
     return NextResponse.json({ error: "Invalid content kind." }, { status: 422 });
   }

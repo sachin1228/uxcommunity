@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import test, { afterEach } from "node:test"
 
@@ -103,8 +103,15 @@ test("every session boundary leaves with a full document navigation", () => {
     "app/signup/page.tsx",
   ]
 
+  // The suite is run from the repo root by the npm scripts and from this
+  // workspace's own directory by CI, so find the app instead of assuming one.
+  const appDir = [process.cwd(), join(process.cwd(), "apps", "web")].find((dir) =>
+    existsSync(join(dir, "app", "login", "page.tsx")),
+  )
+  assert.ok(appDir, `could not locate the web app from ${process.cwd()}`)
+
   for (const file of boundaries) {
-    const source = readFileSync(join(process.cwd(), "apps/web", file), "utf8")
+    const source = readFileSync(join(appDir, file), "utf8")
     assert.match(
       source,
       /window\.location\.(assign|replace)\(/,

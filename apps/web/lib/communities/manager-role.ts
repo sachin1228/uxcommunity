@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { createServiceClient } from "@/lib/supabase/service";
+import type { Json } from "@/lib/supabase/database.types";
 
 type Db = ReturnType<typeof createServiceClient>;
 
@@ -139,7 +140,8 @@ export interface ActivityEntry {
   actorName?: string | null;
   action: string;
   targetUserId?: string | null;
-  details?: Record<string, unknown>;
+  /** Arbitrary JSON stored on the activity row (see the `details` column). */
+  details?: Json;
 }
 
 /**

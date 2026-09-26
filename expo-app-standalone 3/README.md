@@ -31,8 +31,6 @@ Create a `.env` file in the root of this folder:
 
 ```
 EXPO_PUBLIC_API_URL=https://app.uxcommunity.in
-EXPO_PUBLIC_SUPABASE_URL=https://eauupthwlnarkauwifmw.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl
 ```
 
 > `.env` is read automatically by Expo during local development and `prebuild`.
@@ -151,7 +149,7 @@ expo-app-standalone 3/
 │   ├── api.ts            Base fetch client (reads EXPO_PUBLIC_API_URL)
 │   ├── auth.ts           Login / logout / getMe
 │   ├── communities.ts    Community data fetching
-│   └── supabase.ts       Supabase client (Realtime)
+│   └── eventTimezone.ts  Event timezone helpers
 ├── constants/            Colors and theme constants
 ├── assets/               Images and fonts
 ├── app.json              Expo app config
@@ -163,7 +161,7 @@ expo-app-standalone 3/
 
 ## Notes
 
-- **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`uxcommunity_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. No Supabase Auth is used.
+- **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`uxcommunity_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. It talks to the API only — no Supabase client and no Supabase Auth.
 - **Rate limiting:** Login is rate-limited on the server (Upstash Redis). If you hit too many attempts, wait a few minutes.
 - **`EXPO_PUBLIC_*` vars** are baked into the JS bundle at build time. Changing them requires a rebuild.
 

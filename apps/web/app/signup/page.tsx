@@ -305,7 +305,9 @@ function SignupInner() {
   // endpoints are validation-only (nothing is created until the final submit),
   // so going back to edit earlier steps is always safe.
   function goToStep(target: 1 | 2 | 3) {
-    if (target >= step || welcome) return;
+    // `step` is the terminal "done" state once signup completes, which has no
+    // earlier step to go back to.
+    if (typeof step !== "number" || target >= step || welcome) return;
     setStep(target);
   }
   return (

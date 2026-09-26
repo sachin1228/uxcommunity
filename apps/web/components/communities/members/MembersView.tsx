@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, MoreHorizontal, Search, Users, X } from "lucide-react";
+import { Fragment, useState, useEffect, useRef, useCallback } from "react";
+import { Check, ClipboardList, MoreHorizontal, Search, Users, X } from "lucide-react";
+import { EVENT_JOIN_QUESTIONS } from "@/lib/communities/event-join-questions";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest } from "@/lib/request-cache";
@@ -26,6 +27,16 @@ interface PendingRequest {
   request_message: string | null;
 }
 
+/** One member's answers to the event's compulsory join questions. */
+interface EventJoinResponse {
+  user_id:         string;
+  company_name:    string;
+  work_experience: string;
+  why_attend:      string;
+  expectations:    string;
+  created_at:      string;
+}
+
 interface MembersViewProps {
   communityId: string;
   currentUserId: string;
@@ -33,6 +44,8 @@ interface MembersViewProps {
   /** Owner or admin granted "manage members" — may remove members & decide requests. */
   canManageMembers?: boolean;
   isPrivate?:  boolean;
+  /** Event group chats record each member's answers to the host's join questions. */
+  isEventChat?: boolean;
 }
 
 const PAGE_SIZE = 30;
@@ -50,7 +63,7 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, isPrivate = false }: MembersViewProps) {
+export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, isPrivate = false, isEventChat = false }: MembersViewProps) {
   // Owners can do everything; admins act within their granted permissions.
   const manager = isOwner || canManageMembers;
   const requestUrl = `/api/communities/${communityId}/members?page=0`;
@@ -69,8 +82,14 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
   const [requestsLoading,  setRequestsLoading]  = useState(false);
   const [requestsLoaded,   setRequestsLoaded]   = useState(false);
 
+  // Join-question answers (event chats + managers only): what each member
+  // answered before the host's questions let them in.
+  const [joinResponses,    setJoinResponses]    = useState<Map<string, EventJoinResponse>>(new Map());
+
   // Per-member remove dropdown
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+  // The one member whose join answers are expanded (event chats).
+  const [expandedAnswersFor, setExpandedAnswersFor] = useState<string | null>(null);
   // Locks a specific pending request (accept/decline) so double-clicks cannot
   // fire the same mutation twice. Cleared on success and on failure.
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
@@ -157,6 +176,24 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
       })
       .catch(() => { setRequestsLoaded(true); setRequestsLoading(false); });
   }, [communityId, manager, isPrivate]);
+
+  // Fetch the recorded join answers (managers + event chats only). A member
+  // who joined before the questions existed simply has no row, and their row
+  // in the list renders without the section. Nothing is cleared when the
+  // section hides — the answers are only ever read behind the same gate, so
+  // stale rows never reach the screen.
+  useEffect(() => {
+    if (!manager || !isEventChat) return;
+    let cancelled = false;
+    fetch(`/api/communities/${communityId}/event-join-responses`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { responses?: EventJoinResponse[] } | null) => {
+        if (cancelled) return;
+        setJoinResponses(new Map((data?.responses ?? []).map((row) => [row.user_id, row])));
+      })
+      .catch(() => { if (!cancelled) setJoinResponses(new Map()); });
+    return () => { cancelled = true; };
+  }, [communityId, manager, isEventChat]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -348,8 +385,8 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                   !isOwnerRow &&
                   !(isAdminRow && !isOwner);
                 return (
+                  <Fragment key={member.user_id}>
                   <li
-                    key={member.user_id}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-raised transition-colors"
                   >
                     <ChatAvatar name={member.name} url={member.avatar_url} size={9} />
@@ -399,6 +436,52 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                       </div>
                     )}
                   </li>
+                  {/* This member's answers to the host's compulsory join
+                      questions — event chats only, collapsed to one line until
+                      the manager opens them. Rendered as a sibling row so the
+                      member row itself never reflows when it opens. */}
+                  {isEventChat && manager && (
+                    <li
+                      className="-mt-1 px-3 pb-2"
+                    >
+                      {joinResponses.get(member.user_id) ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedAnswersFor(expandedAnswersFor === member.user_id ? null : member.user_id)}
+                            aria-expanded={expandedAnswersFor === member.user_id}
+                            className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-body text-[11px] font-medium text-accent transition-colors hover:bg-accent/10"
+                          >
+                            <ClipboardList strokeWidth={2.5} size={12} />
+                            {expandedAnswersFor === member.user_id ? "Hide join answers" : "View join answers"}
+                          </button>
+                          {expandedAnswersFor === member.user_id && (() => {
+                            const answers = joinResponses.get(member.user_id)!;
+                            return (
+                              <dl className="mt-1.5 flex flex-col gap-2 rounded-lg border border-border bg-surface-raised/50 px-3 py-2.5">
+                                {EVENT_JOIN_QUESTIONS.map(({ key, label }) => (
+                                  <div key={key}>
+                                    <dt className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+                                      {label}
+                                    </dt>
+                                    <dd className="whitespace-pre-wrap break-words font-body text-xs leading-relaxed text-foreground">
+                                      {answers[key]}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            );
+                          })()}
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-1.5 py-1 font-body text-[11px] text-foreground-subtle">
+                          <ClipboardList strokeWidth={2.5} size={12} />
+                          No join answers recorded
+                        </span>
+                      )}
+                    </li>
+                  )}
+                  </Fragment>
                 );
               })}
             </ul>

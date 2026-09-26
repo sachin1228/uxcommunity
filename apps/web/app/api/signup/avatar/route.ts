@@ -133,6 +133,11 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = await hashPassword(identity.password);
+  // complete_signup declares its two avatar params as bare `text` rather than
+  // `text default null`, so the generated RPC types require a string — even
+  // though NULL is the right value for a member with no uploaded avatar, and
+  // the function's own guards handle both. Cast at this boundary instead of
+  // weakening the generated types.
   const { data, error } = await db.rpc("complete_signup", {
     p_name: identity.name,
     p_email: identity.email.toLowerCase(),
@@ -144,9 +149,10 @@ export async function POST(request: NextRequest) {
     // Interests are no longer collected during signup — members discover and
     // join interest communities from Explore Communities instead.
     p_interest_ids: [],
-    p_avatar_url: profilePictureUrl,
-    p_avatar_source: profilePictureUrl ? "upload" : null,
-    p_invitation_token: token ?? null,
+    p_avatar_url: profilePictureUrl as string,
+    p_avatar_source: (profilePictureUrl ? "upload" : null) as string,
+    // `undefined` takes the parameter's DEFAULT NULL — the same stored value.
+    p_invitation_token: token ?? undefined,
   });
 
   if (error || !data?.[0]?.user_id) {

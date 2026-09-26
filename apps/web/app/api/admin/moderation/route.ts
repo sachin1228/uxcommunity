@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { isModerationStatus } from "@/lib/moderation/status";
 
 const PAGE_SIZE = 50;
-const STATUSES = new Set(["approved", "review", "rejected"]);
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   const status = request.nextUrl.searchParams.get("status") ?? "review";
   const page = Math.max(1, Number.parseInt(request.nextUrl.searchParams.get("page") ?? "1", 10));
-  const safeStatus = STATUSES.has(status) ? status : "review";
+  const safeStatus = isModerationStatus(status) ? status : "review";
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 

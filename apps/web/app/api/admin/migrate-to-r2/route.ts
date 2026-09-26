@@ -12,6 +12,7 @@ import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { uploadToR2, parseR2Key } from "@/lib/r2";
+import { selectDynamicColumn, updateDynamicColumn } from "@/lib/r2-cleanup";
 
 /** Parse bucket + storage path out of a Supabase public URL. */
 function parseSupabasePath(url: string): { bucket: string; storagePath: string } | null {
@@ -107,44 +108,47 @@ export async function POST() {
 
   // ── 1. Master-data + community tables ──────────────────────────────────────
   for (const { table, column } of MASTER_TABLES) {
-    const { data: rows, error } = await db
-      .from(table)
-      .select(`id, ${column}`)
-      .not(column, "is", null);
+    // MASTER_TABLES is a reviewed constant, so the dynamic table/column pair
+    // goes through the one whitelisted helper (see lib/r2-cleanup).
+    const { rows, error } = await selectDynamicColumn(db, table, column);
 
     if (error) {
       console.error(`[migrate-to-r2] Failed to fetch ${table}:`, error);
       continue;
     }
 
-    for (const row of (rows ?? []) as unknown as Record<string, string | null>[]) {
-      const url: string | null = row[column];
+    for (const row of rows) {
+      const id = typeof row.id === "string" ? row.id : null;
+      const rawUrl = row[column];
+      const url = typeof rawUrl === "string" ? rawUrl : null;
       if (!url) continue;
 
       // Already in R2 — skip
       if (parseR2Key(url)) {
-        results.push({ id: row.id, table, oldUrl: url, newUrl: null, status: "skipped", reason: "already in R2" });
+        results.push({ id, table, oldUrl: url, newUrl: null, status: "skipped", reason: "already in R2" });
         continue;
       }
 
       // Not a Supabase URL — leave it alone
       if (!isSupabaseUrl(url)) {
-        results.push({ id: row.id, table, oldUrl: url, newUrl: null, status: "skipped", reason: "external URL" });
+        results.push({ id, table, oldUrl: url, newUrl: null, status: "skipped", reason: "external URL" });
         continue;
       }
 
       try {
         const buffer = await fetchBuffer(url, db);
-        const key = deriveR2Key(url, table, row.id);
+        const key = deriveR2Key(url, table, id);
         const newUrl = await uploadToR2(key, buffer, guessContentType(url));
 
-        const { error: patchErr } = await db.from(table).update({ [column]: newUrl }).eq("id", row.id);
-        if (patchErr) throw new Error(patchErr.message);
+        if (id) {
+          const patchErr = await updateDynamicColumn(db, table, column, id, newUrl);
+          if (patchErr) throw new Error(patchErr.message);
+        }
 
-        results.push({ id: row.id, table, oldUrl: url, newUrl, status: "migrated" });
+        results.push({ id, table, oldUrl: url, newUrl, status: "migrated" });
       } catch (err) {
-        console.error(`[migrate-to-r2] ${table}/${row.id}:`, err);
-        results.push({ id: row.id, table, oldUrl: url, newUrl: null, status: "failed", reason: String(err) });
+        console.error(`[migrate-to-r2] ${table}/${id}:`, err);
+        results.push({ id, table, oldUrl: url, newUrl: null, status: "failed", reason: String(err) });
       }
     }
   }

@@ -27,19 +27,13 @@ export async function canStoreShowcaseFlag(
   return supported;
 }
 
-/**
- * Adds showcase_enabled to an explicit community column list, but only once the
- * column exists — so an environment that has not applied the migration keeps
- * reading communities instead of failing the query. Prefer this over select("*"):
- * several callers spread the row into an API response, where a wildcard would
- * start leaking invite_token and other columns.
- */
-export async function withShowcaseColumn(
-  db: ReturnType<typeof createServiceClient>,
-  baseColumns: string,
-): Promise<string> {
-  return (await canStoreShowcaseFlag(db)) ? `${baseColumns}, showcase_enabled` : baseColumns;
-}
+// Callers that need `showcase_enabled` in an explicit column list branch on
+// canStoreShowcaseFlag() and keep each column list a single string literal:
+// the query builder parses that literal into a row type, so a helper that
+// returns a `string` (or a union of column lists) makes the result a
+// GenericStringError. Prefer an explicit list over select("*"): several callers
+// spread the row into an API response, where a wildcard would start leaking
+// invite_token and other columns.
 
 // ── community_join_requests.request_message ───────────────────────────────────
 

@@ -21,8 +21,14 @@ export const SHOWCASE_MEDIA_MAX = 5;
 
 export type VideoAttachmentStatus = "ready" | "failed";
 
-/** Uploaded image/video attachment — mirrors the thread attachment shape. */
-export interface ShowcaseAttachment {
+/**
+ * Uploaded image/video attachment — mirrors the thread attachment shape.
+ *
+ * Declared as a type alias rather than an interface on purpose: only object
+ * *type aliases* get an implicit index signature, which is what makes the shape
+ * assignable to the `Json` column type it is persisted into.
+ */
+export type ShowcaseAttachment = {
   name: string;
   url: string;
   type: string;
@@ -39,7 +45,7 @@ export interface ShowcaseAttachment {
   status?: VideoAttachmentStatus;
   /** Human-readable failure detail (composer-local, never persisted). */
   errorMessage?: string;
-}
+};
 
 /** True when a video attachment is ready to render/play. */
 export function isVideoReady(attachment: ShowcaseAttachment): boolean {

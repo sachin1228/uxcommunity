@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
-import { withShowcaseColumn } from "./showcase-flag";
+import { canStoreShowcaseFlag } from "./showcase-flag";
 import { loadEventChatSidebarMeta } from "./event-chat";
 
 type ActivityRow = {
@@ -89,16 +89,22 @@ export async function getSidebarCommunities(userId: string) {
   const rows = (Array.isArray(activity) ? activity : []) as ActivityRow[];
   if (!rows.length) return NextResponse.json({ communities: [] });
   const activityById = new Map(rows.map((row) => [row.community_id, row]));
-  const { data: communities, error } = await db
-    .from("communities")
-    // Explicit columns (the row is spread into the response): showcase_enabled is
-    // appended only once the showcase-toggle migration has added it.
-    .select(
-      await withShowcaseColumn(
-        db,
-        "id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at",
-      ),
-    )
+  const { data: communities, error } = await (
+    // Explicit columns (the row is spread into the response): showcase_enabled
+    // is read only once the showcase-toggle migration has added it. Each branch
+    // keeps a single string literal (see read-models.ts).
+    await canStoreShowcaseFlag(db)
+      ? db
+          .from("communities")
+          .select(
+            "id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at, showcase_enabled",
+          )
+      : db
+          .from("communities")
+          .select(
+            "id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at",
+          )
+  )
     .in("id", rows.map((row) => row.community_id))
     .eq("is_active", true)
     // Member-led communities without an owner are orphans from a deleted

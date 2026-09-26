@@ -195,7 +195,6 @@ See `apps/web/.env.example` for the full list with comments. Summary:
 | Variable | What it's for |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key (safe to expose in browser) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — server-only, never expose to the client |
 | `SESSION_SECRET` | Secret used to sign JWT session tokens (`openssl rand -base64 32`) |
 | `ADMIN_EMAIL` | Email address for the single built-in admin account |

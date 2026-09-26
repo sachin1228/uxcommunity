@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-
-const STATUSES = new Set(["approved", "review", "rejected"]);
+import { isModerationStatus, type ModerationStatus } from "@/lib/moderation/status";
 
 export async function PATCH(
   request: NextRequest,
@@ -22,9 +21,9 @@ export async function PATCH(
     ban_user?: boolean;
   };
 
-  const patch: { status?: string; moderator_notes?: string | null } = {};
+  const patch: { status?: ModerationStatus; moderator_notes?: string | null } = {};
   if (typeof status === "string") {
-    if (!STATUSES.has(status)) {
+    if (!isModerationStatus(status)) {
       return NextResponse.json({ error: "Invalid moderation status." }, { status: 422 });
     }
     patch.status = status;

@@ -28,6 +28,7 @@ import {
   THREAD_ATTACHMENT_LOOKUP,
   type MediaReferenceLookup,
 } from "@uxcommunity/shared";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   deleteR2AssetIfUnreferenced,
@@ -36,6 +37,52 @@ import {
 } from "@/lib/r2";
 
 export type DbClient = ReturnType<typeof createServiceClient>;
+
+/**
+ * Untyped view of the service-role client, for whitelisted dynamic lookups.
+ *
+ * The generated `Database` type spells a table and its columns as string
+ * literals, so postgrest-js cannot describe a table/column pair resolved at
+ * runtime. Every caller here reads from a reviewed, hardcoded list
+ * (ALL_MEDIA_LOOKUPS, the admin purge/migrate tables) — never from request
+ * input — so the typed client is deliberately dropped for those few queries
+ * and nowhere else.
+ */
+function dynamicClient(db: DbClient): SupabaseClient {
+  return db as unknown as SupabaseClient;
+}
+
+/** `select id, <column> from <table> where <column> is not null`. */
+export async function selectDynamicColumn(
+  db: DbClient,
+  table: string,
+  column: string,
+): Promise<{ rows: Array<Record<string, unknown>>; error: PostgrestError | null }> {
+  const { data, error } = await dynamicClient(db)
+    .from(table)
+    .select(`id, ${column}`)
+    .not(column, "is", null);
+
+  // postgrest-js cannot type a column list built from a variable, so the rows
+  // come back as a parse error here and are re-typed as plain records.
+  return { rows: (data ?? []) as unknown as Array<Record<string, unknown>>, error };
+}
+
+/** `update <table> set <column> = <value> where id = <id>`. */
+export async function updateDynamicColumn(
+  db: DbClient,
+  table: string,
+  column: string,
+  id: string,
+  value: string,
+): Promise<PostgrestError | null> {
+  const { error } = await dynamicClient(db)
+    .from(table)
+    .update({ [column]: value })
+    .eq("id", id);
+
+  return error;
+}
 
 // URL extraction + reference schema live in @uxcommunity/shared — re-exported
 // here so callers of this module have one import surface.
@@ -85,18 +132,14 @@ export async function collectAllMediaReferences(db: DbClient): Promise<MediaRefe
   const references: MediaReference[] = [];
 
   for (const lookup of ALL_MEDIA_LOOKUPS) {
-    const { data, error } = await db
-      .from(lookup.table)
-      .select(`id, ${lookup.column}`)
-      .not(lookup.column, "is", null);
+    const { rows, error } = await selectDynamicColumn(db, lookup.table, lookup.column);
 
     if (error) {
       console.error("[r2-cleanup] reference query failed", { lookup, error });
       continue;
     }
 
-    // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
-    for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    for (const row of rows) {
       const urls = getReferenceUrls(lookup, row?.[lookup.column]);
       for (const url of urls) {
         const key = getR2KeyFromUrl(url);
@@ -182,22 +225,23 @@ export async function collectMasterMediaUrls(
 ): Promise<string[]> {
   const urls: string[] = [];
 
-  // Casts match the repo-wide untyped supabase-js baseline (see next.config.js).
-  const masterResult = (await db
+  // `table` is a reviewed whitelist entry (see selectDynamicColumn), so the
+  // untyped hop is confined to the lookup; the community read below is typed.
+  const masterResult = (await dynamicClient(db)
     .from(table)
     .select("image_url, lottie_url")
     .eq("id", id)
-    .maybeSingle()) as unknown as { data: CommunityRow | null };
-  const communitiesResult = (await db
+    .maybeSingle()) as { data: CommunityRow | null };
+  const { data: communities } = await db
     .from("communities")
     .select("id")
     .eq("type", type)
-    .eq("reference_id", id)) as unknown as { data: Array<{ id: string }> | null };
+    .eq("reference_id", id);
 
   pushUniqueUrl(urls, masterResult.data?.image_url ?? null);
   pushUniqueUrl(urls, masterResult.data?.lottie_url ?? null);
 
-  for (const community of communitiesResult.data ?? []) {
+  for (const community of communities ?? []) {
     const communityUrls = await collectCommunityMediaUrls(db, community.id);
     for (const url of communityUrls) pushUniqueUrl(urls, url);
   }

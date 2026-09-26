@@ -30,14 +30,19 @@ export interface ThreadPollDraft {
   options: string[];
 }
 
-export interface ThreadAttachment {
+/**
+ * Declared as a type alias rather than an interface on purpose: only object
+ * *type aliases* get an implicit index signature, which is what makes the shape
+ * assignable to the `Json` column type it is persisted into.
+ */
+export type ThreadAttachment = {
   name: string;
   url: string;
   type: string;
   size: number;
   /** First-frame JPEG shown while the video streams in (videos only). */
   poster?: string;
-}
+};
 
 export interface CommunityThread {
   id: string;

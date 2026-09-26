@@ -51,6 +51,7 @@ bucket_name = "uxcommunity-web-next-cache"
 # injected via `wrangler secret put` in production.
 [vars]
 NEXT_PUBLIC_APP_URL = "https://app.uxcommunity.in"
+# Only the project URL is public now: the app reaches Supabase exclusively
+# through the server-side service-role client, so it never ships an anon key.
 NEXT_PUBLIC_SUPABASE_URL = "https://eauupthwlnarkauwifmw.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
 NEXT_PUBLIC_REALTIME_URL = "https://rt.uxcommunity.in"

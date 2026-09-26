@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
-import {
-  DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES,
-  ensureBrowserNotificationPermission,
-  formatMessageNotificationPreview,
-  markMessageNotificationSeen,
-  shouldShowBrowserNotification,
-} from "./message-notifications.ts";
+import { DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES, ensureBrowserNotificationPermission, formatMessageNotificationPreview, markMessageNotificationSeen, shouldShowBrowserNotification } from "./message-notifications.ts";
 
 test("formats text and media message previews", () => {
   assert.equal(

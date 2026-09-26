@@ -8,25 +8,19 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://eauupthwlnarkauwifmw.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://eauupthwlnarkauwifmw.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://eauupthwlnarkauwifmw.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in"
       }
     }
   },
