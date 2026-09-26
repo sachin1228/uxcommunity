@@ -29,10 +29,25 @@ import { chatMessageTests } from '../tests/09_chat_messages.js';
 
 export const options = SMOKE_OPTIONS;
 
-// Use a real seeded k6 test user. Override via -e TEST_USER_EMAIL / TEST_USER_PASSWORD.
-// The seeder creates users with pattern k6userNNN@k6test.invalid / K6testPass123!
-const USER_EMAIL     = __ENV.TEST_USER_EMAIL    || 'k6user001@k6test.invalid';
-const USER_PASSWORD  = __ENV.TEST_USER_PASSWORD || 'K6testPass123!';
+// Credentials come from the environment — no account or password is committed
+// here (see k6/README.md). Fail before the run instead of logging in with a
+// stale default and reporting every authenticated check as a 401.
+function requiredEnv(name) {
+  const value = __ENV[name];
+  if (!value) {
+    throw new Error(
+      `${name} is not set.\n` +
+      '  Export your own k6 test account before running this scenario, e.g.\n' +
+      '    export TEST_USER_EMAIL=member@example.com TEST_USER_PASSWORD=...\n' +
+      '    export ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=...\n' +
+      '  See k6/README.md — credentials are never committed to the repository.',
+    );
+  }
+  return value;
+}
+
+const USER_EMAIL     = requiredEnv('TEST_USER_EMAIL');
+const USER_PASSWORD  = requiredEnv('TEST_USER_PASSWORD');
 const ADMIN_EMAIL    = __ENV.ADMIN_EMAIL         || '';
 const ADMIN_PASSWORD = __ENV.ADMIN_PASSWORD      || '';
 

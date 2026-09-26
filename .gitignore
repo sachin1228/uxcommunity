@@ -132,6 +132,15 @@ public/uploads/
 !apps/web/app/api/home/uploads/threads/route.ts
 
 # =========================
+# k6 load-test credentials
+# =========================
+# k6/data/test-users.json is generated locally by `npm run k6:seed`. It holds
+# plaintext passwords and pre-signed session JWTs, so it is derived data and
+# must never be committed — keep only the placeholder in k6/data/.
+k6/data/*
+!k6/data/.gitkeep
+
+# =========================
 # Local SQLite databases
 # =========================
 *.sqlite
