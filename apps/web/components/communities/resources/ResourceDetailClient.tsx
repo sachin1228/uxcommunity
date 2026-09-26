@@ -7,7 +7,7 @@ import { BackLink } from "@/components/ui/BackLink";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import type { CommunityResource, ResourceComment } from "./types";
+import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
 import { CommentSection } from "../CommentSection";

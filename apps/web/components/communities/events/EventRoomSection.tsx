@@ -16,7 +16,7 @@ import {
   formatEventTimeRange,
   hostScheduleForViewer,
 } from "@/lib/communities/event-display";
-import type { CommunityEvent, EventRsvp } from "./types";
+import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import { goingPreview, toGoingEntries } from "./going-list";
 
 /**

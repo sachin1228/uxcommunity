@@ -19,7 +19,7 @@ import {
 } from "./NotificationHoverActions";
 import { userColorVar } from "@/lib/communities/user-color";
 import type { CachedThreadEvent } from "@/lib/communities/cache";
-import { THREAD_CATEGORIES } from "@/components/communities/threads/types";
+import { THREAD_CATEGORIES } from "@/lib/communities/models/threads";
 import {
   KIND_THEME,
   firstLine,

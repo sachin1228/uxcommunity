@@ -17,6 +17,7 @@ import { canStoreShowcaseFlag } from "./showcase-flag";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
+import { isCommunityMember } from "./membership";
 // One shared experience-level label cleaner — see ./comment-authors.ts.
 import { cleanDesignation } from "./comment-authors";
 
@@ -172,19 +173,6 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     },
   };
 });
-
-export async function isCommunityMember(
-  communityId: string,
-  userId: string,
-): Promise<boolean> {
-  const { data } = await createServiceClient()
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return Boolean(data);
-}
 
 async function enrichAuthoredRows(
   rows: Array<Record<string, unknown>>,

@@ -1,6 +1,6 @@
-import type { CommunityThread } from "@/components/communities/threads/types";
-import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
-import type { CommunityResource } from "@/components/communities/resources/types";
+import type { CommunityThread } from "@/lib/communities/models/threads";
+import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
+import type { CommunityResource } from "@/lib/communities/models/resources";
 import type { ShowcasePost } from "@/components/communities/showcase/types";
 import type { ContentKind } from "@/lib/communities/content-sync";
 

@@ -18,7 +18,7 @@ import {
   type ThreadAttachment,
   type ThreadCategory,
   type ThreadPollDraft,
-} from "./types";
+} from "@/lib/communities/models/threads";
 import { CATEGORY_ICONS } from "./categoryIcons";
 import { filterChip } from "../filter-chip";
 

@@ -47,6 +47,9 @@ export interface Community {
   /** Absent on rows that predate the flag; reads as on. */
   showcase_enabled?: boolean | null;
   owner_id?: string | null;
+  /** Carried through from CachedMeta["community"]; absent on sidebar fallbacks. */
+  current_user_role?: CachedMeta["community"]["current_user_role"];
+  current_user_permissions?: CachedMeta["community"]["current_user_permissions"];
 }
 
 export interface Member {

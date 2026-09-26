@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { isCommunityMember } from "@/lib/communities/membership";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
@@ -9,20 +10,6 @@ import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
-
-async function isMember(
-  db: ReturnType<typeof createServiceClient>,
-  communityId: string,
-  userId: string,
-) {
-  const { data } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return Boolean(data);
-}
 
 type EnrichedRow = Record<string, unknown> & {
   users: CommentAuthor | null;
@@ -59,7 +46,7 @@ export async function GET(
 
   if (!threadAccess) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
-  if (!threadAccess.is_public && !publicScope && !(await isMember(db, communityId, session.userId!))) {
+  if (!threadAccess.is_public && !publicScope && !(await isCommunityMember(communityId, session.userId!, db))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
@@ -117,7 +104,7 @@ export async function POST(
   if (!thread.allow_replies) return NextResponse.json({ error: "This thread does not allow replies." }, { status: 403 });
 
   // Private threads require community membership to comment
-  if (!thread.is_public && !publicScope && !(await isMember(db, communityId, userId))) {
+  if (!thread.is_public && !publicScope && !(await isCommunityMember(communityId, userId, db))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 

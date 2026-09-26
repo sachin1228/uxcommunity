@@ -1,6 +1,6 @@
 import "server-only"
 
-import type { CommunityThread, ThreadComment } from "@/components/communities/threads/types"
+import type { CommunityThread, ThreadComment } from "@/lib/communities/models/threads"
 import { attachPollVotes } from "@/lib/threads/poll-votes"
 import { createServiceClient } from "@/lib/supabase/service"
 import { loadCommentAuthors } from "@/lib/communities/comment-authors"

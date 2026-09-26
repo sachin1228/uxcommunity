@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { EventRsvp } from "./types";
+import type { EventRsvp } from "@/lib/communities/models/events";
 import { goingPreview, toGoingEntries } from "./going-list";
 
 const ME = "user-me";

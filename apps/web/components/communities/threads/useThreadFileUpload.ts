@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ThreadAttachment } from "./types";
+import type { ThreadAttachment } from "@/lib/communities/models/threads";
 import { THREAD_IMAGE_MAX } from "./ThreadComposerControls";
 import { compressImage, compressedFile } from "@/lib/image-client";
 

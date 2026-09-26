@@ -6,7 +6,7 @@ import { flattenPreviewText } from "@/lib/communities/preview-text";
 import { Calendar, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
-import type { CommunityEvent, EventRsvp } from "./types";
+import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import { EditEventModal } from "./EditEventModal";
 import { RsvpConfirmDialog, type RsvpConfirmMode } from "./RsvpConfirmDialog";
 import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";

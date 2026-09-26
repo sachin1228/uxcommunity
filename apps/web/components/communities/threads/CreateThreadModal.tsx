@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
-import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "./types";
-import { THREAD_BODY_MAX_LENGTH } from "./types";
+import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "@/lib/communities/models/threads";
+import { THREAD_BODY_MAX_LENGTH } from "@/lib/communities/models/threads";
 import {
   bodyToTitle,
   serializePollDraft,

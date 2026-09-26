@@ -7,7 +7,7 @@ import { BackLink } from "@/components/ui/BackLink";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import type { CommunityThread, ThreadComment } from "./types";
+import type { CommunityThread, ThreadComment } from "@/lib/communities/models/threads";
 import { ThreadCard } from "./ThreadCard";
 import { CommentSection } from "../CommentSection";
 import { updateCommentReactions } from "@/lib/communities/comment-tree";

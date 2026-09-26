@@ -1,49 +1,55 @@
 "use client";
 
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
-import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { AtSign, ChevronDown } from "lucide-react";
 import {
-  applyReactionDelete,
-  applyReactionInsert,
-  markSidebarReactionRemoved,
-  patchSidebarReaction,
-  sidebarStore,
-  metaCache,
   msgCache,
-  msgFetchedAt,
   patchSidebarMessageContent,
-} from "@/lib/communities/cache";
-import {
-  CONTENT_EVENT_CHANGED_EVENT,
   registerCommunitySettingsOpener,
+  sidebarStore,
+  type CachedContentEvent,
   type CachedMessage,
   type CachedMeta,
-  type CachedContentEvent,
-  type CachedThreadEvent,
   type MessageMention,
-  type MessageReaction,
   type ReplyPreview,
 } from "@/lib/communities/cache";
-import {
-  clearReactionIntentsForCommunity,
-  ReactionIntentCoordinator,
-  trackReactionIntent,
-  type ReactionIntent,
-} from "@/lib/reaction-intent-coordinator";
+import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
+import type { MentionCandidate } from "@/lib/communities/mentions";
+import { extractFirstUrl } from "@/lib/communities/linkPreview";
+import { initRequestCache } from "@/lib/request-cache";
+import type { SSRCommunitySections } from "@/lib/communities/server";
+import { Spinner } from "@/components/ui/Spinner";
+import { Modal } from "@/components/ui/Modal";
 import { fmtDate, MAX_MESSAGE_CHARS } from "./chat/chatUtils";
 import { collectPendingMentions } from "./chat/mention-jumps";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
-import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
-
 import { ChatInput } from "./chat/ChatInput";
-import type { MentionCandidate } from "@/lib/communities/mentions";
 import { MessageList } from "./chat/MessageList";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
-import dynamic from "next/dynamic";
-import type { CommunityThread } from "./threads/types";
+import { TypingIndicator } from "./chat/TypingIndicator";
+import { useChatData } from "./chat/useChatData";
+import { useChatLoadError } from "./chat/useChatLoadError";
+import { useChatReactions } from "./chat/useChatReactions";
+import { useCommunityTabs } from "./chat/useCommunityTabs";
+import { useContentTimeline, useLocalContentEventMirror } from "./chat/useContentTimeline";
+import { useMemberMentions } from "./chat/useMemberMentions";
+import { useOnlinePresence } from "./chat/useOnlinePresence";
+import { useRealtimeChat } from "./chat/useRealtimeChat";
+import { useScrollAndUnread } from "./chat/useScrollAndUnread";
+import { useSendMessage } from "./chat/useSendMessage";
+import { useTypingPresence } from "./chat/useTypingPresence";
+import { seedCommunityRequestCache } from "./chat/seedCommunityRequestCache";
+
+function TabLoading() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <Spinner className="h-5 w-5" />
+    </div>
+  );
+}
 
 // Tab views are loaded on first open: the chat shell (what a community switch
 // actually paints) stops parsing/hydrating five large views it never shows.
@@ -52,70 +58,28 @@ import type { CommunityThread } from "./threads/types";
 // inline options object literal per call — Next 16 validates it statically.)
 const ThreadsView = dynamic(() => import("./threads/ThreadsView").then((m) => m.ThreadsView), {
   ssr: false,
-  loading: () => (
-    <div className="flex-1 flex items-center justify-center">
-      <Spinner className="h-5 w-5" />
-    </div>
-  ),
+  loading: TabLoading,
 });
 const EventsView = dynamic(() => import("./events/EventsView").then((m) => m.EventsView), {
   ssr: false,
-  loading: () => (
-    <div className="flex-1 flex items-center justify-center">
-      <Spinner className="h-5 w-5" />
-    </div>
-  ),
+  loading: TabLoading,
 });
 const ResourcesView = dynamic(() => import("./resources/ResourcesView").then((m) => m.ResourcesView), {
   ssr: false,
-  loading: () => (
-    <div className="flex-1 flex items-center justify-center">
-      <Spinner className="h-5 w-5" />
-    </div>
-  ),
+  loading: TabLoading,
 });
 const MembersView = dynamic(() => import("./members/MembersView").then((m) => m.MembersView), {
   ssr: false,
-  loading: () => (
-    <div className="flex-1 flex items-center justify-center">
-      <Spinner className="h-5 w-5" />
-    </div>
-  ),
+  loading: TabLoading,
 });
 const ShowcaseView = dynamic(() => import("./showcase/ShowcaseView").then((m) => m.ShowcaseView), {
   ssr: false,
-  loading: () => (
-    <div className="flex-1 flex items-center justify-center">
-      <Spinner className="h-5 w-5" />
-    </div>
-  ),
+  loading: TabLoading,
 });
 const CommunitySettingsView = dynamic(
   () => import("./CommunitySettingsView").then((m) => m.CommunitySettingsView),
   { ssr: false },
 );
-import { Spinner } from "@/components/ui/Spinner";
-import { Modal } from "@/components/ui/Modal";
-import { useChatData } from "./chat/useChatData";
-import { useChatLoadError } from "./chat/useChatLoadError";
-import { useScrollAndUnread } from "./chat/useScrollAndUnread";
-import { useRealtimeChat } from "./chat/useRealtimeChat";
-import { useSendMessage } from "./chat/useSendMessage";
-import { useTypingPresence } from "./chat/useTypingPresence";
-import { useOnlinePresence } from "./chat/useOnlinePresence";
-import { useMemberMentions } from "./chat/useMemberMentions";
-import { TypingIndicator } from "./chat/TypingIndicator";
-import { extractFirstUrl } from "@/lib/communities/linkPreview";
-import {
-  fetchAndHydrateCommunityBootstrap,
-  initRequestCache,
-  setCachedRequest,
-  type CommunityBootstrap,
-} from "@/lib/request-cache";
-import { realtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/rooms";
-import type { SSRCommunitySections } from "@/lib/communities/server";
-import type { CachedContentEvent as SSRContentEvent } from "@/lib/communities/cache";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -143,24 +107,13 @@ export function CommunityChat({
   initialMessages?: CachedMessage[];
   initialLastReadAt?: string | null;
   initialSections?: SSRCommunitySections;
-  initialContentEvents?: SSRContentEvent[];
+  initialContentEvents?: CachedContentEvent[];
   initialTab?: ChatTab;
 }) {
-  const pathname = usePathname();
   const router = useGuardedRouter();
   const [hasMounted, setHasMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
+  const { activeTab, handleTabChange } = useCommunityTabs(initialTab);
   const [showSettings, setShowSettings] = useState(false);
-  const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
-  // Permanent "John created a …" cards for threads AND the other three areas.
-  // Seeded from /bootstrap (history) and kept current by the chat room's
-  // content-insert / content-delete realtime topics — so the card is as
-  // permanent as a message, not a session-only bubble.
-  const [contentEvents, setContentEvents] = useState<CachedContentEvent[]>([]);
-  /** True once the initial threads fetch for the current community has settled. */
-  const [threadsReady, setThreadsReady] = useState(false);
-  /** True once the content-events history (bootstrap section) has settled. */
-  const [contentEventsReady, setContentEventsReady] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
 
   // Seed every first-page endpoint before child passive effects run. This keeps
@@ -168,212 +121,28 @@ export function CommunityChat({
   useInsertionEffect(() => {
     initRequestCache(currentUserId);
     if (!initialSections) return;
-    const base = `/api/communities/${communityId}`;
-    const urls: Array<[string, unknown]> = [
-      [`${base}/threads`, initialSections.threads],
-      [`${base}/events`, initialSections.events],
-      [`${base}/resources`, initialSections.resources],
-      [`${base}/showcase`, initialSections.showcase],
-      [`${base}/members?page=0`, initialSections.members],
-      [`${base}/rules`, initialSections.rules],
-      [`${base}/content-events`, { events: initialContentEvents }],
-    ];;
-    for (const [url, value] of urls) {
-      if (value !== undefined) setCachedRequest(url, value, currentUserId);
-    }
-    // When the SSR snapshot already carries the community read model and first
-    // message page, mirror it into the bootstrap cache entry as well. Otherwise
-    // every downstream bootstrap-backed read (chat data, info panel, tab views)
-    // fires a fresh network GET /bootstrap even though the page already seeded
-    // everything it needs.
-    if (initialMeta && initialMessages) {
-      const bootstrap: CommunityBootstrap = {
-        community: {
-          community: initialMeta.community,
-          members: initialMeta.members,
-        },
-        messages: { messages: initialMessages },
-        permissions: undefined,
-        unreadCount: 0,
-        failures: [],
-      };
-      setCachedRequest(`${base}/bootstrap`, bootstrap, currentUserId);
-    }
+    seedCommunityRequestCache({
+      communityId,
+      currentUserId,
+      sections: initialSections,
+      contentEvents: initialContentEvents,
+      meta: initialMeta,
+      messages: initialMessages,
+    });
   }, [communityId, currentUserId, initialSections, initialMeta, initialMessages]);
 
-  const handleTabChange = useCallback((tab: ChatTab) => {
-    setActiveTab(tab);
-    const params = new URLSearchParams();
-    if (tab !== "chat") params.set("tab", tab);
-    const qs = params.toString();
-
-    // Tabs are local views of the same mounted community page. pushState keeps
-    // links shareable without requesting a new RSC payload AND makes Back
-    // return to the previous tab instead of leaving the community entirely.
-    // The popstate listener below mirrors history traversal back into state.
-    const url = qs ? `${pathname}?${qs}` : pathname;
-    if (url !== window.location.pathname + window.location.search) {
-      window.history.pushState({ communityTab: tab }, "", url);
-    }
-  }, [pathname]);
-
-  // Back/forward through tab history updates the visible tab without a
-  // navigation. The communityId guard keeps the listener scoped to this page.
-  useEffect(() => {
-    const onPopState = (event: PopStateEvent) => {
-      const match = /[?&]tab=([a-z]+)/.exec(window.location.search);
-      const tab = (match?.[1] ?? "chat") as ChatTab;
-      const valid: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members"];
-      if (!valid.includes(tab)) return;
-      setActiveTab(tab);
-      // Keep the history entry object in sync so repeated Back works.
-      if (event.state?.communityTab !== tab) {
-        window.history.replaceState({ communityTab: tab }, "");
-      }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  const handleThreadCreated = useCallback((thread: CommunityThread) => {
-    setThreadEvents((prev) => {
-      if (prev.some((event) => event.id === thread.id)) return prev;
-      const event: CachedThreadEvent = {
-        id: thread.id,
-        community_id: thread.community_id,
-        user_id: thread.user_id,
-        title: thread.title,
-        category: thread.category,
-        attachments: thread.attachments ?? [],
-        created_at: thread.created_at,
-        users: thread.users,
-      };
-      return [...prev, event].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-      );
-    });
-  }, []);
-
-  // Symmetric with handleThreadCreated: when the creator deletes a thread from
-  // the Threads tab, its "created a new thread" bubble must disappear from chat
-  // immediately rather than lingering until (or forever without) the realtime
-  // thread-delete echo.
-  const handleThreadDeleted = useCallback((threadId: string) => {
-    setThreadEvents((prev) => prev.filter((event) => event.id !== threadId));
-    // The unified content-event card is the one the timeline renders now.
-    setContentEvents((prev) => prev.filter((event) => event.id !== threadId));
-  }, []);
-
-  // Local creates for the other three areas (showcase/resource/event) — the
-  // server broadcast (content-insert) also lands here, so the dedupe by id
-  // keeps this idempotent for the creator's own clients.
-  const handleContentCreated = useCallback((event: CachedContentEvent) => {
-    setContentEvents((prev) => {
-      if (prev.some((item) => item.id === event.id)) return prev;
-      return [...prev, event].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-      );
-    });
-  }, []);
-
-  const handleContentDeleted = useCallback((id: string) => {
-    setContentEvents((prev) => prev.filter((event) => event.id !== id));
-  }, []);
-
-  // Reaction groups that arrive with each message page (the RPC attaches them
-  // for the timeline's notification cards) are folded into the content events.
-  const mergeContentReactions = useCallback(
-    (rows: Array<{ content_id: string; kind: string; reactions: MessageReaction[] }>) => {
-      setContentEvents((prev) => {
-        const byId = new Map(rows.map((row) => [row.content_id, row.reactions]));
-        let changed = false;
-        const next = prev.map((event) => {
-          const reactions = byId.get(event.id);
-          if (!reactions) return event;
-          const current = event.reactions ?? [];
-          // Compare the reactors too, not just the emoji: the same emoji gaining
-          // another member changes the pill's count.
-          if (
-            current.length === reactions.length &&
-            current.every(
-              (r, i) =>
-                r.emoji === reactions[i].emoji &&
-                r.user_ids.length === reactions[i].user_ids.length &&
-                r.user_ids.every((id, j) => id === reactions[i].user_ids[j]),
-            )
-          ) {
-            return event;
-          }
-          changed = true;
-          return { ...event, reactions };
-        });
-        return changed ? next : prev;
-      });
-    },
-    [],
-  );
-
-  // Prime only first-render data. Secondary tabs fetch from their own cached
-  // endpoints when mounted, so their work cannot delay the chat shell.
-  useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        setThreadEvents([]);
-        setThreadsReady(false);
-        setContentEvents([]);
-        setContentEventsReady(false);
-      }
-    });
-    initRequestCache(currentUserId);
-
-    // A server-rendered snapshot is authoritative for this navigation. Seed
-    // the shared client caches and avoid immediately requesting the same page
-    // data again after hydration.
-    if (initialMeta && initialMessages) {
-      const fetchedAt = Date.now();
-      metaCache.set(communityId, { ...initialMeta, fetchedAt });
-      msgCache.set(communityId, initialMessages);
-      msgFetchedAt.set(communityId, fetchedAt);
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setThreadsReady(true);
-          setContentEventsReady(true);
-        }
-      });
-      return () => { cancelled = true; };
-    }
-
-    void fetchAndHydrateCommunityBootstrap(communityId, currentUserId)
-      .then((data) => {
-        if (cancelled) return;
-        const communityData = data.community as {
-          community: CachedMeta["community"];
-          members: CachedMeta["members"];
-        };
-        const messageData = data.messages as { messages: CachedMessage[] };
-        const contentData = data["content-events"] as { events?: CachedContentEvent[] } | undefined;
-        const fetchedAt = Date.now();
-
-        metaCache.set(communityId, {
-          community: communityData.community,
-          members: communityData.members,
-          fetchedAt,
-        });
-        msgCache.set(communityId, messageData.messages ?? []);
-        msgFetchedAt.set(communityId, fetchedAt);
-        if (contentData) setContentEvents(contentData.events ?? []);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) {
-          setThreadsReady(true);
-          setContentEventsReady(true);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [communityId, currentUserId, initialMessages, initialMeta]);
+  const {
+    threadEvents,
+    setThreadEvents,
+    contentEvents,
+    setContentEvents,
+    threadsReady,
+    contentEventsReady,
+    handleThreadCreated,
+    handleThreadDeleted,
+    mergeContentReactions,
+    applyContentReactions,
+  } = useContentTimeline({ communityId, currentUserId, initialMeta, initialMessages });
 
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
@@ -430,42 +199,7 @@ export function CommunityChat({
     onContentReactions: mergeContentReactions,
   });
 
-  // Local creates/deletes from the mounted tabs (Threads/Showcase/Resources/
-  // Events) mirror into the timeline instantly — the server broadcast arrives
-  // later via realtime and dedupes by id.
-  useEffect(() => {
-    const onContentEvent = (change: Event) => {
-      const detail = (change as CustomEvent<{
-        kind: "insert" | "delete";
-        event: { id: string; community_id: string; user_id?: string; kind: CachedContentEvent["kind"]; title?: string; created_at?: string; meta?: CachedContentEvent["meta"] };
-      }>).detail;
-      if (!detail || detail.event.community_id !== communityId) return;
-      if (detail.kind === "delete") {
-        setContentEvents((prev) => prev.filter((event) => event.id !== detail.event.id));
-        return;
-      }
-      const row = detail.event;
-      setContentEvents((prev) => {
-        if (prev.some((event) => event.id === row.id)) return prev;
-        const member = members.find((m) => m.user_id === row.user_id);
-        const next: CachedContentEvent = {
-          id: row.id,
-          community_id: row.community_id,
-          user_id: row.user_id ?? currentUserId,
-          kind: row.kind,
-          title: row.title ?? "",
-          created_at: row.created_at ?? new Date().toISOString(),
-          meta: row.meta ?? null,
-          users: member?.users ?? null,
-        };
-        return [...prev, next].sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-        );
-      });
-    };
-    window.addEventListener(CONTENT_EVENT_CHANGED_EVENT, onContentEvent);
-    return () => window.removeEventListener(CONTENT_EVENT_CHANGED_EVENT, onContentEvent);
-  }, [communityId, currentUserId, members]);
+  useLocalContentEventMirror({ communityId, currentUserId, members, setContentEvents });
 
   // ── Pending @mention jumps (the "@" pill) ─────────────────────────────────
   // Read straight off the loaded messages: any message that mentions the
@@ -486,228 +220,12 @@ export function CommunityChat({
     [messages, currentUserId, initialLastReadAt, jumpedMentionIds],
   );
 
-  const handleReactionToggled = useCallback(
-    (msgId: string, reactions: MessageReaction[]) => {
-      setMessages((prev) => {
-        const next = prev.map((m) => m.id === msgId ? { ...m, reactions } : m);
-        msgCache.set(communityId, next);
-        return next;
-      });
-    },
-    [communityId, setMessages]
-  );
-
-  const reactionCoordinatorsRef = useRef(
-    new Map<string, ReactionIntentCoordinator<MessageReaction[]>>(),
-  );
-
-  const projectOwnReaction = useCallback(
-    (reactions: MessageReaction[], desiredEmoji: ReactionIntent) => {
-      const currentEmoji = reactions.find((reaction) =>
-        reaction.user_ids.includes(currentUserId),
-      )?.emoji;
-      const withoutCurrent = currentEmoji
-        ? applyReactionDelete(reactions, currentEmoji, currentUserId)
-        : reactions;
-      return desiredEmoji
-        ? applyReactionInsert(withoutCurrent, desiredEmoji, currentUserId)
-        : withoutCurrent;
-    },
-    [currentUserId],
-  );
-
-  useEffect(() => {
-    const coordinators = reactionCoordinatorsRef.current;
-    return () => {
-      for (const coordinator of coordinators.values()) coordinator.dispose();
-      coordinators.clear();
-      clearReactionIntentsForCommunity(communityId);
-    };
-  }, [communityId]);
-
-  // ── Inline hover reaction handler ─────────────────────────────────────────
-  const handleReaction = useCallback(
-    (msgId: string, emoji: string) => {
-      const message = msgCache.get(communityId)?.find((item) => item.id === msgId);
-      if (!message) return;
-
-      let coordinator = reactionCoordinatorsRef.current.get(msgId);
-      if (!coordinator) {
-        const initialEmoji = message.reactions?.find((reaction) =>
-          reaction.user_ids.includes(currentUserId),
-        )?.emoji ?? null;
-        const messagePreview = message.content
-          ? `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`
-          : message.image_url
-            ? "📷 Photo"
-            : "a message";
-
-        const paintIntent = (desiredEmoji: ReactionIntent) => {
-          const latest = msgCache.get(communityId)?.find((item) => item.id === msgId);
-          if (latest) {
-            handleReactionToggled(
-              msgId,
-              projectOwnReaction(latest.reactions ?? [], desiredEmoji),
-            );
-          }
-          if (desiredEmoji === null) markSidebarReactionRemoved(communityId, msgId);
-          patchSidebarReaction(
-            communityId,
-            desiredEmoji === null
-              ? null
-              : {
-                  messageId: msgId,
-                  emoji: desiredEmoji,
-                  createdAt: new Date().toISOString(),
-                  firstName: "You",
-                  isOwn: true,
-                  messagePreview,
-                },
-          );
-        };
-
-        coordinator = new ReactionIntentCoordinator<MessageReaction[]>({
-          initialValue: initialEmoji,
-          onOptimisticChange: paintIntent,
-          onIntentChange: (value, pending) => {
-            trackReactionIntent(communityId, msgId, currentUserId, value, pending);
-          },
-          persist: async (desiredEmoji) => {
-            const res = await fetch(
-              `/api/communities/${communityId}/messages/${msgId}/reactions`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ desiredEmoji }),
-              },
-            );
-            if (!res.ok) throw new Error("Unable to update reaction");
-            const data = await res.json() as {
-              reactions: MessageReaction[];
-              currentUserEmoji: ReactionIntent;
-            };
-            return { value: data.currentUserEmoji, data: data.reactions };
-          },
-          onConfirmed: ({ value, data }) => {
-            handleReactionToggled(msgId, data);
-            paintIntent(value);
-          },
-        });
-        reactionCoordinatorsRef.current.set(msgId, coordinator);
-      }
-
-      coordinator.toggle(emoji);
-    },
-    [communityId, currentUserId, handleReactionToggled, projectOwnReaction],
-  );
-
-  // ── Notification-card reactions ("created a …" content events) ────────────
-  // Same optimistic coordinator as message reactions, but persisting through
-  // the content-events reactions endpoint (keyed by content id + kind).
-  const contentReactionCoordinatorsRef = useRef(
-    new Map<string, ReactionIntentCoordinator<MessageReaction[]>>(),
-  );
-
-  const applyContentReactions = useCallback(
-    (contentId: string, reactions: MessageReaction[]) => {
-      setContentEvents((prev) => {
-        let changed = false;
-        const next = prev.map((event) => {
-          if (event.id !== contentId) return event;
-          changed = true;
-          return { ...event, reactions };
-        });
-        // Keep the previous array when the card isn't in the loaded window (or
-        // already carries this state) so nothing re-renders needlessly.
-        return changed ? next : prev;
-      });
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const coordinators = contentReactionCoordinatorsRef.current;
-    return () => {
-      for (const coordinator of coordinators.values()) coordinator.dispose();
-      coordinators.clear();
-    };
-  }, []);
-
-  const handleContentReaction = useCallback(
-    (event: CachedContentEvent, emoji: string) => {
-      const contentId = event.id;
-      const kind = event.kind;
-
-      // The sidebar confirms the reaction in the same frame, exactly like a
-      // message reaction — previewing the card's title ("You reacted 🔥 to:
-      // \"ui vs ux\""). Only a newer message takes that line back, so the patch
-      // survives the refetch that follows.
-      const cardTitle = (event.title || "").split("\n")[0].trim();
-      const contentPreview = cardTitle
-        ? `"${cardTitle.slice(0, 40)}${cardTitle.length > 40 ? "…" : ""}"`
-        : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-
-      const paintIntent = (desiredEmoji: ReactionIntent) => {
-        applyContentReactions(
-          contentId,
-          projectOwnReaction(event.reactions ?? [], desiredEmoji),
-        );
-        if (desiredEmoji === null) markSidebarReactionRemoved(communityId, contentId);
-        patchSidebarReaction(
-          communityId,
-          desiredEmoji === null
-            ? null
-            : {
-                messageId: contentId,
-                emoji: desiredEmoji,
-                createdAt: new Date().toISOString(),
-                firstName: "You",
-                isOwn: true,
-                contentKind: kind,
-                messagePreview: contentPreview,
-              },
-        );
-      };
-
-      let coordinator = contentReactionCoordinatorsRef.current.get(contentId);
-      if (!coordinator) {
-        const initialEmoji =
-          event.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji ?? null;
-
-        coordinator = new ReactionIntentCoordinator<MessageReaction[]>({
-          initialValue: initialEmoji,
-          onOptimisticChange: paintIntent,
-          onIntentChange: (value, pending) => {
-            trackReactionIntent(communityId, contentId, currentUserId, value, pending);
-          },
-          persist: async (desiredEmoji) => {
-            const res = await fetch(
-              `/api/communities/${communityId}/content-events/${contentId}/reactions`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ kind, desiredEmoji }),
-              },
-            );
-            if (!res.ok) throw new Error("Unable to update reaction");
-            const data = await res.json() as {
-              reactions: MessageReaction[];
-              currentUserEmoji: ReactionIntent;
-            };
-            return { value: data.currentUserEmoji, data: data.reactions };
-          },
-          onConfirmed: ({ value, data }) => {
-            applyContentReactions(contentId, data);
-            paintIntent(value);
-          },
-        });
-        contentReactionCoordinatorsRef.current.set(contentId, coordinator);
-      }
-
-      coordinator.toggle(emoji);
-    },
-    [applyContentReactions, communityId, currentUserId, projectOwnReaction],
-  );
+  const { handleReaction, handleContentReaction } = useChatReactions({
+    communityId,
+    currentUserId,
+    setMessages,
+    applyContentReactions,
+  });
 
   // ── Reply-to-notification: anchor the composer to a content event ─────────
   const handleContentReply = useCallback(
@@ -1424,8 +942,10 @@ export function CommunityChat({
       : activeTab;
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
-  const myRole = (displayCommunity as any)?.current_user_role ?? (isOwner ? "owner" : null);
-  const myPerms = (displayCommunity as any)?.current_user_permissions;
+  // Role and grants only exist on the loaded read model; the sidebar fallback
+  // never carries them, so read them from `community` directly.
+  const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
+  const myPerms = community?.current_user_permissions;
   // Platform-appointed admins of app-created communities get the same
   // management UI as a private-group creator, scoped by their grants.
   const isAdminWith = (permission: "can_edit_settings" | "can_manage_members" | "can_delete_messages") =>

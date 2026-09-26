@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { MessageSquare } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
-import type { CommunityEvent, EventComment, EventRsvp } from "./types";
+import type { CommunityEvent, EventComment, EventRsvp } from "@/lib/communities/models/events";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest } from "@/lib/request-cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";

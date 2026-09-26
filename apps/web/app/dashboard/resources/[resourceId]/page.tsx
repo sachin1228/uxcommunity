@@ -5,7 +5,7 @@ import { ResourceDetailClient } from "@/components/communities/resources/Resourc
 import { HomeRail } from "@/app/dashboard/HomeRail";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
-import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
+import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
 
 interface Props {
   params: Promise<{ resourceId: string }>;

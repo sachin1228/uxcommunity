@@ -12,7 +12,7 @@ import {
   Package,
   type LucideIcon,
 } from "lucide-react";
-import type { ResourceType } from "./types";
+import type { ResourceType } from "@/lib/communities/models/resources";
 
 const iconMap: Record<ResourceType, LucideIcon> = {
   figma:       Figma,

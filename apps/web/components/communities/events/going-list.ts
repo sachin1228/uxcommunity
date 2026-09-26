@@ -1,4 +1,4 @@
-import type { EventRsvp } from "./types";
+import type { EventRsvp } from "@/lib/communities/models/events";
 
 /**
  * The info card's "who is going" list: RSVP rows in, named entries out.
