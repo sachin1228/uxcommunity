@@ -1,16 +1,26 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
+import { RealtimeMetrics } from "./metrics";
+import { TopicSocketIndex } from "./subscriptions";
 
 /**
- * User Durable Object — ONE per user. Owns the single client WebSocket
- * for user-scoped rooms (notifications).
+ * User Durable Object — ONE per user (`user:${userId}`). Owns the single
+ * browser/device WebSocket multiplexing that user's logical user-scoped rooms
+ * (notifications, …).
  *
  * Community-scoped rooms (chat, threads, events, resources, showcase, rules)
  * are handled by CommunityDO directly — 0 RPCs.
  *
  * State model:
- *   WebSocket attachment: { userId: string }
- *   In-memory: topic subscriptions per WebSocket connection
+ *   WebSocket attachment: { userId, subs }
+ *   In-memory: topic subscriptions per WebSocket connection + a
+ *   (room, topic) → sockets index so a publish touches only its recipients.
+ *
+ * Fan-out:
+ *   A user's DO usually holds one socket per device/tab, so the old "walk every
+ *   client and test its subscription map" was already small — but it still cost
+ *   O(all sockets) per event and retried dead sockets forever. The index makes
+ *   it O(recipients) and failed sends evict the socket immediately.
  */
 
 interface ClientState {
@@ -25,9 +35,21 @@ interface UserAttachment {
   subs?: Record<string, string[]>;
 }
 
+/** Composite index key: a subscription is (logical room, topic). */
+function subscriptionKey(room: string, topic: string): string {
+  return `${room}\u0000${topic}`;
+}
+
 export class UserDO extends DurableObject<Env> {
   private clients = new Map<WebSocket, ClientState>();
+  /** (room, topic) → sockets, for targeted delivery. */
+  private subscriptions = new TopicSocketIndex<WebSocket>();
   private reconstructed = false;
+
+  readonly metrics = new RealtimeMetrics();
+
+  /** Opaque token for THIS in-memory instance — see CommunityDO's `instanceId`. */
+  private readonly instanceId = crypto.randomUUID().slice(0, 8);
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -41,6 +63,16 @@ export class UserDO extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     this.ensureReconstructed();
+
+    // Aggregate-only introspection for operations.
+    if (request.headers.get("x-realtime-stats") === this.env.REALTIME_PUBLISH_SECRET) {
+      return Response.json({
+        instanceId: this.instanceId,
+        sockets: this.clients.size,
+        subscriptionRefs: this.subscriptions.referenceCount,
+        metrics: this.metrics.toJSON(),
+      });
+    }
 
     // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
@@ -74,7 +106,11 @@ export class UserDO extends DurableObject<Env> {
 
     const subscriptions = new Map<string, Set<string>>();
     for (const [room, topics] of Object.entries(attachment.subs ?? {})) {
-      subscriptions.set(room, new Set(topics));
+      const set = new Set(topics);
+      subscriptions.set(room, set);
+      for (const topic of set) {
+        this.subscriptions.add(subscriptionKey(room, topic), ws);
+      }
     }
 
     const state: ClientState = { userId: attachment.userId, subscriptions };
@@ -115,6 +151,7 @@ export class UserDO extends DurableObject<Env> {
       userId,
       subscriptions: new Map(),
     });
+    this.metrics.connectionsOpened += 1;
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -147,10 +184,10 @@ export class UserDO extends DurableObject<Env> {
       if (!msg.user || msg.user.id !== state.userId) return;
       this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
     } else if (msg.t === "subscribe" && msg.room && msg.topic) {
-      this.handleSubscribe(state, msg.room, msg.topic);
+      this.handleSubscribe(state, ws, msg.room, msg.topic);
       this.persist(ws, state);
     } else if (msg.t === "unsubscribe" && msg.room && msg.topic) {
-      this.handleUnsubscribe(state, msg.room, msg.topic);
+      this.handleUnsubscribe(state, ws, msg.room, msg.topic);
       this.persist(ws, state);
     } else if (msg.t === "publish" && msg.room && msg.topic) {
       this.handlePublish(state, msg.room, msg.topic, msg.data);
@@ -160,10 +197,29 @@ export class UserDO extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket): Promise<void> {
     this.ensureReconstructed();
     this.clients.delete(ws);
+    this.subscriptions.removeSocket(ws);
+    this.metrics.connectionsClosed += 1;
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
     await this.webSocketClose(ws);
+  }
+
+  /**
+   * Drop a socket whose `send()` failed. Without this the socket stays in the
+   * subscription index and every later event retries a connection that can
+   * never succeed.
+   */
+  private evictSocket(ws: WebSocket): void {
+    this.clients.delete(ws);
+    this.subscriptions.removeSocket(ws);
+    this.metrics.connectionsClosed += 1;
+    this.metrics.sendFailures += 1;
+    try {
+      ws.close(1011, "send failed");
+    } catch {
+      // Already closed.
+    }
   }
 
   // ── HTTP publish (server-side) ───────────────────────────────────────
@@ -187,33 +243,46 @@ export class UserDO extends DurableObject<Env> {
       sender: body.exclude_user,
     });
 
-    for (const [ws, state] of this.clients) {
-      const topics = state.subscriptions.get(body.room);
-      if (!topics?.has(body.topic)) continue;
-      if (body.exclude_user && state.userId === body.exclude_user) continue;
+    this.deliver(subscriptionKey(body.room, body.topic), eventMsg, body.exclude_user);
+    return new Response("ok");
+  }
 
+  /** Send `eventMsg` to the sockets subscribed to one (room, topic) pair. */
+  private deliver(key: string, eventMsg: string, excludeUserId?: string): void {
+    const recipients = this.subscriptions.subscribers(key);
+    if (!recipients || recipients.size === 0) return;
+
+    this.metrics.eventsPublished += 1;
+    this.metrics.fanoutRecipients += recipients.size;
+
+    for (const ws of recipients) {
+      const state = this.clients.get(ws);
+      if (!state) continue;
+      if (excludeUserId && state.userId === excludeUserId) continue;
+
+      this.metrics.deliverAttempts += 1;
       try {
         ws.send(eventMsg);
       } catch {
-        // WebSocket send failed — will be cleaned up on close
+        this.evictSocket(ws);
       }
     }
-
-    return new Response("ok");
   }
 
   // ── Subscription handling (user-scoped rooms) ─────────────────────────
 
-  private handleSubscribe(state: ClientState, room: string, topic: string): void {
+  private handleSubscribe(state: ClientState, ws: WebSocket, room: string, topic: string): void {
     let topics = state.subscriptions.get(room);
     if (!topics) {
       topics = new Set();
       state.subscriptions.set(room, topics);
     }
     topics.add(topic);
+    // Duplicate subscribe frames are absorbed by the index.
+    this.subscriptions.add(subscriptionKey(room, topic), ws);
   }
 
-  private handleUnsubscribe(state: ClientState, room: string, topic: string): void {
+  private handleUnsubscribe(state: ClientState, ws: WebSocket, room: string, topic: string): void {
     const topics = state.subscriptions.get(room);
     if (topics) {
       topics.delete(topic);
@@ -221,11 +290,11 @@ export class UserDO extends DurableObject<Env> {
         state.subscriptions.delete(room);
       }
     }
+    this.subscriptions.remove(subscriptionKey(room, topic), ws);
   }
 
   private handlePublish(state: ClientState, room: string, topic: string, data: unknown): void {
-    const topics = state.subscriptions.get(room);
-    if (!topics?.has(topic)) return;
+    if (!state.subscriptions.get(room)?.has(topic)) return;
 
     const eventMsg = JSON.stringify({
       t: "event",
@@ -235,22 +304,18 @@ export class UserDO extends DurableObject<Env> {
       sender: state.userId,
     });
 
-    for (const [clientWs, clientState] of this.clients) {
-      const clientTopics = clientState.subscriptions.get(room);
-      if (!clientTopics?.has(topic)) continue;
-      if (clientState.userId === state.userId) continue;
-
-      try {
-        clientWs.send(eventMsg);
-      } catch {
-        // WebSocket send failed — will be cleaned up on close
-      }
-    }
+    // The publisher's own sockets are the exclusion set, matching the previous
+    // behaviour where a client never received its own event back.
+    this.deliver(subscriptionKey(room, topic), eventMsg, state.userId);
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
   private sendToClient(ws: WebSocket, msg: unknown): void {
-    try { ws.send(JSON.stringify(msg)); } catch { /* ignore */ }
+    try {
+      ws.send(JSON.stringify(msg));
+    } catch {
+      this.evictSocket(ws);
+    }
   }
 }

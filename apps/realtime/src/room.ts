@@ -1,6 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import type { PublishRequest } from "./types";
+import { RealtimeMetrics } from "./metrics";
+import {
+  TopicSocketIndex,
+  buildPresenceSnapshot,
+  presenceSignature,
+  type PresenceMeta,
+} from "./subscriptions";
 
 /**
  * Community Durable Object — ONE per community. Handles all logical realtime
@@ -12,27 +19,30 @@ import type { PublishRequest } from "./types";
  *
  * State scoping:
  *   SOCKET-scoped (per individual WebSocket connection):
- *     wsToUser[ws]   = userId
- *     wsTopics[ws]    = Set<topics> this socket is subscribed to
+ *     wsToUser[ws]        = userId
+ *     subscriptions       = topic → sockets (targeted fan-out index)
+ *   USER-scoped (multi-device bookkeeping + presence):
  *     userSockets[userId] = Set<WebSocket> all sockets for this user
+ *     userMeta[userId]    = { name, avatar } cached at join() so a presence
+ *                           snapshot never has to deserialize attachments
  *
- *   USER-scoped (for efficient fan-out, shared across all sockets of a user):
- *     subscriptionsByUser[userId]  = Set<topics> (union of all socket subscriptions)
- *     subscriptionsByTopic[topic]  = Set<userIds> subscribed to that topic
+ * Fan-out:
+ *   A publish resolves `subscriptions.subscribers(topic)` and sends only to
+ *   those sockets. The earlier revision walked every socket in the DO and asked
+ *   each one whether it was subscribed, which made one event's cost proportional
+ *   to the room population rather than to its recipients.
  *
  * Multi-device safety:
- *   When the same user has multiple sockets, closing one socket only removes
- *   topics from the dual-index if NO OTHER socket of that user still has
- *   that topic. This prevents one tab's close from killing another tab's
- *   subscriptions.
+ *   Subscriptions are per socket, so closing one tab can never remove another
+ *   tab's subscription.
  *
  * WebSocket state (hibernation-safe):
- *   Each WebSocket attachment stores { userId, topics: string[] }.
+ *   Each WebSocket attachment stores { userId, topics, name, avatar }.
  *   On wake, ctx.getWebSockets() + deserializeAttachment() rebuilds all maps.
  *
  * Authorization:
  *   - WebSocket upgrade requires x-realtime-uid header (set by Worker after JWT auth)
- *   - Membership checked via internal API (fail-closed)
+ *   - Membership checked via internal API (fail-closed) with a bounded cache
  *
  * Event classification:
  *   - EPHEMERAL (typing, presence): drop on delivery failure, no retry
@@ -46,28 +56,57 @@ interface WebSocketAttachment {
   avatar: string | null;
 }
 
+/**
+ * How long presence changes are allowed to coalesce.
+ *
+ * Presence is a coarse "who is here" roster: a 150 ms delay is imperceptible,
+ * while sending a full snapshot on every join/close made a reconnect storm
+ * quadratic (N connections joining produced N snapshots × N sockets).
+ */
+const PRESENCE_COALESCE_MS = 150;
+
+/** Membership re-check window and the cap on cached entries. */
+const MEMBERSHIP_CACHE_TTL_MS = 60_000;
+const MEMBERSHIP_CACHE_MAX_ENTRIES = 500;
+/** Sweep expired `auth:*` storage keys every N membership API checks. */
+const MEMBERSHIP_STORAGE_PRUNE_EVERY = 64;
+
 export class Room extends DurableObject<Env> {
   /**
-   * Dual-index subscriber store (USER-scoped, for efficient fan-out).
-   * subscriptionsByUser[userId] = Set of topics the user is subscribed to (across all sockets).
-   * subscriptionsByTopic[topic] = Set of userIds subscribed to that topic.
+   * Targeted fan-out index: topic → sockets that subscribed to it.
+   * This is the only structure a broadcast reads.
    */
-  private subscriptionsByUser = new Map<string, Set<string>>();
-  private subscriptionsByTopic = new Map<string, Set<string>>();
-  private subscribersReconstructed = false;
+  private subscriptions = new TopicSocketIndex<WebSocket>();
 
-  /**
-   * WebSocket-ownership maps (SOCKET-scoped, rebuilt after hibernation).
-   * wsToUser[ws]     = userId of the connected client.
-   * wsTopics[ws]     = Set<topics> this SPECIFIC socket is subscribed to.
-   * userSockets[userId] = Set<WebSocket> all active sockets for this user.
-   */
+  /** Socket → userId, and userId → its sockets (multi-device + presence). */
   private wsToUser = new Map<WebSocket, string>();
-  private wsTopics = new Map<WebSocket, Set<string>>();
   private userSockets = new Map<string, Set<WebSocket>>();
+  /** Display metadata cached at join() — presence snapshots never touch attachments. */
+  private userMeta = new Map<string, PresenceMeta>();
 
   /** In-flight reconstruction, shared so concurrent callers await the same work. */
   private reconstructPromise: Promise<void> | null = null;
+  private reconstructed = false;
+
+  /** Coalesced presence state. */
+  private presenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private presenceDirty = false;
+  private lastPresenceSignature: string | null = null;
+
+  /** Bounded membership authorization cache (in-memory LRU + pruned storage). */
+  private membershipCache = new Map<string, { ok: boolean; ts: number }>();
+  private membershipStorageWrites = 0;
+
+  readonly metrics = new RealtimeMetrics();
+
+  /**
+   * Opaque token for THIS in-memory instance. A hibernating DO is evicted and
+   * recreated freely, and a recreated instance starts its counters at zero and
+   * rebuilds its sockets from the attachments — so "is this the instance that
+   * served the request I just made?" is the first question any counter reading
+   * raises, and the token answers it without exposing anything about the room.
+   */
+  private readonly instanceId = crypto.randomUUID().slice(0, 8);
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -78,13 +117,18 @@ export class Room extends DurableObject<Env> {
 
     // After hibernation the first event is frequently a webSocketMessage (e.g.
     // a typing publish), not a fetch. Rebuild socket/user maps up front so that
-    // frame is not silently dropped because wsToUser is empty.
+    // frame is not silently dropped because the maps are empty.
     this.ctx.blockConcurrencyWhile(() => this.ensureSubscribers());
   }
 
   // ── Fetch handler ──────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
+    // Aggregate-only introspection for operations (never message contents).
+    if (request.headers.get("x-realtime-stats") === this.env.REALTIME_PUBLISH_SECRET) {
+      return Response.json(this.stats());
+    }
+
     // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
       return this.publish(request);
@@ -96,6 +140,20 @@ export class Room extends DurableObject<Env> {
     }
 
     return new Response("Not found", { status: 404 });
+  }
+
+  /** Counts only: connections, subscribers, fan-out and failure totals. */
+  private stats(): Record<string, unknown> {
+    return {
+      room: this.roomName(),
+      instanceId: this.instanceId,
+      sockets: this.wsToUser.size,
+      users: this.userSockets.size,
+      topics: this.subscriptions.topicCount,
+      subscriptionRefs: this.subscriptions.referenceCount,
+      membershipCacheSize: this.membershipCache.size,
+      metrics: this.metrics.toJSON(),
+    };
   }
 
   // ── WebSocket lifecycle (hibernation-safe) ─────────────────────────
@@ -137,17 +195,11 @@ export class Room extends DurableObject<Env> {
     };
     server.serializeAttachment(attachment);
 
-    // Track in memory — socket-scoped state
-    this.wsToUser.set(server, userId);
-    this.wsTopics.set(server, new Set());
-
-    // Track this socket under the user (for multi-device cleanup)
-    let sockets = this.userSockets.get(userId);
-    if (!sockets) {
-      sockets = new Set();
-      this.userSockets.set(userId, sockets);
-    }
-    sockets.add(server);
+    this.trackSocket(server, userId);
+    this.metrics.connectionsOpened += 1;
+    // A new socket changes the presence roster (it joins as "unknown" until its
+    // `join` frame lands, exactly like the previous snapshot did).
+    this.markPresenceDirty();
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -188,13 +240,18 @@ export class Room extends DurableObject<Env> {
         attachment.avatar = msg.user.avatar ?? null;
         ws.serializeAttachment(attachment);
       }
+      // Cache for presence snapshots — written once per join, read per flush.
+      this.userMeta.set(userId, {
+        name: msg.user.name ?? null,
+        avatar: msg.user.avatar ?? null,
+      });
 
       this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
-      this.broadcastPresence();
+      this.markPresenceDirty();
     } else if (msg.t === "subscribe" && msg.topic) {
-      await this.handleWsSubscribe(ws, userId, msg.topic);
+      this.handleWsSubscribe(ws, msg.topic);
     } else if (msg.t === "unsubscribe" && msg.topic) {
-      await this.handleWsUnsubscribe(ws, userId, msg.topic);
+      this.handleWsUnsubscribe(ws, msg.topic);
     } else if (msg.t === "publish" && msg.topic) {
       await this.handleWsPublish(ws, userId, msg.topic, msg.data);
     }
@@ -202,76 +259,71 @@ export class Room extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket): Promise<void> {
     await this.ensureSubscribers();
-    const userId = this.wsToUser.get(ws);
-    if (!userId) return;
-
-    // Remove this socket's subscriptions from the dual-index
-    // Only remove from dual-index if NO OTHER socket of this user still has this topic
-    const topics = this.wsTopics.get(ws);
-    if (topics) {
-      const otherSockets = this.userSockets.get(userId);
-      for (const topic of topics) {
-        // Check if any OTHER socket of this user still subscribes to this topic
-        let stillSubscribed = false;
-        if (otherSockets) {
-          for (const otherWs of otherSockets) {
-            if (otherWs === ws) continue;
-            const otherTopics = this.wsTopics.get(otherWs);
-            if (otherTopics?.has(topic)) {
-              stillSubscribed = true;
-              break;
-            }
-          }
-        }
-        if (!stillSubscribed) {
-          this.removeFromTopicIndex(userId, topic);
-        }
-      }
-      this.wsTopics.delete(ws);
-    }
-
-    // Remove this socket from the user's socket set
-    const sockets = this.userSockets.get(userId);
-    if (sockets) {
-      sockets.delete(ws);
-      if (sockets.size === 0) {
-        this.userSockets.delete(userId);
-      }
-    }
-
-    this.wsToUser.delete(ws);
-    this.broadcastPresence();
+    this.removeSocket(ws, "close");
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
-    await this.webSocketClose(ws);
+    await this.ensureSubscribers();
+    this.removeSocket(ws, "error");
+  }
+
+  // ── Socket bookkeeping ────────────────────────────────────────────
+
+  /** Register an accepted socket in the socket- and user-scoped maps. */
+  private trackSocket(ws: WebSocket, userId: string): void {
+    this.wsToUser.set(ws, userId);
+
+    let sockets = this.userSockets.get(userId);
+    if (!sockets) {
+      sockets = new Set();
+      this.userSockets.set(userId, sockets);
+    }
+    sockets.add(ws);
+  }
+
+  /**
+   * Drop a socket from every index. Idempotent, so a close handler racing an
+   * eviction (or a duplicate runtime callback) cannot double-count.
+   *
+   * `close` is used for send failures: a socket that cannot be written to must
+   * not stay in the fan-out index, otherwise every subsequent event retries it.
+   */
+  private removeSocket(ws: WebSocket, reason: "close" | "error" | "send-failed"): void {
+    const userId = this.wsToUser.get(ws);
+    if (userId === undefined && !this.subscriptions.socketTopics(ws)) return;
+
+    this.subscriptions.removeSocket(ws);
+    this.wsToUser.delete(ws);
+
+    if (userId !== undefined) {
+      const sockets = this.userSockets.get(userId);
+      if (sockets) {
+        sockets.delete(ws);
+        if (sockets.size === 0) {
+          this.userSockets.delete(userId);
+          this.userMeta.delete(userId);
+        }
+      }
+    }
+
+    this.metrics.connectionsClosed += 1;
+    if (reason === "send-failed") {
+      this.metrics.sendFailures += 1;
+      try {
+        ws.close(1011, "send failed");
+      } catch {
+        // Already closing/closed — nothing to do.
+      }
+    }
+    this.markPresenceDirty();
   }
 
   // ── WebSocket message handlers ─────────────────────────────────────
 
-  private async handleWsSubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
-    // Add topic to this socket's topic set
-    let topics = this.wsTopics.get(ws);
-    if (!topics) {
-      topics = new Set();
-      this.wsTopics.set(ws, topics);
-    }
-    topics.add(topic);
-
-    // Update dual index (user-scoped, for fan-out)
-    let userTopics = this.subscriptionsByUser.get(userId);
-    if (!userTopics) {
-      userTopics = new Set();
-      this.subscriptionsByUser.set(userId, userTopics);
-    }
-    userTopics.add(topic);
-
-    let topicSubs = this.subscriptionsByTopic.get(topic);
-    if (!topicSubs) {
-      topicSubs = new Set();
-      this.subscriptionsByTopic.set(topic, topicSubs);
-    }
-    topicSubs.add(userId);
+  private handleWsSubscribe(ws: WebSocket, topic: string): void {
+    // Idempotent: a duplicate subscribe frame (React remount, reconnect replay)
+    // must not create a second subscription.
+    this.subscriptions.add(topic, ws);
 
     // Update WebSocket attachment
     const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
@@ -283,31 +335,8 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  private async handleWsUnsubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
-    // Remove topic from this socket's topic set
-    const topics = this.wsTopics.get(ws);
-    if (topics) {
-      topics.delete(topic);
-    }
-
-    // Check if any OTHER socket of this user still has this topic
-    let stillSubscribed = false;
-    const sockets = this.userSockets.get(userId);
-    if (sockets) {
-      for (const otherWs of sockets) {
-        if (otherWs === ws) continue;
-        const otherTopics = this.wsTopics.get(otherWs);
-        if (otherTopics?.has(topic)) {
-          stillSubscribed = true;
-          break;
-        }
-      }
-    }
-
-    // Only remove from dual-index if no other socket has this topic
-    if (!stillSubscribed) {
-      this.removeFromTopicIndex(userId, topic);
-    }
+  private handleWsUnsubscribe(ws: WebSocket, topic: string): void {
+    this.subscriptions.remove(topic, ws);
 
     // Update WebSocket attachment
     const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
@@ -318,12 +347,11 @@ export class Room extends DurableObject<Env> {
   }
 
   private async handleWsPublish(ws: WebSocket, userId: string, topic: string, data: unknown): Promise<void> {
-    // Check if THIS socket is subscribed to the topic
-    const topics = this.wsTopics.get(ws);
-    if (!topics?.has(topic)) return;
+    // Only a socket subscribed to the topic may publish into it.
+    if (!this.subscriptions.socketTopics(ws)?.has(topic)) return;
 
-    // Broadcast to all subscribers (sender excluded via broadcastByTopic)
-    await this.broadcastByTopic(topic, data, userId, userId);
+    // Broadcast to all subscribers (sender excluded).
+    this.broadcastByTopic(topic, data, userId, userId);
   }
 
   // ── Subscriber index reconstruction after hibernation ────────────────
@@ -334,23 +362,20 @@ export class Room extends DurableObject<Env> {
    * callers (message/close/publish/upgrade) just await the shared promise.
    */
   private ensureSubscribers(): Promise<void> {
-    if (this.subscribersReconstructed) return Promise.resolve();
+    if (this.reconstructed) return Promise.resolve();
     if (!this.reconstructPromise) {
-      this.reconstructPromise = (async () => {
-        this.reconstructWebSockets();
-        this.rebuildUserScopedMaps();
-        this.subscribersReconstructed = true;
-      })().finally(() => {
-        this.reconstructPromise = null;
-      });
+      this.reconstructPromise = Promise.resolve()
+        .then(() => {
+          for (const ws of this.ctx.getWebSockets()) {
+            this.adoptSocket(ws);
+          }
+          this.reconstructed = true;
+        })
+        .finally(() => {
+          this.reconstructPromise = null;
+        });
     }
     return this.reconstructPromise;
-  }
-
-  private reconstructWebSockets(): void {
-    for (const ws of this.ctx.getWebSockets()) {
-      this.adoptSocket(ws);
-    }
   }
 
   /**
@@ -368,79 +393,20 @@ export class Room extends DurableObject<Env> {
     if (!attachment?.userId) return null;
 
     const userId = attachment.userId;
+    this.trackSocket(ws, userId);
 
-    // Rebuild socket-scoped state
-    this.wsToUser.set(ws, userId);
-
-    let topics = this.wsTopics.get(ws);
-    if (!topics) {
-      topics = new Set();
-      this.wsTopics.set(ws, topics);
-    }
     for (const topic of attachment.topics ?? []) {
-      topics.add(topic);
+      this.subscriptions.add(topic, ws);
     }
 
-    // Rebuild user → sockets index
-    let sockets = this.userSockets.get(userId);
-    if (!sockets) {
-      sockets = new Set();
-      this.userSockets.set(userId, sockets);
-    }
-    sockets.add(ws);
-
-    // Keep the user-scoped dual index in sync for fan-out
-    let userTopics = this.subscriptionsByUser.get(userId);
-    if (!userTopics) {
-      userTopics = new Set();
-      this.subscriptionsByUser.set(userId, userTopics);
-    }
-    for (const topic of topics) {
-      userTopics.add(topic);
-      let topicSubs = this.subscriptionsByTopic.get(topic);
-      if (!topicSubs) {
-        topicSubs = new Set();
-        this.subscriptionsByTopic.set(topic, topicSubs);
-      }
-      topicSubs.add(userId);
+    if (attachment.name !== undefined || attachment.avatar !== undefined) {
+      this.userMeta.set(userId, {
+        name: attachment.name ?? null,
+        avatar: attachment.avatar ?? null,
+      });
     }
 
     return userId;
-  }
-
-  /**
-   * Rebuild user-scoped dual-index maps from socket-scoped maps.
-   * Called after reconstructWebSockets() to ensure subscriptionsByUser
-   * and subscriptionsByTopic are consistent with connected WebSockets.
-   * Subscription state lives in WebSocket attachments — no per-subscribe
-   * storage writes needed.
-   */
-  private rebuildUserScopedMaps(): void {
-    this.subscriptionsByUser.clear();
-    this.subscriptionsByTopic.clear();
-
-    for (const [ws, userId] of this.wsToUser) {
-      const topics = this.wsTopics.get(ws);
-      if (!topics) continue;
-
-      let userTopics = this.subscriptionsByUser.get(userId);
-      if (!userTopics) {
-        userTopics = new Set();
-        this.subscriptionsByUser.set(userId, userTopics);
-      }
-      for (const topic of topics) {
-        userTopics.add(topic);
-      }
-
-      for (const topic of topics) {
-        let topicSubs = this.subscriptionsByTopic.get(topic);
-        if (!topicSubs) {
-          topicSubs = new Set();
-          this.subscriptionsByTopic.set(topic, topicSubs);
-        }
-        topicSubs.add(userId);
-      }
-    }
   }
 
   // ── HTTP publish (server-side) ───────────────────────────────────────
@@ -457,26 +423,31 @@ export class Room extends DurableObject<Env> {
     }
 
     await this.ensureSubscribers();
-    await this.broadcastByTopic(body.topic, body.data, body.exclude_user);
+    this.metrics.eventsPublished += 1;
+    this.broadcastByTopic(body.topic, body.data, body.exclude_user);
 
     return new Response("ok");
   }
 
-  // ��─ Broadcast with dual-index lookup ──────────────────────────────────
+  // ── Broadcast with targeted fan-out ─────────────────────────────────
 
   /**
-   * Broadcast an event to all subscribers of a topic.
-   * Iterates ctx.getWebSockets() and sends directly via ws.send().
-   * 0 RPC calls.
+   * Send an event to the sockets subscribed to `topic` — and only those.
+   *
+   * Cost is O(recipients), not O(sockets in the DO): the subscriber set is read
+   * directly from the topic index instead of scanning every attached socket.
+   * The payload is serialized once per broadcast.
    */
-  private async broadcastByTopic(
+  private broadcastByTopic(
     topic: string,
     data: unknown,
     excludeUserId?: string,
     senderUserId?: string,
-  ): Promise<void> {
-    const topicSubs = this.subscriptionsByTopic.get(topic);
-    if (!topicSubs || topicSubs.size === 0) return;
+  ): void {
+    const recipients = this.subscriptions.subscribers(topic);
+    if (!recipients || recipients.size === 0) return;
+
+    this.metrics.fanoutRecipients += recipients.size;
 
     const eventMsg = JSON.stringify({
       t: "event",
@@ -486,90 +457,81 @@ export class Room extends DurableObject<Env> {
       sender: senderUserId,
     });
 
-    for (const ws of this.ctx.getWebSockets()) {
+    for (const ws of recipients) {
       const userId = this.wsToUser.get(ws);
       if (!userId) continue;
       if (excludeUserId && userId === excludeUserId) continue;
-      const topics = this.wsTopics.get(ws);
-      if (!topics?.has(topic)) continue;
 
+      this.metrics.deliverAttempts += 1;
       try {
         ws.send(eventMsg);
       } catch {
-        // WebSocket send failed — will be cleaned up on close
+        // One broken socket must not affect the rest of the fan-out, and it
+        // must not be retried on every subsequent event — evict it now.
+        this.removeSocket(ws, "send-failed");
       }
     }
   }
 
   // ── Presence ──────────────────────────────────────────────────────
 
-  /** Broadcast one entry per connected member, with tabs/devices folded into connections. */
-  private broadcastPresence(): void {
-    const users = new Map<
-      string,
-      { id: string; name: string | null; avatar: string | null; connections: number }
-    >();
-
-    for (const ws of this.ctx.getWebSockets()) {
-      const userId = this.wsToUser.get(ws);
-      if (!userId) continue;
-
-      const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
-      const current = users.get(userId);
-      if (current) {
-        current.connections += 1;
-        if (!current.name && attachment?.name) current.name = attachment.name;
-        if (!current.avatar && attachment?.avatar) current.avatar = attachment.avatar;
-      } else {
-        users.set(userId, {
-          id: userId,
-          name: attachment?.name ?? null,
-          avatar: attachment?.avatar ?? null,
-          connections: 1,
-        });
-      }
+  /**
+   * Mark the roster as changed and schedule a flush.
+   *
+   * Joins and closes are coalesced into one snapshot per window: before this, a
+   * reconnect storm sent a full snapshot (with an attachment deserialization
+   * per socket, twice) for every single join and close.
+   */
+  private markPresenceDirty(): void {
+    this.presenceDirty = true;
+    if (this.presenceTimer !== null) {
+      this.metrics.presenceCoalesced += 1;
+      return;
     }
+    this.presenceTimer = setTimeout(() => {
+      this.presenceTimer = null;
+      this.flushPresence();
+    }, PRESENCE_COALESCE_MS);
+  }
+
+  /** Broadcast one entry per connected member, with tabs/devices folded into connections. */
+  private flushPresence(): void {
+    if (!this.presenceDirty) return;
+    this.presenceDirty = false;
+
+    const sockets = this.ctx.getWebSockets();
+    if (sockets.length === 0) return;
+
+    const users = buildPresenceSnapshot(this.userSockets, this.userMeta);
+    const signature = presenceSignature(users);
+    // Nothing changed since the last snapshot — skip the write entirely.
+    if (signature === this.lastPresenceSignature) {
+      this.metrics.presenceSkipped += 1;
+      return;
+    }
+    this.lastPresenceSignature = signature;
 
     const message = JSON.stringify({
       t: "presence",
       room: this.roomName(),
-      users: [...users.values()],
+      users,
     });
 
-    for (const ws of this.ctx.getWebSockets()) {
+    for (const ws of sockets) {
+      // Counted separately from event fan-out: this addresses the whole room, so
+      // folding it into `deliverAttempts` would hide the cost of a publish.
+      this.metrics.presenceDeliverAttempts += 1;
       try {
         ws.send(message);
       } catch {
-        // The close/error handler removes dead sockets and publishes a fresh snapshot.
+        // A dead socket is evicted; the next flush publishes a fresh snapshot.
+        this.removeSocket(ws, "send-failed");
       }
     }
-  }
-
-  // ── Index helpers ──────────────────────────────────────────────────
-
-  private removeFromTopicIndex(userId: string, topic: string): void {
-    const userTopics = this.subscriptionsByUser.get(userId);
-    if (userTopics) {
-      userTopics.delete(topic);
-      if (userTopics.size === 0) {
-        this.subscriptionsByUser.delete(userId);
-      }
-    }
-
-    const topicSubs = this.subscriptionsByTopic.get(topic);
-    if (topicSubs) {
-      topicSubs.delete(userId);
-      if (topicSubs.size === 0) {
-        this.subscriptionsByTopic.delete(topic);
-      }
-    }
+    this.metrics.presenceBroadcasts += 1;
   }
 
   // ── Membership authorization (fail-closed) ──────────────────────────
-
-  /** Cache TTL: re-check membership every 60 seconds. */
-  private static readonly MEMBERSHIP_CACHE_TTL_MS = 60_000;
-  private membershipCache = new Map<string, { ok: boolean; ts: number }>();
 
   private async checkMembership(userId: string): Promise<boolean> {
     if (!this.env.API_URL) return true;
@@ -578,9 +540,15 @@ export class Room extends DurableObject<Env> {
     const cacheKey = `${communityId}:${userId}`;
 
     const cached = this.membershipCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < Room.MEMBERSHIP_CACHE_TTL_MS) {
+    if (cached && Date.now() - cached.ts < MEMBERSHIP_CACHE_TTL_MS) {
+      this.metrics.membershipCacheHits += 1;
+      // Refresh LRU position: the cache is capped, so a hot community with
+      // thousands of connecting members must not evict its own active set.
+      this.membershipCache.delete(cacheKey);
+      this.membershipCache.set(cacheKey, cached);
       return cached.ok;
     }
+    if (cached) this.membershipCache.delete(cacheKey);
 
     try {
       const stored = await this.ctx.storage.get<{ ok: boolean; ts: number }>(`auth:${cacheKey}`);
@@ -588,15 +556,17 @@ export class Room extends DurableObject<Env> {
         stored &&
         typeof stored.ok === "boolean" &&
         typeof stored.ts === "number" &&
-        Date.now() - stored.ts < Room.MEMBERSHIP_CACHE_TTL_MS
+        Date.now() - stored.ts < MEMBERSHIP_CACHE_TTL_MS
       ) {
-        this.membershipCache.set(cacheKey, stored);
+        this.setMembershipCache(cacheKey, stored);
+        this.metrics.membershipCacheHits += 1;
         return stored.ok;
       }
     } catch {
       // Storage read failed — fall through to the authoritative API check.
     }
 
+    this.metrics.membershipChecks += 1;
     try {
       const response = await fetch(
         `${this.env.API_URL}/api/communities/${communityId}/members/${userId}/check`,
@@ -619,13 +589,19 @@ export class Room extends DurableObject<Env> {
         }
       }
 
-      this.membershipCache.set(cacheKey, { ok: authorized, ts: Date.now() });
+      this.setMembershipCache(cacheKey, { ok: authorized, ts: Date.now() });
 
       try {
         await this.ctx.storage.put(`auth:${cacheKey}`, {
           ok: authorized,
           ts: Date.now(),
         });
+        this.membershipStorageWrites += 1;
+        if (this.membershipStorageWrites % MEMBERSHIP_STORAGE_PRUNE_EVERY === 0) {
+          // Storage entries are only useful inside the TTL; without a sweep a
+          // large community accumulated one permanent key per member forever.
+          await this.pruneMembershipStorage();
+        }
       } catch {
         // Storage write failed — not critical
       }
@@ -634,6 +610,37 @@ export class Room extends DurableObject<Env> {
     } catch {
       this.membershipCache.delete(cacheKey);
       return false;
+    }
+  }
+
+  /** Insert into the bounded cache, evicting the oldest entry past the cap. */
+  private setMembershipCache(cacheKey: string, value: { ok: boolean; ts: number }): void {
+    this.membershipCache.delete(cacheKey);
+    this.membershipCache.set(cacheKey, value);
+    while (this.membershipCache.size > MEMBERSHIP_CACHE_MAX_ENTRIES) {
+      const oldest = this.membershipCache.keys().next().value;
+      if (oldest === undefined) break;
+      this.membershipCache.delete(oldest);
+      this.metrics.membershipCacheEvictions += 1;
+    }
+  }
+
+  /** Delete expired `auth:*` keys (bounded page — the sweep repeats next cycle). */
+  private async pruneMembershipStorage(): Promise<void> {
+    try {
+      const now = Date.now();
+      const entries = await this.ctx.storage.list<{ ok: boolean; ts: number }>({
+        prefix: "auth:",
+        limit: 256,
+      });
+      const expired: string[] = [];
+      for (const [key, value] of entries) {
+        const ts = typeof value?.ts === "number" ? value.ts : 0;
+        if (now - ts >= MEMBERSHIP_CACHE_TTL_MS) expired.push(key);
+      }
+      if (expired.length > 0) await this.ctx.storage.delete(expired);
+    } catch {
+      // Maintenance only — never fail a connection because cleanup failed.
     }
   }
 
@@ -653,7 +660,7 @@ export class Room extends DurableObject<Env> {
     try {
       ws.send(JSON.stringify(msg));
     } catch {
-      /* ignore */
+      this.removeSocket(ws, "send-failed");
     }
   }
 }

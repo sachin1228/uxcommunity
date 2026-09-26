@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendExpoPush, type ExpoPushMessage } from "./expo";
-import { loadUnreadMessageTotals } from "./unread-totals";
+import { loadUnreadMessageTotals, type UntypedRpc } from "./unread-totals";
 
 /** Keeps the notification body to a WhatsApp-sized preview. */
 const PREVIEW_MAX = 120;
@@ -14,6 +14,35 @@ const PREVIEW_MAX = 120;
  */
 export const AUDIBLE_WINDOW_MS = 60_000;
 export const AUDIBLE_MAX = 3;
+
+/**
+ * Recipients resolved per database round trip.
+ *
+ * A community is read with keyset pagination instead of one unbounded
+ * `.in(...)`: PostgREST builds its filters into the request URL, so a single
+ * query carrying every member of a large community grows past the URL limit and
+ * fails outright, and even when it fits it puts the whole membership in the
+ * route handler's memory at once. 500 keeps each request small and each chunk's
+ * working set bounded while staying well inside PostgREST's row cap (1,000).
+ */
+export const PUSH_RECIPIENT_CHUNK = 500;
+
+/**
+ * Ceiling on device pushes for ONE chat message, and the wall-clock budget the
+ * sender may spend on it.
+ *
+ * Both exist because the sender runs in the message route's `after()` block,
+ * which the platform terminates — an unbounded fan-out over a very large
+ * community would be killed halfway through with no record of why. Hitting
+ * either bound stops delivery for the remaining recipients; nothing is lost
+ * permanently because the message itself is already committed and every client
+ * resyncs unread state from the database on open.
+ */
+export const PUSH_MAX_DELIVERIES = 10_000;
+export const PUSH_TIME_BUDGET_MS = 20_000;
+
+/** Dead-token cleanup accepts a bounded token list per request. */
+const TOKEN_DELETE_CHUNK = 200;
 
 /** Previous window state for one (member, community) pair. */
 export interface PushBudgetState {
@@ -150,6 +179,45 @@ export function isWithinQuietHours(
     : current >= start || current < end;
 }
 
+/** The smallest possible UUID — every real id sorts after it. */
+const MIN_UUID = "00000000-0000-0000-0000-000000000000";
+
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
+/** What one message's push delivery cost, for logging and tests. */
+export interface ChatPushReport {
+  /** Members read from the database (sender excluded, muted excluded). */
+  scanned: number;
+  /** Members that had at least one device token. */
+  reachable: number;
+  /** Device pushes handed to Expo. */
+  deliveries: number;
+  /** Recipient chunks processed (bounded by the chunk size). */
+  chunks: number;
+  /** Set when a bound stopped delivery early. */
+  truncated: "deliveries" | "time" | "error" | null;
+  /** Tokens Expo reported as dead (deleted by this call). */
+  deadTokens: number;
+}
+
+/**
+ * Injection points for the delivery loop. Production passes none of these;
+ * tests pass a fake database and a recording sender so the batching contract
+ * (chunk sizes, query count, no oversized `IN`) can be asserted without a
+ * live Postgres.
+ */
+export interface ChatPushDeps {
+  db?: ServiceClient;
+  send?: (messages: ExpoPushMessage[]) => Promise<string[]>;
+  /** Wall clock used for the audible budget and quiet hours. */
+  now?: () => Date;
+  /** Monotonic-ish milliseconds used for the delivery budget. */
+  clock?: () => number;
+  chunkSize?: number;
+  maxDeliveries?: number;
+  timeBudgetMs?: number;
+}
+
 /**
  * Pushes a new chat message to every member's devices, except the sender's.
  *
@@ -160,16 +228,25 @@ export function isWithinQuietHours(
  *
  * Always called from the message route's `after()` block, so a slow push
  * lookup can never delay the sender's response. Every failure is swallowed.
+ *
+ * Scaling shape: members are paged with a keyset cursor (`user_id > last`)
+ * rather than read in one query, so the per-message query count grows with
+ * `members / PUSH_RECIPIENT_CHUNK` instead of the community being loaded whole.
+ * Only one chunk of recipients — and one chunk of push messages — is resident
+ * at a time.
  */
-export async function sendChatMessagePush(params: {
-  communityId: string;
-  messageId: string;
-  senderId: string;
-  senderName: string | null;
-  content: string | null;
-  hasImage: boolean;
-  isReply: boolean;
-}): Promise<void> {
+export async function sendChatMessagePush(
+  params: {
+    communityId: string;
+    messageId: string;
+    senderId: string;
+    senderName: string | null;
+    content: string | null;
+    hasImage: boolean;
+    isReply: boolean;
+  },
+  deps: ChatPushDeps = {},
+): Promise<ChatPushReport> {
   const {
     communityId,
     messageId,
@@ -180,164 +257,258 @@ export async function sendChatMessagePush(params: {
     isReply,
   } = params;
 
-  const db = createServiceClient();
+  const db = deps.db ?? createServiceClient();
+  const send = deps.send ?? sendExpoPush;
+  const now = deps.now ?? (() => new Date());
+  const clock = deps.clock ?? (() => Date.now());
+  const chunkSize = Math.max(1, deps.chunkSize ?? PUSH_RECIPIENT_CHUNK);
+  const maxDeliveries = Math.max(1, deps.maxDeliveries ?? PUSH_MAX_DELIVERIES);
+  const deadline = clock() + Math.max(1, deps.timeBudgetMs ?? PUSH_TIME_BUDGET_MS);
+
+  const report: ChatPushReport = {
+    scanned: 0,
+    reachable: 0,
+    deliveries: 0,
+    chunks: 0,
+    truncated: null,
+    deadTokens: 0,
+  };
 
   try {
-    // Members + community name in parallel — both are single indexed lookups.
-    // Muted memberships are dropped here rather than later: the mute is part
-    // of "is this a recipient at all".
-    const [membersResult, communityResult] = await Promise.all([
-      db
-        .from("community_members")
-        .select("user_id, notifications_muted")
-        .eq("community_id", communityId)
-        .neq("user_id", senderId),
-      db.from("communities").select("name").eq("id", communityId).maybeSingle(),
-    ]);
-
-    const recipientIds = (membersResult.data ?? [])
-      .filter((row) => !(row as { notifications_muted?: boolean }).notifications_muted)
-      .map((row) => (row as { user_id: string }).user_id)
-      .filter(Boolean);
-
-    if (recipientIds.length === 0) return;
-
+    const communityResult = await db
+      .from("communities")
+      .select("name")
+      .eq("id", communityId)
+      .maybeSingle();
     const communityName =
       (communityResult.data as { name?: string } | null)?.name ?? "New message";
 
-    // Preferences, device tokens, the audible-push budget and the badge total
-    // are four independent reads of the same recipient set — run them together.
-    const [preferencesResult, tokensResult, throttleResult, badges] = await Promise.all([
-      db
-        .from("notification_preferences")
-        .select(
-          "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
-        )
-        .in("user_id", recipientIds),
-      db.from("push_tokens").select("token, user_id").in("user_id", recipientIds),
-      db
-        .from("push_throttle")
-        .select("user_id, window_started_at, sent_count")
-        .eq("community_id", communityId)
-        .in("user_id", recipientIds),
-      // Total *unread* messages across all communities, not just this one, so
-      // the icon badge matches what the app shows. Computed server-side
-      // because a push can land while the app is closed.
-      loadUnreadMessageTotals(recipientIds),
-    ]);
-
-    const preferences = new Map<string, PreferencesRow>();
-    for (const row of (preferencesResult.data ?? []) as PreferencesRow[]) {
-      preferences.set(row.user_id, row);
-    }
-
-    const tokensByUser = new Map<string, string[]>();
-    for (const row of (tokensResult.data ?? []) as { token: string; user_id: string }[]) {
-      if (!row.token) continue;
-      const list = tokensByUser.get(row.user_id) ?? [];
-      list.push(row.token);
-      tokensByUser.set(row.user_id, list);
-    }
-
-    const throttle = new Map<string, { windowStartedAt: number; count: number }>();
-    for (const row of (throttleResult.data ?? []) as {
-      user_id: string;
-      window_started_at: string;
-      sent_count: number;
-    }[]) {
-      throttle.set(row.user_id, {
-        windowStartedAt: new Date(row.window_started_at).getTime(),
-        count: Number(row.sent_count) || 0,
-      });
-    }
-
-    const now = new Date();
     const body = `${senderName ?? "Someone"}: ${preview({ content, hasImage, isReply })}`;
-    const messages: ExpoPushMessage[] = [];
-    const throttleUpserts: {
-      user_id: string;
-      community_id: string;
-      window_started_at: string;
-      sent_count: number;
-    }[] = [];
+    const deadTokens = new Set<string>();
 
-    for (const userId of recipientIds) {
-      const userTokens = tokensByUser.get(userId);
-      if (!userTokens || userTokens.length === 0) continue;
-
-      const userPreferences = preferences.get(userId);
-      // No row means defaults, which have chat push on.
-      if (userPreferences && !userPreferences.chat_push_enabled) continue;
-
-      // One budget per (member, community), counted in pushes rather than in
-      // messages: a member who receives fifty messages in a minute still gets
-      // the first three buzzing, and the notification keeps updating after
-      // that without making a sound.
-      const budget = nextPushBudget(throttle.get(userId), now.getTime());
-
-      // Quiet hours silence rather than suppress: the notification still
-      // lands (so the badge and the shade stay accurate) but without sound,
-      // which is the part that wakes people up. A member who wants nothing at
-      // all mutes the community — see the settings screen.
-      const quiet = isWithinQuietHours(userPreferences, now);
-      const wantsSound = (userPreferences?.chat_sound ?? "default") === "default";
-      const audible = budget.withinBudget && !quiet && wantsSound;
-
-      // Only a buzzing push consumes the budget. Counting the silent ones
-      // would mean a member throttled during quiet hours stayed throttled
-      // into the morning, and someone who chose the silent sound would be
-      // spending a budget they never hear.
-      if (audible) {
-        throttleUpserts.push({
-          user_id: userId,
-          community_id: communityId,
-          window_started_at: new Date(budget.windowStartedAt).toISOString(),
-          sent_count: budget.sentCount,
-        });
+    let cursor = MIN_UUID;
+    for (;;) {
+      if (clock() > deadline) {
+        report.truncated = "time";
+        break;
       }
 
-      for (const token of userTokens) {
-        messages.push({
-          to: token,
-          title: communityName,
-          body,
-          sound: audible ? "default" : null,
-          channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
-          badge: badges.get(userId) ?? 0,
-          // One collapsed notification per chat, like WhatsApp's
-          // per-conversation stack, so a busy community can't bury the
-          // notification shade.
-          collapseId: `community-${communityId}`,
-          data: {
-            type: "community_message",
-            communityId,
-            messageId,
-            badge: badges.get(userId) ?? 0,
-            silent: !audible,
-          },
-        });
+      // Keyset page of recipients. Muted memberships are excluded in SQL —
+      // the mute is part of "is this a recipient at all", and filtering in the
+      // database keeps the page full instead of returning muted rows that get
+      // discarded client-side.
+      const membersResult = await db
+        .from("community_members")
+        .select("user_id")
+        .eq("community_id", communityId)
+        .neq("user_id", senderId)
+        .eq("notifications_muted", false)
+        .order("user_id", { ascending: true })
+        .gt("user_id", cursor)
+        .limit(chunkSize);
+
+      const memberRows = (membersResult.data ?? []) as { user_id: string }[];
+      if (memberRows.length === 0) break;
+
+      const recipientIds = memberRows.map((row) => row.user_id).filter(Boolean);
+      if (recipientIds.length === 0) break;
+      cursor = recipientIds[recipientIds.length - 1]!;
+      report.chunks += 1;
+      report.scanned += recipientIds.length;
+
+      // Tokens first: without a device there is nothing to send, so the
+      // preference, throttle and badge reads are only issued for members that
+      // can actually be reached. A member with no tokens is not a recipient in
+      // any observable sense, so this is a pure reduction in work.
+      const tokensResult = await db
+        .from("push_tokens")
+        .select("token, user_id")
+        .in("user_id", recipientIds);
+
+      const tokensByUser = new Map<string, string[]>();
+      for (const row of (tokensResult.data ?? []) as { token: string; user_id: string }[]) {
+        if (!row.token) continue;
+        const list = tokensByUser.get(row.user_id) ?? [];
+        list.push(row.token);
+        tokensByUser.set(row.user_id, list);
       }
-    }
+      if (tokensByUser.size === 0) continue;
 
-    if (messages.length === 0) return;
+      const reachableIds = [...tokensByUser.keys()];
+      report.reachable += reachableIds.length;
 
-    // Best-effort: a failed budget write only costs a missed throttle, never
-    // the notification itself. Empty when every push this round was silent.
-    if (throttleUpserts.length > 0) {
-      try {
-        await db
+      // Three independent reads of the same (bounded) recipient set.
+      const [preferencesResult, throttleResult, badges] = await Promise.all([
+        db
+          .from("notification_preferences")
+          .select(
+            "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
+          )
+          .in("user_id", reachableIds),
+        db
           .from("push_throttle")
-          .upsert(throttleUpserts as never, { onConflict: "user_id,community_id" });
-      } catch (error) {
-        console.error("[push] throttle write failed", error);
+          .select("user_id, window_started_at, sent_count")
+          .eq("community_id", communityId)
+          .in("user_id", reachableIds),
+        // Total *unread* messages across all communities, not just this one, so
+        // the icon badge matches what the app shows. Computed server-side
+        // because a push can land while the app is closed.
+        loadUnreadMessageTotals(reachableIds, db as unknown as UntypedRpc),
+      ]);
+
+      const preferences = new Map<string, PreferencesRow>();
+      for (const row of (preferencesResult.data ?? []) as PreferencesRow[]) {
+        preferences.set(row.user_id, row);
+      }
+
+      const throttle = new Map<string, PushBudgetState>();
+      for (const row of (throttleResult.data ?? []) as {
+        user_id: string;
+        window_started_at: string;
+        sent_count: number;
+      }[]) {
+        throttle.set(row.user_id, {
+          windowStartedAt: new Date(row.window_started_at).getTime(),
+          count: Number(row.sent_count) || 0,
+        });
+      }
+
+      const nowDate = now();
+      const messages: ExpoPushMessage[] = [];
+      const throttleUpserts: {
+        user_id: string;
+        community_id: string;
+        window_started_at: string;
+        sent_count: number;
+      }[] = [];
+
+      for (const userId of reachableIds) {
+        const userTokens = tokensByUser.get(userId);
+        if (!userTokens || userTokens.length === 0) continue;
+
+        const userPreferences = preferences.get(userId);
+        // No row means defaults, which have chat push on.
+        if (userPreferences && !userPreferences.chat_push_enabled) continue;
+
+        // One budget per (member, community), counted in pushes rather than in
+        // messages: a member who receives fifty messages in a minute still gets
+        // the first three buzzing, and the notification keeps updating after
+        // that without making a sound.
+        const budget = nextPushBudget(throttle.get(userId), nowDate.getTime());
+
+        // Quiet hours silence rather than suppress: the notification still
+        // lands (so the badge and the shade stay accurate) but without sound,
+        // which is the part that wakes people up. A member who wants nothing at
+        // all mutes the community — see the settings screen.
+        const quiet = isWithinQuietHours(userPreferences, nowDate);
+        const wantsSound = (userPreferences?.chat_sound ?? "default") === "default";
+        const audible = budget.withinBudget && !quiet && wantsSound;
+
+        // Only a buzzing push consumes the budget. Counting the silent ones
+        // would mean a member throttled during quiet hours stayed throttled
+        // into the morning, and someone who chose the silent sound would be
+        // spending a budget they never hear.
+        if (audible) {
+          throttleUpserts.push({
+            user_id: userId,
+            community_id: communityId,
+            window_started_at: new Date(budget.windowStartedAt).toISOString(),
+            sent_count: budget.sentCount,
+          });
+        }
+
+        for (const token of userTokens) {
+          messages.push({
+            to: token,
+            title: communityName,
+            body,
+            sound: audible ? "default" : null,
+            channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
+            badge: badges.get(userId) ?? 0,
+            // One collapsed notification per chat, like WhatsApp's
+            // per-conversation stack, so a busy community can't bury the
+            // notification shade.
+            collapseId: `community-${communityId}`,
+            data: {
+              type: "community_message",
+              communityId,
+              messageId,
+              badge: badges.get(userId) ?? 0,
+              silent: !audible,
+            },
+          });
+        }
+      }
+
+      if (messages.length > 0) {
+        // Enforce the ceiling per chunk so the whole device list never has to
+        // be resident, and remember that delivery was cut short.
+        const remaining = maxDeliveries - report.deliveries;
+        if (remaining <= 0) {
+          report.truncated = "deliveries";
+          break;
+        }
+        const batch = messages.length > remaining ? messages.slice(0, remaining) : messages;
+        if (batch.length < messages.length) report.truncated = "deliveries";
+
+        try {
+          const dead = await send(batch);
+          report.deliveries += batch.length;
+          for (const token of dead) deadTokens.add(token);
+        } catch (error) {
+          console.error("[push] delivery failed", error);
+          report.truncated = "error";
+          break;
+        }
+      }
+
+      // Best-effort: a failed budget write only costs a missed throttle, never
+      // the notification itself. Empty when every push this round was silent.
+      if (throttleUpserts.length > 0) {
+        try {
+          await db
+            .from("push_throttle")
+            .upsert(throttleUpserts as never, { onConflict: "user_id,community_id" });
+        } catch (error) {
+          console.error("[push] throttle write failed", error);
+        }
+      }
+
+      if (report.truncated === "deliveries") break;
+      if (memberRows.length < chunkSize) break;
+    }
+
+    // Dead tokens are pruned in bounded batches — the same URL-size reason the
+    // recipient read is paged.
+    report.deadTokens = deadTokens.size;
+    if (deadTokens.size > 0) {
+      const tokens = [...deadTokens];
+      for (let i = 0; i < tokens.length; i += TOKEN_DELETE_CHUNK) {
+        try {
+          await db
+            .from("push_tokens")
+            .delete()
+            .in("token", tokens.slice(i, i + TOKEN_DELETE_CHUNK));
+        } catch (error) {
+          console.error("[push] dead token cleanup failed", error);
+        }
       }
     }
 
-    const deadTokens = await sendExpoPush(messages);
-    if (deadTokens.length > 0) {
-      await db.from("push_tokens").delete().in("token", deadTokens);
+    // Only an interrupted fan-out logs, and then it logs ONE aggregate line:
+    // never per recipient, never with message contents, and never for the
+    // normal large-community case (which is expected work, not an anomaly).
+    // The full per-message numbers are returned in the report for callers and
+    // tests that want them.
+    if (report.truncated !== null) {
+      console.warn(
+        `[push] community=${communityId} truncated=${report.truncated} chunks=${report.chunks} scanned=${report.scanned} reachable=${report.reachable} deliveries=${report.deliveries}`,
+      );
     }
   } catch (error) {
     console.error("[push] chat notification failed", error);
+    report.truncated = "error";
   }
+
+  return report;
 }
