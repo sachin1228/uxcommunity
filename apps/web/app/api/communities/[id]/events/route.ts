@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
+import { isCommunityMember } from "@/lib/communities/membership";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
@@ -33,20 +34,6 @@ function validOffsetMinutes(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value)) return null;
   // UTC-14 … UTC+14: outside that, the value is a bug rather than a zone.
   return Math.abs(value) <= 840 ? value : null;
-}
-
-async function isMember(
-  db: ReturnType<typeof createServiceClient>,
-  communityId: string,
-  userId: string,
-) {
-  const { data } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return Boolean(data);
 }
 
 const EVENT_PAGE_SIZE = 25;
@@ -149,7 +136,7 @@ export async function POST(
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, userId))) {
+  if (!(await isCommunityMember(communityId, userId, db))) {
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 

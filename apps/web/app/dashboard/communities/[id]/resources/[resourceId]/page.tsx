@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
-import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
+import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
 
 interface Props {
   params: Promise<{ id: string; resourceId: string }>;

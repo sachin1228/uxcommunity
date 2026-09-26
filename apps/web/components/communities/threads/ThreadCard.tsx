@@ -10,8 +10,8 @@ import {
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 
-import type { CommunityThread } from "./types";
-import { THREAD_CATEGORIES } from "./types";
+import type { CommunityThread } from "@/lib/communities/models/threads";
+import { THREAD_CATEGORIES } from "@/lib/communities/models/threads";
 import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 

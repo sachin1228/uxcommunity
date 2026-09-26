@@ -15,7 +15,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./types";
+import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "@/lib/communities/models/threads";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";

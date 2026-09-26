@@ -4,7 +4,7 @@ import {
   Lightbulb,
   Megaphone,
 } from "lucide-react";
-import type { ThreadCategory } from "./types";
+import type { ThreadCategory } from "@/lib/communities/models/threads";
 
 export const CATEGORY_ICONS: Record<ThreadCategory, React.ElementType> = {
   question: HelpCircle,

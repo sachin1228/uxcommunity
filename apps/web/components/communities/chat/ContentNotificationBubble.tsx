@@ -28,7 +28,7 @@ import {
   NotificationReactionPills,
 } from "./NotificationHoverActions";
 import { userColorVar } from "@/lib/communities/user-color";
-import { RESOURCE_TYPES } from "../resources/types";
+import { RESOURCE_TYPES } from "@/lib/communities/models/resources";
 import type { CachedContentEvent, ContentEventKind } from "@/lib/communities/cache";
 import {
   KIND_THEME,

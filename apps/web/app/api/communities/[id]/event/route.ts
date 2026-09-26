@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { isCommunityMember } from "@/lib/communities/read-models";
+import { isCommunityMember } from "@/lib/communities/membership";
 import { loadEventRoomSection } from "@/lib/communities/event-chat";
 
 /**

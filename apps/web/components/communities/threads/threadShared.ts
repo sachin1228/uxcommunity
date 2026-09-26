@@ -1,8 +1,8 @@
-import type { ThreadPollDraft, ThreadPoll } from "./types";
+import type { ThreadPollDraft, ThreadPoll } from "@/lib/communities/models/threads";
 import {
   POLL_MIN_OPTIONS,
   THREAD_BODY_MAX_LENGTH,
-} from "./types";
+} from "@/lib/communities/models/threads";
 
 /** Shared constants and helpers for thread card rendering. */
 

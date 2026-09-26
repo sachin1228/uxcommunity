@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
-import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
+import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import { enrichCommunityEvents } from "./read-models";
 
 /**

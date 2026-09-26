@@ -7,8 +7,8 @@ import {
 } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
-import type { CommunityResource } from "./types";
-import { RESOURCE_TYPES } from "./types";
+import type { CommunityResource } from "@/lib/communities/models/resources";
+import { RESOURCE_TYPES } from "@/lib/communities/models/resources";
 import { ResourceFormModal } from "./ResourceFormModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { communityFeedLayout } from "../feed-layout";

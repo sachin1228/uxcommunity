@@ -1,6 +1,6 @@
 import "server-only";
 import type { createServiceClient } from "@/lib/supabase/service";
-import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
+import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import { canStoreShowcaseFlag } from "./showcase-flag";
 import { enrichEventCards, EVENT_CARD_COLUMNS, loadEventAttendeePreviews } from "./event-cards";
 import { EVENT_CHAT_COMMUNITY_TYPE, canJoinEventChatWith, eventChatName } from "./event-chat-rules";

@@ -27,7 +27,7 @@
  */
 
 import { sidebarStore } from "./cache";
-import { markReadOnServer } from "@/components/communities/panel/markReadOnServer";
+import { markReadOnServer } from "./mark-read";
 
 export interface MarkReadOptions {
   /** Last known unread MESSAGE count from the sidebar projection. */

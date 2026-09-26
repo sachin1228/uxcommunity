@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
-import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type ThreadComment } from "./types";
+import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type ThreadComment } from "@/lib/communities/models/threads";
 import { renderWithLinks } from "./renderWithLinks";
 import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";

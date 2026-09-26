@@ -6,7 +6,7 @@ import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
-import type { CommunityEvent } from "./types";
+import type { CommunityEvent } from "@/lib/communities/models/events";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { EventGroupCreatedModal } from "./EventGroupCreatedModal";

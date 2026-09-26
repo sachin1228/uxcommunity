@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { BarChart3, Check, Loader2 } from "lucide-react";
-import type { ThreadPoll } from "./types";
+import type { ThreadPoll } from "@/lib/communities/models/threads";
 
 function zeroCounts(optionCount: number): number[] {
   return Array.from({ length: optionCount }, () => 0);

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique } from "@/lib/r2";
-import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
+import type { ThreadCategory, ThreadAttachment } from "@/lib/communities/models/threads";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";

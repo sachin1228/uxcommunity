@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
+import { isCommunityMember } from "@/lib/communities/membership";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import type { ResourceType } from "@/components/communities/resources/types";
+import type { ResourceType } from "@/lib/communities/models/resources";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityResources } from "@/lib/communities/read-models";
 import { contentEventPayload } from "@/lib/communities/content-events";
@@ -15,20 +16,6 @@ const RESOURCE_TYPES = new Set<ResourceType>([
   "figma", "article", "tool", "video", "book",
   "font", "icon_pack", "color", "template", "inspiration", "other",
 ]);
-
-async function isMember(
-  db: ReturnType<typeof createServiceClient>,
-  communityId: string,
-  userId: string,
-) {
-  const { data } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return Boolean(data);
-}
 
 async function withAuthorAndMeta(
   db: ReturnType<typeof createServiceClient>,
@@ -110,7 +97,7 @@ export async function POST(
   const userId = session.userId!;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, userId))) {
+  if (!(await isCommunityMember(communityId, userId, db))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
