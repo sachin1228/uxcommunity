@@ -10,7 +10,9 @@ k6/
 ├── data/                   # Gitignored fixtures (test-users.json) + .gitkeep
 ├── lib/
 │   ├── fixture.js          # Shape + validation rules for generated test users
-│   └── fixture.test.mjs    # Unit test for the fixture rules (npm run test:k6-fixtures)
+│   ├── fixture.test.mjs    # Unit test for the fixture rules (npm run test:k6-fixtures)
+│   ├── realtime-fanout.mjs      # Delivery accounting + guards for the 5K realtime test
+│   └── realtime-fanout.test.mjs # Unit test for that accounting (npm run test:k6-realtime)
 ├── utils/
 │   ├── auth.js             # Login / logout helpers
 │   ├── checks.js           # Reusable check factories
@@ -37,8 +39,8 @@ k6/
 │   ├── seed-users.js       # Creates k6user_* fixtures + writes k6/data/test-users.json
 │   ├── cleanup-users.js    # Deletes seeded users and the fixture
 │   └── rsvp-regression-test.mjs  # Live home-feed RSVP revert regression
-├── loadtest-5k.mjs         # 5,000-socket production realtime load test (node, not k6)
-└── staging-*.mjs           # Realtime staging smoke / diagnostic / 5k helpers
+├── loadtest-5k.mjs         # Same-community realtime fan-out load test (node, not k6)
+└── staging-smoke-test.mjs  # One-socket staging realtime smoke test
 ```
 
 ## Prerequisites
@@ -280,12 +282,58 @@ worker directly; they need `SESSION_SECRET` and, for publishing,
 
 | Script | What it does |
 |---|---|
-| `node k6/loadtest-5k.mjs` | Opens 5,000 authenticated WebSockets against production, subscribes to rooms and measures a single fan-out |
-| `node k6/staging-smoke-test.mjs` | Connect → join → subscribe → publish → receive against the staging worker |
-| `node k6/staging-loadtest-5k.mjs` | The 5k realtime test pointed at the staging worker |
+| `node k6/staging-smoke-test.mjs` | One socket: connect → join → subscribe → `/stats` confirms the subscription → server publish → receive |
+| `node k6/loadtest-5k.mjs` | N distinct authenticated users in ONE community room, subscribed to the community topic, receiving controlled server-published events with exact per-event delivery accounting |
 | `node k6/scripts/rsvp-regression-test.mjs` | Reproduces the home-feed "I'm going" revert flow against a live environment |
 
 Each script documents its own env vars in its header comment.
+
+### Same-community realtime fan-out load test
+
+```bash
+REALTIME_URL=https://uxcommunity-realtime-staging.<account>.workers.dev \
+SESSION_SECRET=<target env secret> \
+REALTIME_PUBLISH_SECRET=<target env secret> \
+TEST_COMMUNITY_ID=<community uuid> \
+  node k6/loadtest-5k.mjs
+```
+
+The 5K stages are the same script — it is the client count that changes:
+
+| Stage | Command |
+|---|---|
+| smoke | `TOTAL_CLIENTS=20 EVENT_COUNT=5 node k6/loadtest-5k.mjs` |
+| 100 | `TOTAL_CLIENTS=100 node k6/loadtest-5k.mjs` |
+| 500 | `TOTAL_CLIENTS=500 node k6/loadtest-5k.mjs` |
+| 1,000 | `TOTAL_CLIENTS=1000 node k6/loadtest-5k.mjs` |
+| 2,500 | `TOTAL_CLIENTS=2500 node k6/loadtest-5k.mjs` |
+| 5,000 | `TOTAL_CLIENTS=5000 node k6/loadtest-5k.mjs` |
+
+What it does and does not prove:
+
+- Every client gets its OWN user id and its OWN JWT — never one token reused.
+- Every client connects to `chat:${TEST_COMMUNITY_ID}` and subscribes to the real
+  community topic (`message`); the subscribe frame's `room` field is ignored by
+  the server, which is why the CONNECTION itself must be opened against the
+  community room.
+- Deliveries are verified per event, per socket: expected / received / missing /
+  duplicates come from a fixed-size bitmap, not from samples.
+- `GET /stats` on the room supplies the server-side ground truth
+  (`sockets`, `subscriptionRefs`, `eventsPublished`, `deliverAttempts`,
+  `presenceDeliverAttempts`) and the instance id, so a DO restart mid-run is
+  visible instead of silently averaging into the result.
+- The verdict is FAIL on a short connection rate, missing/duplicate deliveries,
+  cross-room or cross-topic frames, or a DO restart during the run.
+- Latency is client-measured (publish dispatch → frame parsed) and therefore an
+  upper bound: the protocol has no subscribe ACK and the Worker exposes no
+  per-event server-side timing.
+- A non-staging host aborts unless `ALLOW_NON_STAGING=1`; production must never
+  be the target of this test.
+
+`ROOM_MODE=distinct` is a control experiment: it gives every client its own
+room, which separates "this room cannot hold N sockets" from "this machine
+cannot hold N sockets". `CONTROL_GROUP_SIZE` adds the older cross-room isolation
+group inside the target community run.
 
 ---
 
@@ -329,6 +377,7 @@ realtime WebSocket protocol (the node scripts below cover that instead).
 
 ```bash
 npm run test:k6-fixtures    # shape/validation rules + "no credentials tracked" guards
+npm run test:k6-realtime    # realtime delivery accounting + staging-target guards
 npm run k6:seed             # writes k6/data/test-users.json (untracked)
 k6 inspect k6/scenarios/chat_concurrent.js   # proves the scenarios can load it
 ```
