@@ -17,12 +17,15 @@
  * - is_archived: false forced on new message arrival
  * - Separate reaction INSERT / UPDATE / DELETE handlers (matches web)
  * - Background reconciliation on AppState 'active': max(server, local) unread
+ * - Live sockets are bounded to the most recently active window, so a member of
+ *   100 communities does not carry 100 WebSockets (`lib/realtimeWindow.ts`)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
+import { selectLiveCommunityIds } from '@/lib/realtimeWindow';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
@@ -485,11 +488,27 @@ export function useCommunities() {
     communitiesRef.current = communities.filter((c) => !c.is_archived);
   }, [communities]);
 
-  // Re-subscribe whenever the set of community IDs changes or user loads
+  /**
+   * The communities that hold a live socket — the most recently active window
+   * (`realtimeWindow.ts`). A socket is not free on a phone, and subscribing to
+   * every membership made a 30-community member carry 30 of them.
+   *
+   * Nothing the user is looking at depends on this window: the open chat
+   * subscribes its own room from `useChatMessages`, and everything past the
+   * window is caught up by the reconcile above (foreground, reconnect, and
+   * pull-to-refresh on the list).
+   */
+  const liveCommunityIds = useMemo(
+    () => selectLiveCommunityIds(communities.map((c) => c.id)),
+    [communities],
+  );
+
+  // Re-subscribe whenever the live window changes or the user loads. The key is
+  // the window's membership, not the array identity: every message patch
+  // rebuilds `communities`, and a reorder must not re-subscribe anything.
   useEffect(() => {
-    if (communities.length === 0) return;
-    const ids = communities.map((c) => c.id).sort();
-    subscribeAll(ids);
+    if (liveCommunityIds.length === 0) return;
+    subscribeAll(liveCommunityIds);
     return () => {
       unsubscribesRef.current.forEach((unsub) => unsub());
       unsubscribesRef.current = [];
@@ -497,7 +516,7 @@ export function useCommunities() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    communities.map((c) => c.id).sort().join(','),
+    liveCommunityIds.slice().sort().join(','),
     subscribeAll,
   ]);
 

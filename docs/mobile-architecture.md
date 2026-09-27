@@ -82,13 +82,63 @@ probe) and exports the singleton the hooks import.
 
 - **Community-scoped rooms** (`chat:*`, `threads:*`, `events:*`, `resources:*`,
   `showcase:*`, `rules:`, `*-comments:*`) each get **their own WebSocket**
-  straight to that community's `CommunityDO`.
+  straight to the `CommunityDO` instance that owns that room —
+  `resolveRoomTarget` (`apps/realtime/src/room-routing.ts`) routes by room name,
+  so `chat:<id>` and `threads:<id>` are different instances. The community
+  *list* keeps a socket only for the most recently active window of them, so the
+  count does not grow with membership (see “Socket budget” below).
 - **User-scoped rooms** (`notifications:*`, `profile:*`) share one connection
   to the `UserDO`, keyed `user:${userId}` — the same instance
   `resolveRoomTarget` in `apps/realtime/src/room-routing.ts` publishes them to.
   Before an identity exists the socket uses the `user:global` placeholder and is
   re-keyed by `init()`, so a socket opened first still lands on the right DO.
 - Message delivery is 0 RPCs — publish/subscribe straight over the socket.
+
+### Socket budget
+
+A phone should not carry one WebSocket per community. `useCommunities` used to
+call `realtimeClient.connect(realtimeRooms.chat(cid))` for **every** joined
+community, so a member of 30 communities held ~30 sockets: 30 heartbeats, 30
+reconnect attempts per network change, 30 DO connections, 30 units of memory the
+OS may reclaim. The list now subscribes a bounded window instead —
+`selectLiveCommunityIds` in `lib/realtimeWindow.ts` keeps the
+`COMMUNITY_REALTIME_LIMIT` (10) most recently active communities, the head of the
+list's existing activity order. Web's sidebar applies the same policy with
+`SIDEBAR_REALTIME_LIMIT` (15); mobile keeps fewer. Tests:
+`lib/realtimeWindow.test.ts` (policy) and `lib/realtimeScale.test.ts` (the real
+client against a fake platform: 1/10/50/100 memberships, one socket per live
+community, one reconnect per socket, release/logout behaviour).
+
+**Why not one shared socket.** The obvious design — one socket per device
+carrying every community as a subscription — cannot be built safely on the
+current server, and this PR does not pretend otherwise:
+
+1. **A WebSocket terminates in exactly one Durable Object, and the instance name
+   *is* the room identity.** `handleUpgrade`
+   (`apps/realtime/src/index.ts`) resolves the `room` query parameter to one DO
+   and hands the upgrade to it; `Room.roomName()` (`apps/realtime/src/room.ts`)
+   is `ctx.id.name`, and every event and presence frame is stamped with it. The
+   socket's room is fixed at upgrade time — there is no “join another room”
+   frame to send it to.
+2. **Inside a Room DO, subscriptions are keyed by topic alone**
+   (`TopicSocketIndex` in `apps/realtime/src/subscriptions.ts`). That is only
+   unambiguous because one instance serves one logical room: two communities in
+   one instance would collide on `message` / `like` / `save` and merge their
+   presence rosters.
+3. **Routing community events through `user:${userId}` instead would change the
+   fan-out model.** The UserDO already multiplexes logical rooms safely, but
+   only user-scoped ones; publishing a community event there means one DO
+   request *per online recipient* instead of one request plus local `ws.send()`s
+   (`fanOutEvents` with its bounded pool exists precisely to avoid that cost),
+   and it would change the protocol web shares.
+
+So the honest guarantee is **bounded**, not multiplexed: a 100-community member
+opens exactly as many community sockets as a 10-community member. What is
+outside the window is still kept current — the list reconcile in
+`useCommunities` runs on foreground, on reconnect and on pull-to-refresh — and a
+screen the user actually opens subscribes its own room regardless of the window
+(`useChatMessages` for the open chat, `useCommunityContent` for its tabs).
+User-scoped rooms already share the single `user:${userId}` socket.
 
 ### Room + topic model
 
