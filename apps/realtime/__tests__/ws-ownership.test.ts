@@ -227,20 +227,37 @@ describe("WebSocket ownership: direct delivery", () => {
 // ============================================================================
 
 describe("WebSocket ownership: sender exclusion", () => {
-  it("sender does not receive their own message", async () => {
+  it("sender does not receive their own event", async () => {
     const token = await createToken("ws_sender1");
+    const peerToken = await createToken("ws_sender_peer");
     const { ws, messages, close } = connectCommunityWs("chat:ws_comm_sender", token);
+    const peer = connectCommunityWs("chat:ws_comm_sender", peerToken);
     try {
-      await joinAndSubscribe(ws, messages, "ws_sender1", "chat:ws_comm_sender", "chat");
+      // `typing` is the only topic a member may publish (see client-publish.ts);
+      // the sender-exclusion rule must hold for it exactly as for server events.
+      await joinAndSubscribe(ws, messages, "ws_sender1", "chat:ws_comm_sender", "typing");
+      await joinAndSubscribe(peer.ws, peer.messages, "ws_sender_peer", "chat:ws_comm_sender", "typing");
 
-      // Publish via WebSocket (sender is ws_sender1)
-      ws.send(JSON.stringify({ t: "publish", room: "chat:ws_comm_sender", topic: "chat", data: { text: "from me" } }));
+      ws.send(JSON.stringify({
+        t: "publish",
+        room: "chat:ws_comm_sender",
+        topic: "typing",
+        data: { user_id: "ws_sender1", name: "Me", typing: true },
+      }));
       await new Promise((r) => setTimeout(r, 1000));
 
-      // Sender should NOT receive their own message
-      const events = messages.filter((m) => m.t === "event" && m.data?.text === "from me");
+      // Peer received it, stamped with the sender's authenticated identity.
+      const peerEvents = peer.messages.filter((m) => m.t === "event" && m.topic === "typing");
+      expect(peerEvents.length).toBeGreaterThan(0);
+      expect(peerEvents[0].data.user_id).toBe("ws_sender1");
+
+      // Sender should NOT receive their own event.
+      const events = messages.filter((m) => m.t === "event" && m.topic === "typing");
       expect(events.length).toBe(0);
-    } finally { close(); }
+    } finally {
+      close();
+      peer.close();
+    }
   });
 
   it("sender exclusion works with server-side publish", async () => {

@@ -38,6 +38,19 @@ export class RealtimeMetrics {
   presenceSkipped = 0;
   /** Presence flushes collapsed into a scheduled one (reconnect storms). */
   presenceCoalesced = 0;
+  /**
+   * Member-authored publishes (WebSocket `publish` frames) that passed the
+   * security boundary and were fanned out. Kept apart from `eventsPublished`,
+   * which counts secret-authenticated server publishes, so an operator can see
+   * how much of a room's traffic is client-originated at all.
+   */
+  clientPublishesAccepted = 0;
+  /** Client publishes dropped because the topic is not client-publishable. */
+  clientPublishRejectedTopic = 0;
+  /** Client publishes dropped because the payload was malformed/oversized. */
+  clientPublishRejectedPayload = 0;
+  /** Client publishes dropped by the per-socket/per-user token bucket. */
+  clientPublishRateLimited = 0;
   /** Membership authorization calls that reached the internal API. */
   membershipChecks = 0;
   membershipCacheHits = 0;
@@ -55,6 +68,10 @@ export class RealtimeMetrics {
       presenceDeliverAttempts: this.presenceDeliverAttempts,
       presenceSkipped: this.presenceSkipped,
       presenceCoalesced: this.presenceCoalesced,
+      clientPublishesAccepted: this.clientPublishesAccepted,
+      clientPublishRejectedTopic: this.clientPublishRejectedTopic,
+      clientPublishRejectedPayload: this.clientPublishRejectedPayload,
+      clientPublishRateLimited: this.clientPublishRateLimited,
       membershipChecks: this.membershipChecks,
       membershipCacheHits: this.membershipCacheHits,
       membershipCacheEvictions: this.membershipCacheEvictions,
