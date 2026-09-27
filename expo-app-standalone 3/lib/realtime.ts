@@ -19,8 +19,8 @@ import { RealtimeClient, type RealtimeSocket } from './realtimeCore';
 export { realtimeRooms, isCommunityRoom, userSocketKey } from './realtimeCore';
 export type {
   RealtimeEventHandler,
+  RealtimePresence,
   RealtimePresenceHandler,
-  RealtimePresenceUser,
   RealtimeStatusHandler,
   RealtimeUser,
 } from './realtimeCore';

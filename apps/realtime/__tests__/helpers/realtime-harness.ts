@@ -376,16 +376,14 @@ class HarnessImpl implements Harness {
       try {
         const msg = JSON.parse(String(data)) as Record<string, any>;
         msg._recvMs = performance.now();
-        // Presence snapshots carry one entry per connected member and are
-        // re-broadcast on every coalesced roster change, so retaining them
-        // costs ~40KB × flush × socket — enough to OOM a 1,500-socket suite
-        // before it measures anything. The perf suites assert on `event`
-        // frames, so keep a cheap stub instead of the roster.
+        // Presence frames are tiny (an online-member count), but they arrive once
+        // per flush per socket, so keep the frame shape explicit rather than
+        // letting suites depend on fields the protocol no longer sends.
         if (msg.t === "presence") {
           messages.push({
             t: "presence",
             room: msg.room,
-            userCount: Array.isArray(msg.users) ? msg.users.length : 0,
+            count: msg.count,
             _recvMs: msg._recvMs,
           });
           return;

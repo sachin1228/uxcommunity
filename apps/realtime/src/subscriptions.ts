@@ -118,61 +118,33 @@ export class TopicSocketIndex<Socket extends IndexSocket = IndexSocket> {
   }
 }
 
-/** One entry of a presence snapshot, exactly as the wire format expects. */
-export interface PresenceEntry {
-  id: string;
-  name: string | null;
-  avatar: string | null;
-  connections: number;
-}
-
 export interface PresenceMeta {
   name: string | null;
   avatar: string | null;
 }
 
 /**
- * Build a presence snapshot from the user → sockets map plus cached display
- * metadata.
+ * Count the members currently present in a room.
  *
- * Two things make this cheaper than the revision it replaces: it never calls
- * `deserializeAttachment()` (the metadata is cached in memory when a socket
- * joins), and it derives connection counts from the socket sets the DO already
- * maintains for multi-device cleanup instead of a second pass over every
- * socket.
+ * This number is the entire presence payload (see `PresenceMessage`), because
+ * the only consumer in the product is the "N online" badge — `useOnlinePresence`
+ * reads the count and nothing renders a roster. The revision this replaces built
+ * one entry per member (id, name, avatar, connection count) and wrote that
+ * serialized roster to every socket on every flush, which is quadratic in room
+ * size: a 2,500-socket staging room pushed gigabytes through `ws.send()`.
  *
- * Ordering is first-seen, matching the previous snapshot's behaviour so the
- * client-side roster does not reshuffle between events.
+ * Folding is preserved: `socketsByUser` holds every socket of a member, and a
+ * member with three tabs/devices still counts once. A member's entry is dropped
+ * with its last socket, so a closed tab cannot leave a ghost online.
  */
-export function buildPresenceSnapshot<Socket extends IndexSocket>(
+export function countOnlineUsers<Socket extends IndexSocket>(
   socketsByUser: ReadonlyMap<string, ReadonlySet<Socket>>,
-  meta: ReadonlyMap<string, PresenceMeta>,
-): PresenceEntry[] {
-  const users: PresenceEntry[] = [];
-  for (const [userId, sockets] of socketsByUser) {
-    if (sockets.size === 0) continue;
-    const entry = meta.get(userId);
-    users.push({
-      id: userId,
-      name: entry?.name ?? null,
-      avatar: entry?.avatar ?? null,
-      connections: sockets.size,
-    });
+): number {
+  let count = 0;
+  for (const sockets of socketsByUser.values()) {
+    if (sockets.size > 0) count += 1;
   }
-  return users;
-}
-
-/**
- * Stable, cheap signature of a presence snapshot. Used to skip a broadcast when
- * nothing changed, so an idle room does not re-serialize identical JSON for
- * every socket.
- */
-export function presenceSignature(users: readonly PresenceEntry[]): string {
-  let signature = "";
-  for (const user of users) {
-    signature += `${user.id}:${user.connections}:${user.name ?? ""}:${user.avatar ?? ""}|`;
-  }
-  return signature;
+  return count;
 }
 
 /**

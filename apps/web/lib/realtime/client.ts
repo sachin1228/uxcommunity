@@ -32,15 +32,19 @@ export interface RealtimeUser {
   avatar: string | null;
 }
 
-export interface RealtimePresenceUser {
-  id: string;
-  name: string | null;
-  avatar: string | null;
-  connections: number;
+/**
+ * Presence payload for a room — how many distinct members are online.
+ *
+ * The server counts the members it has sockets for (multi-tab/multi-device
+ * folded into one member) and broadcasts that number. It is deliberately not a
+ * roster: the only presence consumer renders "N online".
+ */
+export interface RealtimePresence {
+  count: number;
 }
 
 type EventHandler = (data: unknown, sender?: string) => void;
-type PresenceHandler = (users: RealtimePresenceUser[]) => void;
+type PresenceHandler = (presence: RealtimePresence) => void;
 type StatusHandler = (connected: boolean) => void;
 
 const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
@@ -122,7 +126,7 @@ class RealtimeClient {
   private globalEvents = new Map<string, Set<EventHandler>>();
   private globalPresenceHandlers = new Set<PresenceHandler>();
   private globalStatusHandlers = new Set<StatusHandler>();
-  private presenceCache = new Map<string, RealtimePresenceUser[]>();
+  private presenceCache = new Map<string, RealtimePresence>();
 
   private sessionToken: string | null = null;
   /** Identity persisted across connections so sockets created later still send `join`. */
@@ -324,9 +328,7 @@ class RealtimeClient {
         topic?: string;
         data?: unknown;
         sender?: string;
-        users?: RealtimePresenceUser[];
-        joined?: RealtimePresenceUser;
-        left?: { id: string };
+        count?: number;
         message?: string;
         connectionId?: string;
       };
@@ -351,22 +353,12 @@ class RealtimeClient {
         this.dispatchToRoom(room, msg.topic, msg.data, msg.sender);
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
       } else if (msg.t === "presence" && room) {
-        this.presenceCache.set(room, msg.users ?? []);
-        this.emitRoomPresence(room, msg.users ?? []);
-        this.emitGlobalPresence(msg.users ?? []);
-      } else if (msg.t === "presence_delta" && room) {
-        const cached = this.presenceCache.get(room) ?? [];
-        let updated: RealtimePresenceUser[];
-        if (msg.joined) {
-          updated = [...cached.filter((u) => u.id !== msg.joined!.id), msg.joined];
-        } else if (msg.left) {
-          updated = cached.filter((u) => u.id !== msg.left!.id);
-        } else {
-          updated = cached;
-        }
-        this.presenceCache.set(room, updated);
-        this.emitRoomPresence(room, updated);
-        this.emitGlobalPresence(updated);
+        const presence: RealtimePresence = {
+          count: typeof msg.count === "number" && msg.count > 0 ? msg.count : 0,
+        };
+        this.presenceCache.set(room, presence);
+        this.emitRoomPresence(room, presence);
+        this.emitGlobalPresence(presence);
       } else if (msg.t === "error") {
         console.warn("[realtime]", msg.message);
       }
@@ -768,19 +760,19 @@ class RealtimeClient {
     }
   }
 
-  private emitRoomPresence(room: string, users: RealtimePresenceUser[]): void {
+  private emitRoomPresence(room: string, presence: RealtimePresence): void {
     const state = this.rooms.get(room);
     if (!state) return;
     for (const handler of state.presenceHandlers) {
-      try { handler(users); } catch (error) {
+      try { handler(presence); } catch (error) {
         console.error("[realtime] presence handler error", error);
       }
     }
   }
 
-  private emitGlobalPresence(users: RealtimePresenceUser[]): void {
+  private emitGlobalPresence(presence: RealtimePresence): void {
     for (const handler of this.globalPresenceHandlers) {
-      try { handler(users); } catch (error) {
+      try { handler(presence); } catch (error) {
         console.error("[realtime] global presence handler error", error);
       }
     }

@@ -12,17 +12,15 @@
  *      room cannot accumulate index entries.
  *   4. Closing one tab/device cannot remove a subscription another tab of the
  *      same user still holds.
- *   5. Presence snapshots are built from in-memory state (no attachment
- *      deserialization) and can be skipped when nothing changed.
+ *   5. Presence is a member count derived from in-memory state (no attachment
+ *      deserialization, no per-member roster), so it cannot grow with the room.
  */
 
 import { describe, it, expect } from "vitest";
 import {
   TopicSocketIndex,
-  buildPresenceSnapshot,
-  presenceSignature,
+  countOnlineUsers,
   runBoundedPool,
-  type PresenceMeta,
 } from "../src/subscriptions";
 
 /** Stand-in for a WebSocket: identity is all the index cares about. */
@@ -142,47 +140,33 @@ describe("TopicSocketIndex — targeted fan-out", () => {
   });
 });
 
-describe("buildPresenceSnapshot", () => {
-  it("folds multiple sockets per user into one entry with a connection count", () => {
+describe("countOnlineUsers", () => {
+  it("counts members, not sockets — tabs and devices fold into one online member", () => {
     const userSockets = new Map<string, Set<{ name: string }>>([
-      ["u1", new Set([socket("a"), socket("b")])],
-      ["u2", new Set([socket("c")])],
-    ]);
-    const meta = new Map<string, PresenceMeta>([
-      ["u1", { name: "Alice", avatar: "a.png" }],
+      ["u1", new Set([socket("a"), socket("b"), socket("c")])],
+      ["u2", new Set([socket("d")])],
     ]);
 
-    expect(buildPresenceSnapshot(userSockets, meta)).toEqual([
-      { id: "u1", name: "Alice", avatar: "a.png", connections: 2 },
-      { id: "u2", name: null, avatar: null, connections: 1 },
-    ]);
+    expect(countOnlineUsers(userSockets)).toBe(2);
   });
 
-  it("skips users whose last socket just left", () => {
+  it("drops a member with its last socket, so a closed tab cannot stay online", () => {
     const userSockets = new Map<string, Set<{ name: string }>>([
       ["u1", new Set()],
       ["u2", new Set([socket("c")])],
     ]);
 
-    expect(buildPresenceSnapshot(userSockets, new Map()).map((u) => u.id)).toEqual(["u2"]);
+    expect(countOnlineUsers(userSockets)).toBe(1);
   });
 
-  it("produces a stable signature until the roster actually changes", () => {
-    const snapshot = [
-      { id: "u1", name: "Alice", avatar: null, connections: 1 },
-      { id: "u2", name: null, avatar: null, connections: 2 },
-    ];
-    const same = [
-      { id: "u1", name: "Alice", avatar: null, connections: 1 },
-      { id: "u2", name: null, avatar: null, connections: 2 },
-    ];
-
-    expect(presenceSignature(snapshot)).toBe(presenceSignature(same));
-    expect(presenceSignature([...snapshot, { id: "u3", name: null, avatar: null, connections: 1 }]))
-      .not.toBe(presenceSignature(snapshot));
-    expect(
-      presenceSignature(snapshot.map((u) => (u.id === "u2" ? { ...u, connections: 1 } : u))),
-    ).not.toBe(presenceSignature(snapshot));
+  it("counts an empty room as zero and reads no per-member state", () => {
+    expect(countOnlineUsers(new Map())).toBe(0);
+    // A member's identity is irrelevant to the payload: nothing is serialized
+    // per member, which is what kept presence O(members) per flush.
+    const anon = new Map<string, Set<{ name: string }>>([
+      ["u1", new Set([socket("a")])],
+    ]);
+    expect(countOnlineUsers(anon)).toBe(1);
   });
 });
 

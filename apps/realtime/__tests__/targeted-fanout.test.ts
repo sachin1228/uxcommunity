@@ -9,8 +9,8 @@
  *   - duplicate subscribe frames (React remount, reconnect replay) do not
  *     multiply deliveries;
  *   - reconnect re-subscribes without duplicating or replaying;
- *   - presence snapshots are folded per user and coalesced instead of being
- *     broadcast once per join.
+ *   - presence is one online-member count per change, folded per member and
+ *     coalesced instead of a per-member roster broadcast once per join.
  *
  * Kept to a handful of sockets: the test runner, not the Worker, is the
  * bottleneck at four-digit connection counts.
@@ -296,7 +296,7 @@ describe("targeted fan-out", () => {
     }
   });
 
-  it("folds multiple tabs into one presence entry and coalesces snapshots", async () => {
+  it("broadcasts one online-member count, folding tabs and coalescing joins", async () => {
     const room = "chat:presence-coalesce";
     const userA = [await connectRoom(room, "presence-a"), await connectRoom(room, "presence-a")];
     const userB = [await connectRoom(room, "presence-b")];
@@ -313,11 +313,13 @@ describe("targeted fan-out", () => {
       const lastPresence = presenceFrames.at(-1);
       expect(lastPresence).toBeTruthy();
 
-      const users = lastPresence.users as Array<{ id: string; connections: number }>;
-      expect(users.find((u) => u.id === "presence-a")?.connections).toBe(2);
-      expect(users.find((u) => u.id === "presence-b")?.connections).toBe(1);
+      // Two members own the three sockets — a second tab of the same member
+      // must not count twice, and the payload is a count, not a roster.
+      expect(lastPresence.count).toBe(2);
+      expect(lastPresence.users).toBeUndefined();
+      expect(JSON.stringify(lastPresence).length).toBeLessThan(120);
 
-      // Three joins must not produce a full snapshot per socket.
+      // Three joins must not produce a broadcast per socket.
       expect(presenceFrames.length).toBeLessThan(all.length);
     } finally {
       for (const conn of all) conn.close();

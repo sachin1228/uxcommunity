@@ -62,7 +62,8 @@
     "test:member-count": "npx supabase test db --file supabase/tests/member_count.test.sql",
     "k6:seed": "node k6/scripts/seed-users.js",
     "k6:cleanup": "node k6/scripts/cleanup-users.js",
-    "test:k6-fixtures": "tsx --test k6/lib/fixture.test.mjs"
+    "test:k6-fixtures": "tsx --test k6/lib/fixture.test.mjs",
+    "test:k6-realtime": "tsx --test k6/lib/realtime-fanout.test.mjs"
   },
   "engines": {
     "node": ">=22.0.0",

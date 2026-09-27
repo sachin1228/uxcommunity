@@ -12,8 +12,7 @@ import {
 } from "./client-publish";
 import {
   TopicSocketIndex,
-  buildPresenceSnapshot,
-  presenceSignature,
+  countOnlineUsers,
   type PresenceMeta,
 } from "./subscriptions";
 
@@ -31,8 +30,8 @@ import {
  *     subscriptions       = topic → sockets (targeted fan-out index)
  *   USER-scoped (multi-device bookkeeping + presence):
  *     userSockets[userId] = Set<WebSocket> all sockets for this user
- *     userMeta[userId]    = { name, avatar } cached at join() so a presence
- *                           snapshot never has to deserialize attachments
+ *     userMeta[userId]    = { name, avatar } cached at join() so client-publish
+ *                           frames never have to deserialize attachments
  *
  * Fan-out:
  *   A publish resolves `subscriptions.subscribers(topic)` and sends only to
@@ -71,11 +70,30 @@ interface WebSocketAttachment {
 /**
  * How long presence changes are allowed to coalesce.
  *
- * Presence is a coarse "who is here" roster: a 150 ms delay is imperceptible,
- * while sending a full snapshot on every join/close made a reconnect storm
- * quadratic (N connections joining produced N snapshots × N sockets).
+ * Presence is a coarse online-member count: a 150 ms delay is imperceptible,
+ * while flushing per join/close made a reconnect storm quadratic (N connections
+ * produced N flushes × N sockets). Coalescing bounds the flush count; the count
+ * payload bounds each flush.
  */
 const PRESENCE_COALESCE_MS = 150;
+
+/**
+ * How many sockets one presence flush may write to.
+ *
+ * A count has to reach every attached socket, so a flush is inherently O(room)
+ * work. Doing all of it inside one timer callback is what starved the Durable
+ * Object in the H-3 5K ladder: at 4,351 attached sockets the flush wrote the
+ * room back to back, the object could not interleave upgrades and queued `join`
+ * frames with it (only 42 of 4,351 sockets ever got their `hello`), and the room
+ * was lost.
+ *
+ * Capping the window bounds the work one presence change can impose on the
+ * object. A room at or below the cap still delivers every change in a single
+ * window — identical behaviour for normal-sized communities — and a larger room
+ * rotates: the cursor advances by the cap each window (~150 ms), so a
+ * 5,000-socket room converges on the current count within ~3 s.
+ */
+const PRESENCE_FLUSH_BUDGET = 256;
 
 /** Membership re-check window and the cap on cached entries. */
 const MEMBERSHIP_CACHE_TTL_MS = 60_000;
@@ -93,7 +111,7 @@ export class Room extends DurableObject<Env> {
   /** Socket → userId, and userId → its sockets (multi-device + presence). */
   private wsToUser = new Map<WebSocket, string>();
   private userSockets = new Map<string, Set<WebSocket>>();
-  /** Display metadata cached at join() — presence snapshots never touch attachments. */
+  /** Display metadata cached at join() — client-publish frames never touch attachments. */
   private userMeta = new Map<string, PresenceMeta>();
 
   /** In-flight reconstruction, shared so concurrent callers await the same work. */
@@ -103,7 +121,17 @@ export class Room extends DurableObject<Env> {
   /** Coalesced presence state. */
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
   private presenceDirty = false;
-  private lastPresenceSignature: string | null = null;
+  /** Next socket index still owed the current count; 0 starts a lap. */
+  private presenceCursor = 0;
+  /** Last observed online count — how a change is noticed between flushes. */
+  private presenceSeenCount: number | null = null;
+  /** Count a finished clean lap proved to sit on every attached socket. */
+  private presenceStableCount: number | null = null;
+  /** Bumped whenever the observed count changes. */
+  private presenceChangeSeq = 0;
+  /** Change sequence and socket count captured when the current lap started. */
+  private presenceLapChanges = 0;
+  private presenceLapSockets = 0;
 
   /** Bounded membership authorization cache (in-memory LRU + pruned storage). */
   private membershipCache = new Map<string, { ok: boolean; ts: number }>();
@@ -224,8 +252,8 @@ export class Room extends DurableObject<Env> {
 
     this.trackSocket(server, userId);
     this.metrics.connectionsOpened += 1;
-    // A new socket changes the presence roster (it joins as "unknown" until its
-    // `join` frame lands, exactly like the previous snapshot did).
+    // A new socket changes the online-member count (it counts before its `join`
+    // frame lands, exactly like the previous roster snapshot did).
     this.markPresenceDirty();
 
     return new Response(null, { status: 101, webSocket: client });
@@ -513,6 +541,7 @@ export class Room extends DurableObject<Env> {
       data,
       sender: senderUserId,
     });
+    const eventBytes = eventMsg.length;
 
     for (const ws of recipients) {
       const userId = this.wsToUser.get(ws);
@@ -522,6 +551,7 @@ export class Room extends DurableObject<Env> {
       this.metrics.deliverAttempts += 1;
       try {
         ws.send(eventMsg);
+        this.metrics.eventPayloadBytes += eventBytes;
       } catch {
         // One broken socket must not affect the rest of the fan-out, and it
         // must not be retried on every subsequent event — evict it now.
@@ -533,11 +563,11 @@ export class Room extends DurableObject<Env> {
   // ── Presence ──────────────────────────────────────────────────────
 
   /**
-   * Mark the roster as changed and schedule a flush.
+   * Mark presence as changed and schedule a flush.
    *
-   * Joins and closes are coalesced into one snapshot per window: before this, a
-   * reconnect storm sent a full snapshot (with an attachment deserialization
-   * per socket, twice) for every single join and close.
+   * Joins and closes are coalesced into one count per window: before this, a
+   * reconnect storm sent a message (with an attachment deserialization per
+   * socket, twice) for every single join and close.
    */
   private markPresenceDirty(): void {
     this.presenceDirty = true;
@@ -551,41 +581,91 @@ export class Room extends DurableObject<Env> {
     }, PRESENCE_COALESCE_MS);
   }
 
-  /** Broadcast one entry per connected member, with tabs/devices folded into connections. */
+  /**
+   * Send the room's online-member count to the next window of sockets.
+   *
+   * The payload is a single number by design (see `countOnlineUsers`): the only
+   * presence consumer in the product renders "N online", so a roster added
+   * nothing but bytes. The work per flush is capped at `PRESENCE_FLUSH_BUDGET`
+   * sends (see that constant for why), so a room larger than the cap is told the
+   * count one window at a time — a lap over the room — until every attached
+   * socket holds it.
+   *
+   * A lap only proves delivery when neither the count nor the socket population
+   * moved while it ran; a change landing mid-lap runs another lap instead of
+   * declaring the room settled. The cursor is never reset, so a busy room keeps
+   * advancing through its sockets rather than refreshing the same first window
+   * on every change.
+   */
   private flushPresence(): void {
     if (!this.presenceDirty) return;
     this.presenceDirty = false;
 
     const sockets = this.ctx.getWebSockets();
-    if (sockets.length === 0) return;
+    if (sockets.length === 0) {
+      // Nothing to tell, and a socket that arrives later must be told afresh.
+      this.presenceCursor = 0;
+      this.presenceSeenCount = null;
+      this.presenceStableCount = null;
+      return;
+    }
 
-    const users = buildPresenceSnapshot(this.userSockets, this.userMeta);
-    const signature = presenceSignature(users);
-    // Nothing changed since the last snapshot — skip the write entirely.
-    if (signature === this.lastPresenceSignature) {
+    const count = countOnlineUsers(this.userSockets);
+    if (count !== this.presenceSeenCount) {
+      this.presenceSeenCount = count;
+      this.presenceChangeSeq += 1;
+      this.metrics.presenceCountChanges += 1;
+    }
+
+    const startingLap = this.presenceCursor === 0;
+    // Idle room: every socket holds this count and no lap is in progress.
+    if (startingLap && count === this.presenceStableCount) {
       this.metrics.presenceSkipped += 1;
       return;
     }
-    this.lastPresenceSignature = signature;
+    if (startingLap) {
+      this.presenceLapChanges = this.presenceChangeSeq;
+      this.presenceLapSockets = sockets.length;
+    }
 
     const message = JSON.stringify({
       t: "presence",
       room: this.roomName(),
-      users,
+      count,
     });
+    const messageBytes = message.length;
 
-    for (const ws of sockets) {
+    const end = Math.min(sockets.length, this.presenceCursor + PRESENCE_FLUSH_BUDGET);
+    for (let index = this.presenceCursor; index < end; index += 1) {
+      const ws = sockets[index];
+      if (!ws) continue;
       // Counted separately from event fan-out: this addresses the whole room, so
       // folding it into `deliverAttempts` would hide the cost of a publish.
       this.metrics.presenceDeliverAttempts += 1;
       try {
         ws.send(message);
+        this.metrics.presencePayloadBytes += messageBytes;
       } catch {
-        // A dead socket is evicted; the next flush publishes a fresh snapshot.
+        // A dead socket is evicted; the next flush publishes a fresh count.
         this.removeSocket(ws, "send-failed");
       }
     }
     this.metrics.presenceBroadcasts += 1;
+
+    if (end < sockets.length) {
+      // Budget spent: the rest of the room is owed this count.
+      this.presenceCursor = end;
+      this.metrics.presenceDeferredWindows += 1;
+      this.markPresenceDirty();
+      return;
+    }
+
+    this.presenceCursor = 0;
+    if (this.presenceChangeSeq === this.presenceLapChanges && sockets.length === this.presenceLapSockets) {
+      this.presenceStableCount = count;
+    } else {
+      this.markPresenceDirty();
+    }
   }
 
   // ── Membership authorization (fail-closed) ──────────────────────────
