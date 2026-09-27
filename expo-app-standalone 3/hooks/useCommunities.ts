@@ -19,9 +19,10 @@
  * - Background reconciliation on AppState 'active': max(server, local) unread
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
+import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
@@ -145,6 +146,22 @@ export function useCommunities() {
     }
   }, []);
 
+  /**
+   * List catch-up after a realtime gap.
+   *
+   * The sockets above hold the unread counts and last-message previews of every
+   * listed community. When one of them re-opens (Wi-Fi → LTE, a backgrounded
+   * app, a recycled half-open socket) whatever was published during the gap is
+   * already gone, so the list is reconciled from the server instead. Debounced
+   * because a network switch re-opens every community socket at once and one
+   * list fetch covers all of them.
+   */
+  const listCatchUp = useMemo(
+    () => createCatchUpScheduler(reconcile, { debounceMs: 1000 }),
+    [reconcile],
+  );
+  useEffect(() => () => listCatchUp.cancel(), [listCatchUp]);
+
   // ── Typing flush helper ────────────────────────────────────────────────────
   const flushTyping = useCallback(() => {
     const now = Date.now();
@@ -181,6 +198,15 @@ export function useCommunities() {
         const room = realtimeRooms.chat(cid);
 
         realtimeClient.connect(room);
+
+        // Once this socket is up it will not miss anything; whatever was
+        // published before that is recovered from the server instead of waiting
+        // for the next foreground.
+        unsubscribesRef.current.push(
+          realtimeClient.onRoomStatus(room, (connected) => {
+            if (connected) listCatchUp.schedule();
+          }),
+        );
 
         // ── New message ───────────────────────────────────────────────────
         unsubscribesRef.current.push(
@@ -448,7 +474,7 @@ export function useCommunities() {
         );
       });
     },
-    [user?.id, user?.name, resolveName, flushTyping]
+    [user?.id, user?.name, resolveName, flushTyping, listCatchUp]
   );
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -477,10 +503,10 @@ export function useCommunities() {
 
   // Background reconciliation when app is foregrounded
   useEffect(() => {
-    const handle = (state: AppStateStatus) => { if (state === 'active') reconcile(); };
+    const handle = (state: AppStateStatus) => { if (state === 'active') listCatchUp.schedule(); };
     const sub = AppState.addEventListener('change', handle);
     return () => sub.remove();
-  }, [reconcile]);
+  }, [listCatchUp]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 

@@ -105,13 +105,25 @@ export async function getCommunities(): Promise<Community[]> {
   }));
 }
 
+/**
+ * One page of a community's messages.
+ *
+ * `before` walks backwards through history (pagination). `after` returns only
+ * what arrived strictly later than the cursor — oldest-first, so the page
+ * appends — and is what reconnect/foreground catch-up uses to recover messages
+ * published while the socket was down.
+ */
 export async function getMessages(
   communityId: string,
-  before?: string
+  before?: string,
+  after?: string
 ): Promise<Message[]> {
-  const qs = before ? `?before=${encodeURIComponent(before)}` : '';
+  const params = new URLSearchParams();
+  if (before) params.set('before', before);
+  if (after) params.set('after', after);
+  const qs = params.toString();
   const { data } = await apiFetch<{ messages: Message[] }>(
-    `/api/communities/${communityId}/messages${qs}`
+    `/api/communities/${communityId}/messages${qs ? `?${qs}` : ''}`
   );
   return data.messages;
 }

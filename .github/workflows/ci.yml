@@ -65,6 +65,13 @@ jobs:
           echo "running $(( $(echo "$FILES" | wc -l) )) test files"
           npx tsx --tsconfig tsconfig.json --test $FILES
 
+      # Blocking. The mobile app is not an npm workspace, so its suites are not
+      # picked up by the glob above. These cover the realtime lifecycle
+      # (reconnect catch-up, logout cleanup, account switch, user-room keying)
+      # and import nothing from React Native, so they run on the runner as-is.
+      - name: Run mobile realtime tests
+        run: npm run test:mobile-realtime
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest

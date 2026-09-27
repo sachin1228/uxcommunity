@@ -12,6 +12,8 @@ expo-app-standalone 3/
 ├── lib/
 │   ├── api.ts                  REST client — cookie session over fetch
 │   ├── realtime.ts             singleton multiplexed WebSocket client
+│   ├── realtimeCore.ts         its platform-free lifecycle (socket state machine)
+│   ├── realtimeCatchUp.ts      reconnect/foreground gap recovery helpers
 │   ├── push.ts                 push registration, channels, badge, diagnostics
 │   ├── auth.ts                 login / logout / me endpoints
 │   └── communities.ts          REST calls for communities & messages
@@ -70,7 +72,11 @@ realtime WebSocket (see below).
 
 `lib/realtime.ts` is a port of the web client (`apps/web/lib/realtime/client.ts`):
 a **singleton `realtimeClient`** that multiplexes WebSockets to the Cloudflare
-Durable Objects in `apps/realtime`.
+Durable Objects in `apps/realtime`. The lifecycle itself lives in
+`lib/realtimeCore.ts`, which imports nothing from React Native so it can be
+tested as a plain state machine (`lib/realtimeCore.test.ts`); `lib/realtime.ts`
+supplies the platform pieces (authenticated URL, socket factory, foreground
+probe) and exports the singleton the hooks import.
 
 ### Connection topology
 
@@ -78,7 +84,10 @@ Durable Objects in `apps/realtime`.
   `showcase:*`, `rules:`, `*-comments:*`) each get **their own WebSocket**
   straight to that community's `CommunityDO`.
 - **User-scoped rooms** (`notifications:*`, `profile:*`) share one connection
-  to the `UserDO` (`user:global`).
+  to the `UserDO`, keyed `user:${userId}` — the same instance
+  `resolveRoomTarget` in `apps/realtime/src/room-routing.ts` publishes them to.
+  Before an identity exists the socket uses the `user:global` placeholder and is
+  re-keyed by `init()`, so a socket opened first still lands on the right DO.
 - Message delivery is 0 RPCs — publish/subscribe straight over the socket.
 
 ### Room + topic model
@@ -113,6 +122,38 @@ Three mechanisms handle this:
 3. **Exponential reconnect backoff** — 1 s base, capped at 15 s; replayed
    subscriptions and queued publishes are flushed on reconnect (local
    refcounts are authoritative, so nothing is lost).
+
+### Reconnect catch-up
+
+A reconnect restores the socket and its subscriptions, but it cannot deliver
+what was published while the socket was down — that is a real gap (Wi-Fi → LTE,
+a backgrounded app, a half-open socket the heartbeat recycled). Recovery uses
+the existing APIs, never a poll loop:
+
+- `onRoomStatus(room, handler)` fires `true` whenever a room's socket comes up
+  (a re-open after a drop included) and `false` when it drops. A subscribed
+  socket receives everything published after that point, so one catch-up per
+  open leaves no window uncovered.
+- `useChatMessages` turns that edge — and its own AppState listener — into one
+  debounced, single-flight `GET …/messages?after=<newest real message>` and
+  merges the page without duplicates (`lib/realtimeCatchUp.ts`). An optimistic
+  send whose echo was in the gap is confirmed by the merge rather than
+  duplicated, and a send whose POST has not resolved yet is never dropped.
+- `useCommunityContent` refetches its tab's React Query data on the same edge,
+  and `useCommunities` reconciles the community list, both debounced so a
+  single network blip costs one request per surface.
+
+### Logout and account switch
+
+Everything in the client — sockets, subscriptions, queued frames, reconnect
+timers, cached presence and the `join` identity — belongs to the signed-in
+account, so `AuthContext` calls `resetRealtimeSession()` (a `destroy()`) before
+signing in, and on logout / a session that has gone stale. `destroy()` also
+bumps an internal session counter, which makes every cleanup closure captured by
+that account inert: an unmounting screen from the previous session can no longer
+release the next account's rooms. If an identity changes without a logout,
+`init()` re-keys the user socket to `user:${userId}`, re-joins the remaining
+sockets as the new member and forgets the previous account's user-scoped rooms.
 
 ### What flows over the chat room
 
