@@ -110,10 +110,11 @@ const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 20000);
 const HELLO_TIMEOUT_MS = Number(process.env.HELLO_TIMEOUT_MS || 15000);
 const SETTLE_MS = Number(process.env.SETTLE_MS || 8000);
 /**
- * After the ramp the room keeps broadcasting presence snapshots (one per
- * ~150ms window while sockets join) and the Durable Object drains that backlog.
- * The publish phase only starts once the room is quiet again, otherwise the
- * fan-out numbers would describe the connect storm instead of a message.
+ * After the ramp the room keeps sending presence counts (one window of sockets
+ * per ~150ms while they join, capped per window by the DO) and the Durable
+ * Object drains what is left. The publish phase only starts once the room is
+ * quiet again, otherwise the fan-out numbers would describe the connect storm
+ * instead of a message.
  */
 const QUIESCE_TIMEOUT_MS = Number(process.env.QUIESCE_TIMEOUT_MS || 180000);
 /** Inbound frames/second tolerated while deciding the room is quiet. */
@@ -229,6 +230,22 @@ async function waitFor(predicate, timeoutMs, intervalMs = 100) {
 
 function bump(map, key) {
   map.set(key, (map.get(key) || 0) + 1);
+}
+
+/**
+ * Record ONE failure per client.
+ *
+ * A socket that never opened reports twice — once as the `error` the runtime
+ * raised (`read ECONNRESET`) and once as the timeout/close that followed — so
+ * counting every callback made `Failed: 1,098` describe 649 sockets. The tally
+ * is meant to be read against `Connected`, so it counts sockets.
+ */
+function recordConnectFailure(client, reason) {
+  if (client.connectFailure !== null) return;
+  client.connectFailure = reason || "error";
+  metrics.connectFailed += 1;
+  bump(metrics.connectFailureReasons, client.connectFailure);
+  client.state = "connect-failed";
 }
 
 function rate(part, total) {
@@ -398,6 +415,8 @@ class Client {
     this.pongs = 0;
     this.errors = [];
     this.heartbeatTimer = null;
+    /** First (and only) recorded connect failure reason, or null when it opened. */
+    this.connectFailure = null;
   }
 
   get isLive() {
@@ -407,10 +426,9 @@ class Client {
 
 /**
  * Cheap frame classifier: look at a few bytes instead of deserializing the
- * whole payload. A presence snapshot for a 1,000-socket room is ~70 KB and one
- * is sent per socket per flush, so parsing them made the HARNESS the bottleneck
- * (and then the DO's own sends backed up behind a client that could not drain
- * them). Only frames that can carry this run's event are fully parsed.
+ * whole payload. Presence frames used to be a ~70 KB roster per socket per
+ * flush, so the count of them (not their size) still makes them the bulk of
+ * inbound frames; only frames that can carry this run's event are fully parsed.
  */
 function frameHead(data) {
   if (typeof data === "string") return data.slice(0, 24);
@@ -506,9 +524,7 @@ async function openClient(client) {
 
     const timer = setTimeout(() => {
       if (client.openedAt === null) {
-        metrics.connectFailed += 1;
-        bump(metrics.connectFailureReasons, "connect timeout");
-        client.state = "connect-failed";
+        recordConnectFailure(client, "connect timeout");
         try {
           client.ws?.terminate();
         } catch {
@@ -522,8 +538,7 @@ async function openClient(client) {
     try {
       ws = new WebSocket(socketUrl(client.room, client.token));
     } catch (error) {
-      metrics.connectFailed += 1;
-      bump(metrics.connectFailureReasons, error.message);
+      recordConnectFailure(client, error.message);
       finish();
       return;
     }
@@ -551,10 +566,8 @@ async function openClient(client) {
 
     ws.on("unexpected-response", (_request, response) => {
       if (client.openedAt === null) {
-        metrics.connectFailed += 1;
         bump(metrics.upgradeRejections, String(response.statusCode));
-        bump(metrics.connectFailureReasons, `upgrade rejected ${response.statusCode}`);
-        client.state = "connect-failed";
+        recordConnectFailure(client, `upgrade rejected ${response.statusCode}`);
       }
       finish();
     });
@@ -562,11 +575,7 @@ async function openClient(client) {
     ws.on("error", (error) => {
       metrics.wsErrors += 1;
       client.errors.push(error.message);
-      if (client.openedAt === null) {
-        metrics.connectFailed += 1;
-        bump(metrics.connectFailureReasons, error.message || "error");
-        client.state = "connect-failed";
-      }
+      if (client.openedAt === null) recordConnectFailure(client, error.message);
       finish();
     });
 
@@ -845,14 +854,14 @@ async function connectClients() {
 }
 
 /**
- * Wait until the room stops broadcasting before publishing anything.
+ * Wait until the room stops sending presence counts before publishing anything.
  *
- * Every socket that connects marks the presence roster dirty, and the DO flushes
- * a snapshot to every socket in the room per ~150ms window (`flushPresence()`),
- * so a 1,000-socket ramp leaves a large backlog of presence frames queued for
- * delivery. Publishing into that backlog measures the connect storm, not message
- * fan-out — this waits for the DO's own counters and the inbound frame rate to
- * settle, and reports how long that took and how much presence traffic it cost.
+ * Every socket that connects marks presence dirty and the DO sends the online
+ * count to one window of sockets per ~150ms (`flushPresence()`), so a large ramp
+ * still leaves counts queued for delivery. Publishing into that measures the
+ * connect storm, not message fan-out — this waits for the DO's own counters and
+ * the inbound frame rate to settle, and reports how long that took and how much
+ * presence traffic it cost.
  */
 async function waitForQuiescence() {
   console.log("  Waiting for the room to quiesce (presence backlog from the ramp)…");
@@ -902,7 +911,7 @@ async function waitForQuiescence() {
       };
       console.log(
         `  Room quiesced after ${metrics.quiesce.waitedMs}ms. Presence cost of the ${mainGroupSize}-socket ramp: ` +
-          `${metrics.quiesce.presenceBroadcastsDuringRamp} snapshot broadcast(s), ` +
+          `${metrics.quiesce.presenceBroadcastsDuringRamp} presence window(s), ` +
           `${metrics.quiesce.presenceDeliveriesDuringRamp} socket send(s) — received here: ` +
           `${metrics.presenceFrames} frame(s) / ${(metrics.presenceBytes / 1e6).toFixed(1)} MB.`,
       );
@@ -1165,7 +1174,7 @@ function evaluate(summary) {
   }
   if (metrics.presenceBytes > 200e6) {
     warnings.push(
-      `the harness received ${(metrics.presenceBytes / 1e6).toFixed(0)} MB of presence snapshots during the ramp — the room's presence cost dominates this stage`,
+      `the harness received ${(metrics.presenceBytes / 1e6).toFixed(0)} MB of presence frames during the ramp — the room's presence cost dominates this stage`,
     );
   }
 
@@ -1260,12 +1269,12 @@ function printReport(summary, verdict) {
   if (metrics.closeReasons.size > 0) {
     console.log(`  Close reasons:          ${JSON.stringify(Object.fromEntries(metrics.closeReasons))}`);
   }
-  console.log(`  Presence frames ignored:${String(m.h3_presence_frames_ignored).padStart(6)} (${(m.h3_presence_bytes_ignored / 1e6).toFixed(1)} MB, never parsed)`);
+  console.log(`  Presence frames ignored:${String(m.h3_presence_frames_ignored).padStart(6)} (${(m.h3_presence_bytes_ignored / 1e6).toFixed(1)} MB of online-count frames, never parsed)`);
   console.log(`  Heartbeat pongs:        ${m.h3_pongs_received}`);
   if (m.h3_quiesce) {
     console.log(
       `  Quiesce:                ${m.h3_quiesce.quiesced ? `settled after ${m.h3_quiesce.waitedMs}ms` : `NOT settled within ${QUIESCE_TIMEOUT_MS}ms`}` +
-        `${m.h3_quiesce.presenceBroadcastsDuringRamp !== undefined ? ` | ramp presence: ${m.h3_quiesce.presenceBroadcastsDuringRamp} broadcast(s) / ${m.h3_quiesce.presenceDeliveriesDuringRamp} send(s)` : ""}`,
+        `${m.h3_quiesce.presenceBroadcastsDuringRamp !== undefined ? ` | ramp presence: ${m.h3_quiesce.presenceBroadcastsDuringRamp} window(s) / ${m.h3_quiesce.presenceDeliveriesDuringRamp} send(s)` : ""}`,
     );
   }
   console.log("");

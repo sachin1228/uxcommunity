@@ -8,9 +8,9 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 /**
  * Tracks how many members are currently online in a community.
  *
- * The Community Durable Object publishes a presence snapshot whenever a
- * member joins or disconnects. Multiple tabs/devices belonging to the same
- * member are folded into one online user by the server.
+ * The Community Durable Object broadcasts the online-member count whenever it
+ * changes. Multiple tabs/devices belonging to the same member are folded into
+ * one online user by the server, so this is a count of members, not sockets.
  */
 export function useOnlinePresence({
   communityId,
@@ -29,8 +29,8 @@ export function useOnlinePresence({
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
 
     const unsubRoom = realtimeClient.subscribe(chatRoom);
-    const unsubPresence = realtimeClient.onPresence(chatRoom, (users) => {
-      setOnlineCount(users.length);
+    const unsubPresence = realtimeClient.onPresence(chatRoom, ({ count }) => {
+      setOnlineCount(count);
     });
 
     realtimeClient.connect();

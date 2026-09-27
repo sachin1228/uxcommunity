@@ -25,24 +25,19 @@ export interface EventMessage {
   sender?: string;
 }
 
-export interface PresenceUser {
-  id: string;
-  name: string | null;
-  avatar: string | null;
-  connections: number;
-}
-
+/**
+ * Online-member count for a room — the whole presence payload.
+ *
+ * Deliberately a number rather than a roster: every socket in the room receives
+ * it on each change, so a per-member array made one flush cost
+ * O(members × sockets) bytes. Clients that need more than "N online" must be
+ * given a targeted message, not a bigger broadcast.
+ */
 export interface PresenceMessage {
   t: "presence";
   room: string;
-  users: PresenceUser[];
-}
-
-export interface PresenceDeltaMessage {
-  t: "presence_delta";
-  room: string;
-  joined?: PresenceUser;
-  left?: { id: string };
+  /** Distinct members with at least one live socket in the room. */
+  count: number;
 }
 
 export interface ErrorMessage {
@@ -87,12 +82,7 @@ export type ClientMessage =
   | UnsubscribeMessage
   | PublishMessage;
 
-export type ServerMessage =
-  | HelloMessage
-  | EventMessage
-  | PresenceMessage
-  | PresenceDeltaMessage
-  | ErrorMessage;
+export type ServerMessage = HelloMessage | EventMessage | PresenceMessage | ErrorMessage;
 
 /** Server-to-server publish payload for POST /publish. */
 export interface PublishRequest {

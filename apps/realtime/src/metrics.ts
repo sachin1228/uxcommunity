@@ -24,17 +24,37 @@ export class RealtimeMetrics {
   /**
    * `ws.send()` calls attempted for EVENT fan-out — exactly one per recipient
    * of a published topic. Presence traffic is deliberately NOT mixed in here:
-   * a roster re-broadcast addresses every socket in the room, so counting it as
+   * a presence broadcast addresses every socket in the room, so counting it as
    * `deliverAttempts` made the send count for one publish unreadable (a 500
    * socket room re-broadcasting presence inflates it by 500 per flush). Keeping
    * them apart is what makes `deliverAttempts` usable as "cost of this publish".
    */
   deliverAttempts = 0;
-  /** Presence snapshots actually written to sockets. */
+  /**
+   * Bytes written by EVENT fan-out (payload length × successful recipients).
+   * Exposed so a change to presence, publish or the fan-out indexes can be shown
+   * not to have altered the cost of a message broadcast.
+   */
+  eventPayloadBytes = 0;
+  /** Presence flush windows that wrote at least one frame. */
   presenceBroadcasts = 0;
-  /** `ws.send()` calls attempted for presence snapshots (one per socket per flush). */
+  /**
+   * Flush windows that covered only part of the room because the per-window send
+   * budget ran out. Zero for any room small enough to be refreshed in one window;
+   * nonzero means the room is rotating through the attached sockets.
+   */
+  presenceDeferredWindows = 0;
+  /** `ws.send()` calls attempted for presence broadcasts (one per socket per flush). */
   presenceDeliverAttempts = 0;
-  /** Presence flushes skipped because the snapshot had not changed. */
+  /**
+   * Bytes written by presence broadcasts (payload length × successful
+   * recipients). The payload is a count, so this stays ~60 B per socket per
+   * flush instead of ~one roster entry per member per socket.
+   */
+  presencePayloadBytes = 0;
+  /** Presence flushes that changed the online count and were broadcast. */
+  presenceCountChanges = 0;
+  /** Presence flushes skipped because the online count had not changed. */
   presenceSkipped = 0;
   /** Presence flushes collapsed into a scheduled one (reconnect storms). */
   presenceCoalesced = 0;
@@ -64,8 +84,12 @@ export class RealtimeMetrics {
       eventsPublished: this.eventsPublished,
       fanoutRecipients: this.fanoutRecipients,
       deliverAttempts: this.deliverAttempts,
+      eventPayloadBytes: this.eventPayloadBytes,
       presenceBroadcasts: this.presenceBroadcasts,
+      presenceDeferredWindows: this.presenceDeferredWindows,
       presenceDeliverAttempts: this.presenceDeliverAttempts,
+      presencePayloadBytes: this.presencePayloadBytes,
+      presenceCountChanges: this.presenceCountChanges,
       presenceSkipped: this.presenceSkipped,
       presenceCoalesced: this.presenceCoalesced,
       clientPublishesAccepted: this.clientPublishesAccepted,
