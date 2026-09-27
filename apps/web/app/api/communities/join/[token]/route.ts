@@ -28,7 +28,7 @@ export async function GET(
   const db = createServiceClient();
   const { data: community, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, is_private, description")
+    .select("id, name, type, image_url, is_private, description, member_count")
     .eq("invite_token", token)
     .eq("is_active", true)
     .maybeSingle();
@@ -37,12 +37,9 @@ export async function GET(
     return NextResponse.json({ error: "Invite link not found or expired." }, { status: 404 });
   }
 
-  const { count } = await db
-    .from("community_members")
-    .select("*", { count: "exact", head: true })
-    .eq("community_id", community.id);
-
-  return NextResponse.json({ community: { ...community, member_count: count ?? 0 } });
+  // member_count is the community row's own column (20260927120000), so the
+  // invite landing page does not count the community's memberships to show it.
+  return NextResponse.json({ community: { ...community, member_count: community.member_count ?? 0 } });
 }
 
 // ── POST /api/communities/join/[token]

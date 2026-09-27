@@ -135,6 +135,7 @@ export type Database = {
           is_private: boolean;
           lottie_format: string | null;
           lottie_url: string | null;
+          member_count: number;
           name: string;
           owner_id: string | null;
           reference_id: string | null;
@@ -154,6 +155,7 @@ export type Database = {
           is_private?: boolean;
           lottie_format?: string | null;
           lottie_url?: string | null;
+          member_count?: number;
           name: string;
           owner_id?: string | null;
           reference_id?: string | null;
@@ -173,6 +175,7 @@ export type Database = {
           is_private?: boolean;
           lottie_format?: string | null;
           lottie_url?: string | null;
+          member_count?: number;
           name?: string;
           owner_id?: string | null;
           reference_id?: string | null;
