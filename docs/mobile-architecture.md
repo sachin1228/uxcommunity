@@ -12,6 +12,8 @@ expo-app-standalone 3/
 ├── lib/
 │   ├── api.ts                  REST client — cookie session over fetch
 │   ├── realtime.ts             singleton multiplexed WebSocket client
+│   ├── realtimeCore.ts         its platform-free lifecycle (socket state machine)
+│   ├── realtimeCatchUp.ts      reconnect/foreground gap recovery helpers
 │   ├── push.ts                 push registration, channels, badge, diagnostics
 │   ├── auth.ts                 login / logout / me endpoints
 │   └── communities.ts          REST calls for communities & messages
@@ -70,16 +72,73 @@ realtime WebSocket (see below).
 
 `lib/realtime.ts` is a port of the web client (`apps/web/lib/realtime/client.ts`):
 a **singleton `realtimeClient`** that multiplexes WebSockets to the Cloudflare
-Durable Objects in `apps/realtime`.
+Durable Objects in `apps/realtime`. The lifecycle itself lives in
+`lib/realtimeCore.ts`, which imports nothing from React Native so it can be
+tested as a plain state machine (`lib/realtimeCore.test.ts`); `lib/realtime.ts`
+supplies the platform pieces (authenticated URL, socket factory, foreground
+probe) and exports the singleton the hooks import.
 
 ### Connection topology
 
 - **Community-scoped rooms** (`chat:*`, `threads:*`, `events:*`, `resources:*`,
   `showcase:*`, `rules:`, `*-comments:*`) each get **their own WebSocket**
-  straight to that community's `CommunityDO`.
+  straight to the `CommunityDO` instance that owns that room —
+  `resolveRoomTarget` (`apps/realtime/src/room-routing.ts`) routes by room name,
+  so `chat:<id>` and `threads:<id>` are different instances. The community
+  *list* keeps a socket only for the most recently active window of them, so the
+  count does not grow with membership (see “Socket budget” below).
 - **User-scoped rooms** (`notifications:*`, `profile:*`) share one connection
-  to the `UserDO` (`user:global`).
+  to the `UserDO`, keyed `user:${userId}` — the same instance
+  `resolveRoomTarget` in `apps/realtime/src/room-routing.ts` publishes them to.
+  Before an identity exists the socket uses the `user:global` placeholder and is
+  re-keyed by `init()`, so a socket opened first still lands on the right DO.
 - Message delivery is 0 RPCs — publish/subscribe straight over the socket.
+
+### Socket budget
+
+A phone should not carry one WebSocket per community. `useCommunities` used to
+call `realtimeClient.connect(realtimeRooms.chat(cid))` for **every** joined
+community, so a member of 30 communities held ~30 sockets: 30 heartbeats, 30
+reconnect attempts per network change, 30 DO connections, 30 units of memory the
+OS may reclaim. The list now subscribes a bounded window instead —
+`selectLiveCommunityIds` in `lib/realtimeWindow.ts` keeps the
+`COMMUNITY_REALTIME_LIMIT` (10) most recently active communities, the head of the
+list's existing activity order. Web's sidebar applies the same policy with
+`SIDEBAR_REALTIME_LIMIT` (15); mobile keeps fewer. Tests:
+`lib/realtimeWindow.test.ts` (policy) and `lib/realtimeScale.test.ts` (the real
+client against a fake platform: 1/10/50/100 memberships, one socket per live
+community, one reconnect per socket, release/logout behaviour).
+
+**Why not one shared socket.** The obvious design — one socket per device
+carrying every community as a subscription — cannot be built safely on the
+current server, and this PR does not pretend otherwise:
+
+1. **A WebSocket terminates in exactly one Durable Object, and the instance name
+   *is* the room identity.** `handleUpgrade`
+   (`apps/realtime/src/index.ts`) resolves the `room` query parameter to one DO
+   and hands the upgrade to it; `Room.roomName()` (`apps/realtime/src/room.ts`)
+   is `ctx.id.name`, and every event and presence frame is stamped with it. The
+   socket's room is fixed at upgrade time — there is no “join another room”
+   frame to send it to.
+2. **Inside a Room DO, subscriptions are keyed by topic alone**
+   (`TopicSocketIndex` in `apps/realtime/src/subscriptions.ts`). That is only
+   unambiguous because one instance serves one logical room: two communities in
+   one instance would collide on `message` / `like` / `save` and merge their
+   presence rosters.
+3. **Routing community events through `user:${userId}` instead would change the
+   fan-out model.** The UserDO already multiplexes logical rooms safely, but
+   only user-scoped ones; publishing a community event there means one DO
+   request *per online recipient* instead of one request plus local `ws.send()`s
+   (`fanOutEvents` with its bounded pool exists precisely to avoid that cost),
+   and it would change the protocol web shares.
+
+So the honest guarantee is **bounded**, not multiplexed: a 100-community member
+opens exactly as many community sockets as a 10-community member. What is
+outside the window is still kept current — the list reconcile in
+`useCommunities` runs on foreground, on reconnect and on pull-to-refresh — and a
+screen the user actually opens subscribes its own room regardless of the window
+(`useChatMessages` for the open chat, `useCommunityContent` for its tabs).
+User-scoped rooms already share the single `user:${userId}` socket.
 
 ### Room + topic model
 
@@ -113,6 +172,38 @@ Three mechanisms handle this:
 3. **Exponential reconnect backoff** — 1 s base, capped at 15 s; replayed
    subscriptions and queued publishes are flushed on reconnect (local
    refcounts are authoritative, so nothing is lost).
+
+### Reconnect catch-up
+
+A reconnect restores the socket and its subscriptions, but it cannot deliver
+what was published while the socket was down — that is a real gap (Wi-Fi → LTE,
+a backgrounded app, a half-open socket the heartbeat recycled). Recovery uses
+the existing APIs, never a poll loop:
+
+- `onRoomStatus(room, handler)` fires `true` whenever a room's socket comes up
+  (a re-open after a drop included) and `false` when it drops. A subscribed
+  socket receives everything published after that point, so one catch-up per
+  open leaves no window uncovered.
+- `useChatMessages` turns that edge — and its own AppState listener — into one
+  debounced, single-flight `GET …/messages?after=<newest real message>` and
+  merges the page without duplicates (`lib/realtimeCatchUp.ts`). An optimistic
+  send whose echo was in the gap is confirmed by the merge rather than
+  duplicated, and a send whose POST has not resolved yet is never dropped.
+- `useCommunityContent` refetches its tab's React Query data on the same edge,
+  and `useCommunities` reconciles the community list, both debounced so a
+  single network blip costs one request per surface.
+
+### Logout and account switch
+
+Everything in the client — sockets, subscriptions, queued frames, reconnect
+timers, cached presence and the `join` identity — belongs to the signed-in
+account, so `AuthContext` calls `resetRealtimeSession()` (a `destroy()`) before
+signing in, and on logout / a session that has gone stale. `destroy()` also
+bumps an internal session counter, which makes every cleanup closure captured by
+that account inert: an unmounting screen from the previous session can no longer
+release the next account's rooms. If an identity changes without a logout,
+`init()` re-keys the user socket to `user:${userId}`, re-joins the remaining
+sockets as the new member and forgets the previous account's user-scoped rooms.
 
 ### What flows over the chat room
 

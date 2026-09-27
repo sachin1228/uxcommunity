@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
+import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
 import { ContentByKind, ContentKind, getCommunityContent } from '@/lib/communityContent';
 
 export function communityContentKey(communityId: string, kind: ContentKind) {
@@ -46,6 +47,21 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
     staleTime: 20_000,
   });
 
+  /**
+   * Refetch trigger for realtime gaps.
+   *
+   * A tab whose socket dropped missed the inserts/updates published in the
+   * meantime and there is no cursor to ask for them, so the honest recovery is
+   * a refetch. Debounced and single-flight so a flaky network (a burst of
+   * reconnects plus a foreground) still produces one refetch, and React Query
+   * dedupes it against an already-running one.
+   */
+  const gapRefetch = useMemo(
+    () => createCatchUpScheduler(invalidate, { debounceMs: 500 }),
+    [invalidate],
+  );
+  useEffect(() => () => gapRefetch.cancel(), [gapRefetch]);
+
   // Realtime subscription via Cloudflare singleton
   useEffect(() => {
     if (!communityId || !enabled) return;
@@ -61,20 +77,27 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
     const unsubscribes = config.topics.map((topic) =>
       realtimeClient.on(room, topic, invalidate)
     );
+    // Whatever was published before this socket came up is gone; refetch it
+    // instead of waiting for the next tab switch.
+    unsubscribes.push(
+      realtimeClient.onRoomStatus(room, (connected) => {
+        if (connected) gapRefetch.schedule();
+      }),
+    );
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
       unsubRoom();
     };
-  }, [communityId, enabled, invalidate, kind]);
+  }, [communityId, enabled, invalidate, kind, gapRefetch]);
 
   useEffect(() => {
     if (!enabled) return;
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') invalidate();
+      if (state === 'active') gapRefetch.schedule();
     });
     return () => subscription.remove();
-  }, [enabled, invalidate]);
+  }, [enabled, gapRefetch]);
 
   return query;
 }

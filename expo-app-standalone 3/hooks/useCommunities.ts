@@ -17,11 +17,15 @@
  * - is_archived: false forced on new message arrival
  * - Separate reaction INSERT / UPDATE / DELETE handlers (matches web)
  * - Background reconciliation on AppState 'active': max(server, local) unread
+ * - Live sockets are bounded to the most recently active window, so a member of
+ *   100 communities does not carry 100 WebSockets (`lib/realtimeWindow.ts`)
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
+import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
+import { selectLiveCommunityIds } from '@/lib/realtimeWindow';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
@@ -145,6 +149,22 @@ export function useCommunities() {
     }
   }, []);
 
+  /**
+   * List catch-up after a realtime gap.
+   *
+   * The sockets above hold the unread counts and last-message previews of every
+   * listed community. When one of them re-opens (Wi-Fi → LTE, a backgrounded
+   * app, a recycled half-open socket) whatever was published during the gap is
+   * already gone, so the list is reconciled from the server instead. Debounced
+   * because a network switch re-opens every community socket at once and one
+   * list fetch covers all of them.
+   */
+  const listCatchUp = useMemo(
+    () => createCatchUpScheduler(reconcile, { debounceMs: 1000 }),
+    [reconcile],
+  );
+  useEffect(() => () => listCatchUp.cancel(), [listCatchUp]);
+
   // ── Typing flush helper ────────────────────────────────────────────────────
   const flushTyping = useCallback(() => {
     const now = Date.now();
@@ -181,6 +201,15 @@ export function useCommunities() {
         const room = realtimeRooms.chat(cid);
 
         realtimeClient.connect(room);
+
+        // Once this socket is up it will not miss anything; whatever was
+        // published before that is recovered from the server instead of waiting
+        // for the next foreground.
+        unsubscribesRef.current.push(
+          realtimeClient.onRoomStatus(room, (connected) => {
+            if (connected) listCatchUp.schedule();
+          }),
+        );
 
         // ── New message ───────────────────────────────────────────────────
         unsubscribesRef.current.push(
@@ -448,7 +477,7 @@ export function useCommunities() {
         );
       });
     },
-    [user?.id, user?.name, resolveName, flushTyping]
+    [user?.id, user?.name, resolveName, flushTyping, listCatchUp]
   );
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -459,11 +488,27 @@ export function useCommunities() {
     communitiesRef.current = communities.filter((c) => !c.is_archived);
   }, [communities]);
 
-  // Re-subscribe whenever the set of community IDs changes or user loads
+  /**
+   * The communities that hold a live socket — the most recently active window
+   * (`realtimeWindow.ts`). A socket is not free on a phone, and subscribing to
+   * every membership made a 30-community member carry 30 of them.
+   *
+   * Nothing the user is looking at depends on this window: the open chat
+   * subscribes its own room from `useChatMessages`, and everything past the
+   * window is caught up by the reconcile above (foreground, reconnect, and
+   * pull-to-refresh on the list).
+   */
+  const liveCommunityIds = useMemo(
+    () => selectLiveCommunityIds(communities.map((c) => c.id)),
+    [communities],
+  );
+
+  // Re-subscribe whenever the live window changes or the user loads. The key is
+  // the window's membership, not the array identity: every message patch
+  // rebuilds `communities`, and a reorder must not re-subscribe anything.
   useEffect(() => {
-    if (communities.length === 0) return;
-    const ids = communities.map((c) => c.id).sort();
-    subscribeAll(ids);
+    if (liveCommunityIds.length === 0) return;
+    subscribeAll(liveCommunityIds);
     return () => {
       unsubscribesRef.current.forEach((unsub) => unsub());
       unsubscribesRef.current = [];
@@ -471,16 +516,16 @@ export function useCommunities() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    communities.map((c) => c.id).sort().join(','),
+    liveCommunityIds.slice().sort().join(','),
     subscribeAll,
   ]);
 
   // Background reconciliation when app is foregrounded
   useEffect(() => {
-    const handle = (state: AppStateStatus) => { if (state === 'active') reconcile(); };
+    const handle = (state: AppStateStatus) => { if (state === 'active') listCatchUp.schedule(); };
     const sub = AppState.addEventListener('change', handle);
     return () => sub.remove();
-  }, [reconcile]);
+  }, [listCatchUp]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 

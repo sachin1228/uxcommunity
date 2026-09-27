@@ -4,9 +4,13 @@
  * - Pagination: older messages via ?before=<ISO>
  * - Realtime: Cloudflare Durable Object WebSocket (message, message-edit,
  *   message-delete, reaction-insert/update/delete)
+ * - Catch-up: after a reconnect or a return to the foreground, the socket may
+ *   have missed publishes, so the hook asks the API for everything after its
+ *   newest real message (?after=<ISO>) and merges it without duplicates.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
   getMessages,
@@ -15,6 +19,11 @@ import {
   Reaction,
 } from '@/lib/communities';
 import { pickOptimisticMatch } from '@/lib/chat';
+import {
+  createCatchUpScheduler,
+  latestMessageCursor,
+  mergeCaughtUpMessages,
+} from '@/lib/realtimeCatchUp';
 import { useAuth } from '@/context/AuthContext';
 
 /**
@@ -34,6 +43,19 @@ export function useChatMessages(communityId: string) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Latest list for the catch-up cursor. Read when the fetch actually runs (not
+  // when it is scheduled), so a burst of triggers uses the newest cursor and
+  // cannot request the same gap twice.
+  const messagesRef = useRef<Message[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  /** Guards a catch-up that is still in flight when the user switches chat. */
+  const communityIdRef = useRef(communityId);
+  useEffect(() => {
+    communityIdRef.current = communityId;
+  }, [communityId]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -65,6 +87,30 @@ export function useChatMessages(communityId: string) {
       setIsLoadingMore(false);
     }
   }, [communityId, messages, isLoadingMore, hasMore]);
+
+  /**
+   * Catch up on anything published while the socket was down.
+   *
+   * Debounced and single-flight: the reconnect signal, the foreground probe and
+   * the heartbeat recycle routinely fire within a second of each other, and one
+   * `?after=` page is enough to cover all three.
+   */
+  const catchUp = useMemo(() => {
+    const targetCommunityId = communityId;
+    return createCatchUpScheduler(async () => {
+      const cursor = latestMessageCursor(messagesRef.current);
+      // Nothing real to anchor the cursor to yet — the initial `load()` is
+      // already on its way with a full page.
+      if (!cursor) return;
+      const missed = await getMessages(targetCommunityId, undefined, cursor);
+      // The user switched away while the page was in flight: those rows belong
+      // to the community that was on screen, not this one.
+      if (communityIdRef.current !== targetCommunityId) return;
+      if (missed.length === 0) return;
+      setMessages((prev) => mergeCaughtUpMessages(prev, missed));
+    });
+  }, [communityId]);
+  useEffect(() => () => catchUp.cancel(), [catchUp]);
 
   /** Optimistically append a sent message. */
   const appendMessage = useCallback((msg: Message) => {
@@ -330,11 +376,30 @@ export function useChatMessages(communityId: string) {
       }),
     );
 
+    // ── Gap recovery ───────────────────────────────────────────────────────
+    // A socket cannot deliver what was published before it was subscribed, so
+    // every open — and most importantly a re-open after a drop (Wi-Fi → LTE, a
+    // backgrounded app, a recycled half-open socket) — asks the API for the gap
+    // instead of waiting for the next remount.
+    unsubscribes.push(
+      realtimeClient.onRoomStatus(room, (connected) => {
+        if (connected) catchUp.schedule();
+      }),
+    );
+    // Coming back to the foreground probes the socket, but the probe takes up to
+    // a heartbeat timeout to conclude the socket is dead — catch up right away
+    // instead of waiting for that verdict.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') catchUp.schedule();
+    });
+
     return () => {
+      appStateSub.remove();
+      catchUp.cancel();
       unsubscribes.forEach((unsub) => unsub());
       unsubRoom();
     };
-  }, [communityId, user?.id, user?.name]);
+  }, [communityId, user?.id, user?.name, catchUp]);
 
   useEffect(() => {
     load();
