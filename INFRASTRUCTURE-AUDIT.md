@@ -195,9 +195,11 @@ Total: 0-1 HTTP requests, 0-2 DB queries
 2. after() — runs once the response is on the wire:
    → Realtime: publishChatEvent() → ONE event to chat:${id}; the Room DO
      broadcasts to every socket subscribed to that room (no per-member forwards)
-   → Push: sendChatMessagePush() → chunked member lookup (500/query) + Expo push;
-     audible pushes bounded to 3/minute per member, delivery capped at
-     PUSH_MAX_DELIVERIES within PUSH_TIME_BUDGET_MS
+   → Push: sendChatMessagePush() → chunked member lookup (500/query), then
+     lib/push/expo.ts batches 100/request with bounded concurrency, paces at the
+     project rate limit and retries transient failures; audible pushes bounded to
+     3/minute per member, delivery capped at PUSH_MAX_DELIVERIES within
+     PUSH_TIME_BUDGET_MS (audit H-2)
 3. Optimistic UI: message appears immediately (0 HTTP)
 4. Sidebar: the same chat event patches the local sidebar cache (0 HTTP)
 Total: 1 HTTP request, 2 DB queries in the request path + deferred publish/push work
@@ -1056,6 +1058,12 @@ The provided Vercel dashboard data shows:
 - **Problem**: Realtime delivery is now one room event, but the deferred Expo push fan-out still targets every member except the sender. At 10K members, one message can queue ~10K device pushes (chunked 500/query, capped at `PUSH_MAX_DELIVERIES = 10,000` inside `PUSH_TIME_BUDGET_MS = 20s`).
 - **Impact**: Expo push quota, deferred CPU on the sending worker, DB reads for member/preference/token lookups
 - **Scale at which it matters**: 1,000+ members in a single community
+- **Reliability (audit H-2)**: delivery no longer drops work silently — the Expo
+  client batches to the provider's 100/request limit, keeps ≤`PUSH_MAX_CONCURRENCY`
+  requests in flight, paces at `PUSH_RATE_LIMIT`, retries transient failures, and
+  the fan-out reports delivered/permanent/transient counts plus a `complete` flag.
+  The O(N) work itself remains: at ~600 notifications/sec a community larger than
+  ~12,000 members cannot be fully fanned out inside one request's `after()` budget.
 
 ### 2. Notification Work Is Deferred but Still Per-Engagement
 - **File**: `apps/web/lib/notifications.ts:deferNotification()` / `createNotification()`

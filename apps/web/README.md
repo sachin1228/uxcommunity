@@ -74,7 +74,7 @@ Community rooms (`chat:*`, `presence:*`, `threads:*`, `events:*`, `resources:*`,
 
 ## Push notifications
 
-`lib/push/` sends Expo push messages for chat activity: `chat.ts` resolves recipients in chunks, applies per-member audible budgets and quiet hours, and deletes dead tokens; `unread-totals.ts` computes badge counts. Registration and preferences live under `/api/push/*`.
+`lib/push/` sends Expo push messages for chat activity: `chat.ts` resolves recipients in chunks, applies per-member audible budgets and quiet hours, deletes dead tokens, and reports exactly how many devices were reached; `expo.ts` is the provider boundary — batches to Expo's 100-per-request limit, keeps a bounded number of requests in flight, paces them at the project rate limit, retries transient failures (and only the messages that failed) and never retries a permanent one; `unread-totals.ts` computes badge counts. Registration and preferences live under `/api/push/*`. Delivery limits are env-tunable: `PUSH_BATCH_SIZE`, `PUSH_MAX_CONCURRENCY`, `PUSH_RATE_LIMIT`, `PUSH_MAX_RETRIES`, `PUSH_RETRY_BASE_MS`, `PUSH_RETRY_MAX_MS`, `PUSH_REQUEST_TIMEOUT_MS`, `PUSH_MAX_DELIVERIES`, `PUSH_TIME_BUDGET_MS`.
 
 ## Rate limiting
 

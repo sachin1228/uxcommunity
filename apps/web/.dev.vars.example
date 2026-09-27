@@ -44,3 +44,16 @@ R2_PUBLIC_URL=
 ADMIN_EMAIL=
 ADMIN_PASSWORD=
 INVITATION_EXPIRY_DAYS=7
+
+# --- Optional push delivery tuning (leave blank to use the defaults) ---
+# Expo accepts at most 100 messages per request and ~600 notifications per
+# second per project; see apps/web/lib/push/expo.ts for how each value is used.
+PUSH_BATCH_SIZE=
+PUSH_MAX_CONCURRENCY=
+PUSH_RATE_LIMIT=
+PUSH_MAX_RETRIES=
+PUSH_RETRY_BASE_MS=
+PUSH_RETRY_MAX_MS=
+PUSH_REQUEST_TIMEOUT_MS=
+PUSH_MAX_DELIVERIES=
+PUSH_TIME_BUDGET_MS=
