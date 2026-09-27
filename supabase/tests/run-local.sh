@@ -31,6 +31,10 @@
 #   * A bare Postgres has none of Supabase's project-level default grants, so
 #     service_role is granted read access explicitly to keep that assertion
 #     meaningful.
+#   * member_count_scale.test.sql spawns its own psql sessions to overlap two
+#     transactions, so it needs PGHOST/PGDATABASE/PGUSER exported (below). The
+#     harness exports them; a SQL editor does not, and there that file's own
+#     "both concurrent join transactions committed" assertion is what fails.
 # ============================================================================
 set -u
 
@@ -64,6 +68,14 @@ pg_ctl -D "$PGDATA" -o "-k $SOCK -c listen_addresses= -c wal_level=logical" -l "
 
 PSQL="psql -h $SOCK -U postgres -v ON_ERROR_STOP=0 -q"
 $PSQL -d postgres -c "create database $DB" >/dev/null 2>&1 || stop_now "could not create database"
+
+# Exported so a test can open a SECOND connection to this same database with a
+# bare `psql` (member_count_scale.test.sql drives two overlapping transactions
+# through psql \! that way). PGHOST is the unix socket, so nothing here becomes
+# reachable over the network.
+export PGHOST="$SOCK"
+export PGDATABASE="$DB"
+export PGUSER=postgres
 
 # Supabase-only primitives the migration history expects to exist.
 $PSQL -d $DB -c "create role anon; create role authenticated; create role service_role;" >/dev/null 2>&1

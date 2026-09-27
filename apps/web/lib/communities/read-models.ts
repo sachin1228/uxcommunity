@@ -64,12 +64,12 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
       ? db
           .from("communities")
           .select(
-            "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format, showcase_enabled",
+            "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format, showcase_enabled, member_count",
           )
       : db
           .from("communities")
           .select(
-            "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format",
+            "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format, member_count",
           ))
       .eq("id", communityId)
       .eq("is_active", true)
@@ -114,7 +114,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   }
 
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
+  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows }] = await Promise.all([
     resolveCommunityDp({
       type: community.type,
       reference_id: community.reference_id,
@@ -122,7 +122,9 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     }),
     hasMasterData ? getMasterNameMap(community.type) : Promise.resolve({} as Record<string, string>),
     getExperienceLevelNameMap(),
-    db.from("community_members").select("user_id, joined_at, role", { count: "exact" }).eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
+    // The 10 avatars the detail page renders — no `count: "exact"`: the
+    // community's own member_count is the total (20260927120000).
+    db.from("community_members").select("user_id, joined_at, role").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
   ]);
 
   const memberUserIds = (memberRows ?? []).map((member) => member.user_id);
@@ -162,7 +164,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         event_end: eventRoom?.eventEnd ?? null,
         image_url: dp.image_url,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
-        member_count: memberCount ?? 0,
+        member_count: (community as unknown as { member_count?: number | null }).member_count ?? 0,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,
         current_user_role: currentUserRole,
         current_user_permissions: currentUserPermissions,

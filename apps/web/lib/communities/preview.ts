@@ -38,14 +38,15 @@ export async function loadCommunityPreview(
   communityId: string,
   userId: string,
 ): Promise<CommunityPreviewData | null> {
-  const [{ data: community }, { count: memberCount }, { data: membership }] = await Promise.all([
+  const [{ data: community }, { data: membership }] = await Promise.all([
+    // member_count rides on the row itself (20260927120000), so the preview no
+    // longer counts the community's memberships separately.
     db
       .from("communities")
-      .select("id, name, type, reference_id, image_url, description, is_private")
+      .select("id, name, type, reference_id, image_url, description, is_private, member_count")
       .eq("id", communityId)
       .eq("is_active", true)
       .maybeSingle(),
-    db.from("community_members").select("community_id", { count: "exact", head: true }).eq("community_id", communityId),
     db.from("community_members").select("community_id").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
   ]);
 
@@ -60,6 +61,7 @@ export async function loadCommunityPreview(
     image_url: string | null;
     description: string | null;
     is_private: boolean | null;
+    member_count: number | null;
   };
 
   // One count per public content area — the same rows the home feed
@@ -99,7 +101,7 @@ export async function loadCommunityPreview(
     is_private: row.is_private ?? false,
     image_url: dp.image_url,
     description: row.description,
-    member_count: memberCount ?? 0,
+    member_count: row.member_count ?? 0,
     public_counts: {
       ...(countRows[0].count ? { threads: countRows[0].count } : {}),
       ...(countRows[1].count ? { events: countRows[1].count } : {}),

@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data: communities, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at")
+    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at, member_count")
     .order("type")
     .order("name");
 
@@ -35,29 +35,20 @@ export async function GET() {
     )
   );
 
-  // Member + message counts in parallel
-  const [memberCounts, messageCounts] = await Promise.all([
-    Promise.all(
-      communities.map((c) =>
-        db
-          .from("community_members")
-          .select("*", { count: "exact", head: true })
-          .eq("community_id", c.id)
-          .then(({ count }) => ({ id: c.id, count: count ?? 0 }))
-      )
-    ),
-    Promise.all(
-      communities.map((c) =>
-        db
-          .from("community_messages")
-          .select("*", { count: "exact", head: true })
-          .eq("community_id", c.id)
-          .then(({ count }) => ({ id: c.id, count: count ?? 0 }))
-      )
-    ),
-  ]);
+  // Message counts in parallel. Member counts are not queried at all: the
+  // directory reads communities.member_count from the rows above, so a page of
+  // N communities used to cost N counts over (potentially huge) membership
+  // sets and now costs zero (20260927120000).
+  const messageCounts = await Promise.all(
+    communities.map((c) =>
+      db
+        .from("community_messages")
+        .select("*", { count: "exact", head: true })
+        .eq("community_id", c.id)
+        .then(({ count }) => ({ id: c.id, count: count ?? 0 }))
+    )
+  );
 
-  const memberCountMap  = Object.fromEntries(memberCounts.map((r)  => [r.id, r.count]));
   const messageCountMap = Object.fromEntries(messageCounts.map((r) => [r.id, r.count]));
 
   const result = communities.map((c, i) => ({
@@ -78,7 +69,7 @@ export async function GET() {
     is_app_created: c.type !== "user",
     is_active:     c.is_active ?? true,
     created_at:    c.created_at,
-    member_count:  memberCountMap[c.id]  ?? 0,
+    member_count:  c.member_count ?? 0,
     message_count: messageCountMap[c.id] ?? 0,
   }));
 

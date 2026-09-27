@@ -17,7 +17,7 @@ export async function GET(
 
   const { data: community, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, description, reference_id, owner_id, is_active, created_at, updated_at")
+    .select("id, name, type, image_url, description, reference_id, owner_id, is_active, created_at, updated_at, member_count")
     .eq("id", id)
     .maybeSingle();
 
@@ -42,14 +42,14 @@ export async function GET(
       ? (masterNameMap[community.reference_id] ?? null)
       : null;
 
-  // Counts + members + messages in parallel
+  // Message count + members + messages in parallel. The member total comes off
+  // the community row (20260927120000) rather than a count over every
+  // membership in it, so only the 20-row preview touches community_members.
   const [
-    { count: member_count },
     { count: message_count },
     { data: memberRows },
     { data: msgRows },
   ] = await Promise.all([
-    db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", id),
     db.from("community_messages").select("*", { count: "exact", head: true }).eq("community_id", id),
     db
       .from("community_members")
@@ -102,7 +102,7 @@ export async function GET(
       lottie_format: null,
       lottie_data: null,
       reference_name,
-      member_count:  member_count  ?? 0,
+      member_count:  community.member_count ?? 0,
       message_count: message_count ?? 0,
       members,
       messages,

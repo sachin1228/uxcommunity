@@ -50,15 +50,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
   let chatCommunityJoined = false;
   let chatMemberCount = 0;
   if (chatCommunity) {
-    const [joined, { count }] = await Promise.all([
-      isEventChatMember(db, chatCommunity.id, userId),
-      db
-        .from("community_members")
-        .select("community_id", { count: "exact", head: true })
-        .eq("community_id", chatCommunity.id),
-    ]);
-    chatCommunityJoined = joined;
-    chatMemberCount = count ?? 0;
+    chatCommunityJoined = await isEventChatMember(db, chatCommunity.id, userId);
+    // The room's size rides on the community row (20260927120000), so opening
+    // an event no longer counts every membership in its chat.
+    chatMemberCount = chatCommunity.member_count ?? 0;
   }
 
   // Same DP rule as every other surface: app-created communities keep their

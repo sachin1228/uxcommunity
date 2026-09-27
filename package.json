@@ -59,6 +59,7 @@
     "test:feed-scope": "tsx --test apps/web/lib/feeds/home-feed-options.test.ts",
     "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql",
     "test:security": "npx supabase test db --file supabase/tests/public_read_exposure.test.sql",
+    "test:member-count": "npx supabase test db --file supabase/tests/member_count.test.sql",
     "k6:seed": "node k6/scripts/seed-users.js",
     "k6:cleanup": "node k6/scripts/cleanup-users.js",
     "test:k6-fixtures": "tsx --test k6/lib/fixture.test.mjs"

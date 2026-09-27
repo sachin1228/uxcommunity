@@ -23,6 +23,8 @@ export interface EventChatLink {
   name: string;
   image_url: string | null;
   owner_id: string | null;
+  /** Materialized counter on communities (see 20260927120000). */
+  member_count: number;
 }
 
 /** The group chat community linked to an event, or null when none exists yet. */
@@ -32,7 +34,7 @@ export async function getEventChatCommunity(
 ): Promise<EventChatLink | null> {
   const { data } = await db
     .from("communities")
-    .select("id, name, image_url, owner_id")
+    .select("id, name, image_url, owner_id, member_count")
     .eq("event_id", eventId)
     .eq("is_active", true)
     .maybeSingle();
@@ -412,25 +414,26 @@ export async function loadEventChatGate(
 ): Promise<EventChatGate | null> {
   const { data: community } = await db
     .from("communities")
-    .select("id, name, event_id")
+    .select("id, name, event_id, member_count")
     .eq("id", communityId)
     .eq("is_active", true)
     .maybeSingle();
-  const row = community as { id: string; name: string; event_id: string | null } | null;
+  const row = community as { id: string; name: string; event_id: string | null; member_count: number } | null;
   if (!row?.event_id) return null;
 
   const event = await loadEventChatEvent(db, row.event_id);
   if (!event) return null;
 
-  const [canJoin, { count: memberCount }, { count: rsvpCount }] = await Promise.all([
+  const [canJoin, { count: rsvpCount }] = await Promise.all([
     canJoinEventChat(db, event, userId),
-    db.from("community_members").select("community_id", { count: "exact", head: true }).eq("community_id", communityId),
     db.from("event_rsvps").select("event_id", { count: "exact", head: true }).eq("event_id", event.id),
   ]);
 
   return {
     communityName: row.name,
-    memberCount: memberCount ?? 0,
+    // Read from the community row: the room's size used to cost a count over
+    // every membership in it, on every event page render.
+    memberCount: row.member_count ?? 0,
     rsvpCount: rsvpCount ?? 0,
     canJoin,
     event,
