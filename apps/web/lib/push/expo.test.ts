@@ -39,8 +39,12 @@ interface FakeProvider {
   requests: string[][];
   /** `clock()` at each dispatch, for pacing assertions. */
   dispatchTimes: number[];
-  /** Highest number of requests in flight at once. */
-  peakConcurrency: number;
+  /**
+   * Highest number of requests in flight at once — a live read, not a snapshot:
+   * the counters above are only meaningful after the send has finished, and a
+   * value copied out at construction time is always zero.
+   */
+  peakConcurrency: () => number;
   fetch: typeof fetch;
 }
 
@@ -80,7 +84,7 @@ function provider(
   return {
     requests,
     dispatchTimes,
-    peakConcurrency,
+    peakConcurrency: () => peakConcurrency,
     fetch: fetchImpl as unknown as typeof fetch,
   };
 }
@@ -182,7 +186,11 @@ test("a 10,000-recipient fan-out is split into provider-sized batches with nothi
 
   const sent = fake.requests.flat();
   assert.equal(sent.length, 10_000);
-  assert.equal(new Set(sent).size, 10_000, "every recipient entered processing exactly once");
+  assert.equal(
+    new Set(sent).size,
+    10_000,
+    "every batch was acknowledged, so no recipient was handed over twice",
+  );
 });
 
 test("a batch size over Expo's limit is clamped instead of rejected", async () => {
@@ -250,7 +258,16 @@ test("partial failure: 95 deliver, 3 tokens are dead, 2 are retried", async () =
 });
 
 test("permanent ticket errors are not retried", async () => {
-  for (const code of ["MessageTooBig", "MismatchSenderId", "InvalidCredentials", "InvalidProviderToken"]) {
+  for (const code of [
+    "MessageTooBig",
+    "MismatchSenderId",
+    "InvalidCredentials",
+    "InvalidProviderToken",
+    // An error code this version of the code has never seen: a ticket is a
+    // deterministic answer about these bytes, so an unknown one is permanent
+    // rather than an invitation to retry forever.
+    "UnknownDeterministicError",
+  ]) {
     const fake = provider((tokens) => tokens.map(() => errorTicket(code)));
     const delivery = await sendExpoPushBatches(messages(10), {
       fetch: fake.fetch,
@@ -263,6 +280,80 @@ test("permanent ticket errors are not retried", async () => {
     assert.equal(delivery.transientFailures, 0);
     assert.equal(delivery.deadTokens.length, 0, `${code} is a project problem, not a dead device`);
   }
+});
+
+// ── 3b. The lost-response ambiguity ─────────────────────────────────────────
+
+/**
+ * The distributed-systems case this design cannot make exactly-once, only
+ * correctly *accounted* for.
+ *
+ * Expo can accept a batch and then the response never arrives: the socket dies,
+ * the response body is truncated, or the isolate is killed between the send and
+ * the read. From the worker's side that is indistinguishable from a request that
+ * never landed. Expo's send API takes no idempotency key for a message, so there
+ * is nothing to de-duplicate a retry with — the honest description is
+ * at-least-once, and the honest promise is that the message is never *counted* as
+ * delivered on the strength of an answer that never arrived.
+ */
+test("a lost response is retried and may duplicate — but is never counted as delivered", async () => {
+  const batch = messages(100);
+  const seenByProvider: string[][] = [];
+  let call = 0;
+
+  const fake = (async (_url: unknown, init?: { body?: unknown }): Promise<Response> => {
+    const tokens = (JSON.parse(String(init?.body)) as ExpoPushMessage[]).map((m) => m.to);
+    call += 1;
+    // The provider DOES accept the messages: it is the answer that is lost.
+    seenByProvider.push(tokens);
+    if (call === 1) throw new Error("socket hang up after the request was sent");
+    return new Response(
+      JSON.stringify({ data: tokens.map(() => ({ status: "ok" })) }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }) as unknown as typeof fetch;
+
+  const delivery = await sendExpoPushBatches(batch, {
+    fetch: fake,
+    sleep: async () => {},
+    random: () => 0,
+    config: { rateLimit: 1_000_000_000, retryBaseMs: 1 },
+  });
+
+  assert.equal(delivery.requests, 2);
+  assert.equal(delivery.delivered, 100, "the retry's acknowledgement is what counts");
+  assert.equal(delivery.transientFailures, 0);
+  assert.equal(delivery.settled, true);
+
+  // The batch reached the provider twice, so a device may show the notification
+  // twice. This is the accepted, documented cost of not losing it — `collapseId`
+  // in the payload is what collapses the repeat on the device.
+  assert.equal(seenByProvider.length, 2);
+  assert.equal(seenByProvider.flat().length, 200);
+});
+
+test("a lost response with no retries left is reported as unknown, not as not-delivered", async () => {
+  const batch = messages(10);
+  let seenByProvider = 0;
+
+  const fake = (async (_url: unknown, init?: { body?: unknown }): Promise<Response> => {
+    const tokens = JSON.parse(String(init?.body)) as ExpoPushMessage[];
+    seenByProvider += tokens.length;
+    throw new Error("socket hang up after the request was sent");
+  }) as unknown as typeof fetch;
+
+  const delivery = await sendExpoPushBatches(batch, {
+    fetch: fake,
+    sleep: async () => {},
+    random: () => 0,
+    config: { maxRetries: 0, rateLimit: 1_000_000_000 },
+  });
+
+  assert.equal(delivery.delivered, 0, "nothing was acknowledged, so nothing is counted");
+  assert.equal(delivery.transientFailures, 10);
+  assert.equal(delivery.settled, false);
+  // The provider may well have them; the fan-out cannot know, and says so.
+  assert.equal(seenByProvider, 10);
 });
 
 test("messages Expo did not answer for are retried, never assumed delivered", async () => {
@@ -414,6 +505,43 @@ test("jitter is applied, so retries do not stampede", async () => {
 
 // ── 4. Throughput: batching, concurrency, pacing ────────────────────────────
 
+/**
+ * Concurrency must not let the pacer dispatch early: workers claim batches in
+ * order and `pacer.nextDispatchAt` is advanced synchronously by whoever claims
+ * the next slot, so more workers cannot buy more than the configured rate.
+ */
+test("concurrency cannot make the pacer dispatch faster than configured", async () => {
+  const clock = virtualClock();
+  const fake = provider((tokens) => ok(tokens.length), {
+    latencyMs: 5_000, // far slower than the pace, so the pacer is the binding limit
+    clock: clock.clock,
+    sleep: clock.sleep,
+  });
+
+  const delivery = await sendExpoPushBatches(messages(4_000), {
+    fetch: fake.fetch,
+    clock: clock.clock,
+    sleep: clock.sleep,
+    deadline: 1_000_000 + 600_000,
+    config: { maxConcurrency: 16, rateLimit: 600 },
+  });
+
+  assert.equal(delivery.delivered, 4_000);
+  assert.equal(fake.requests.length, 40);
+  assert.ok(
+    fake.peakConcurrency() > 6,
+    `the run really did use the wider pool (peak ${fake.peakConcurrency()})`,
+  );
+  assert.ok(
+    fake.peakConcurrency() <= 16,
+    `the pool must stay bounded (peak ${fake.peakConcurrency()})`,
+  );
+  for (let i = 1; i < fake.dispatchTimes.length; i += 1) {
+    const gap = fake.dispatchTimes[i]! - fake.dispatchTimes[i - 1]!;
+    assert.ok(gap >= 166, `batch ${i} started ${gap}ms after the previous one, faster than 600/s`);
+  }
+});
+
 test("requests stay within the configured concurrency", async () => {
   const clock = virtualClock();
   const fake = provider((tokens) => ok(tokens.length), {
@@ -434,9 +562,10 @@ test("requests stay within the configured concurrency", async () => {
 
   assert.equal(delivery.delivered, 1_000);
   assert.equal(fake.requests.length, 10);
-  assert.ok(
-    fake.peakConcurrency <= 4,
-    `expected at most 4 concurrent requests, saw ${fake.peakConcurrency}`,
+  assert.equal(
+    fake.peakConcurrency(),
+    4,
+    "the pool runs exactly as wide as it is allowed to, and no wider",
   );
 });
 
@@ -480,6 +609,20 @@ test("dispatch is paced at the configured notifications per second", async () =>
     elapsedMs >= 9_800,
     `6,000 notifications cannot be paced faster than the provider limit (saw ${elapsedMs}ms)`,
   );
+
+  // The bucket's burst capacity is exactly one batch: no one-second window may
+  // carry more than the limit plus that single batch, at any concurrency.
+  for (let start = 0; start < fake.dispatchTimes.length; start += 1) {
+    const windowStart = fake.dispatchTimes[start]!;
+    const dispatched = fake.requests.filter((_batch, index) => {
+      const at = fake.dispatchTimes[index]!;
+      return at >= windowStart && at < windowStart + 1_000;
+    }).length;
+    assert.ok(
+      dispatched * EXPO_MAX_BATCH <= 600 + EXPO_MAX_BATCH,
+      `a 1s window from batch ${start} dispatched ${dispatched * EXPO_MAX_BATCH} notifications`,
+    );
+  }
 });
 
 // ── 5. Deadline ─────────────────────────────────────────────────────────────
@@ -502,6 +645,11 @@ test("nothing new is started after the deadline", async () => {
   assert.ok(delivery.delivered > 0, "the work that fits in the budget is still done");
   assert.ok(delivery.delivered < 1_000);
   assert.equal(delivery.settled, false);
+  // The messages the deadline cut off are accounted for, not dropped.
+  assert.equal(
+    delivery.delivered + delivery.permanentFailures + delivery.transientFailures,
+    1_000,
+  );
   // Every message is still accounted for: delivered + transient === 1,000.
   assert.equal(delivery.delivered + delivery.transientFailures, 1_000);
   assert.ok(
@@ -688,7 +836,9 @@ test("load: 100 / 1,000 / 10,000 / 50,000 recipients, provider mocked", async ()
       batches: Math.ceil(size / EXPO_MAX_BATCH),
       requests: delivery.requests,
       durationMs: Math.round(durationMs),
-      // Wall clock the same fan-out costs at Expo's real 600 notifications/sec.
+      // Wall clock this fan-out costs when paced at 600 notifications/sec. It is
+      // an estimate for ONE invocation: the pacer is local, so a concurrent
+      // fan-out elsewhere can push the project over 600/s (absorbed by 429s).
       pacedMs: Math.round((size / 600) * 1000),
       retries: delivery.requests - Math.ceil(size / EXPO_MAX_BATCH),
       permanent: delivery.permanentFailures,
@@ -698,7 +848,7 @@ test("load: 100 / 1,000 / 10,000 / 50,000 recipients, provider mocked", async ()
   }
 
   console.log(
-    "\n  recipients | batches | requests | duration | paced@600/s | retries | permanent | heap Δ\n" +
+    "\n  recipients | batches | requests | duration | paced 600/s (est) | retries | permanent | heap Δ\n" +
       rows
         .map(
           (row) =>
@@ -718,6 +868,248 @@ test("load: 100 / 1,000 / 10,000 / 50,000 recipients, provider mocked", async ()
   // batching stays inside the provider's limits.
   for (const row of rows) {
     assert.ok(row.batches <= Math.ceil(row.recipients / EXPO_MAX_BATCH));
+  }
+});
+
+// ── 9b. The accounting invariant, on every path ─────────────────────────────
+
+/**
+ * The one thing the sender must never do is leave a message out of the count.
+ *
+ * Each case drives a different provider answer through the real batching, retry
+ * and classification code and asserts, for every one of them:
+ *   * `delivered + permanentFailures + transientFailures` equals what was handed in;
+ *   * nothing is credited as delivered on the strength of an answer Expo never
+ *     sent, so every unreachable-provider case stays at `delivered: 0`;
+ *   * the per-message verdict behind those counters is complete —
+ *     `sendExpoPushDetailed` names a reason for each message, never a hole.
+ */
+interface InvariantCase {
+  name: string;
+  /** What the provider does with a request. `call` is 1-based. */
+  respond: (tokens: string[], call: number) => Response;
+  /** Retries allowed, default 0 so each case isolates one classification. */
+  maxRetries?: number;
+  expect: {
+    delivered: number;
+    permanent: number;
+    transient: number;
+    settled: boolean;
+    /** Tokens the case may report as dead — non-zero only for the real one. */
+    dead?: number;
+  };
+}
+
+/** A 200 whose tickets are `null` for ok, or an Expo error code. */
+function ticketResponse(codes: (string | null)[]): Response {
+  return new Response(
+    JSON.stringify({
+      data: codes.map((code) =>
+        code === null
+          ? { status: "ok" }
+          : { status: "error", message: "", details: { error: code } },
+      ),
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/** A request-level failure. `{}` is what Expo sends for one. */
+function statusResponse(status: number): Response {
+  return new Response("{}", { status });
+}
+
+const okTickets = (tokens: string[]): Response => ticketResponse(tokens.map(() => null));
+const allTickets = (code: string) => (tokens: string[]): Response =>
+  ticketResponse(tokens.map(() => code));
+
+/** Every case is run with exactly two messages. */
+const CASES: InvariantCase[] = [
+  {
+    name: "200, every ticket ok",
+    respond: okTickets,
+    expect: { delivered: 2, permanent: 0, transient: 0, settled: true },
+  },
+  {
+    name: "200, one ticket missing",
+    respond: (tokens) => ticketResponse(tokens.slice(0, 1).map(() => null)),
+    expect: { delivered: 1, permanent: 0, transient: 1, settled: false },
+  },
+  {
+    name: "200, no tickets at all",
+    respond: () => ticketResponse([]),
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "200, DeviceNotRegistered",
+    respond: allTickets("DeviceNotRegistered"),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true, dead: 2 },
+  },
+  {
+    name: "200, MessageRateExceeded",
+    respond: allTickets("MessageRateExceeded"),
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "200, InternalError",
+    respond: allTickets("InternalError"),
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "200, ServiceUnavailable",
+    respond: allTickets("ServiceUnavailable"),
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "200, MessageTooBig",
+    respond: allTickets("MessageTooBig"),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true },
+  },
+  {
+    name: "200, MismatchSenderId",
+    respond: allTickets("MismatchSenderId"),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true },
+  },
+  {
+    name: "200, InvalidCredentials",
+    respond: allTickets("InvalidCredentials"),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true },
+  },
+  {
+    name: "200, InvalidProviderToken",
+    respond: allTickets("InvalidProviderToken"),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true },
+  },
+  {
+    name: "200, unknown ticket code",
+    respond: allTickets("NoSuchExpoError"),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true },
+  },
+  ...([429, 500, 502, 503, 504, 408, 425].map(
+    (status): InvariantCase => ({
+      name: `HTTP ${status}`,
+      respond: () => statusResponse(status),
+      expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+    }),
+  )),
+  {
+    name: "HTTP 400 (deterministic payload rejection)",
+    respond: () => statusResponse(400),
+    expect: { delivered: 0, permanent: 2, transient: 0, settled: true },
+  },
+  {
+    name: "network error",
+    respond: () => {
+      throw new Error("ECONNRESET");
+    },
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "request timeout",
+    respond: () => {
+      const error = new Error("The operation was aborted due to timeout");
+      error.name = "TimeoutError";
+      throw error;
+    },
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "unreadable response body",
+    respond: () => new Response("<html>gateway</html>", { status: 200 }),
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "200 with request-level errors and no tickets",
+    respond: () =>
+      new Response(JSON.stringify({ errors: [{ code: "TOO_MANY_REQUESTS" }] }), { status: 200 }),
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "429 then the retry is accepted",
+    respond: (tokens, call) => (call === 1 ? statusResponse(429) : okTickets(tokens)),
+    maxRetries: 1,
+    expect: { delivered: 2, permanent: 0, transient: 0, settled: true },
+  },
+  {
+    name: "503 through a full retry budget",
+    respond: () => statusResponse(503),
+    maxRetries: 3,
+    expect: { delivered: 0, permanent: 0, transient: 2, settled: false },
+  },
+  {
+    name: "200, mixed ok and permanently dead in one batch",
+    respond: () => ticketResponse([null, "DeviceNotRegistered"]),
+    // Nothing is left unknown: every message has a final verdict.
+    expect: { delivered: 1, permanent: 1, transient: 0, settled: true, dead: 1 },
+  },
+];
+
+test("every provider outcome keeps the accounting invariant", async () => {
+  for (const testCase of CASES) {
+    const batch = messages(2);
+
+    /** A fresh provider call log for each of the two views below. */
+    const run = () => {
+      const requests: string[][] = [];
+      const fetchImpl = (async (_url: unknown, init?: { body?: unknown }): Promise<Response> => {
+        const tokens = (JSON.parse(String(init?.body)) as ExpoPushMessage[]).map((m) => m.to);
+        requests.push(tokens);
+        return testCase.respond(tokens, requests.length);
+      }) as unknown as typeof fetch;
+      return {
+        requests,
+        deps: {
+          fetch: fetchImpl,
+          sleep: async () => {},
+          random: () => 0,
+          config: { maxRetries: testCase.maxRetries ?? 0, retryBaseMs: 1, rateLimit: 1_000_000_000 },
+        },
+      };
+    };
+
+    const delivery = await sendExpoPushBatches(batch, run().deps);
+
+    assert.equal(
+      delivery.delivered + delivery.permanentFailures + delivery.transientFailures,
+      batch.length,
+      `${testCase.name}: every message must be accounted for`,
+    );
+    assert.equal(delivery.delivered, testCase.expect.delivered, `${testCase.name}: delivered`);
+    assert.equal(
+      delivery.permanentFailures,
+      testCase.expect.permanent,
+      `${testCase.name}: permanent`,
+    );
+    assert.equal(
+      delivery.transientFailures,
+      testCase.expect.transient,
+      `${testCase.name}: transient`,
+    );
+    assert.equal(delivery.settled, testCase.expect.settled, `${testCase.name}: settled`);
+    // Only a genuinely unregistered device may be pruned. A project-level or
+    // transient failure must never cost a member their token.
+    assert.equal(
+      delivery.deadTokens.length,
+      testCase.expect.dead ?? 0,
+      `${testCase.name}: tokens proposed for deletion`,
+    );
+
+    // The same case, seen per message: no message may be left without a verdict.
+    const detailed = await sendExpoPushDetailed(batch, run().deps);
+    assert.equal(detailed.outcomes.length, batch.length, `${testCase.name}: one outcome each`);
+    for (const outcome of detailed.outcomes) {
+      assert.notEqual(
+        outcome.error,
+        "Unknown",
+        `${testCase.name}: ${outcome.token} has no verdict`,
+      );
+      assert.notEqual(
+        outcome.error,
+        "UnaccountedFor",
+        `${testCase.name}: ${outcome.token} fell out of the accounting`,
+      );
+      assert.equal(outcome.error === null, outcome.ok, `${testCase.name}: ok/error disagree`);
+    }
   }
 });
 

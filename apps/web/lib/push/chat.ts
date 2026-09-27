@@ -45,7 +45,8 @@ export const PUSH_RECIPIENT_CHUNK = 500;
  * never reached.
  *
  * The bounds are not arbitrary. Expo accepts ~600 notifications per second per
- * project, so 10,000 devices is already ~17 seconds of the 20-second budget: an
+ * project, so 10,000 devices is already ~17 seconds of the 20-second budget even
+ * though the sender pages its requests to that rate (per invocation) — an
  * unbounded fan-out cannot finish inside a request, at any concurrency. What can
  * be guaranteed is that everything attempted is accounted for, that transient
  * failures are retried, and that a shortfall is reported instead of being
@@ -74,6 +75,19 @@ export const PUSH_TIME_BUDGET_MS = 20_000;
  * permanently invalid is a completed chunk, not a broken provider.
  */
 export const PUSH_MAX_CONSECUTIVE_FAILED_CHUNKS = 3;
+
+/**
+ * A one-line, token-free description of a caught error for logging.
+ *
+ * Device tokens are the one piece of recipient data this pipeline must never
+ * write down, and the places errors are caught here all touch queries whose
+ * filters name tokens — so a database or provider error can quote one back. Every
+ * push log line goes through this instead of stringifying the raw error.
+ */
+function describeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return redactPushTokens(message);
+}
 
 /** Numeric environment override, falling back when unset or unparseable. */
 function envLimit(key: string, fallback: number, minimum: number): number {
@@ -229,29 +243,39 @@ type ServiceClient = ReturnType<typeof createServiceClient>;
 /**
  * What one message's push delivery cost, for logging and tests.
  *
- * `deliveries` counts only pushes the provider accepted. Failures are split by
- * whether a retry could have helped, and `complete` says whether every device
- * this fan-out intended to reach was actually reached — a caller can no longer
- * read a report as "all good" when part of the fan-out went missing.
+ * `deliveries` counts only pushes the provider acknowledged. Failures are split
+ * by whether a retry could have helped, and `complete` says whether every device
+ * this fan-out intended to reach was acknowledged — a caller can no longer read a
+ * report as "all good" when part of the fan-out went missing. Nothing that was
+ * never acknowledged is counted as a delivery, and nothing is dropped from the
+ * counts entirely (a recipient past a bound is reported through `truncated`).
  */
 export interface ChatPushReport {
   /** Members read from the database (sender excluded, muted excluded). */
   scanned: number;
   /** Members that had at least one device token. */
   reachable: number;
-  /** Device pushes the provider accepted. */
+  /** Device pushes the provider acknowledged. */
   deliveries: number;
   /** Device pushes rejected for a reason a retry cannot fix. */
   failedPermanent: number;
-  /** Device pushes still failing when the retries and the budget ran out. */
+  /**
+   * Device pushes still failing when the retries and the budget ran out. Their
+   * fate is unknown, not "not delivered": a lost response looks the same as a
+   * request that never landed (see `sendExpoPushBatches`).
+   */
   failedTransient: number;
   /** Recipient chunks processed (bounded by the chunk size). */
   chunks: number;
-  /** Set when a bound stopped delivery early. */
+  /** Set when a bound stopped delivery early, leaving recipients untouched. */
   truncated: "deliveries" | "time" | "error" | null;
   /** Tokens Expo reported as dead (deleted by this call). */
   deadTokens: number;
-  /** True when every device push was accepted and nothing was left behind. */
+  /**
+   * True only when every intended device push was acknowledged: no truncation,
+   * no permanent failure, no transient failure left behind. It does not promise
+   * that no notification was duplicated (see `sendExpoPushBatches`).
+   */
   complete: boolean;
 }
 
@@ -300,10 +324,14 @@ export interface ChatPushDeps {
  *
  * Delivery shape: each chunk's devices go to `sendExpoPushBatches`, which batches
  * them to Expo's 100-per-request limit, keeps a bounded number of requests in
- * flight, paces them at the project rate limit, and retries only the messages
- * that failed transiently. The loop itself never assumes a chunk succeeded: it
- * adds up what the provider accepted, retries nothing twice, and reports the
- * shortfall.
+ * flight, paces dispatch to the configured per-invocation rate, and retries the
+ * messages Expo did not acknowledge. The loop itself never assumes a chunk
+ * succeeded: it adds up what the provider accepted, retries nothing it already
+ * has an acknowledgement for, and reports the shortfall.
+ *
+ * Delivery is at-least-once (see `sendExpoPushBatches`): a push whose response
+ * was lost is retried and may arrive twice, and `collapseId` on the payload is
+ * what keeps a repeated notification for the same chat collapsed on the device.
  */
 export async function sendChatMessagePush(
   params: {
@@ -548,10 +576,7 @@ export async function sendChatMessagePush(
           // means this whole chunk is in an unknown state. It is counted as a
           // transient failure rather than as delivered, and the loop continues
           // so that one bad chunk cannot discard the recipients behind it.
-          console.error(
-            "[push] delivery failed for one chunk",
-            redactPushTokens(error instanceof Error ? error.message : String(error)),
-          );
+          console.error("[push] delivery failed for one chunk", describeError(error));
           report.failedTransient += batch.length;
           delivery = null;
         }
@@ -583,7 +608,7 @@ export async function sendChatMessagePush(
             .from("push_throttle")
             .upsert(throttleUpserts as never, { onConflict: "user_id,community_id" });
         } catch (error) {
-          console.error("[push] throttle write failed", error);
+          console.error("[push] throttle write failed", describeError(error));
         }
       }
 
@@ -603,7 +628,9 @@ export async function sendChatMessagePush(
             .delete()
             .in("token", tokens.slice(i, i + TOKEN_DELETE_CHUNK));
         } catch (error) {
-          console.error("[push] dead token cleanup failed", error);
+          // This delete names tokens in its filter, so a database error can quote
+          // one back: redact before it reaches a log.
+          console.error("[push] dead token cleanup failed", describeError(error));
         }
       }
     }
@@ -622,7 +649,7 @@ export async function sendChatMessagePush(
       );
     }
   } catch (error) {
-    console.error("[push] chat notification failed", error);
+    console.error("[push] chat notification failed", describeError(error));
     report.truncated = "error";
   }
 

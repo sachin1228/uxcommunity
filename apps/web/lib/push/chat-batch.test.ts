@@ -75,6 +75,8 @@ interface FakeState {
   throttle: Map<string, { window_started_at: string; sent_count: number }>;
   unread: Map<string, number>;
   deadTokens: string[];
+  /** Make the token delete fail with an error that quotes the tokens. */
+  deleteQuotesTokens?: boolean;
 }
 
 function fakeState(overrides: Partial<FakeState> = {}): FakeState {
@@ -105,7 +107,14 @@ function createFakeDb(state: FakeState) {
     const ids = (ctx.inValues ?? []) as string[];
     switch (ctx.table) {
       case "push_tokens":
-        if (ctx.op === "delete") return { data: null, error: null };
+        if (ctx.op === "delete") {
+          // PostgREST can quote the offending filter value back in its details;
+          // the operator reflects that so a test can prove it is redacted.
+          if (state.deleteQuotesTokens) {
+            throw new Error(`delete failed: token in (${ids.join(",")}) is not permitted`);
+          }
+          return { data: null, error: null };
+        }
         return {
           data: ids.flatMap((id) =>
             (state.tokens.get(id) ?? []).map((token) => ({ token, user_id: id })),
@@ -480,6 +489,9 @@ test("the time budget stops the fan-out and reports why", async () => {
   assert.equal(report.truncated, "time");
   assert.equal(report.chunks, 1);
   assert.equal(report.deliveries, 500);
+  // The recipients the budget never reached are reported through `truncated`,
+  // and the run cannot read as a success.
+  assert.equal(report.complete, false);
 });
 
 // ── 4. Dead tokens ──────────────────────────────────────────────────────────
@@ -575,7 +587,12 @@ test("provider failures are counted per device, never as deliveries", async () =
   assert.equal(report.complete, false);
 });
 
-test("no device token is ever sent twice, whatever the provider does", async () => {
+/**
+ * Sending an acknowledged device again is the one thing the fan-out can still
+ * control. (It is not a promise of exactly-once delivery: a response that never
+ * arrives is retried and may duplicate — see `sendExpoPushBatches`.)
+ */
+test("a device the provider acknowledged is never handed over again", async () => {
   const members: string[] = [];
   for (let i = 1; i <= 600; i += 1) members.push(userId(i));
   const state = fakeState({ members });
@@ -597,12 +614,18 @@ test("no device token is ever sent twice, whatever the provider does", async () 
         permanentFailures: 1,
         deadTokens: [messages[messages.length - 1]!.to],
       });
+      // (`delivered` here means the sender acknowledged them; the fan-out's own
+      // retry policy never re-sends those.)
     },
   }));
 
   assert.equal(chunk, 3);
   assert.equal(sentTokens.length, 600);
-  assert.equal(new Set(sentTokens).size, 600, "each device was handed over exactly once");
+  assert.equal(
+    new Set(sentTokens).size,
+    600,
+    "each acknowledged device was handed over exactly once by this fan-out",
+  );
 });
 
 /**
@@ -654,6 +677,39 @@ test("an interrupted fan-out reports its gap and a re-run reaches the whole comm
   assert.equal(rerun.complete, true);
   assert.equal(rerun.deliveries, 1_000);
   assert.equal(seen.size, 1_000, "the unprocessed tail of the first run is reachable on the next one");
+});
+
+test("a device token never reaches a log, even when a query echoes it back", async () => {
+  const secret = "ExponentPushToken[secret-device-1]";
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), [secret]]]),
+    deleteQuotesTokens: true,
+  });
+  const { db } = createFakeDb(state);
+
+  const logged: string[] = [];
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  console.error = (...args: unknown[]) => logged.push(args.map(String).join(" "));
+  console.warn = (...args: unknown[]) => logged.push(args.map(String).join(" "));
+
+  try {
+    // The provider reports the device as gone, so the fan-out tries to prune it
+    // and the delete blows up quoting the token it was filtering on.
+    await sendChatMessagePush(BASE_PARAMS, deps(db, {
+      send: async () => delivery({ delivered: 1, permanentFailures: 1, deadTokens: [secret] }),
+    }));
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+
+  assert.ok(logged.length > 0, "the failed cleanup is still reported");
+  for (const line of logged) {
+    assert.ok(!line.includes(secret), `a device token reached a log line: ${line}`);
+    assert.ok(!line.includes("secret-device-1"), "…not even partially");
+  }
 });
 
 test("a 10,000-recipient fan-out is not truncated by batching", async () => {

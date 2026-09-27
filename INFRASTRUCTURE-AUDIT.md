@@ -196,10 +196,10 @@ Total: 0-1 HTTP requests, 0-2 DB queries
    → Realtime: publishChatEvent() → ONE event to chat:${id}; the Room DO
      broadcasts to every socket subscribed to that room (no per-member forwards)
    → Push: sendChatMessagePush() → chunked member lookup (500/query), then
-     lib/push/expo.ts batches 100/request with bounded concurrency, paces at the
-     project rate limit and retries transient failures; audible pushes bounded to
-     3/minute per member, delivery capped at PUSH_MAX_DELIVERIES within
-     PUSH_TIME_BUDGET_MS (audit H-2)
+     lib/push/expo.ts batches 100/request with bounded concurrency, paces dispatch
+     at PUSH_RATE_LIMIT (per invocation, not project-wide) and retries transient
+     failures; audible pushes bounded to 3/minute per member, delivery capped at
+     PUSH_MAX_DELIVERIES within PUSH_TIME_BUDGET_MS (audit H-2)
 3. Optimistic UI: message appears immediately (0 HTTP)
 4. Sidebar: the same chat event patches the local sidebar cache (0 HTTP)
 Total: 1 HTTP request, 2 DB queries in the request path + deferred publish/push work
@@ -1060,10 +1060,18 @@ The provided Vercel dashboard data shows:
 - **Scale at which it matters**: 1,000+ members in a single community
 - **Reliability (audit H-2)**: delivery no longer drops work silently — the Expo
   client batches to the provider's 100/request limit, keeps ≤`PUSH_MAX_CONCURRENCY`
-  requests in flight, paces at `PUSH_RATE_LIMIT`, retries transient failures, and
-  the fan-out reports delivered/permanent/transient counts plus a `complete` flag.
+  requests in flight, paces dispatch at `PUSH_RATE_LIMIT` (per invocation), retries
+  transient failures, and the fan-out reports acknowledged/permanent/transient
+  counts plus a `complete` flag. Delivery is at-least-once: a lost response is
+  retried and may duplicate, since Expo has no message idempotency key.
   The O(N) work itself remains: at ~600 notifications/sec a community larger than
   ~12,000 members cannot be fully fanned out inside one request's `after()` budget.
+- **Open follow-ups from H-2** (not in this fix, both need new infrastructure):
+  push receipts are never fetched, so a `DeviceNotRegistered` that only appears in
+  a receipt (~15 min later) is never acted on; and an isolate kill mid-fan-out
+  cannot be reported or resumed from inside the request — the durable recovery is
+  the committed message row plus each client's unread resync. Closing either needs
+  a scheduler/worker (a durable fan-out queue and a receipt-check job).
 
 ### 2. Notification Work Is Deferred but Still Per-Engagement
 - **File**: `apps/web/lib/notifications.ts:deferNotification()` / `createNotification()`

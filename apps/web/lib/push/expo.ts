@@ -5,15 +5,17 @@
  * member who sent the chat message — but it is NOT best-effort in the sense of
  * dropping work. This module is the reliability boundary between a fan-out (a
  * list of device messages) and Expo: it splits the list into provider-sized
- * batches, keeps a bounded number of requests in flight, paces them at the
- * project's notification rate limit, retries the failures that can succeed
- * later, and accounts for every single message handed to it.
+ * batches, keeps a bounded number of requests in flight, paces batch dispatch
+ * to `rateLimit` notifications per second (per invocation — see the note on
+ * `EXPO_RATE_LIMIT_PER_SEC`), retries the failures that can succeed later, and
+ * accounts for every single message handed to it.
  *
  * The previous version sent one request per 100 messages, serially and with no
  * retries, and swallowed every request-level failure. A 429, a 5xx or a network
  * hiccup therefore lost that whole batch of up to 100 devices while the caller
  * still counted the messages as delivered. See `sendExpoPushBatches` for the
- * rules now in force.
+ * rules now in force, and for the delivery guarantee this module does *not*
+ * provide (it is at-least-once, not exactly-once).
  *
  * Nothing here logs a token or a notification payload: Expo's own error text
  * quotes the failing token (for example "ExponentPushToken[…] is not a
@@ -34,12 +36,16 @@ export const EXPO_MAX_BATCH = 100;
  * Expo's documented ceiling: 600 notifications per second per project. Sends
  * above it come back as `TOO_MANY_REQUESTS` (HTTP 429).
  *
- * The pacing in this module is per invocation, like the official
- * expo-server-sdk's local token bucket. Two simultaneous large fan-outs in two
- * isolates can therefore exceed it together; that case is handled by the 429
- * path (Retry-After is honoured and the batch is retried) rather than by a
- * shared counter, because a distributed limiter would put a network round trip
- * in front of every batch of every chat message.
+ * IMPORTANT — this is a *target for one invocation*, not a global limit. The
+ * pacer is local, like the official expo-server-sdk's token bucket: it bounds
+ * what a single fan-out dispatches and knows nothing about other isolates. Two
+ * simultaneous large fan-outs can therefore exceed the project's 600/s together.
+ *
+ * The safety mechanism for that case is Expo's own answer: a 429 (with or
+ * without `Retry-After`) marks the whole batch transient and it is retried with
+ * backoff, so the excess costs requests, not recipients. Coordinating across
+ * invocations would need shared state (Redis/Upstash) in front of every batch of
+ * every chat message; that is deliberately not done here.
  */
 export const EXPO_RATE_LIMIT_PER_SEC = 600;
 
@@ -56,7 +62,10 @@ export interface PushDeliveryConfig {
   batchSize: number;
   /** Requests in flight at once. */
   maxConcurrency: number;
-  /** Notifications per second. Batch starts are paced so this is an average bound. */
+  /**
+   * Notifications per second, applied to *this invocation's* batch starts. It is
+   * an average bound on local dispatch, not a project-wide budget.
+   */
   rateLimit: number;
   /** Retries per batch after the first attempt (0 disables retrying). */
   maxRetries: number;
@@ -198,20 +207,32 @@ const STATUS_TRANSIENT = 3;
  *
  * `delivered + permanentFailures + transientFailures` is exactly the number of
  * messages handed in, so a caller can never mistake an unaccounted message for a
- * delivered one.
+ * delivered one. Nothing is discarded from that sum, at any exit path.
  */
 export interface ExpoPushDelivery {
-  /** Messages Expo accepted (ticket status `ok`). */
+  /**
+   * Messages Expo acknowledged with a `ok` ticket. This is acceptance by the
+   * provider, not proof that a device showed the notification — Expo's tickets
+   * only say the message was received and queued for FCM/APNs.
+   */
   delivered: number;
   /** Messages that failed in a way a retry cannot fix, and were not retried. */
   permanentFailures: number;
-  /** Messages still failing when the retry budget or the deadline ran out. */
+  /**
+   * Messages still failing when the retry budget or the deadline ran out. A
+   * message here may or may not have reached Expo — a request whose response was
+   * lost is indistinguishable from one that never arrived (see
+   * `sendExpoPushBatches`), so this count is "unknown", not "not delivered".
+   */
   transientFailures: number;
   /** Tokens Expo reported as permanently unregistered, for the caller to delete. */
   deadTokens: string[];
   /** Requests actually issued, retries included. */
   requests: number;
-  /** True when no message is left in an unknown state. */
+  /**
+   * True when every message was either acknowledged or permanently rejected,
+   * i.e. `transientFailures === 0`. It says nothing about duplicate delivery.
+   */
   settled: boolean;
   /** A token-free description of the last request-level failure, if any. */
   providerError: string | null;
@@ -491,16 +512,27 @@ interface DeliveryRun {
  *   * every message is attempted at least once, in batches of at most
  *     `batchSize` (100 by Expo's own limit);
  *   * at most `maxConcurrency` requests are in flight, paced so the average is
- *     `rateLimit` notifications per second;
- *   * transient failures are retried with bounded exponential backoff — and only
- *     the failed messages are re-sent, so an accepted message is never delivered
- *     twice;
+ *     `rateLimit` notifications per second *for this invocation*;
+ *   * transient failures are retried with bounded exponential backoff, and only
+ *     messages the provider did *not* acknowledge are re-sent — an acknowledged
+ *     message is never intentionally sent again;
  *   * permanent failures are never retried;
  *   * once `deadline` passes, nothing new is started and the remaining messages
  *     are reported as transient failures.
  *
- * There is no path that silently drops a batch: every message ends up in exactly
- * one of delivered / permanentFailures / transientFailures.
+ * Delivery is at-least-once, not exactly-once, and this module does not pretend
+ * otherwise. A request can be accepted by Expo and have its response lost (the
+ * socket dies, the isolate is killed, the response is unreadable); the worker
+ * cannot tell that apart from a request that never arrived, so it retries and the
+ * device may receive the same notification twice. Expo's API has no idempotency
+ * key for a message, so no retry-safe token exists to fix that. What is
+ * guaranteed instead:
+ *   * an acknowledged success is never intentionally re-sent;
+ *   * a permanent failure is never retried;
+ *   * a transient failure is retried, bounded by `maxRetries` and `deadline`;
+ *   * a lost/unknown response is treated as transient (and may duplicate);
+ *   * every message ends in exactly one of delivered / permanentFailures /
+ *     transientFailures — see `closeAccounting`.
  */
 async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Promise<DeliveryRun> {
   const cfg = clampPushDeliveryConfig({ ...loadPushDeliveryConfig(), ...deps.config });
@@ -534,8 +566,16 @@ async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Pro
   }
 
   // Shared pacing state: `nextDispatchAt` is advanced synchronously by whoever
-  // claims the next slot, so the average dispatch rate stays at or below the
-  // configured limit no matter how many workers are running.
+  // claims the next slot — before any await — so two workers can never both
+  // consume the same slot and concurrency cannot raise the dispatch rate.
+  //
+  // The shape is a token bucket whose capacity is exactly one batch: the first
+  // dispatch is free, then each next batch must wait `batchSize / rateLimit`
+  // seconds after the previous one. A window therefore holds at most
+  // `rateLimit` notifications plus one batch of burst; a slot that goes unused
+  // (all workers busy on slow responses) leaves the clock ahead of the schedule,
+  // which credits at most that single batch, never more. That is the same
+  // trade-off the official SDK's throttler makes.
   const pacer = { nextDispatchAt: 0 };
 
   async function pace(count: number): Promise<void> {
@@ -620,8 +660,44 @@ async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Pro
   });
   await Promise.all(workers);
 
-  delivery.settled = delivery.transientFailures === 0;
+  closeAccounting(statuses, failures, delivery);
   return { delivery, statuses, failures };
+}
+
+/**
+ * Makes the accounting invariant true by construction, whatever happened above.
+ *
+ * Every exit path in `runBatch` settles the messages it was responsible for, so
+ * this should find nothing. It runs anyway because the invariant is the promise
+ * the whole fan-out is built on — "no message silently disappears from the
+ * counts" — and a future edit to a retry path could break it without any test
+ * noticing at the time. Anything still unresolved is reported as a transient
+ * failure (the honest answer: its fate is unknown) and logged as one aggregate
+ * line, so a hole in the accounting is loud rather than silent.
+ */
+function closeAccounting(
+  statuses: Uint8Array,
+  failures: Map<number, { error: string | null; message: string | null }>,
+  delivery: ExpoPushDelivery,
+): void {
+  let unresolved = 0;
+  for (let index = 0; index < statuses.length; index += 1) {
+    if (statuses[index] !== STATUS_UNKNOWN) continue;
+    statuses[index] = STATUS_TRANSIENT;
+    failures.set(index, { error: "UnaccountedFor", message: null });
+    unresolved += 1;
+  }
+
+  if (unresolved > 0) {
+    delivery.transientFailures += unresolved;
+    console.error(
+      `[push] ${unresolved} of ${statuses.length} messages were left unaccounted for by the delivery run; reported as transient`,
+    );
+  }
+
+  // Restated from the counters that a caller reads, so the flag and the numbers
+  // can never disagree — including when the loop above had to repair something.
+  delivery.settled = delivery.transientFailures === 0;
 }
 
 /**
@@ -630,6 +706,12 @@ async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Pro
  * This is the chat fan-out's sender: it needs the counts (so it can report how
  * many recipients were actually reached) and the dead tokens (so it can prune
  * them), not the per-device narrative.
+ *
+ * Delivery guarantee: at-least-once. Acknowledged successes are never
+ * intentionally re-sent, permanent failures are never retried, transient
+ * failures are retried within `maxRetries`/`deadline`, and a request whose
+ * response was lost counts as transient and may therefore duplicate a push. See
+ * `runDelivery` for why exactly-once is not offered.
  */
 export async function sendExpoPushBatches(
   messages: ExpoPushMessage[],
