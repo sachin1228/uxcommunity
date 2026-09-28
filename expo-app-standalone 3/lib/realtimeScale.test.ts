@@ -642,3 +642,30 @@ test('User A → logout → User B leaves none of A’s rooms or sockets reachab
   aliceNotifications();
   client.destroy();
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// F. Bounded queued-frame buffer (audit: `conn.pending` was unbounded)
+// ══════════════════════════════════════════════════════════════════════════
+
+test('the queued-frame buffer stays bounded while a socket cannot open', async () => {
+  const { client, platform } = createClient();
+  client.init(ALICE);
+
+  const room = realtimeRooms.chat('c1');
+  client.connect(room);
+  await flush();
+
+  const conn = internals(client).connections.get(room);
+  assert.ok(conn, 'the room connection exists');
+
+  // The socket is created but never opened, so every publish is queued — the
+  // offline-session case that used to grow without limit.
+  for (let i = 0; i < 500; i += 1) client.publish(room, 'typing', { i });
+  assert.ok(
+    conn.pending.length <= 128,
+    `queued frames must stay bounded, got ${conn.pending.length}`,
+  );
+  assert.ok(platform.sockets.length >= 1);
+
+  client.destroy();
+});

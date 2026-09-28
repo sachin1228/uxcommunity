@@ -56,6 +56,13 @@ const HEARTBEAT_INTERVAL_MS = 25_000;
 const HEARTBEAT_TIMEOUT_MS = 6_000;
 const PING_FRAME = "ping";
 const PONG_FRAME = "pong";
+/**
+ * Hard cap on frames queued for a socket that is not open yet. Queued
+ * subscription frames are redundant (refcounts are replayed on open), so the
+ * OLDEST frame is dropped on overflow and the newest state always wins. Without
+ * a cap a long offline session grew this array without bound.
+ */
+const MAX_PENDING_FRAMES = 128;
 
 /** Community-scoped room prefixes that get their own WebSocket. */
 const COMMUNITY_ROOM_PREFIXES = ["chat:", "threads:", "events:", "resources:", "showcase:", "rules:", "thread-comments:", "resource-comments:"];
@@ -64,14 +71,21 @@ function isCommunityRoom(room: string): boolean {
   return COMMUNITY_ROOM_PREFIXES.some((prefix) => room.startsWith(prefix));
 }
 
-function buildWebSocketUrl(baseUrl: string, room: string, token?: string): string {
+/**
+ * Build the WebSocket URL for a room.
+ *
+ * The session JWT is NEVER placed in the URL (audit M-7): browsers send the
+ * `uxcommunity_session` cookie on the handshake automatically, and the realtime
+ * Worker authenticates from that cookie. A query token is therefore neither
+ * needed nor accepted here — a 7-day credential in a URL is logged by every
+ * intermediary on the way.
+ */
+function buildWebSocketUrl(baseUrl: string, room: string): string {
   if (!baseUrl) {
     return `/ws?room=${encodeURIComponent(room)}`;
   }
   const wsBase = baseUrl.replace(/^http/, "ws");
-  const params = new URLSearchParams({ room });
-  if (token) params.set("token", token);
-  return `${wsBase}/ws?${params.toString()}`;
+  return `${wsBase}/ws?${new URLSearchParams({ room }).toString()}`;
 }
 
 interface RoomState {
@@ -128,7 +142,6 @@ class RealtimeClient {
   private globalStatusHandlers = new Set<StatusHandler>();
   private presenceCache = new Map<string, RealtimePresence>();
 
-  private sessionToken: string | null = null;
   /** Identity persisted across connections so sockets created later still send `join`. */
   private user: RealtimeUser | null = null;
   private lifecycleBound = false;
@@ -194,11 +207,6 @@ class RealtimeClient {
       next.manuallyClosed = false;
       this.openConnection(next);
     }
-  }
-
-  /** Set the session JWT for authenticated WebSocket connections. */
-  setSessionToken(token: string): void {
-    this.sessionToken = token;
   }
 
   connect(): void {
@@ -276,7 +284,7 @@ class RealtimeClient {
     // Only open sockets for connections that are still registered.
     if (this.connections.get(conn.key) !== conn) return;
 
-    const url = buildWebSocketUrl(REALTIME_URL, conn.key, this.sessionToken ?? undefined);
+    const url = buildWebSocketUrl(REALTIME_URL, conn.key);
     if (!url) return;
 
     // Detach any stale socket so its late events cannot touch this connection.
@@ -732,6 +740,7 @@ class RealtimeClient {
       return;
     }
     conn.pending.push(json);
+    if (conn.pending.length > MAX_PENDING_FRAMES) conn.pending.shift();
     // Ensure a socket is on its way so the queued frame actually flushes.
     if (!conn.manuallyClosed && (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING)) {
       this.openConnection(conn);
