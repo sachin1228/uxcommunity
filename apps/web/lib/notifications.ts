@@ -1,7 +1,9 @@
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { notificationRealtimeEvent } from "@/lib/notifications-realtime";
 import type { Json } from "@/lib/supabase/database.types";
 
 /**
@@ -62,114 +64,38 @@ export async function createNotification(
   const body = input.body?.slice(0, 500) ?? null;
   const href = input.href;
 
-  // Cap storage growth (500MB free tier): interactions on the same entity
-  // (e.g. "Sachin replied" then "Priya replied" to the same thread) reuse a
-  // single unread notification row instead of creating a new row per event.
-  // Bumping created_at keeps the notification at the top of the list, and
-  // metadata.count records how many events it aggregates.
-  const { data: existing, error: lookupError } = (await db
-    .from("notifications")
-    .select("id, metadata")
-    .eq("user_id", input.userId)
-    .eq("entity_type", input.entityType)
-    .eq("entity_id", input.entityId)
-    .is("read_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()) as unknown as {
-    data: { id: string; metadata: Record<string, unknown> | null } | null;
-    error: unknown;
-  };
-
-  if (!lookupError && existing) {
-    const prevMetadata = existing.metadata ?? {};
-    const prevCount =
-      typeof prevMetadata.count === "number" ? prevMetadata.count : 1;
-    const createdNow = new Date().toISOString();
-    const { error } = (await db
-      .from("notifications")
-      .update({
-        actor_id: input.actorId ?? null,
-        type: input.type,
-        title,
-        body,
-        href,
-        metadata: { ...prevMetadata, count: prevCount + 1 },
-        created_at: createdNow,
-      } as never)
-      .eq("id", existing.id)) as unknown as { error: unknown };
-    if (error) {
-      console.error("[notifications] dedupe update failed", error);
-      return { ok: false, error };
-    }
-    // Best-effort realtime: keep other open bell dropdowns in sync.
-    void publishRealtimeBatch([
-      {
-        room: realtimeRooms.notifications(input.userId),
-        topic: "update",
-        data: {
-          next: {
-            id: existing.id,
-            user_id: input.userId,
-            actor_id: input.actorId ?? null,
-            community_id: input.communityId ?? null,
-            type: input.type,
-            entity_type: input.entityType,
-            entity_id: input.entityId,
-            title,
-            body,
-            href,
-            read_at: null,
-            created_at: createdNow,
-          },
-          old: { id: existing.id, read_at: null },
-        },
-      },
-    ]);
-    return { ok: true };
-  }
-
-  const { data: insertedRow, error } = (await db
-    .from("notifications")
-    .insert({
-      user_id: input.userId,
-      actor_id: input.actorId ?? null,
-      community_id: communityId,
-      type: input.type,
-      entity_type: input.entityType,
-      entity_id: input.entityId,
-      title,
-      body,
-      href,
-      metadata: input.metadata ?? {},
-    })
-    .select("id, user_id, type, title, body, href, read_at, created_at")
-    .single()) as unknown as {
-    data: {
-      id: string;
-      user_id: string;
-      type: string;
-      title: string;
-      body: string | null;
-      href: string;
-      read_at: string | null;
-      created_at: string;
-    } | null;
-    error: unknown;
-  };
+  // The database owns the dedupe decision now. `create_notification` inserts a
+  // new unread row or atomically aggregates this event into the existing one for
+  // (user_id, entity_type, entity_id) in a single statement, backed by the
+  // partial unique index from migration 20260928140000_notification_dedupe.sql.
+  // Two concurrent callers can no longer both pass an existence check and both
+  // insert, so interactions on the same entity still collapse into one unread
+  // row (bumping created_at keeps it at the top of the list and metadata.count
+  // records how many events it aggregates).
+  const { data, error } = await callPerformanceRpc(db, "create_notification", {
+    p_user_id: input.userId,
+    p_actor_id: input.actorId ?? null,
+    p_community_id: communityId,
+    p_type: input.type,
+    p_entity_type: input.entityType,
+    p_entity_id: input.entityId,
+    p_title: title,
+    p_body: body,
+    p_href: href,
+    p_metadata: input.metadata ?? {},
+  });
 
   if (error) {
-    console.error("[notifications] insert failed", error);
+    console.error("[notifications] create failed", error);
     return { ok: false, error };
   }
 
-  if (insertedRow) {
+  const created = data?.[0] ?? null;
+  if (created) {
+    // `inserted` decides insert vs update: a deduplicated event must not emit a
+    // second insert, which would double the client's unread badge.
     void publishRealtimeBatch([
-      {
-        room: realtimeRooms.notifications(input.userId),
-        topic: "insert",
-        data: insertedRow,
-      },
+      notificationRealtimeEvent(created, realtimeRooms.notifications(input.userId)),
     ]);
   }
 
