@@ -121,8 +121,10 @@ export async function GET(
       ? "past"
       : null;
   const body = { events: enriched, nextCursor };
-  timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: enriched.length });
-  return NextResponse.json(body);
+  const timing = timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: enriched.length });
+  const response = NextResponse.json(body);
+  response.headers.set("Server-Timing", timing);
+  return response;
 }
 
 export async function POST(
