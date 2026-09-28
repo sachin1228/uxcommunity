@@ -369,56 +369,6 @@ export async function loadCommunityEvents(
   return { ok: true, data: { events, nextCursor } };
 }
 
-export async function loadCommunityMembersPage(
-  communityId: string,
-  userId: string,
-): Promise<ReadResult<{ members: unknown[]; has_more: boolean; total: number }>> {
-  const db = createServiceClient();
-  if (!(await isCommunityMember(communityId, userId))) {
-    return { ok: false, status: 403, error: "Not a member." };
-  }
-  const { data: rows, error } = await db
-    .from("community_members")
-    .select("user_id, joined_at, role")
-    .eq("community_id", communityId)
-    .order("joined_at", { ascending: true });
-  if (error) return { ok: false, status: 500, error: "Failed to load members." };
-
-  const allRows = (rows ?? []) as Array<{ user_id: string; joined_at: string; role: string | null }>;
-  const pageRows = allRows.slice(0, 30);
-  const ids = pageRows.map((row) => row.user_id);
-  const [{ data: users }, { data: profiles }, experienceLevelNameMap] = ids.length
-    ? await Promise.all([
-        db.from("users").select("id, name").in("id", ids),
-        db.from("designer_profiles").select("user_id, avatar_url, experience_level").in("user_id", ids),
-        getExperienceLevelNameMap(),
-      ])
-    : [{ data: [] }, { data: [] }, {} as Record<string, string>];
-  const userRows = (users ?? []) as Array<{ id: string; name: string }>;
-  const profileRows = (profiles ?? []) as Array<{
-    user_id: string;
-    avatar_url: string | null;
-    experience_level: string | null;
-  }>;
-  const userMap = Object.fromEntries(userRows.map((user) => [user.id, user]));
-  const profileMap = Object.fromEntries(profileRows.map((profile) => [profile.user_id, profile]));
-  const members = pageRows.flatMap((row) => {
-    const user = userMap[row.user_id] as any;
-    const profile = profileMap[row.user_id] as any;
-    return user ? [{
-      user_id: row.user_id,
-      joined_at: row.joined_at,
-      role: row.role ?? "member",
-      name: user.name,
-      avatar_url: profile?.avatar_url ?? null,
-      designation: profile?.experience_level
-        ? cleanDesignation(experienceLevelNameMap[profile.experience_level] ?? profile.experience_level)
-        : null,
-    }] : [];
-  });
-  return { ok: true, data: { members, has_more: allRows.length > 30, total: allRows.length } };
-}
-
 export async function loadCommunityRules(
   communityId: string,
 ): Promise<ReadResult<{ rules: unknown[] }>> {

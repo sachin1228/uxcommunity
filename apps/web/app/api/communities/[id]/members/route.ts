@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
 
+/** Rows per page. The server owns this, so a caller cannot widen a page. */
 const PAGE_SIZE = 30;
-
-function memberRoleRank(role: string | null | undefined): number {
-  if (role === "owner") return 0;
-  if (role === "admin") return 1;
-  return 2;
-}
 
 /**
  * GET /api/communities/[id]/members?page=0&search=...
  *
  * Paginated member list. page is 0-indexed, PAGE_SIZE rows per page.
  * Optional `search` filters by name (case-insensitive, server-side).
+ *
+ * The page is selected in Postgres (audit M-2): the database applies the
+ * LIMIT/OFFSET and returns only the requested rows, so the work and transfer
+ * are proportional to the page rather than to the community's membership.
  */
 export async function GET(
   req: NextRequest,
@@ -28,8 +28,11 @@ export async function GET(
   const { id: communityId } = await params;
 
   const url    = new URL(req.url);
-  const page   = Math.max(0, parseInt(url.searchParams.get("page") ?? "0", 10));
-  const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
+  // Negative, non-numeric and fractional page numbers collapse to the first
+  // page rather than reaching the query as a bad offset.
+  const rawPage = parseInt(url.searchParams.get("page") ?? "0", 10);
+  const page    = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 0;
+  const search  = (url.searchParams.get("search") ?? "").trim().toLowerCase();
 
   const db = createServiceClient();
 
@@ -45,53 +48,32 @@ export async function GET(
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
-  // Fetch all member user_ids ordered by join date (needed for stable pagination).
-  const { data: allRows } = await db
-    .from("community_members")
-    .select("user_id, joined_at, role")
-    .eq("community_id", communityId)
-    .order("joined_at", { ascending: true });
+  const offset = page * PAGE_SIZE;
 
-  let memberRows = allRows ?? [];
-  if (!memberRows.length) return NextResponse.json({ members: [], has_more: false });
+  const { data: pageRows, error } = await callPerformanceRpc(db, "get_community_members_page", {
+    p_community_id: communityId,
+    p_search:       search || null,
+    p_limit:        PAGE_SIZE,
+    p_offset:       offset,
+  });
 
-  const allUserIds = memberRows.map((m) => m.user_id);
-
-  // If searching, fetch names first so we can filter by name server-side.
-  // Communities can have hundreds of members — passing every member's id to a
-  // single `.in()` filter blows past PostgREST's URL length limit, so search
-  // the users table first (bounded) and intersect with memberships.
-  let filteredUserIds = allUserIds;
-  if (search) {
-    const { data: nameRows, error: nameErr } = await db
-      .from("users")
-      .select("id, name")
-      .ilike("name", `%${search}%`)
-      .limit(500);
-    if (nameErr) {
-      return NextResponse.json({ error: "Failed to search members." }, { status: 500 });
-    }
-    filteredUserIds = (nameRows ?? []).map((u) => u.id);
-    memberRows = memberRows.filter((m) => filteredUserIds.includes(m.user_id));
+  if (error) {
+    return NextResponse.json({ error: "Failed to load members." }, { status: 500 });
   }
 
-  memberRows.sort((a, b) => memberRoleRank(a.role) - memberRoleRank(b.role));
+  const rows = pageRows ?? [];
+  if (!rows.length) {
+    return NextResponse.json({ members: [], has_more: false, total: 0 });
+  }
 
-  const total      = memberRows.length;
-  const from       = page * PAGE_SIZE;
-  const pageRows   = memberRows.slice(from, from + PAGE_SIZE);
-  const has_more   = from + PAGE_SIZE < total;
+  const total    = Number(rows[0].total ?? 0);
+  const has_more = offset + rows.length < total;
+  const pageUserIds = rows.map((m) => m.user_id);
 
-  if (!pageRows.length) return NextResponse.json({ members: [], has_more: false });
-
-  const pageUserIds = pageRows.map((m) => m.user_id);
-
-  const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", pageUserIds),
-    db.from("designer_profiles")
-      .select("user_id, avatar_url, experience_level")
-      .in("user_id", pageUserIds),
-  ]);
+  const { data: profiles } = await db
+    .from("designer_profiles")
+    .select("user_id, avatar_url, experience_level")
+    .in("user_id", pageUserIds);
 
   const slugs = [...new Set((profiles ?? []).map((p: any) => p.experience_level).filter(Boolean) as string[])];
   const expLevelMap: Record<string, string> = {};
@@ -101,25 +83,18 @@ export async function GET(
   }
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.user_id, p]));
-  const userMap    = Object.fromEntries((users    ?? []).map((u) => [u.id, u]));
 
-  const roleMap = Object.fromEntries((allRows ?? []).map((m) => [m.user_id, (m as any).role ?? "member"]));
-
-  const members = pageRows
-    .map((m) => {
-      const u = userMap[m.user_id];
-      const p = profileMap[m.user_id];
-      if (!u) return null;
-      return {
-        user_id:     m.user_id,
-        joined_at:   m.joined_at,
-        role:        roleMap[m.user_id] ?? "member",
-        name:        u.name,
-        avatar_url:  p?.avatar_url ?? null,
-        designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-      };
-    })
-    .filter(Boolean);
+  const members = rows.map((m) => {
+    const p = profileMap[m.user_id];
+    return {
+      user_id:     m.user_id,
+      joined_at:   m.joined_at,
+      role:        m.role ?? "member",
+      name:        m.name,
+      avatar_url:  p?.avatar_url ?? null,
+      designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+    };
+  });
 
   return NextResponse.json({ members, has_more, total });
 }

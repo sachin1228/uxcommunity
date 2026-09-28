@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 
 const PAGE_SIZE = 30;
 
@@ -9,7 +10,17 @@ const PAGE_SIZE = 30;
  *
  * Paginated member search used by the "Add community admin" picker. Returns
  * every member (including current admins/owners, flagged via `role`) so the
- * UI can show why a row isn't promotable.
+ * UI can show why a row isn't promotable. `email` rides along because the
+ * picker renders it.
+ *
+ * The page is selected in Postgres (audit M-2): get_admin_community_members_page
+ * applies the LIMIT/OFFSET itself, so the work and the transfer are
+ * proportional to the page rather than to the community's membership. The old
+ * implementation transferred every membership row and sliced in Node, then ran
+ * a second query for up to 500 name matches to intersect in JavaScript.
+ *
+ * Authorization is unchanged: an admin session is required before the
+ * service-role function is called.
  */
 export async function GET(
   req: NextRequest,
@@ -19,8 +30,11 @@ export async function GET(
   const { id } = await params;
 
   const url = new URL(req.url);
-  const page = Math.max(0, parseInt(url.searchParams.get("page") ?? "0", 10));
-  const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
+  // Negative, non-numeric and fractional page numbers collapse to the first
+  // page rather than reaching the query as a bad offset.
+  const rawPage = parseInt(url.searchParams.get("page") ?? "0", 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 0;
+  const search = (url.searchParams.get("search") ?? "").trim();
 
   const db = createServiceClient();
 
@@ -33,64 +47,37 @@ export async function GET(
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
 
-  const { data: allRows } = await db
-    .from("community_members")
-    .select("user_id, joined_at, role")
-    .eq("community_id", id)
-    .order("joined_at", { ascending: true });
+  const offset = page * PAGE_SIZE;
 
-  let memberRows = allRows ?? [];
-  if (!memberRows.length) {
+  const { data: pageRows, error } = await callPerformanceRpc(db, "get_admin_community_members_page", {
+    p_community_id: id,
+    p_search: search || null,
+    p_limit: PAGE_SIZE,
+    p_offset: offset,
+  });
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to load members." }, { status: 500 });
+  }
+
+  const rows = pageRows ?? [];
+  if (!rows.length) {
+    // A page past the end (or a search with no matches) has nothing further to
+    // load. As on the normal member endpoint, `total` is 0 here; the UI only
+    // reads it while `has_more` is true.
     return NextResponse.json({ members: [], has_more: false, total: 0 });
   }
 
-  if (search) {
-    // Communities can have hundreds of members — passing every member's id to
-    // a single `.in()` filter blows past PostgREST's URL length limit and the
-    // request fails. Search the users table first (bounded), then intersect
-    // with this community's memberships.
-    const { data: nameRows, error: nameErr } = await db
-      .from("users")
-      .select("id")
-      .ilike("name", `%${search}%`)
-      .limit(500);
-    if (nameErr) {
-      return NextResponse.json({ error: "Failed to search members." }, { status: 500 });
-    }
-    const matched = new Set((nameRows ?? []).map((u) => u.id));
-    memberRows = memberRows.filter((m) => matched.has(m.user_id));
-  }
+  const total = Number(rows[0].total ?? 0);
+  const has_more = offset + rows.length < total;
 
-  const total = memberRows.length;
-  const from = page * PAGE_SIZE;
-  const pageRows = memberRows.slice(from, from + PAGE_SIZE);
-  const has_more = from + PAGE_SIZE < total;
-
-  if (!pageRows.length) {
-    return NextResponse.json({ members: [], has_more: false, total });
-  }
-
-  const pageUserIds = pageRows.map((m) => m.user_id);
-  const { data: users } = await db
-    .from("users")
-    .select("id, name, email")
-    .in("id", pageUserIds);
-
-  const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u]));
-
-  const members = pageRows.flatMap((m) => {
-    const user = userMap[m.user_id];
-    if (!user) return [];
-    return [
-      {
-        user_id: m.user_id,
-        name: user.name,
-        email: user.email,
-        joined_at: m.joined_at,
-        role: m.role ?? "member",
-      },
-    ];
-  });
+  const members = rows.map((m) => ({
+    user_id: m.user_id,
+    name: m.name,
+    email: m.email,
+    joined_at: m.joined_at,
+    role: m.role ?? "member",
+  }));
 
   return NextResponse.json({ members, has_more, total });
 }
