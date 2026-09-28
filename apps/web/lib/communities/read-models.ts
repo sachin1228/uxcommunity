@@ -419,13 +419,15 @@ export async function loadCommunityMessagePage(
 
   if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
   const rows = (data ?? []) as Array<Record<string, unknown>>;
-  // The RPC repeats the page's content-reaction groups on every row — they are
-  // a lateral aggregate over the whole page, not a per-message field — and also
-  // ships the raw anchor uuid beside the resolved reply_to_content preview.
-  // Hoist the groups once and drop both per-row copies so a 50-message page
-  // doesn't carry the same inline card list 50 times. Unknown-key deletes are
-  // free; the spread keeps this a plain object literal.
-  const contentReactions = rows.length ? (rows[0].content_reactions ?? null) : null;
+  // The RPC ships the page's content-reaction groups on a SINGLE row (they are
+  // a lateral aggregate over the whole page, not a per-message field) and also
+  // returns the raw anchor uuid beside the resolved reply_to_content preview.
+  // Hoist that one copy and drop it — plus the raw uuid — from every message so
+  // the page-level list is not repeated per row. Scanning for the carrying row
+  // instead of assuming index 0 keeps this independent of result ordering.
+  // Unknown-key deletes are free; the spread keeps this a plain object literal.
+  const contentReactions =
+    rows.find((row) => row.content_reactions != null)?.content_reactions ?? null;
   const messages = rows.map((row) => {
     const message = { ...row };
     delete message.content_reactions;
