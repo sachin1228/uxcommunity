@@ -24,6 +24,32 @@ import {
   sendChatMessagePush,
   type ChatPushDeps,
 } from "./chat";
+import type { ExpoPushDelivery } from "./expo";
+
+/**
+ * A stand-in for the provider sender's return value.
+ *
+ * The real sender accounts for every message it is given (`delivered +
+ * permanentFailures + transientFailures` equals the batch size), so the fakes
+ * below do too — that invariant is what the fan-out's report is built on.
+ */
+function delivery(overrides: Partial<ExpoPushDelivery> = {}): ExpoPushDelivery {
+  return {
+    delivered: 0,
+    permanentFailures: 0,
+    transientFailures: 0,
+    deadTokens: [],
+    requests: 1,
+    settled: true,
+    providerError: null,
+    ...overrides,
+  };
+}
+
+/** Every message accepted, which is the happy path. */
+function acceptAll(messages: { to: string }[]): ExpoPushDelivery {
+  return delivery({ delivered: messages.length });
+}
 
 // ── Fake Supabase client ────────────────────────────────────────────────────
 
@@ -49,6 +75,8 @@ interface FakeState {
   throttle: Map<string, { window_started_at: string; sent_count: number }>;
   unread: Map<string, number>;
   deadTokens: string[];
+  /** Make the token delete fail with an error that quotes the tokens. */
+  deleteQuotesTokens?: boolean;
 }
 
 function fakeState(overrides: Partial<FakeState> = {}): FakeState {
@@ -79,7 +107,14 @@ function createFakeDb(state: FakeState) {
     const ids = (ctx.inValues ?? []) as string[];
     switch (ctx.table) {
       case "push_tokens":
-        if (ctx.op === "delete") return { data: null, error: null };
+        if (ctx.op === "delete") {
+          // PostgREST can quote the offending filter value back in its details;
+          // the operator reflects that so a test can prove it is redacted.
+          if (state.deleteQuotesTokens) {
+            throw new Error(`delete failed: token in (${ids.join(",")}) is not permitted`);
+          }
+          return { data: null, error: null };
+        }
         return {
           data: ids.flatMap((id) =>
             (state.tokens.get(id) ?? []).map((token) => ({ token, user_id: id })),
@@ -250,7 +285,7 @@ test("a 4,321-member community is paged by keyset — no query carries the whole
     chunkSize: 500,
     send: async (messages) => {
       sent.push(messages.length);
-      return [];
+      return acceptAll(messages);
     },
   }));
 
@@ -292,7 +327,7 @@ test("query count grows with chunks, not with members", async () => {
 
     await sendChatMessagePush(BASE_PARAMS, deps(db, {
       chunkSize: 500,
-      send: async () => [],
+      send: async (messages) => acceptAll(messages),
     }));
     return { total: calls.length, calls };
   }
@@ -360,7 +395,7 @@ test("sender, muted members and disabled-preference members are not pushed", asy
   const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
     send: async (messages) => {
       delivered = messages as unknown as Array<Record<string, unknown>>;
-      return [];
+      return acceptAll(messages);
     },
   }));
 
@@ -400,7 +435,7 @@ test("only audible pushes consume the audible budget", async () => {
   });
 
   const { db, calls } = createFakeDb(state);
-  await sendChatMessagePush(BASE_PARAMS, deps(db, { send: async () => [] }));
+  await sendChatMessagePush(BASE_PARAMS, deps(db, { send: async (messages) => acceptAll(messages) }));
 
   const upserts = calls.filter((call) => call.op === "upsert");
   assert.equal(upserts.length, 1, "one throttle write for the audible push");
@@ -421,7 +456,7 @@ test("delivery is capped and the truncation is reported", async () => {
     maxDeliveries: 3,
     send: async (messages) => {
       batches.push(messages.length);
-      return [];
+      return acceptAll(messages);
     },
   }));
 
@@ -430,6 +465,8 @@ test("delivery is capped and the truncation is reported", async () => {
   assert.deepEqual(batches, [3]);
   // The message itself is untouched by the cap — callers still return success.
   assert.equal(report.deadTokens, 0);
+  // …but the report no longer reads as an unqualified success.
+  assert.equal(report.complete, false);
 });
 
 test("the time budget stops the fan-out and reports why", async () => {
@@ -446,12 +483,15 @@ test("the time budget stops the fan-out and reports why", async () => {
     // Two reads at zero (budget setup + first loop check) let the first chunk
     // run, then the clock jumps past the budget so the next chunk is skipped.
     clock: () => (ticks++ < 2 ? 0 : 1_000_000),
-    send: async () => [],
+    send: async (messages) => acceptAll(messages),
   }));
 
   assert.equal(report.truncated, "time");
   assert.equal(report.chunks, 1);
   assert.equal(report.deliveries, 500);
+  // The recipients the budget never reached are reported through `truncated`,
+  // and the run cannot read as a success.
+  assert.equal(report.complete, false);
 });
 
 // ── 4. Dead tokens ──────────────────────────────────────────────────────────
@@ -464,29 +504,237 @@ test("dead tokens are pruned in bounded batches", async () => {
   const { db, calls } = createFakeDb(state);
 
   const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
-    send: async () => ["dead"],
+    send: async () => delivery({ delivered: 1, permanentFailures: 1, deadTokens: ["dead"] }),
   }));
 
   const deletes = calls.filter((call) => call.op === "delete");
   assert.equal(deletes.length, 1);
   assert.equal(deletes[0]!.inSize, 1);
   assert.equal(report.deadTokens, 1);
+  // A dead token is a permanent failure, and it is reported as one.
+  assert.equal(report.failedPermanent, 1);
+  assert.equal(report.deliveries, 1);
+  assert.equal(report.complete, false);
 });
 
-test("a send failure stops delivery instead of looping over a broken provider", async () => {
+test("a broken provider stops delivery once three chunks in a row reach nobody", async () => {
+  const members = [userId(1), userId(2), userId(3), userId(4), userId(5)];
   const state = fakeState({
-    members: [userId(1), userId(2)],
-    tokens: new Map([[userId(1), ["t1"]], [userId(2), ["t2"]]]),
+    members,
+    tokens: new Map(members.map((id) => [id, [`token-${id}`]])),
   });
   const { db } = createFakeDb(state);
+  let attempts = 0;
 
   const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
     chunkSize: 1,
     send: async () => {
+      attempts += 1;
       throw new Error("expo down");
     },
   }));
 
   assert.equal(report.truncated, "error");
+  assert.equal(attempts, 3, "the breaker stops after three consecutive dead chunks");
+  // Nothing was delivered, and nothing was claimed as delivered either.
   assert.equal(report.deliveries, 0);
+  assert.equal(report.failedTransient, 3);
+  assert.equal(report.complete, false);
+});
+
+// ── 5. Provider failures lose nothing ───────────────────────────────────────
+
+test("a failed chunk does not discard the recipients behind it", async () => {
+  const members = [userId(1), userId(2), userId(3)];
+  const state = fakeState({
+    members,
+    tokens: new Map(members.map((id) => [id, [`token-${id}`]])),
+  });
+  const { db } = createFakeDb(state);
+  let attempt = 0;
+
+  const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    chunkSize: 1,
+    send: async (messages) => {
+      attempt += 1;
+      // The first chunk hits a provider hiccup; the sender reports it as
+      // transient (it never claims an unaccounted message as delivered).
+      if (attempt === 1) throw new Error("expo timeout");
+      return acceptAll(messages);
+    },
+  }));
+
+  assert.equal(report.deliveries, 2, "recipients after the failed chunk are still pushed");
+  assert.equal(report.failedTransient, 1);
+  assert.equal(report.truncated, null, "one bad chunk is not a reason to truncate the fan-out");
+  assert.equal(report.complete, false, "…but the report must not claim completeness");
+});
+
+test("provider failures are counted per device, never as deliveries", async () => {
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), ["t1", "t2", "t3", "t4"]]]),
+  });
+  const { db } = createFakeDb(state);
+
+  const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    send: async () => delivery({ delivered: 1, permanentFailures: 1, transientFailures: 1 }),
+  }));
+
+  assert.equal(report.deliveries, 1);
+  assert.equal(report.failedPermanent, 1);
+  assert.equal(report.failedTransient, 1);
+  assert.equal(report.complete, false);
+});
+
+/**
+ * Sending an acknowledged device again is the one thing the fan-out can still
+ * control. (It is not a promise of exactly-once delivery: a response that never
+ * arrives is retried and may duplicate — see `sendExpoPushBatches`.)
+ */
+test("a device the provider acknowledged is never handed over again", async () => {
+  const members: string[] = [];
+  for (let i = 1; i <= 600; i += 1) members.push(userId(i));
+  const state = fakeState({ members });
+  for (const id of members) state.tokens.set(id, [`token-${id}`]);
+  const { db } = createFakeDb(state);
+
+  const sentTokens: string[] = [];
+  let chunk = 0;
+
+  await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    chunkSize: 200,
+    send: async (messages) => {
+      chunk += 1;
+      sentTokens.push(...messages.map((message) => message.to));
+      // Every chunk is reported as a partial failure, which is the case where a
+      // naive retry would re-send devices that already received the push.
+      return delivery({
+        delivered: messages.length - 1,
+        permanentFailures: 1,
+        deadTokens: [messages[messages.length - 1]!.to],
+      });
+      // (`delivered` here means the sender acknowledged them; the fan-out's own
+      // retry policy never re-sends those.)
+    },
+  }));
+
+  assert.equal(chunk, 3);
+  assert.equal(sentTokens.length, 600);
+  assert.equal(
+    new Set(sentTokens).size,
+    600,
+    "each acknowledged device was handed over exactly once by this fan-out",
+  );
+});
+
+/**
+ * The durability question, answered at the level this architecture can answer it.
+ *
+ * There is no queue, so a fan-out that is cut off (platform kill, time budget,
+ * provider outage) does not resume by itself. What must hold is that the
+ * shortfall is reported rather than hidden, and that nothing is *permanently*
+ * unreachable: recipient selection is deterministic and complete, so the very
+ * next fan-out — or the client's own unread resync — reaches the tail that the
+ * interrupted run never got to.
+ */
+test("an interrupted fan-out reports its gap and a re-run reaches the whole community", async () => {
+  const members: string[] = [];
+  for (let i = 1; i <= 1_000; i += 1) members.push(userId(i));
+  const state = fakeState({ members });
+  for (const id of members) state.tokens.set(id, [`token-${id}`]);
+
+  // ── Run 1: the provider accepts one chunk and then goes quiet, and the budget
+  // runs out while it is down.
+  const first = createFakeDb(state);
+  let ticks = 0;
+  const interrupted = await sendChatMessagePush(BASE_PARAMS, deps(first.db, {
+    chunkSize: 100,
+    timeBudgetMs: 5,
+    // Two reads at zero let the first chunk run; the clock then jumps past the
+    // budget, so the remaining chunks are never attempted.
+    clock: () => (ticks++ < 2 ? 0 : 1_000_000),
+    send: async (messages) => acceptAll(messages),
+  }));
+
+  assert.equal(interrupted.truncated, "time");
+  assert.equal(interrupted.complete, false, "a cut-off fan-out never reports success");
+  assert.equal(interrupted.deliveries, 100);
+  assert.ok(interrupted.deliveries < members.length);
+
+  // ── Run 2 (a later message, or the same recipients retried): the recipient
+  // list is rebuilt from the database and covered in full.
+  const second = createFakeDb(state);
+  const seen = new Set<string>();
+  const rerun = await sendChatMessagePush(BASE_PARAMS, deps(second.db, {
+    chunkSize: 100,
+    send: async (messages) => {
+      for (const message of messages) seen.add(message.to);
+      return acceptAll(messages);
+    },
+  }));
+
+  assert.equal(rerun.complete, true);
+  assert.equal(rerun.deliveries, 1_000);
+  assert.equal(seen.size, 1_000, "the unprocessed tail of the first run is reachable on the next one");
+});
+
+test("a device token never reaches a log, even when a query echoes it back", async () => {
+  const secret = "ExponentPushToken[secret-device-1]";
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), [secret]]]),
+    deleteQuotesTokens: true,
+  });
+  const { db } = createFakeDb(state);
+
+  const logged: string[] = [];
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  console.error = (...args: unknown[]) => logged.push(args.map(String).join(" "));
+  console.warn = (...args: unknown[]) => logged.push(args.map(String).join(" "));
+
+  try {
+    // The provider reports the device as gone, so the fan-out tries to prune it
+    // and the delete blows up quoting the token it was filtering on.
+    await sendChatMessagePush(BASE_PARAMS, deps(db, {
+      send: async () => delivery({ delivered: 1, permanentFailures: 1, deadTokens: [secret] }),
+    }));
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+
+  assert.ok(logged.length > 0, "the failed cleanup is still reported");
+  for (const line of logged) {
+    assert.ok(!line.includes(secret), `a device token reached a log line: ${line}`);
+    assert.ok(!line.includes("secret-device-1"), "…not even partially");
+  }
+});
+
+test("a 10,000-recipient fan-out is not truncated by batching", async () => {
+  const members: string[] = [];
+  for (let i = 1; i <= 10_000; i += 1) members.push(userId(i));
+  const state = fakeState({ members });
+  for (const id of members) state.tokens.set(id, [`token-${id}`]);
+  const { db } = createFakeDb(state);
+
+  const seen = new Set<string>();
+  let handedOver = 0;
+
+  const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    send: async (messages) => {
+      handedOver += messages.length;
+      for (const message of messages) seen.add(message.to);
+      return acceptAll(messages);
+    },
+  }));
+
+  assert.equal(report.scanned, 10_000);
+  assert.equal(report.reachable, 10_000);
+  assert.equal(report.deliveries, 10_000);
+  assert.equal(report.truncated, null);
+  assert.equal(report.complete, true);
+  assert.equal(handedOver, 10_000, "every recipient entered processing");
+  assert.equal(seen.size, 10_000, "no recipient was sent to twice");
 });

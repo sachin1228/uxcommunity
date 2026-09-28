@@ -1,5 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { sendExpoPush, type ExpoPushMessage } from "./expo";
+import {
+  redactPushTokens,
+  sendExpoPushBatches,
+  type ExpoPushDelivery,
+  type ExpoPushMessage,
+} from "./expo";
 import { loadUnreadMessageTotals, type UntypedRpc } from "./unread-totals";
 
 /** Keeps the notification body to a WhatsApp-sized preview. */
@@ -29,17 +34,68 @@ export const PUSH_RECIPIENT_CHUNK = 500;
 
 /**
  * Ceiling on device pushes for ONE chat message, and the wall-clock budget the
- * sender may spend on it.
+ * sender may spend on it. Both are overridable (`PUSH_MAX_DELIVERIES`,
+ * `PUSH_TIME_BUDGET_MS`) and both are only defaults.
  *
- * Both exist because the sender runs in the message route's `after()` block,
+ * They exist because the sender runs in the message route's `after()` block,
  * which the platform terminates — an unbounded fan-out over a very large
- * community would be killed halfway through with no record of why. Hitting
- * either bound stops delivery for the remaining recipients; nothing is lost
- * permanently because the message itself is already committed and every client
- * resyncs unread state from the database on open.
+ * community would be killed halfway through. They are not silent: the sender
+ * counts every recipient it hands over, so hitting either bound reports
+ * `truncated` ("deliveries" / "time") alongside the number of devices that were
+ * never reached.
+ *
+ * The bounds are not arbitrary. Expo accepts ~600 notifications per second per
+ * project, so 10,000 devices is already ~17 seconds of the 20-second budget even
+ * though the sender pages its requests to that rate (per invocation) — an
+ * unbounded fan-out cannot finish inside a request, at any concurrency. What can
+ * be guaranteed is that everything attempted is accounted for, that transient
+ * failures are retried, and that a shortfall is reported instead of being
+ * counted as delivered.
+ *
+ * Why there is still no queue here: a chat push is a transient OS notification,
+ * not a durable record. The durable record already exists — the message row,
+ * committed before this runs — and every client derives unread state from it on
+ * open, so an unreached device is corrected by the client rather than by a
+ * retry. A queue would need a worker, a consumer and receipt tracking to deliver
+ * something the recipient re-derives for free. What a queue *would* buy is
+ * coverage of a community larger than one request can pace; that is a known,
+ * documented limit (see `PUSH_MAX_DELIVERIES`) rather than a silent loss.
  */
 export const PUSH_MAX_DELIVERIES = 10_000;
 export const PUSH_TIME_BUDGET_MS = 20_000;
+
+/**
+ * Recipient chunks that may fail end-to-end before the fan-out gives up.
+ *
+ * A chunk that reached nobody because the provider is unreachable is worth
+ * trying the next chunk for (the provider may be fine again, and each chunk
+ * carries its own retries), but a provider that answers nothing three times in a
+ * row is down: continuing would spend the rest of the budget re-learning that.
+ * Only genuinely transient failures count — a chunk whose tokens are all
+ * permanently invalid is a completed chunk, not a broken provider.
+ */
+export const PUSH_MAX_CONSECUTIVE_FAILED_CHUNKS = 3;
+
+/**
+ * A one-line, token-free description of a caught error for logging.
+ *
+ * Device tokens are the one piece of recipient data this pipeline must never
+ * write down, and the places errors are caught here all touch queries whose
+ * filters name tokens — so a database or provider error can quote one back. Every
+ * push log line goes through this instead of stringifying the raw error.
+ */
+function describeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return redactPushTokens(message);
+}
+
+/** Numeric environment override, falling back when unset or unparseable. */
+function envLimit(key: string, fallback: number, minimum: number): number {
+  const raw = typeof process === "undefined" ? undefined : process.env[key];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+}
 
 /** Dead-token cleanup accepts a bounded token list per request. */
 const TOKEN_DELETE_CHUNK = 200;
@@ -184,20 +240,43 @@ const MIN_UUID = "00000000-0000-0000-0000-000000000000";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-/** What one message's push delivery cost, for logging and tests. */
+/**
+ * What one message's push delivery cost, for logging and tests.
+ *
+ * `deliveries` counts only pushes the provider acknowledged. Failures are split
+ * by whether a retry could have helped, and `complete` says whether every device
+ * this fan-out intended to reach was acknowledged — a caller can no longer read a
+ * report as "all good" when part of the fan-out went missing. Nothing that was
+ * never acknowledged is counted as a delivery, and nothing is dropped from the
+ * counts entirely (a recipient past a bound is reported through `truncated`).
+ */
 export interface ChatPushReport {
   /** Members read from the database (sender excluded, muted excluded). */
   scanned: number;
   /** Members that had at least one device token. */
   reachable: number;
-  /** Device pushes handed to Expo. */
+  /** Device pushes the provider acknowledged. */
   deliveries: number;
+  /** Device pushes rejected for a reason a retry cannot fix. */
+  failedPermanent: number;
+  /**
+   * Device pushes still failing when the retries and the budget ran out. Their
+   * fate is unknown, not "not delivered": a lost response looks the same as a
+   * request that never landed (see `sendExpoPushBatches`).
+   */
+  failedTransient: number;
   /** Recipient chunks processed (bounded by the chunk size). */
   chunks: number;
-  /** Set when a bound stopped delivery early. */
+  /** Set when a bound stopped delivery early, leaving recipients untouched. */
   truncated: "deliveries" | "time" | "error" | null;
   /** Tokens Expo reported as dead (deleted by this call). */
   deadTokens: number;
+  /**
+   * True only when every intended device push was acknowledged: no truncation,
+   * no permanent failure, no transient failure left behind. It does not promise
+   * that no notification was duplicated (see `sendExpoPushBatches`).
+   */
+  complete: boolean;
 }
 
 /**
@@ -208,7 +287,13 @@ export interface ChatPushReport {
  */
 export interface ChatPushDeps {
   db?: ServiceClient;
-  send?: (messages: ExpoPushMessage[]) => Promise<string[]>;
+  /**
+   * Provider sender. Receives one chunk of device messages and the fan-out's
+   * deadline, and must return an outcome for every message it was given —
+   * `sendExpoPushBatches` guarantees that, which is what lets the loop report
+   * exactly what happened instead of assuming success.
+   */
+  send?: (messages: ExpoPushMessage[], options: { deadline: number }) => Promise<ExpoPushDelivery>;
   /** Wall clock used for the audible budget and quiet hours. */
   now?: () => Date;
   /** Monotonic-ish milliseconds used for the delivery budget. */
@@ -216,6 +301,7 @@ export interface ChatPushDeps {
   chunkSize?: number;
   maxDeliveries?: number;
   timeBudgetMs?: number;
+  maxConsecutiveFailedChunks?: number;
 }
 
 /**
@@ -227,13 +313,25 @@ export interface ChatPushDeps {
  * written to `notifications`.
  *
  * Always called from the message route's `after()` block, so a slow push
- * lookup can never delay the sender's response. Every failure is swallowed.
+ * lookup can never delay the sender's response. Every failure is swallowed — but
+ * never hidden from the returned report.
  *
  * Scaling shape: members are paged with a keyset cursor (`user_id > last`)
  * rather than read in one query, so the per-message query count grows with
  * `members / PUSH_RECIPIENT_CHUNK` instead of the community being loaded whole.
  * Only one chunk of recipients — and one chunk of push messages — is resident
  * at a time.
+ *
+ * Delivery shape: each chunk's devices go to `sendExpoPushBatches`, which batches
+ * them to Expo's 100-per-request limit, keeps a bounded number of requests in
+ * flight, paces dispatch to the configured per-invocation rate, and retries the
+ * messages Expo did not acknowledge. The loop itself never assumes a chunk
+ * succeeded: it adds up what the provider accepted, retries nothing it already
+ * has an acknowledgement for, and reports the shortfall.
+ *
+ * Delivery is at-least-once (see `sendExpoPushBatches`): a push whose response
+ * was lost is retried and may arrive twice, and `collapseId` on the payload is
+ * what keeps a repeated notification for the same chat collapsed on the device.
  */
 export async function sendChatMessagePush(
   params: {
@@ -258,21 +356,40 @@ export async function sendChatMessagePush(
   } = params;
 
   const db = deps.db ?? createServiceClient();
-  const send = deps.send ?? sendExpoPush;
+  const send =
+    deps.send ??
+    ((messages, options) => sendExpoPushBatches(messages, { deadline: options.deadline }));
   const now = deps.now ?? (() => new Date());
   const clock = deps.clock ?? (() => Date.now());
   const chunkSize = Math.max(1, deps.chunkSize ?? PUSH_RECIPIENT_CHUNK);
-  const maxDeliveries = Math.max(1, deps.maxDeliveries ?? PUSH_MAX_DELIVERIES);
-  const deadline = clock() + Math.max(1, deps.timeBudgetMs ?? PUSH_TIME_BUDGET_MS);
+  const maxDeliveries = Math.max(
+    1,
+    deps.maxDeliveries ?? envLimit("PUSH_MAX_DELIVERIES", PUSH_MAX_DELIVERIES, 1),
+  );
+  const maxConsecutiveFailedChunks = Math.max(
+    1,
+    deps.maxConsecutiveFailedChunks ?? PUSH_MAX_CONSECUTIVE_FAILED_CHUNKS,
+  );
+  const deadline =
+    clock() +
+    Math.max(1, deps.timeBudgetMs ?? envLimit("PUSH_TIME_BUDGET_MS", PUSH_TIME_BUDGET_MS, 1));
 
   const report: ChatPushReport = {
     scanned: 0,
     reachable: 0,
     deliveries: 0,
+    failedPermanent: 0,
+    failedTransient: 0,
     chunks: 0,
     truncated: null,
     deadTokens: 0,
+    complete: false,
   };
+
+  /** Consecutive chunks that reached nobody for a transient reason. */
+  let failedChunks = 0;
+  /** Last provider-level failure, logged once with the aggregate below. */
+  let providerError: string | null = null;
 
   try {
     const communityResult = await db
@@ -443,7 +560,7 @@ export async function sendChatMessagePush(
       if (messages.length > 0) {
         // Enforce the ceiling per chunk so the whole device list never has to
         // be resident, and remember that delivery was cut short.
-        const remaining = maxDeliveries - report.deliveries;
+        const remaining = maxDeliveries - report.deliveries - report.failedPermanent - report.failedTransient;
         if (remaining <= 0) {
           report.truncated = "deliveries";
           break;
@@ -451,12 +568,33 @@ export async function sendChatMessagePush(
         const batch = messages.length > remaining ? messages.slice(0, remaining) : messages;
         if (batch.length < messages.length) report.truncated = "deliveries";
 
+        let delivery: ExpoPushDelivery | null = null;
         try {
-          const dead = await send(batch);
-          report.deliveries += batch.length;
-          for (const token of dead) deadTokens.add(token);
+          delivery = await send(batch, { deadline });
         } catch (error) {
-          console.error("[push] delivery failed", error);
+          // The provider sender accounts for every message it accepted; a throw
+          // means this whole chunk is in an unknown state. It is counted as a
+          // transient failure rather than as delivered, and the loop continues
+          // so that one bad chunk cannot discard the recipients behind it.
+          console.error("[push] delivery failed for one chunk", describeError(error));
+          report.failedTransient += batch.length;
+          delivery = null;
+        }
+
+        if (delivery) {
+          report.deliveries += delivery.delivered;
+          report.failedPermanent += delivery.permanentFailures;
+          report.failedTransient += delivery.transientFailures;
+          if (delivery.providerError) providerError = delivery.providerError;
+          for (const token of delivery.deadTokens) deadTokens.add(token);
+        }
+
+        // A chunk that reached nobody for a transient reason is a hint that the
+        // provider is down; one that merely had bad tokens is a chunk that did
+        // its job. Only the former counts towards giving up.
+        const reachedNobody = !delivery || (delivery.delivered === 0 && delivery.transientFailures > 0);
+        failedChunks = reachedNobody ? failedChunks + 1 : 0;
+        if (failedChunks >= maxConsecutiveFailedChunks) {
           report.truncated = "error";
           break;
         }
@@ -470,7 +608,7 @@ export async function sendChatMessagePush(
             .from("push_throttle")
             .upsert(throttleUpserts as never, { onConflict: "user_id,community_id" });
         } catch (error) {
-          console.error("[push] throttle write failed", error);
+          console.error("[push] throttle write failed", describeError(error));
         }
       }
 
@@ -490,23 +628,28 @@ export async function sendChatMessagePush(
             .delete()
             .in("token", tokens.slice(i, i + TOKEN_DELETE_CHUNK));
         } catch (error) {
-          console.error("[push] dead token cleanup failed", error);
+          // This delete names tokens in its filter, so a database error can quote
+          // one back: redact before it reaches a log.
+          console.error("[push] dead token cleanup failed", describeError(error));
         }
       }
     }
 
-    // Only an interrupted fan-out logs, and then it logs ONE aggregate line:
-    // never per recipient, never with message contents, and never for the
-    // normal large-community case (which is expected work, not an anomaly).
-    // The full per-message numbers are returned in the report for callers and
-    // tests that want them.
-    if (report.truncated !== null) {
+    // Only an interrupted or partly failed fan-out logs, and then it logs ONE
+    // aggregate line: never per recipient, never with message contents or
+    // tokens, and never for the normal large-community case (which is expected
+    // work, not an anomaly). The full per-message numbers are returned in the
+    // report for callers and tests that want them.
+    report.complete =
+      report.truncated === null && report.failedPermanent === 0 && report.failedTransient === 0;
+
+    if (!report.complete) {
       console.warn(
-        `[push] community=${communityId} truncated=${report.truncated} chunks=${report.chunks} scanned=${report.scanned} reachable=${report.reachable} deliveries=${report.deliveries}`,
+        `[push] community=${communityId} truncated=${report.truncated} chunks=${report.chunks} scanned=${report.scanned} reachable=${report.reachable} deliveries=${report.deliveries} permanent=${report.failedPermanent} transient=${report.failedTransient}${providerError ? ` provider=${redactPushTokens(providerError)}` : ""}`,
       );
     }
   } catch (error) {
-    console.error("[push] chat notification failed", error);
+    console.error("[push] chat notification failed", describeError(error));
     report.truncated = "error";
   }
 
