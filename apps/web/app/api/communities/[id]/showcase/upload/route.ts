@@ -10,6 +10,7 @@ import {
   proxyUploadKind,
   readBoundedBody,
 } from "@/lib/video/upload-guard";
+import { logEvent } from "@/lib/observability/log";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -104,7 +105,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       { status: 201 },
     );
   } catch (error) {
-    console.error("[showcase upload]", error);
+    logEvent("error", {
+      event: "showcase.upload_failed",
+      community_id: id,
+      user_id: session.userId,
+      error,
+    });
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
 }
@@ -162,7 +168,11 @@ async function completeDirectUpload(request: NextRequest) {
       return NextResponse.json({ error: "Upload did not reach storage. Try again." }, { status: 409 });
     }
   } catch (error) {
-    console.error("[showcase upload] completion HEAD failed:", error);
+    logEvent("error", {
+      event: "showcase.video_finalize_head_failed",
+      media_id: mediaId,
+      error,
+    });
     return NextResponse.json({ error: "Could not verify the upload. Try again." }, { status: 500 });
   }
 

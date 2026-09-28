@@ -82,8 +82,10 @@ export async function GET(
     timer.finish({ status: result.status });
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
-  timer.finish({ status: 200, response_bytes: estimateJsonBytes(result.data), returned_rows: result.data.resources.length });
-  return NextResponse.json(result.data);
+  const timing = timer.finish({ status: 200, response_bytes: estimateJsonBytes(result.data), returned_rows: result.data.resources.length });
+  const response = NextResponse.json(result.data);
+  response.headers.set("Server-Timing", timing);
+  return response;
 }
 
 export async function POST(

@@ -42,7 +42,8 @@ jobs:
         run: |
           for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID \
             SESSION_SECRET SUPABASE_SERVICE_ROLE_KEY \
-            REALTIME_URL REALTIME_PUBLISH_SECRET; do
+            REALTIME_URL REALTIME_PUBLISH_SECRET \
+            API_URL API_SECRET; do
             if [ -z "${!name}" ]; then
               echo "::error::Missing GitHub secret: $name"
               exit 1
@@ -55,17 +56,33 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REALTIME_URL: ${{ secrets.REALTIME_URL }}
           REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
+          API_URL: ${{ secrets.API_URL }}
+          API_SECRET: ${{ secrets.API_SECRET }}
 
       # ── Realtime worker (the web app publishes to it) ─────────────────────
       - name: Deploy realtime worker
         working-directory: apps/realtime
         run: npx wrangler deploy
 
+      # Set AFTER the deploy, and never from the dashboard: `wrangler deploy`
+      # replaces dashboard-managed vars and secrets with the ones in the config
+      # file, so a value added by hand in the Cloudflare UI disappears on the
+      # next merge. Anything the Worker needs at runtime has to be pushed here.
+      #
+      # API_URL / API_SECRET are the membership check's configuration. The
+      # realtime Worker FAILS CLOSED without them (audit M-8): with API_URL
+      # missing or unreachable, or API_SECRET not matching the web app's, every
+      # community socket is refused rather than silently let in. They are
+      # therefore verified above and pushed here on every deploy, and API_SECRET
+      # is written into the web Worker's .dev.vars below from the same GitHub
+      # secret, so the two Workers cannot drift apart.
       - name: Set realtime worker secrets
         working-directory: apps/realtime
         run: |
           echo "${{ secrets.SESSION_SECRET }}" | npx wrangler versions secret put SESSION_SECRET
           echo "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler versions secret put REALTIME_PUBLISH_SECRET
+          echo "${{ secrets.API_URL }}" | npx wrangler versions secret put API_URL
+          echo "${{ secrets.API_SECRET }}" | npx wrangler versions secret put API_SECRET
 
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files
@@ -90,6 +107,9 @@ jobs:
           cat > .dev.vars <<EOF
           SESSION_SECRET=${{ secrets.SESSION_SECRET }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Same value the realtime Worker gets, from the same GitHub secret:
+          # the internal membership endpoint only accepts this exact secret.
+          API_SECRET=${{ secrets.API_SECRET }}
           REALTIME_URL=${{ secrets.REALTIME_URL }}
           REALTIME_PUBLISH_SECRET=${{ secrets.REALTIME_PUBLISH_SECRET }}
           UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}

@@ -118,11 +118,13 @@ export async function GET(req: NextRequest) {
   }
 
   const body = { items };
-  timer.finish({
+  const timing = timer.finish({
     status: 200,
     returned_rows: items.length,
     response_bytes: estimateJsonBytes(body),
   });
 
-  return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+  const response = NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+  response.headers.set("Server-Timing", timing);
+  return response;
 }

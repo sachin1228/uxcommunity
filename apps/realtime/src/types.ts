@@ -90,4 +90,10 @@ export interface PublishRequest {
   topic: string;
   data: unknown;
   exclude_user?: string;
+  /**
+   * Stable id for this publish, reused by every retry of the same event so the
+   * receiving DO can drop a duplicate delivery (see `event-dedupe.ts`). Absent
+   * for older publishers — those are always broadcast.
+   */
+  event_id?: string;
 }

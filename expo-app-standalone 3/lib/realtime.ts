@@ -10,11 +10,21 @@
  *
  * Requires in .env:
  *   EXPO_PUBLIC_REALTIME_URL=wss://rt.uxcommunity.in
+ *
+ * Authentication: the session cookie is sent as a WebSocket handshake header,
+ * NOT as a `?token=` query parameter — React Native's WebSocket accepts request
+ * headers via its third constructor argument. The server reads the same
+ * `uxcommunity_session` cookie it reads for browsers, so nothing changed there.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus } from 'react-native';
-import { RealtimeClient, type RealtimeSocket } from './realtimeCore';
+import {
+  RealtimeClient,
+  buildRealtimeSocketUrl,
+  sessionCookieHeaders,
+  type RealtimeSocket,
+} from './realtimeCore';
 
 export { realtimeRooms, isCommunityRoom, userSocketKey } from './realtimeCore';
 export type {
@@ -31,20 +41,46 @@ const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
 /**
  * Build a WebSocket URL for a connection key.
  *
- * The session token rides in the query string because React Native's WebSocket
- * API cannot send custom headers, and it is read on every open attempt so a
- * renewed session is picked up without restarting the app.
+ * Deliberately token-free: the session JWT is a 7-day credential and used to
+ * ride in this query string, where it is captured by proxies, access logs and
+ * the app's own analytics. It now goes in the handshake headers instead.
  */
 async function buildSocketUrl(socketKey: string): Promise<string> {
   if (!REALTIME_URL) {
     console.warn('[realtime] EXPO_PUBLIC_REALTIME_URL is not set');
     return '';
   }
+  return buildRealtimeSocketUrl(REALTIME_URL, socketKey);
+}
+
+/**
+ * Handshake headers for a socket: the session cookie replayed from AsyncStorage,
+ * read on every open attempt so a renewed session is picked up without an app
+ * restart.
+ */
+async function buildSocketHeaders(): Promise<Record<string, string> | undefined> {
   const token = await AsyncStorage.getItem(SESSION_STORAGE_KEY).catch(() => null);
-  const wsBase = REALTIME_URL.replace(/^http/, 'ws');
-  const params = new URLSearchParams({ room: socketKey });
-  if (token) params.set('token', token);
-  return `${wsBase}/ws?${params.toString()}`;
+  return sessionCookieHeaders(token);
+}
+
+/** Options React Native's WebSocket accepts beyond the standard two arguments. */
+type ReactNativeWebSocketOptions = { headers?: Record<string, string> };
+
+/**
+ * React Native's WebSocket constructor takes a non-standard third argument for
+ * request headers. The DOM lib types do not describe it, so the constructor is
+ * reached through an explicit, documented cast rather than an `any`.
+ */
+function createReactNativeSocket(
+  url: string,
+  headers?: Record<string, string>,
+): RealtimeSocket {
+  const Socket = WebSocket as unknown as new (
+    url: string,
+    protocols?: string | string[],
+    options?: ReactNativeWebSocketOptions,
+  ) => unknown;
+  return new Socket(url, undefined, headers ? { headers } : undefined) as RealtimeSocket;
 }
 
 /**
@@ -53,10 +89,8 @@ async function buildSocketUrl(socketKey: string): Promise<string> {
  */
 export const realtimeClient = new RealtimeClient({
   buildSocketUrl,
-  // React Native's WebSocket declares DOM-shaped handlers (an `event` argument
-  // and a `this` binding) while the core only assigns its own handlers and
-  // reads `readyState`, so the adapter is where the two shapes meet.
-  createSocket: (url) => new WebSocket(url) as unknown as RealtimeSocket,
+  buildSocketHeaders,
+  createSocket: createReactNativeSocket,
   onForeground: (handler) => {
     const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') handler();

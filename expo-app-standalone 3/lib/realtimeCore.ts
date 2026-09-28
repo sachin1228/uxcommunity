@@ -46,8 +46,13 @@
  *   while they were down, so `onRoomStatus(room, …)` tells the hooks when a
  *   socket re-opened and they catch the gap up from the API.
  *
- * Authentication: the session JWT rides in the `token` query parameter, because
- * React Native's WebSocket API cannot send custom headers.
+ * Authentication: the session cookie rides in the WebSocket handshake's
+ * `Cookie` header. React Native's WebSocket accepts request headers through a
+ * non-standard third constructor argument (`{ headers }`), which is how the
+ * JWT left the URL: a 7-day credential in a query string is recorded by any
+ * proxy or access log and lands in the app's own logs; a handshake header does
+ * not. The server already authenticated the same `uxcommunity_session` cookie
+ * for browsers (`apps/realtime/src/index.ts`), so no server change is needed.
  */
 
 export interface RealtimeUser {
@@ -85,14 +90,46 @@ export interface RealtimeSocket {
 /** Everything this core needs from the platform it runs on. */
 export interface RealtimePlatform {
   /**
-   * URL for a socket key — `wss://…/ws?room=<key>&token=<jwt>`. Resolved on
-   * every open attempt, so a rotated session token is picked up without an
-   * app restart.
+   * URL for a socket key — `wss://…/ws?room=<key>` (NO token; see the auth note
+   * at the top of this file). Resolved on every open attempt.
    */
   buildSocketUrl(socketKey: string): Promise<string>;
-  createSocket(url: string): RealtimeSocket;
+  /**
+   * Optional handshake headers for a socket key — carries the session cookie so
+   * the JWT never appears in the URL. Resolved per open attempt so a renewed
+   * session is picked up without an app restart.
+   */
+  buildSocketHeaders?(
+    socketKey: string,
+  ): Promise<Record<string, string> | undefined> | Record<string, string> | undefined;
+  createSocket(url: string, headers?: Record<string, string>): RealtimeSocket;
   /** Fires when the app returns to the foreground. Returns an unsubscribe. */
   onForeground(handler: () => void): () => void;
+}
+
+/** Name of the session cookie the web backend issues and the realtime Worker reads. */
+export const SESSION_COOKIE_NAME = 'uxcommunity_session';
+
+/**
+ * The socket URL for a connection key. Deliberately carries only `room`: the
+ * session credential travels as a handshake header (see `sessionCookieHeaders`).
+ */
+export function buildRealtimeSocketUrl(baseUrl: string, socketKey: string): string {
+  if (!baseUrl) return '';
+  const wsBase = baseUrl.replace(/^http/, 'ws');
+  return `${wsBase}/ws?${new URLSearchParams({ room: socketKey }).toString()}`;
+}
+
+/**
+ * The handshake headers carrying the session cookie, or undefined without a
+ * token. A missing token yields no header (the server then rejects the upgrade
+ * with 401), rather than a `Cookie: …=` with an empty value.
+ */
+export function sessionCookieHeaders(
+  token: string | null | undefined,
+): Record<string, string> | undefined {
+  if (!token) return undefined;
+  return { Cookie: `${SESSION_COOKIE_NAME}=${token}` };
 }
 
 /** Timing knobs — defaults are production values; tests shrink the backoff. */
@@ -112,6 +149,17 @@ const DEFAULT_HEARTBEAT_TIMEOUT_MS = 6_000;
 
 const PING_FRAME = 'ping';
 const PONG_FRAME = 'pong';
+
+/**
+ * Hard cap on frames queued for a socket that is not open yet.
+ *
+ * A client that is offline (or between reconnects) queues every publish frame
+ * it produces. Nothing bounded that before, so a long offline session could
+ * grow `conn.pending` without limit. Queued subscription frames are redundant
+ * anyway (the refcounts are replayed on open), so dropping the OLDEST frame on
+ * overflow is safe: the newest state wins, and the buffer stays small.
+ */
+const MAX_PENDING_FRAMES = 128;
 
 /** WebSocket readyState values (the global constant object is not needed). */
 const SOCKET_OPEN = 1;
@@ -429,8 +477,16 @@ export class RealtimeClient {
 
     conn.opening = true;
     let url = '';
+    let headers: Record<string, string> | undefined;
     try {
       url = await this.platform.buildSocketUrl(conn.key);
+      // Auth headers (the session cookie) are resolved per open attempt from
+      // the same place as the URL, so a rotated token is picked up on the next
+      // reconnect. Failures here fall back to no headers rather than a stale
+      // token — the server rejects the upgrade with 401 and we back off.
+      if (url && this.platform.buildSocketHeaders) {
+        headers = await this.platform.buildSocketHeaders(conn.key);
+      }
     } catch {
       url = '';
     } finally {
@@ -447,7 +503,7 @@ export class RealtimeClient {
 
     let ws: RealtimeSocket;
     try {
-      ws = this.platform.createSocket(url);
+      ws = this.platform.createSocket(url, headers);
     } catch {
       this.scheduleReconnect(conn);
       return;
@@ -1004,6 +1060,11 @@ export class RealtimeClient {
       }
     }
     conn.pending.push(json);
+    if (conn.pending.length > MAX_PENDING_FRAMES) {
+      // Drop the oldest frame: stale state (a superseded typing/publish frame or
+      // a redundant subscribe) must not crowd out the newest one.
+      conn.pending.shift();
+    }
   }
 
   private dispatchToRoom(

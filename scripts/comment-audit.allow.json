@@ -105,6 +105,12 @@
       "reason": "the 'before' columns of this document name the files the refactor deleted — that is the point of the table"
     },
     {
+      "rule": "stale-path",
+      "match": "k6/staging-loadtest-5k.mjs",
+      "file": "docs/realtime-5k-loadtest-audit.md",
+      "reason": "the same pattern: this document narrates the script's deletion and names it in its change table, so the path is deliberately absent"
+    },
+    {
       "rule": "banned-phrase",
       "match": "Supabase Realtime",
       "file": "expo-app-standalone 3/hooks/useCommunities.ts",

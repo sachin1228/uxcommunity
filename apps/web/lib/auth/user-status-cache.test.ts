@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test, { afterEach } from "node:test"
 
-import { clearUserStatusCache, getUserStatusCached } from "./user-status-cache"
+import { clearUserStatusCache, getUserStatusCached, userStatusCacheSize } from "./user-status-cache"
 
 afterEach(() => clearUserStatusCache())
 
@@ -35,6 +35,17 @@ test("reuses a live entry and isolates users", async () => {
   await getUserStatusCached("user-b", load, { ttlMs: 1_000, now: 200 })
 
   assert.equal(calls, 2)
+})
+
+test("stays bounded by evicting the oldest entries", async () => {
+  clearUserStatusCache()
+  const load = async () => ({ exists: true, is_blocked: false })
+
+  for (let i = 0; i < 10; i += 1) {
+    await getUserStatusCached(`user-${i}`, load, { ttlMs: 60_000, maxEntries: 3 })
+  }
+
+  assert.equal(userStatusCacheSize(), 3)
 })
 
 test("reloads an expired entry", async () => {

@@ -4,6 +4,7 @@ import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { notificationRealtimeEvent } from "@/lib/notifications-realtime";
+import { logEvent } from "@/lib/observability/log";
 import type { Json } from "@/lib/supabase/database.types";
 
 /**
@@ -86,7 +87,12 @@ export async function createNotification(
   });
 
   if (error) {
-    console.error("[notifications] create failed", error);
+    logEvent("error", {
+      event: "notifications.create_failed",
+      user_id: input.userId,
+      entity_type: input.entityType,
+      error,
+    });
     return { ok: false, error };
   }
 
@@ -119,7 +125,12 @@ export function deferNotification(input: DeferredNotificationInput) {
         : "Someone";
       await createNotification(db, { ...input, title: input.title(actorName) });
     } catch (error) {
-      console.error("[notifications] deferred delivery failed", error);
+      logEvent("error", {
+        event: "notifications.deferred_delivery_failed",
+        user_id: input.userId,
+        entity_type: input.entityType,
+        error,
+      });
     }
   });
 }

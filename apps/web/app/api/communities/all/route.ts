@@ -52,12 +52,14 @@ export async function GET() {
   const rows = (communities ?? []) as Array<Record<string, unknown>>;
 
   const body = { communities: rows };
-  timer.finish({
+  const timing = timer.finish({
     database_queries: 1,
     rows: body.communities.length,
     response_bytes: estimateJsonBytes(body),
     status: 200,
   });
 
-  return NextResponse.json(body);
+  const response = NextResponse.json(body);
+  response.headers.set("Server-Timing", timing);
+  return response;
 }
