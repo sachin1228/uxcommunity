@@ -32,6 +32,8 @@ interface Ticket {
   status: "ok" | "error";
   message?: string;
   details?: { error?: string };
+  /** Expo's receipt ID, present on an accepted ticket. */
+  id?: string;
 }
 
 interface FakeProvider {
@@ -374,6 +376,74 @@ test("messages Expo did not answer for are retried, never assumed delivered", as
   assert.deepEqual(fake.requests[1], [batch[98]!.to, batch[99]!.to]);
   assert.equal(delivery.delivered, 100);
   assert.equal(delivery.settled, true);
+});
+
+// ── 3b-ii. Ticket IDs for the receipt lookup ────────────────────────────────
+
+/**
+ * An `ok` ticket carries the ID of the receipt that FCM/APNs will later answer
+ * with, and that receipt is the only place a well-formed token can be found to
+ * be permanently unregistered. The ID is therefore returned paired with the
+ * token it was issued for, which is what `processExpoPushReceipts` consumes.
+ */
+test("accepted messages come back with their ticket IDs, paired with their tokens", async () => {
+  const batch = messages(4);
+  const fake = provider(() => [
+    { status: "ok", id: "ticket-0" },
+    errorTicket("DeviceNotRegistered"),
+    { status: "ok", id: "ticket-2" },
+    // Accepted, but Expo sent no ID: a success that cannot be checked later.
+    { status: "ok" },
+  ]);
+
+  const delivery = await sendExpoPushBatches(batch, {
+    fetch: fake.fetch,
+    sleep: async () => {},
+    random: () => 0,
+  });
+
+  assert.deepEqual(delivery.receiptRefs, [
+    { ticketId: "ticket-0", token: batch[0]!.to },
+    { ticketId: "ticket-2", token: batch[2]!.to },
+  ]);
+  assert.equal(delivery.delivered, 3, "a ticket without an ID is still a delivery");
+});
+
+test("a retried message is paired with the ticket ID of the attempt that was accepted", async () => {
+  const batch = messages(2);
+  const fake = provider((_tokens, call) =>
+    call === 0
+      ? [errorTicket("MessageRateExceeded"), { status: "ok", id: "ticket-1" }]
+      : [{ status: "ok", id: "ticket-0-retry" }],
+  );
+
+  const delivery = await sendExpoPushBatches(batch, {
+    fetch: fake.fetch,
+    sleep: async () => {},
+    random: () => 0,
+    config: { rateLimit: 1_000_000, retryBaseMs: 1 },
+  });
+
+  assert.deepEqual(
+    [...delivery.receiptRefs].sort((a, b) => a.ticketId.localeCompare(b.ticketId)),
+    [
+      { ticketId: "ticket-0-retry", token: batch[0]!.to },
+      { ticketId: "ticket-1", token: batch[1]!.to },
+    ],
+  );
+});
+
+test("messages that were not accepted yield no ticket to look up", async () => {
+  const fake = provider(() => new Response("{}", { status: 500 }));
+  const delivery = await sendExpoPushBatches(messages(3), {
+    fetch: fake.fetch,
+    sleep: async () => {},
+    random: () => 0,
+    config: { maxRetries: 0 },
+  });
+
+  assert.deepEqual(delivery.receiptRefs, []);
+  assert.deepEqual(delivery.deadTokens, []);
 });
 
 // ── 3. Throttling and transport failures ────────────────────────────────────

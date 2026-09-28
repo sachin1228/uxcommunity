@@ -4,7 +4,9 @@ import {
   sendExpoPushBatches,
   type ExpoPushDelivery,
   type ExpoPushMessage,
+  type ExpoPushTicketRef,
 } from "./expo";
+import { processExpoPushReceipts, type ReceiptProcessingReport } from "./receipts";
 import { loadUnreadMessageTotals, type UntypedRpc } from "./unread-totals";
 
 /** Keeps the notification body to a WhatsApp-sized preview. */
@@ -65,6 +67,29 @@ export const PUSH_MAX_DELIVERIES = 10_000;
 export const PUSH_TIME_BUDGET_MS = 20_000;
 
 /**
+ * How long the fan-out waits, at the end of a message, before looking up the
+ * receipts of the tickets Expo accepted — the push-receipt half of audit H-2.
+ *
+ * A receipt says what FCM/APNs answered, and that is the only place a
+ * well-formed token can turn out to be permanently dead (`DeviceNotRegistered`
+ * appears in a receipt, not in a ticket). Expo recommends checking ~15 minutes
+ * after a send, which no request can afford; waiting a little means catching the
+ * receipts that are ready within the message's own budget instead of never
+ * looking at all. A ticket with no receipt yet costs nothing — it is reported as
+ * deferred (`ReceiptProcessingReport.deferred`) and its token is kept.
+ *
+ * The wait is charged against the same `PUSH_TIME_BUDGET_MS` deadline as the
+ * send, never beyond it, and both knobs are overridable: `PUSH_RECEIPT_CHECK=0`
+ * turns the whole step off, `PUSH_RECEIPT_GRACE_MS=0` checks immediately.
+ *
+ * The cost is one bounded receipt request (plus this wait) per message, and it
+ * lands where receipts are most likely to be ready: a fan-out that paced itself
+ * over several seconds has already had its earliest receipts answered by Expo by
+ * the time it finishes.
+ */
+export const PUSH_RECEIPT_GRACE_MS = 1_500;
+
+/**
  * Recipient chunks that may fail end-to-end before the fan-out gives up.
  *
  * A chunk that reached nobody because the provider is unreachable is worth
@@ -95,6 +120,13 @@ function envLimit(key: string, fallback: number, minimum: number): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+}
+
+/** Boolean environment override (`0`/`false`/`off`/`no` disable), for opt-outs. */
+function envFlag(key: string, fallback: boolean): boolean {
+  const raw = typeof process === "undefined" ? undefined : process.env[key];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  return !["0", "false", "off", "no"].includes(raw.trim().toLowerCase());
 }
 
 /** Dead-token cleanup accepts a bounded token list per request. */
@@ -269,12 +301,28 @@ export interface ChatPushReport {
   chunks: number;
   /** Set when a bound stopped delivery early, leaving recipients untouched. */
   truncated: "deliveries" | "time" | "error" | null;
-  /** Tokens Expo reported as dead (deleted by this call). */
+  /**
+   * Tokens Expo reported as dead and this call deleted: the ones a ticket
+   * rejected, plus any a receipt called `DeviceNotRegistered`. A receipt-detected
+   * token is reported here and in `receiptsChecked` without changing `complete`:
+   * that push was accepted, this is token hygiene after the fact.
+   */
   deadTokens: number;
+  /** Ticket IDs whose receipts were looked up for this message. */
+  receiptsChecked: number;
+  /**
+   * Receipts that were not available yet, or whose lookup failed. Not a
+   * delivery failure: those pushes were accepted, but Expo had not answered for
+   * them when the request ended, so their devices are neither cleared nor
+   * blamed — and this run will not look again (see `PUSH_RECEIPT_GRACE_MS`).
+   */
+  receiptsDeferred: number;
   /**
    * True only when every intended device push was acknowledged: no truncation,
    * no permanent failure, no transient failure left behind. It does not promise
-   * that no notification was duplicated (see `sendExpoPushBatches`).
+   * that no notification was duplicated (see `sendExpoPushBatches`), and it is
+   * not affected by receipt lookups — a deferred receipt means Expo had not
+   * answered yet about a push it *did* accept (see `receiptsDeferred`).
    */
   complete: boolean;
 }
@@ -302,6 +350,19 @@ export interface ChatPushDeps {
   maxDeliveries?: number;
   timeBudgetMs?: number;
   maxConsecutiveFailedChunks?: number;
+  /**
+   * Receipt lookup, given the ticket IDs this fan-out's sends were accepted
+   * with. Receives the fan-out's deadline, and must return a report for every
+   * ref it was given — `processExpoPushReceipts` guarantees that.
+   */
+  processReceipts?: (
+    refs: ExpoPushTicketRef[],
+    options: { deadline: number },
+  ) => Promise<ReceiptProcessingReport>;
+  /** Milliseconds to wait before the receipt lookup; 0 checks immediately. */
+  receiptGraceMs?: number;
+  /** Injectable so the grace wait costs tests no real time. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -332,6 +393,23 @@ export interface ChatPushDeps {
  * Delivery is at-least-once (see `sendExpoPushBatches`): a push whose response
  * was lost is retried and may arrive twice, and `collapseId` on the payload is
  * what keeps a repeated notification for the same chat collapsed on the device.
+ *
+ * Token hygiene: after the fan-out, the ticket IDs Expo accepted are handed to
+ * `processExpoPushReceipts`, which looks their receipts up and reports any device
+ * Expo has since found permanently unregistered. Those tokens are deleted
+ * through the same path as the ones a ticket named. Receipts that Expo had not
+ * answered for yet — the common case, since Expo recommends checking ~15 minutes
+ * later — are reported as deferred and delete nothing, so a token is only ever
+ * removed on a positive `DeviceNotRegistered`.
+ *
+ * Limitation, stated where it is decided: this improves token hygiene after Expo
+ * accepts a push ticket, and it does not guarantee that a notification was
+ * displayed to the member — a receipt's `ok` means FCM/APNs received the
+ * message, not that a device showed it. Because nothing persists the ticket →
+ * token mapping, a receipt that becomes available after this request ends is
+ * never looked up, and an interrupted fan-out is not resumed: the durable
+ * recovery for a message is its committed row plus each client's unread resync,
+ * not this push.
  */
 export async function sendChatMessagePush(
   params: {
@@ -361,6 +439,18 @@ export async function sendChatMessagePush(
     ((messages, options) => sendExpoPushBatches(messages, { deadline: options.deadline }));
   const now = deps.now ?? (() => new Date());
   const clock = deps.clock ?? (() => Date.now());
+  const sleep =
+    deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const processReceipts =
+    deps.processReceipts ??
+    ((refs, options) => processExpoPushReceipts(refs, { deadline: options.deadline }));
+  // An injected lookup is an explicit request to run it; otherwise the step is
+  // on unless the deployment turns it off.
+  const receiptsEnabled = deps.processReceipts !== undefined || envFlag("PUSH_RECEIPT_CHECK", true);
+  const receiptGraceMs = Math.max(
+    0,
+    deps.receiptGraceMs ?? envLimit("PUSH_RECEIPT_GRACE_MS", PUSH_RECEIPT_GRACE_MS, 0),
+  );
   const chunkSize = Math.max(1, deps.chunkSize ?? PUSH_RECIPIENT_CHUNK);
   const maxDeliveries = Math.max(
     1,
@@ -383,6 +473,8 @@ export async function sendChatMessagePush(
     chunks: 0,
     truncated: null,
     deadTokens: 0,
+    receiptsChecked: 0,
+    receiptsDeferred: 0,
     complete: false,
   };
 
@@ -402,6 +494,11 @@ export async function sendChatMessagePush(
 
     const body = `${senderName ?? "Someone"}: ${preview({ content, hasImage, isReply })}`;
     const deadTokens = new Set<string>();
+    // Ticket IDs Expo accepted this fan-out with, kept only for as long as this
+    // call runs: a receipt is looked up from them at the end (see
+    // `PUSH_RECEIPT_GRACE_MS`), and nothing is written down, because a durable
+    // ticket store is the queue this design deliberately does not have.
+    const acceptedTickets: ExpoPushTicketRef[] = [];
 
     let cursor = MIN_UUID;
     for (;;) {
@@ -587,6 +684,7 @@ export async function sendChatMessagePush(
           report.failedTransient += delivery.transientFailures;
           if (delivery.providerError) providerError = delivery.providerError;
           for (const token of delivery.deadTokens) deadTokens.add(token);
+          for (const ref of delivery.receiptRefs) acceptedTickets.push(ref);
         }
 
         // A chunk that reached nobody for a transient reason is a hint that the
@@ -614,6 +712,31 @@ export async function sendChatMessagePush(
 
       if (report.truncated === "deliveries") break;
       if (memberRows.length < chunkSize) break;
+    }
+
+    // Receipts, before the pruning below so both kinds of dead token are removed
+    // in one pass. A ticket only says Expo took the message; the receipt says
+    // what FCM/APNs did with it, and `DeviceNotRegistered` for a perfectly valid
+    // token appears there and nowhere else. Best-effort and budget-bounded: the
+    // wait for receipts is spent inside the same `deadline` as the send, an
+    // unready receipt is reported as deferred rather than acted on, and a failed
+    // lookup removes nothing.
+    if (receiptsEnabled && acceptedTickets.length > 0 && clock() < deadline) {
+      const graceMs = Math.min(receiptGraceMs, Math.max(0, deadline - clock()));
+      if (graceMs > 0) await sleep(graceMs);
+      if (clock() < deadline) {
+        try {
+          const receipts = await processReceipts(acceptedTickets, { deadline });
+          report.receiptsChecked = receipts.checked;
+          report.receiptsDeferred = receipts.deferred;
+          for (const token of receipts.deadTokens) deadTokens.add(token);
+          if (receipts.providerError) providerError = receipts.providerError;
+        } catch (error) {
+          // A receipt check can never be allowed to cost the fan-out, and it has
+          // already delivered by this point.
+          console.error("[push] receipt lookup failed", describeError(error));
+        }
+      }
     }
 
     // Dead tokens are pruned in bounded batches — the same URL-size reason the
