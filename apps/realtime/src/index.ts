@@ -2,6 +2,8 @@ import { jwtVerify } from "jose";
 import type { Env } from "./env";
 import { resolveRoomTarget } from "./room-routing";
 import { runBoundedPool } from "./subscriptions";
+import { isRetryableStatus, retryWithBackoff } from "./retry";
+import { logEvent } from "./log";
 export { UserDO } from "./user";
 export { Room } from "./room";
 export { resolveRoomTarget, USER_ROOM_PREFIXES } from "./room-routing";
@@ -14,6 +16,22 @@ const LEGACY_SESSION_COOKIE = "draft_session";
  * fan-out cannot spawn an unbounded number of simultaneous subrequests.
  */
 const FANOUT_CONCURRENCY = 40;
+
+/**
+ * Bounded retry for a single room delivery (production-readiness audit, M-1).
+ *
+ * DURABILITY BOUNDARY: this absorbs a transient blip (a moment of DO
+ * unavailability, a reset connection, a 429/5xx) — it is NOT a durable queue,
+ * so an outage longer than the retry budget still loses that room's event. The
+ * database stays the source of truth and connected clients resync on
+ * reconnect/visibility; this only narrows the window in which a live client
+ * could miss an event. Retries reuse the event's `event_id`, and the room DO
+ * de-duplicates by it, so a retry cannot double-deliver.
+ */
+const FANOUT_RETRY_ATTEMPTS = 3;
+const FANOUT_RETRY_BASE_MS = 60;
+const FANOUT_RETRY_MAX_MS = 300;
+const FANOUT_RETRY_JITTER = 0.3;
 
 function secretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
@@ -117,11 +135,13 @@ async function handlePublish(request: Request, env: Env, ctx: ExecutionContext):
     topic?: string;
     data?: unknown;
     exclude_user?: string;
+    event_id?: string;
     events?: Array<{
       room: string;
       topic: string;
       data?: unknown;
       exclude_user?: string;
+      event_id?: string;
     }>;
   };
   try {
@@ -133,7 +153,13 @@ async function handlePublish(request: Request, env: Env, ctx: ExecutionContext):
   const events = Array.isArray(body.events)
     ? body.events
     : body.room && body.topic
-      ? [{ room: body.room, topic: body.topic, data: body.data, exclude_user: body.exclude_user }]
+      ? [{
+          room: body.room,
+          topic: body.topic,
+          data: body.data,
+          exclude_user: body.exclude_user,
+          event_id: body.event_id,
+        }]
       : [];
 
   if (!events.length) {
@@ -158,16 +184,33 @@ async function handlePublish(request: Request, env: Env, ctx: ExecutionContext):
  *
  * Failures are per-event: one unreachable room never stops the rest.
  */
-async function fanOutEvents(
+interface FanOutEvent {
+  room: string;
+  topic: string;
+  data?: unknown;
+  exclude_user?: string;
+  event_id?: string;
+}
+
+/**
+ * Deliver one event to one room, retrying only TRANSIENT failures.
+ *
+ * Retryable: a thrown fetch error (connection reset, DNS blip) and a 429/5xx
+ * from the DO. Permanent: any 2xx (delivered) or 4xx (the request is wrong).
+ * Retries reuse `event_id`, so a retry that races a successful attempt is
+ * dropped by the DO rather than delivered twice.
+ */
+async function deliverToRoom(
   env: Env,
   requestUrl: string,
-  events: Array<{ room: string; topic: string; data?: unknown; exclude_user?: string }>,
-): Promise<void> {
-  await runBoundedPool(events, FANOUT_CONCURRENCY, async (event) => {
-    const { namespace, name } = resolveRoomTarget(env, event.room);
-    try {
-      const stub = namespace.get(namespace.idFromName(name));
-      await stub.fetch(
+  event: FanOutEvent,
+): Promise<Response> {
+  const { namespace, name } = resolveRoomTarget(env, event.room);
+  const stub = namespace.get(namespace.idFromName(name));
+
+  return retryWithBackoff(
+    () =>
+      stub.fetch(
         new Request(requestUrl, {
           method: "POST",
           headers: {
@@ -181,12 +224,55 @@ async function fanOutEvents(
             topic: event.topic,
             data: event.data ?? null,
             exclude_user: event.exclude_user,
+            event_id: event.event_id,
           }),
         }),
-      );
+      ),
+    {
+      attempts: FANOUT_RETRY_ATTEMPTS,
+      baseDelayMs: FANOUT_RETRY_BASE_MS,
+      maxDelayMs: FANOUT_RETRY_MAX_MS,
+      jitter: FANOUT_RETRY_JITTER,
+    },
+    ({ value, error }) => (error ? true : value ? isRetryableStatus(value.status) : false),
+    {
+      onRetry: ({ attempt, delayMs }) =>
+        logEvent("warn", {
+          event: "realtime.publish.fanout_retry",
+          room: event.room,
+          topic: event.topic,
+          attempt,
+          delay_ms: delayMs,
+        }),
+    },
+  );
+}
+
+async function fanOutEvents(
+  env: Env,
+  requestUrl: string,
+  events: FanOutEvent[],
+): Promise<void> {
+  await runBoundedPool(events, FANOUT_CONCURRENCY, async (event) => {
+    try {
+      const response = await deliverToRoom(env, requestUrl, event);
+      if (!response.ok) {
+        // Retries exhausted on a transient status — the room did not receive it.
+        logEvent("error", {
+          event: "realtime.publish.fanout_failed",
+          room: event.room,
+          topic: event.topic,
+          status: response.status,
+        });
+      }
     } catch (error) {
       // Best-effort: a failed room must not stop the rest of the fan-out.
-      console.error("[realtime] publish fan-out failed", event.room, error);
+      logEvent("error", {
+        event: "realtime.publish.fanout_failed",
+        room: event.room,
+        topic: event.topic,
+        error,
+      });
     }
   });
 }

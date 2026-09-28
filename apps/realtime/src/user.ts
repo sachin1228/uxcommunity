@@ -8,6 +8,7 @@ import {
   guardClientPublish,
 } from "./client-publish";
 import { TopicSocketIndex } from "./subscriptions";
+import { EventIdDedupe } from "./event-dedupe";
 
 /**
  * User Durable Object — ONE per user (`user:${userId}`). Owns the single
@@ -58,6 +59,9 @@ export class UserDO extends DurableObject<Env> {
   /** (room, topic) → sockets, for targeted delivery. */
   private subscriptions = new TopicSocketIndex<WebSocket>();
   private reconstructed = false;
+
+  /** Event ids already applied — drops fan-out retries (see event-dedupe.ts). */
+  private publishedEventIds = new EventIdDedupe();
 
   /** One client-publish bucket per socket; released when the socket goes. */
   private socketPublishLimit = new PublishRateLimiter<WebSocket>(
@@ -246,7 +250,13 @@ export class UserDO extends DurableObject<Env> {
   // ── HTTP publish (server-side) ───────────────────────────────────────
 
   private async publish(request: Request): Promise<Response> {
-    let body: { room?: string; topic?: string; data?: unknown; exclude_user?: string };
+    let body: {
+      room?: string;
+      topic?: string;
+      data?: unknown;
+      exclude_user?: string;
+      event_id?: string;
+    };
     try {
       body = (await request.json()) as typeof body;
     } catch {
@@ -254,6 +264,13 @@ export class UserDO extends DurableObject<Env> {
     }
     if (!body.room || !body.topic) {
       return new Response("Bad request", { status: 400 });
+    }
+
+    // Idempotency: a retried publish carries the same `event_id`; a duplicate
+    // delivery is acknowledged without a second fan-out.
+    if (body.event_id && !this.publishedEventIds.accept(body.event_id)) {
+      this.metrics.duplicateDeliveriesSuppressed += 1;
+      return new Response("ok");
     }
 
     const eventMsg = JSON.stringify({

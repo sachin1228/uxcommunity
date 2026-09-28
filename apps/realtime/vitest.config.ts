@@ -5,6 +5,9 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     include: ["__tests__/**/*.test.ts"],
+    // Supplies a local membership API for every suite: the room DO fails closed
+    // without one (audit M-8). See __tests__/global-setup.ts.
+    globalSetup: ["./__tests__/global-setup.ts"],
     // The perf suites each start their own miniflare instance and hold hundreds
     // of live WebSockets. Running files in parallel (the vitest default) makes
     // every latency number depend on how many other suites happen to be running

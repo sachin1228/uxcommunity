@@ -17,6 +17,7 @@ import type { UnstableDevWorker } from "wrangler";
 import WebSocket from "ws";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { pointDevVarsAt } from "./helpers/membership-stub";
 
 // Read secrets from .dev.vars to match the Worker's environment
 const devVars = readFileSync(resolve(__dirname, "../.dev.vars"), "utf-8");
@@ -118,6 +119,9 @@ async function joinAndSubscribe(
   await new Promise((r) => setTimeout(r, 300));
 }
 
+// Community sockets are authorized against API_URL, which the vitest global
+// setup points at a local membership stub (the DO fails CLOSED without one —
+// audit M-8). See __tests__/global-setup.ts.
 beforeAll(async () => {
   worker = await unstable_dev("src/index.ts", {
     configPath: "wrangler.toml",
@@ -568,12 +572,58 @@ describe("Unauthorized RPC", () => {
 // ============================================================================
 
 describe("Membership authorization", () => {
-  it("subscribe is rejected when membership API is unavailable (fail-closed)", async () => {
-    // API_URL is set to http://localhost:3000 but no web app is running.
-    // With fail-closed authorization, subscribe via RPC is rejected.
-    // HTTP publish does not check membership (it checks publish secret).
+  it("HTTP publish does not check membership (it checks the publish secret)", async () => {
     const res = await publish("chat:test_outage", "chat", { text: "test" });
     expect(res.ok).toBe(true);
+  });
+
+  /**
+   * M-8 regression: an unconfigured or unreachable membership API must REFUSE a
+   * community socket (403), never silently authorize it.
+   *
+   * `pointDevVarsAt` rewrites `.dev.vars` for the duration of a fresh Worker.
+   */
+  async function expectCommunitySocketRefused(apiUrl: string): Promise<void> {
+    const restore = pointDevVarsAt(apiUrl);
+    const outageWorker = await unstable_dev("src/index.ts", {
+      configPath: "wrangler.toml",
+      experimentalExcludeMiniflareV1: true,
+    });
+    try {
+      const token = await createToken("user_outage");
+      const ws = new WebSocket(
+        `http://127.0.0.1:${outageWorker.port}/ws?room=chat:outage&token=${token}`,
+      );
+      const status = await new Promise<number>((resolveStatus) => {
+        ws.on("error", () => resolveStatus(0));
+        ws.on("unexpected-response", (_req: unknown, res: { statusCode?: number }) =>
+          resolveStatus(res.statusCode ?? 0),
+        );
+        ws.on("open", () => resolveStatus(200));
+        setTimeout(() => resolveStatus(0), 5000);
+      });
+      expect(status).toBe(403);
+      try { ws.close(); } catch { /* ignore */ }
+    } finally {
+      await outageWorker.stop();
+      restore();
+    }
+  }
+
+  it("refuses a community socket when API_URL is missing (fail-closed)", async () => {
+    await expectCommunitySocketRefused("");
+  });
+
+  it("refuses a community socket when API_URL is unreachable (fail-closed)", async () => {
+    // A port that nothing listens on: the membership fetch fails, so the
+    // upgrade must be denied rather than treated as "not a member".
+    const { createServer } = await import("http");
+    const probe = createServer();
+    await new Promise<void>((r) => probe.listen(0, "127.0.0.1", r));
+    const deadPort = (probe.address() as { port: number }).port;
+    await new Promise<void>((r) => probe.close(() => r()));
+
+    await expectCommunitySocketRefused(`http://127.0.0.1:${deadPort}`);
   });
 
   it("subscribe is rejected when membership API returns 403 (non-member)", async () => {

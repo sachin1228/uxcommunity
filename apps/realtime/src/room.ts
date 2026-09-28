@@ -15,6 +15,9 @@ import {
   countOnlineUsers,
   type PresenceMeta,
 } from "./subscriptions";
+import { EventIdDedupe } from "./event-dedupe";
+import { resolveMembershipConfig } from "./membership-config";
+import { logEvent } from "./log";
 
 /**
  * Community Durable Object — ONE per community. Handles all logical realtime
@@ -95,6 +98,13 @@ const PRESENCE_COALESCE_MS = 150;
  */
 const PRESENCE_FLUSH_BUDGET = 256;
 
+/**
+ * One warn per isolate when membership authorization is unconfigured. Repeated
+ * per-connection logs would be noise; the aggregate counter and this line are
+ * enough for an operator to spot the misconfiguration.
+ */
+let warnedMissingMembershipApi = false;
+
 /** Membership re-check window and the cap on cached entries. */
 const MEMBERSHIP_CACHE_TTL_MS = 60_000;
 const MEMBERSHIP_CACHE_MAX_ENTRIES = 500;
@@ -136,6 +146,12 @@ export class Room extends DurableObject<Env> {
   /** Bounded membership authorization cache (in-memory LRU + pruned storage). */
   private membershipCache = new Map<string, { ok: boolean; ts: number }>();
   private membershipStorageWrites = 0;
+
+  /**
+   * Event ids already applied by this room — drops fan-out retries that race a
+   * successful first attempt. Bounded + TTL'd (see event-dedupe.ts).
+   */
+  private publishedEventIds = new EventIdDedupe();
 
   /**
    * Client-publish rate limits. Both are keyed by things that already live in
@@ -507,6 +523,15 @@ export class Room extends DurableObject<Env> {
       return new Response("Bad request", { status: 400 });
     }
 
+    // Idempotency: a retried publish reuses its `event_id`, so an event that
+    // already reached this room is acknowledged rather than broadcast twice.
+    if (body.event_id) {
+      if (!this.publishedEventIds.accept(body.event_id)) {
+        this.metrics.duplicateDeliveriesSuppressed += 1;
+        return new Response("ok");
+      }
+    }
+
     await this.ensureSubscribers();
     this.metrics.eventsPublished += 1;
     this.broadcastByTopic(body.topic, body.data, body.exclude_user);
@@ -671,7 +696,21 @@ export class Room extends DurableObject<Env> {
   // ── Membership authorization (fail-closed) ──────────────────────────
 
   private async checkMembership(userId: string): Promise<boolean> {
-    if (!this.env.API_URL) return true;
+    // FAIL CLOSED: without a membership API there is no way to authorize a
+    // community room, so the connection is refused instead of granting access.
+    // (Previously an unset API_URL returned `true`, silently disabling room
+    // authorization for every authenticated member.)
+    const config = resolveMembershipConfig(this.env);
+    if (!config.configured || !config.apiUrl) {
+      if (!warnedMissingMembershipApi) {
+        warnedMissingMembershipApi = true;
+        logEvent("error", {
+          event: "realtime.membership.config_missing",
+          room: this.roomName(),
+        });
+      }
+      return false;
+    }
 
     const communityId = this.communityIdFromRoom();
     const cacheKey = `${communityId}:${userId}`;
@@ -706,7 +745,7 @@ export class Room extends DurableObject<Env> {
     this.metrics.membershipChecks += 1;
     try {
       const response = await fetch(
-        `${this.env.API_URL}/api/communities/${communityId}/members/${userId}/check`,
+        `${config.apiUrl}/api/communities/${communityId}/members/${userId}/check`,
         {
           method: "GET",
           headers: {
@@ -744,7 +783,14 @@ export class Room extends DurableObject<Env> {
       }
 
       return authorized;
-    } catch {
+    } catch (error) {
+      // The API is unreachable: fail closed and make the cause observable.
+      this.metrics.membershipChecksFailed += 1;
+      logEvent("warn", {
+        event: "realtime.membership.check_failed",
+        community_id: communityId,
+        error,
+      });
       this.membershipCache.delete(cacheKey);
       return false;
     }

@@ -71,8 +71,16 @@ export class RealtimeMetrics {
   clientPublishRejectedPayload = 0;
   /** Client publishes dropped by the per-socket/per-user token bucket. */
   clientPublishRateLimited = 0;
+  /**
+   * Server publishes dropped as a replay of an `event_id` already delivered
+   * (fan-out retry that raced a successful first attempt). Nonzero means the
+   * retry path engaged but the room was not told twice.
+   */
+  duplicateDeliveriesSuppressed = 0;
   /** Membership authorization calls that reached the internal API. */
   membershipChecks = 0;
+  /** Membership checks that could not complete and were denied (fail-closed). */
+  membershipChecksFailed = 0;
   membershipCacheHits = 0;
   membershipCacheEvictions = 0;
 
@@ -96,7 +104,9 @@ export class RealtimeMetrics {
       clientPublishRejectedTopic: this.clientPublishRejectedTopic,
       clientPublishRejectedPayload: this.clientPublishRejectedPayload,
       clientPublishRateLimited: this.clientPublishRateLimited,
+      duplicateDeliveriesSuppressed: this.duplicateDeliveriesSuppressed,
       membershipChecks: this.membershipChecks,
+      membershipChecksFailed: this.membershipChecksFailed,
       membershipCacheHits: this.membershipCacheHits,
       membershipCacheEvictions: this.membershipCacheEvictions,
     };
