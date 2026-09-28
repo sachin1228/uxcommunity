@@ -25,6 +25,10 @@ type PerformanceRpcMap = {
       can_join: boolean;
     }>;
   };
+  get_community_members_page: {
+    args: { p_community_id: string; p_search: string | null; p_limit: number; p_offset: number };
+    returns: Array<{ user_id: string; joined_at: string; role: string; name: string; total: number }>;
+  };
   get_showcase_interactions: { args: { p_user_id: string; p_post_ids: string[] }; returns: Json };
   get_showcase_list_page: {
     args: { p_community_id: string; p_user_id: string; p_cursor_created_at: string | null; p_cursor_id: string | null; p_limit: number };
