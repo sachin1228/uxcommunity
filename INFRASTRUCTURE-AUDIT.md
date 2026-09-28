@@ -10,7 +10,6 @@
 > notifications are engagement-only and deferred via `after()`, and `lib/` is the
 > domain layer (`lib/communities/models/*`, `membership.ts`, `mark-read.ts`).
 > Estimates that were not re-measured are still marked ESTIMATE.
-
 ---
 
 # EXECUTIVE SUMMARY
