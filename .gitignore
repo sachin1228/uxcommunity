@@ -56,8 +56,7 @@ yarn-error.log*
 # =========================
 .open-next/
 .wrangler/
-.dev.vars
-.dev.vars.local
+.dev.vars*
 # Keep example env
 !.dev.vars.example
 
