@@ -155,6 +155,11 @@ interface ExpoPushTicket {
   status?: "ok" | "error";
   message?: string;
   details?: { error?: string };
+  /**
+   * Expo's ticket ID for an accepted message, used later to fetch the receipt.
+   * Only `status: "ok"` tickets carry one.
+   */
+  id?: string;
 }
 
 interface ExpoPushResponse {
@@ -185,6 +190,23 @@ const TRANSIENT_TICKET_ERRORS = new Set([
 
 /** Request-level error codes Expo returns in `errors[]`. */
 const TRANSIENT_REQUEST_CODES = new Set(["TOO_MANY_REQUESTS", "INTERNAL_ERROR"]);
+
+/**
+ * One accepted message's provider ticket ID, paired with the token it was sent
+ * to.
+ *
+ * This is the whole ticket → token mapping: Expo's ID is a provider handle, and
+ * the only place it means anything to us is next to the device it belongs to. It
+ * is returned with the delivery rather than written down, because the fan-out
+ * has no durable storage to write it to (see `sendExpoPushBatches`) and the
+ * receipt it unlocks is worth having only while the same call is still running.
+ */
+export interface ExpoPushTicketRef {
+  /** Expo's ticket ID — the `ids` entry for the receipt lookup. */
+  ticketId: string;
+  /** The device token that ticket was issued for. Never logged. */
+  token: string;
+}
 
 /** What happened to one message, as Expo reported it on its final attempt. */
 export interface ExpoPushOutcome {
@@ -227,6 +249,12 @@ export interface ExpoPushDelivery {
   transientFailures: number;
   /** Tokens Expo reported as permanently unregistered, for the caller to delete. */
   deadTokens: string[];
+  /**
+   * Ticket ID + token for every message Expo accepted, which is what
+   * `processExpoPushReceipts` needs to look the receipts up. Empty for a message
+   * that was not accepted: only an `ok` ticket has an ID.
+   */
+  receiptRefs: ExpoPushTicketRef[];
   /** Requests actually issued, retries included. */
   requests: number;
   /**
@@ -293,7 +321,7 @@ function parseRetryAfter(header: string | null, now: number): number | null {
 }
 
 /** A request timeout that is a no-op on a runtime without `AbortSignal.timeout`. */
-function timeoutSignal(ms: number): AbortSignal | undefined {
+export function timeoutSignal(ms: number): AbortSignal | undefined {
   try {
     return typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
       ? AbortSignal.timeout(ms)
@@ -314,6 +342,12 @@ interface AttemptFailure {
 interface AttemptResult {
   /** Indexes Expo accepted. */
   ok: number[];
+  /**
+   * Ticket ID per accepted index, where Expo supplied one. Its absence is not a
+   * failure: a message can be accepted without a receipt ID, in which case
+   * there is simply no receipt to look up later.
+   */
+  tickets: Map<number, string>;
   /** Messages that are permanently undeliverable and must not be retried. */
   permanent: AttemptFailure[];
   /** Indexes that may succeed on a later attempt. */
@@ -371,6 +405,7 @@ async function attemptBatch(
     // Network hiccup, DNS failure, timeout, Expo outage.
     return {
       ok: [],
+      tickets: new Map(),
       permanent: [],
       transient: allIndexes(messages.length),
       dead: [],
@@ -398,6 +433,7 @@ async function attemptBatch(
     const description = `expo ${response.status}${codes.length ? ` ${codes.join(",")}` : ""}`;
     return {
       ok: [],
+      tickets: new Map(),
       permanent: retry ? [] : allFailed(messages.length, description),
       transient: retry ? allIndexes(messages.length) : [],
       dead: [],
@@ -413,6 +449,7 @@ async function attemptBatch(
   } catch {
     return {
       ok: [],
+      tickets: new Map(),
       permanent: [],
       transient: allIndexes(messages.length),
       dead: [],
@@ -432,6 +469,7 @@ async function attemptBatch(
     const description = `expo ${requestCodes.join(",")}`;
     return {
       ok: [],
+      tickets: new Map(),
       permanent: retry ? [] : allFailed(messages.length, description),
       transient: retry ? allIndexes(messages.length) : [],
       dead: [],
@@ -443,6 +481,7 @@ async function attemptBatch(
 
   const result: AttemptResult = {
     ok: [],
+    tickets: new Map(),
     permanent: [],
     transient: [],
     dead: [],
@@ -461,6 +500,9 @@ async function attemptBatch(
     }
     if (ticket.status !== "error") {
       result.ok.push(index);
+      // Accepted — remember Expo's ticket ID so a receipt can find this device
+      // later. A ticket without an ID is still a success, just not checkable.
+      if (ticket.id) result.tickets.set(index, ticket.id);
       return;
     }
 
@@ -548,6 +590,7 @@ async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Pro
     permanentFailures: 0,
     transientFailures: 0,
     deadTokens: [],
+    receiptRefs: [],
     requests: 0,
     settled: false,
     providerError: null,
@@ -624,6 +667,11 @@ async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Pro
         STATUS_DELIVERED,
       );
       delivery.delivered += result.ok.length;
+      for (const index of result.ok) {
+        const ticketId = result.tickets.get(index);
+        const token = subset[index]?.to;
+        if (ticketId && token) delivery.receiptRefs.push({ ticketId, token });
+      }
 
       for (const failure of result.permanent) {
         const failureIndex = offset + pending[failure.index]!;

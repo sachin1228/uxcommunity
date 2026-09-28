@@ -24,7 +24,8 @@ import {
   sendChatMessagePush,
   type ChatPushDeps,
 } from "./chat";
-import type { ExpoPushDelivery } from "./expo";
+import type { ExpoPushDelivery, ExpoPushTicketRef } from "./expo";
+import type { ReceiptProcessingReport } from "./receipts";
 
 /**
  * A stand-in for the provider sender's return value.
@@ -39,9 +40,25 @@ function delivery(overrides: Partial<ExpoPushDelivery> = {}): ExpoPushDelivery {
     permanentFailures: 0,
     transientFailures: 0,
     deadTokens: [],
+    receiptRefs: [],
     requests: 1,
     settled: true,
     providerError: null,
+    ...overrides,
+  };
+}
+
+/** A stand-in for the receipt lookup's return value. */
+function receipts(overrides: Partial<ReceiptProcessingReport> = {}): ReceiptProcessingReport {
+  return {
+    checked: 0,
+    ready: 0,
+    deferred: 0,
+    serviceErrors: 0,
+    deadTokens: [],
+    requests: 0,
+    providerError: null,
+    complete: true,
     ...overrides,
   };
 }
@@ -63,6 +80,8 @@ interface QueryCall {
   /** Keyset cursor handed to `gt("user_id", …)`. */
   cursor?: string;
   rows?: number;
+  /** Values handed to `in(...)` — what a delete was actually scoped to. */
+  inValues?: unknown[];
 }
 
 interface FakeState {
@@ -212,6 +231,7 @@ function createFakeDb(state: FakeState) {
           table,
           op: ctx.op,
           inSize: ctx.inValues?.length,
+          inValues: ctx.inValues,
           limit: ctx.limit,
           cursor: ctx.cursor,
         });
@@ -737,4 +757,161 @@ test("a 10,000-recipient fan-out is not truncated by batching", async () => {
   assert.equal(report.complete, true);
   assert.equal(handedOver, 10_000, "every recipient entered processing");
   assert.equal(seen.size, 10_000, "no recipient was sent to twice");
+});
+
+// ── 6. Receipt processing after the fan-out ─────────────────────────────────
+
+/**
+ * The ticket → token mapping has to survive from the send to the receipt check,
+ * and the cleanup it produces has to be as narrow as the ticket-level one: a
+ * receipt names one provider ticket, which belongs to one device.
+ */
+test("a token Expo calls dead in a receipt is pruned, and only that token", async () => {
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), ["token-live-1", "token-dead", "token-live-2"]]]),
+  });
+  const { db, calls } = createFakeDb(state);
+  let handed: ExpoPushTicketRef[] = [];
+
+  const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    receiptGraceMs: 0,
+    send: async (messages) =>
+      delivery({
+        delivered: messages.length,
+        receiptRefs: [
+          { ticketId: "tk-live-1", token: "token-live-1" },
+          { ticketId: "tk-dead", token: "token-dead" },
+          { ticketId: "tk-live-2", token: "token-live-2" },
+        ],
+      }),
+    processReceipts: async (refs) => {
+      handed = refs;
+      return receipts({ checked: 3, ready: 3, requests: 1, deadTokens: ["token-dead"] });
+    },
+  }));
+
+  // The lookup is handed exactly the tickets this fan-out was accepted with.
+  assert.deepEqual(handed, [
+    { ticketId: "tk-live-1", token: "token-live-1" },
+    { ticketId: "tk-dead", token: "token-dead" },
+    { ticketId: "tk-live-2", token: "token-live-2" },
+  ]);
+
+  // One delete, scoped to the one device Expo named — not the member's others.
+  const deletes = calls.filter((call) => call.op === "delete" && call.table === "push_tokens");
+  assert.equal(deletes.length, 1);
+  assert.deepEqual(deletes[0]!.inValues, ["token-dead"]);
+
+  assert.equal(report.deadTokens, 1);
+  assert.equal(report.receiptsChecked, 3);
+  assert.equal(report.receiptsDeferred, 0);
+});
+
+test("a deferred or failed receipt lookup removes nothing", async () => {
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), ["token-1"]]]),
+  });
+  const { db, calls } = createFakeDb(state);
+
+  const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    receiptGraceMs: 0,
+    send: async (messages) =>
+      delivery({
+        delivered: messages.length,
+        receiptRefs: [{ ticketId: "tk-1", token: "token-1" }],
+      }),
+    // What a throttled or unavailable receipt lookup reports: unknown, not dead.
+    processReceipts: async () =>
+      receipts({
+        checked: 1,
+        deferred: 1,
+        requests: 1,
+        providerError: "expo receipts 429",
+        complete: false,
+      }),
+  }));
+
+  assert.equal(calls.filter((call) => call.op === "delete").length, 0);
+  assert.equal(report.deadTokens, 0);
+  assert.equal(report.receiptsChecked, 1);
+  assert.equal(report.receiptsDeferred, 1);
+  // The push itself was acknowledged; an unanswered receipt is not a delivery
+  // failure, and must not be reported as one.
+  assert.equal(report.complete, true);
+});
+
+test("the receipt lookup waits for the grace period inside the fan-out's budget", async () => {
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), ["token-1"]]]),
+  });
+  const { db } = createFakeDb(state);
+  const slept: number[] = [];
+  const order: string[] = [];
+
+  await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    receiptGraceMs: 1_500,
+    sleep: async (ms) => {
+      slept.push(ms);
+    },
+    send: async (messages) => {
+      order.push("send");
+      return delivery({
+        delivered: messages.length,
+        receiptRefs: [{ ticketId: "tk-1", token: "token-1" }],
+      });
+    },
+    processReceipts: async () => {
+      order.push("receipts");
+      return receipts({ checked: 1, ready: 1, requests: 1 });
+    },
+  }));
+
+  assert.deepEqual(slept, [1_500]);
+  assert.deepEqual(order, ["send", "receipts"]);
+});
+
+test("the receipt check is skipped when nothing was accepted or the step is off", async () => {
+  const state = fakeState({
+    members: [userId(1)],
+    tokens: new Map([[userId(1), ["token-1"]]]),
+  });
+  const { db } = createFakeDb(state);
+  const slept: number[] = [];
+  const previous = process.env.PUSH_RECEIPT_CHECK;
+  process.env.PUSH_RECEIPT_CHECK = "0";
+
+  try {
+    const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+      receiptGraceMs: 1_500,
+      sleep: async (ms) => {
+        slept.push(ms);
+      },
+      send: async (messages) =>
+        delivery({
+          delivered: messages.length,
+          receiptRefs: [{ ticketId: "tk-1", token: "token-1" }],
+        }),
+    }));
+
+    assert.equal(report.receiptsChecked, 0);
+    assert.equal(slept.length, 0, "a disabled check costs neither time nor a request");
+  } finally {
+    if (previous === undefined) delete process.env.PUSH_RECEIPT_CHECK;
+    else process.env.PUSH_RECEIPT_CHECK = previous;
+  }
+
+  // A fan-out whose sends produced no ticket IDs has nothing to check either.
+  const idle = createFakeDb(state);
+  const none = await sendChatMessagePush(BASE_PARAMS, deps(idle.db, {
+    receiptGraceMs: 1_500,
+    sleep: async (ms) => {
+      slept.push(ms);
+    },
+    send: async (messages) => delivery({ delivered: messages.length }),
+  }));
+  assert.equal(none.receiptsChecked, 0);
+  assert.equal(slept.length, 0);
 });

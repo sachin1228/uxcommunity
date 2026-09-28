@@ -200,6 +200,10 @@ Total: 0-1 HTTP requests, 0-2 DB queries
      at PUSH_RATE_LIMIT (per invocation, not project-wide) and retries transient
      failures; audible pushes bounded to 3/minute per member, delivery capped at
      PUSH_MAX_DELIVERIES within PUSH_TIME_BUDGET_MS (audit H-2)
+   → Receipts: lib/push/receipts.ts looks up the accepted tickets' receipts
+     (1000 IDs/request, bounded concurrency, inside the same budget) and prunes
+     the tokens Expo calls DeviceNotRegistered; unready receipts are deferred,
+     never acted on (audit H-2 receipt follow-up)
 3. Optimistic UI: message appears immediately (0 HTTP)
 4. Sidebar: the same chat event patches the local sidebar cache (0 HTTP)
 Total: 1 HTTP request, 2 DB queries in the request path + deferred publish/push work
@@ -1066,12 +1070,28 @@ The provided Vercel dashboard data shows:
   retried and may duplicate, since Expo has no message idempotency key.
   The O(N) work itself remains: at ~600 notifications/sec a community larger than
   ~12,000 members cannot be fully fanned out inside one request's `after()` budget.
-- **Open follow-ups from H-2** (not in this fix, both need new infrastructure):
-  push receipts are never fetched, so a `DeviceNotRegistered` that only appears in
-  a receipt (~15 min later) is never acted on; and an isolate kill mid-fan-out
-  cannot be reported or resumed from inside the request — the durable recovery is
-  the committed message row plus each client's unread resync. Closing either needs
-  a scheduler/worker (a durable fan-out queue and a receipt-check job).
+- **Receipt follow-up (done)**: `processExpoPushReceipts` looks up the receipts of
+  the tickets Expo accepted, in bounded batches (1000 IDs/request) with bounded
+  concurrency, and reports the tokens Expo calls `DeviceNotRegistered` so the
+  fan-out deletes exactly those. It runs at the end of the same `after()` call,
+  after a short grace period (`PUSH_RECEIPT_GRACE_MS`, inside the fan-out's
+  budget), so only receipts ready that early are seen; a ticket with no receipt
+  yet, or a failed lookup, is reported as deferred and removes nothing, and the
+  lookup never retries.
+- **Limitations this does NOT remove**:
+  - A receipt that becomes available after the request ends is never looked up.
+    Expo recommends checking receipts ~15 minutes after a send and clears them
+    after 24h, and nothing persists the ticket → token mapping (that would be the
+    durable store this design deliberately does not have), so most receipts are
+    simply never read. Closing that needs a scheduler plus a durable ticket store
+    (the receipt-check job).
+  - Receipt processing improves token hygiene after Expo accepts a ticket. It
+    does not guarantee the notification was displayed: a receipt's `ok` means
+    FCM/APNs received the message, not that a device showed it.
+  - An isolate kill mid-fan-out still cannot be reported or resumed from inside
+    the request — the durable recovery is the committed message row plus each
+    client's unread resync — so durable fan-out/resume remains an open follow-up
+    needing a queue and a worker.
 
 ### 2. Notification Work Is Deferred but Still Per-Engagement
 - **File**: `apps/web/lib/notifications.ts:deferNotification()` / `createNotification()`

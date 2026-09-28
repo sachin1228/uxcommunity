@@ -57,3 +57,7 @@ PUSH_RETRY_MAX_MS=
 PUSH_REQUEST_TIMEOUT_MS=
 PUSH_MAX_DELIVERIES=
 PUSH_TIME_BUDGET_MS=
+# Push receipts: 0 disables the post-send receipt check, the grace period is how
+# long it waits for Expo to publish a receipt (see apps/web/lib/push/receipts.ts).
+PUSH_RECEIPT_CHECK=
+PUSH_RECEIPT_GRACE_MS=
