@@ -72,6 +72,11 @@ jobs:
       - name: Run mobile realtime tests
         run: npm run test:mobile-realtime
 
+      # Blocking. Same reason as above: the bounded sender-name cache lives in
+      # the mobile app, which the web glob cannot see.
+      - name: Run mobile lib tests
+        run: npm run test:mobile-cache
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest

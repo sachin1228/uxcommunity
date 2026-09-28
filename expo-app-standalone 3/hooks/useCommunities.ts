@@ -26,6 +26,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
 import { selectLiveCommunityIds } from '@/lib/realtimeWindow';
+import { createNameCache } from '@/lib/nameCache';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
@@ -88,8 +89,11 @@ export function useCommunities() {
 
   const unsubscribesRef = useRef<Array<() => void>>([]);
   const typingTimers   = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  /** Cached sender names keyed by user_id — mirrors web's resolvedNames Map. */
-  const resolvedNames  = useRef(new Map<string, string>());
+  /**
+   * Cached sender names keyed by user_id — mirrors web's resolvedNames Map,
+   * but bounded so a member of many communities cannot grow it without limit.
+   */
+  const resolvedNames  = useRef(createNameCache());
   const reconcileRef   = useRef(false);
   /** Latest visible list, so markCommunityRead can sum unread without a re-render. */
   const communitiesRef = useRef<Community[]>([]);
