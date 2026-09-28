@@ -67,7 +67,7 @@ export function summarizeSamples(values) {
   };
 }
 
-/** Count samples per LATENCY_BUCKET (each sample lands in exactly one bucket). */
+/** Count samples per LATENCY_BUCKETS bucket (each sample lands in exactly one). */
 export function bucketize(values) {
   const samples = (values ?? []).filter((value) => Number.isFinite(value));
   return LATENCY_BUCKETS.map((bucket, index) => {
