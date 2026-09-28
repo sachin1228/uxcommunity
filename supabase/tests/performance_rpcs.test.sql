@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(27);
 
-select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer']);
+select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer','uuid[]']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
 select has_function('public', 'get_all_communities', array['uuid']);
 select has_function('public', 'get_thread_list_aggregates', array['uuid','uuid[]']);
