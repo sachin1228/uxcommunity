@@ -7,6 +7,7 @@ import { publishChatEvent } from "@/lib/realtime/server";
 import { contentTableFor } from "@/lib/communities/content-tables";
 import { sendChatMessagePush } from "@/lib/push/chat";
 import { createServerTimer } from "@/lib/server-timing";
+import { createContentEventIdCache } from "@/lib/communities/content-event-ids";
 import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
 
 /**
@@ -15,7 +16,7 @@ import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
  * Their emoji reactions ride along with each message page so the cards stay
  * current without a separate fetch.
  */
-async function loadContentEventIds(communityId: string): Promise<string[]> {
+async function queryContentEventIds(communityId: string): Promise<string[]> {
   const db = createServiceClient();
   const [threads, showcase, resources, events] = await Promise.all([
     db.from("community_threads").select("id").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
@@ -30,6 +31,14 @@ async function loadContentEventIds(communityId: string): Promise<string[]> {
     ...(events.data ?? []),
   ].map((row) => (row as { id: string }).id);
 }
+
+/**
+ * The four reads above only change when content is created, so they are cached
+ * per community for 60 s (audit M-11) instead of running on every chat fetch —
+ * including catch-up and pagination requests, which almost never need fresh
+ * ids mid-window. Bounded + in-flight-deduped (see content-event-ids.ts).
+ */
+const loadContentEventIds = createContentEventIdCache(queryContentEventIds).load;
 
 export async function GET(
   req: NextRequest,
@@ -338,7 +347,7 @@ export async function POST(
     }
   });
 
-  timer.finish({
+  const timing = timer.finish({
     query_count: 1 + (reply_to_id ? 1 : 0) + (mentionUserIds.length ? 2 : 0),
   });
 
@@ -360,6 +369,6 @@ export async function POST(
         mentions:  inserted.mentions ?? [],
       },
     },
-    { status: 201 }
+    { status: 201, headers: { "Server-Timing": timing } }
   );
 }
