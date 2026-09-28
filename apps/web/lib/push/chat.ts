@@ -8,6 +8,7 @@ import {
 } from "./expo";
 import { processExpoPushReceipts, type ReceiptProcessingReport } from "./receipts";
 import { loadUnreadMessageTotals, type UntypedRpc } from "./unread-totals";
+import { logEvent } from "@/lib/observability/log";
 
 /** Keeps the notification body to a WhatsApp-sized preview. */
 const PREVIEW_MAX = 120;
@@ -673,7 +674,12 @@ export async function sendChatMessagePush(
           // means this whole chunk is in an unknown state. It is counted as a
           // transient failure rather than as delivered, and the loop continues
           // so that one bad chunk cannot discard the recipients behind it.
-          console.error("[push] delivery failed for one chunk", describeError(error));
+          logEvent("error", {
+            event: "push.chunk_delivery_failed",
+            community_id: communityId,
+            recipients: batch.length,
+            error: describeError(error),
+          });
           report.failedTransient += batch.length;
           delivery = null;
         }
@@ -706,7 +712,11 @@ export async function sendChatMessagePush(
             .from("push_throttle")
             .upsert(throttleUpserts as never, { onConflict: "user_id,community_id" });
         } catch (error) {
-          console.error("[push] throttle write failed", describeError(error));
+          logEvent("error", {
+            event: "push.throttle_write_failed",
+            community_id: communityId,
+            error: describeError(error),
+          });
         }
       }
 
@@ -734,7 +744,12 @@ export async function sendChatMessagePush(
         } catch (error) {
           // A receipt check can never be allowed to cost the fan-out, and it has
           // already delivered by this point.
-          console.error("[push] receipt lookup failed", describeError(error));
+          logEvent("error", {
+            event: "push.receipt_lookup_failed",
+            community_id: communityId,
+            tickets: acceptedTickets.length,
+            error: describeError(error),
+          });
         }
       }
     }
@@ -753,7 +768,11 @@ export async function sendChatMessagePush(
         } catch (error) {
           // This delete names tokens in its filter, so a database error can quote
           // one back: redact before it reaches a log.
-          console.error("[push] dead token cleanup failed", describeError(error));
+          logEvent("error", {
+            event: "push.dead_token_cleanup_failed",
+            community_id: communityId,
+            error: describeError(error),
+          });
         }
       }
     }
@@ -767,12 +786,25 @@ export async function sendChatMessagePush(
       report.truncated === null && report.failedPermanent === 0 && report.failedTransient === 0;
 
     if (!report.complete) {
-      console.warn(
-        `[push] community=${communityId} truncated=${report.truncated} chunks=${report.chunks} scanned=${report.scanned} reachable=${report.reachable} deliveries=${report.deliveries} permanent=${report.failedPermanent} transient=${report.failedTransient}${providerError ? ` provider=${redactPushTokens(providerError)}` : ""}`,
-      );
+      logEvent("warn", {
+        event: "push.fanout_incomplete",
+        community_id: communityId,
+        truncated: report.truncated,
+        chunks: report.chunks,
+        scanned: report.scanned,
+        reachable: report.reachable,
+        deliveries: report.deliveries,
+        permanent: report.failedPermanent,
+        transient: report.failedTransient,
+        ...(providerError ? { provider: redactPushTokens(providerError) } : {}),
+      });
     }
   } catch (error) {
-    console.error("[push] chat notification failed", describeError(error));
+    logEvent("error", {
+      event: "push.fanout_failed",
+      community_id: communityId,
+      error: describeError(error),
+    });
     report.truncated = "error";
   }
 
