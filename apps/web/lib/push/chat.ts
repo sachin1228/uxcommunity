@@ -8,20 +8,36 @@ import {
 } from "./expo";
 import { processExpoPushReceipts, type ReceiptProcessingReport } from "./receipts";
 import { loadUnreadMessageTotals, type UntypedRpc } from "./unread-totals";
+import {
+  AUDIBLE_CHANNEL_ID,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  SILENT_CHANNEL_ID,
+  isWithinQuietHours,
+  nextPushBudget,
+  type PreferencesRow,
+  type PushBudgetState,
+} from "./preferences";
 import { logEvent } from "@/lib/observability/log";
+
+/**
+ * The notification-preference policy (quiet hours, audible budget, channels and
+ * defaults) lives in ./preferences.ts and is re-exported here so the existing
+ * importers — the push settings route and `chat.test.ts` — keep working
+ * unchanged.
+ */
+export {
+  AUDIBLE_CHANNEL_ID,
+  AUDIBLE_MAX,
+  AUDIBLE_WINDOW_MS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  SILENT_CHANNEL_ID,
+  isWithinQuietHours,
+  nextPushBudget,
+} from "./preferences";
+export type { PushBudgetState, QuietHoursInput } from "./preferences";
 
 /** Keeps the notification body to a WhatsApp-sized preview. */
 const PREVIEW_MAX = 120;
-
-/**
- * Audible-push budget. Inside one window a member gets at most this many
- * *buzzing* notifications from a single community; the rest still update the
- * notification (so the latest text and the badge stay right) but arrive
- * silently. Without it a busy chat turns a phone into a metronome for as long
- * as the conversation lasts.
- */
-export const AUDIBLE_WINDOW_MS = 60_000;
-export const AUDIBLE_MAX = 3;
 
 /**
  * Recipients resolved per database round trip.
@@ -133,12 +149,6 @@ function envFlag(key: string, fallback: boolean): boolean {
 /** Dead-token cleanup accepts a bounded token list per request. */
 const TOKEN_DELETE_CHUNK = 200;
 
-/** Previous window state for one (member, community) pair. */
-export interface PushBudgetState {
-  windowStartedAt: number;
-  count: number;
-}
-
 /**
  * What the next push costs, given how many already went out in this window.
  *
@@ -146,17 +156,6 @@ export interface PushBudgetState {
  * resets to one, a live window increments, and anything past the cap is no
  * longer allowed to buzz.
  */
-export function nextPushBudget(
-  previous: PushBudgetState | undefined,
-  nowMs: number,
-): { windowStartedAt: number; sentCount: number; withinBudget: boolean } {
-  const windowExpired =
-    !previous || nowMs - previous.windowStartedAt >= AUDIBLE_WINDOW_MS;
-  const windowStartedAt = windowExpired ? nowMs : previous.windowStartedAt;
-  const sentCount = windowExpired ? 1 : previous.count + 1;
-  return { windowStartedAt, sentCount, withinBudget: sentCount <= AUDIBLE_MAX };
-}
-
 /**
  * Android channel ids. The app creates both: `messages` buzzes, and
  * `messages-silent` exists precisely so a silent push does not have to reuse —
@@ -164,34 +163,6 @@ export function nextPushBudget(
  * immutable after creation, which is why the choice is expressed as a channel
  * rather than as a per-message tweak.
  */
-export const AUDIBLE_CHANNEL_ID = "messages";
-export const SILENT_CHANNEL_ID = "messages-silent";
-
-interface PreferencesRow extends QuietHoursInput {
-  user_id: string;
-  chat_push_enabled: boolean;
-  chat_sound: "default" | "silent";
-  quiet_hours_enabled: boolean;
-}
-
-/** The subset of a preference row that decides quiet hours. */
-export interface QuietHoursInput {
-  quiet_hours_enabled: boolean;
-  quiet_hours_start: string | null;
-  quiet_hours_end: string | null;
-  quiet_hours_timezone: string | null;
-}
-
-/** What a member who has never opened the settings screen gets. */
-export const DEFAULT_NOTIFICATION_PREFERENCES = {
-  chat_push_enabled: true,
-  chat_sound: "default" as const,
-  quiet_hours_enabled: false,
-  quiet_hours_start: "22:00",
-  quiet_hours_end: "07:00",
-  quiet_hours_timezone: "UTC",
-};
-
 /**
  * Byte-identical to the web client's `formatMessageNotificationPreview`
  * (lib/communities/message-notifications.ts) so the same message reads the
@@ -207,65 +178,6 @@ function preview(message: { content: string | null; hasImage: boolean; isReply: 
   return normalized.length > PREVIEW_MAX
     ? `${normalized.slice(0, PREVIEW_MAX - 3)}…`
     : normalized;
-}
-
-/**
- * Minutes past local midnight in `timeZone`, or null when the zone is not one
- * this runtime understands (an unknown IANA name throws). Null means "cannot
- * tell", and quiet hours are then treated as off — a member missing their
- * quiet hours because their timezone string went stale is far better than
- * their notifications silently disappearing.
- */
-function zonedMinutes(timeZone: string, date: Date): number | null {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(date);
-    const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0") % 24;
-    const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-    if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
-    return hour * 60 + minute;
-  } catch {
-    return null;
-  }
-}
-
-/** "22:00" / "22:00:00" → 1320. Null when unparseable. */
-function parseClock(value: string | null): number | null {
-  if (!value) return null;
-  const match = /^(\d{1,2}):(\d{2})/.exec(value.trim());
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
-}
-
-/**
- * True when `now` falls inside the member's quiet hours, evaluated in *their*
- * timezone — a window that followed the server's clock would fire at the wrong
- * hour for everyone outside it. Windows that cross midnight (22:00 → 07:00)
- * are the common case, so the comparison wraps.
- */
-export function isWithinQuietHours(
-  preferences: QuietHoursInput | undefined,
-  now: Date,
-): boolean {
-  if (!preferences?.quiet_hours_enabled) return false;
-
-  const start = parseClock(preferences.quiet_hours_start);
-  const end = parseClock(preferences.quiet_hours_end);
-  if (start === null || end === null || start === end) return false;
-
-  const current = zonedMinutes(preferences.quiet_hours_timezone ?? "UTC", now);
-  if (current === null) return false;
-
-  return start < end
-    ? current >= start && current < end
-    : current >= start || current < end;
 }
 
 /** The smallest possible UUID — every real id sorts after it. */

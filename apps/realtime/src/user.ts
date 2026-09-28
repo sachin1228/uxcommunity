@@ -9,6 +9,8 @@ import {
 } from "./client-publish";
 import { TopicSocketIndex } from "./subscriptions";
 import { EventIdDedupe } from "./event-dedupe";
+import type { PublishRequest } from "./types";
+import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
 
 /**
  * User Durable Object — ONE per user (`user:${userId}`). Owns the single
@@ -205,7 +207,7 @@ export class UserDO extends DurableObject<Env> {
 
     if (msg.t === "join") {
       if (!msg.user || msg.user.id !== state.userId) return;
-      this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
+      this.sendToClient(ws, helloFrame(crypto.randomUUID()));
     } else if (msg.t === "subscribe" && msg.room && msg.topic) {
       this.handleSubscribe(state, ws, msg.room, msg.topic);
       this.persist(ws, state);
@@ -250,19 +252,8 @@ export class UserDO extends DurableObject<Env> {
   // ── HTTP publish (server-side) ───────────────────────────────────────
 
   private async publish(request: Request): Promise<Response> {
-    let body: {
-      room?: string;
-      topic?: string;
-      data?: unknown;
-      exclude_user?: string;
-      event_id?: string;
-    };
-    try {
-      body = (await request.json()) as typeof body;
-    } catch {
-      return new Response("Bad request", { status: 400 });
-    }
-    if (!body.room || !body.topic) {
+    const body: PublishRequest | null = await readPublishRequest(request);
+    if (!body) {
       return new Response("Bad request", { status: 400 });
     }
 
@@ -273,8 +264,7 @@ export class UserDO extends DurableObject<Env> {
       return new Response("ok");
     }
 
-    const eventMsg = JSON.stringify({
-      t: "event",
+    const eventMsg = encodeEventFrame({
       room: body.room,
       topic: body.topic,
       data: body.data,
@@ -350,8 +340,7 @@ export class UserDO extends DurableObject<Env> {
 
     this.metrics.clientPublishesAccepted += 1;
 
-    const eventMsg = JSON.stringify({
-      t: "event",
+    const eventMsg = encodeEventFrame({
       room,
       topic,
       data: decision.data,

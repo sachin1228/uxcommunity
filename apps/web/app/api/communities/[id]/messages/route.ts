@@ -3,12 +3,11 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityMessagePage } from "@/lib/communities/read-models";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { publishChatEvent } from "@/lib/realtime/server";
 import { contentTableFor } from "@/lib/communities/content-tables";
-import { sendChatMessagePush } from "@/lib/push/chat";
 import { createServerTimer } from "@/lib/server-timing";
 import { createContentEventIdCache } from "@/lib/communities/content-event-ids";
-import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
+import { readMessageRequestBody } from "@/lib/communities/message-request";
+import { announceNewChatMessage } from "@/lib/communities/message-publish";
 
 /**
  * Ids of the community's recent content items (threads / showcase posts /
@@ -153,47 +152,22 @@ export async function POST(
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  let content: string;
-  let reply_to_id: string | null = null;
-  let replyToContent: { id: string; kind: string } | null = null;
-  let replyContentTitle: string | null = null;
-  let image_url: string | null = null;
-  let mentionUserIds: string[] = [];
-  try {
-    const body = await req.json();
-    content     = (body.content ?? "").trim();
-    reply_to_id = body.reply_to_id ?? null;
-    // Replies can anchor to a content item (thread/showcase/resource/event —
-    // the chat timeline's "created a …" cards) instead of a chat message. A
-    // message anchor always wins, so this is only read when reply_to_id is
-    // absent; the anchor is validated against the community below.
-    if (
-      !reply_to_id &&
-      typeof body.reply_to_content?.id === "string" &&
-      typeof body.reply_to_content?.kind === "string" &&
-      ["thread", "showcase", "resource", "event"].includes(body.reply_to_content.kind)
-    ) {
-      replyToContent = { id: body.reply_to_content.id, kind: body.reply_to_content.kind };
+  // ── Request body: what a well-formed message is ────────────────────────────
+  const parsed = await readMessageRequestBody(req, userId);
+  if (!parsed.ok) {
+    if (parsed.reason === "malformed") {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
-    image_url   = body.image_url   ?? null;
-    // Mentions are sent as opaque member ids picked from the client roster;
-    // names are resolved server-side below so storage never trusts the client.
-    if (Array.isArray(body.mentions)) {
-      const ids = (body.mentions as Array<{ user_id?: unknown }>)
-        .filter((m) => m && typeof m.user_id === "string")
-        .map((m) => m.user_id as string)
-        .filter((id: string) => id && id !== userId);
-      mentionUserIds = [...new Set(ids)].slice(0, MENTION_MAX_PER_MESSAGE);
+    if (parsed.reason === "empty") {
+      return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
     }
-  } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return NextResponse.json({ error: "Message too long." }, { status: 422 });
   }
-
-  if (!content && !image_url) return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
-  if (content.length > 2000)  return NextResponse.json({ error: "Message too long." },        { status: 422 });
-
-  // Mentions only make sense when there is text to mention someone in.
-  if (!content) mentionUserIds = [];
+  const { content, replyToContent, imageUrl: image_url, mentionUserIds } = parsed.value;
+  // Mutable: an anchor that turns out not to exist in this community is
+  // silently dropped below rather than failing the send.
+  let reply_to_id = parsed.value.replyToId;
+  let replyContentTitle: string | null = null;
 
   // Validate reply_to_id belongs to this community (if provided)
   if (reply_to_id) {
@@ -291,56 +265,13 @@ export async function POST(
   // "Someone said hi → John: hi" flicker.
   after(async () => {
     try {
-      let replySenderName: string | null = null;
-      if (reply_to_id) {
-        const { data: parentRow } = await db
-          .from("community_messages")
-          .select("user_id")
-          .eq("id", reply_to_id)
-          .maybeSingle();
-        const parentId = (parentRow as { user_id?: string } | null)?.user_id ?? null;
-        if (parentId) {
-          const { data: parentUser } = await db
-            .from("users")
-            .select("name")
-            .eq("id", parentId)
-            .maybeSingle();
-          replySenderName = (parentUser as { name?: string } | null)?.name ?? null;
-        }
-      }
-      await publishChatEvent({
+      await announceNewChatMessage({
         communityId,
-        topic: "message",
-        data: {
-          id: inserted.id,
-          community_id: communityId,
-          user_id: inserted.user_id,
-          sender_name: senderName,
-          sender_avatar_url: senderAvatarUrl,
-          content: inserted.content ?? "",
-          created_at: inserted.created_at,
-          reply_to_id: inserted.reply_to_id ?? null,
-          reply_sender_name: replySenderName,
-          // Content-anchored replies carry their own preview fields.
-          reply_to_content_id: inserted.reply_to_content_id ?? null,
-          reply_content_kind: reply_to_content_id ? replyToContent!.kind : null,
-          reply_content_title: reply_to_content_id ? replyContentTitle : null,
-          image_url: inserted.image_url ?? null,
-          mentions: inserted.mentions ?? [],
-        },
-      });
-
-      // Wake every other member's device. Realtime only reaches an app that is
-      // running — once the OS suspends it the socket dies — so background
-      // delivery has to go through Expo's push service.
-      await sendChatMessagePush({
-        communityId,
-        messageId: inserted.id,
-        senderId: inserted.user_id,
+        inserted,
         senderName,
-        content: inserted.content ?? null,
-        hasImage: !!inserted.image_url,
-        isReply: !!inserted.reply_to_id,
+        senderAvatarUrl,
+        replyContentKind: reply_to_content_id ? replyToContent!.kind : null,
+        replyContentTitle: reply_to_content_id ? replyContentTitle : null,
       });
     } catch (err) {
       console.error("[POST message] realtime publish error:", err);

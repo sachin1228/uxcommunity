@@ -65,6 +65,51 @@ export function scrollChatToBottom(
   );
 }
 
+// ─── Scroll-anchor compensation ───────────────────────────────────────────
+
+/**
+ * A recorded scroll anchor: an element id plus its top measured relative to
+ * the top of the scroll content, so the snapshot means the same thing no
+ * matter where the container happens to be scrolled when it is taken.
+ */
+export interface ScrollAnchor {
+  id: string;
+  /** Distance from the top of the scroll content, in px. */
+  offset: number;
+}
+
+/**
+ * Where an element sits inside its scroll container, from raw geometry.
+ * `scrollTop` is added back in so scrolling the container does not change the
+ * result — which is what lets a snapshot survive the correction it triggers.
+ */
+export function anchorOffset(
+  elTop: number,
+  containerTop: number,
+  scrollTop: number,
+): number {
+  return elTop - containerTop + scrollTop;
+}
+
+/**
+ * How far to scroll to keep a previously-recorded anchor exactly where it was,
+ * after height above it was inserted (positive) or removed (negative) — an
+ * older page being prepended, the load-older slot disappearing once history is
+ * exhausted, a date pill growing into a real boundary.
+ *
+ * Returns 0 when there is nothing to correct: no anchor recorded yet, or the
+ * anchor's element is gone from the list (`nextOffset === null`), so a
+ * conversation that was replaced wholesale is not "compensated" for its
+ * disappearance.
+ */
+export function scrollAnchorDelta(
+  prev: ScrollAnchor | null | undefined,
+  nextOffset: number | null,
+): number {
+  if (!prev || nextOffset === null) return 0;
+  return nextOffset - prev.offset;
+}
+
 // ─── Optimistic sends ─────────────────────────────────────────────────────
 
 /**

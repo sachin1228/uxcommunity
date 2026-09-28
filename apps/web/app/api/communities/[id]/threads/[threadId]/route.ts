@@ -2,75 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique } from "@/lib/r2";
-import type { ThreadCategory, ThreadAttachment } from "@/lib/communities/models/threads";
+import { THREAD_BODY_MAX_LENGTH, type ThreadCategory } from "@/lib/communities/models/threads";
+import {
+  THREAD_CATEGORY_VALUES,
+  normalizeAttachments,
+  normalizeLinks,
+  normalizePoll,
+  normalizeTags,
+} from "@/lib/communities/thread-body";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
-
-const CATEGORIES = new Set<ThreadCategory>([
-  "question", "discussion", "idea", "feedback",
-]);
-
-interface RawAttachment { name?: unknown; url?: unknown; type?: unknown; size?: unknown; }
-
-interface RawPoll {
-  question?: unknown;
-  options?: unknown;
-}
-
-const THREAD_TITLE_MAX_LENGTH = 2000;
-const POLL_QUESTION_MAX_LENGTH = 200;
-const POLL_OPTION_MAX_LENGTH = 100;
-const POLL_MIN_OPTIONS = 2;
-const POLL_MAX_OPTIONS = 6;
-
-/**
- * Validate an optional poll payload.
- * Returns { poll: null } when absent, the normalized poll when present,
- * or null when the shape is invalid.
- */
-function normalizePoll(value: unknown): { poll: { question: string; options: string[] } | null } | null {
-  if (value == null) return { poll: null };
-  if (typeof value !== "object" || Array.isArray(value)) return null;
-  const { question: rawQuestion, options: rawOptions } = value as RawPoll;
-  if (typeof rawQuestion !== "string") return null;
-  const question = rawQuestion.trim();
-  if (!question || question.length > POLL_QUESTION_MAX_LENGTH) return null;
-  if (!Array.isArray(rawOptions)) return null;
-  const options = rawOptions.filter((option): option is string => typeof option === "string").map((option) => option.trim());
-  if (options.length !== rawOptions.length) return null;
-  if (options.length < POLL_MIN_OPTIONS || options.length > POLL_MAX_OPTIONS) return null;
-  if (options.some((option) => !option || option.length > POLL_OPTION_MAX_LENGTH)) return null;
-  if (new Set(options).size !== options.length) return null;
-  return { poll: { question, options } };
-}
-
-function normalizeTags(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 3) return null;
-  const tags = value.filter((t): t is string => typeof t === "string").map((t) => t.trim().replace(/^#/, "")).filter(Boolean);
-  if (tags.length !== value.length || tags.some((t) => t.length > 30)) return null;
-  return [...new Set(tags)].slice(0, 3);
-}
-
-function normalizeLinks(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 10) return null;
-  const links = value.filter((l): l is string => typeof l === "string").map((l) => l.trim());
-  if (links.length !== value.length) return null;
-  for (const l of links) {
-    try { const u = new URL(l); if (!["http:", "https:"].includes(u.protocol)) return null; } catch { return null; }
-  }
-  return [...new Set(links)];
-}
-
-function normalizeAttachments(value: unknown): ThreadAttachment[] | null {
-  if (!Array.isArray(value) || value.length > 5) return null;
-  const out: ThreadAttachment[] = [];
-  for (const item of value as RawAttachment[]) {
-    if (typeof item.name !== "string" || typeof item.url !== "string" || typeof item.type !== "string" || typeof item.size !== "number" || item.name.length > 255 || item.url.length > 2048 || item.type.length > 100 || item.size < 0) return null;
-    out.push({ name: item.name, url: item.url, type: item.type, size: item.size });
-  }
-  return out;
-}
 
 async function enrichThread(
   db: ReturnType<typeof createServiceClient>,
@@ -175,8 +117,8 @@ export async function PATCH(
   const isPublic = body.is_public === true;
   const normalizedPoll = normalizePoll(body.poll);
 
-  if (!title || title.length > THREAD_TITLE_MAX_LENGTH) return NextResponse.json({ error: `Title is required and must be ${THREAD_TITLE_MAX_LENGTH} characters or fewer.` }, { status: 422 });
-  if (!CATEGORIES.has(category) || !tags || !links || !attachments || !normalizedPoll) return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
+  if (!title || title.length > THREAD_BODY_MAX_LENGTH) return NextResponse.json({ error: `Title is required and must be ${THREAD_BODY_MAX_LENGTH} characters or fewer.` }, { status: 422 });
+  if (!THREAD_CATEGORY_VALUES.has(category) || !tags || !links || !attachments || !normalizedPoll) return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
 
   const { data: updated, error } = await db
     .from("community_threads")

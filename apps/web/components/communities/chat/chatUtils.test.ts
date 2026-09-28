@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  anchorOffset,
   applyContentCommentCount,
   formatCommenters,
   pickOptimisticMatch,
+  scrollAnchorDelta,
   scrollChatToBottom,
   type OptimisticLike,
   type ScrollableLike,
+  type ScrollAnchor,
 } from "./chatUtils";
 
 function scrollContainer(
@@ -211,4 +214,127 @@ test("the byline joins the names and blanks out when there are none", () => {
   assert.equal(formatCommenters([]), null);
   assert.equal(formatCommenters(undefined), null);
   assert.equal(formatCommenters(["  ", "Ava"]), "Ava");
+});
+
+// ─── Scroll-anchor compensation ───────────────────────────────────────────
+//
+// The message list keeps the oldest real message as a fixed scroll anchor. Any
+// height inserted or removed *above* it — an older page being prepended, or the
+// load-older slot disappearing once history runs out — is added to scrollTop,
+// so the rows the user is reading stay exactly where they are.
+
+/** The scroll container's top edge, in viewport coordinates. */
+const CONTAINER_TOP = 200;
+
+/**
+ * A DOM-free stand-in for the list content: rows stacked in order beneath an
+ * optional "load older" slot. `scrollTop` slides that content past the
+ * container's top edge exactly like the real overflow container.
+ */
+function messageList(
+  rows: [id: string, height: number][],
+  slotHeight: number,
+  initialScrollTop: number,
+) {
+  let top = initialScrollTop;
+  let slot = slotHeight;
+
+  const offsetOf = (id: string): number => {
+    let y = slot;
+    for (const [rowId, height] of rows) {
+      if (rowId === id) return y;
+      y += height;
+    }
+    throw new Error(`no row ${id}`);
+  };
+
+  // getBoundingClientRect().top for a row, in viewport coordinates.
+  const screenTop = (id: string) => CONTAINER_TOP + offsetOf(id) - top;
+  // What the hook records for its anchor after a commit.
+  const measure = (id: string) => anchorOffset(screenTop(id), CONTAINER_TOP, top);
+
+  return {
+    get scrollTop() {
+      return top;
+    },
+    screenTop,
+    measure,
+    scrollBy: (delta: number) => {
+      top += delta;
+    },
+    /** Older rows arriving at the top of the list. */
+    prepend: (older: [id: string, height: number][]) => {
+      rows.unshift(...older);
+    },
+    /** `hasMoreAbove` flipping false unmounts the h-10 sentinel. */
+    dropSlot: () => {
+      slot = 0;
+    },
+  };
+}
+
+// The measurement has to be scrollTop-independent, otherwise applying the
+// compensation would change the very number the next correction is based on.
+test("a row's recorded offset does not move when the container scrolls", () => {
+  const list = messageList([["m1", 60], ["m2", 90]], 40, 0);
+
+  const before = list.measure("m2");
+  list.scrollBy(35);
+
+  assert.equal(list.measure("m2"), before);
+});
+
+// The repro: reading history mid-list, an older page loads and is prepended
+// above the viewport. Without compensation every visible row jumps down by the
+// height of the new page.
+test("a page prepended above the viewport keeps the read position", () => {
+  const list = messageList([["m3", 60], ["m4", 80], ["m5", 80]], 40, 500);
+  const anchor: ScrollAnchor = { id: "m3", offset: list.measure("m3") };
+  const pinned = list.screenTop("m3");
+
+  list.prepend([["m1", 70], ["m2", 70]]);
+
+  list.scrollBy(scrollAnchorDelta(anchor, list.measure("m3")));
+
+  assert.equal(list.scrollTop, 640, "scrollTop absorbs the 140px prepended above");
+  assert.equal(list.screenTop("m3"), pinned, "the anchored row has not moved");
+  assert.equal(list.screenTop("m5"), pinned + 60 + 80, "nor has anything below it");
+});
+
+// The second repro: the oldest page is loaded, `hasMoreAbove` flips false, and
+// the load-older slot above the first message is removed — 40px of height gone
+// above the anchor.
+test("the load-older slot disappearing keeps the read position", () => {
+  const list = messageList([["m1", 70], ["m2", 70], ["m3", 60]], 40, 300);
+  const anchor: ScrollAnchor = { id: "m1", offset: list.measure("m1") };
+  const pinned = list.screenTop("m1");
+
+  list.dropSlot();
+
+  list.scrollBy(scrollAnchorDelta(anchor, list.measure("m1")));
+
+  assert.equal(list.scrollTop, 260, "scrollTop gives back the 40px slot");
+  assert.equal(list.screenTop("m1"), pinned, "the first message has not moved");
+  assert.equal(list.screenTop("m3"), pinned + 70 + 70, "nor has anything below it");
+});
+
+// Switching communities can unmount the anchored row entirely. A missing
+// anchor must not be read as a huge negative delta that scrolls the new
+// conversation to the top.
+test("an anchor that is no longer in the list corrects nothing", () => {
+  const list = messageList([["n1", 70], ["n2", 70]], 0, 600);
+  const pinned = list.screenTop("n2");
+
+  // The previous anchor (from the old community) is gone: measure returns null.
+  list.scrollBy(scrollAnchorDelta({ id: "m1", offset: 40 }, null));
+
+  assert.equal(list.scrollTop, 600);
+  assert.equal(list.screenTop("n2"), pinned);
+});
+
+// Before the first commit there is nothing to preserve, so the mechanism stays
+// out of the way of useScrollAndUnread's initial placement.
+test("no anchor recorded yet means no correction", () => {
+  assert.equal(scrollAnchorDelta(null, 1_000), 0);
+  assert.equal(scrollAnchorDelta(undefined, 1_000), 0);
 });
