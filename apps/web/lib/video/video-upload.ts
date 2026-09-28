@@ -3,11 +3,13 @@
  *
  *   1. ask the app for a one-shot presigned PUT ticket
  *   2. PUT the file straight to storage (XHR, byte-level progress — these
- *      events now measure the REAL transfer, the slow hop)
+ *      events measure the REAL transfer, the slow hop)
  *   3. call the completion endpoint so the server verifies the object
  *
- * If the ticket step fails, falls back to the classic multipart proxy
- * upload (progress then only measures the fast browser→app hop).
+ * There is deliberately NO multipart proxy fallback: routing a 50 MB video
+ * through the app would put it in Worker memory, which the upload route now
+ * refuses. A failed direct PUT surfaces as an error the composer shows on the
+ * video's tile, and the user can retry.
  *
  * The file itself is never re-encoded: a lossless faststart remux may have
  * happened client-side, and a first-frame poster is captured for cards.
@@ -120,69 +122,27 @@ async function completeDirectUpload(
   return data;
 }
 
-/** Classic multipart proxy upload (fallback when ticketing is unavailable). */
-function proxyUpload(
-  communityId: string,
-  prepared: PreparedVideoUpload,
-  onProgress?: (sent: number, total: number) => void,
-): Promise<VideoUploadResponse> {
-  return new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append("file", prepared.file);
-    if (prepared.poster) form.append("poster", prepared.poster, "poster.jpg");
-
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `/api/communities/${communityId}/showcase/upload`);
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress?.(event.loaded, event.total);
-    };
-    xhr.onload = () => {
-      try {
-        const data = JSON.parse(xhr.responseText) as VideoUploadResponse & { error?: string };
-        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-        else reject(new Error(data.error ?? `Upload failed (${xhr.status}).`));
-      } catch {
-        reject(new Error(`Upload failed (${xhr.status}).`));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Network error during upload."));
-    xhr.send(form);
-  });
-}
-
 /**
- * Uploads a prepared video: direct browser→R2 with real transfer progress,
- * falling back to the proxy path if the ticket cannot be issued.
+ * Uploads a prepared video straight to R2 and finalizes it.
+ *
+ * Bytes go browser→storage only; the app is asked for a ticket and, at the
+ * end, to register the result. A failure at any hop rejects, and the composer
+ * shows the error on that video's tile.
  */
 export async function uploadVideo(
   communityId: string,
   prepared: PreparedVideoUpload,
   onProgress?: (sent: number, total: number) => void,
 ): Promise<VideoUploadResponse> {
-  let ticket: UploadTicket;
-  try {
-    ticket = await requestTicket(communityId, prepared);
-  } catch {
-    // Presigning unavailable (e.g. older deploy) — proxy path still works.
-    return proxyUpload(communityId, prepared, onProgress);
-  }
-
-  try {
-    await putWithProgress(ticket.uploadUrl, prepared.file, prepared.file.type, onProgress);
-    if (prepared.poster && ticket.posterUploadUrl) {
-      // Poster is decorative — best effort, never fail the upload over it.
-      try {
-        await putWithProgress(ticket.posterUploadUrl, prepared.poster, "image/jpeg");
-      } catch (posterError) {
-        console.warn("[video-upload] poster upload failed:", posterError);
-      }
+  const ticket = await requestTicket(communityId, prepared);
+  await putWithProgress(ticket.uploadUrl, prepared.file, prepared.file.type, onProgress);
+  if (prepared.poster && ticket.posterUploadUrl) {
+    // Poster is decorative — best effort, never fail the upload over it.
+    try {
+      await putWithProgress(ticket.posterUploadUrl, prepared.poster, "image/jpeg");
+    } catch (posterError) {
+      console.warn("[video-upload] poster upload failed:", posterError);
     }
-  } catch (directError) {
-    // Most common cause: the bucket's CORS policy does not (yet) allow
-    // browser PUTs — the request never leaves the browser. The proxy path
-    // still works, so uploads must not break while CORS is being configured.
-    console.warn("[video-upload] direct PUT failed, using proxy fallback:", directError);
-    return proxyUpload(communityId, prepared, onProgress);
   }
   return completeDirectUpload(communityId, ticket, prepared);
 }

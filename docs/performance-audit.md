@@ -132,7 +132,7 @@ The request proceeds through membership/community lookup, reference/member queri
 - `apps/web/lib/image-utils.ts` — signature sniffing only; there is no server-side image processing
 - community create/update upload flows
 
-Compression is client-side (`lib/image-client.ts`), so the server's remaining job is to sniff the real type from the bytes and write them to R2. It still does that over a fully buffered body (`file.arrayBuffer()` before `uploadToR2`), and large uploads pay for that buffering in Worker memory. The video path already avoids it: it asks `showcase/upload-ticket` for a presigned PUT (`presignR2Put`) and the bytes go straight to R2, falling back to a proxied upload only when presigning is unavailable.
+Compression is client-side (`lib/image-client.ts`), so the server's remaining job is to sniff the real type from the bytes and write them to R2. It still does that over a fully buffered body (`file.arrayBuffer()` before `uploadToR2`), and large uploads pay for that buffering in Worker memory. The video path is fully direct: it asks `showcase/upload-ticket` for a presigned PUT (`presignR2Put`) and the bytes go straight to R2. The multipart route no longer accepts video bodies at all (it bounds the proxied body and refuses videos), so a video is never buffered in the Worker.
 
 **Recommendation:** Move the remaining multipart uploads onto the same presigned direct-to-storage path, keeping signature validation blocking on the resulting object before it is referenced. Enforce strict dimensions/bytes before upload so the client never sends something the server will reject.
 
