@@ -33,6 +33,36 @@ type PerformanceRpcMap = {
     args: { p_community_id: string; p_search: string | null; p_limit: number; p_offset: number };
     returns: Array<{ user_id: string; joined_at: string; role: string; name: string; email: string; total: number }>;
   };
+  create_notification: {
+    args: {
+      p_user_id: string;
+      p_actor_id: string | null;
+      p_community_id: string | null;
+      p_type: string;
+      p_entity_type: string;
+      p_entity_id: string;
+      p_title: string;
+      p_body: string | null;
+      p_href: string;
+      p_metadata: Json;
+    };
+    returns: Array<{
+      id: string;
+      user_id: string;
+      actor_id: string | null;
+      community_id: string | null;
+      type: string;
+      entity_type: string;
+      entity_id: string;
+      title: string;
+      body: string | null;
+      href: string;
+      metadata: Json;
+      read_at: string | null;
+      created_at: string;
+      inserted: boolean;
+    }>;
+  };
   get_showcase_interactions: { args: { p_user_id: string; p_post_ids: string[] }; returns: Json };
   get_showcase_list_page: {
     args: { p_community_id: string; p_user_id: string; p_cursor_created_at: string | null; p_cursor_id: string | null; p_limit: number };
