@@ -5,8 +5,13 @@ import TruncateMarkup from "react-truncate-markup";
 import type { MessageMention } from "@/lib/communities/cache";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { splitContentByMentions } from "@/lib/communities/mentions";
+import { emojiClusterPattern } from "./chatUtils";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 import { LinkPreview } from "./LinkPreview";
+
+// Module-level instance: the loop below resets `lastIndex` before it runs and
+// exec() clears it again on the final miss, so reuse is safe here.
+const EMOJI_CLUSTER = emojiClusterPattern();
 
 /**
  * Splits a plain text chunk into alternating text/emoji nodes so emoji
@@ -14,9 +19,6 @@ import { LinkPreview } from "./LinkPreview";
  * matching WhatsApp's mixed-content style.
  */
 function renderTextWithEmoji(text: string, key: string | number): React.ReactNode {
-  const EMOJI_CLUSTER =
-    /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
-
   const segments: React.ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -79,12 +81,13 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
 }
 
 /** Highlighted `@Name` mention inside a message bubble — blue text, no chip bg.
- *  On the sender's own blue bubble a light blue keeps it readable. */
+ *  On the sender's own blue bubble the mention stays white like the rest of
+ *  the message: a light-blue name on blue was hard to read. */
 function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
   return (
     <span
       className="inline-block max-w-full break-normal font-semibold"
-      style={{ color: isMe ? "var(--chat-mention-own)" : "var(--ds-blue-700)" }}
+      style={{ color: isMe ? "var(--color-accent-foreground, white)" : "var(--ds-blue-700)" }}
     >
       {text}</span>
   );
@@ -249,24 +252,4 @@ export function MessageContent({
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
     </>
   );
-}
-
-/**
- * Returns true when the entire message text is 1–3 emoji with no other content.
- * Handles ZWJ sequences, skin-tone modifiers, variation selectors, and keycap combiners.
- */
-export function isEmojiOnly(text: string): boolean {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-
-  // Each "cluster" is one rendered emoji glyph, including ZWJ chains like 👨‍👩‍👧.
-  const EMOJI_CLUSTER =
-    /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
-
-  const clusters = [...trimmed.matchAll(EMOJI_CLUSTER)];
-  if (clusters.length === 0 || clusters.length > 3) return false;
-
-  // After stripping matched clusters and whitespace, nothing should be left.
-  const remainder = trimmed.replace(EMOJI_CLUSTER, "").replace(/\s/g, "");
-  return remainder.length === 0;
 }

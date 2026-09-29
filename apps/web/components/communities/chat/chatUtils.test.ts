@@ -4,13 +4,57 @@ import {
   anchorOffset,
   applyContentCommentCount,
   formatCommenters,
+  isEmojiOnly,
   pickOptimisticMatch,
   scrollAnchorDelta,
   scrollChatToBottom,
+  splitEmojiClusters,
   type OptimisticLike,
   type ScrollableLike,
   type ScrollAnchor,
 } from "./chatUtils";
+
+// ─── Emoji-only messages ──────────────────────────────────────────────────
+//
+// A 2–3 emoji message renders as jumbo emoji outside the bubble; four or more
+// stay in a normal text bubble. The glyph split is what lets each of those
+// jumbo emoji animate on its own instead of asking the asset layer for a
+// nonexistent combined codepoint key ("1f600_1f603").
+
+test("one, two and three emoji are emoji-only; four are not", () => {
+  assert.equal(isEmojiOnly("😀"), true);
+  assert.equal(isEmojiOnly("😀😃"), true);
+  assert.equal(isEmojiOnly("😀😃😄"), true);
+  assert.equal(isEmojiOnly("😀😃😄😁"), false);
+});
+
+test("whitespace and blank input around the glyphs", () => {
+  assert.equal(isEmojiOnly("  😀😃  "), true);
+  assert.equal(isEmojiOnly("😀 😃"), true);
+  assert.equal(isEmojiOnly(""), false);
+  assert.equal(isEmojiOnly("   "), false);
+});
+
+test("emoji mixed with text or a link is not emoji-only", () => {
+  assert.equal(isEmojiOnly("hi 😀"), false);
+  assert.equal(isEmojiOnly("😀 https://x.dev"), false);
+  assert.equal(isEmojiOnly("2"), false);
+});
+
+test("a ZWJ sequence and a skin-toned emoji each count once", () => {
+  assert.equal(isEmojiOnly("👨‍👩‍👧"), true);
+  assert.equal(isEmojiOnly("👍🏽👍🏽👍🏽"), true);
+  assert.equal(isEmojiOnly("👍🏽👍🏽👍🏽👍🏽"), false);
+});
+
+test("splitting yields one entry per rendered glyph, in order", () => {
+  assert.deepEqual(splitEmojiClusters("😀😃😄"), ["😀", "😃", "😄"]);
+  // Whitespace between jumbo emoji must not become its own entry on the row.
+  assert.deepEqual(splitEmojiClusters("😀 😃"), ["😀", "😃"]);
+  // ZWJ families stay a single glyph rather than splitting into members.
+  assert.deepEqual(splitEmojiClusters("👨‍👩‍👧👍🏽"), ["👨‍👩‍👧", "👍🏽"]);
+  assert.deepEqual(splitEmojiClusters("no emoji here"), []);
+});
 
 function scrollContainer(
   scrollTop: number,

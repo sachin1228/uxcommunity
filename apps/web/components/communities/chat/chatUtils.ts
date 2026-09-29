@@ -28,6 +28,52 @@ export function fmtTimeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString(DATE_LOCALE, { month: "short", day: "numeric" });
 }
 
+// ─── Emoji-only messages ──────────────────────────────────────────────────
+
+/**
+ * One rendered emoji glyph: ZWJ chains (👨‍👩‍👧), skin-tone modifiers, keycap
+ * combiners and variation selectors each count as a single match. Kept as a
+ * source string so every caller gets its own stateful `/g/` instance — a
+ * shared global regex leaks `lastIndex` between callers.
+ */
+const EMOJI_CLUSTER_SOURCE =
+  "(?:\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F)(?:[\\u{1F3FB}-\\u{1F3FF}])?(?:\\u20E3)?(?:\\uFE0F)?(?:\\u200D(?:\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F)(?:[\\u{1F3FB}-\\u{1F3FF}])?(?:\\uFE0F)?)*[\\uFE0F\\uFE0E]?";
+
+/** A fresh global regex matching one emoji cluster; the caller owns `lastIndex`. */
+export function emojiClusterPattern(): RegExp {
+  return new RegExp(EMOJI_CLUSTER_SOURCE, "gu");
+}
+
+/**
+ * The emoji glyphs in `text`, in order, with plain text and whitespace
+ * between them dropped.
+ *
+ * A multi-emoji message is not one codepoint: asking the asset layer for
+ * "😀😃" produces the key `1f600_1f603`, which has no SVG or Lottie file and
+ * falls back to static system glyphs that wrap. Splitting into glyphs lets a
+ * 2–3 emoji message render as one row of independently animated emoji.
+ */
+export function splitEmojiClusters(text: string): string[] {
+  return [...text.matchAll(emojiClusterPattern())].map((m) => m[0]);
+}
+
+/**
+ * Returns true when the entire message text is 1–3 emoji with no other
+ * content (WhatsApp's jumbo-emoji rule; four or more stay in a text bubble).
+ * Handles ZWJ sequences, skin-tone modifiers, variation selectors, keycaps,
+ * and whitespace between emoji.
+ */
+export function isEmojiOnly(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  const clusters = splitEmojiClusters(trimmed);
+  if (clusters.length === 0 || clusters.length > 3) return false;
+
+  // After stripping matched clusters and whitespace, nothing should be left.
+  return trimmed.replace(emojiClusterPattern(), "").replace(/\s/g, "").length === 0;
+}
+
 // ─── Scroll helpers ───────────────────────────────────────────────────────
 
 /**
