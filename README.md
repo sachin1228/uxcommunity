@@ -100,8 +100,8 @@ uxcommunity/
 # 1. Install all workspace dependencies
 npm install
 
-# 2. Copy and fill in env vars
-cp apps/web/.env.example apps/web/.env.local
+# 2. Create apps/web/.env.local (gitignored) and fill in every value listed
+#    under "Environment variables" below
 
 # 3. Apply database migrations
 # Run each file in supabase/migrations/ in order via the Supabase SQL editor
@@ -155,7 +155,7 @@ npm run dev
 cd apps/realtime && npx wrangler dev   # serves ws://localhost:8787
 ```
 
-The web app's client connects to `ws://localhost:8787` and the server-side fan-out publishes to `http://localhost:8787/publish`. In addition to the vars from `.env.example`, `apps/web/.env.local` needs:
+The web app's client connects to `ws://localhost:8787` and the server-side fan-out publishes to `http://localhost:8787/publish`. In addition to the values listed under **Environment variables** below, `apps/web/.env.local` needs:
 
 | Variable | Value |
 |---|---|
@@ -242,10 +242,11 @@ Copy the APK to the device (Drive, chat, USB) and open it there, allowing "insta
 
 ## Environment variables
 
-See `apps/web/.env.example` for the full list with comments. Summary:
+`apps/web/.env.local` holds every value below; it is gitignored, so create it by hand and keep it out of commits. Next.js reads it during `next dev` and `next build`. Local `wrangler dev` and `opennextjs-cloudflare preview` read `apps/web/.dev.vars` instead, with the same names.
 
 | Variable | What it's for |
 |---|---|
+| `NEXT_PUBLIC_APP_URL` | Public origin of the app, e.g. `http://localhost:3000` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — server-only, never expose to the client |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Cloudflare R2 credentials, bucket name, and public delivery domain |
@@ -257,6 +258,15 @@ See `apps/web/.env.example` for the full list with comments. Summary:
 | `EMAIL_FROM` | Sender address for transactional emails |
 | `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint URL (rate limiting) |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token (rate limiting) |
+| `NEXT_PUBLIC_REALTIME_URL` | Realtime origin the browser opens its WebSocket against |
+| `REALTIME_URL` | Realtime origin the server publishes fan-out to |
+| `REALTIME_PUBLISH_SECRET` | Server-to-server secret for the realtime `/publish` endpoint |
+| `API_SECRET` | Internal secret the realtime worker uses for its membership check; must match the worker's |
+| `INVITATION_EXPIRY_DAYS` | Days an invitation stays valid (defaults to `7`) |
+
+`NEXT_PUBLIC_*` values are inlined into the client bundle at build time. A missing one is not a runtime error but a silently disabled feature: with no realtime URL, no WebSocket ever connects and messages only appear on load or focus. The deploy workflow fails the build rather than ship that state (see `.github/workflows/deploy.yml`).
+
+Push delivery tuning is optional, with defaults in code: `PUSH_BATCH_SIZE`, `PUSH_MAX_CONCURRENCY`, `PUSH_RATE_LIMIT`, `PUSH_MAX_RETRIES`, `PUSH_RETRY_BASE_MS`, `PUSH_RETRY_MAX_MS`, `PUSH_REQUEST_TIMEOUT_MS`, `PUSH_MAX_DELIVERIES`, `PUSH_TIME_BUDGET_MS`, `PUSH_RECEIPT_CHECK`, `PUSH_RECEIPT_GRACE_MS`. `apps/web/lib/push/expo.ts` and `apps/web/lib/push/chat.ts` document what each one bounds.
 
 ## CI/CD
 

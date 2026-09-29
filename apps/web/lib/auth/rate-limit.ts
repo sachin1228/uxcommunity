@@ -11,7 +11,7 @@
  * cost of rate-limiting not being enforced. If you prefer fail-closed, replace
  * the catch branch with { success: false, remaining: 0, resetAt: ... }.
  *
- * Required env vars (see .env.example):
+ * Required env vars:
  *   UPSTASH_REDIS_REST_URL
  *   UPSTASH_REDIS_REST_TOKEN
  */
