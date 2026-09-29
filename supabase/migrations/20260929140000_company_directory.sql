@@ -66,16 +66,22 @@
 --   re-applied and regenerated without disturbing companies members have
 --   already created or domains anybody has already verified.
 --
--- WHY A TEMPORARY TABLE
+-- WHY A STAGING TABLE (NOT A TEMPORARY ONE)
 --   Each entry produces two rows — the company, and its hint — and the second
---   needs the first's generated id. The list is written once, into a throwaway
+--   needs the first's generated id. The list is written once, into a staging
 --   table, and read twice; a plain `values` list could not be used by both
 --   statements without being duplicated.
+--
+--   The staging table is deliberately NOT `temporary`: the Supabase SQL
+--   editor runs statements across pooled sessions, so a session-scoped temp
+--   table is gone by the time the inserts run (`42P01`). A regular table,
+--   dropped at the start and again at the end, survives between statements
+--   and leaves nothing behind.
 -- ============================================================
 
 drop table if exists _company_directory;
 
-create temporary table _company_directory (
+create table _company_directory (
   name   text not null,
   domain text not null
 );
