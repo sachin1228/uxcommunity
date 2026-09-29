@@ -36,15 +36,25 @@
  * WHAT IT WILL NOT DO
  *   * write `verified = true` — a row that claims it is REFUSED, because only a
  *     member's OTP verifies a domain (see the stewardship migration);
- *   * touch a domain a member has proved, or a company a member created: the
- *     merge skips them rather than overwriting, so an import can never take a
- *     domain away from the company that proved it;
+ *   * touch a domain a member has PROVED (a verified claim) or a company a
+ *     member created: the merge skips them rather than overwriting, so an import
+ *     can never take a domain away from the company that proved it, and never
+ *     rewrites a row that is somebody's rather than the directory's. Note the
+ *     two are guarded by DIFFERENT columns on purpose (see the Domains section
+ *     below): a claim is protected by `verified`, a company by `created_by`;
  *   * delete anything, or drop a claim for disagreeing with another one;
  *   * invent a company for a domain whose company is missing — that row is
  *     reported as a rejected import, not silently merged;
  *   * hang an alias or a relationship on a company a member created, or delete a
  *     relationship the export no longer states: the import adds structure, and
  *     removing it is an operator's decision with an audit trail.
+ *
+ *   A domain claim and its evidence are NOT in that last group. They are
+ *   directory DATA about a domain, they never verify anything, and letting them
+ *   land on a company a member created is what "adopt the member's row instead
+ *   of duplicating it" means (docs/company-directory-reset.md §6). Refusing
+ *   them would either lose the fact or reject the whole export, and the member's
+ *   own claim is always a verified one, so it is already protected.
  *
  * THE DRY RUN
  *   `--dry-run` stages the export, validates every row, and rolls back. What it
@@ -358,6 +368,22 @@ on conflict (stage_slug) do nothing;
 -- touched: 'where not d.verified' on the update arm is what stops an import from
 -- rewriting a proof, and the conflict target is the (company_id, domain) key,
 -- not the domain.
+--
+-- WHY THERE IS NO created_by GUARD HERE, WHEN THE ALIAS AND RELATIONSHIP
+-- INSERTS BELOW BOTH HAVE ONE. A claim is not structure and not the member's: it
+-- is the directory's own statement about a domain, it is never verified (the
+-- column list above hard-codes false), and it grants no membership. The member's
+-- protection on this table is verified, which is strictly stronger: every claim
+-- a member path creates is verified at the moment of proof (source
+-- member_verification, migration 150000), so a member-created company's own claim
+-- is already out of reach. What a directory claim added to such a company can do
+-- is exactly what the architecture wants - say 'this domain may be this
+-- company's' - and if a rival proves one of the directory's domains, the resolver
+-- keeps the proof as the steward and records the other claim as superseded
+-- rather than deleting it (invariant 5). Skipping the row instead would either
+-- drop a directory fact or fail the whole import, and it would stop the importer
+-- adopting a member's row for a company it already recognises - which is the
+-- duplicate this merge exists to avoid.
 insert into public.company_domains as d (
   company_id, domain, domain_type, evidence_confidence, source, verified
 )
@@ -405,6 +431,13 @@ on conflict on constraint company_relationships_unique do nothing;
 -- Observations are added, never rewritten into agreement. Re-running the
 -- import refreshes checked/observed_at on the same observation and inserts
 -- nothing new.
+--
+-- Same reasoning as the claims above, and it has to follow them: an observation
+-- is the provenance of a claim, so guarding it by created_by while the claim it
+-- explains is allowed on the row would leave the claim unattributable. Evidence
+-- is also the one table that is only ever ADDED - the update arm refreshes
+-- checked and observed_at and nothing else - so it cannot overwrite a member's
+-- record of what they looked at.
 insert into public.domain_evidence as e (
   company_id, domain, evidence_type, source_url, source, checked, observed_at
 )

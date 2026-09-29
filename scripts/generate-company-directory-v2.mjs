@@ -37,9 +37,30 @@
  *      A conflict is reported and left OWNERLESS, never silently assigned.
  *   5. Ranks the directory deterministically from documented fields, and admits
  *      in the output which basis the rank came from.
- *   6. Writes companies.csv, company_domains.csv and a coverage report. Nothing
- *      is written to supabase/migrations: this is the prototype stage, and the
- *      output is an artifact to review, not a seed to apply.
+ *   6. Writes the five files of the export contract (below) and a coverage
+ *      report. Nothing is written to supabase/migrations: this is the prototype
+ *      stage, and the output is an artifact to review, not a seed to apply.
+ *
+ * THE EXPORT CONTRACT: ONE CANONICAL PLACE PER FACT
+ *   scripts/import-company-directory.mjs reads these five files by header name.
+ *   A fact lives in exactly one of them and nowhere else, so a column the
+ *   importer ignores cannot drift out of agreement with the file it does read.
+ *
+ *     companies.csv              the entity: id, name, country, industry,
+ *                                registry identity, rank. No domains, no aliases
+ *                                and no parent column - each of those is a table
+ *                                in the database, so each gets its own file.
+ *     company_domains.csv        CANONICAL for every domain. The official
+ *                                website and the employee email domain are both
+ *                                CLAIMS here, told apart by `domain_type`, with
+ *                                `evidence_confidence` and `source`.
+ *     domain_evidence.csv        the observations behind a claim.
+ *     company_aliases.csv        alias / former_name search names, typed.
+ *     company_relationships.csv  parent / subsidiary / brand / division structure.
+ *
+ *   An employee email domain is NEVER inferred from a website domain: they are
+ *   separate claim rows with separate evidence, and only curated evidence puts a
+ *   domain in an email-bearing `domain_type`.
  *
  * HOW TO RUN
  *   node scripts/generate-company-directory-v2.mjs --sample 1000
@@ -70,7 +91,11 @@ const DATA_DIR = join(ROOT, "data/company-directory");
 const SEED_DIR = join(DATA_DIR, "seeds");
 // Not `out/`: a directory called out is ignored by the repository's .gitignore
 // (it is where build output goes), and this directory is a reviewable artifact.
-const OUT_DIR = join(DATA_DIR, "prototype");
+// Tests point COMPANY_DIRECTORY_OUT_DIR at a scratch directory so a run never
+// rewrites the committed artifact and never writes into the working tree.
+const OUT_DIR = process.env.COMPANY_DIRECTORY_OUT_DIR
+  ? resolve(process.env.COMPANY_DIRECTORY_OUT_DIR)
+  : join(DATA_DIR, "prototype");
 const DOMAINS_SOURCE = join(ROOT, "apps/web/lib/companies/domains.ts");
 
 /**
@@ -96,6 +121,17 @@ const DOMAIN_TYPES = new Set([
  * distinguishes "the UK site" from "the UK office's mail".
  */
 const EMAIL_BEARING_TYPES = new Set(["corporate_email", "subsidiary_email", "regional"]);
+
+/**
+ * The vocabulary `company_relationships.relationship_type` accepts (migration
+ * 150000). An export cannot invent a seventh one, so the generator refuses to
+ * write a row the database would reject rather than letting the importer report
+ * it as a rejected row later.
+ */
+const RELATIONSHIP_TYPES = ["parent", "subsidiary", "brand", "division", "acquired_company", "former_name"];
+
+/** The layer every alias and every relationship in the export comes from. */
+const CURATED_SOURCE = "curated";
 
 /** Evidence kinds, with the weight each contributes and whether it may stand alone. */
 const EVIDENCE_WEIGHTS = {
@@ -484,6 +520,10 @@ export function toCompany(record, { layer, freeEmail, sources }) {
         domain: checked.domain,
         evidence_type: entry.type ?? "unknown",
         source_url: entry.url ?? null,
+        // Which layer the observation came from. `domain_evidence.source` is a
+        // column in the database and the importer writes it, so the feed has to
+        // carry it or provenance dies at the CSV boundary.
+        source: raw.source ?? record.source ?? layer,
         checked: Boolean(raw.evidence_checked)
       }))
     });
@@ -606,38 +646,62 @@ export function mergeDuplicates(companies) {
   //   1. the registry identity — `source` + `source_id`. Two rows with the same
   //      one are the same legal entity whatever they are called;
   //   2. the name with its legal suffix dropped, WITHIN one jurisdiction, plus
-  //      every alias. Two rows whose names match but whose known jurisdictions
-  //      differ are NOT merged: that is exactly the merge that folded
-  //      same-named companies in different countries into one.
+  //      every alias. Two rows whose names match but whose KNOWN jurisdictions
+  //      are different countries are NOT merged: that is exactly the merge that
+  //      folded same-named companies in different countries into one.
+  //
+  // A jurisdiction that is UNKNOWN is not a different jurisdiction. A discovery
+  // row (Wikidata supplies a name and a website, nothing else) carries no
+  // country at all, and treating that silence as a country of its own left
+  // "Alphabet Inc." (curated, US) and "Alphabet Inc." (Wikidata, no country)
+  // standing as two companies in the picker, each claiming abc.xyz.
   //
   // A name match never overrides a registry identity: if both rows carry one
   // and they differ, they stay separate. The curated record is considered
   // first, so it is the one that survives a collision and keeps its evidence,
   // aliases and relationships.
   const byKey = new Map();
+  // name → the kept rows with that name, so a row with no known country can
+  // still be recognised as the entity that knows its own.
+  const byNameKey = new Map();
   const keptById = new Map();
   const kept = [];
   const merges = [];
 
+  const register = (company, names) => {
+    byKey.set(company.id, company.id);
+    for (const name of names) {
+      byKey.set(`${name}|${company.jurisdiction ?? ""}`, company.id);
+      const bucket = byNameKey.get(name) ?? [];
+      if (!bucket.includes(company.id)) bucket.push(company.id);
+      byNameKey.set(name, bucket);
+    }
+  };
+  const namesOf = (company) =>
+    [company.name, ...company.aliases].map(matchKey).filter((name) => name !== "");
+
   for (const company of sorted) {
     const identity = registryIdentity(company);
-    const keys = [
-      `${matchKey(company.name)}|${company.jurisdiction ?? ''}`,
-      ...company.aliases.map((alias) => `${matchKey(alias)}|${company.jurisdiction ?? ''}`)
-    ].filter((key) => key !== "|");
+    const names = namesOf(company);
+    const keys = names.map((name) => `${name}|${company.jurisdiction ?? ""}`);
     const survivor =
       keptById.get(company.id) ??
       (identity ? kept.find((entry) => registryIdentity(entry) === identity) : null) ??
       kept.find((entry) => {
         if (identity && registryIdentity(entry) && registryIdentity(entry) !== identity) return false;
-        return keys.some((key) => byKey.get(key) === entry.id);
+        if (keys.some((key) => byKey.get(key) === entry.id)) return true;
+        // The same name in two KNOWN, different countries is two companies.
+        // Anything else, including one side not knowing its country, is one.
+        return (
+          jurisdictionsCompatible(entry.jurisdiction, company.jurisdiction) &&
+          names.some((name) => (byNameKey.get(name) ?? []).includes(entry.id))
+        );
       });
 
     if (!survivor) {
       keptById.set(company.id, company);
       kept.push(company);
-      byKey.set(company.id, company.id);
-      for (const key of keys) byKey.set(key, company.id);
+      register(company, names);
       if (identity) byKey.set(identity, company.id);
       continue;
     }
@@ -656,8 +720,20 @@ export function mergeDuplicates(companies) {
     survivor.jurisdiction = survivor.jurisdiction ?? company.jurisdiction ?? null;
     survivor.merged_ids = [...(survivor.merged_ids ?? []), company.id];
     survivor.aliases = survivor.aliases.slice().sort();
+    // The survivor's name set grew and its jurisdiction may have been filled in
+    // by the row just folded in, so both indexes are refreshed for it.
+    register(survivor, namesOf(survivor));
   }
   return { companies: kept, merges };
+}
+
+/**
+ * Two rows may be the same company when neither knows its country, or they
+ * agree on it. Only two rows that both know their country and disagree are
+ * kept apart - the rule in the comment above `mergeDuplicates`.
+ */
+export function jurisdictionsCompatible(a, b) {
+  return a == null || b == null || a === b;
 }
 
 /** `source` + `source_id`, or null when the row carries no registry identity. */
@@ -993,42 +1069,44 @@ function toCsv(header, rows) {
   return [header.join(","), ...rows.map((row) => row.map(csvValue).join(","))].join("\n") + "\n";
 }
 
-export function companiesCsv(companies, owners) {
+/**
+ * The entity file, and only the entity: exactly the columns the importer reads.
+ *
+ * `normalized_name` is derived from `company_name` and nothing reads it;
+ * `website_domain` and `employee_email_domains` are a second, lossy copy of
+ * rows that `company_domains.csv` states canonically (with their type,
+ * confidence and source); `parent_company_id` is one column trying to hold a
+ * graph that `company_relationships.csv` holds properly; and `aliases` is a
+ * `;`-joined string standing in for the alias table. Every one of those was
+ * ignored by the importer, which is exactly the failure mode of a duplicated
+ * field: it looks authoritative and nothing checks it. They are gone.
+ *
+ * What remains is identity (`company_id`), the searchable name, the registry's
+ * own number and jurisdiction - what makes two rows the same entity and lets a
+ * later import recognise a renamed company - and the rank the picker sorts by.
+ */
+export function companiesCsv(companies) {
   const header = [
     "company_id",
     "company_name",
-    "normalized_name",
     "country",
     "industry",
-    "website_domain",
-    "employee_email_domains",
-    "parent_company_id",
     "source",
     "source_id",
     "jurisdiction",
     "source_confidence",
-    "directory_rank",
-    "aliases"
+    "directory_rank"
   ];
   const rows = companies.map((company) => [
     company.id,
     company.name,
-    company.normalized_name,
     company.country,
     company.industry,
-    company.website_domain,
-    // Only domains this company is the STEWARD of may be advertised as its
-    // mail: a claim that lost the resolution is evidence, not a route.
-    company.email_domains.filter((domain) => owners.get(domain) === company.id).join(";"),
-    company.parent_company_id ?? "",
     company.source,
-    // The registry's own number and jurisdiction: what makes two rows the same
-    // entity, and what lets a later import recognise a renamed company.
     company.source_id ?? "",
     company.jurisdiction ?? "",
     company.source_confidence,
-    company.directory_rank,
-    [company.name, ...company.aliases, ...(company.former_names ?? [])].join(";")
+    company.directory_rank
   ]);
   return toCsv(header, rows);
 }
@@ -1091,7 +1169,7 @@ export function companyDomainsCsv(companies, owners, statuses = new Map()) {
  * time is when a human or a job actually looked.
  */
 export function domainEvidenceCsv(companies) {
-  const header = ["company_id", "domain", "evidence_type", "source_url", "checked", "observed_at"];
+  const header = ["company_id", "domain", "evidence_type", "source_url", "source", "checked", "observed_at"];
   const rows = [];
   for (const company of companies) {
     for (const row of company.domains) {
@@ -1101,6 +1179,7 @@ export function domainEvidenceCsv(companies) {
           observation.domain ?? row.domain,
           observation.evidence_type,
           observation.source_url,
+          observation.source ?? row.source ?? "",
           observation.checked,
           observation.observed_at ?? ""
         ]);
@@ -1114,6 +1193,132 @@ export function domainEvidenceCsv(companies) {
       String(a[2]).localeCompare(String(b[2]))
   );
   return toCsv(header, rows);
+}
+
+/**
+ * The alias feed: `company_id, alias, alias_type, source`.
+ *
+ * `aliases` are identity AND search names; `former_names` are search-only, so
+ * the type travels with the row and a former legal name can never collapse a
+ * brand and its parent into one entity. The canonical name is NOT repeated here
+ * - `companies.company_name` is already a search name - so this file holds only
+ * the OTHER names a company is known by.
+ *
+ * Validation happens here rather than in the importer's rejection report: an
+ * empty alias, one longer than the importer accepts, or a name on a company
+ * this export does not contain is a bug in the curated layer, and a bug should
+ * stop the build rather than arrive later as a rejected row.
+ */
+export function companyAliasRows(companies) {
+  const seen = new Set();
+  const rows = [];
+  for (const company of companies) {
+    for (const [alias_type, names] of [
+      ["alias", company.aliases ?? []],
+      ["former_name", company.former_names ?? []]
+    ]) {
+      for (const name of names) {
+        const alias = String(name ?? "").trim();
+        if (alias === "") continue;
+        if (alias.length > 120) {
+          throw new Error(`alias longer than 120 characters: ${company.id} / ${alias}`);
+        }
+        // A name stated twice is one alias. The importer keys on the lowercased
+        // (company, alias) pair, so a second copy of the same string would come
+        // back as `duplicate_alias_in_export` - a self-inflicted rejection.
+        const key = `${company.id}\u0000${alias.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push({
+          company_id: company.id,
+          alias,
+          alias_type,
+          source: company.source ?? CURATED_SOURCE
+        });
+      }
+    }
+  }
+  return rows.sort(compareAliasRows);
+}
+
+function compareAliasRows(a, b) {
+  return (
+    a.company_id.localeCompare(b.company_id) ||
+    a.alias.localeCompare(b.alias) ||
+    a.alias_type.localeCompare(b.alias_type)
+  );
+}
+
+/**
+ * The relationship feed: `parent_company_id, child_company_id,
+ * relationship_type, source`.
+ *
+ * A curated edge is authored as `{ from, child, type }` and is written through
+ * UNCHANGED: `from` is the subject of the statement and `child` its object, and
+ * the type says how the object stands to the subject. "meta-platforms /
+ * facebook / brand" reads "Facebook is Meta's brand"; "facebook /
+ * meta-platforms / parent" reads "Meta is Facebook's parent". Both directions a
+ * curated entity states are kept, because both are authored facts and the
+ * database's unique key is the whole (parent, child, type) triple - normalising
+ * the inverse rows away would be the generator second-guessing the layer.
+ *
+ * Three things are refused outright, because each is a bug in the curated layer
+ * rather than data for the operator's review queue:
+ *   * an endpoint this export does not contain (a dangling edge would state who
+ *     owns whom about a company nobody described);
+ *   * a self-edge (the database's `company_relationships_not_self` check);
+ *   * a type outside the database's vocabulary (`relationship_type` check).
+ * A repeated triple is collapsed instead, and silently: the same edge stated
+ * twice is one row.
+ */
+export function companyRelationshipRows(relationships, companies) {
+  const ids = companies instanceof Set ? companies : new Set(companies.map((company) => company.id));
+  const seen = new Set();
+  const rows = [];
+  for (const edge of relationships) {
+    const parent_company_id = edge.from;
+    const child_company_id = edge.child;
+    const relationship_type = edge.type;
+    if (!ids.has(parent_company_id) || !ids.has(child_company_id)) {
+      throw new Error(
+        `relationship references a company outside the export: ${parent_company_id} -> ${child_company_id}`
+      );
+    }
+    if (parent_company_id === child_company_id) {
+      throw new Error(`self relationship: ${parent_company_id}`);
+    }
+    if (!RELATIONSHIP_TYPES.includes(relationship_type)) {
+      throw new Error(
+        `unknown relationship_type ${relationship_type}: ${parent_company_id} -> ${child_company_id}`
+      );
+    }
+    const key = `${parent_company_id}\u0000${child_company_id}\u0000${relationship_type}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ parent_company_id, child_company_id, relationship_type, source: CURATED_SOURCE });
+  }
+  return rows.sort(
+    (a, b) =>
+      a.parent_company_id.localeCompare(b.parent_company_id) ||
+      a.child_company_id.localeCompare(b.child_company_id) ||
+      a.relationship_type.localeCompare(b.relationship_type)
+  );
+}
+
+export function companyAliasesCsv(rows) {
+  const header = ["company_id", "alias", "alias_type", "source"];
+  return toCsv(
+    header,
+    rows.map((row) => [row.company_id, row.alias, row.alias_type, row.source])
+  );
+}
+
+export function companyRelationshipsCsv(rows) {
+  const header = ["parent_company_id", "child_company_id", "relationship_type", "source"];
+  return toCsv(
+    header,
+    rows.map((row) => [row.parent_company_id, row.child_company_id, row.relationship_type, row.source])
+  );
 }
 
 /**
@@ -1155,6 +1360,7 @@ export function coverageReport({
   rejected,
   sampleSize,
   relationships = [],
+  aliases = [],
   merges = [],
   inputRows = 0
 }) {
@@ -1162,6 +1368,7 @@ export function coverageReport({
   const withEmail = companies.filter((company) => company.email_domains.length > 0).length;
   const multiEmail = companies.filter((company) => company.email_domains.length > 1).length;
   const domains = companies.flatMap((company) => company.domains);
+  const evidenceCount = domains.flatMap((row) => row.evidence ?? []).length;
   const byConfidence = { high: 0, medium: 0, low: 0, unknown: 0 };
   for (const row of domains) byConfidence[row.confidence] = (byConfidence[row.confidence] ?? 0) + 1;
   const emailDomains = domains.filter((row) => EMAIL_BEARING_TYPES.has(row.domain_type));
@@ -1199,6 +1406,7 @@ export function coverageReport({
   lines.push(`| Company-domain rows | ${domains.length.toLocaleString("en-US")} |`);
   lines.push(`| Unique domains | ${new Set(domains.map((row) => row.domain)).size.toLocaleString("en-US")} |`);
   lines.push(`| Parent/subsidiary/brand relationships | ${relationships.length.toLocaleString("en-US")} |`);
+  lines.push(`| Aliases and former names (excluding the canonical name) | ${aliases.length.toLocaleString("en-US")} |`);
   lines.push(`| Duplicate entities merged into one | ${merges.length.toLocaleString("en-US")} |`);
   lines.push(`| Same name within one jurisdiction after merging (to review) | ${duplicateNames.toLocaleString("en-US")} |`);
   lines.push(`| Rows carrying a registry identity (source + source_id) | ${withRegistryIdentity.toLocaleString("en-US")} |`);
@@ -1210,6 +1418,20 @@ export function coverageReport({
       lines.push(`- \`${merge.merged}\` (${merge.name}) → \`${merge.kept}\``);
     }
   }
+  lines.push("");
+  lines.push("## The export files (one canonical place per fact)");
+  lines.push("");
+  lines.push("Read by `scripts/import-company-directory.mjs` by header name. A fact appears");
+  lines.push("in exactly one file, so no column can drift out of agreement with the file the");
+  lines.push("importer actually reads.");
+  lines.push("");
+  lines.push("| File | Holds | Rows |");
+  lines.push("| --- | --- | --- |");
+  lines.push(`| \`companies.csv\` | the entity: id, name, country, industry, registry identity, rank | ${companies.length.toLocaleString("en-US")} |`);
+  lines.push(`| \`company_domains.csv\` | every domain claim - official website and employee email alike, told apart by \`domain_type\` | ${domains.length.toLocaleString("en-US")} |`);
+  lines.push(`| \`domain_evidence.csv\` | the observations behind a claim | ${evidenceCount.toLocaleString("en-US")} |`);
+  lines.push(`| \`company_aliases.csv\` | alias / former_name search names, typed | ${aliases.length.toLocaleString("en-US")} |`);
+  lines.push(`| \`company_relationships.csv\` | parent / subsidiary / brand / division structure | ${relationships.length.toLocaleString("en-US")} |`);
   lines.push("");
   lines.push("## Confidence of email-bearing domains");
   lines.push("");
@@ -1682,6 +1904,14 @@ function main() {
   const result = buildDirectory({ sample });
   const { companies, owners, statuses, conflicts, delegations, rejected, layerStats, sources, relationships, merges } = result;
 
+  // Built and validated once, before anything is written: the alias and
+  // relationship feeds are the two that used to be dropped, and a layer bug in
+  // either must fail the build (or `--check`) rather than surface as a silently
+  // empty file. The coverage report and the CSV files read the same rows, so
+  // they can never disagree about what was emitted.
+  const aliasRows = companyAliasRows(companies);
+  const relationshipRows = companyRelationshipRows(relationships, companies);
+
   const report = coverageReport({
     companies,
     owners,
@@ -1693,6 +1923,7 @@ function main() {
     rejected,
     sampleSize: sample,
     relationships,
+    aliases: aliasRows,
     merges,
     inputRows: result.inputRows
   });
@@ -1722,7 +1953,8 @@ function main() {
         .map((claimant) => `${status.domain} claimed by unknown company ${claimant.company_id}`)
     );
     console.log(`\ncheck: ${blocking.length} domains with no choosable steward, ${conflicts.length} conflicting domains, ` +
-      `${invalid.length} forbidden evidence rows, ${dangling.length} dangling claims, ${issues.length} layer issues`);
+      `${invalid.length} forbidden evidence rows, ${dangling.length} dangling claims, ${issues.length} layer issues, ` +
+      `${aliasRows.length} aliases, ${relationshipRows.length} relationships`);
     for (const issue of issues.slice(0, 20)) console.log(`  ${issue}`);
     for (const problem of dangling.slice(0, 20)) console.log(`  ${problem}`);
     // Conflicting evidence is DATA and does not fail a build: the resolver
@@ -1734,11 +1966,16 @@ function main() {
   }
 
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(join(OUT_DIR, "companies.csv"), companiesCsv(companies, owners));
+  writeFileSync(join(OUT_DIR, "companies.csv"), companiesCsv(companies));
   writeFileSync(join(OUT_DIR, "company_domains.csv"), companyDomainsCsv(companies, owners, statuses));
   writeFileSync(join(OUT_DIR, "domain_evidence.csv"), domainEvidenceCsv(companies));
+  writeFileSync(join(OUT_DIR, "company_aliases.csv"), companyAliasesCsv(aliasRows));
+  writeFileSync(join(OUT_DIR, "company_relationships.csv"), companyRelationshipsCsv(relationshipRows));
   writeFileSync(join(OUT_DIR, "coverage-report.md"), report + "\n");
-  console.log(`\nWrote ${companies.length} companies, ${companies.flatMap((c) => c.domains).length} domain rows, ${relationships.length} relationships`);
+  console.log(
+    `\nWrote ${companies.length} companies, ${companies.flatMap((c) => c.domains).length} domain rows, ` +
+      `${aliasRows.length} aliases, ${relationshipRows.length} relationships`
+  );
   if (args.has("--sql")) {
     writeFileSync(join(OUT_DIR, "company-directory.proposed.sql"), proposedSql(companies, owners));
     console.log("Wrote data/company-directory/out/company-directory.proposed.sql (draft; never applied)");

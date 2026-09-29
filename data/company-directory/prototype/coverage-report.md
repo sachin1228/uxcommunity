@@ -19,8 +19,10 @@ Sample size requested: 1,000
 | Company-domain rows | 1,009 |
 | Unique domains | 1,009 |
 | Parent/subsidiary/brand relationships | 17 |
+| Aliases and former names (excluding the canonical name) | 31 |
 | Duplicate entities merged into one | 18 |
-| Duplicate normalised names left after merging | 0 |
+| Same name within one jurisdiction after merging (to review) | 0 |
+| Rows carrying a registry identity (source + source_id) | 0 |
 
 Merged (the survivor keeps its evidence, the merged row's domains survive as hints):
 
@@ -34,6 +36,20 @@ Merged (the survivor keeps its evidence, the merged row's domains survive as hin
 - `google` (Google) → `google`
 - `hdfc-bank` (HDFC Bank) → `hdfc-bank`
 - `hsbc` (HSBC) → `hsbc`
+
+## The export files (one canonical place per fact)
+
+Read by `scripts/import-company-directory.mjs` by header name. A fact appears
+in exactly one file, so no column can drift out of agreement with the file the
+importer actually reads.
+
+| File | Holds | Rows |
+| --- | --- | --- |
+| `companies.csv` | the entity: id, name, country, industry, registry identity, rank | 1,000 |
+| `company_domains.csv` | every domain claim - official website and employee email alike, told apart by `domain_type` | 1,009 |
+| `domain_evidence.csv` | the observations behind a claim | 38 |
+| `company_aliases.csv` | alias / former_name search names, typed | 31 |
+| `company_relationships.csv` | parent / subsidiary / brand / division structure | 17 |
 
 ## Confidence of email-bearing domains
 

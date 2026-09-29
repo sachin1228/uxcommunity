@@ -37,6 +37,10 @@ import {
   companiesCsv,
   companyDomainsCsv,
   domainEvidenceCsv,
+  companyAliasRows,
+  companyAliasesCsv,
+  companyRelationshipRows,
+  companyRelationshipsCsv,
   stagedMetrics
 } from "./generate-company-directory-v2.mjs";
 import { readFileSync } from "node:fs";
@@ -665,11 +669,15 @@ test("a sample always includes the curated entities", () => {
 /* ── The output contract ────────────────────────────────────────────────── */
 
 test("the CSVs carry exactly the documented columns", () => {
-  const { companies, owners, statuses } = buildDirectory({ sample: 100 });
-  const companyHeader = companiesCsv(companies, owners).split("\n")[0];
+  const { companies, owners, statuses, relationships } = buildDirectory({ sample: 100 });
+  const aliasRows = companyAliasRows(companies);
+  // companies.csv is the ENTITY and nothing else: the domain columns, the alias
+  // string and the parent column are gone, because each of them is a second copy
+  // of a fact that has its own file and its own table. A column the importer
+  // ignores is a column nothing keeps honest.
   assert.equal(
-    companyHeader,
-    "company_id,company_name,normalized_name,country,industry,website_domain,employee_email_domains,parent_company_id,source,source_id,jurisdiction,source_confidence,directory_rank,aliases"
+    companiesCsv(companies).split("\n")[0],
+    "company_id,company_name,country,industry,source,source_id,jurisdiction,source_confidence,directory_rank"
   );
   const domainHeader = companyDomainsCsv(companies, owners, statuses).split("\n")[0];
   assert.equal(
@@ -685,7 +693,15 @@ test("the CSVs carry exactly the documented columns", () => {
   );
   assert.equal(
     domainEvidenceCsv(companies).split("\n")[0],
-    "company_id,domain,evidence_type,source_url,checked,observed_at"
+    "company_id,domain,evidence_type,source_url,source,checked,observed_at"
+  );
+  assert.equal(
+    companyAliasesCsv(aliasRows).split("\n")[0],
+    "company_id,alias,alias_type,source"
+  );
+  assert.equal(
+    companyRelationshipsCsv(companyRelationshipRows(relationships, companies)).split("\n")[0],
+    "parent_company_id,child_company_id,relationship_type,source"
   );
 });
 
@@ -727,6 +743,9 @@ test("evidence observations are emitted with their URL and checked flag", () => 
   const rows = csv.trim().split("\n").slice(1);
   assert.equal(rows.length, 2);
   assert.ok(rows.some((row) => row.includes("first_party_role_address") && row.includes("https://figma.com/contact") && row.endsWith(",true,")));
+  // The observation carries its provenance, so `domain_evidence.source` in the
+  // database is not an empty string after a round trip.
+  assert.ok(rows.every((row) => row.split(",")[4] === "curated"));
 });
 
 test("an unknown evidence kind is a layer bug, not a silent zero weight", () => {
@@ -743,10 +762,99 @@ test("an unknown evidence kind is a layer bug, not a silent zero weight", () => 
 test("the build is deterministic: same inputs, same bytes", () => {
   const first = buildDirectory({ sample: 200 });
   const second = buildDirectory({ sample: 200 });
-  assert.equal(companiesCsv(first.companies, first.owners), companiesCsv(second.companies, second.owners));
+  assert.equal(companiesCsv(first.companies), companiesCsv(second.companies));
   assert.equal(
     companyDomainsCsv(first.companies, first.owners),
     companyDomainsCsv(second.companies, second.owners)
+  );
+  assert.equal(
+    companyAliasesCsv(companyAliasRows(first.companies)),
+    companyAliasesCsv(companyAliasRows(second.companies))
+  );
+  assert.equal(
+    companyRelationshipsCsv(companyRelationshipRows(first.relationships, first.companies)),
+    companyRelationshipsCsv(companyRelationshipRows(second.relationships, second.companies))
+  );
+});
+
+/* ── The alias and relationship feeds ───────────────────────────────────── */
+
+test("aliases carry their type, and the canonical name is not one of them", () => {
+  const { companies } = buildDirectory({ sample: 1000 });
+  const rows = companyAliasRows(companies);
+  const meta = companies.find((company) => company.id === "meta-platforms");
+  assert.deepEqual(
+    rows
+      .filter((row) => row.company_id === "meta-platforms")
+      .map((row) => `${row.alias}:${row.alias_type}`)
+      .sort(),
+    ["Facebook Inc.:former_name", "Facebook, Inc.:former_name", "Meta:alias", "Meta Platforms Inc.:alias"].sort()
+  );
+  // The name lives in companies.csv. Repeating it here is the second copy the
+  // export contract exists to remove.
+  assert.equal(
+    rows.some((row) => row.company_id === "meta-platforms" && row.alias === meta.name),
+    false
+  );
+  // A former name is search-only, so it must not have folded Meta and the
+  // Facebook brand entity into one row.
+  assert.ok(companies.some((company) => company.id === "facebook"));
+});
+
+test("the alias feed collapses a repeat and refuses an unusable alias", () => {
+  const companies = [
+    {
+      id: "acme",
+      name: "Acme",
+      source: "curated",
+      aliases: ["Acme Inc.", "ACME INC."],
+      former_names: ["Acme Incorporated"]
+    }
+  ];
+  const rows = companyAliasRows(companies);
+  assert.deepEqual(rows.map((row) => `${row.alias}:${row.alias_type}`).sort(), [
+    "Acme Inc.:alias",
+    "Acme Incorporated:former_name"
+  ]);
+  assert.throws(() => companyAliasRows([{ id: "acme", name: "Acme", aliases: ["x".repeat(121)] }]), /longer than 120/);
+});
+
+test("the relationship feed keeps both authored directions", () => {
+  const { companies, relationships } = buildDirectory({ sample: 1000 });
+  const rows = companyRelationshipRows(relationships, companies);
+  assert.equal(rows.length, 17, "every curated edge reaches the feed");
+  assert.ok(rows.every((row) => row.source === "curated"));
+  assert.ok(
+    rows.some(
+      (row) =>
+        row.parent_company_id === "meta-platforms" &&
+        row.child_company_id === "facebook" &&
+        row.relationship_type === "brand"
+    )
+  );
+  assert.ok(
+    rows.some(
+      (row) =>
+        row.parent_company_id === "facebook" &&
+        row.child_company_id === "meta-platforms" &&
+        row.relationship_type === "parent"
+    )
+  );
+  const TYPES = new Set(["parent", "subsidiary", "brand", "division", "acquired_company", "former_name"]);
+  assert.ok(rows.every((row) => TYPES.has(row.relationship_type)), "only the database's vocabulary is written");
+});
+
+test("a bad relationship fails the build instead of becoming a rejected row", () => {
+  const companies = [{ id: "acme" }, { id: "holdings" }];
+  const edge = (from, child, type) => [{ from, child, type }];
+  assert.throws(() => companyRelationshipRows(edge("acme", "ghost", "subsidiary"), companies), /outside the export/);
+  assert.throws(() => companyRelationshipRows(edge("acme", "acme", "subsidiary"), companies), /self relationship/);
+  assert.throws(() => companyRelationshipRows(edge("holdings", "acme", "owns"), companies), /unknown relationship_type/);
+  assert.equal(
+    companyRelationshipRows([...edge("holdings", "acme", "subsidiary"), ...edge("holdings", "acme", "subsidiary")], companies)
+      .length,
+    1,
+    "the same edge stated twice is one row"
   );
 });
 

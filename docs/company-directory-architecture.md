@@ -519,6 +519,43 @@ Invariants that hold across every row:
    `low` and `unknown` claims are searchable and selectable, and they establish
    domain control only.
 
+### What an import may touch on a row that is somebody's
+
+The importer guards its merge with two different columns, and the difference is
+not an oversight:
+
+| Table | Guard on an existing row | Why that column |
+| --- | --- | --- |
+| `companies` | `created_by is null` | the row is the member's company; an import owns directory rows, not people's companies |
+| `company_aliases` | `created_by is null` (on the company) | an alias changes what a company is CALLED in search — structure the member did not ask for |
+| `company_relationships` | `created_by is null` (on both ends) | a relationship asserts who owns whom, which is a claim about the member's company, not about a domain |
+| `company_domains` | `verified = false` | a claim is directory DATA about a domain; the member's protection here is the proof, which is strictly stronger |
+| `domain_evidence` | nothing to guard | an observation is only ever ADDED, or has `checked`/`observed_at` refreshed; it is the provenance of a claim, so it follows that claim |
+
+**A domain claim and its evidence MAY land on a company a member created.**
+That is what "adopt the member's row instead of duplicating it" requires
+([company-directory-reset.md](company-directory-reset.md) §6): the importer
+recognises a company by registry number or by slug, and when the slug is one a
+member already created, attaching the directory's claims to that row is the only
+alternative to creating a second company or dropping the fact. It is safe because
+of three properties, each of which is load-bearing:
+
+1. **A claim never verifies.** The statement hard-codes `verified = false`, and a
+   CSV row that claims otherwise is refused outright.
+2. **The member's own claim is always verified.** Every claim a member path
+   creates sets `verified = true, verified_at = now()` at the moment of proof
+   (`member_verification`), so it is already out of an import's reach — there is
+   no member-authored unverified claim for an import to overwrite.
+3. **A proof always outranks a directory claim.** If a directory claim competes
+   with a proof — on the same company or on a different one — the proof stays the
+   steward and the rival claim is recorded `superseded`, never deleted
+   (invariant 5).
+
+An alias or a relationship, by contrast, has no equivalent proof to defer to: it
+would silently rename a member's company in search results, or state that their
+company is owned by someone. Those are refused, and the import's own report counts
+them (`skipped_member_companies`, `skipped_member_relationships`).
+
 ## 6a. The promotion policy, and the review queue that implements it
 
 **Shipped** in `supabase/migrations/20260929152000_company_domain_review.sql`,
@@ -1008,9 +1045,31 @@ what makes the promotion threshold a route rather than a dead end.
 
 Deliberately NOT in this PR: the 500k import, any licensed source adapter, a
 reviewer role or admin UI, bulk or automatic promotion, and anything that
-changes what `verified` means. The import path loads `company_aliases.csv` and
-`company_relationships.csv` when a directory supplies them; the generator does
-not emit them yet, and the dry run says so rather than pretending otherwise.
+changes what `verified` means.
+
+### The export contract: one canonical place per fact
+
+The generator emits five files and the importer reads all five by header name.
+No fact appears in two of them, so there is no column the importer ignores and
+nothing keeps honest — which is exactly how `companies.csv` used to carry a
+`website_domain`, an `employee_email_domains`, a `parent_company_id` and a
+`;`-joined `aliases` column that the import never read.
+
+| File | Canonical for | Notable absences |
+| --- | --- | --- |
+| `companies.csv` | the entity: `company_id`, name, country, industry, registry identity, rank | no domains, no aliases, no parent column |
+| `company_domains.csv` | **every** domain claim — official website and employee email alike, separated by `domain_type`, with `evidence_confidence` and `source` | the importer never derives one type from another |
+| `domain_evidence.csv` | the observations behind a claim, with their URL | — |
+| `company_aliases.csv` | `alias` / `former_name` / `brand` search names, typed | the canonical name is not repeated |
+| `company_relationships.csv` | parent / subsidiary / brand / division structure | — |
+
+The split mirrors the schema: `company_domains`, `domain_evidence`,
+`company_aliases` and `company_relationships` are tables, so each gets a file,
+and `companies` gets the entity. An employee email domain is never inferred from
+a website domain. A duplicated edge or alias is collapsed; a relationship whose
+endpoint is missing, that points at itself, or whose type is outside the
+database's vocabulary fails the generator (and `--check`) instead of arriving as
+a rejected row.
 
 ### Unresolved (no decision made here)
 
