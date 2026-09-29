@@ -97,6 +97,25 @@ jobs:
       - name: Audit comments
         run: node scripts/audit-comments.mjs
 
+  deployment:
+    name: Deployment targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No install step: the audit reads tracked files with git + Node builtins
+      # only, so it costs a few seconds and cannot be blocked by a dependency
+      # problem.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Blocking. The app deploys only to Cloudflare Workers. A reintroduced
+      # vercel.json, @vercel/* package, Vercel CLI step or vercel.app URL would
+      # quietly create a second deployment target no workflow maintains.
+      - name: Audit Vercel drift
+        run: node scripts/audit-vercel.mjs
+
   lint:
     name: ESLint (advisory)
     runs-on: ubuntu-latest
