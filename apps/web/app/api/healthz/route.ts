@@ -2,16 +2,19 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /**
- * Lightweight keep-warm endpoint.
+ * Lightweight liveness/health endpoint.
  *
- * Vercel Cron (vercel.json) pings this every minute so the Lambda container
- * stays alive and the module graph (supabase-js, jose, etc.) stays loaded.
- * This cuts the cold-start penalty from ~2-4 s down to near zero for the
- * first real request after a quiet period.
+ * Returns 200 as soon as the module graph loads. It calls
+ * createServiceClient() so the Supabase singleton is initialised and the heavy
+ * @supabase/supabase-js module is cached for the isolate that serves the
+ * request — it does NOT make a network call to Supabase, just warms the module.
  *
- * The endpoint intentionally calls createServiceClient() so the singleton
- * is initialised and the heavy @supabase/supabase-js module is cached.
- * It does NOT make a network call to Supabase — just warms the module.
+ * No scheduled warm-up is configured, and none is needed: Cloudflare Workers
+ * start in single-digit milliseconds (there is no per-request container boot
+ * the way a Lambda has), so pinging this on a timer would spend invocations for
+ * no measurable latency win. The heavy shared caches live in R2 (see
+ * open-next.config.ts), not per-isolate memory, so a cold isolate is already
+ * cheap. Use middleware.ts's rate-limit bypass if you wire this to a monitor.
  */
 export async function GET() {
   // Initialise the singleton — ensures supabase-js is loaded and the client
@@ -19,8 +22,8 @@ export async function GET() {
   try {
     createServiceClient();
   } catch {
-    // Missing env vars in some environments — still return 200 so the cron
-    // doesn't get marked as failing and start backing off.
+    // Missing env vars in some environments — still return 200 so a health
+    // probe does not see a failure (the singleton is only being warmed).
   }
 
   return NextResponse.json(
@@ -28,7 +31,7 @@ export async function GET() {
     {
       status: 200,
       headers: {
-        // Never cache — cron needs a fresh response each time.
+        // Never cache — a health probe needs a fresh response each time.
         "Cache-Control": "no-store",
       },
     }

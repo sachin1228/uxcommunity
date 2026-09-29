@@ -4,7 +4,7 @@
  * Thin wrapper around the AWS S3-compatible client that R2 exposes.
  * All image uploads in this app go through here instead of Supabase Storage.
  *
- * Required env vars (set in Vercel / .env.local):
+ * Required env vars (Worker secrets in production / .env.local locally):
  *   R2_ACCOUNT_ID          — Cloudflare account ID
  *   R2_ACCESS_KEY_ID       — R2 API token access key
  *   R2_SECRET_ACCESS_KEY   — R2 API token secret

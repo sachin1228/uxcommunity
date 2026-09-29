@@ -138,8 +138,7 @@ new logins use `uxcommunity_session`.
 
 ## Deployment
 
-- **Primary:** Cloudflare Workers via OpenNext (`wrangler.toml`, `npm run deploy`).
-- **Alternate:** Vercel (`vercel.json`, region `syd1`).
+- **Cloudflare Workers** via OpenNext (`wrangler.toml`, `npm run deploy`) — the only deployment target.
 - **Previews:** `.github/workflows/preview.yml` builds a per-PR worker with realtime disabled.
 
 ## Environment variables
