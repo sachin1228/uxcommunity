@@ -66,18 +66,26 @@
 --   re-applied and regenerated without disturbing companies members have
 --   already created or domains anybody has already verified.
 --
--- WHY A STAGING TABLE (NOT A TEMPORARY ONE)
+-- WHY ONE BLOCK, AND A STAGING TABLE INSIDE IT
 --   Each entry produces two rows — the company, and its hint — and the second
 --   needs the first's generated id. The list is written once, into a staging
 --   table, and read twice; a plain `values` list could not be used by both
 --   statements without being duplicated.
 --
---   The staging table is deliberately NOT `temporary`: the Supabase SQL
---   editor runs statements across pooled sessions, so a session-scoped temp
---   table is gone by the time the inserts run (`42P01`). A regular table,
---   dropped at the start and again at the end, survives between statements
---   and leaves nothing behind.
+--   The whole file is ONE statement — a DO block — so it runs in one session
+--   and one transaction no matter how the Supabase SQL editor pools its
+--   connections. An earlier draft used a TEMPORARY staging table spread over
+--   several statements and died on the editor with `42P01` (the temp table
+--   did not survive to the next statement's session), and a failure part-way
+--   through a multi-statement seed can leave a half-applied directory behind.
+--   Inside one block neither can happen: the statements share the session by
+--   construction, and any failure rolls the whole seed back. The staging table
+--   is dropped at the start and again at the end, so the file is safe to
+--   re-run and leaves nothing behind.
 -- ============================================================
+
+do $directory_seed$
+begin
 
 drop table if exists _company_directory;
 
@@ -4744,3 +4752,6 @@ from (
 on conflict (company_id, domain) do nothing;
 
 drop table if exists _company_directory;
+
+end
+$directory_seed$;

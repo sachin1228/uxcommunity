@@ -17,6 +17,7 @@
  *   node scripts/mirror-company-logos.mjs            # fetch and store
  *   node scripts/mirror-company-logos.mjs --dry-run  # fetch and report only
  *   node scripts/mirror-company-logos.mjs --limit 25 # first 25 companies
+ *   node scripts/mirror-company-logos.mjs --concurrency 16 # 16 companies at a time
  *
  * Needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME,
  * R2_PUBLIC_URL, NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
@@ -24,13 +25,25 @@
  * Safe to re-run: a company that already has a logo_url is skipped unless
  * --force is passed, and a failed upload is logged rather than fatal.
  *
- * The provider below is the same one the app derives from; keep the two in
- * step if it is ever changed.
+ * The app derives its render-time fallback from Google's favicon service
+ * (apps/web/lib/companies/logos.ts). This script is free to be smarter: it
+ * asks several icon providers in order — Google first (fastest, widest
+ * coverage), then Icon Horse (reads the site's own icons), then DuckDuckGo —
+ * and stores the first real icon any of them has. A stored copy always wins
+ * over the derived one, so where it came from does not matter to the app.
  */
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-const PROVIDER = "https://www.google.com/s2/favicons";
+const PROVIDERS = [
+  { name: "google", url: (domain) => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${SIZE}` },
+  { name: "icon-horse", url: (domain) => `https://icon.horse/icon/${encodeURIComponent(domain)}` },
+  { name: "duckduckgo", url: (domain) => `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico` },
+];
+// Icon Horse answers 200 with the SAME placeholder image for any domain it
+// has nothing for (Google and DuckDuckGo answer 404 instead). This never-real
+// domain is fetched once to calibrate what that placeholder looks like.
+const GHOST_DOMAIN = "logo-mirror-placeholder-check.invalid";
 const SIZE = 128;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -39,6 +52,8 @@ const dryRun = args.has("--dry-run");
 const force = args.has("--force");
 const limitFlag = process.argv.indexOf("--limit");
 const limit = limitFlag === -1 ? Infinity : Number(process.argv[limitFlag + 1]) || Infinity;
+const concurrencyFlag = process.argv.indexOf("--concurrency");
+const concurrency = Math.max(1, concurrencyFlag === -1 ? 1 : Number(process.argv[concurrencyFlag + 1]) || 1);
 
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -87,15 +102,27 @@ const headers = {
  * verified rows the way `search_companies` does.
  */
 async function companiesNeedingLogos() {
-  const query = new URLSearchParams({
-    select: "id,name,slug,logo_url,company_domains(domain,verified)",
-    "company_domains.domain": "not.is.null",
-    order: "name.asc",
-  });
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/companies?${query}`, { headers });
-  if (!res.ok) throw new Error(`GET companies: ${res.status} ${await res.text()}`);
+  // PostgREST caps a single request at 1000 rows, and the directory is bigger
+  // than that: page through with a stable sort so offset pagination is
+  // deterministic and no company is missed.
+  const PAGE = 1000;
+  const rows = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const query = new URLSearchParams({
+      select: "id,name,slug,logo_url,company_domains(domain,verified)",
+      "company_domains.domain": "not.is.null",
+      order: "name.asc",
+      limit: String(PAGE),
+      offset: String(offset),
+    });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/companies?${query}`, { headers });
+    if (!res.ok) throw new Error(`GET companies: ${res.status} ${await res.text()}`);
 
-  const rows = await res.json();
+    const page = await res.json();
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
+
   return rows
     .map((row) => {
       const domains = [...(row.company_domains ?? [])].sort(
@@ -106,10 +133,12 @@ async function companiesNeedingLogos() {
     .filter((row) => row.domain && (force || !row.logo_url));
 }
 
-/** Fetches the icon, or null when the provider has none for this domain. */
-async function fetchLogo(domain) {
-  const url = `${PROVIDER}?domain=${encodeURIComponent(domain)}&sz=${SIZE}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+/** Fetches one provider's response as an image, or null when it is not one. */
+async function fetchFrom(provider, domain) {
+  const res = await fetch(provider.url(domain), {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    redirect: "follow",
+  });
 
   // A domain the provider does not know answers 404 — an ordinary outcome, and
   // the reason CompanyLogo is allowed to fall back to the company's initial.
@@ -122,6 +151,31 @@ async function fetchLogo(domain) {
   if (body.length === 0) return null;
 
   return { body, contentType };
+}
+
+/**
+ * Fetches the first icon any provider actually has, or null when none do.
+ * Each provider signals "nothing" differently: Google and DuckDuckGo return
+ * 404; Icon Horse returns its placeholder, which is only detectable by
+ * comparing bytes against a one-time calibration fetch.
+ */
+let iconHorsePlaceholder = null;
+
+async function fetchLogo(domain) {
+  for (const provider of PROVIDERS) {
+    const logo = await fetchFrom(provider, domain);
+    if (!logo) continue;
+
+    if (provider.name === "icon-horse") {
+      if (!iconHorsePlaceholder) {
+        iconHorsePlaceholder = (await fetchFrom(provider, GHOST_DOMAIN))?.body ?? null;
+      }
+      if (iconHorsePlaceholder && iconHorsePlaceholder.equals(logo.body)) continue;
+    }
+
+    return { ...logo, provider: provider.name };
+  }
+  return null;
 }
 
 function extensionFor(contentType) {
@@ -174,30 +228,42 @@ let stored = 0;
 let skipped = 0;
 let failed = 0;
 
-for (const company of work) {
+async function processOne(company) {
   try {
     const logo = await fetchLogo(company.domain);
     if (!logo) {
-      console.log(`  –  ${company.name} (${company.domain}): provider has no icon`);
+      console.log(`  –  ${company.name} (${company.domain}): no provider has an icon`);
       skipped++;
-      continue;
+      return;
     }
 
     if (dryRun) {
-      console.log(`  ?  ${company.name} (${company.domain}): ${logo.contentType}, ${logo.body.length} bytes`);
+      console.log(`  ?  ${company.name} (${company.domain}): ${logo.contentType}, ${logo.body.length} bytes via ${logo.provider}`);
       stored++;
-      continue;
+      return;
     }
 
     const key = `companies/logos/${company.slug}-${Date.now()}.${extensionFor(logo.contentType)}`;
     const url = await upload(key, logo.body, logo.contentType);
     await saveLogoUrl(company.id, url);
-    console.log(`  ✓  ${company.name} → ${url}`);
+    console.log(`  ✓  ${company.name} ← ${logo.provider}`);
     stored++;
   } catch (error) {
     console.error(`  ✗  ${company.name} (${company.domain}): ${error.message}`);
     failed++;
   }
 }
+
+// A simple worker pool: `concurrency` runners pull the next company off a
+// shared cursor. Each company still walks the providers in order, so the
+// outcome is the same as the serial run, only many at a time.
+let cursor = 0;
+await Promise.all(
+  Array.from({ length: Math.min(concurrency, work.length) }, async () => {
+    while (cursor < work.length) {
+      await processOne(work[cursor++]);
+    }
+  })
+);
 
 console.log(`\nDone: ${stored} ${dryRun ? "available" : "stored"}, ${skipped} without an icon, ${failed} failed.`);
