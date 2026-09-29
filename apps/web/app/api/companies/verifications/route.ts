@@ -56,6 +56,7 @@ const STATUS_FOR_FAILURE: Record<StartFailureCode, number> = {
   domain_already_verified: 409,
   already_member: 409,
   unknown_user: 401,
+  not_installed: 503,
   unexpected: 500,
 };
 
@@ -84,6 +85,8 @@ function failureMessage(code: StartFailureCode, companyName: string | null): str
       return "That email's domain isn't a valid company domain.";
     case "unknown_user":
       return "Your session is no longer valid. Sign in again.";
+    case "not_installed":
+      return "Adding a company isn't available right now. Please try again later.";
     default:
       return "Something went wrong sending the verification code. Please try again.";
   }

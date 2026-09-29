@@ -73,6 +73,17 @@ export interface ProfileCompanyState {
   pending: PendingVerification | null;
 }
 
+/**
+ * PostgREST/Postgres codes that mean the company feature was never installed on
+ * this database: the migration that defines the tables and functions has not
+ * been applied, or PostgREST is serving a stale schema cache. Reported as its
+ * own failure so the member sees something true instead of "something went
+ * wrong", and the route logs what to run.
+ */
+const NOT_INSTALLED_CODES = new Set(["PGRST202", "PGRST205", "42883", "42P01", "42501", "3F000"]);
+
+export const MIGRATION_FILE = "supabase/migrations/20260929120000_company_verified_domains.sql";
+
 /** Failure codes `start_company_verification` can report. */
 export const START_FAILURE_CODES = [
   "invalid_work_email",
@@ -85,6 +96,7 @@ export const START_FAILURE_CODES = [
   "domain_already_verified",
   "already_member",
   "unknown_user",
+  "not_installed",
 ] as const;
 
 export type StartFailureCode = (typeof START_FAILURE_CODES)[number] | "unexpected";
@@ -104,6 +116,7 @@ export type ConfirmStatus =
   | "company_inactive"
   | "domain_not_verified"
   | "domain_already_verified"
+  | "not_installed"
   | "unexpected";
 
 export type ConfirmVerificationResult =
@@ -124,6 +137,14 @@ function readRaised(error: PostgrestError | null): {
   detail: Record<string, unknown> | null;
 } {
   if (!error) return { code: "unexpected", detail: null };
+
+  if (error.code && NOT_INSTALLED_CODES.has(error.code)) {
+    console.error(
+      `[companies] the company feature is not installed on this database (${error.code}: ${error.message}). ` +
+        `Apply ${MIGRATION_FILE} and reload the PostgREST schema cache.`
+    );
+    return { code: "not_installed", detail: null };
+  }
 
   const code = (error.message ?? "").trim().split("\n")[0].trim();
   let detail: Record<string, unknown> | null = null;
@@ -363,6 +384,9 @@ export async function confirmCompanyVerification(
     // which case the transaction rolled back and the member joins instead.
     if (code === "domain_already_verified") {
       return { ok: false, status: "domain_already_verified", attemptsLeft: null };
+    }
+    if (code === "not_installed") {
+      return { ok: false, status: "not_installed", attemptsLeft: null };
     }
     console.error("[companies] confirm verification failed:", error);
     return { ok: false, status: "unexpected", attemptsLeft: null };
