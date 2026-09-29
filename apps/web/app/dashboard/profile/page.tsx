@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
+import { getProfileCompanyState } from "@/lib/companies/service";
 import { ProfileClient } from "./ProfileClient";
 
 export const metadata = { title: "Your Profile" };
@@ -26,6 +27,7 @@ export default async function ProfilePage({ searchParams }: Props) {
     { data: userInterests },
     { data: allInterests },
     { data: bannerRow },
+    { company: profileCompany, pending: pendingCompany },
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
@@ -48,6 +50,9 @@ export default async function ProfilePage({ searchParams }: Props) {
       .select("banner_url")
       .eq("user_id", userId)
       .maybeSingle(),
+    // The company line on the profile, plus any work-email challenge still
+    // waiting on a code so the picker can reopen straight into it.
+    getProfileCompanyState(db, userId),
   ]);
 
   // Resolve the job title slug to its admin-managed display name (the profile
@@ -86,6 +91,8 @@ export default async function ProfilePage({ searchParams }: Props) {
       initialBio={(profile as any)?.bio ?? ""}
       initialInterestIds={myInterestIds}
       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
+      initialCompany={profileCompany}
+      pendingCompany={pendingCompany}
     />
   );
 }

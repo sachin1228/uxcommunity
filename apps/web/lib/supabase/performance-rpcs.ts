@@ -77,6 +77,101 @@ type PerformanceRpcMap = {
   get_event_list_page: { args: { p_community_id: string; p_user_id: string; p_phase: "upcoming" | "past"; p_cursor_event_date: string | null; p_cursor_id: string | null; p_now: string; p_limit: number }; returns: Array<{ item: Json }> };
   get_home_feed_page: { args: { p_user_id: string; p_before: string | null; p_limit: number; p_scope: HomeFeedScope }; returns: Array<{ item: Json }> };
   get_profile_feed_page: { args: { p_user_id: string; p_scope: ProfileFeedScope; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
+  // ─── Companies (verified work domains) ───
+  // All company rules live in these functions (see
+  // supabase/migrations/20260929120000_company_verified_domains.sql); the API
+  // routes only supply the session user id, so the client never dictates which
+  // company or domain a membership lands on.
+  search_companies: {
+    args: { p_query: string; p_limit: number };
+    returns: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      domain: string | null;
+      verified: boolean;
+      member_count: number;
+    }>;
+  };
+  company_domain_owner: {
+    args: { p_domain: string };
+    returns: Array<{ company_id: string; name: string; slug: string; verified: boolean }>;
+  };
+  get_user_company: {
+    args: { p_user_id: string };
+    returns: Array<{
+      company_id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      is_active: boolean;
+      domain: string | null;
+      domain_verified: boolean;
+      membership_verified: boolean;
+      joined_at: string | null;
+    }>;
+  };
+  get_pending_company_verification: {
+    args: { p_user_id: string; p_verification_id: string | null };
+    returns: Array<{
+      verification_id: string;
+      company_id: string | null;
+      company_name: string;
+      domain: string;
+      work_email: string;
+      attempts_left: number;
+      expires_at: string;
+      created_at: string;
+    }>;
+  };
+  start_company_verification: {
+    args: {
+      p_user_id: string;
+      p_domain: string;
+      p_work_email: string;
+      p_code_hash: string;
+      p_company_id: string | null;
+      p_company_name: string | null;
+      p_ttl_minutes: number;
+    };
+    returns: Array<{
+      verification_id: string;
+      company_id: string | null;
+      company_name: string;
+      domain: string;
+      work_email: string;
+      expires_at: string;
+    }>;
+  };
+  confirm_company_verification: {
+    args: { p_user_id: string; p_verification_id: string; p_code_hash: string };
+    returns: Array<{
+      status: string;
+      attempts_left: number | null;
+      company_id: string | null;
+      company_name: string | null;
+      company_slug: string | null;
+      company_logo_url: string | null;
+      domain: string | null;
+      joined_at: string | null;
+    }>;
+  };
+  leave_company: { args: { p_user_id: string }; returns: boolean };
+  get_company_page: {
+    args: { p_slug: string };
+    returns: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      is_active: boolean;
+      created_at: string;
+      member_count: number;
+      domains: Json;
+      members: Json;
+    }>;
+  };
 };
 
 /** Card scopes the profile activity tabs can request. */

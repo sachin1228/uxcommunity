@@ -7,6 +7,11 @@ import { ProfileCard } from "./components/ProfileCard";
 import { ImagePickerModal } from "./components/ImagePickerModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
+import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
+import type {
+  PendingCompanyVerification,
+  ProfileCompanyView,
+} from "@/components/companies/types";
 
 interface Props {
   userId: string;
@@ -26,6 +31,8 @@ interface Props {
   initialBio: string;
   initialInterestIds: string[];
   allInterests: { id: string; name: string; image_url?: string | null }[];
+  initialCompany: ProfileCompanyView | null;
+  pendingCompany: PendingCompanyVerification | null;
 }
 
 export function ProfileClient({
@@ -41,9 +48,15 @@ export function ProfileClient({
   initialBio,
   initialInterestIds,
   allInterests,
+  initialCompany,
+  pendingCompany,
 }: Props) {
   const router = useRouter();
   const [name] = useState(initialName);
+  // The server is the source of truth: the client only mirrors what the last
+  // read returned, and refreshes the page after a membership changes.
+  const [showCompanyPicker, setShowCompanyPicker] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(pendingCompany);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl);
   const [showPicturePicker, setShowPicturePicker] = useState(false);
@@ -220,6 +233,8 @@ export function ProfileClient({
           jobTitle={jobTitle}
           bio={initialBio}
           interestNames={interestNames}
+          company={initialCompany}
+          onAddCompany={() => setShowCompanyPicker(true)}
         />
       </div>
 
@@ -235,6 +250,20 @@ export function ProfileClient({
           onRemoveUpload={handleRemoveUpload}
           onSave={handleSavePicture}
           onClose={closePicturePicker}
+        />
+      )}
+
+      {/* Mounted only while open: the picker's state is per-attempt, so
+          unmounting it is what resets the search, the email and the code. */}
+      {showCompanyPicker && (
+        <AddCompanyModal
+          open
+          onClose={() => setShowCompanyPicker(false)}
+          initialPending={pendingVerification}
+          onVerified={() => {
+            setPendingVerification(null);
+            router.refresh();
+          }}
         />
       )}
 
