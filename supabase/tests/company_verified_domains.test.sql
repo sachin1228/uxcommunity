@@ -28,7 +28,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(80);
+select plan(104);
 
 -- ─── Fixture ────────────────────────────────────────────────
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
@@ -41,7 +41,9 @@ delete from public.company_email_verifications where user_id in (
   'c0c0c0c0-0000-4000-8000-000000000003',
   'c0c0c0c0-0000-4000-8000-000000000004',
   'c0c0c0c0-0000-4000-8000-000000000005',
-  'c0c0c0c0-0000-4000-8000-000000000006'
+  'c0c0c0c0-0000-4000-8000-000000000006',
+  'c0c0c0c0-0000-4000-8000-000000000007',
+  'c0c0c0c0-0000-4000-8000-000000000008'
 );
 delete from public.designer_profiles where user_id in (
   'c0c0c0c0-0000-4000-8000-000000000001',
@@ -49,7 +51,9 @@ delete from public.designer_profiles where user_id in (
   'c0c0c0c0-0000-4000-8000-000000000003',
   'c0c0c0c0-0000-4000-8000-000000000004',
   'c0c0c0c0-0000-4000-8000-000000000005',
-  'c0c0c0c0-0000-4000-8000-000000000006'
+  'c0c0c0c0-0000-4000-8000-000000000006',
+  'c0c0c0c0-0000-4000-8000-000000000007',
+  'c0c0c0c0-0000-4000-8000-000000000008'
 );
 delete from public.users where id in (
   'c0c0c0c0-0000-4000-8000-000000000001',
@@ -57,9 +61,11 @@ delete from public.users where id in (
   'c0c0c0c0-0000-4000-8000-000000000003',
   'c0c0c0c0-0000-4000-8000-000000000004',
   'c0c0c0c0-0000-4000-8000-000000000005',
-  'c0c0c0c0-0000-4000-8000-000000000006'
+  'c0c0c0c0-0000-4000-8000-000000000006',
+  'c0c0c0c0-0000-4000-8000-000000000007',
+  'c0c0c0c0-0000-4000-8000-000000000008'
 );
-delete from public.companies where slug in ('figma', 'google', 'midlevel', 'stale-co');
+delete from public.companies where slug in ('figma', 'google', 'midlevel', 'stale-co', 'hintco', 'reserved-co');
 
 insert into public.users (id, name, email, password_hash, application_id) values
   ('c0c0c0c0-0000-4000-8000-000000000001', 'Sachin', 'sachin@figma.test',      'x', null),
@@ -67,7 +73,9 @@ insert into public.users (id, name, email, password_hash, application_id) values
   ('c0c0c0c0-0000-4000-8000-000000000003', 'Raj',    'raj@randomcompany.test', 'x', null),
   ('c0c0c0c0-0000-4000-8000-000000000004', 'Meera',  'meera@somecorp.test',    'x', null),
   ('c0c0c0c0-0000-4000-8000-000000000005', 'Arjun',  'arjun@google.test',      'x', null),
-  ('c0c0c0c0-0000-4000-8000-000000000006', 'Dev',    'dev@midlevel.test',      'x', null);
+  ('c0c0c0c0-0000-4000-8000-000000000006', 'Dev',    'dev@midlevel.test',      'x', null),
+  ('c0c0c0c0-0000-4000-8000-000000000007', 'Asha',   'asha@hintco.test',       'x', null),
+  ('c0c0c0c0-0000-4000-8000-000000000008', 'Vikram', 'vikram@reserved.test',   'x', null);
 
 insert into public.designer_profiles (user_id, experience_level)
 select id, 'mid_level' from public.users
@@ -77,7 +85,9 @@ where id in (
   'c0c0c0c0-0000-4000-8000-000000000003',
   'c0c0c0c0-0000-4000-8000-000000000004',
   'c0c0c0c0-0000-4000-8000-000000000005',
-  'c0c0c0c0-0000-4000-8000-000000000006'
+  'c0c0c0c0-0000-4000-8000-000000000006',
+  'c0c0c0c0-0000-4000-8000-000000000007',
+  'c0c0c0c0-0000-4000-8000-000000000008'
 )
 on conflict (user_id) do update set experience_level = excluded.experience_level;
 
@@ -386,7 +396,7 @@ select throws_ok(
 );
 
 select is(
-  (select member_count::int from public.search_companies('Google')),
+  (select member_count::int from public.search_companies('Google') where name = 'Google'),
   (select count(*)::int from public.company_members as m
     join public.companies as c on c.id = m.company_id
    where c.name = 'Google' and m.verified),
@@ -410,7 +420,7 @@ select is(
 );
 
 select is(
-  (select member_count::int from public.search_companies('Google')),
+  (select member_count::int from public.search_companies('Google') where name = 'Google'),
   2,
   'an unverified membership is not counted'
 );
@@ -689,8 +699,11 @@ select is(
 
 -- ─── 9. Search ──────────────────────────────────────────────
 
+-- Asserted by name, not by count: the directory is generated and grows, so a
+-- bare count here would break the moment another company's name starts with the
+-- same three letters.
 select is(
-  (select count(*)::int from public.search_companies('fig')),
+  (select count(*)::int from public.search_companies('fig') where name = 'Figma'),
   1,
   'search finds a company by name prefix'
 );
@@ -721,6 +734,11 @@ select is(
 
 insert into public.companies (name, slug, is_active)
 values ('Stale Co', 'stale-co', false);
+
+-- Listed with the domain it is known by, like any directory entry: a company
+-- nobody can prove is a dead end, which section 11 asserts none of them are.
+insert into public.company_domains (company_id, domain)
+select id, 'stale.co' from public.companies where slug = 'stale-co';
 
 select is(
   (select count(*)::int from public.search_companies('Stale Co')),
@@ -852,6 +870,274 @@ select is(
    where c.name = 'Google' and m.verified),
   3,
   'other companies are untouched'
+);
+
+-- ─── 11. The default directory: a hint is a name to prove ───
+
+-- 20260929140000_company_directory.sql seeds companies with the domain each is
+-- known by, as UNVERIFIED rows: hints. These assertions pin what a hint may
+-- do — be found, be joined, and be promoted by the first member who proves the
+-- mailbox — and what it may not: own a domain, answer a domain search, or
+-- stand in for the emailed code.
+
+-- Two directory entries exactly as that seed writes them: a company, plus an
+-- unproved domain. Nothing here verifies anything.
+insert into public.companies (name, slug) values ('Hintco', 'hintco'), ('Reserved Co', 'reserved-co');
+insert into public.company_domains (company_id, domain)
+select id, 'hintco.test' from public.companies where slug = 'hintco';
+insert into public.company_domains (company_id, domain)
+select id, 'reserved.test' from public.companies where slug = 'reserved-co';
+
+select is(
+  (select domain from public.search_companies('Hintco')),
+  'hintco.test',
+  'search reports the domain a directory entry is known by'
+);
+
+select is(
+  (select verified from public.search_companies('Hintco')),
+  false,
+  'search never reports a directory domain as verified'
+);
+
+select is(
+  (select verified from public.company_domain_owner('hintco.test')),
+  false,
+  'the domain owner lookup returns a hint unverified, so routing never follows it'
+);
+
+select is(
+  (select count(*)::int from public.search_companies('hintco.test')),
+  0,
+  'a hint does not answer a domain search'
+);
+
+-- A member picks Hintco from the directory and gives a work email on the domain
+-- the directory knows it by. This has to open a challenge: without hints this
+-- path was closed (no verified domain to match) while the name was taken, which
+-- is the dead end the seed would otherwise create for every company it lists.
+select is(
+  (select company_name from public.start_company_verification(
+    p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000007',
+    p_domain     => 'hintco.test',
+    p_work_email => 'asha@hintco.test',
+    p_code_hash  => 'hash-asha',
+    p_company_id => (select id from public.companies where slug = 'hintco')
+  )),
+  'Hintco',
+  'a directory hint is enough to open a work-email challenge'
+);
+
+-- Proving the mailbox is still what turns the hint into a claim: the challenge
+-- above only exists because a code has to come back.
+select is(
+  (select status from public.confirm_company_verification(
+    'c0c0c0c0-0000-4000-8000-000000000007',
+    (select id from public.company_email_verifications
+      where user_id = 'c0c0c0c0-0000-4000-8000-000000000007' and consumed_at is null),
+    'hash-asha'
+  )),
+  'verified',
+  'confirming the code promotes the directory hint'
+);
+
+select is(
+  (select count(*)::int from public.company_domains where domain = 'hintco.test'),
+  1,
+  'the hint row is promoted, not duplicated'
+);
+
+select is(
+  (select verified from public.company_domains where domain = 'hintco.test'),
+  true,
+  'the promoted domain row is verified by the member''s proof'
+);
+
+select is(
+  (select count(*)::int from public.companies where lower(name) = 'hintco'),
+  1,
+  'proving a hinted domain creates no second company'
+);
+
+select is(
+  (select name from public.get_user_company('c0c0c0c0-0000-4000-8000-000000000007')),
+  'Hintco',
+  'the member who proved the hinted domain displays its company'
+);
+
+select is(
+  (select count(*)::int from public.company_members as m
+    join public.companies as c on c.id = m.company_id
+   where c.slug = 'hintco' and m.verified),
+  1,
+  'the member joins the directory company once'
+);
+
+-- A hint is not a blanket invitation: Hintco is verified for hintco.test alone,
+-- so an unrelated domain still cannot join it.
+select throws_ok(
+  $$select public.start_company_verification(
+      p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000008',
+      p_domain     => 'elsewhere.test',
+      p_work_email => 'vikram@elsewhere.test',
+      p_code_hash  => 'hash-vikram',
+      p_company_id => (select id from public.companies where slug = 'hintco')
+    )$$,
+  'P0001',
+  'hint-does-not-open-other-domains',
+  'a directory company still refuses a domain it never listed'
+);
+
+-- Naming a company on a domain the directory already maps elsewhere is refused
+-- (proving it here would invent a second company for one domain).
+select throws_ok(
+  $$select public.start_company_verification(
+      p_user_id      => 'c0c0c0c0-0000-4000-8000-000000000008',
+      p_domain       => 'reserved.test',
+      p_work_email   => 'vikram@reserved.test',
+      p_code_hash    => 'hash-vikram',
+      p_company_name => 'Reserved Co Two'
+    )$$,
+  'P0001',
+  'hint-domain-reserved',
+  'a domain the directory already lists cannot be spent on a new company'
+);
+
+select is(
+  (select count(*)::int from public.companies where lower(name) = 'reserved co two'),
+  0,
+  'the reserved-domain refusal created no company'
+);
+
+-- The refusal above is the same message whether the holder's claim is proved or
+-- only listed, so the route tells the member which it is through the exception
+-- detail. The helper is local to this file: pgTAP assertions are queries, and
+-- an exception detail is only reachable from inside a handler.
+create or replace function public.test_company_refusal_reason(
+  p_user_id      uuid,
+  p_domain       text,
+  p_work_email   text,
+  p_company_name text
+) returns text
+language plpgsql
+as $$
+declare
+  v_detail text;
+begin
+  begin
+    perform public.start_company_verification(
+      p_user_id      => p_user_id,
+      p_domain       => p_domain,
+      p_work_email   => p_work_email,
+      p_code_hash    => 'hash-reason',
+      p_company_name => p_company_name
+    );
+  exception when others then
+    get stacked diagnostics v_detail = pg_exception_detail;
+    return v_detail::jsonb ->> 'reason';
+  end;
+  return null;
+end;
+$$;
+
+select is(
+  public.test_company_refusal_reason(
+    'c0c0c0c0-0000-4000-8000-000000000008',
+    'reserved.test',
+    'vikram@reserved.test',
+    'Reserved Co Two'
+  ),
+  'reserved',
+  'a domain the directory lists is reported as reserved, not as proved'
+);
+
+select is(
+  public.test_company_refusal_reason(
+    'c0c0c0c0-0000-4000-8000-000000000008',
+    'hintco.test',
+    'vikram@hintco.test',
+    'Hintco Clone'
+  ),
+  'verified',
+  'a domain somebody has proved is reported as verified'
+);
+
+-- ...and joining the company that holds it works, with the same work email.
+select is(
+  (select status from public.confirm_company_verification(
+    'c0c0c0c0-0000-4000-8000-000000000008',
+    (select verification_id from public.start_company_verification(
+      p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000008',
+      p_domain     => 'reserved.test',
+      p_work_email => 'vikram@reserved.test',
+      p_code_hash  => 'hash-vikram-2',
+      p_company_id => (select id from public.companies where slug = 'reserved-co')
+    )),
+    'hash-vikram-2'
+  )),
+  'verified',
+  'the member joins the company the domain is listed for'
+);
+
+select is(
+  (select count(*)::int from public.company_domains where domain = 'reserved.test' and verified),
+  1,
+  'joining promotes that company''s own hint to a verified claim'
+);
+
+-- The directory itself has to be there: the picker is only useful if the seed
+-- applied, and what it plants has to be a hint rather than a claim.
+select is(
+  (select count(*)::int from public.companies where slug = 'flipkart'),
+  1,
+  'the default company directory is loaded'
+);
+
+select is(
+  (select d.verified from public.company_domains as d
+    join public.companies as c on c.id = d.company_id
+   where c.slug = 'flipkart' and d.domain = 'flipkart.com'),
+  false,
+  'a seeded domain starts as an unproved hint'
+);
+
+-- The invariants the generator has to keep. Each one, if it broke, would put a
+-- dead end in the picker: a listed company nobody can join, a domain two
+-- companies both claim, or a consumer mailbox offered as an employer.
+select ok(
+  (select count(*) from public.companies where created_by is null) >= 1000,
+  'the directory is a real list, not a stub'
+);
+
+select is(
+  (select count(*)::int from public.companies as c
+    where c.created_by is null
+      and not exists (select 1 from public.company_domains as d where d.company_id = c.id)),
+  0,
+  'every directory entry has a domain a member can prove'
+);
+
+select is(
+  (select count(*)::int from (
+     select d.domain
+     from public.company_domains as d
+     join public.companies as c on c.id = d.company_id
+     where c.created_by is null
+     group by d.domain
+     having count(*) > 1
+   ) as duplicates),
+  0,
+  'no domain is offered by two directory entries'
+);
+
+select is(
+  (select count(*)::int from public.company_domains as d
+    join public.companies as c on c.id = d.company_id
+   where c.created_by is null
+     and d.domain in ('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
+                      'icloud.com', 'proton.me', 'mail.ru', 'qq.com')),
+  0,
+  'no consumer mailbox domain is offered as a company domain'
 );
 
 select * from finish();

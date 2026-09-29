@@ -64,9 +64,26 @@ const STATUS_FOR_FAILURE: Record<StartFailureCode, number> = {
   unexpected: 500,
 };
 
-function failureMessage(code: StartFailureCode, companyName: string | null): string {
+/**
+ * `reserved` marks the refusal that is not about a proven domain: the domain is
+ * one the company directory already lists for a company (a hint nobody has
+ * proved yet, see supabase/migrations/20260929130000_company_directory_hints.sql).
+ * The member's action is the same either way — join that company — but the
+ * reason has to be told truthfully, because "already verified" would be a
+ * claim nobody has made.
+ */
+function failureMessage(
+  code: StartFailureCode,
+  companyName: string | null,
+  reserved = false
+): string {
   switch (code) {
     case "domain_already_verified":
+      if (reserved) {
+        return companyName
+          ? `That domain is already listed for ${companyName}. Join ${companyName} instead.`
+          : "That domain is already listed for another company. Search for that company and join it instead.";
+      }
       return companyName
         ? `${companyName} already has that domain verified. Join ${companyName} instead.`
         : "That domain is already verified for another company. Search for that company and join it instead.";
@@ -75,7 +92,7 @@ function failureMessage(code: StartFailureCode, companyName: string | null): str
         ? `A company called ${companyName} already exists. Pick it from search and verify with a ${companyName} work email to join it, or give yours a distinguishing name.`
         : "A company with that name already exists. Pick it from search instead.";
     case "domain_not_verified_for_company":
-      return "That domain isn't verified for this company. Use a work email on one of its verified domains, or create the company you actually work at.";
+      return "That domain isn't one of this company's domains. Check which company owns your work email's domain, or use a different work email.";
     case "already_member":
       return "You've already verified a work email for this company.";
     case "company_inactive":
@@ -230,7 +247,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: started.code,
-        message: failureMessage(started.code, refused?.name ?? null),
+        message: failureMessage(
+          started.code,
+          refused?.name ?? null,
+          started.detail?.reason === "reserved"
+        ),
         ...(refused ? { company: refused } : {}),
       },
       { status: STATUS_FOR_FAILURE[started.code] ?? 500 }

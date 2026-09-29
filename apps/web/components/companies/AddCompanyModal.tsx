@@ -391,7 +391,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
                             </span>
                           ) : (
                             <span className="font-body text-xs text-foreground-subtle">
-                              No verified domain yet
+                              No domain on file yet
                             </span>
                           )}
                           {company.verified && <VerifiedMark size="xs" />}

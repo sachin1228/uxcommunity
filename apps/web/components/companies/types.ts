@@ -5,7 +5,10 @@ export interface CompanyOption {
   name: string;
   slug?: string;
   logoUrl?: string | null;
-  /** Primary verified domain, when the company has one. */
+  /**
+   * The company's primary domain: verified when a member has proved it, else
+   * the domain the company directory knows it by. `verified` says which.
+   */
   domain?: string | null;
   verified?: boolean;
   memberCount?: number;

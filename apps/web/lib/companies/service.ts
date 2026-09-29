@@ -1,6 +1,7 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { maskEmail } from "./domains";
+import { companyLogoUrl } from "./logos";
 
 /**
  * Server-side access to the verified-company model.
@@ -20,7 +21,11 @@ export interface CompanyHit {
   name: string;
   slug: string;
   logoUrl: string | null;
-  /** Primary verified domain, or null when the company has none yet. */
+  /**
+   * The company's primary verified domain, or — for a directory entry nobody
+   * has proved yet — the domain it is known by. `verified` is what separates
+   * the two; a hint is a name to prove, not a claim of ownership.
+   */
   domain: string | null;
   verified: boolean;
   memberCount: number;
@@ -82,7 +87,17 @@ export interface ProfileCompanyState {
  */
 const NOT_INSTALLED_CODES = new Set(["PGRST202", "PGRST205", "42883", "42P01", "42501", "3F000"]);
 
-export const MIGRATION_FILE = "supabase/migrations/20260929120000_company_verified_domains.sql";
+/**
+ * The migrations that install the company feature, in order. They are listed
+ * together because the order matters: the directory seed would list companies
+ * whose domains still cannot be claimed if the hint migration were missing,
+ * which is the dead end that migration removes.
+ */
+export const COMPANY_MIGRATIONS = [
+  "supabase/migrations/20260929120000_company_verified_domains.sql",
+  "supabase/migrations/20260929130000_company_directory_hints.sql",
+  "supabase/migrations/20260929140000_company_directory.sql",
+] as const;
 
 /** Failure codes `start_company_verification` can report. */
 export const START_FAILURE_CODES = [
@@ -141,7 +156,7 @@ function readRaised(error: PostgrestError | null): {
   if (error.code && NOT_INSTALLED_CODES.has(error.code)) {
     console.error(
       `[companies] the company feature is not installed on this database (${error.code}: ${error.message}). ` +
-        `Apply ${MIGRATION_FILE} and reload the PostgREST schema cache.`
+        `Apply ${COMPANY_MIGRATIONS.join(", ")} in order, then reload the PostgREST schema cache.`
     );
     return { code: "not_installed", detail: null };
   }
@@ -198,7 +213,7 @@ export async function searchCompanies(
     id: row.id,
     name: row.name,
     slug: row.slug,
-    logoUrl: row.logo_url,
+    logoUrl: companyLogoUrl(row.logo_url, row.domain),
     domain: row.domain,
     verified: Boolean(row.verified),
     memberCount: Number(row.member_count ?? 0),
@@ -230,7 +245,7 @@ export async function getProfileCompanyState(
           id: companyRow.company_id,
           name: companyRow.name,
           slug: companyRow.slug,
-          logoUrl: companyRow.logo_url,
+          logoUrl: companyLogoUrl(companyRow.logo_url, companyRow.domain),
           isActive: Boolean(companyRow.is_active),
           domain: companyRow.domain,
           domainVerified: Boolean(companyRow.domain_verified),
@@ -412,7 +427,7 @@ export async function confirmCompanyVerification(
       id: row.company_id as string,
       name: row.company_name as string,
       slug: row.company_slug as string,
-      logoUrl: row.company_logo_url,
+      logoUrl: companyLogoUrl(row.company_logo_url, row.domain),
       domain: row.domain,
       joinedAt: row.joined_at,
     },
@@ -464,18 +479,20 @@ export async function getCompanyPage(
   const row = (data ?? [])[0];
   if (!row) return null;
 
+  const domains = parseJsonArray(row.domains).map((entry) => ({
+    domain: String(entry.domain ?? ""),
+    verifiedAt: typeof entry.verified_at === "string" ? entry.verified_at : null,
+  }));
+
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
-    logoUrl: row.logo_url,
+    logoUrl: companyLogoUrl(row.logo_url, domains[0]?.domain ?? null),
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     memberCount: Number(row.member_count ?? 0),
-    domains: parseJsonArray(row.domains).map((entry) => ({
-      domain: String(entry.domain ?? ""),
-      verifiedAt: typeof entry.verified_at === "string" ? entry.verified_at : null,
-    })),
+    domains,
     members: parseJsonArray(row.members).map((entry) => ({
       name: String(entry.name ?? ""),
       avatarUrl: typeof entry.avatar_url === "string" ? entry.avatar_url : null,

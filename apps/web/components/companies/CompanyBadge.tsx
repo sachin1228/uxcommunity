@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { BadgeCheck } from "lucide-react";
 
 /**
@@ -7,6 +8,11 @@ import { BadgeCheck } from "lucide-react";
  * has no logo (a newly created one is allowed to start empty), and a
  * user-uploaded logo is never proof of ownership — it is decoration next to
  * the verified domain, which is the actual signal.
+ *
+ * The image is allowed to fail quietly. Most logos are resolved from the
+ * company's domain (see lib/companies/logos.ts) and the provider answers 404
+ * for a domain it has no icon for, so an error is an ordinary outcome, not a
+ * broken page: the initial takes over instead.
  */
 export function CompanyLogo({
   name,
@@ -19,15 +25,19 @@ export function CompanyLogo({
   size?: number;
   className?: string;
 }) {
+  // Remembered per URL rather than as a boolean, so a logo that changes (a
+  // company gets a real one) is retried without an effect resetting state.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const style = { width: size, height: size };
 
-  if (logoUrl) {
+  if (logoUrl && logoUrl !== failedUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={logoUrl}
         alt=""
         style={style}
+        onError={() => setFailedUrl(logoUrl)}
         className={`shrink-0 rounded-md border border-border bg-surface object-cover ${className}`}
       />
     );
