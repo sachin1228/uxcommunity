@@ -6,14 +6,9 @@ import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 
 interface Props {
   userId: string;
-  user: {
-    name: string;
-    email: string;
-    avatarUrl: string | null;
-  };
 }
 
-export function MobileSidebar({ userId, user }: Props) {
+export function MobileSidebar({ userId }: Props) {
   const [open, setOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -76,7 +71,7 @@ export function MobileSidebar({ userId, user }: Props) {
               </button>
             </div>
             <div className="min-h-0 flex-1" onClick={() => setOpen(false)}>
-              <GlobalSidebar userId={userId} user={user} mobile />
+              <GlobalSidebar userId={userId} mobile />
             </div>
           </section>
         </div>

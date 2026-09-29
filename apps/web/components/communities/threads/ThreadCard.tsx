@@ -669,14 +669,9 @@ export function ThreadCard({
 
       {lightboxIndex !== null && (
         <ThreadImageLightbox
-          thread={thread}
-          communityId={communityId}
-          currentUserId={currentUserId}
           images={images}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
-          onLikeToggle={() => likeCoalescerRef.current?.toggle()}
-          onUpdated={onUpdated}
         />
       )}
     </>

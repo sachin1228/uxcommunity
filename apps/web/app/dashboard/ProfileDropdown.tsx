@@ -12,8 +12,6 @@ interface Props {
   name: string;
   email: string;
   avatarUrl: string | null;
-  /** "icon" (default) — compact avatar button for bars; "row" — full-width row for the sidebar. */
-  variant?: "icon" | "row";
 }
 
 /** Rows are uniform: label on the left, icon on the right. */
@@ -27,8 +25,15 @@ const MENU_LINKS = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Props) {
-  const isRow = variant === "row";
+/**
+ * The member's avatar trigger and its menu.
+ *
+ * Lives at the right end of the topbar, where the name and email have room to
+ * appear inside the menu instead of crowding the bar — the avatar alone
+ * identifies it, and the member's name is on the profile row of every page they
+ * own. The trigger is icon-only; there is no room for the name here.
+ */
+export function ProfileDropdown({ name, email, avatarUrl }: Props) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { loggingOut, handleLogout } = useLogout();
@@ -43,28 +48,14 @@ export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Pr
         onClick={() => setOpen((v) => !v)}
         aria-label="Profile menu"
         aria-expanded={open}
-        className={
-          isRow
-            ? "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-[5px] py-1 text-left transition-colors hover:bg-surface-raised focus:outline-none"
-            : "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border focus:outline-none"
-        }
+        className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border transition-colors hover:border-foreground-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <AvatarImg
           url={avatarUrl}
           name={name}
-          size={isRow ? 32 : 28}
-          className={isRow ? "h-8 w-8 shrink-0 rounded-full object-cover" : "h-7 w-7 rounded-full object-cover"}
+          size={28}
+          className="h-7 w-7 rounded-full object-cover"
         />
-        {isRow && (
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-body text-sm font-medium leading-tight text-foreground">
-              {name}
-            </span>
-            <span className="mt-0.5 block truncate font-body text-[11px] leading-tight text-foreground-muted">
-              {email}
-            </span>
-          </span>
-        )}
       </button>
 
       {/* Portal dropdown — sits above all stacking contexts */}
@@ -72,7 +63,7 @@ export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Pr
         triggerRef={triggerRef}
         open={open}
         onClose={() => setOpen(false)}
-        align={isRow ? "left" : "right"}
+        align="right"
         tone="overlay"
         className="w-60"
       >

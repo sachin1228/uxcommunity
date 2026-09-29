@@ -3,8 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
-import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 import { UndoToast } from "@/components/ui/UndoToast";
+import { Topbar } from "./Topbar";
 
 
 export default async function DashboardLayout({
@@ -65,15 +65,14 @@ export default async function DashboardLayout({
   const sidebarUser = { name, email, avatarUrl };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background-subtle text-foreground">
-      {/* Narrow-viewport nav trigger — floats because there is no topbar anymore */}
-      <div className="fixed left-2 top-2 z-40 min-[500px]:hidden">
-        <MobileSidebar userId={userId} user={sidebarUser} />
-      </div>
+    <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+      {/* End to end: the bar spans the window and sits above the sidebar, so
+          the brand reads as the app's header rather than the sidebar's. */}
+      <Topbar userId={userId} user={sidebarUser} />
 
       <div className="flex min-h-0 min-w-0 flex-1">
         <div className="hidden h-full min-[500px]:block">
-          <GlobalSidebar userId={userId} user={sidebarUser} />
+          <GlobalSidebar userId={userId} />
         </div>
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">

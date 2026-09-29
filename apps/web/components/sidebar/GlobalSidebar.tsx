@@ -4,7 +4,6 @@ import { useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
-import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -17,22 +16,12 @@ import {
   subscribeCreateCommunityDialog,
 } from "@/lib/communities/create-community-dialog";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
-import { useNotifications } from "@/lib/use-notifications";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { BrandLogo } from "@/components/ui/BrandLogo";
-import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
-interface SidebarUser {
-  name: string;
-  email: string;
-  avatarUrl: string | null;
-}
-
 interface Props {
   userId: string;
-  user: SidebarUser;
   mobile?: boolean;
 }
 
@@ -42,7 +31,7 @@ function isMatch(href: string, pathname: string) {
     : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function GlobalSidebar({ userId, user, mobile = false }: Props) {
+export function GlobalSidebar({ userId, mobile = false }: Props) {
   const pathname = usePathname();
   // One dialog for every trigger: the sidebar's "+" and the homepage rail's
   // create card both flip this store (see lib/communities/create-community-dialog.ts).
@@ -51,8 +40,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
     isCreateCommunityDialogOpen,
     () => false,
   );
-  const { unreadCount: notificationCount } = useNotifications(userId);
-
   const {
     communities,
     loading,
@@ -85,7 +72,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const exploreActive = pathname === "/dashboard/communities";
   const libraryActive = isMatch("/dashboard/library", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
-  const notificationsActive = isMatch("/dashboard/notifications", pathname);
 
   return (
     <aside
@@ -103,32 +89,10 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           }}
         />
       )}
+      {/* No brand row here: the logo, the unread badge and the profile menu all
+          moved to the topbar (see apps/web/app/dashboard/Topbar.tsx), which is
+          visible from every page. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-      {!mobile && (
-        <div className="flex items-center justify-between px-[13px] pb-[11px] pt-[13px]">
-          <BrandLogo iconClassName="h-7 w-7" markOnly />
-          <div className="flex items-center gap-1">
-            {/* Notifications — opens the dedicated notifications page */}
-            <Link
-              href="/dashboard/notifications"
-              aria-label={notificationCount > 0 ? `${notificationCount} unread notifications` : "Notifications"}
-              title="Notifications"
-              className="relative flex h-6 w-6 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              <NotificationBellIcon size={18} />
-              {notificationCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white"
-                  aria-hidden
-                >
-                  {notificationCount > 99 ? "99+" : notificationCount}
-                </span>
-              )}
-            </Link>
-          </div>
-        </div>
-      )}
-
       {/* WORKSPACE nav */}
       <div className="px-[13px] pb-[9px] pt-[13px]">
         <p className="mb-[9px] px-[5px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
@@ -240,11 +204,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           </ul>
         )}
       </div>
-      </div>
-
-      {/* Profile — pinned to the bottom of the sidebar */}
-      <div className="shrink-0 border-t border-border px-3 py-2.5">
-        <ProfileDropdown variant="row" {...user} />
       </div>
     </aside>
   );
