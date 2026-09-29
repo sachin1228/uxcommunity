@@ -26,3 +26,16 @@ new_sqlite_classes = ["UserDO"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = []
+
+# Invocation logs. These used to live in a duplicate config at the repository
+# root, which existed only so the Cloudflare Git integration could build from
+# there. That integration is disconnected, so this file is the sole source of
+# truth for the Worker and has to carry them itself: `wrangler deploy` replaces
+# the Worker's configuration wholesale on every deploy, so omitting this block
+# here is what silently turns realtime logging off.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true

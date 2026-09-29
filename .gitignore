@@ -24,9 +24,6 @@ coverage/
 .env.test.local
 .env.production.local
 
-# Keep example env
-!.env.example
-
 # =========================
 # Logs
 # =========================
@@ -57,8 +54,6 @@ yarn-error.log*
 .open-next/
 .wrangler/
 .dev.vars*
-# Keep example env
-!.dev.vars.example
 
 # =========================
 # Supabase

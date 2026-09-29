@@ -130,7 +130,7 @@ npm run dev        # starts the Next.js dev server on http://localhost:3000
 npm run dev:realtime   # optional second terminal: realtime worker on ws://localhost:8787
 ```
 
-Copy `apps/web/.env.example` → `apps/web/.env.local` and fill in all values before starting. Realtime needs the matching `REALTIME_*` vars (see the root README).
+Create `apps/web/.env.local` and fill in every value listed under **Environment variables** in the root README before starting. Realtime needs the matching `REALTIME_*` vars, listed in the same table.
 
 The app is branded **UX Community**. The existing `draft_session` cookie is
 accepted during rollout so rebranding does not invalidate active sessions;
@@ -143,4 +143,4 @@ new logins use `uxcommunity_session`.
 
 ## Environment variables
 
-See `.env.example` for the full annotated list, including Supabase, R2, Upstash Redis, Resend, GIPHY, session, and realtime values. All variables are required for full functionality.
+The full list — Supabase, R2, Upstash Redis, Resend, GIPHY, session, and realtime values — is under **Environment variables** in the root README. All of them are required for full functionality.

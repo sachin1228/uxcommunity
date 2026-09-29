@@ -65,9 +65,12 @@ jobs:
         run: npx wrangler deploy
 
       # Set AFTER the deploy, and never from the dashboard: `wrangler deploy`
-      # replaces dashboard-managed vars and secrets with the ones in the config
-      # file, so a value added by hand in the Cloudflare UI disappears on the
-      # next merge. Anything the Worker needs at runtime has to be pushed here.
+      # replaces the Worker's vars with the ones in its config file, so a
+      # plaintext value added by hand in the Cloudflare UI disappears on the
+      # next merge. Secrets are exempt from that sweep — wrangler never deletes
+      # them on a deploy — but the values still belong here, because taking both
+      # Workers' copies from one GitHub secret is what keeps them provably in
+      # sync.
       #
       # API_URL / API_SECRET are the membership check's configuration. The
       # realtime Worker FAILS CLOSED without them (audit M-8): with API_URL
