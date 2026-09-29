@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_ENABLED_TABS } from "./areas";
+import { resolveCommunityDp } from "./dp";
 import { canStoreShowcaseFlag } from "./showcase-flag";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
@@ -12,6 +13,14 @@ import type { CachedMeta } from "./cache";
  * first server render. Members, permissions and messages hydrate client-side
  * from the request cache (revisits) or a fresh bootstrap fetch, so navigation
  * never blocks on secondary data.
+ *
+ * The DP is resolved through the master-data resolver, exactly like the read
+ * model and the sidebar projection. The raw `communities.image_url` column is
+ * not the display value for a master-backed community: the linked master row
+ * wins. Painting the column here showed the pre-replacement picture in the
+ * header while every other surface showed the master row's, and the snapshot
+ * is copied into the client meta cache, so the mismatch outlived the fetch
+ * that would have corrected it.
  *
  * Latency profile: exactly TWO database round trips, issued in parallel — plus
  * a best-effort pair more, and only for an event's group chat, for the date
@@ -59,13 +68,21 @@ export async function fetchCommunityMetaSSR(
     ? await loadEventRoomMeta(db, communityId).catch(() => null)
     : null;
 
+  // The DP the API and sidebar serve: the master row's image when the
+  // community is master-backed (a cached lookup — see dp.ts).
+  const dp = await resolveCommunityDp({
+    type: community.type,
+    reference_id: (community as any).reference_id ?? null,
+    image_url: (community as any).image_url ?? null,
+  });
+
   const meta: CachedMeta = {
     community: {
       id: community.id, name: community.name, type: community.type,
       // member_count streams in with /bootstrap; omitting it here lets the
       // header fall back to the sidebar entry's count for the first paint.
       member_count: 0,
-      image_url: (community as any).image_url ?? null,
+      image_url: dp.image_url,
       description: (community as any).description ?? null,
       created_at: (community as any).created_at ?? undefined,
       owner_id: (community as any).owner_id ?? null,
