@@ -28,9 +28,9 @@ import { execFileSync } from "node:child_process";
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(ROOT, "..");
 const EMOJI_DIR = path.join(REPO_ROOT, "apps", "web", "public", "emoji");
-// Lives outside public/ on purpose: Vercel copies ALL of public/ into the
-// deployment, and the extracted assets are already there — shipping the
-// 13MB tarball alongside them would double the static payload.
+// Lives outside public/ on purpose: everything in public/ is copied into the
+// static asset output, and the extracted assets are already there — shipping
+// the 13MB tarball alongside them would double the static payload.
 const TARBALL = path.join(REPO_ROOT, "apps", "web", "emoji-assets.tar.gz");
 const STAMP = path.join(EMOJI_DIR, ".extracted-sha");
 

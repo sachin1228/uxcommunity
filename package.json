@@ -19,6 +19,7 @@
     "deploy:realtime": "wrangler deploy --config apps/realtime/wrangler.toml",
     "lint": "npm run lint --workspace=apps/web",
     "audit:comments": "node scripts/audit-comments.mjs",
+    "audit:vercel": "node scripts/audit-vercel.mjs",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts apps/web/lib/auth/signup-status.test.ts",
     "test:request-cache": "tsx --test apps/web/lib/request-cache.test.ts",

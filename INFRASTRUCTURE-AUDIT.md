@@ -16,7 +16,7 @@
 
 ## Top 10 Findings
 
-1. **Dual deployment architecture** — The app runs on both Cloudflare Workers (via OpenNext) and Vercel. The current active deployment is Cloudflare Workers. The Vercel dashboard numbers reflect the alternate deployment path.
+1. **Single deployment architecture** — The app runs only on Cloudflare Workers (via OpenNext). The former Vercel alternate target has been removed from the repository, so the Cloudflare Workers deployment is the only one.
 
 2. **Chat fan-out is one room event plus push** — Sending ONE chat message triggers 1 database INSERT, 1 realtime publish to the community's `chat:${id}` room (the DO broadcasts to every socket in that room), and a deferred Expo push fan-out to members who are not connected. There is no per-member Durable Object forward or per-member notification row anymore; the cost that remains is the push fan-out, which is chunked and bounded (`PUSH_MAX_DELIVERIES`, `PUSH_TIME_BUDGET_MS`).
 
@@ -34,7 +34,7 @@
 
 9. **Rate limiting is layered** — Global guard: 20 requests/10s burst, 120/60s sustained per user or IP. On top of that, per-route limits cover login (IP + email), applications, password reset, sign-up steps, chat sends (5/10s + 20/60s), content creation, comments, and reactions (`lib/auth/rate-limit.ts`).
 
-10. **Chat messages API has special timeout handling** — `maxDuration: 10` in `vercel.json` for the messages endpoint. It calls the `get_community_message_page` RPC, then publishes one realtime event and the push fan-out from an `after()` block.
+10. **Chat messages API defers its fan-out** — The messages endpoint calls the `get_community_message_page` RPC, publishes one realtime event, then runs the Expo push fan-out from an `after()` block (mapped to the Worker's `waitUntil`, so the response is not held open for it).
 
 ---
 
@@ -71,8 +71,7 @@ User (Mobile/Expo)
 ```
 
 ### Deployment Stack
-- **Primary**: Cloudflare Workers via OpenNext (`apps/web/wrangler.toml`)
-- **Alternate**: Vercel (`apps/web/vercel.json`, region: syd1)
+- **Web**: Cloudflare Workers via OpenNext (`apps/web/wrangler.toml`)
 - **Realtime**: Separate Cloudflare Worker (`apps/realtime/wrangler.toml`, root `wrangler.toml` mirrors it)
 - **Durable Objects**: `Room` (per community, migration v1) and `UserDO` (per user, migration v2)
 - **CI**: GitHub Actions — `ci.yml` (types + unit tests), `preview.yml` (per-PR worker)
@@ -99,18 +98,15 @@ User (Mobile/Expo)
 | Validation | Zod | Application | Input validation |
 
 ### Infrastructure Services Used
-- ✅ Vercel (alternate deployment)
 - ✅ Supabase (PostgreSQL)
 - ✅ Cloudflare (Workers, Durable Objects, R2, CDN)
 - ✅ PostgreSQL (via Supabase)
 - ✅ Expo Push Service (chat notifications)
-- ✅ Vercel Functions (alternate deployment)
-- ✅ Vercel Edge Functions (middleware on Vercel)
 - ✅ Cloudflare Workers (primary deployment)
 - ✅ Cloudflare Durable Objects (realtime: `Room` + `UserDO`)
 - ❌ Redis (Upstash used for rate limiting only, not caching)
 - ❌ Queues (no job queues)
-- ❌ Cron Jobs (only Vercel keep-warm cron)
+- ❌ Cron Jobs (no scheduled jobs; Cloudflare Workers have no container to keep warm)
 - ✅ WebSockets (Cloudflare Durable Objects)
 - ❌ Server-Sent Events
 - ⚠️ Polling (only the sidebar when a user has more communities than the 15 live-socket cap; everything else catches up on reconnect/focus)
@@ -772,8 +768,8 @@ User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media 
   `packages/shared/src/r2-media.ts`, shared by the runtime cleanup and the
   admin audit so they can never disagree.
 
-## Overlap Between Cloudflare and Vercel
-**FACT**: The app has BOTH Cloudflare Workers (primary) and Vercel (alternate) deployment configs. They do NOT overlap in production — only one is active. The Vercel config exists as an alternate deployment path. The CI/CD pipeline (`.github/workflows/deploy.yml`) deploys to Cloudflare.
+## Deployment Target
+**FACT**: The app deploys only to Cloudflare Workers (via OpenNext). A former alternate Vercel config (`vercel.json`) has been removed, and the CI/CD pipeline (`.github/workflows/deploy.yml`) deploys to Cloudflare. The retired Vercel deployment's dashboard data is kept below as historical analysis only.
 
 ---
 
@@ -821,8 +817,8 @@ User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media 
 | Category | Count/day |
 |---|---|
 | HTTP requests | ~30 |
-| Vercel Edge Requests | ~30 (if on Vercel) |
-| Vercel Function Invocations | ~20 |
+| Edge Requests | ~30 |
+| Function Invocations | ~20 |
 | Database operations | ~50 |
 | Realtime events (received) | ~20 |
 | WebSocket connections (peak) | 3-5 |
@@ -832,8 +828,8 @@ User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media 
 | Category | Count/day |
 |---|---|
 | HTTP requests | ~100 |
-| Vercel Edge Requests | ~100 |
-| Vercel Function Invocations | ~60 |
+| Edge Requests | ~100 |
+| Function Invocations | ~60 |
 | Database operations | ~200 |
 | Realtime events (received) | ~100 |
 | WebSocket connections (peak) | 5-8 |
@@ -843,8 +839,8 @@ User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media 
 | Category | Count/day |
 |---|---|
 | HTTP requests | ~300 |
-| Vercel Edge Requests | ~300 |
-| Vercel Function Invocations | ~180 |
+| Edge Requests | ~300 |
+| Function Invocations | ~180 |
 | Database operations | ~600 |
 | Realtime events (received) | ~500 |
 | WebSocket connections (peak) | 10-14 |
@@ -992,11 +988,11 @@ Assumptions:
 
 ---
 
-# VERCEL DASHBOARD CORRELLATION
+# RETIRED VERCEL DEPLOYMENT (HISTORICAL)
 
-## Current 30-Day Usage Analysis
+## 30-Day Usage Analysis (while the alternate target was active)
 
-The provided Vercel dashboard data shows:
+The Vercel dashboard data captured while the alternate deployment was live shows:
 
 | Metric | Value | Daily Average | Assessment |
 |---|---|---|---|
@@ -1015,7 +1011,7 @@ The provided Vercel dashboard data shows:
 2. **The edge/function ratio is healthy**: 56% function invocations means 44% are served from cache/static. The caching strategy is working.
 3. **CPU usage is minimal**: 30 minutes of active CPU over 30 days means the average request uses 0.24ms of CPU. This is extremely fast — the middleware (JWT verify + rate limit check) is lightweight.
 4. **Image optimization is barely used**: Only 16 transformations means the app mostly serves images directly from R2/Supabase URLs.
-5. **This does NOT represent production traffic**: The Vercel deployment appears to be the alternate/backup deployment. The primary deployment is on Cloudflare Workers, which would have separate metrics.
+5. **This was never production traffic**: The Vercel deployment was an alternate/backup target (now removed). Production runs on Cloudflare Workers, which meters separately.
 
 ---
 

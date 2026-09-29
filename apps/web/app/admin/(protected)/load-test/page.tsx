@@ -212,7 +212,7 @@ export default function LoadTestPage() {
                 label="Base URL"
                 value={baseUrl}
                 onChange={setBaseUrl}
-                placeholder="https://your-app.vercel.app"
+                placeholder="https://app.uxcommunity.in"
               />
 
               {/* Community ID */}

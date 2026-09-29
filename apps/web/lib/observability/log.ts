@@ -11,8 +11,8 @@
  *   JWTs, session cookies, push tokens, message/content bodies, email
  *   addresses, or any other personal data. Callers pass ids and counts only.
  *
- * These lines go to the platform's existing log sink (Cloudflare Workers Logs /
- * Vercel) — no new logging infrastructure.
+ * These lines go to the platform's existing log sink (Cloudflare Workers Logs) —
+ * no new logging infrastructure.
  *
  * Deliberately NOT marked `server-only`: the marker's package is not resolvable
  * by the `tsx --test` runner, and server-only modules that log (push, realtime)

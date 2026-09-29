@@ -44,7 +44,7 @@ uxcommunity/
 │   │   ├── lib/                Domain + client code: auth/, communities/ (+ models/, tests),
 │   │   │                       realtime/, push/, supabase/, home/, feeds/, r2*/
 │   │   ├── middleware.ts       Session check, route protection, global request rate limit
-│   │   └── wrangler.toml       OpenNext worker config (vercel.json is the alternate target)
+│   │   └── wrangler.toml       OpenNext worker config for the Cloudflare deployment
 │   └── realtime/               Cloudflare Worker: Room DO (per community) + UserDO (per user)
 │       ├── src/                index.ts, room.ts, user.ts, room-routing.ts, subscriptions.ts
 │       └── __tests__/          vitest suites (unit + staging harnesses)

@@ -7,7 +7,7 @@
  * on every subsequent request.
  *
  * Configure EXPO_PUBLIC_API_URL in your .env / EAS secrets, e.g.:
- *   EXPO_PUBLIC_API_URL=https://your-web-app.vercel.app
+ *   EXPO_PUBLIC_API_URL=https://app.example.com
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
