@@ -182,7 +182,9 @@ In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (
 
 ### Cloudflare deployment targets
 
-The root `wrangler.toml` intentionally targets `uxcommunity-realtime`, which owns both Durable Object classes (`Room` for communities, `UserDO` for user rooms). Run `npm run deploy:realtime` for that Worker and `npm run deploy:web` for the separate OpenNext web Worker; never deploy the web bundle with the root Wrangler configuration.
+Two Workers deploy from this repository, both from `.github/workflows/deploy.yml`, in that order: `uxcommunity-realtime` (config in `apps/realtime/wrangler.toml`), which owns both Durable Object classes (`Room` for communities, `UserDO` for user rooms), and then `uxcommunity-web` (config in `apps/web/wrangler.toml`), the OpenNext bundle that publishes to it.
+
+Neither Worker has a Cloudflare Git integration connected. Cloudflare's own build system runs one build command and one deploy command per Worker, which cannot express realtime's secrets being pushed between the two deploys, nor gate on the type check and unit tests, so the GitHub Actions pipeline owns both. Locally, `npm run deploy:realtime` and `npm run deploy:web` each target their own config file.
 
 ## Building the Android APK locally (no Expo cloud)
 
