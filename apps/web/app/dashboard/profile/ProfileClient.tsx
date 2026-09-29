@@ -199,7 +199,7 @@ export function ProfileClient({
   }
 
   return (
-    <div className="mx-auto mt-8 max-w-4xl">
+    <div className="mx-auto mt-8 max-w-3xl">
       <div className="mb-8">
         <h1 className="font-display text-2xl font-semibold text-foreground">Your Profile</h1>
         <p className="mt-0.5 font-body text-sm text-foreground-muted">
