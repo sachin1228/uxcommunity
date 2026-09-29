@@ -1,0 +1,534 @@
+{
+  "note": "Hand-curated company entities, their domains and their corporate relationships. This is the only layer allowed to assert that a domain is an employee email domain, and every assertion carries evidence whose TYPE decides the confidence the pipeline derives - the file never states a confidence itself. `evidence_checked` means a person opened the source and saw that domain; an unchecked entry is capped at `low` however many entries it has. Evidence of type `redirect_from_website` is rejected outright: a redirect proves nothing about mailboxes. `aliases` are identity AND search names; `former_names` are search-only, so a former legal name can never collapse a brand and its parent into one entity. Consumed by scripts/generate-company-directory-v2.mjs.",
+  "layer": "A entities + B domains + D evidence + relationships",
+  "delegations_note": "Explicit mail delegations: {company_id, domain, granted_by, evidence[], evidence_checked, review_status}. A delegation is the ONLY way an entity may verify its staff on another entity's domain, it never transfers ownership, and an unreviewed one grants nothing. Kept empty on purpose: no parent/subsidiary mailbox arrangement here has been evidenced yet, and inventing one would be exactly the inference this model forbids.",
+  "delegations": [],
+  "entities": [
+    {
+      "id": "meta-platforms",
+      "name": "Meta Platforms",
+      "aliases": ["Meta", "Meta Platforms Inc."],
+      "former_names": ["Facebook Inc.", "Facebook, Inc."],
+      "country": "US",
+      "industry": "internet",
+      "status": "active",
+      "website_domain": "meta.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q380",
+      "sitelinks": 250,
+      "domains": [
+        {
+          "domain": "meta.com",
+          "domain_type": "primary_website",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.wikidata.org/wiki/Q380" }]
+        },
+        {
+          "domain": "fb.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": true,
+          "evidence": [
+            { "type": "first_party_document", "url": "https://about.fb.com/news/2021/10/facebook-company-is-now-meta/" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ],
+      "relationships": [
+        { "child": "facebook", "type": "brand" },
+        { "child": "whatsapp", "type": "subsidiary" },
+        { "child": "instagram", "type": "subsidiary" }
+      ]
+    },
+    {
+      "id": "facebook",
+      "name": "Facebook",
+      "aliases": ["Facebook App"],
+      "country": "US",
+      "industry": "social media",
+      "status": "active",
+      "website_domain": "facebook.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q380",
+      "sitelinks": 240,
+      "domains": [
+        {
+          "domain": "facebook.com",
+          "domain_type": "brand",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://about.fb.com/" }]
+        }
+      ],
+      "relationships": [{ "child": "meta-platforms", "type": "parent" }]
+    },
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp",
+      "aliases": ["WhatsApp Messenger", "WhatsApp LLC"],
+      "country": "US",
+      "industry": "messaging",
+      "status": "active",
+      "website_domain": "whatsapp.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q10686",
+      "sitelinks": 190,
+      "domains": [
+        {
+          "domain": "whatsapp.com",
+          "domain_type": "primary_website",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.wikidata.org/wiki/Q10686" }]
+        }
+      ],
+      "relationships": [{ "child": "meta-platforms", "type": "parent" }]
+    },
+    {
+      "id": "instagram",
+      "name": "Instagram",
+      "aliases": ["Instagram Inc."],
+      "country": "US",
+      "industry": "social media",
+      "status": "active",
+      "website_domain": "instagram.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q209330",
+      "sitelinks": 210,
+      "domains": [
+        {
+          "domain": "instagram.com",
+          "domain_type": "brand",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.wikidata.org/wiki/Q209330" }]
+        }
+      ],
+      "relationships": [{ "child": "meta-platforms", "type": "parent" }]
+    },
+    {
+      "id": "alphabet",
+      "name": "Alphabet Inc.",
+      "aliases": ["Alphabet"],
+      "country": "US",
+      "industry": "holding company",
+      "status": "active",
+      "website_domain": "abc.xyz",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q20800404",
+      "sitelinks": 120,
+      "domains": [
+        {
+          "domain": "abc.xyz",
+          "domain_type": "primary_website",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.wikidata.org/wiki/Q20800404" }]
+        }
+      ],
+      "relationships": [{ "child": "google", "type": "subsidiary" }]
+    },
+    {
+      "id": "google",
+      "name": "Google",
+      "aliases": ["Google LLC", "Google Inc."],
+      "country": "US",
+      "industry": "internet",
+      "status": "active",
+      "website_domain": "google.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q95",
+      "sitelinks": 300,
+      "domains": [
+        {
+          "domain": "google.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": true,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://about.google/" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ],
+      "relationships": [{ "child": "alphabet", "type": "parent" }]
+    },
+    {
+      "id": "microsoft",
+      "name": "Microsoft",
+      "aliases": ["Microsoft Corporation", "MSFT"],
+      "country": "US",
+      "industry": "software",
+      "status": "active",
+      "website_domain": "microsoft.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q2283",
+      "sitelinks": 290,
+      "domains": [
+        {
+          "domain": "microsoft.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": true,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks" },
+            { "type": "first_party_document", "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000789019" }
+          ]
+        },
+        {
+          "domain": "microsoft.co.uk",
+          "domain_type": "regional",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.microsoft.com/en-gb/" }]
+        }
+      ]
+    },
+    {
+      "id": "amazon",
+      "name": "Amazon",
+      "aliases": ["Amazon.com Inc.", "Amazon.com"],
+      "country": "US",
+      "industry": "retail",
+      "status": "active",
+      "website_domain": "amazon.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q3884",
+      "sitelinks": 260,
+      "domains": [
+        {
+          "domain": "amazon.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": true,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        },
+        {
+          "domain": "amazon.in",
+          "domain_type": "regional",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.amazon.in/" }]
+        }
+      ]
+    },
+    {
+      "id": "amazon-web-services",
+      "name": "Amazon Web Services",
+      "aliases": ["AWS"],
+      "country": "US",
+      "industry": "cloud computing",
+      "status": "active",
+      "website_domain": "aws.amazon.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q456157",
+      "sitelinks": 70,
+      "domains": [
+        {
+          "domain": "aws.amazon.com",
+          "domain_type": "brand",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://aws.amazon.com/" }]
+        }
+      ],
+      "relationships": [{ "child": "amazon", "type": "division" }]
+    },
+    {
+      "id": "tata-sons",
+      "name": "Tata Sons",
+      "aliases": ["Tata Group"],
+      "country": "IN",
+      "industry": "holding company",
+      "status": "active",
+      "website_domain": "tata.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q1814614",
+      "sitelinks": 60,
+      "domains": [
+        {
+          "domain": "tata.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.tata.com/contact-us" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ],
+      "relationships": [
+        { "child": "tata-consultancy-services", "type": "subsidiary" },
+        { "child": "tata-motors", "type": "subsidiary" }
+      ]
+    },
+    {
+      "id": "tata-consultancy-services",
+      "name": "Tata Consultancy Services",
+      "aliases": ["TCS", "Tata Consultancy Services Ltd."],
+      "country": "IN",
+      "industry": "IT services",
+      "status": "active",
+      "website_domain": "tcs.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q638633",
+      "sitelinks": 55,
+      "domains": [
+        {
+          "domain": "tcs.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": true,
+          "evidence": [
+            { "type": "first_party_careers_contact", "url": "https://www.tcs.com/careers" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ],
+      "relationships": [{ "child": "tata-sons", "type": "parent" }]
+    },
+    {
+      "id": "tata-motors",
+      "name": "Tata Motors",
+      "country": "IN",
+      "industry": "automotive",
+      "status": "active",
+      "website_domain": "tatamotors.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q188875",
+      "sitelinks": 60,
+      "domains": [
+        {
+          "domain": "tatamotors.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [{ "type": "first_party_careers_contact", "url": "https://www.tatamotors.com/careers/" }]
+        }
+      ],
+      "relationships": [{ "child": "tata-sons", "type": "parent" }]
+    },
+    {
+      "id": "volkswagen-group",
+      "name": "Volkswagen Group",
+      "aliases": ["Volkswagen AG"],
+      "country": "DE",
+      "industry": "automotive",
+      "status": "active",
+      "website_domain": "volkswagen-group.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q156578",
+      "sitelinks": 150,
+      "domains": [
+        {
+          "domain": "volkswagen-group.com",
+          "domain_type": "primary_website",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.wikidata.org/wiki/Q156578" }]
+        },
+        {
+          "domain": "volkswagen.de",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.volkswagen.de/de/impressum.html" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ],
+      "relationships": [
+        { "child": "audi", "type": "subsidiary" },
+        { "child": "porsche", "type": "subsidiary" }
+      ]
+    },
+    {
+      "id": "audi",
+      "name": "Audi",
+      "aliases": ["Audi AG"],
+      "country": "DE",
+      "industry": "automotive",
+      "status": "active",
+      "website_domain": "audi.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q23317",
+      "sitelinks": 120,
+      "domains": [
+        {
+          "domain": "audi.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.audi.com/en/legal-notice.html" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        },
+        {
+          "domain": "audi.de",
+          "domain_type": "regional",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.audi.de/" }]
+        }
+      ],
+      "relationships": [{ "child": "volkswagen-group", "type": "parent" }]
+    },
+    {
+      "id": "porsche",
+      "name": "Porsche",
+      "aliases": ["Dr. Ing. h.c. F. Porsche AG", "Porsche AG"],
+      "country": "DE",
+      "industry": "automotive",
+      "status": "active",
+      "website_domain": "porsche.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q179562",
+      "sitelinks": 130,
+      "domains": [
+        {
+          "domain": "porsche.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.porsche.com/international/legal-notice/" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ],
+      "relationships": [{ "child": "volkswagen-group", "type": "parent" }]
+    },
+    {
+      "id": "hsbc",
+      "name": "HSBC",
+      "aliases": ["HSBC Holdings plc", "Hongkong and Shanghai Banking Corporation"],
+      "country": "GB",
+      "industry": "banking",
+      "status": "active",
+      "website_domain": "hsbc.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q190464",
+      "sitelinks": 130,
+      "domains": [
+        {
+          "domain": "hsbc.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.hsbc.com/contact/" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        },
+        {
+          "domain": "hsbc.co.uk",
+          "domain_type": "regional",
+          "evidence_checked": false,
+          "evidence": [{ "type": "first_party_legal_page", "url": "https://www.hsbc.co.uk/" }]
+        },
+        {
+          "domain": "hsbc.com.hk",
+          "domain_type": "regional",
+          "evidence_checked": false,
+          "evidence": [{ "type": "external_reputable", "url": "https://www.hsbc.com.hk/" }]
+        }
+      ]
+    },
+    {
+      "id": "hdfc-bank",
+      "name": "HDFC Bank",
+      "aliases": ["HDFC Bank Limited"],
+      "country": "IN",
+      "industry": "banking",
+      "status": "active",
+      "website_domain": "hdfcbank.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q1034255",
+      "sitelinks": 45,
+      "domains": [
+        {
+          "domain": "hdfcbank.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.hdfcbank.com/personal/need-help" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bharti-airtel",
+      "name": "Bharti Airtel",
+      "aliases": ["Airtel", "Bharti Airtel Limited"],
+      "country": "IN",
+      "industry": "telecommunications",
+      "status": "active",
+      "website_domain": "airtel.in",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q854713",
+      "sitelinks": 70,
+      "domains": [
+        {
+          "domain": "airtel.in",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_legal_page", "url": "https://www.airtel.in/contact-us" },
+            { "type": "mx_record", "url": "https://www.rfc-editor.org/rfc/rfc7483" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iit-bombay",
+      "name": "Indian Institute of Technology Bombay",
+      "aliases": ["IIT Bombay", "IITB"],
+      "country": "IN",
+      "industry": "higher education",
+      "status": "active",
+      "website_domain": "iitb.ac.in",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q174461",
+      "sitelinks": 60,
+      "domains": [
+        {
+          "domain": "iitb.ac.in",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_role_address", "url": "https://www.iitb.ac.in/en/about-iit-bombay/contact-us" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apollo-hospitals",
+      "name": "Apollo Hospitals",
+      "aliases": ["Apollo Hospitals Enterprise Limited"],
+      "country": "IN",
+      "industry": "healthcare",
+      "status": "active",
+      "website_domain": "apollohospitals.com",
+      "source": "curated",
+      "source_url": "https://www.wikidata.org/wiki/Q4780284",
+      "sitelinks": 25,
+      "domains": [
+        {
+          "domain": "apollohospitals.com",
+          "domain_type": "corporate_email",
+          "evidence_checked": false,
+          "evidence": [
+            { "type": "first_party_careers_contact", "url": "https://www.apollohospitals.com/careers" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "acme-technologies-example",
+      "name": "Acme Technologies",
+      "aliases": [],
+      "country": "IN",
+      "industry": "unknown",
+      "status": "unknown",
+      "website_domain": "acmetech.io",
+      "source": "example",
+      "source_url": "https://www.wikidata.org/wiki/Q4830453",
+      "sitelinks": 2,
+      "domains": [
+        {
+          "domain": "acmetech.io",
+          "domain_type": "primary_website",
+          "evidence_checked": false,
+          "evidence": []
+        }
+      ],
+      "note": "Kept deliberately as the counter-example from the audit: the name looks like the domain, and the string similarity is NOT evidence. Its domain is a website hint whose email confidence is `unknown`, and the pipeline must flag the name/domain relation as a review signal rather than accept it."
+    }
+  ]
+}

@@ -318,3 +318,73 @@ export async function sendRejectionEmail(
     `.trim(),
   });
 }
+
+/**
+ * The one-time code that proves a member controls a work mailbox on a company
+ * domain. The domain — not the company name typed in the form — is what the
+ * code is issued for, so the email names both: the code approves a domain, and
+ * the member can see exactly which one.
+ */
+export async function sendCompanyVerificationEmail(
+  to: string,
+  name: string,
+  details: { companyName: string; domain: string; code: string; expiresMinutes: number }
+): Promise<void> {
+  const { companyName, domain, code, expiresMinutes } = details;
+
+  await getResend().emails.send({
+    from: getFrom(),
+    to,
+    subject: `Your ${APP_NAME} verification code: ${code}`,
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#161413;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td style="padding:32px 40px 0;background:#1B1918;">
+            <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
+              ${APP_NAME}<span style="color:#888888;">/</span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px;">
+            <h1 style="margin:0 0 8px;font-size:26px;font-weight:600;color:#F5F2F0;">
+              Verify your work email
+            </h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#7B7B7B;line-height:1.6;">
+              Hi ${name}, enter this code to confirm you work at <strong style="color:#F5F2F0;">${companyName}</strong>.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#7B7B7B;line-height:1.6;">
+              Proving you control this mailbox verifies the domain
+              <strong style="color:#F5F2F0;">${domain}</strong>. It does not make you an
+              administrator or an official representative of the company.
+            </p>
+            <p style="margin:0 0 8px;padding:16px 20px;background:#161413;border:1px solid #262220;border-radius:10px;font-size:30px;font-weight:600;letter-spacing:0.28em;color:#F5F2F0;text-align:center;">
+              ${code}
+            </p>
+            <p style="margin:16px 0 0;font-size:13px;color:#7B7B7B;">
+              This code expires in ${expiresMinutes} minutes and can only be used once.
+              If you didn't ask to add a company to your profile, you can ignore this email.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #262220;">
+            <p style="margin:0;font-size:12px;color:#5A5A5A;">
+              © ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+    `.trim(),
+  });
+}

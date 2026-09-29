@@ -1,8 +1,11 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
-import { Camera, MapPin, PenLine, Star, Layers, BadgeCheck } from "lucide-react";
+import { Building2, Camera, MapPin, PenLine, Star, Layers, BadgeCheck, Plus } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { VerifiedMark } from "@/components/companies/CompanyBadge";
+import type { ProfileCompanyView } from "@/components/companies/types";
 
 const chipCls =
   "flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground";
@@ -21,6 +24,10 @@ interface ProfileCardProps {
   bio: string;
   /** Read-only topic chips; topics are picked during onboarding. */
   interestNames: string[];
+  /** The verified company on the profile, or null when none is set. */
+  company: ProfileCompanyView | null;
+  /** Opens the company picker — the same flow as the one on Settings. */
+  onAddCompany: () => void;
 }
 
 /**
@@ -40,9 +47,90 @@ export function ProfileCard({
   jobTitle,
   bio,
   interestNames,
+  company,
+  onAddCompany,
 }: ProfileCardProps) {
-  // Role line: "Product Designer · Bengaluru" — mirrors the reference layout.
-  const roleLine = [jobTitle, city].filter(Boolean).join(" · ");
+  // Role line: "Product Designer · Figma · Pune · …" — mirrors the reference
+  // layout. The company sits right after the role, and when there is none the
+  // same slot invites the member to add one instead.
+  const roleParts: React.ReactNode[] = [];
+
+  if (jobTitle) {
+    roleParts.push(
+      <span key="role" className="flex items-center gap-1">
+        <BadgeCheck strokeWidth={2.5} size={12} className="text-accent" />
+        {jobTitle}
+      </span>
+    );
+  }
+
+  if (company) {
+    // A deactivated company keeps whatever the member already had, but the
+    // name is no longer a link and the verified mark is gone: the company
+    // behind it is not something to advertise any more.
+    roleParts.push(
+      <Fragment key="company">
+        {company.isActive ? (
+          <Link
+            href={`/dashboard/companies/${company.slug}`}
+            className="flex items-center gap-1 transition-colors hover:text-accent"
+            title={company.domain ? `Verified via ${company.domain}` : "Company"}
+          >
+            <Building2 strokeWidth={2.5} size={12} className="text-accent" />
+            {company.name}
+          </Link>
+        ) : (
+          <span
+            className="flex items-center gap-1 text-foreground-subtle"
+            title="This company is no longer active"
+          >
+            <Building2 strokeWidth={2.5} size={12} />
+            {company.name}
+          </span>
+        )}
+        {company.isActive && company.domainVerified && <VerifiedMark label={false} size="xs" />}
+      </Fragment>
+    );
+  } else {
+    roleParts.push(
+      <button
+        key="add-company"
+        type="button"
+        onClick={onAddCompany}
+        className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+      >
+        <Plus strokeWidth={2.5} size={11} />
+        Add your company
+      </button>
+    );
+  }
+
+  if (city) {
+    roleParts.push(
+      <span key="city" className="flex items-center gap-1">
+        <MapPin strokeWidth={2.5} size={12} className="text-accent" />
+        {city}
+      </span>
+    );
+  }
+
+  if (sector) {
+    roleParts.push(
+      <span key="sector" className="flex items-center gap-1">
+        <Layers strokeWidth={2.5} size={12} className="text-accent" />
+        {sector}
+      </span>
+    );
+  }
+
+  if (experienceLevel) {
+    roleParts.push(
+      <span key="experience" className="flex items-center gap-1 capitalize">
+        <Star strokeWidth={2.5} size={12} className="text-accent" />
+        {experienceLevel.replace(/_/g, " ")}
+      </span>
+    );
+  }
 
   return (
     <section
@@ -101,42 +189,15 @@ export function ProfileCard({
           </Link>
         </div>
 
-        {/* Role · city */}
-        {(roleLine || sector || experienceLevel) && (
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-body text-sm text-foreground-muted">
-            {jobTitle && (
-              <span className="flex items-center gap-1">
-                <BadgeCheck strokeWidth={2.5} size={12} className="text-accent" />
-                {jobTitle}
-              </span>
-            )}
-            {roleLine && jobTitle && <span aria-hidden="true">·</span>}
-            {city && (
-              <span className="flex items-center gap-1">
-                <MapPin strokeWidth={2.5} size={12} className="text-accent" />
-                {city}
-              </span>
-            )}
-            {sector && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="flex items-center gap-1">
-                  <Layers strokeWidth={2.5} size={12} className="text-accent" />
-                  {sector}
-                </span>
-              </>
-            )}
-            {experienceLevel && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="flex items-center gap-1 capitalize">
-                  <Star strokeWidth={2.5} size={12} className="text-accent" />
-                  {experienceLevel.replace(/_/g, " ")}
-                </span>
-              </>
-            )}
-          </p>
-        )}
+        {/* Role · company · city · sector · level */}
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
+          {roleParts.map((part, index) => (
+            <Fragment key={index}>
+              {index > 0 && <span aria-hidden="true">·</span>}
+              {part}
+            </Fragment>
+          ))}
+        </p>
 
         {/* Bio */}
         {bio && (
