@@ -4,7 +4,11 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendCompanyVerificationEmail } from "@/lib/email";
-import { checkWorkEmail } from "@/lib/companies/domains";
+import {
+  checkWorkEmail,
+  companyNameMatchesDomain,
+  suggestedCompanyName,
+} from "@/lib/companies/domains";
 import {
   getCompanyVerification,
   refusedCompany,
@@ -172,6 +176,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const requestedName = parsed.data.company_name?.trim() ?? null;
+
+    // A NEW company is named by hand while its trust comes from the domain, so
+    // the name has to correspond to the domain being proved. Without this the
+    // first person from `acme.com` could label it "Microsoft", and because a
+    // name can only be used once, the real Microsoft would later be told to
+    // join a company whose verified domain is acme.com. Joining an existing
+    // company is unaffected: there the domain has to match that company's own
+    // verified domains, which the database checks.
+    if (!parsed.data.company_id && requestedName) {
+      const nameMatch = companyNameMatchesDomain(requestedName, emailCheck.domain);
+      if (!nameMatch.ok) {
+        const suggestion = suggestedCompanyName(emailCheck.domain);
+        return NextResponse.json(
+          {
+            error: "company_name_domain_mismatch",
+            message: suggestion
+              ? `A company is named after the domain it proves. For ${emailCheck.domain}, use a name like “${suggestion}”.`
+              : `A company is named after the domain it proves, and “${requestedName}” doesn't match ${emailCheck.domain}.`,
+            domain: emailCheck.domain,
+            suggested_name: suggestion,
+          },
+          { status: 422 }
+        );
+      }
+    }
+
     claim = {
       domain: emailCheck.domain,
       workEmail: workEmail.trim().toLowerCase(),
@@ -179,7 +210,7 @@ export async function POST(request: NextRequest) {
       // the company from the verified domain and refuses anything that does
       // not match, so a client cannot claim a company by posting its id.
       companyId: parsed.data.company_id ?? null,
-      companyName: parsed.data.company_id ? null : parsed.data.company_name ?? null,
+      companyName: parsed.data.company_id ? null : requestedName,
     };
   }
 

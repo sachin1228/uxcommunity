@@ -3,10 +3,12 @@ import { test } from "node:test";
 import {
   FREE_EMAIL_DOMAINS,
   checkWorkEmail,
+  companyNameMatchesDomain,
   domainFromEmail,
   isFreeEmailDomain,
   maskEmail,
   normalizeDomain,
+  suggestedCompanyName,
 } from "./domains";
 
 /**
@@ -80,6 +82,49 @@ test("checkWorkEmail explains why a personal address is refused", () => {
   const work = checkWorkEmail(" Sachin@Figma.com ");
   assert.equal(work.ok, true);
   assert.equal(work.ok === true && work.domain, "figma.com");
+});
+
+test("a company name has to correspond to the domain it proves", () => {
+  // The name is a label; the domain is the trust signal, so the label has to
+  // line up with it. Otherwise the first person from acme.com could name it
+  // "Microsoft" and the real Microsoft would be locked out of its own name.
+  const accepted: [string, string][] = [
+    ["Figma", "figma.com"],
+    ["Figma", "FIGMA.COM"],
+    ["Labsmart", "labsmart.co.in"],
+    ["Labsmart Technologies Pvt Ltd", "labsmart.in"],
+    ["Google India", "google.com"],
+    ["Acme Labs", "acme-labs.com"],
+    ["Tata Consultancy Services", "tcs.com"],
+    ["TCS", "tcs.com"],
+    ["FB", "fb.com"],
+    ["X", "x.com"],
+    ["Swiggy", "swiggy.in"],
+    ["Swiggy Foods", "swiggy.com"],
+  ];
+
+  for (const [name, domain] of accepted) {
+    assert.equal(companyNameMatchesDomain(name, domain).ok, true, `${name} + ${domain}`);
+  }
+
+  const refused: [string, string][] = [
+    ["labsmart", "google.com"],
+    ["Microsoft", "acme.com"],
+    ["Meera Design Co", "figma.com"],
+    ["Acme", "randomcompany.com"],
+    ["", "figma.com"],
+    ["Figma", ""],
+  ];
+
+  for (const [name, domain] of refused) {
+    const result = companyNameMatchesDomain(name, domain);
+    assert.equal(result.ok, false, `${name} + ${domain} should be refused`);
+  }
+
+  // The refusal carries the label so the UI can suggest the matching name.
+  assert.equal(companyNameMatchesDomain("Microsoft", "acme-labs.com").label, "acme");
+  assert.equal(suggestedCompanyName("labsmart.co.in"), "Labsmart");
+  assert.equal(suggestedCompanyName("tcs.com"), "Tcs");
 });
 
 test("the work email is only ever shown masked", () => {

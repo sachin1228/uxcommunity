@@ -167,6 +167,144 @@ export function checkWorkEmail(email: string | null | undefined): WorkEmailCheck
 }
 
 /**
+ * Words that describe a legal entity rather than the entity itself, dropped
+ * before a name is turned into initials so "Labsmart Technologies Pvt Ltd"
+ * abbreviates to LT, not LTPL.
+ */
+const LEGAL_ENTITY_WORDS = new Set([
+  "pvt",
+  "private",
+  "ltd",
+  "limited",
+  "llc",
+  "inc",
+  "incorporated",
+  "corp",
+  "corporation",
+  "company",
+  "gmbh",
+  "pte",
+  "plc",
+  "sa",
+  "ag",
+  "bv",
+  "srl",
+]);
+
+/**
+ * Labels that only say where a domain sits in the DNS tree (the `co` of
+ * `labsmart.co.in`), never which company it belongs to. Filters the
+ * second-level suffixes some countries use — `co`, `ac`, `com` — so
+ * `example.co.uk` cannot offer `co` as the word a name has to match.
+ */
+const DOMAIN_STRUCTURE_LABELS = new Set([
+  "com",
+  "net",
+  "org",
+  "gov",
+  "edu",
+  "co",
+  "ac",
+  "gen",
+  "res",
+  "firm",
+  "ltd",
+  "plc",
+  "www",
+]);
+
+function words(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/**
+ * The labels of a domain that could name a company: `tcs.com` → [tcs],
+ * `acme-labs.co.uk` → [acme, labs].
+ */
+function companyLabels(domain: string): string[] {
+  return domain
+    .split(".")
+    .slice(0, -1)
+    .flatMap((label) => label.split("-"))
+    .filter((label) => label && !DOMAIN_STRUCTURE_LABELS.has(label));
+}
+
+/**
+ * Does the company name a member typed correspond to the domain they are about
+ * to prove?
+ *
+ * The name is a label; the domain is the trust signal. Without this rule the
+ * first person from any domain can put a name on it that belongs to someone
+ * else — `acme.com` labelled "Microsoft" — and because a name can only be used
+ * once, the real Microsoft arriving later with microsoft.com is then told to
+ * join a company whose verified domain is acme.com. That is how the two rails
+ * already in place (a name is joined, never re-created; a verified domain has
+ * one owner) can be turned into an impersonation, so the name has to line up
+ * with the domain: a shared word, the label inside the name, or the name's
+ * abbreviation.
+ *
+ * Deliberately generous in the true-positive direction: "Tata Consultancy
+ * Services" matches tcs.com through its initials, and "Labsmart Technologies"
+ * matches labsmart.co.in through a shared word.
+ */
+export function companyNameMatchesDomain(
+  name: string | null | undefined,
+  domain: string | null | undefined
+): { ok: boolean; reason: "matched" | "no_relation" | "missing"; label: string } {
+  const normalizedDomain = normalizeDomain(domain);
+  const raw = typeof name === "string" ? name.trim() : "";
+
+  if (!normalizedDomain || !raw) {
+    return { ok: false, reason: "missing", label: normalizedDomain ? companyLabels(normalizedDomain)[0] ?? "" : "" };
+  }
+
+  const nameWords = words(raw);
+  const labels = companyLabels(normalizedDomain);
+  const compact = nameWords.join("");
+  // "Tata Consultancy Services" → tcs, which is how that company's own domain
+  // is spelled.
+  const initials = nameWords
+    .filter((word) => !LEGAL_ENTITY_WORDS.has(word))
+    .map((word) => word[0])
+    .join("");
+  const label = labels[0] ?? normalizedDomain.split(".")[0];
+
+  const matched =
+    // A shared word: "Google India" for google.com, "FB" for fb.com. A trailing
+    // plural is ignored, so "Swiggy Foods" still matches swiggy.com.
+    labels.some(
+      (candidate) =>
+        candidate.length >= 2 &&
+        nameWords.some(
+          (word) => word === candidate || word.replace(/s$/, "") === candidate.replace(/s$/, "")
+        )
+    ) ||
+    // The label spelled inside the name: "Labsmarttechnologies" for labsmart.in.
+    // Three characters or more, so a short label cannot match by accident.
+    labels.some((candidate) => candidate.length >= 3 && compact.includes(candidate)) ||
+    // The initials of the name: "Tata Consultancy Services" for tcs.com.
+    labels.some((candidate) => candidate.length >= 2 && candidate === initials) ||
+    // A one-character name, where there is nothing to abbreviate: "X" for x.com.
+    (label.length === 1 && compact === label);
+
+  return { ok: matched, reason: matched ? "matched" : "no_relation", label };
+}
+
+/**
+ * A suggested company name for a domain — `labsmart.co.in` → `Labsmart`. Used
+ * to offer the member the name that would match, instead of just refusing.
+ */
+export function suggestedCompanyName(domain: string | null | undefined): string {
+  const normalized = normalizeDomain(domain);
+  if (!normalized) return "";
+  const label = companyLabels(normalized)[0] ?? normalized.split(".")[0];
+  return label ? label[0].toUpperCase() + label.slice(1) : "";
+}
+
+/**
  * `sachin@figma.com` → `s***n@figma.com`. The work email is only ever shown
  * back to the member who entered it, and even then masked, so it cannot leak
  * into a screenshot of the picker.

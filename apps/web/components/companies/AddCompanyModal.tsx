@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, Check, Loader2, Search } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { checkWorkEmail } from "@/lib/companies/domains";
+import {
+  checkWorkEmail,
+  companyNameMatchesDomain,
+  domainFromEmail,
+  suggestedCompanyName,
+} from "@/lib/companies/domains";
 import { CompanyLogo, VerifiedMark } from "./CompanyBadge";
 import type { CompanyOption, PendingCompanyVerification } from "./types";
 
@@ -153,6 +158,16 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
   const trimmedQuery = query.trim();
   const emailCheck = email.trim() ? checkWorkEmail(email) : null;
   const emailInvalid = emailCheck?.ok === false ? emailCheck : null;
+
+  // The domain a new company will be verified by comes from the work email, so
+  // the name can be checked against it before the member submits — the server
+  // enforces the same rule, this just says it early and offers the fix.
+  const claimedDomain = domainFromEmail(email);
+  const nameMismatch =
+    !selected && newName.trim() && claimedDomain
+      ? companyNameMatchesDomain(newName, claimedDomain)
+      : null;
+  const nameSuggestion = claimedDomain ? suggestedCompanyName(claimedDomain) : "";
 
   const startVerification = useCallback(
     async (payload: {
@@ -464,7 +479,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
                     {newName.trim()}
                   </p>
                   <p className="mt-0.5 font-body text-xs text-foreground-muted">
-                    New company — verified by your domain
+                    New company · verified by {claimedDomain ?? "your work email domain"}
                   </p>
                 </>
               )}
@@ -524,6 +539,27 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
               "We'll email a code to prove you work there. It verifies the domain, not a job title."}
           </p>
 
+          {/* The name has to correspond to the domain being proved, because the
+              domain is what the verified mark means. The server enforces this;
+              saying it here lets the member fix it before submitting. */}
+          {nameMismatch?.ok === false && claimedDomain && (
+            <div className="mt-3 rounded-lg border border-border bg-surface-raised px-3.5 py-3">
+              <p className="font-body text-xs leading-relaxed text-foreground-muted">
+                A company is named after the domain it proves. “{newName.trim()}” doesn&apos;t
+                match {claimedDomain}, and members see the domain beside the name.
+              </p>
+              {nameSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => setNewName(nameSuggestion)}
+                  className="mt-2 font-body text-xs font-medium text-accent hover:underline"
+                >
+                  Use “{nameSuggestion}” instead
+                </button>
+              )}
+            </div>
+          )}
+
           {formFailure && <FailureNotice failure={formFailure} onJoin={chooseExisting} />}
 
           <button
@@ -533,7 +569,8 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
               submitting ||
               !email.trim() ||
               Boolean(emailInvalid) ||
-              (!selected && !newName.trim())
+              (!selected && !newName.trim()) ||
+              nameMismatch?.ok === false
             }
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >

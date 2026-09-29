@@ -22,8 +22,9 @@
 --   8. leaving a company, and deleting one, clean up the profile pointer
 --      without destroying the member's profile.
 --
--- The free/personal email list is application policy, not schema, so it is
--- covered by apps/web/lib/companies/domains.test.ts.
+-- The free/personal email list, and the rule that a new company's typed name
+-- has to correspond to the domain it proves, are application policy rather than
+-- schema, so they are covered by apps/web/lib/companies/domains.test.ts.
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;

@@ -53,10 +53,16 @@
 --   The only client-supplied identity is the requested company_id / name, and
 --   both are re-validated against company_domains here.
 --
---   The free/personal email list is deliberately NOT stored in this migration:
---   it is policy that changes over time, and a migration is immutable history.
---   The single source of truth is apps/web/lib/companies/domains.ts, which the
---   route (server) and the picker UI both import.
+--   Two rules are NOT here: the free/personal email list, and the requirement
+--   that a NEW company's typed name corresponds to the domain being proved
+--   ("acme.com" cannot be labelled "Microsoft"). Both are naming/policy
+--   decisions that change over time, and a migration is immutable history.
+--   Their single source of truth is apps/web/lib/companies/domains.ts
+--   (FREE_EMAIL_DOMAINS, companyNameMatchesDomain), which the route enforces
+--   server-side before any write and the picker shares for instant feedback.
+--   Everything structural — one verified owner per domain, one membership per
+--   member and company, the domain coming from the challenge rather than the
+--   request — is enforced below.
 --
 -- COMPANY LOGOS
 --   logo_url is set out of band (upload or a later resolution step from the
