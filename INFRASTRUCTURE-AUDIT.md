@@ -30,7 +30,7 @@
 
 7. **129 API route handlers** — The web app has 129 Next.js route handlers under `app/api/`, all running as serverless functions on Cloudflare Workers. Each involves a DB query.
 
-8. **Well-implemented caching** — Sophisticated client-side caching: `request-cache.ts`, `cache.ts` (module-level community/message cache), `msgCache`/`metaCache` (bounded LRU maps), `master-data-cache.ts` (1-hour cached master data), `dedupe-fetch.ts`.
+8. **Well-implemented caching** — Sophisticated client-side caching: `request-cache.ts`, `community-cache.ts` (module-level community/message cache), `msgCache`/`metaCache` (bounded LRU maps), `master-data-cache.ts` (1-hour cached master data), `dedupe-fetch.ts`.
 
 9. **Rate limiting is layered** — Global guard: 20 requests/10s burst, 120/60s sustained per user or IP. On top of that, per-route limits cover login (IP + email), applications, password reset, sign-up steps, chat sends (5/10s + 20/60s), content creation, comments, and reactions (`lib/auth/rate-limit.ts`).
 
@@ -534,7 +534,7 @@ Total: 0 HTTP, 0 DB queries, 5 new WebSocket, 5 close
 ### Request Deduplication
 - **`dedupe-fetch.ts`**: Client-side in-flight dedup + settle replay. Two modes: `exact` (750ms) and `url` (600ms for toggles).
 - **`request-cache.ts`**: Server-side fetch cache with community bootstrap hydration. 15-min stale for bootstrap data.
-- **`cache.ts`**: Module-level `msgCache`/`metaCache` with bounded LRU (25 communities max).
+- **`community-cache.ts`**: Module-level `msgCache`/`metaCache` with bounded LRU (25 communities max).
 - **`lib/realtime/pool.ts`**: WebSocket connection pooling with 5-min idle timeout.
 
 ### Potential Duplicate Requests
@@ -686,9 +686,9 @@ Logout:
 | **Browser HTTP cache** | Standard HTTP Cache-Control | Varies | Per browser | Low (most responses no-store) |
 | **dedupe-fetch.ts** | In-flight dedup + settle replay | 750ms (exact), 600ms (url) | Per tab | High for rapid clicks |
 | **request-cache.ts** | Server-side fetch cache (module-level Map) | 60s default, 15min bootstrap, 60s sidebar | Per serverless instance | HIGH for SPA nav |
-| **cache.ts msgCache** | Module-level BoundedCommunityMap (25 entries) | Persistent until eviction | Per tab, SPA lifetime | HIGH for community switching |
-| **cache.ts metaCache** | Module-level BoundedCommunityMap (25 entries) | 5 min (META_STALE_MS) | Per tab, SPA lifetime | HIGH for community switching |
-| **cache.ts sidebarStore** | Module-level object | 60s (SIDEBAR_STALE_MS) | Per tab | HIGH |
+| **community-cache.ts msgCache** | Module-level BoundedCommunityMap (25 entries) | Persistent until eviction | Per tab, SPA lifetime | HIGH for community switching |
+| **community-cache.ts metaCache** | Module-level BoundedCommunityMap (25 entries) | 5 min (META_STALE_MS) | Per tab, SPA lifetime | HIGH for community switching |
+| **sidebar-store.ts sidebarStore** | Module-level object | 60s (SIDEBAR_STALE_MS) | Per tab | HIGH |
 | **master-data-cache.ts** | Next.js unstable_cache | 1 hour | Per serverless instance | VERY HIGH (rarely changes) |
 | **Cloudflare CDN** | Edge cache | Default | Global | HIGH for static assets |
 | **Cloudflare Workers cache** | ISR | Varies | Per edge location | Medium |

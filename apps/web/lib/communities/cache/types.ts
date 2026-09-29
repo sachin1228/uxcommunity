@@ -2,8 +2,9 @@
  * The shapes the client-side community caches hold.
  *
  * WHY THIS EXISTS
- *   These types were declared inside `lib/communities/cache.ts` — one 771-line
- *   module that also held four independent caches and three policy registries.
+ *   These types were declared inside the 771-line community-cache monolith that
+ *   the `lib/communities/cache/index.ts` barrel split apart — one module that
+ *   also held four independent caches and three policy registries.
  *   They describe *what* is cached, which is a question the stores, the sidebar
  *   projection, the chat hooks and the notification cards all have to answer
  *   together, so they live in one place of their own.
