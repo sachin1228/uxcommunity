@@ -47,7 +47,7 @@ interface MessageListProps {
   firstUnreadMsgId: string | null;
   unreadDisplayCount: number;
   unreadDividerRef: RefObject<HTMLDivElement>;
-  /** Observed by an IntersectionObserver in CommunityChat to trigger loading older messages. */
+  /** Observed by an IntersectionObserver in useMessageListAnchor to trigger loading older messages. */
   topSentinelRef: RefObject<HTMLDivElement>;
   bottomRef: RefObject<HTMLDivElement>;
   initialPositionResolved: boolean;
@@ -244,7 +244,7 @@ export const MessageList = memo(function MessageList({
           IntersectionObserver sentinel and hosts the spinner, which only
           toggles visibility — never layout — so nothing below it moves when a
           fetch starts or finishes. Removing the row (hasMoreAbove → false) is
-          compensated by the scroll-preservation effect in CommunityChat.     */}
+          compensated by the scroll-preservation effect in useMessageListAnchor. */}
       {hasMoreAbove && (
         <div
           ref={topSentinelRef}

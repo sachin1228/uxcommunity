@@ -6,30 +6,8 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
-import { requireZoneAwareIso } from "@/lib/communities/event-time";
+import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
 import type { Database } from "@/lib/supabase/database.types";
-
-/**
- * An IANA zone name the runtime can resolve, or null — the same best-effort
- * rule the create route applies, since this is display metadata.
- */
-function validTimeZone(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const name = value.trim();
-  if (!name || name.length > 64) return null;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: name });
-    return name;
-  } catch {
-    return null;
-  }
-}
-
-/** The host's offset in minutes east of UTC, or null when it isn't a sane one. */
-function validOffsetMinutes(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value)) return null;
-  return Math.abs(value) <= 840 ? value : null;
-}
 
 export async function GET(
   _req: NextRequest,

@@ -9,32 +9,12 @@ import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
 import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
-import { isPastStart, requireZoneAwareIso } from "@/lib/communities/event-time";
-
-/**
- * An IANA zone name the runtime can actually resolve, or null. The stored name
- * is only ever used to re-derive a wall clock on someone else's browser, so an
- * unrecognised value is dropped (its offset fallback still tells the story)
- * rather than rejecting the event over metadata.
- */
-function validTimeZone(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const name = value.trim();
-  if (!name || name.length > 64) return null;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: name });
-    return name;
-  } catch {
-    return null;
-  }
-}
-
-/** The host's offset in minutes east of UTC, or null when it isn't a sane one. */
-function validOffsetMinutes(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value)) return null;
-  // UTC-14 … UTC+14: outside that, the value is a bug rather than a zone.
-  return Math.abs(value) <= 840 ? value : null;
-}
+import {
+  isPastStart,
+  requireZoneAwareIso,
+  validOffsetMinutes,
+  validTimeZone,
+} from "@/lib/communities/event-time";
 
 const EVENT_PAGE_SIZE = 25;
 

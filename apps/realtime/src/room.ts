@@ -1,6 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
-import type { PublishRequest } from "./types";
 import { RealtimeMetrics } from "./metrics";
 import {
   PublishRateLimiter,
@@ -10,14 +9,15 @@ import {
   USER_PUBLISH_REFILL_PER_SECOND,
   guardClientPublish,
 } from "./client-publish";
+import { TopicSocketIndex } from "./subscriptions";
 import {
-  TopicSocketIndex,
-  countOnlineUsers,
-  type PresenceMeta,
-} from "./subscriptions";
+  SocketRegistry,
+  type WebSocketAttachment,
+} from "./socket-registry";
 import { EventIdDedupe } from "./event-dedupe";
-import { resolveMembershipConfig } from "./membership-config";
-import { logEvent } from "./log";
+import { MembershipAuthorizer } from "./membership-auth";
+import { PresenceBroadcaster } from "./presence";
+import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
 
 /**
  * Community Durable Object — ONE per community. Handles all logical realtime
@@ -29,10 +29,9 @@ import { logEvent } from "./log";
  *
  * State scoping:
  *   SOCKET-scoped (per individual WebSocket connection):
- *     wsToUser[ws]        = userId
+ *     sockets             = wsToUser + userSockets (see socket-registry.ts)
  *     subscriptions       = topic → sockets (targeted fan-out index)
  *   USER-scoped (multi-device bookkeeping + presence):
- *     userSockets[userId] = Set<WebSocket> all sockets for this user
  *     userMeta[userId]    = { name, avatar } cached at join() so client-publish
  *                           frames never have to deserialize attachments
  *
@@ -61,55 +60,9 @@ import { logEvent } from "./log";
  * Event classification:
  *   - EPHEMERAL (typing, presence): drop on delivery failure, no retry
  *   - DURABLE (chat, edit, delete, reaction): client recovers via DB
- */
-
-interface WebSocketAttachment {
-  userId: string;
-  topics: string[];
-  name: string | null;
-  avatar: string | null;
-}
-
-/**
- * How long presence changes are allowed to coalesce.
  *
- * Presence is a coarse online-member count: a 150 ms delay is imperceptible,
- * while flushing per join/close made a reconnect storm quadratic (N connections
- * produced N flushes × N sockets). Coalescing bounds the flush count; the count
- * payload bounds each flush.
+ * Presence is coalesced and lap-budgeted — see presence.ts.
  */
-const PRESENCE_COALESCE_MS = 150;
-
-/**
- * How many sockets one presence flush may write to.
- *
- * A count has to reach every attached socket, so a flush is inherently O(room)
- * work. Doing all of it inside one timer callback is what starved the Durable
- * Object in the H-3 5K ladder: at 4,351 attached sockets the flush wrote the
- * room back to back, the object could not interleave upgrades and queued `join`
- * frames with it (only 42 of 4,351 sockets ever got their `hello`), and the room
- * was lost.
- *
- * Capping the window bounds the work one presence change can impose on the
- * object. A room at or below the cap still delivers every change in a single
- * window — identical behaviour for normal-sized communities — and a larger room
- * rotates: the cursor advances by the cap each window (~150 ms), so a
- * 5,000-socket room converges on the current count within ~3 s.
- */
-const PRESENCE_FLUSH_BUDGET = 256;
-
-/**
- * One warn per isolate when membership authorization is unconfigured. Repeated
- * per-connection logs would be noise; the aggregate counter and this line are
- * enough for an operator to spot the misconfiguration.
- */
-let warnedMissingMembershipApi = false;
-
-/** Membership re-check window and the cap on cached entries. */
-const MEMBERSHIP_CACHE_TTL_MS = 60_000;
-const MEMBERSHIP_CACHE_MAX_ENTRIES = 500;
-/** Sweep expired `auth:*` storage keys every N membership API checks. */
-const MEMBERSHIP_STORAGE_PRUNE_EVERY = 64;
 
 export class Room extends DurableObject<Env> {
   /**
@@ -118,34 +71,15 @@ export class Room extends DurableObject<Env> {
    */
   private subscriptions = new TopicSocketIndex<WebSocket>();
 
-  /** Socket → userId, and userId → its sockets (multi-device + presence). */
-  private wsToUser = new Map<WebSocket, string>();
-  private userSockets = new Map<string, Set<WebSocket>>();
-  /** Display metadata cached at join() — client-publish frames never touch attachments. */
-  private userMeta = new Map<string, PresenceMeta>();
+  /**
+   * Socket → userId, userId → its sockets, and the display metadata cached at
+   * join() (multi-device bookkeeping + the presence count).
+   */
+  private sockets = new SocketRegistry();
 
   /** In-flight reconstruction, shared so concurrent callers await the same work. */
   private reconstructPromise: Promise<void> | null = null;
   private reconstructed = false;
-
-  /** Coalesced presence state. */
-  private presenceTimer: ReturnType<typeof setTimeout> | null = null;
-  private presenceDirty = false;
-  /** Next socket index still owed the current count; 0 starts a lap. */
-  private presenceCursor = 0;
-  /** Last observed online count — how a change is noticed between flushes. */
-  private presenceSeenCount: number | null = null;
-  /** Count a finished clean lap proved to sit on every attached socket. */
-  private presenceStableCount: number | null = null;
-  /** Bumped whenever the observed count changes. */
-  private presenceChangeSeq = 0;
-  /** Change sequence and socket count captured when the current lap started. */
-  private presenceLapChanges = 0;
-  private presenceLapSockets = 0;
-
-  /** Bounded membership authorization cache (in-memory LRU + pruned storage). */
-  private membershipCache = new Map<string, { ok: boolean; ts: number }>();
-  private membershipStorageWrites = 0;
 
   /**
    * Event ids already applied by this room — drops fan-out retries that race a
@@ -169,6 +103,24 @@ export class Room extends DurableObject<Env> {
   );
 
   readonly metrics = new RealtimeMetrics();
+
+  /** Coalesced online-count broadcasts for this room — see presence.ts. */
+  private readonly presence = new PresenceBroadcaster({
+    getSockets: () => this.ctx.getWebSockets(),
+    socketsByUser: this.sockets.socketsByUser,
+    roomName: this.roomName(),
+    metrics: this.metrics,
+    onSendFailed: (ws) => this.removeSocket(ws, "send-failed"),
+  });
+
+  /** Community membership authorization (fail-closed) — see membership-auth.ts. */
+  private readonly membership = new MembershipAuthorizer({
+    storage: this.ctx.storage,
+    env: this.env,
+    communityId: this.communityIdFromRoom(),
+    roomName: this.roomName(),
+    metrics: this.metrics,
+  });
 
   /**
    * Opaque token for THIS in-memory instance. A hibernating DO is evicted and
@@ -218,11 +170,11 @@ export class Room extends DurableObject<Env> {
     return {
       room: this.roomName(),
       instanceId: this.instanceId,
-      sockets: this.wsToUser.size,
-      users: this.userSockets.size,
+      sockets: this.sockets.socketCount,
+      users: this.sockets.userCount,
       topics: this.subscriptions.topicCount,
       subscriptionRefs: this.subscriptions.referenceCount,
-      membershipCacheSize: this.membershipCache.size,
+      membershipCacheSize: this.membership.cacheSize,
       metrics: this.metrics.toJSON(),
     };
   }
@@ -242,7 +194,7 @@ export class Room extends DurableObject<Env> {
     const room = this.roomName();
     const isSubEntityRoom = room.startsWith("thread-comments:") || room.startsWith("resource-comments:");
     if (!isSubEntityRoom) {
-      const isMember = await this.checkMembership(userId);
+      const isMember = await this.membership.check(userId);
       if (!isMember) {
         return new Response("Forbidden", { status: 403 });
       }
@@ -266,7 +218,7 @@ export class Room extends DurableObject<Env> {
     };
     server.serializeAttachment(attachment);
 
-    this.trackSocket(server, userId);
+    this.sockets.track(server, userId);
     this.metrics.connectionsOpened += 1;
     // A new socket changes the online-member count (it counts before its `join`
     // frame lands, exactly like the previous roster snapshot did).
@@ -294,7 +246,7 @@ export class Room extends DurableObject<Env> {
     // Guard: make sure socket maps are populated (post-hibernation wake).
     await this.ensureSubscribers();
 
-    let userId: string | undefined = this.wsToUser.get(ws);
+    let userId: string | undefined = this.sockets.userId(ws);
     if (!userId) {
       // Socket accepted but not tracked (e.g. reconstructed set changed).
       // Fall back to the attachment so the frame is never silently dropped.
@@ -312,12 +264,12 @@ export class Room extends DurableObject<Env> {
         ws.serializeAttachment(attachment);
       }
       // Cache for presence snapshots — written once per join, read per flush.
-      this.userMeta.set(userId, {
+      this.sockets.setUserMeta(userId, {
         name: msg.user.name ?? null,
         avatar: msg.user.avatar ?? null,
       });
 
-      this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
+      this.sendToClient(ws, helloFrame(crypto.randomUUID()));
       this.markPresenceDirty();
     } else if (msg.t === "subscribe" && msg.topic) {
       this.handleWsSubscribe(ws, msg.topic);
@@ -340,18 +292,6 @@ export class Room extends DurableObject<Env> {
 
   // ── Socket bookkeeping ────────────────────────────────────────────
 
-  /** Register an accepted socket in the socket- and user-scoped maps. */
-  private trackSocket(ws: WebSocket, userId: string): void {
-    this.wsToUser.set(ws, userId);
-
-    let sockets = this.userSockets.get(userId);
-    if (!sockets) {
-      sockets = new Set();
-      this.userSockets.set(userId, sockets);
-    }
-    sockets.add(ws);
-  }
-
   /**
    * Drop a socket from every index. Idempotent, so a close handler racing an
    * eviction (or a duplicate runtime callback) cannot double-count.
@@ -360,24 +300,16 @@ export class Room extends DurableObject<Env> {
    * not stay in the fan-out index, otherwise every subsequent event retries it.
    */
   private removeSocket(ws: WebSocket, reason: "close" | "error" | "send-failed"): void {
-    const userId = this.wsToUser.get(ws);
+    const userId = this.sockets.userId(ws);
     if (userId === undefined && !this.subscriptions.socketTopics(ws)) return;
 
     this.subscriptions.removeSocket(ws);
-    this.wsToUser.delete(ws);
+    const { lastSocketForUser } = this.sockets.untrack(ws);
     this.socketPublishLimit.release(ws);
 
-    if (userId !== undefined) {
-      const sockets = this.userSockets.get(userId);
-      if (sockets) {
-        sockets.delete(ws);
-        if (sockets.size === 0) {
-          this.userSockets.delete(userId);
-          this.userMeta.delete(userId);
-          // Last socket for this user in this room — its shared budget goes too.
-          this.userPublishLimit.release(userId);
-        }
-      }
+    // Last socket for this user in this room — its shared budget goes too.
+    if (userId !== undefined && lastSocketForUser) {
+      this.userPublishLimit.release(userId);
     }
 
     this.metrics.connectionsClosed += 1;
@@ -428,7 +360,7 @@ export class Room extends DurableObject<Env> {
     // the secret-authenticated POST /publish handler below.
     const decision = guardClientPublish(topic, data, {
       userId,
-      name: this.userMeta.get(userId)?.name,
+      name: this.sockets.getUserMeta(userId)?.name,
     });
     if (!decision.ok) {
       if (decision.reason === "topic") this.metrics.clientPublishRejectedTopic += 1;
@@ -480,46 +412,26 @@ export class Room extends DurableObject<Env> {
   }
 
   /**
-   * Register a single accepted socket in the socket-scoped and user-scoped
-   * maps using its hibernation attachment. Returns the userId, or null if the
-   * socket carries no usable attachment.
+   * Register a single accepted socket from its hibernation attachment and index
+   * its topics. Returns the userId, or null if the socket carries no usable
+   * attachment.
    */
   private adoptSocket(ws: WebSocket): string | null {
-    let attachment: WebSocketAttachment | undefined;
-    try {
-      attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
-    } catch {
-      return null;
-    }
-    if (!attachment?.userId) return null;
+    const adopted = this.sockets.adopt(ws);
+    if (!adopted) return null;
 
-    const userId = attachment.userId;
-    this.trackSocket(ws, userId);
-
-    for (const topic of attachment.topics ?? []) {
+    for (const topic of adopted.topics) {
       this.subscriptions.add(topic, ws);
     }
 
-    if (attachment.name !== undefined || attachment.avatar !== undefined) {
-      this.userMeta.set(userId, {
-        name: attachment.name ?? null,
-        avatar: attachment.avatar ?? null,
-      });
-    }
-
-    return userId;
+    return adopted.userId;
   }
 
   // ── HTTP publish (server-side) ───────────────────────────────────────
 
   private async publish(request: Request): Promise<Response> {
-    let body: PublishRequest;
-    try {
-      body = (await request.json()) as PublishRequest;
-    } catch {
-      return new Response("Bad request", { status: 400 });
-    }
-    if (!body.room || !body.topic) {
+    const body = await readPublishRequest(request);
+    if (!body) {
       return new Response("Bad request", { status: 400 });
     }
 
@@ -559,8 +471,7 @@ export class Room extends DurableObject<Env> {
 
     this.metrics.fanoutRecipients += recipients.size;
 
-    const eventMsg = JSON.stringify({
-      t: "event",
+    const eventMsg = encodeEventFrame({
       room: this.roomName(),
       topic,
       data,
@@ -569,7 +480,7 @@ export class Room extends DurableObject<Env> {
     const eventBytes = eventMsg.length;
 
     for (const ws of recipients) {
-      const userId = this.wsToUser.get(ws);
+      const userId = this.sockets.userId(ws);
       if (!userId) continue;
       if (excludeUserId && userId === excludeUserId) continue;
 
@@ -587,244 +498,9 @@ export class Room extends DurableObject<Env> {
 
   // ── Presence ──────────────────────────────────────────────────────
 
-  /**
-   * Mark presence as changed and schedule a flush.
-   *
-   * Joins and closes are coalesced into one count per window: before this, a
-   * reconnect storm sent a message (with an attachment deserialization per
-   * socket, twice) for every single join and close.
-   */
+  /** Mark presence as changed and schedule a coalesced flush. */
   private markPresenceDirty(): void {
-    this.presenceDirty = true;
-    if (this.presenceTimer !== null) {
-      this.metrics.presenceCoalesced += 1;
-      return;
-    }
-    this.presenceTimer = setTimeout(() => {
-      this.presenceTimer = null;
-      this.flushPresence();
-    }, PRESENCE_COALESCE_MS);
-  }
-
-  /**
-   * Send the room's online-member count to the next window of sockets.
-   *
-   * The payload is a single number by design (see `countOnlineUsers`): the only
-   * presence consumer in the product renders "N online", so a roster added
-   * nothing but bytes. The work per flush is capped at `PRESENCE_FLUSH_BUDGET`
-   * sends (see that constant for why), so a room larger than the cap is told the
-   * count one window at a time — a lap over the room — until every attached
-   * socket holds it.
-   *
-   * A lap only proves delivery when neither the count nor the socket population
-   * moved while it ran; a change landing mid-lap runs another lap instead of
-   * declaring the room settled. The cursor is never reset, so a busy room keeps
-   * advancing through its sockets rather than refreshing the same first window
-   * on every change.
-   */
-  private flushPresence(): void {
-    if (!this.presenceDirty) return;
-    this.presenceDirty = false;
-
-    const sockets = this.ctx.getWebSockets();
-    if (sockets.length === 0) {
-      // Nothing to tell, and a socket that arrives later must be told afresh.
-      this.presenceCursor = 0;
-      this.presenceSeenCount = null;
-      this.presenceStableCount = null;
-      return;
-    }
-
-    const count = countOnlineUsers(this.userSockets);
-    if (count !== this.presenceSeenCount) {
-      this.presenceSeenCount = count;
-      this.presenceChangeSeq += 1;
-      this.metrics.presenceCountChanges += 1;
-    }
-
-    const startingLap = this.presenceCursor === 0;
-    // Idle room: every socket holds this count and no lap is in progress.
-    if (startingLap && count === this.presenceStableCount) {
-      this.metrics.presenceSkipped += 1;
-      return;
-    }
-    if (startingLap) {
-      this.presenceLapChanges = this.presenceChangeSeq;
-      this.presenceLapSockets = sockets.length;
-    }
-
-    const message = JSON.stringify({
-      t: "presence",
-      room: this.roomName(),
-      count,
-    });
-    const messageBytes = message.length;
-
-    const end = Math.min(sockets.length, this.presenceCursor + PRESENCE_FLUSH_BUDGET);
-    for (let index = this.presenceCursor; index < end; index += 1) {
-      const ws = sockets[index];
-      if (!ws) continue;
-      // Counted separately from event fan-out: this addresses the whole room, so
-      // folding it into `deliverAttempts` would hide the cost of a publish.
-      this.metrics.presenceDeliverAttempts += 1;
-      try {
-        ws.send(message);
-        this.metrics.presencePayloadBytes += messageBytes;
-      } catch {
-        // A dead socket is evicted; the next flush publishes a fresh count.
-        this.removeSocket(ws, "send-failed");
-      }
-    }
-    this.metrics.presenceBroadcasts += 1;
-
-    if (end < sockets.length) {
-      // Budget spent: the rest of the room is owed this count.
-      this.presenceCursor = end;
-      this.metrics.presenceDeferredWindows += 1;
-      this.markPresenceDirty();
-      return;
-    }
-
-    this.presenceCursor = 0;
-    if (this.presenceChangeSeq === this.presenceLapChanges && sockets.length === this.presenceLapSockets) {
-      this.presenceStableCount = count;
-    } else {
-      this.markPresenceDirty();
-    }
-  }
-
-  // ── Membership authorization (fail-closed) ──────────────────────────
-
-  private async checkMembership(userId: string): Promise<boolean> {
-    // FAIL CLOSED: without a membership API there is no way to authorize a
-    // community room, so the connection is refused instead of granting access.
-    // (Previously an unset API_URL returned `true`, silently disabling room
-    // authorization for every authenticated member.)
-    const config = resolveMembershipConfig(this.env);
-    if (!config.configured || !config.apiUrl) {
-      if (!warnedMissingMembershipApi) {
-        warnedMissingMembershipApi = true;
-        logEvent("error", {
-          event: "realtime.membership.config_missing",
-          room: this.roomName(),
-        });
-      }
-      return false;
-    }
-
-    const communityId = this.communityIdFromRoom();
-    const cacheKey = `${communityId}:${userId}`;
-
-    const cached = this.membershipCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < MEMBERSHIP_CACHE_TTL_MS) {
-      this.metrics.membershipCacheHits += 1;
-      // Refresh LRU position: the cache is capped, so a hot community with
-      // thousands of connecting members must not evict its own active set.
-      this.membershipCache.delete(cacheKey);
-      this.membershipCache.set(cacheKey, cached);
-      return cached.ok;
-    }
-    if (cached) this.membershipCache.delete(cacheKey);
-
-    try {
-      const stored = await this.ctx.storage.get<{ ok: boolean; ts: number }>(`auth:${cacheKey}`);
-      if (
-        stored &&
-        typeof stored.ok === "boolean" &&
-        typeof stored.ts === "number" &&
-        Date.now() - stored.ts < MEMBERSHIP_CACHE_TTL_MS
-      ) {
-        this.setMembershipCache(cacheKey, stored);
-        this.metrics.membershipCacheHits += 1;
-        return stored.ok;
-      }
-    } catch {
-      // Storage read failed — fall through to the authoritative API check.
-    }
-
-    this.metrics.membershipChecks += 1;
-    try {
-      const response = await fetch(
-        `${config.apiUrl}/api/communities/${communityId}/members/${userId}/check`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${this.env.API_SECRET}`,
-          },
-          signal: AbortSignal.timeout(3000),
-        },
-      );
-
-      let authorized = false;
-      if (response.ok) {
-        try {
-          const body = await response.json() as { ok?: boolean };
-          authorized = body.ok === true;
-        } catch {
-          authorized = false;
-        }
-      }
-
-      this.setMembershipCache(cacheKey, { ok: authorized, ts: Date.now() });
-
-      try {
-        await this.ctx.storage.put(`auth:${cacheKey}`, {
-          ok: authorized,
-          ts: Date.now(),
-        });
-        this.membershipStorageWrites += 1;
-        if (this.membershipStorageWrites % MEMBERSHIP_STORAGE_PRUNE_EVERY === 0) {
-          // Storage entries are only useful inside the TTL; without a sweep a
-          // large community accumulated one permanent key per member forever.
-          await this.pruneMembershipStorage();
-        }
-      } catch {
-        // Storage write failed — not critical
-      }
-
-      return authorized;
-    } catch (error) {
-      // The API is unreachable: fail closed and make the cause observable.
-      this.metrics.membershipChecksFailed += 1;
-      logEvent("warn", {
-        event: "realtime.membership.check_failed",
-        community_id: communityId,
-        error,
-      });
-      this.membershipCache.delete(cacheKey);
-      return false;
-    }
-  }
-
-  /** Insert into the bounded cache, evicting the oldest entry past the cap. */
-  private setMembershipCache(cacheKey: string, value: { ok: boolean; ts: number }): void {
-    this.membershipCache.delete(cacheKey);
-    this.membershipCache.set(cacheKey, value);
-    while (this.membershipCache.size > MEMBERSHIP_CACHE_MAX_ENTRIES) {
-      const oldest = this.membershipCache.keys().next().value;
-      if (oldest === undefined) break;
-      this.membershipCache.delete(oldest);
-      this.metrics.membershipCacheEvictions += 1;
-    }
-  }
-
-  /** Delete expired `auth:*` keys (bounded page — the sweep repeats next cycle). */
-  private async pruneMembershipStorage(): Promise<void> {
-    try {
-      const now = Date.now();
-      const entries = await this.ctx.storage.list<{ ok: boolean; ts: number }>({
-        prefix: "auth:",
-        limit: 256,
-      });
-      const expired: string[] = [];
-      for (const [key, value] of entries) {
-        const ts = typeof value?.ts === "number" ? value.ts : 0;
-        if (now - ts >= MEMBERSHIP_CACHE_TTL_MS) expired.push(key);
-      }
-      if (expired.length > 0) await this.ctx.storage.delete(expired);
-    } catch {
-      // Maintenance only — never fail a connection because cleanup failed.
-    }
+    this.presence.markPresenceDirty();
   }
 
   // ── Room helpers ────────────────────────────────────────────────────
