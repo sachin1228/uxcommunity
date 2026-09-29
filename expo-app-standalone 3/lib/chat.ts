@@ -354,7 +354,7 @@ export function splitContentForRender(
 
 // ─── Message reactions ────────────────────────────────────────────────────
 //
-// Port of apps/web/lib/communities/cache.ts `applyReactionInsert` /
+// Port of apps/web/lib/communities/cache/reactions.ts `applyReactionInsert` /
 // `applyReactionDelete`. The reaction API takes an explicit *desired* emoji
 // (`null` clears it) rather than a toggle, so the client has to project the
 // intent locally — that projection is what makes a tap feel instant on mobile.

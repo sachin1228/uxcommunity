@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { masterDataSchema } from "@/lib/validations";
 import { z } from "zod";
 import { cleanupMasterDataMedia, collectMasterMediaUrls } from "@/lib/r2-cleanup";
+import { syncMasterImageToCommunities } from "@/lib/master-data/mirror-image";
 
 const patchSchema = masterDataSchema
   .extend({ is_active: z.boolean().optional() })
@@ -41,6 +42,16 @@ export async function PATCH(
     );
   }
   const db = createServiceClient();
+
+  // A new picture replaces the old one everywhere the master row is mirrored,
+  // so read the outgoing URL first — after the update it is gone, and with it
+  // the only pointer that could reclaim the object from R2.
+  const changesImage = parsed.data.image_url !== undefined;
+  const previousImageUrl = changesImage
+    ? (await db.from("cities").select("image_url").eq("id", id).maybeSingle())
+        .data?.image_url ?? null
+    : null;
+
   const { data, error } = await db
     .from("cities")
     .update(parsed.data)
@@ -53,8 +64,29 @@ export async function PATCH(
     }
     return NextResponse.json({ error: "Failed to update city." }, { status: 500 });
   }
+
+  // `communities.image_url` mirrors this row, so write the new picture (or the
+  // cleared null) through to every linked community — the read path resolves
+  // the master row, and leaving the column behind keeps the replaced object
+  // referenced forever.
+  let communitiesMirrored: number | null = null;
+  if (changesImage) {
+    communitiesMirrored = (
+      await syncMasterImageToCommunities({
+        db,
+        table: "cities",
+        masterId: id,
+        imageUrl: parsed.data.image_url ?? null,
+        previousImageUrl,
+      })
+    ).mirrored;
+  }
+
   revalidateTag("master-images", {});
-  return NextResponse.json({ city: data });
+  return NextResponse.json({
+    city: data,
+    ...(communitiesMirrored !== null ? { communities_mirrored: communitiesMirrored } : {}),
+  });
 }
 
 export async function DELETE(

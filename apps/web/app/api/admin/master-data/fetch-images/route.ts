@@ -7,6 +7,7 @@ import { MASTER_IMAGE_LOOKUPS } from "@/lib/r2-cleanup";
 import { extensionForMime } from "@/lib/image-utils";
 import { shouldAutoFetchImage } from "@/lib/master-data/eligibility";
 import { MASTER_TABLES, type MasterTable } from "@/lib/master-data/master-tables";
+import { syncMasterImageToCommunities } from "@/lib/master-data/mirror-image";
 import { findWikipediaImage } from "@/lib/master-data/wikipedia-image";
 
 // `as const` keeps each table name a string literal: the Supabase query
@@ -134,16 +135,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Failed to save image on item." });
   }
 
-  // The replacement succeeded — delete the previous image unless another row
-  // (community mirror or another master row) still references it.
-  if (row.image_url && row.image_url !== url) {
-    try {
-      await deleteR2AssetIfUnreferenced(db, row.image_url, MASTER_IMAGE_LOOKUPS);
-    } catch (cleanupError) {
-      console.error("[fetch-images] replaced-image cleanup error:", cleanupError);
-    }
-  }
+  // The replacement succeeded — write it through to the communities that mirror
+  // this row, then delete the previous image unless another row (another master
+  // row, or a community that still points at it) references it. The mirror has
+  // to land first: until the communities column stops pointing at the old
+  // object, the cleanup correctly refuses to reclaim it.
+  const mirror = await syncMasterImageToCommunities({
+    db,
+    table: body.table,
+    masterId: row.id,
+    imageUrl: url,
+    previousImageUrl: row.image_url,
+  });
 
   revalidateTag("master-images", {});
-  return NextResponse.json({ ok: true, item: updated });
+  return NextResponse.json({ ok: true, item: updated, communities_mirrored: mirror.mirrored });
 }

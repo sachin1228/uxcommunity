@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { z } from "zod";
 import { cleanupMasterDataMedia, collectMasterMediaUrls } from "@/lib/r2-cleanup";
+import { syncMasterImageToCommunities } from "@/lib/master-data/mirror-image";
 import type { Database } from "@/lib/supabase/database.types";
 
 const patchSchema = z.object({
@@ -67,6 +68,15 @@ export async function PATCH(
   }
 
   const db = createServiceClient();
+
+  // A new picture replaces the old one everywhere the master row is mirrored,
+  // so read the outgoing URL first — after the update it is gone, and with it
+  // the only pointer that could reclaim the object from R2.
+  const previousImageUrl = image_url !== undefined
+    ? (await db.from("experience_levels").select("image_url").eq("id", id).maybeSingle())
+        .data?.image_url ?? null
+    : null;
+
   const { data, error } = await db
     .from("experience_levels")
     .update(updateData)
@@ -74,8 +84,29 @@ export async function PATCH(
     .select("id, slug, name, image_url, is_active, created_at, updated_at")
     .single();
   if (error) return NextResponse.json({ error: "Failed to update experience level." }, { status: 500 });
+
+  // `communities.image_url` mirrors this row, so write the new picture (or the
+  // cleared null) through to every linked community — the read path resolves
+  // the master row, and leaving the column behind keeps the replaced object
+  // referenced forever.
+  let communitiesMirrored: number | null = null;
+  if (image_url !== undefined) {
+    communitiesMirrored = (
+      await syncMasterImageToCommunities({
+        db,
+        table: "experience_levels",
+        masterId: id,
+        imageUrl: image_url,
+        previousImageUrl,
+      })
+    ).mirrored;
+  }
+
   revalidateTag("master-images", {});
-  return NextResponse.json({ experience_level: shape(data) });
+  return NextResponse.json({
+    experience_level: shape(data),
+    ...(communitiesMirrored !== null ? { communities_mirrored: communitiesMirrored } : {}),
+  });
 }
 
 export async function DELETE(
