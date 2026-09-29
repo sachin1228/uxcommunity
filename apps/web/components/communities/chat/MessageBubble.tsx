@@ -3,11 +3,11 @@
 import { Fragment, useState, useRef, useEffect, useCallback, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Ban } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime } from "./chatUtils";
+import { fmtTime, isEmojiOnly, splitEmojiClusters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 import { MessageHoverActions } from "./MessageHoverActions";
-import { MessageContent, isEmojiOnly } from "./MessageText";
+import { MessageContent } from "./MessageText";
 
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { ModalPortal } from "@/components/ui/Modal";
@@ -402,7 +402,10 @@ export const MessageBubble = memo(function MessageBubble({
   const isDeleted = !!msg.deleted_at;
   const imageOnly = !!imageUrl && !msg.content && !replyTo && !replyToContent;
 
-  // Show as a large bubble-free emoji when the entire message is 1–3 emoji glyphs.
+  // Show as large bubble-free emoji when the entire message is 1–3 emoji
+  // glyphs. Each glyph renders on its own — a two- or three-emoji message is
+  // not one codepoint, so handing the whole string to the emoji asset layer
+  // misses every file and drops to static system glyphs that wrap.
   const isEmojiMsg =
     !isDeleted &&
     !imageUrl &&
@@ -410,6 +413,7 @@ export const MessageBubble = memo(function MessageBubble({
     !replyToContent &&
     !!msg.content &&
     isEmojiOnly(msg.content);
+  const emojiGlyphs = isEmojiMsg ? splitEmojiClusters(msg.content ?? "") : [];
 
   // Inline style: Tailwind does not emit color-mix() for arbitrary CSS-var
   // utilities with an opacity modifier (bg-[var(--x)]/25 never compiles), so
@@ -521,7 +525,18 @@ export const MessageBubble = memo(function MessageBubble({
                 data-side={isMe ? "right" : "left"}
               >
                 <div className="flex flex-col items-start select-none">
-                  <AnimatedEmoji emoji={msg.content} size={EMOJI_MESSAGE_SIZE} />
+                  {/* One row, never wrapped — 2–3 emoji stay big and side by
+                      side, each animating on its own. */}
+                  <div className="flex flex-nowrap items-center gap-0.5">
+                    {emojiGlyphs.map((glyph, i) => (
+                      <AnimatedEmoji
+                        key={`${glyph}-${i}`}
+                        emoji={glyph}
+                        size={EMOJI_MESSAGE_SIZE}
+                        className="shrink-0"
+                      />
+                    ))}
+                  </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     {msg.edited_at && (
                       <span className="font-body text-[10px] text-foreground-muted/60">edited</span>

@@ -202,9 +202,22 @@ test("a batch size over Expo's limit is clamped instead of rejected", async () =
     config: { batchSize: 1_000, rateLimit: 1_000_000 },
   });
 
+  // The contract is the clamp and the completeness, not the order the three
+  // batches happened to leave in. Batches are independent slices, so nothing
+  // downstream cares which one goes first — and at this config the pacer spaces
+  // them 0.1ms apart, which is below timer resolution: which worker resumes
+  // first is a race. Asserting the raw order flaked ~1 run in 300 locally (and
+  // once on CI) with the third batch landing before the second.
   assert.deepEqual(
-    fake.requests.map((batch) => batch.length),
-    [100, 100, 50],
+    fake.requests.map((batch) => batch.length).sort((a, b) => a - b),
+    [50, 100, 100],
+    "every batch is clamped to Expo's 100-message limit, remainder included",
+  );
+  assert.equal(fake.requests.flat().length, 250, "no recipient is dropped");
+  assert.equal(
+    new Set(fake.requests.flat()).size,
+    250,
+    "no recipient is handed over twice",
   );
   assert.equal(delivery.delivered, 250);
 });
