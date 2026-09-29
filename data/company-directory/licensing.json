@@ -1,0 +1,102 @@
+{
+  "note": "The legal posture of each source, kept apart from sources.json (which records what a source IS and what it is good for). Rendered into docs/company-data-sources.md and read by the pipeline's report. `committable` answers the question that actually blocks a public repository: may derived company/domain rows from this source be committed here? A licence line is a record of what the source states, not legal advice, and the value of this file is that the question is answered per source instead of assumed once for all of them.",
+  "reviewed_at": "2026-09-29",
+  "fields": {
+    "redistribution": "may the source's data be redistributed",
+    "committable": "may company/domain rows DERIVED from it be committed to this public repository",
+    "attribution": "what credit the licence requires in a redistributed product",
+    "api_restrictions": "what the access method's terms forbid",
+    "rate_limits": "published or observed limits"
+  },
+  "sources": {
+    "wikidata": {
+      "redistribution": "yes - CC0 1.0 is a public domain dedication with no conditions",
+      "committable": "yes",
+      "attribution": "none required; crediting Wikidata is courtesy, and the seed migration already names it",
+      "api_restrictions": "etiquette, not licence: identify the client with a descriptive User-Agent, avoid parallel bulk queries against WDQS, prefer the dumps for full copies",
+      "rate_limits": "no published quota; WDQS throttles and returns 429/504 bodies that are not JSON, which the generator treats as a retryable failure"
+    },
+    "gleif-lei": {
+      "redistribution": "yes, under the GLEIF LEI Data Terms of Use (no warranty, no implied endorsement)",
+      "committable": "only after re-reading the current terms page; the LEI data is intended to be freely usable, and the terms page is the authority, not this file",
+      "attribution": "credit GLEIF as the source of the LEI reference data",
+      "api_restrictions": "the search API is for lookups; bulk use is expected through the golden-copy files instead",
+      "rate_limits": "golden copy is a file download, updated three times daily; no per-request quota on the files"
+    },
+    "companies-house-uk": {
+      "redistribution": "yes - Open Government Licence v3.0 permits commercial and non-commercial reuse",
+      "committable": "yes, with the attribution below; note that the register contains personal data (officer names, service addresses) that should NOT be committed, only company-level facts",
+      "attribution": "must state that the data is from Companies House and is licensed under the OGL v3.0",
+      "api_restrictions": "the REST API is for live lookups at a sane rate; bulk extraction is expected through the bulk products and the streaming API",
+      "rate_limits": "600 requests per 5 minutes per API key (published)"
+    },
+    "sec-edgar": {
+      "redistribution": "yes - US government works are not subject to copyright",
+      "committable": "yes for extracted company/domain facts; do not commit whole filings",
+      "attribution": "none required",
+      "api_restrictions": "automated access must declare a descriptive User-Agent with contact details and stay within the published request rate",
+      "rate_limits": "10 requests per second (published)"
+    },
+    "opencorporates": {
+      "redistribution": "the open tier is ODbL: redistribution of a DERIVED DATABASE must itself be ODbL, with attribution and share-alike. Several national registers inside it are not openly licensed at all.",
+      "committable": "no - share-alike on a committed derived database is a licence obligation this repository has not accepted",
+      "attribution": "required by ODbL where it applies",
+      "api_restrictions": "the free API tier explicitly forbids bulk extraction and re-publication",
+      "rate_limits": "tier-dependent; the free tier is small and throttled"
+    },
+    "crunchbase-zoominfo": {
+      "redistribution": "no - subscription terms forbid redistributing the dataset or a derived mapping",
+      "committable": "no",
+      "attribution": "n/a",
+      "api_restrictions": "redistribution and bulk export are prohibited; some vendors forbid using the data to build a competing dataset",
+      "rate_limits": "subscription-dependent"
+    },
+    "common-crawl": {
+      "redistribution": "the crawl files are openly available; the crawled CONTENT stays the copyright of each site",
+      "committable": "yes for derived DOMAIN facts (a domain published a role address on its own site); never commit an individual address, a person, or page text",
+      "attribution": "none required by Common Crawl; the sites' own terms still apply to their content",
+      "api_restrictions": "respect robots.txt and each site's terms for any live fetching; the crawl archives themselves are free to download",
+      "rate_limits": "S3/HTTP index downloads are unthrottled; live per-site fetching is what needs a self-imposed limit"
+    },
+    "public-dns": {
+      "redistribution": "DNS resolution results are facts about public infrastructure; RDAP responses carry per-registry terms",
+      "committable": "yes for derived facts (this domain has MX, this domain resolves); no registrant personal data",
+      "attribution": "none for DNS; RDAP output is registry-specific",
+      "api_restrictions": "bulk RDAP harvesting is against several registries' terms; use RDAP for individual lookups",
+      "rate_limits": "registry-specific; ICANN's RDAP profile expects polite use"
+    },
+    "ct-logs": {
+      "redistribution": "yes - CT logs are append-only public audit logs",
+      "committable": "yes for derived facts (this hostname had a certificate)",
+      "attribution": "none required",
+      "api_restrictions": "bulk querying of the popular search interfaces is discouraged; the logs themselves can be consumed directly",
+      "rate_limits": "interface-dependent; the logs have no query quota"
+    },
+    "ror": {
+      "redistribution": "yes - CC0 1.0",
+      "committable": "yes",
+      "attribution": "none required",
+      "api_restrictions": "the API is unmetered but asks for reasonable use; monthly bulk releases exist",
+      "rate_limits": "none published"
+    },
+    "tranco-umbrella": {
+      "redistribution": "Tranco is free to use and redistribute with citation; the Cisco Umbrella list is under Cisco's own terms",
+      "committable": "yes with citation for Tranco; check Cisco's terms for the Umbrella list",
+      "attribution": "cite the Tranco paper / Tranco list as the source of the ranking",
+      "api_restrictions": "the lists are snapshots; no query API to abuse",
+      "rate_limits": "daily file downloads"
+    }
+  },
+  "rejected_for_licence": [
+    {
+      "id": "email-intelligence-apis",
+      "name": "Domain and email-intelligence APIs (Hunter, Clearbit-style enrichment, similar)",
+      "why": "their terms almost universally forbid storing or re-publishing the returned data as a dataset, which is exactly what a seeded directory is. A lookup may be permitted for an internal check; the answer may not become a committed row, and several of them derive their answers from sources we would not accept anyway."
+    },
+    {
+      "id": "people-search-datasets",
+      "name": "People-search, breach and credential corpora",
+      "why": "never used, whatever a licence says: the product needs the DOMAIN, not a person, and these sources are personal data obtained from a breach in most cases."
+    }
+  ]
+}

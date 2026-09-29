@@ -1,0 +1,1001 @@
+company_id,company_name,normalized_name,country,industry,website_domain,employee_email_domains,parent_company_id,source,source_confidence,directory_rank,aliases
+microsoft,Microsoft,microsoft,US,software,microsoft.com,microsoft.com,,curated,,1,Microsoft;MSFT;Microsoft Corporation
+google,Google,google,US,internet,google.com,google.com,alphabet,curated,,2,Google;Google Inc.;Google LLC
+amazon,Amazon,amazon,US,retail,amazon.com,amazon.com,,curated,,3,Amazon;Amazon.com;Amazon.com Inc.
+meta-platforms,Meta Platforms,meta platforms,US,internet,meta.com,fb.com,,curated,,4,"Meta Platforms;Meta;Meta Platforms Inc.;Facebook Inc.;Facebook, Inc."
+tata-consultancy-services,Tata Consultancy Services,tata consultancy services,IN,IT services,tcs.com,tcs.com,tata-sons,curated,,5,Tata Consultancy Services;TCS;Tata Consultancy Services Ltd.
+volkswagen-group,Volkswagen Group,volkswagen group,DE,automotive,volkswagen-group.com,volkswagen.de,,curated,,6,Volkswagen Group;Volkswagen AG
+hsbc,HSBC,hsbc,GB,banking,hsbc.com,hsbc.com,,curated,,7,HSBC;HSBC Holdings plc;Hongkong and Shanghai Banking Corporation
+porsche,Porsche,porsche,DE,automotive,porsche.com,porsche.com,volkswagen-group,curated,,8,Porsche;Dr. Ing. h.c. F. Porsche AG;Porsche AG
+audi,Audi,audi,DE,automotive,audi.com,audi.com,volkswagen-group,curated,,9,Audi;Audi AG
+bharti-airtel,Bharti Airtel,bharti airtel,IN,telecommunications,airtel.in,airtel.in,,curated,,10,Bharti Airtel;Airtel;Bharti Airtel Limited
+tata-sons,Tata Sons,tata sons,IN,holding company,tata.com,tata.com,,curated,,11,Tata Sons;Tata Group
+hdfc-bank,HDFC Bank,hdfc bank,IN,banking,hdfcbank.com,hdfcbank.com,,curated,,12,HDFC Bank;HDFC Bank Limited
+iit-bombay,Indian Institute of Technology Bombay,indian institute of technology bombay,IN,higher education,iitb.ac.in,iitb.ac.in,,curated,,13,Indian Institute of Technology Bombay;IIT Bombay;IITB
+tata-motors,Tata Motors,tata motors,IN,automotive,tatamotors.com,tatamotors.com,tata-sons,curated,,14,Tata Motors
+apollo-hospitals,Apollo Hospitals,apollo hospitals,IN,healthcare,apollohospitals.com,apollohospitals.com,,curated,,15,Apollo Hospitals;Apollo Hospitals Enterprise Limited
+facebook,Facebook,facebook,US,social media,facebook.com,,meta-platforms,curated,,16,Facebook;Facebook App
+instagram,Instagram,instagram,US,social media,instagram.com,,meta-platforms,curated,,17,Instagram;Instagram Inc.
+whatsapp,WhatsApp,whatsapp,US,messaging,whatsapp.com,,meta-platforms,curated,,18,WhatsApp;WhatsApp LLC;WhatsApp Messenger
+alphabet,Alphabet Inc.,alphabet inc,US,holding company,abc.xyz,,,curated,,19,Alphabet Inc.;Alphabet
+amazon-web-services,Amazon Web Services,amazon web services,US,cloud computing,aws.amazon.com,,,curated,,20,Amazon Web Services;AWS
+acme-technologies-example,Acme Technologies,acme technologies,IN,unknown,acmetech.io,,,example,,21,Acme Technologies
+11-bit-studios,11 Bit Studios,11 bit studios,,,11bitstudios.com,,,wikidata,,22,11 Bit Studios
+123rf,123RF,123rf,,,123rf.com,,,wikidata,,23,123RF
+1xbet,1xBet,1xbet,,,1xbet.com,,,wikidata,,24,1xBet
+2015-inc,"2015, Inc.",2015 inc,,,2015games.net,,,wikidata,,25,"2015, Inc."
+3d-systems,3D Systems,3d systems,,,3dsystems.com,,,wikidata,,26,3D Systems
+3m,3M,3m,,,3m.com,,,wikidata,,27,3M
+7-eleven,7-Eleven,7 eleven,,,7-eleven.com,,,wikidata,,28,7-Eleven
+888casino,888casino,888casino,,,888casino.com,,,wikidata,,29,888casino
+888poker,888poker,888poker,,,888poker.com,,,wikidata,,30,888poker
+888sport,888sport,888sport,,,888sport.com,,,wikidata,,31,888sport
+9-air,9 Air,9 air,,,9air.com,,,wikidata,,32,9 Air
+99acres,99acres,99acres,,,99acres.com,,,wikidata,,33,99acres
+9gag,9GAG,9gag,,,9gag.com,,,wikidata,,34,9GAG
+a-g-barr,A.G. Barr,a g barr,,,agbarr.co.uk,,,wikidata,,35,A.G. Barr
+a-o-smith,A. O. Smith,a o smith,,,aosmith.com,,,wikidata,,36,A. O. Smith
+a-t-cross-company,A. T. Cross Company,a t cross company,,,cross.com,,,wikidata,,37,A. T. Cross Company
+a24,A24,a24,,,a24films.com,,,wikidata,,38,A24
+a4tech,A4Tech,a4tech,,,a4tech.com,,,wikidata,,39,A4Tech
+aakash-educational-services,Aakash Educational Services,aakash educational services,,,aakash.ac.in,,,wikidata,,40,Aakash Educational Services
+ab-volvo,AB Volvo,ab volvo,,,volvogroup.com,,,wikidata,,41,AB Volvo
+abarth,Abarth,abarth,,,abarth.com,,,wikidata,,42,Abarth
+abb-group,ABB Group,abb group,,,global.abb,,,wikidata,,43,ABB Group
+abbey-dawn,Abbey Dawn,abbey dawn,,,abbeydawn.com,,,wikidata,,44,Abbey Dawn
+abbott,Abbott,abbott,,,abbott.com,,,wikidata,,45,Abbott
+abbvie,AbbVie,abbvie,,,abbvie.com,,,wikidata,,46,AbbVie
+abbyy,ABBYY,abbyy,,,abbyy.com,,,wikidata,,47,ABBYY
+abebooks,AbeBooks,abebooks,,,abebooks.com,,,wikidata,,48,AbeBooks
+abengoa,Abengoa,abengoa,,,abengoa.com,,,wikidata,,49,Abengoa
+abercrombie-fitch,Abercrombie & Fitch,abercrombie fitch,,,abercrombie.com,,,wikidata,,50,Abercrombie & Fitch
+abertis,Abertis,abertis,,,abertis.com,,,wikidata,,51,Abertis
+abn-amro,ABN AMRO,abn amro,,,abnamro.com,,,wikidata,,52,ABN AMRO
+absa-group-limited,ABSA Group Limited,absa group limited,,,absa.africa,,,wikidata,,53,ABSA Group Limited
+abus,ABUS,abus,,,abus.com,,,wikidata,,54,ABUS
+abx-air,ABX Air,abx air,,,abxair.com,,,wikidata,,55,ABX Air
+academi,Academi,academi,,,theacademi.org,,,wikidata,,56,Academi
+accenture,Accenture,accenture,,,accenture.com,,,wikidata,,57,Accenture
+access,Access,access,,,access-company.com,,,wikidata,,58,Access
+access-industries,Access Industries,access industries,,,accessindustries.com,,,wikidata,,59,Access Industries
+acciona,Acciona,acciona,,,acciona.com,,,wikidata,,60,Acciona
+accor,Accor,accor,,,accor.com,,,wikidata,,61,Accor
+accuphase,Accuphase,accuphase,,,accuphase.co.jp,,,wikidata,,62,Accuphase
+accuracy-international,Accuracy International,accuracy international,,,accuracyinternational.com,,,wikidata,,63,Accuracy International
+accuweather,AccuWeather,accuweather,,,accuweather.com,,,wikidata,,64,AccuWeather
+ace-hardware,Ace Hardware,ace hardware,,,acehardware.com,,,wikidata,,65,Ace Hardware
+acer,Acer,acer,,,acer.com,,,wikidata,,66,Acer
+acerinox,Acerinox,acerinox,,,acerinox.com,,,wikidata,,67,Acerinox
+achema-ab,"Achema, AB",achema ab,,,achema.com,,,wikidata,,68,"Achema, AB"
+acne-studios,Acne Studios,acne studios,,,acnestudios.com,,,wikidata,,69,Acne Studios
+acronis,Acronis,acronis,,,acronis.com,,,wikidata,,70,Acronis
+actelion,Actelion,actelion,,,actelion.com,,,wikidata,,71,Actelion
+action,Action,action,,,action.com,,,wikidata,,72,Action
+activision-blizzard,Activision Blizzard,activision blizzard,,,activisionblizzard.com,,,wikidata,,73,Activision Blizzard
+adafruit-industries,Adafruit Industries,adafruit industries,,,adafruit.com,,,wikidata,,74,Adafruit Industries
+adama-agricultural-solutions-ltd,Adama Agricultural Solutions Ltd.,adama agricultural solutions ltd,,,adama.com,,,wikidata,,75,Adama Agricultural Solutions Ltd.
+adani-enterprises,Adani Enterprises,adani enterprises,,,adanienterprises.com,,,wikidata,,76,Adani Enterprises
+adani-group,Adani Group,adani group,,,adani.com,,,wikidata,,77,Adani Group
+adani-ports-and-sez,Adani Ports and SEZ,adani ports and sez,,,adaniports.com,,,wikidata,,78,Adani Ports and SEZ
+adaptec,Adaptec,adaptec,,,adaptec.com,,,wikidata,,79,Adaptec
+adata,ADATA,adata,,,adata.com,,,wikidata,,80,ADATA
+adidas,Adidas,adidas,,,adidas.com,,,wikidata,,81,Adidas
+adient,Adient,adient,,,adient.com,,,wikidata,,82,Adient
+aditya-birla-group,Aditya Birla Group,aditya birla group,,,adityabirla.com,,,wikidata,,83,Aditya Birla Group
+admiral-group,Admiral Group,admiral group,,,admiralgroup.co.uk,,,wikidata,,84,Admiral Group
+adobe,Adobe,adobe,,,adobe.com,,,wikidata,,85,Adobe
+advanced-info-service,Advanced Info Service,advanced info service,,,ais.co.th,,,wikidata,,86,Advanced Info Service
+advanced-micro-devices,Advanced Micro Devices,advanced micro devices,,,amd.com,,,wikidata,,87,Advanced Micro Devices
+advantest,Advantest,advantest,,,advantest.com,,,wikidata,,88,Advantest
+advent-international,Advent International,advent international,,,adventinternational.com,,,wikidata,,89,Advent International
+adweek,Adweek,adweek,,,adweek.com,,,wikidata,,90,Adweek
+adyen,Adyen,adyen,,,adyen.com,,,wikidata,,91,Adyen
+aecom,AECOM,aecom,,,aecom.com,,,wikidata,,92,AECOM
+aegean-airlines,Aegean Airlines,aegean airlines,,,aegeanair.com,,,wikidata,,93,Aegean Airlines
+aegon,Aegon,aegon,,,aegon.com,,,wikidata,,94,Aegon
+aeon,Aeon,aeon,,,aeon.info,,,wikidata,,95,Aeon
+aer-lingus,Aer Lingus,aer lingus,,,aerlingus.com,,,wikidata,,96,Aer Lingus
+aercap,AerCap,aercap,,,aercap.com,,,wikidata,,97,AerCap
+aeroflot,Aeroflot,aeroflot,,,aeroflot.com,,,wikidata,,98,Aeroflot
+aerogaviota,Aerogaviota,aerogaviota,,,aerogaviota.com,,,wikidata,,99,Aerogaviota
+aeroitalia,Aeroitalia,aeroitalia,,,aeroitalia.com,,,wikidata,,100,Aeroitalia
+aerom-xico,Aeroméxico,aerom xico,,,aeromexico.com,,,wikidata,,101,Aeroméxico
+aeropostal-alas-de-venezuela,Aeropostal Alas de Venezuela,aeropostal alas de venezuela,,,aeropostal.com,,,wikidata,,102,Aeropostal Alas de Venezuela
+aes-corporation,AES Corporation,aes corporation,,,aes.com,,,wikidata,,103,AES Corporation
+aetna,Aetna,aetna,,,aetna.com,,,wikidata,,104,Aetna
+affirm,Affirm,affirm,,,affirm.com,,,wikidata,,105,Affirm
+affirm-films,Affirm Films,affirm films,,,affirmfilms.com,,,wikidata,,106,Affirm Films
+aflac,Aflac,aflac,,,aflac.com,,,wikidata,,107,Aflac
+african-express-airways,African Express Airways,african express airways,,,africanexpress.net,,,wikidata,,108,African Express Airways
+agc,AGC,agc,,,agc.com,,,wikidata,,109,AGC
+agco,AGCO,agco,,,agcocorp.com,,,wikidata,,110,AGCO
+ageas,Ageas,ageas,,,ageas.com,,,wikidata,,111,Ageas
+agent-provocateur,Agent Provocateur,agent provocateur,,,agentprovocateur.com,,,wikidata,,112,Agent Provocateur
+agfa-gevaert,Agfa-Gevaert,agfa gevaert,,,agfa.com,,,wikidata,,113,Agfa-Gevaert
+agilent-technologies,Agilent Technologies,agilent technologies,,,agilent.com,,,wikidata,,114,Agilent Technologies
+agrana,Agrana,agrana,,,agrana.com,,,wikidata,,115,Agrana
+agricultural-bank-of-china,Agricultural Bank of China,agricultural bank of china,,,abchina.com,,,wikidata,,116,Agricultural Bank of China
+agv,AGV,agv,,,agv.com,,,wikidata,,117,AGV
+ahlstrom-munksj,Ahlstrom-Munksjö,ahlstrom munksj,,,ahlstrom.com,,,wikidata,,118,Ahlstrom-Munksjö
+ahmad-tea,Ahmad Tea,ahmad tea,,,ahmadtea.com,,,wikidata,,119,Ahmad Tea
+ahold-delhaize,Ahold Delhaize,ahold delhaize,,,aholddelhaize.com,,,wikidata,,120,Ahold Delhaize
+aia-group,AIA Group,aia group,,,aia.com,,,wikidata,,121,AIA Group
+aiesec,AIESEC,aiesec,,,aiesec.org,,,wikidata,,122,AIESEC
+aigo,Aigo,aigo,,,aigo.com,,,wikidata,,123,Aigo
+aimpoint-ab,Aimpoint AB,aimpoint ab,,,aimpoint.com,,,wikidata,,124,Aimpoint AB
+air-antilles,Air Antilles,air antilles,,,airantilles.com,,,wikidata,,125,Air Antilles
+air-arabia,Air Arabia,air arabia,,,airarabia.com,,,wikidata,,126,Air Arabia
+air-astana,Air Astana,air astana,,,airastana.com,,,wikidata,,127,Air Astana
+air-atlanta-icelandic,Air Atlanta Icelandic,air atlanta icelandic,,,airatlanta.com,,,wikidata,,128,Air Atlanta Icelandic
+air-austral,Air Austral,air austral,,,air-austral.com,,,wikidata,,129,Air Austral
+air-botswana,Air Botswana,air botswana,,,airbotswana.co.bw,,,wikidata,,130,Air Botswana
+air-busan,Air Busan,air busan,,,airbusan.com,,,wikidata,,131,Air Busan
+air-cairo,Air Cairo,air cairo,,,aircairo.com,,,wikidata,,132,Air Cairo
+air-canada,Air Canada,air canada,,,aircanada.com,,,wikidata,,133,Air Canada
+air-century,Air Century,air century,,,aircentury.com,,,wikidata,,134,Air Century
+air-changan,Air Changan,air changan,,,airchangan.com,,,wikidata,,135,Air Changan
+air-chathams,Air Chathams,air chathams,,,airchathams.co.nz,,,wikidata,,136,Air Chathams
+air-china,Air China,air china,,,airchina.com,,,wikidata,,137,Air China
+air-corsica,Air Corsica,air corsica,,,aircorsica.com,,,wikidata,,138,Air Corsica
+air-dilijans,Air Dilijans,air dilijans,,,airdilijans.com,,,wikidata,,139,Air Dilijans
+air-europa,Air Europa,air europa,,,aireuropa.com,,,wikidata,,140,Air Europa
+air-france,Air France,air france,,,airfrance.com,,,wikidata,,141,Air France
+air-greenland,Air Greenland,air greenland,,,airgreenland.com,,,wikidata,,142,Air Greenland
+air-guyane-express,Air Guyane Express,air guyane express,,,airguyane.com,,,wikidata,,143,Air Guyane Express
+air-haifa,Air Haifa,air haifa,,,airhaifa.com,,,wikidata,,144,Air Haifa
+air-india,Air India,air india,,,airindia.com,,,wikidata,,145,Air India
+air-libya,Air Libya,air libya,,,airlibya.aero,,,wikidata,,146,Air Libya
+air-liquide,Air Liquide,air liquide,,,airliquide.com,,,wikidata,,147,Air Liquide
+air-madagascar,Air Madagascar,air madagascar,,,madagascarairlines.com,,,wikidata,,148,Air Madagascar
+air-mandalay,Air Mandalay,air mandalay,,,airmandalay.com,,,wikidata,,149,Air Mandalay
+air-marshall-islands,Air Marshall Islands,air marshall islands,,,airmarshallislands.net,,,wikidata,,150,Air Marshall Islands
+air-mauritius,Air Mauritius,air mauritius,,,airmauritius.com,,,wikidata,,151,Air Mauritius
+air-new-zealand,Air New Zealand,air new zealand,,,airnewzealand.co.nz,,,wikidata,,152,Air New Zealand
+air-north,Air North,air north,,,flyairnorth.com,,,wikidata,,153,Air North
+air-peace,Air Peace,air peace,,,flyairpeace.com,,,wikidata,,154,Air Peace
+air-premia,Air Premia,air premia,,,airpremia.com,,,wikidata,,155,Air Premia
+air-products-chemicals,Air Products & Chemicals,air products chemicals,,,airproducts.com,,,wikidata,,156,Air Products & Chemicals
+air-rarotonga,Air Rarotonga,air rarotonga,,,airraro.com,,,wikidata,,157,Air Rarotonga
+air-saint-pierre,Air Saint-Pierre,air saint pierre,,,airsaintpierre.com,,,wikidata,,158,Air Saint-Pierre
+air-senegal,Air Senegal,air senegal,,,flyairsenegal.com,,,wikidata,,159,Air Senegal
+air-seoul,Air Seoul,air seoul,,,flyairseoul.com,,,wikidata,,160,Air Seoul
+air-serbia,Air Serbia,air serbia,,,airserbia.com,,,wikidata,,161,Air Serbia
+air-service-gabon,Air Service Gabon,air service gabon,,,airservice.aero,,,wikidata,,162,Air Service Gabon
+air-seychelles,Air Seychelles,air seychelles,,,airseychelles.com,,,wikidata,,163,Air Seychelles
+air-sinai,Air Sinai,air sinai,,,flyairsinai.com,,,wikidata,,164,Air Sinai
+air-sunshine,Air Sunshine,air sunshine,,,airsunshine.com,,,wikidata,,165,Air Sunshine
+air-tahiti,Air Tahiti,air tahiti,,,airtahiti.com,,,wikidata,,166,Air Tahiti
+air-tahiti-nui,Air Tahiti Nui,air tahiti nui,,,airtahitinui.com,,,wikidata,,167,Air Tahiti Nui
+air-tanzania,Air Tanzania,air tanzania,,,airtanzania.co.tz,,,wikidata,,168,Air Tanzania
+air-tractor,Air Tractor,air tractor,,,airtractor.com,,,wikidata,,169,Air Tractor
+air-transat,Air Transat,air transat,,,airtransat.com,,,wikidata,,170,Air Transat
+air-vanuatu,Air Vanuatu,air vanuatu,,,airvanuatu.com,,,wikidata,,171,Air Vanuatu
+air-zimbabwe,Air Zimbabwe,air zimbabwe,,,airzimbabwe.aero,,,wikidata,,172,Air Zimbabwe
+airalo,Airalo,airalo,,,airalo.com,,,wikidata,,173,Airalo
+airasia,AirAsia,airasia,,,airasia.com,,,wikidata,,174,AirAsia
+airasia-x,AirAsia X,airasia x,,,airasiax.com,,,wikidata,,175,AirAsia X
+airbaltic,AirBaltic,airbaltic,,,airbaltic.com,,,wikidata,,176,AirBaltic
+airblue,airblue,airblue,,,airblue.com,,,wikidata,,177,airblue
+airbnb,Airbnb,airbnb,,,airbnb.com,,,wikidata,,178,Airbnb
+airbus,Airbus,airbus,,,airbus.com,,,wikidata,,179,Airbus
+aircalin,Aircalin,aircalin,,,aircalin.com,,,wikidata,,180,Aircalin
+airest,Airest,airest,,,airest.aero,,,wikidata,,181,Airest
+airfast-indonesia,Airfast Indonesia,airfast indonesia,,,airfastindonesia.com,,,wikidata,,182,Airfast Indonesia
+airfix,Airfix,airfix,,,airfix.com,,,wikidata,,183,Airfix
+airhelp,AirHelp,airhelp,,,airhelp.com,,,wikidata,,184,AirHelp
+airkenya-express,Airkenya Express,airkenya express,,,airkenya.com,,,wikidata,,185,Airkenya Express
+airlink,Airlink,airlink,,,flyairlink.com,,,wikidata,,186,Airlink
+airstream,Airstream,airstream,,,airstream.com,,,wikidata,,187,Airstream
+airtable,Airtable,airtable,,,airtable.com,,,wikidata,,188,Airtable
+airtanker-services-limited,AirTanker Services Limited,airtanker services limited,,,airtanker.co.uk,,,wikidata,,189,AirTanker Services Limited
+aisin-seiki,Aisin Seiki,aisin seiki,,,aisin.com,,,wikidata,,190,Aisin Seiki
+aixtron-se,Aixtron SE,aixtron se,,,aixtron.com,,,wikidata,,191,Aixtron SE
+ajet,AJet,ajet,,,ajet.com,,,wikidata,,192,AJet
+ajinomoto,Ajinomoto,ajinomoto,,,ajinomoto.co.jp,,,wikidata,,193,Ajinomoto
+ajio,Ajio,ajio,,,ajio.com,,,wikidata,,194,Ajio
+akamai-technologies,Akamai Technologies,akamai technologies,,,akamai.com,,,wikidata,,195,Akamai Technologies
+akasa-air,Akasa Air,akasa air,,,akasaair.com,,,wikidata,,196,Akasa Air
+akbank,Akbank,akbank,,,akbank.com,,,wikidata,,197,Akbank
+aker,Aker,aker,,,akerasa.com,,,wikidata,,198,Aker
+aker-solutions,Aker Solutions,aker solutions,,,akersolutions.com,,,wikidata,,199,Aker Solutions
+akg-acoustics,AKG Acoustics,akg acoustics,,,akg.com,,,wikidata,,200,AKG Acoustics
+akismet,Akismet,akismet,,,akismet.com,,,wikidata,,201,Akismet
+akita-shoten,Akita Shoten,akita shoten,,,akitashoten.co.jp,,,wikidata,,202,Akita Shoten
+akom,AKOM,akom,,,akomkorea.com,,,wikidata,,203,AKOM
+akrapovi,Akrapovič,akrapovi,,,akrapovic.com,,,wikidata,,204,Akrapovič
+aksys-games,Aksys Games,aksys games,,,aksysgames.com,,,wikidata,,205,Aksys Games
+akwa-group,Akwa Group,akwa group,,,akwagroup.com,,,wikidata,,206,Akwa Group
+akzonobel,AkzoNobel,akzonobel,,,akzonobel.com,,,wikidata,,207,AkzoNobel
+al-baraka-banking-group,Al Baraka Banking Group,al baraka banking group,,,albaraka.com,,,wikidata,,208,Al Baraka Banking Group
+al-jazeera-media-network,Al Jazeera Media Network,al jazeera media network,,,aljazeera.net,,,wikidata,,209,Al Jazeera Media Network
+al-naser-airlines,Al-Naser Airlines,al naser airlines,,,alnaserairlines.com,,,wikidata,,210,Al-Naser Airlines
+alaska-airlines,Alaska Airlines,alaska airlines,,,alaskaair.com,,,wikidata,,211,Alaska Airlines
+albawings,Albawings,albawings,,,albawings.com,,,wikidata,,212,Albawings
+albemarle-corporation,Albemarle Corporation,albemarle corporation,,,albemarle.com,,,wikidata,,213,Albemarle Corporation
+albertsons,Albertsons,albertsons,,,albertsonscompanies.com,,,wikidata,,214,Albertsons
+albertsons-companies,Albertsons Companies,albertsons companies,,,albertsons.com,,,wikidata,,215,Albertsons Companies
+alcoa,Alcoa,alcoa,,,alcoa.com,,,wikidata,,216,Alcoa
+alcon,Alcon,alcon,,,alcon.com,,,wikidata,,217,Alcon
+alcon-entertainment,Alcon Entertainment,alcon entertainment,,,alconent.com,,,wikidata,,218,Alcon Entertainment
+alembic-inc,Alembic Inc,alembic inc,,,alembicguitars.com,,,wikidata,,219,Alembic Inc
+alesis,Alesis,alesis,,,alesis.com,,,wikidata,,220,Alesis
+alessi,Alessi,alessi,,,alessi.com,,,wikidata,,221,Alessi
+alexander-mcqueen,Alexander McQueen,alexander mcqueen,,,alexandermcqueen.com,,,wikidata,,222,Alexander McQueen
+alexandria-airlines,Alexandria Airlines,alexandria airlines,,,alexandriaairlines.net,,,wikidata,,223,Alexandria Airlines
+alexion-pharmaceuticals,Alexion Pharmaceuticals,alexion pharmaceuticals,,,alexion.com,,,wikidata,,224,Alexion Pharmaceuticals
+alfa-group,Alfa Group,alfa group,,,alfagroup.org,,,wikidata,,225,Alfa Group
+alfa-laval,Alfa Laval,alfa laval,,,alfalaval.com,,,wikidata,,226,Alfa Laval
+alfa-romeo,Alfa Romeo,alfa romeo,,,alfaromeo.com,,,wikidata,,227,Alfa Romeo
+alfred-dunhill,Alfred Dunhill,alfred dunhill,,,dunhill.com,,,wikidata,,228,Alfred Dunhill
+alibaba-cloud,Alibaba Cloud,alibaba cloud,,,alibabacloud.com,,,wikidata,,229,Alibaba Cloud
+alibaba-group,Alibaba Group,alibaba group,,,alibaba.com,,,wikidata,,230,Alibaba Group
+alienware,Alienware,alienware,,,alienware.com,,,wikidata,,231,Alienware
+aliexpress,AliExpress,aliexpress,,,aliexpress.com,,,wikidata,,232,AliExpress
+all-elite-wrestling,All Elite Wrestling,all elite wrestling,,,allelitewrestling.com,,,wikidata,,233,All Elite Wrestling
+all-media-network,All Media Network,all media network,,,allmedianetwork.com,,,wikidata,,234,All Media Network
+all-nippon-airways,All Nippon Airways,all nippon airways,,,ana.co.jp,,,wikidata,,235,All Nippon Airways
+allegiant-air,Allegiant Air,allegiant air,,,allegiantair.com,,,wikidata,,236,Allegiant Air
+allergan-plc,Allergan plc,allergan plc,,,allergan.com,,,wikidata,,237,Allergan plc
+allianz,Allianz,allianz,,,allianz.com,,,wikidata,,238,Allianz
+allied-air,Allied Air,allied air,,,alliedairng.com,,,wikidata,,239,Allied Air
+allison-transmission,Allison Transmission,allison transmission,,,allisontransmission.com,,,wikidata,,240,Allison Transmission
+allstate,Allstate,allstate,,,allstate.com,,,wikidata,,241,Allstate
+allwinner-technology-co-ltd,Allwinner Technology Co. Ltd.,allwinner technology co ltd,,,allwinnertech.com,,,wikidata,,242,Allwinner Technology Co. Ltd.
+ally-financial,Ally Financial,ally financial,,,ally.com,,,wikidata,,243,Ally Financial
+almarai-company,Almarai Company,almarai company,,,almarai.com,,,wikidata,,244,Almarai Company
+almirall,Almirall,almirall,,,almirall.com,,,wikidata,,245,Almirall
+aloha-air-cargo,Aloha Air Cargo,aloha air cargo,,,alohaaircargo.com,,,wikidata,,246,Aloha Air Cargo
+alpha-industries,Alpha Industries,alpha industries,,,alphaindustries.com,,,wikidata,,247,Alpha Industries
+alpine-electronics,Alpine Electronics,alpine electronics,,,alpine.com,,,wikidata,,248,Alpine Electronics
+alpinestars,Alpinestars,alpinestars,,,alpinestars.com,,,wikidata,,249,Alpinestars
+alps-alpine,Alps Alpine,alps alpine,,,alpsalpine.com,,,wikidata,,250,Alps Alpine
+altadis,Altadis,altadis,,,altadis.com,,,wikidata,,251,Altadis
+altana,Altana,altana,,,altana.com,,,wikidata,,252,Altana
+altec-lansing,Altec Lansing,altec lansing,,,alteclansing.com,,,wikidata,,253,Altec Lansing
+alten,Alten,alten,,,alten.com,,,wikidata,,254,Alten
+altera,Altera,altera,,,altera.com,,,wikidata,,255,Altera
+altice,Altice,altice,,,altice.net,,,wikidata,,256,Altice
+altium-limited,Altium Limited,altium limited,,,altium.com,,,wikidata,,257,Altium Limited
+altria,Altria,altria,,,altria.com,,,wikidata,,258,Altria
+always,Always,always,,,always.com,,,wikidata,,259,Always
+am-general,AM General,am general,,,amgeneral.com,,,wikidata,,260,AM General
+am-rica-m-vil,América Móvil,am rica m vil,,,americamovil.com,,,wikidata,,261,América Móvil
+amada-co,Amada Co,amada co,,,amada.co.jp,,,wikidata,,262,Amada Co
+amagi,Amagi,amagi,,,amagi.com,,,wikidata,,263,Amagi
+amazon-lab126,Amazon Lab126,amazon lab126,,,lab126.com,,,wikidata,,264,Amazon Lab126
+amblin-partners,Amblin Partners,amblin partners,,,amblin.com,,,wikidata,,265,Amblin Partners
+ambu,Ambu,ambu,,,ambu.com,,,wikidata,,266,Ambu
+ambuja-cements,Ambuja Cements,ambuja cements,,,ambujacement.com,,,wikidata,,267,Ambuja Cements
+amc-airlines,AMC Airlines,amc airlines,,,amcairlines.com,,,wikidata,,268,AMC Airlines
+amc-global-media,AMC Global Media,amc global media,,,amcglobalmedia.com,,,wikidata,,269,AMC Global Media
+amc-networks-international,AMC Networks International,amc networks international,,,amcnetworks.com,,,wikidata,,270,AMC Networks International
+amc-theatres,AMC Theatres,amc theatres,,,amctheatres.com,,,wikidata,,271,AMC Theatres
+amcor,Amcor,amcor,,,amcor.com,,,wikidata,,272,Amcor
+amdocs,Amdocs,amdocs,,,amdocs.com,,,wikidata,,273,Amdocs
+amer-sports,Amer Sports,amer sports,,,amersports.com,,,wikidata,,274,Amer Sports
+american-airlines,American Airlines,american airlines,,,aa.com,,,wikidata,,275,American Airlines
+american-apparel-inc,American Apparel Inc.,american apparel inc,,,americanapparel.com,,,wikidata,,276,American Apparel Inc.
+american-automobile-association,American Automobile Association,american automobile association,,,aaa.com,,,wikidata,,277,American Automobile Association
+american-electric-power,American Electric Power,american electric power,,,aep.com,,,wikidata,,278,American Electric Power
+american-express,American Express,american express,,,americanexpress.com,,,wikidata,,279,American Express
+american-international-group,American International Group,american international group,,,aig.com,,,wikidata,,280,American International Group
+american-president-lines,American President Lines,american president lines,,,apl.com,,,wikidata,,281,American President Lines
+american-society-for-testing-and-materials,American Society for Testing and Materials,american society for testing and materials,,,astm.org,,,wikidata,,282,American Society for Testing and Materials
+american-society-of-composers-authors-and-publishers,"American Society of Composers, Authors and Publishers",american society of composers authors and publishers,,,ascap.com,,,wikidata,,283,"American Society of Composers, Authors and Publishers"
+ameriprise-financial,Ameriprise Financial,ameriprise financial,,,ameriprise.com,,,wikidata,,284,Ameriprise Financial
+amgen,Amgen,amgen,,,amgen.com,,,wikidata,,285,Amgen
+amorepacific-corporation,Amorepacific Corporation,amorepacific corporation,,,amorepacific.com,,,wikidata,,286,Amorepacific Corporation
+ampeg,Ampeg,ampeg,,,ampeg.com,,,wikidata,,287,Ampeg
+ampere-computing,Ampere Computing,ampere computing,,,amperecomputing.com,,,wikidata,,288,Ampere Computing
+ampex,Ampex,ampex,,,ampex.com,,,wikidata,,289,Ampex
+amphenol,Amphenol,amphenol,,,amphenol.com,,,wikidata,,290,Amphenol
+ams-osram-ag,ams OSRAM AG,ams osram ag,,,ams.com,,,wikidata,,291,ams OSRAM AG
+amstel-brewery,Amstel Brewery,amstel brewery,,,amstel.com,,,wikidata,,292,Amstel Brewery
+amul,Amul,amul,,,amul.com,,,wikidata,,293,Amul
+amundi,Amundi,amundi,,,amundi.com,,,wikidata,,294,Amundi
+amuse,Amuse,amuse,,,amuse.co.jp,,,wikidata,,295,Amuse
+an-post,An Post,an post,,,anpost.com,,,wikidata,,296,An Post
+analog-devices,Analog Devices,analog devices,,,analog.com,,,wikidata,,297,Analog Devices
+anarock,Anarock,anarock,,,anarock.com,,,wikidata,,298,Anarock
+ancestry-com-inc,Ancestry.com Inc.,ancestry com inc,,,ancestry.com,,,wikidata,,299,Ancestry.com Inc.
+anchor,Anchor,anchor,,,anchordairy.com,,,wikidata,,300,Anchor
+ancol-dreamland,Ancol Dreamland,ancol dreamland,,,ancol.com,,,wikidata,,301,Ancol Dreamland
+andela,Andela,andela,,,andela.com,,,wikidata,,302,Andela
+andritz,Andritz,andritz,,,andritz.com,,,wikidata,,303,Andritz
+anduril-industries,Anduril Industries,anduril industries,,,anduril.com,,,wikidata,,304,Anduril Industries
+angara-airlines,Angara Airlines,angara airlines,,,angara.aero,,,wikidata,,305,Angara Airlines
+angel-one,Angel One,angel one,,,angelone.in,,,wikidata,,306,Angel One
+anglo-american-platinum,Anglo American Platinum,anglo american platinum,,,angloamericanplatinum.com,,,wikidata,,307,Anglo American Platinum
+anglo-american-plc,Anglo American plc,anglo american plc,,,angloamerican.com,,,wikidata,,308,Anglo American plc
+anglogold-ashanti,AngloGold Ashanti,anglogold ashanti,,,anglogoldashanti.com,,,wikidata,,309,AngloGold Ashanti
+anheuser-busch-inbev,Anheuser-Busch InBev,anheuser busch inbev,,,ab-inbev.com,,,wikidata,,310,Anheuser-Busch InBev
+animaccord,Animaccord,animaccord,,,animaccord.com,,,wikidata,,311,Animaccord
+animate,Animate,animate,,,animate.co.jp,,,wikidata,,312,Animate
+animawings,Animawings,animawings,,,animawings.com,,,wikidata,,313,Animawings
+anime-limited,Anime Limited,anime limited,,,alltheanime.com,,,wikidata,,314,Anime Limited
+animoca-brands,Animoca Brands,animoca brands,,,animocabrands.com,,,wikidata,,315,Animoca Brands
+animusic,Animusic,animusic,,,animusic.com,,,wikidata,,316,Animusic
+ankai,Ankai,ankai,,,ankai.com,,,wikidata,,317,Ankai
+anker,Anker,anker,,,anker.com,,,wikidata,,318,Anker
+ann-summers,Ann Summers,ann summers,,,annsummers.com,,,wikidata,,319,Ann Summers
+anritsu,Anritsu,anritsu,,,anritsu.com,,,wikidata,,320,Anritsu
+ant-group,Ant Group,ant group,,,antgroup.com,,,wikidata,,321,Ant Group
+anta,Anta,anta,,,anta.com,,,wikidata,,322,Anta
+antec,Antec,antec,,,antec.com,,,wikidata,,323,Antec
+anthropic,Anthropic,anthropic,,,anthropic.com,,,wikidata,,324,Anthropic
+antofagasta-plc,Antofagasta plc,antofagasta plc,,,antofagasta.co.uk,,,wikidata,,325,Antofagasta plc
+antonio-zamperla-s-p-a,Antonio Zamperla S.p.A,antonio zamperla s p a,,,zamperla.com,,,wikidata,,326,Antonio Zamperla S.p.A
+anz,ANZ,anz,,,anz.com.au,,,wikidata,,327,ANZ
+aoc-international,AOC International,aoc international,,,aoc.com,,,wikidata,,328,AOC International
+aon-plc,Aon plc,aon plc,,,aon.com,,,wikidata,,329,Aon plc
+aoni-production,Aoni Production,aoni production,,,aoni.co.jp,,,wikidata,,330,Aoni Production
+aopen,AOpen,aopen,,,aopen.com,,,wikidata,,331,AOpen
+apa-corporation,APA Corporation,apa corporation,,,apachecorp.com,,,wikidata,,332,APA Corporation
+apax-partners,Apax Partners,apax partners,,,apax.com,,,wikidata,,333,Apax Partners
+aperam,Aperam,aperam,,,aperam.com,,,wikidata,,334,Aperam
+apollo-global-management,Apollo Global Management,apollo global management,,,apollo.com,,,wikidata,,335,Apollo Global Management
+apollo-tyres,Apollo Tyres,apollo tyres,,,apollotyres.com,,,wikidata,,336,Apollo Tyres
+apple,Apple,apple,,,apple.com,,,wikidata,,337,Apple
+apple-records,Apple Records,apple records,,,applerecords.com,,,wikidata,,338,Apple Records
+applied-materials,Applied Materials,applied materials,,,appliedmaterials.com,,,wikidata,,339,Applied Materials
+aprilia-racing,Aprilia Racing,aprilia racing,,,aprilia.com,,,wikidata,,340,Aprilia Racing
+aptiv,Aptiv,aptiv,,,aptiv.com,,,wikidata,,341,Aptiv
+aquascutum,Aquascutum,aquascutum,,,aquascutum.co.uk,,,wikidata,,342,Aquascutum
+arab-bank,Arab Bank,arab bank,,,arabbank.com,,,wikidata,,343,Arab Bank
+arab-satellite-communications-organization,Arab Satellite Communications Organization,arab satellite communications organization,,,arabsat.com,,,wikidata,,344,Arab Satellite Communications Organization
+arai-helmet,Arai Helmet,arai helmet,,,araihelmet.com,,,wikidata,,345,Arai Helmet
+arajet,Arajet,arajet,,,arajet.com,,,wikidata,,346,Arajet
+aramark,Aramark,aramark,,,aramark.com,,,wikidata,,347,Aramark
+aramco,Aramco,aramco,,,aramco.com,,,wikidata,,348,Aramco
+arby-s,Arby's,arby s,,,arbys.com,,,wikidata,,349,Arby's
+arca-space,ARCA Space,arca space,,,arcaspace.com,,,wikidata,,350,ARCA Space
+arcadis,Arcadis,arcadis,,,arcadis.com,,,wikidata,,351,Arcadis
+arcandor,Arcandor,arcandor,,,arcandor.com,,,wikidata,,352,Arcandor
+arcelormittal,ArcelorMittal,arcelormittal,,,arcelormittal.com,,,wikidata,,353,ArcelorMittal
+archer-daniels-midland,Archer Daniels Midland,archer daniels midland,,,adm.com,,,wikidata,,354,Archer Daniels Midland
+archie-comics,Archie Comics,archie comics,,,archiecomics.com,,,wikidata,,355,Archie Comics
+arco,ARCO,arco,,,arco.com,,,wikidata,,356,ARCO
+arctic-cat,Arctic Cat,arctic cat,,,arcticcat.com,,,wikidata,,357,Arctic Cat
+arena,Arena,arena,,,arenasport.com,,,wikidata,,358,Arena
+arenanet,ArenaNet,arenanet,,,arena.net,,,wikidata,,359,ArenaNet
+argo-spa,ARGO SpA,argo spa,,,argospa.com,,,wikidata,,360,ARGO SpA
+argon-18,Argon 18,argon 18,,,argon18bike.com,,,wikidata,,361,Argon 18
+argos,Argos,argos,,,argos.co.uk,,,wikidata,,362,Argos
+aria,Aria,aria,,,ariaguitars.com,,,wikidata,,363,Aria
+ariana-afghan-airlines,Ariana Afghan Airlines,ariana afghan airlines,,,flyariana.com,,,wikidata,,364,Ariana Afghan Airlines
+ariel-motor-company,Ariel Motor Company,ariel motor company,,,arielmotor.co.uk,,,wikidata,,365,Ariel Motor Company
+arik-air,Arik Air,arik air,,,arikair.com,,,wikidata,,366,Arik Air
+arika,Arika,arika,,,arika.co.jp,,,wikidata,,367,Arika
+arista-networks,Arista Networks,arista networks,,,arista.com,,,wikidata,,368,Arista Networks
+ariston,Ariston,ariston,,,aristongroup.com,,,wikidata,,369,Ariston
+arkia,Arkia,arkia,,,arkia.com,,,wikidata,,370,Arkia
+arla-foods,Arla Foods,arla foods,,,arla.com,,,wikidata,,371,Arla Foods
+arm,Arm,arm,,,arm.com,,,wikidata,,372,Arm
+arri,Arri,arri,,,arri.com,,,wikidata,,373,Arri
+arrinera,Arrinera,arrinera,,,arrinera.com,,,wikidata,,374,Arrinera
+arris-group,Arris Group,arris group,,,arris.com,,,wikidata,,375,Arris Group
+arriva,Arriva,arriva,,,arriva.co.uk,,,wikidata,,376,Arriva
+arrow-electronics,Arrow Electronics,arrow electronics,,,arrow.com,,,wikidata,,377,Arrow Electronics
+art-basel,Art Basel,art basel,,,artbasel.com,,,wikidata,,378,Art Basel
+art-lebedev-studio,Art. Lebedev Studio,art lebedev studio,,,artlebedev.com,,,wikidata,,379,Art. Lebedev Studio
+artmajeur,Artmajeur,artmajeur,,,artmajeur.com,,,wikidata,,380,Artmajeur
+arts-vision,Arts Vision,arts vision,,,artsvision.co.jp,,,wikidata,,381,Arts Vision
+arturia,Arturia,arturia,,,arturia.com,,,wikidata,,382,Arturia
+aruba-airlines,Aruba Airlines,aruba airlines,,,arubaairlines.com,,,wikidata,,383,Aruba Airlines
+asahi-breweries,Asahi Breweries,asahi breweries,,,asahibeer.com,,,wikidata,,384,Asahi Breweries
+asahi-broadcasting-group-holdings,Asahi Broadcasting Group Holdings,asahi broadcasting group holdings,,,asahi.co.jp,,,wikidata,,385,Asahi Broadcasting Group Holdings
+asana,Asana,asana,,,asana.com,,,wikidata,,386,Asana
+aserca-airlines,Aserca Airlines,aserca airlines,,,asercaairlines.com,,,wikidata,,387,Aserca Airlines
+ashland-inc,Ashland Inc.,ashland inc,,,ashland.com,,,wikidata,,388,Ashland Inc.
+ashley-madison,Ashley Madison,ashley madison,,,ashleymadison.com,,,wikidata,,389,Ashley Madison
+ashok-leyland,Ashok Leyland,ashok leyland,,,ashokleyland.com,,,wikidata,,390,Ashok Leyland
+asia-cargo-airlines,Asia Cargo Airlines,asia cargo airlines,,,asiacargonetworkgroup.com,,,wikidata,,391,Asia Cargo Airlines
+asian-development-bank,Asian Development Bank,asian development bank,,,adb.org,,,wikidata,,392,Asian Development Bank
+asian-paints,Asian Paints,asian paints,,,asianpaints.com,,,wikidata,,393,Asian Paints
+asian-wings-airways,Asian Wings Airways,asian wings airways,,,asianwingsair.com,,,wikidata,,394,Asian Wings Airways
+asiana-airlines,Asiana Airlines,asiana airlines,,,flyasiana.com,,,wikidata,,395,Asiana Airlines
+asiasat,AsiaSat,asiasat,,,asiasat.com,,,wikidata,,396,AsiaSat
+asics,ASICS,asics,,,asics.com,,,wikidata,,397,ASICS
+asm-international,ASM International,asm international,,,asm.com,,,wikidata,,398,ASM International
+asml,ASML,asml,,,asml.com,,,wikidata,,399,ASML
+asos,ASOS,asos,,,asos.com,,,wikidata,,400,ASOS
+asprey,Asprey,asprey,,,asprey.com,,,wikidata,,401,Asprey
+asrock,ASRock,asrock,,,asrock.com,,,wikidata,,402,ASRock
+assa-abloy,Assa Abloy,assa abloy,,,assaabloy.com,,,wikidata,,403,Assa Abloy
+assicurazioni-generali,Assicurazioni Generali,assicurazioni generali,,,generali.com,,,wikidata,,404,Assicurazioni Generali
+associated-british-foods,Associated British Foods,associated british foods,,,abf.co.uk,,,wikidata,,405,Associated British Foods
+associated-independent-recording,Associated Independent Recording,associated independent recording,,,airstudios.com,,,wikidata,,406,Associated Independent Recording
+astellas-pharma,Astellas Pharma,astellas pharma,,,astellas.com,,,wikidata,,407,Astellas Pharma
+aston-martin-lagonda,Aston Martin Lagonda,aston martin lagonda,,,astonmartinlagonda.com,,,wikidata,,408,Aston Martin Lagonda
+astra,Astra,astra,,,astra-trucks.com,,,wikidata,,409,Astra
+astra-international,Astra International,astra international,,,astra.co.id,,,wikidata,,410,Astra International
+astrazeneca,AstraZeneca,astrazeneca,,,astrazeneca.com,,,wikidata,,411,AstraZeneca
+astrobotic-technology,Astrobotic Technology,astrobotic technology,,,astrobotic.com,,,wikidata,,412,Astrobotic Technology
+astrum-corporation,Astrum Corporation,astrum corporation,,,astrum-st.com,,,wikidata,,413,Astrum Corporation
+asus,ASUS,asus,,,asus.com,,,wikidata,,414,ASUS
+at-t,AT&T,at t,,,att.com,,,wikidata,,415,AT&T
+atari,Atari,atari,,,atari.com,,,wikidata,,416,Atari
+atkins,Atkins,atkins,,,atkinsglobal.com,,,wikidata,,417,Atkins
+atlantic-grupa,Atlantic Grupa,atlantic grupa,,,atlanticgrupa.com,,,wikidata,,418,Atlantic Grupa
+atlantic-treaty-association,Atlantic Treaty Association,atlantic treaty association,,,atahq.org,,,wikidata,,419,Atlantic Treaty Association
+atlas-air,Atlas Air,atlas air,,,atlasair.com,,,wikidata,,420,Atlas Air
+atlas-copco,Atlas Copco,atlas copco,,,atlascopco.com,,,wikidata,,421,Atlas Copco
+atlas-entertainment,Atlas Entertainment,atlas entertainment,,,atlasentertainment.com,,,wikidata,,422,Atlas Entertainment
+atlassian,Atlassian,atlassian,,,atlassian.com,,,wikidata,,423,Atlassian
+atomic-monster,Atomic Monster,atomic monster,,,atomicmonster.com,,,wikidata,,424,Atomic Monster
+atomic-skis,Atomic Skis,atomic skis,,,atomic.com,,,wikidata,,425,Atomic Skis
+atos-se,Atos SE,atos se,,,atos.net,,,wikidata,,426,Atos SE
+atotech,Atotech,atotech,,,atotech.com,,,wikidata,,427,Atotech
+atradius,Atradius,atradius,,,atradius.com,,,wikidata,,428,Atradius
+atresmedia,Atresmedia,atresmedia,,,atresmedia.com,,,wikidata,,429,Atresmedia
+attijariwafa-bank,Attijariwafa Bank,attijariwafa bank,,,attijariwafabank.com,,,wikidata,,430,Attijariwafa Bank
+audemars-piguet,Audemars Piguet,audemars piguet,,,audemarspiguet.com,,,wikidata,,431,Audemars Piguet
+audible-inc,"Audible, Inc.",audible inc,,,audible.com,,,wikidata,,432,"Audible, Inc."
+audiomachine,Audiomachine,audiomachine,,,audiomachine.com,,,wikidata,,433,Audiomachine
+auntie-anne-s,Auntie Anne's,auntie anne s,,,auntieannes.com,,,wikidata,,434,Auntie Anne's
+auo-corporation,AUO Corporation,auo corporation,,,auo.com,,,wikidata,,435,AUO Corporation
+aurigny-air-services,Aurigny Air Services,aurigny air services,,,aurigny.com,,,wikidata,,436,Aurigny Air Services
+aurubis,Aurubis,aurubis,,,aurubis.com,,,wikidata,,437,Aurubis
+aussiebum,aussieBum,aussiebum,,,aussiebum.com,,,wikidata,,438,aussieBum
+austal,Austal,austal,,,austal.com,,,wikidata,,439,Austal
+austrian-airlines,Austrian Airlines,austrian airlines,,,austrian.com,,,wikidata,,440,Austrian Airlines
+autodesk,Autodesk,autodesk,,,autodesk.com,,,wikidata,,441,Autodesk
+autogrill,Autogrill,autogrill,,,autogrill.com,,,wikidata,,442,Autogrill
+autoliv,Autoliv,autoliv,,,autoliv.com,,,wikidata,,443,Autoliv
+automatic-data-processing,Automatic Data Processing,automatic data processing,,,adp.com,,,wikidata,,444,Automatic Data Processing
+automattic,Automattic,automattic,,,automattic.com,,,wikidata,,445,Automattic
+autonation,AutoNation,autonation,,,autonation.com,,,wikidata,,446,AutoNation
+autonavi-holdings-limited,AutoNavi Holdings Limited,autonavi holdings limited,,,autonavi.com,,,wikidata,,447,AutoNavi Holdings Limited
+autozone,AutoZone,autozone,,,autozone.com,,,wikidata,,448,AutoZone
+avalanche-software,Avalanche Software,avalanche software,,,avalanchesoftware.com,,,wikidata,,449,Avalanche Software
+avanti-air,Avanti Air,avanti air,,,avantiair.com,,,wikidata,,450,Avanti Air
+avatar-press,Avatar Press,avatar press,,,avatarpress.com,,,wikidata,,451,Avatar Press
+avatrade,AvaTrade,avatrade,,,avatrade.com,,,wikidata,,452,AvaTrade
+avaya,Avaya,avaya,,,avaya.com,,,wikidata,,453,Avaya
+avedis-zildjian-company,Avedis Zildjian Company,avedis zildjian company,,,zildjian.com,,,wikidata,,454,Avedis Zildjian Company
+avelo-airlines,Avelo Airlines,avelo airlines,,,aveloair.com,,,wikidata,,455,Avelo Airlines
+aver-information,AVer Information,aver information,,,aver.com,,,wikidata,,456,AVer Information
+avery-dennison,Avery Dennison,avery dennison,,,avery.com,,,wikidata,,457,Avery Dennison
+aveva,AVEVA,aveva,,,aveva.com,,,wikidata,,458,AVEVA
+avex-group,Avex Group,avex group,,,avex.co.jp,,,wikidata,,459,Avex Group
+avialeasing,Avialeasing,avialeasing,,,avialeasing.com,,,wikidata,,460,Avialeasing
+avianca,Avianca,avianca,,,avianca.com,,,wikidata,,461,Avianca
+aviastar,Aviastar,aviastar,,,aviastar.biz,,,wikidata,,462,Aviastar
+avid-technology,Avid Technology,avid technology,,,avid.com,,,wikidata,,463,Avid Technology
+avion-express,Avion Express,avion express,,,avionexpress.aero,,,wikidata,,464,Avion Express
+avior-airlines,Avior Airlines,avior airlines,,,aviorair.com,,,wikidata,,465,Avior Airlines
+avira,Avira,avira,,,avira.com,,,wikidata,,466,Avira
+avis-budget-group,Avis Budget Group,avis budget group,,,avisbudgetgroup.com,,,wikidata,,467,Avis Budget Group
+aviva,Aviva,aviva,,,aviva.com,,,wikidata,,468,Aviva
+avlo,Avlo,avlo,,,avlorenfe.com,,,wikidata,,469,Avlo
+avnet,Avnet,avnet,,,avnet.com,,,wikidata,,470,Avnet
+avon-products-inc,Avon Products Inc.,avon products inc,,,avonworldwide.com,,,wikidata,,471,Avon Products Inc.
+axa,AXA,axa,,,axa.com,,,wikidata,,472,AXA
+axe,Axe,axe,,,axe.com,,,wikidata,,473,Axe
+axiata,Axiata,axiata,,,axiata.com,,,wikidata,,474,Axiata
+axiom-space,Axiom Space,axiom space,,,axiomspace.com,,,wikidata,,475,Axiom Space
+axios,Axios,axios,,,axios.com,,,wikidata,,476,Axios
+axis-bank,Axis Bank,axis bank,,,axisbank.com,,,wikidata,,477,Axis Bank
+axis-communications,Axis Communications,axis communications,,,axis.com,,,wikidata,,478,Axis Communications
+axon-enterprise,Axon Enterprise,axon enterprise,,,axon.com,,,wikidata,,479,Axon Enterprise
+axpo-holding,Axpo Holding,axpo holding,,,axpo.com,,,wikidata,,480,Axpo Holding
+ayit-aviation-and-tourism,Ayit Aviation and Tourism,ayit aviation and tourism,,,ayit.co.il,,,wikidata,,481,Ayit Aviation and Tourism
+azercell,Azercell,azercell,,,azercell.com,,,wikidata,,482,Azercell
+azovstal,Azovstal,azovstal,,,metinvestholding.com,,,wikidata,,483,Azovstal
+azur-air,Azur Air,azur air,,,azurair.com,,,wikidata,,484,Azur Air
+b-braun,B. Braun,b braun,,,bbraun.com,,,wikidata,,485,B. Braun
+b-c-rich,B.C. Rich,b c rich,,,bcrich.com,,,wikidata,,486,B.C. Rich
+b92,B92,b92,,,b92.net,,,wikidata,,487,B92
+babbel,Babbel,babbel,,,babbel.com,,,wikidata,,488,Babbel
+babcock-international,Babcock International,babcock international,,,babcockinternational.com,,,wikidata,,489,Babcock International
+babcock-wilcox,Babcock & Wilcox,babcock wilcox,,,babcock.com,,,wikidata,,490,Babcock & Wilcox
+baby-einstein,Baby Einstein,baby einstein,,,babyeinstein.com,,,wikidata,,491,Baby Einstein
+bacardi,Bacardi,bacardi,,,bacardi.com,,,wikidata,,492,Bacardi
+badoo,Badoo,badoo,,,badoo.com,,,wikidata,,493,Badoo
+badr-airlines,Badr Airlines,badr airlines,,,badrairlines.com,,,wikidata,,494,Badr Airlines
+bae-systems,BAE Systems,bae systems,,,baesystems.com,,,wikidata,,495,BAE Systems
+bahco,Bahco,bahco,,,bahco.com,,,wikidata,,496,Bahco
+bahrain-air,Bahrain Air,bahrain air,,,bahrainair.net,,,wikidata,,497,Bahrain Air
+baic-motor,BAIC Motor,baic motor,,,baicmotor.com,,,wikidata,,498,BAIC Motor
+baidu,Baidu,baidu,,,baidu.com,,,wikidata,,499,Baidu
+baillie-gifford,Baillie Gifford,baillie gifford,,,bailliegifford.com,,,wikidata,,500,Baillie Gifford
+bain-capital,Bain Capital,bain capital,,,baincapital.com,,,wikidata,,501,Bain Capital
+bain-company,Bain & Company,bain company,,,bain.com,,,wikidata,,502,Bain & Company
+bajaj-allianz,Bajaj Allianz,bajaj allianz,,,bajajallianz.com,,,wikidata,,503,Bajaj Allianz
+bajaj-auto,Bajaj Auto,bajaj auto,,,bajajauto.com,,,wikidata,,504,Bajaj Auto
+bajaj-electricals,Bajaj Electricals,bajaj electricals,,,bajajelectricals.com,,,wikidata,,505,Bajaj Electricals
+bajaj-finserv,Bajaj Finserv,bajaj finserv,,,bajajfinserv.in,,,wikidata,,506,Bajaj Finserv
+bajaj-group,Bajaj Group,bajaj group,,,bajajgroup.org,,,wikidata,,507,Bajaj Group
+bakcell,Bakcell,bakcell,,,bakcell.com,,,wikidata,,508,Bakcell
+baker-hughes,Baker Hughes,baker hughes,,,bakerhughes.com,,,wikidata,,509,Baker Hughes
+bakkafrost,Bakkafrost,bakkafrost,,,bakkafrost.com,,,wikidata,,510,Bakkafrost
+balaji-telefilms,Balaji Telefilms,balaji telefilms,,,balajitelefilms.com,,,wikidata,,511,Balaji Telefilms
+baldwin-piano-company,Baldwin Piano Company,baldwin piano company,,,baldwinpiano.com,,,wikidata,,512,Baldwin Piano Company
+balfour-beatty,Balfour Beatty,balfour beatty,,,balfourbeatty.com,,,wikidata,,513,Balfour Beatty
+ball-corporation,Ball Corporation,ball corporation,,,ball.com,,,wikidata,,514,Ball Corporation
+baltic-exchange,Baltic Exchange,baltic exchange,,,balticexchange.com,,,wikidata,,515,Baltic Exchange
+bamboo-airways,Bamboo Airways,bamboo airways,,,bambooairways.com,,,wikidata,,516,Bamboo Airways
+bambu-lab,Bambu Lab,bambu lab,,,bambulab.com,,,wikidata,,517,Bambu Lab
+banco-bradesco,Banco Bradesco,banco bradesco,,,bradesco.com.br,,,wikidata,,518,Banco Bradesco
+banco-do-brasil,Banco do Brasil,banco do brasil,,,bb.com.br,,,wikidata,,519,Banco do Brasil
+banco-santander,Banco Santander,banco santander,,,santander.com,,,wikidata,,520,Banco Santander
+bancolombia,Bancolombia,bancolombia,,,bancolombia.com,,,wikidata,,521,Bancolombia
+bandai-namco-arts,Bandai Namco Arts,bandai namco arts,,,bandainamcoarts.co.jp,,,wikidata,,522,Bandai Namco Arts
+bang-olufsen,Bang & Olufsen,bang olufsen,,,bang-olufsen.com,,,wikidata,,523,Bang & Olufsen
+bangkok-airways,Bangkok Airways,bangkok airways,,,bangkokair.com,,,wikidata,,524,Bangkok Airways
+bangkok-bank,Bangkok Bank,bangkok bank,,,bangkokbank.com,,,wikidata,,525,Bangkok Bank
+banijay-entertainment,Banijay Entertainment,banijay entertainment,,,banijay.com,,,wikidata,,526,Banijay Entertainment
+bank-central-asia,Bank Central Asia,bank central asia,,,bca.co.id,,,wikidata,,527,Bank Central Asia
+bank-islam-malaysia,Bank Islam Malaysia,bank islam malaysia,,,bankislam.com,,,wikidata,,528,Bank Islam Malaysia
+bank-leumi-le-israel-b-m,Bank Leumi Le- Israel B.m.,bank leumi le israel b m,,,leumi.co.il,,,wikidata,,529,Bank Leumi Le- Israel B.m.
+bank-mandiri,Bank Mandiri,bank mandiri,,,bankmandiri.co.id,,,wikidata,,530,Bank Mandiri
+bank-negara-indonesia,Bank Negara Indonesia,bank negara indonesia,,,bni.co.id,,,wikidata,,531,Bank Negara Indonesia
+bank-of-america,Bank of America,bank of america,,,bankofamerica.com,,,wikidata,,532,Bank of America
+bank-of-baroda,Bank of Baroda,bank of baroda,,,bankofbaroda.in,,,wikidata,,533,Bank of Baroda
+bank-of-china,Bank of China,bank of china,,,bankofchina.com,,,wikidata,,534,Bank of China
+bank-of-china-hong-kong,Bank of China (Hong Kong),bank of china hong kong,,,bochk.com,,,wikidata,,535,Bank of China (Hong Kong)
+bank-of-cyprus,Bank of Cyprus,bank of cyprus,,,bankofcyprus.com,,,wikidata,,536,Bank of Cyprus
+bank-of-england,Bank of England,bank of england,,,bankofengland.co.uk,,,wikidata,,537,Bank of England
+bank-of-ireland,Bank of Ireland,bank of ireland,,,bankofireland.com,,,wikidata,,538,Bank of Ireland
+bank-of-montreal,Bank of Montreal,bank of montreal,,,bmo.com,,,wikidata,,539,Bank of Montreal
+bank-of-scotland,Bank of Scotland,bank of scotland,,,bankofscotland.co.uk,,,wikidata,,540,Bank of Scotland
+bank-of-shanghai,Bank of Shanghai,bank of shanghai,,,bankofshanghai.com,,,wikidata,,541,Bank of Shanghai
+bank-of-yokohama,Bank of Yokohama,bank of yokohama,,,boy.co.jp,,,wikidata,,542,Bank of Yokohama
+bank-one-corporation,Bank One Corporation,bank one corporation,,,bankone.com,,,wikidata,,543,Bank One Corporation
+bank-rakyat-indonesia,Bank Rakyat Indonesia,bank rakyat indonesia,,,bri.co.id,,,wikidata,,544,Bank Rakyat Indonesia
+bankinter,Bankinter,bankinter,,,bankinter.com,,,wikidata,,545,Bankinter
+banorte,Banorte,banorte,,,banorte.com,,,wikidata,,546,Banorte
+banque-misr,Banque Misr,banque misr,,,banquemisr.com,,,wikidata,,547,Banque Misr
+barclays,Barclays,barclays,,,barclays.com,,,wikidata,,548,Barclays
+barco,Barco,barco,,,barco.com,,,wikidata,,549,Barco
+barilla,Barilla,barilla,,,barilla.com,,,wikidata,,550,Barilla
+barilla-group,Barilla Group,barilla group,,,barillagroup.com,,,wikidata,,551,Barilla Group
+barnes-noble,Barnes & Noble,barnes noble,,,barnesandnoble.com,,,wikidata,,552,Barnes & Noble
+barrett-firearms-manufacturing,Barrett Firearms Manufacturing,barrett firearms manufacturing,,,barrett.net,,,wikidata,,553,Barrett Firearms Manufacturing
+barrick-mining-corporation,Barrick Mining Corporation,barrick mining corporation,,,barrick.com,,,wikidata,,554,Barrick Mining Corporation
+basecamp,Basecamp,basecamp,,,basecamp.com,,,wikidata,,555,Basecamp
+basf,BASF,basf,,,basf.com,,,wikidata,,556,BASF
+bashneft,Bashneft,bashneft,,,bashneft.com,,,wikidata,,557,Bashneft
+baskin-robbins,Baskin-Robbins,baskin robbins,,,baskinrobbins.com,,,wikidata,,558,Baskin-Robbins
+bata-limited,Bata Limited,bata limited,,,bata.com,,,wikidata,,559,Bata Limited
+batik-air,Batik Air,batik air,,,batikair.com,,,wikidata,,560,Batik Air
+bauer-hockey,Bauer Hockey,bauer hockey,,,bauer.com,,,wikidata,,561,Bauer Hockey
+bauer-media-group,Bauer Media Group,bauer media group,,,bauermedia.com,,,wikidata,,562,Bauer Media Group
+bauhaus,Bauhaus,bauhaus,,,bauhaus.info,,,wikidata,,563,Bauhaus
+bausch-health,Bausch Health,bausch health,,,bauschhealth.com,,,wikidata,,564,Bausch Health
+bausch-lomb,Bausch & Lomb,bausch lomb,,,bausch.com,,,wikidata,,565,Bausch & Lomb
+baxter-international,Baxter International,baxter international,,,baxter.com,,,wikidata,,566,Baxter International
+bayer,Bayer,bayer,,,bayer.com,,,wikidata,,567,Bayer
+bbc-sport,BBC Sport,bbc sport,,,bbc.com,,,wikidata,,568,BBC Sport
+bbc-television,BBC Television,bbc television,,,bbc.co.uk,,,wikidata,,569,BBC Television
+bbn-technologies,BBN Technologies,bbn technologies,,,bbn.com,,,wikidata,,570,BBN Technologies
+bbs-kraftfahrzeugtechnik,BBS Kraftfahrzeugtechnik,bbs kraftfahrzeugtechnik,,,bbs.com,,,wikidata,,571,BBS Kraftfahrzeugtechnik
+bbva,BBVA,bbva,,,bbva.com,,,wikidata,,572,BBVA
+bdo-international,BDO International,bdo international,,,bdo.global,,,wikidata,,573,BDO International
+bearingpoint,BearingPoint,bearingpoint,,,bearingpoint.com,,,wikidata,,574,BearingPoint
+beatport,Beatport,beatport,,,beatport.com,,,wikidata,,575,Beatport
+beats-electronics,Beats Electronics,beats electronics,,,beatsbydre.com,,,wikidata,,576,Beats Electronics
+bechtel,Bechtel,bechtel,,,bechtel.com,,,wikidata,,577,Bechtel
+beckhoff-automation,Beckhoff Automation,beckhoff automation,,,beckhoff.com,,,wikidata,,578,Beckhoff Automation
+beckman-coulter,Beckman Coulter,beckman coulter,,,beckmancoulter.com,,,wikidata,,579,Beckman Coulter
+behringer,Behringer,behringer,,,behringer.com,,,wikidata,,580,Behringer
+beiersdorf,Beiersdorf,beiersdorf,,,beiersdorf.com,,,wikidata,,581,Beiersdorf
+bein-media-group,beIN Media Group,bein media group,,,beinmediagroup.com,,,wikidata,,582,beIN Media Group
+bekaert,Bekaert,bekaert,,,bekaert.com,,,wikidata,,583,Bekaert
+beko,Beko,beko,,,bekocorporate.com,,,wikidata,,584,Beko
+belgrade-nikola-tesla-airport,Belgrade Nikola Tesla Airport,belgrade nikola tesla airport,,,beg.aero,,,wikidata,,585,Belgrade Nikola Tesla Airport
+belkin-international-inc,"Belkin International, Inc.",belkin international inc,,,belkin.com,,,wikidata,,586,"Belkin International, Inc."
+bell-howell,Bell & Howell,bell howell,,,bellhowell.net,,,wikidata,,587,Bell & Howell
+bellasi,Bellasi,bellasi,,,bellasi.com,,,wikidata,,588,Bellasi
+bellsouth,BellSouth,bellsouth,,,bellsouth.com,,,wikidata,,589,BellSouth
+belmond,Belmond,belmond,,,belmond.com,,,wikidata,,590,Belmond
+beml-limited,BEML Limited,beml limited,,,bemlindia.com,,,wikidata,,591,BEML Limited
+ben-jerry-s,Ben & Jerry's,ben jerry s,,,benjerry.com,,,wikidata,,592,Ben & Jerry's
+benefit-cosmetics,Benefit Cosmetics,benefit cosmetics,,,benefitcosmetics.com,,,wikidata,,593,Benefit Cosmetics
+benesse,Benesse,benesse,,,benesse.co.jp,,,wikidata,,594,Benesse
+benetton-group,Benetton Group,benetton group,,,benetton.com,,,wikidata,,595,Benetton Group
+bennett-coleman-co,"Bennett, Coleman & Co.",bennett coleman co,,,timesofindia.com,,,wikidata,,596,"Bennett, Coleman & Co."
+benq,BenQ,benq,,,benq.com,,,wikidata,,597,BenQ
+bentley,Bentley,bentley,,,bentleymotors.com,,,wikidata,,598,Bentley
+bentley-systems,Bentley Systems,bentley systems,,,bentley.com,,,wikidata,,599,Bentley Systems
+bergdorf-goodman,Bergdorf Goodman,bergdorf goodman,,,bergdorfgoodman.com,,,wikidata,,600,Bergdorf Goodman
+berger-paints,Berger Paints,berger paints,,,bergerpaints.com,,,wikidata,,601,Berger Paints
+beriev,Beriev,beriev,,,beriev.com,,,wikidata,,602,Beriev
+bering-air,Bering Air,bering air,,,beringair.com,,,wikidata,,603,Bering Air
+berkshire-hathaway,Berkshire Hathaway,berkshire hathaway,,,berkshirehathaway.com,,,wikidata,,604,Berkshire Hathaway
+berlitz-corporation,Berlitz Corporation,berlitz corporation,,,berlitz.com,,,wikidata,,605,Berlitz Corporation
+bernina-sewing-machine,Bernina Sewing Machine,bernina sewing machine,,,bernina.com,,,wikidata,,606,Bernina Sewing Machine
+bershka,Bershka,bershka,,,bershka.com,,,wikidata,,607,Bershka
+besix,Besix,besix,,,besix.com,,,wikidata,,608,Besix
+best-buy,Best Buy,best buy,,,bestbuy.com,,,wikidata,,609,Best Buy
+best-western,Best Western,best western,,,bestwestern.com,,,wikidata,,610,Best Western
+bestseller,Bestseller,bestseller,,,bestseller.com,,,wikidata,,611,Bestseller
+beta-motor,Beta Motor,beta motor,,,betamotor.com,,,wikidata,,612,Beta Motor
+betano,Betano,betano,,,betano.com,,,wikidata,,613,Betano
+betfair,betfair,betfair,,,betfair.com,,,wikidata,,614,betfair
+betfred,Betfred,betfred,,,betfred.com,,,wikidata,,615,Betfred
+betsson,Betsson,betsson,,,betsson.com,,,wikidata,,616,Betsson
+bewakoof,Bewakoof,bewakoof,,,bewakoof.com,,,wikidata,,617,Bewakoof
+beyerdynamic,Beyerdynamic,beyerdynamic,,,beyerdynamic.com,,,wikidata,,618,Beyerdynamic
+beyond-meat,Beyond Meat,beyond meat,,,beyondmeat.com,,,wikidata,,619,Beyond Meat
+bezeq-the-israeli-telecommunication-corp-ltd,Bezeq The Israeli Telecommunication Corp. Ltd.,bezeq the israeli telecommunication corp ltd,,,bezeq.co.il,,,wikidata,,620,Bezeq The Israeli Telecommunication Corp. Ltd.
+bfgoodrich,BFGoodrich,bfgoodrich,,,bfgoodrich.com,,,wikidata,,621,BFGoodrich
+bh-air,BH Air,bh air,,,bhairlines.com,,,wikidata,,622,BH Air
+bharat-biotech-international,Bharat Biotech International,bharat biotech international,,,bharatbiotech.com,,,wikidata,,623,Bharat Biotech International
+bharat-electronics,Bharat Electronics,bharat electronics,,,bel-india.in,,,wikidata,,624,Bharat Electronics
+bharat-forge,Bharat Forge,bharat forge,,,bharatforge.com,,,wikidata,,625,Bharat Forge
+bharat-heavy-electricals,Bharat Heavy Electricals,bharat heavy electricals,,,bhel.com,,,wikidata,,626,Bharat Heavy Electricals
+bharat-petroleum,Bharat Petroleum,bharat petroleum,,,bharatpetroleum.in,,,wikidata,,627,Bharat Petroleum
+bharat-sanchar-nigam-limited,Bharat Sanchar Nigam Limited,bharat sanchar nigam limited,,,bsnl.co.in,,,wikidata,,628,Bharat Sanchar Nigam Limited
+bharatbenz,BharatBenz,bharatbenz,,,bharatbenz.com,,,wikidata,,629,BharatBenz
+bharatpe,BharatPe,bharatpe,,,bharatpe.com,,,wikidata,,630,BharatPe
+bharti-enterprises,Bharti Enterprises,bharti enterprises,,,bharti.com,,,wikidata,,631,Bharti Enterprises
+bhartiya-mahila-bank,Bhartiya Mahila Bank,bhartiya mahila bank,,,bhartiyamahilabank.com,,,wikidata,,632,Bhartiya Mahila Bank
+bhp,BHP,bhp,,,bhp.com,,,wikidata,,633,BHP
+bial,Bial,bial,,,bial.com,,,wikidata,,634,Bial
+bianchi-bicycles,Bianchi Bicycles,bianchi bicycles,,,bianchi.com,,,wikidata,,635,Bianchi Bicycles
+bic,Bic,bic,,,bic.com,,,wikidata,,636,Bic
+big-boy-restaurants,Big Boy Restaurants,big boy restaurants,,,bigboy.com,,,wikidata,,637,Big Boy Restaurants
+big-fish-games,Big Fish Games,big fish games,,,bigfishgames.com,,,wikidata,,638,Big Fish Games
+bigbasket,BigBasket,bigbasket,,,bigbasket.com,,,wikidata,,639,BigBasket
+bigelow-aerospace,Bigelow Aerospace,bigelow aerospace,,,bigelowaerospace.com,,,wikidata,,640,Bigelow Aerospace
+bilfinger-se,Bilfinger SE,bilfinger se,,,bilfinger.com,,,wikidata,,641,Bilfinger SE
+bilibili,Bilibili,bilibili,,,bilibili.com,,,wikidata,,642,Bilibili
+binter-canarias,Binter Canarias,binter canarias,,,bintercanarias.com,,,wikidata,,643,Binter Canarias
+biocon,Biocon,biocon,,,biocon.com,,,wikidata,,644,Biocon
+biogen,Biogen,biogen,,,biogen.com,,,wikidata,,645,Biogen
+birkenstock,Birkenstock,birkenstock,,,birkenstock.com,,,wikidata,,646,Birkenstock
+birlasoft,Birlasoft,birlasoft,,,birlasoft.com,,,wikidata,,647,Birlasoft
+birra-menabrea,Birra Menabrea,birra menabrea,,,birramenabrea.com,,,wikidata,,648,Birra Menabrea
+bismillah-airlines,Bismillah Airlines,bismillah airlines,,,bismillahairlines.net,,,wikidata,,649,Bismillah Airlines
+bitdefender,Bitdefender,bitdefender,,,bitdefender.com,,,wikidata,,650,Bitdefender
+bitfinex,Bitfinex,bitfinex,,,bitfinex.com,,,wikidata,,651,Bitfinex
+bitly,Bitly,bitly,,,bitly.com,,,wikidata,,652,Bitly
+bitmain,Bitmain,bitmain,,,bitmain.com,,,wikidata,,653,Bitmain
+bitpanda,Bitpanda,bitpanda,,,bitpanda.com,,,wikidata,,654,Bitpanda
+black-cube,Black Cube,black cube,,,blackcube.com,,,wikidata,,655,Black Cube
+black-diamond-equipment,Black Diamond Equipment,black diamond equipment,,,blackdiamondequipment.com,,,wikidata,,656,Black Diamond Equipment
+blackberry,BlackBerry,blackberry,,,blackberry.com,,,wikidata,,657,BlackBerry
+blackbuck,BlackBuck,blackbuck,,,blackbuck.com,,,wikidata,,658,BlackBuck
+blacklane,Blacklane,blacklane,,,blacklane.com,,,wikidata,,659,Blacklane
+blackmagic-design,Blackmagic Design,blackmagic design,,,blackmagicdesign.com,,,wikidata,,660,Blackmagic Design
+blackrock,BlackRock,blackrock,,,blackrock.com,,,wikidata,,661,BlackRock
+blackstone,Blackstone,blackstone,,,blackstone.com,,,wikidata,,662,Blackstone
+blinkit,Blinkit,blinkit,,,blinkit.com,,,wikidata,,663,Blinkit
+block,Block,block,,,block.xyz,,,wikidata,,664,Block
+bloober-team,Bloober Team,bloober team,,,blooberteam.com,,,wikidata,,665,Bloober Team
+bloomberg-l-p,Bloomberg L.P.,bloomberg l p,,,bloomberg.com,,,wikidata,,666,Bloomberg L.P.
+bloomsbury-publishing,Bloomsbury Publishing,bloomsbury publishing,,,bloomsbury.com,,,wikidata,,667,Bloomsbury Publishing
+blu-products,Blu Products,blu products,,,bluproducts.com,,,wikidata,,668,Blu Products
+blue-bell-creameries,Blue Bell Creameries,blue bell creameries,,,bluebell.com,,,wikidata,,669,Blue Bell Creameries
+blue-dart,Blue Dart,blue dart,,,bluedart.com,,,wikidata,,670,Blue Dart
+blue-dart-aviation,Blue Dart Aviation,blue dart aviation,,,bluedartaviation.com,,,wikidata,,671,Blue Dart Aviation
+blue-islands,Blue Islands,blue islands,,,blueislands.com,,,wikidata,,672,Blue Islands
+blue-microphones,Blue Microphones,blue microphones,,,bluemic.com,,,wikidata,,673,Blue Microphones
+blue-origin,Blue Origin,blue origin,,,blueorigin.com,,,wikidata,,674,Blue Origin
+blue-star,Blue Star,blue star,,,bluestarindia.com,,,wikidata,,675,Blue Star
+blue-star-ferries,Blue Star Ferries,blue star ferries,,,bluestarferries.com,,,wikidata,,676,Blue Star Ferries
+blue-wing-airlines,Blue Wing Airlines,blue wing airlines,,,bluewingairlines.com,,,wikidata,,677,Blue Wing Airlines
+bluebird-airways,Bluebird Airways,bluebird airways,,,bluebirdair.com,,,wikidata,,678,Bluebird Airways
+bluehost,Bluehost,bluehost,,,bluehost.com,,,wikidata,,679,Bluehost
+bluescope-steel,BlueScope Steel,bluescope steel,,,bluescope.com,,,wikidata,,680,BlueScope Steel
+bluestacks,BlueStacks,bluestacks,,,bluestacks.com,,,wikidata,,681,BlueStacks
+blur-studio,Blur Studio,blur studio,,,blur.com,,,wikidata,,682,Blur Studio
+bmc-software,BMC Software,bmc software,,,bmc.com,,,wikidata,,683,BMC Software
+bmg-rights-management,BMG Rights Management,bmg rights management,,,bmg.com,,,wikidata,,684,BMG Rights Management
+bmw-group,BMW Group,bmw group,,,bmw.com,,,wikidata,,685,BMW Group
+bnp-paribas,BNP Paribas,bnp paribas,,,bnpparibas.com,,,wikidata,,686,BNP Paribas
+boat,boAt,boat,,,boat-lifestyle.com,,,wikidata,,687,boAt
+bobcat-company,Bobcat Company,bobcat company,,,bobcat.com,,,wikidata,,688,Bobcat Company
+bodum,Bodum,bodum,,,bodum.com,,,wikidata,,689,Bodum
+boe-technology,BOE Technology,boe technology,,,boe.com,,,wikidata,,690,BOE Technology
+boeing,Boeing,boeing,,,boeing.com,,,wikidata,,691,Boeing
+bohemia-interactive,Bohemia Interactive,bohemia interactive,,,bohemia.net,,,wikidata,,692,Bohemia Interactive
+bojangles-famous-chicken-n-biscuits,Bojangles' Famous Chicken 'n Biscuits,bojangles famous chicken n biscuits,,,bojangles.com,,,wikidata,,693,Bojangles' Famous Chicken 'n Biscuits
+bolex,Bolex,bolex,,,bolex.com,,,wikidata,,694,Bolex
+boliden-ab,Boliden AB,boliden ab,,,boliden.com,,,wikidata,,695,Boliden AB
+bolt,Bolt,bolt,,,bolt.eu,,,wikidata,,696,Bolt
+bolwell,Bolwell,bolwell,,,bolwell.com,,,wikidata,,697,Bolwell
+bomag,BOMAG,bomag,,,bomag.com,,,wikidata,,698,BOMAG
+bombardier,Bombardier,bombardier,,,bombardier.com,,,wikidata,,699,Bombardier
+bombardier-recreational-products,Bombardier Recreational Products,bombardier recreational products,,,brp.com,,,wikidata,,700,Bombardier Recreational Products
+bonava,Bonava,bonava,,,bonava.com,,,wikidata,,701,Bonava
+bonnier-group,Bonnier Group,bonnier group,,,bonnier.com,,,wikidata,,702,Bonnier Group
+book-off,Book Off,book off,,,bookoff.co.jp,,,wikidata,,703,Book Off
+booking-com,booking.com,booking com,,,booking.com,,,wikidata,,704,booking.com
+booking-holdings,Booking Holdings,booking holdings,,,bookingholdings.com,,,wikidata,,705,Booking Holdings
+bookmyshow,BookMyShow,bookmyshow,,,bookmyshow.com,,,wikidata,,706,BookMyShow
+books-kinokuniya,Books Kinokuniya,books kinokuniya,,,kinokuniya.com,,,wikidata,,707,Books Kinokuniya
+booz-allen-hamilton,Booz Allen Hamilton,booz allen hamilton,,,boozallen.com,,,wikidata,,708,Booz Allen Hamilton
+boozt,Boozt,boozt,,,boozt.com,,,wikidata,,709,Boozt
+borealis,Borealis,borealis,,,borealisgroup.com,,,wikidata,,710,Borealis
+borgwarner,BorgWarner,borgwarner,,,borgwarner.com,,,wikidata,,711,BorgWarner
+borland,Borland,borland,,,borland.com,,,wikidata,,712,Borland
+borsalino,Borsalino,borsalino,,,borsalino.com,,,wikidata,,713,Borsalino
+borsodchem,BorsodChem,borsodchem,,,borsodchem-group.com,,,wikidata,,714,BorsodChem
+bosch,Bosch,bosch,,,bosch.com,,,wikidata,,715,Bosch
+bosch-rexroth,Bosch Rexroth,bosch rexroth,,,boschrexroth.com,,,wikidata,,716,Bosch Rexroth
+bose-corporation,Bose Corporation,bose corporation,,,bose.com,,,wikidata,,717,Bose Corporation
+boss-corporation,Boss Corporation,boss corporation,,,boss.info,,,wikidata,,718,Boss Corporation
+boston-consulting-group,Boston Consulting Group,boston consulting group,,,bcg.com,,,wikidata,,719,Boston Consulting Group
+boston-dynamics,Boston Dynamics,boston dynamics,,,bostondynamics.com,,,wikidata,,720,Boston Dynamics
+boston-pizza,Boston Pizza,boston pizza,,,bostonpizza.com,,,wikidata,,721,Boston Pizza
+boston-scientific,Boston Scientific,boston scientific,,,bostonscientific.com,,,wikidata,,722,Boston Scientific
+botswana-stock-exchange,Botswana Stock Exchange,botswana stock exchange,,,bse.co.bw,,,wikidata,,723,Botswana Stock Exchange
+bottega-veneta,Bottega Veneta,bottega veneta,,,bottegaveneta.com,,,wikidata,,724,Bottega Veneta
+bouygues,Bouygues,bouygues,,,bouygues.com,,,wikidata,,725,Bouygues
+bowers-wilkins,Bowers & Wilkins,bowers wilkins,,,bowerswilkins.com,,,wikidata,,726,Bowers & Wilkins
+box,Box,box,,,box.com,,,wikidata,,727,Box
+box-office-mojo,Box Office Mojo,box office mojo,,,boxofficemojo.com,,,wikidata,,728,Box Office Mojo
+bp,BP,bp,,,bp.com,,,wikidata,,729,BP
+br-ndby-if,Brøndby IF,br ndby if,,,brondby.com,,,wikidata,,730,Brøndby IF
+braum-s,Braum's,braum s,,,braums.com,,,wikidata,,731,Braum's
+braun,Braun,braun,,,braun.com,,,wikidata,,732,Braun
+breguet,Breguet,breguet,,,breguet.com,,,wikidata,,733,Breguet
+breitling,Breitling,breitling,,,breitling.com,,,wikidata,,734,Breitling
+brembo,Brembo,brembo,,,brembo.com,,,wikidata,,735,Brembo
+brenntag,Brenntag,brenntag,,,brenntag.com,,,wikidata,,736,Brenntag
+brewdog,BrewDog,brewdog,,,brewdog.com,,,wikidata,,737,BrewDog
+brex,Brex,brex,,,brex.com,,,wikidata,,738,Brex
+brf,BRF,brf,,,brf-br.com,,,wikidata,,739,BRF
+bridgestone,Bridgestone,bridgestone,,,bridgestone.com,,,wikidata,,740,Bridgestone
+bridgewater-associates,Bridgewater Associates,bridgewater associates,,,bridgewater.com,,,wikidata,,741,Bridgewater Associates
+bright-food,Bright Food,bright food,,,brightfood.com,,,wikidata,,742,Bright Food
+brill,Brill,brill,,,brill.com,,,wikidata,,743,Brill
+brink-s,Brink's,brink s,,,brinks.com,,,wikidata,,744,Brink's
+brio,BRIO,brio,,,brio-toys.com,,,wikidata,,745,BRIO
+bristol-myers-squibb,Bristol Myers Squibb,bristol myers squibb,,,bms.com,,,wikidata,,746,Bristol Myers Squibb
+brita,Brita,brita,,,brita.net,,,wikidata,,747,Brita
+britannia-industries,Britannia Industries,britannia industries,,,britannia.co.in,,,wikidata,,748,Britannia Industries
+british-airways,British Airways,british airways,,,britishairways.com,,,wikidata,,749,British Airways
+british-american-tobacco,British American Tobacco,british american tobacco,,,bat.com,,,wikidata,,750,British American Tobacco
+british-gas,British Gas,british gas,,,britishgas.co.uk,,,wikidata,,751,British Gas
+broadcom,Broadcom,broadcom,,,broadcom.com,,,wikidata,,752,Broadcom
+broadwood-and-sons,Broadwood and Sons,broadwood and sons,,,broadwood.co.uk,,,wikidata,,753,Broadwood and Sons
+brocade-communications-systems,Brocade Communications Systems,brocade communications systems,,,brocade.com,,,wikidata,,754,Brocade Communications Systems
+brompton-bicycle,Brompton Bicycle,brompton bicycle,,,brompton.com,,,wikidata,,755,Brompton Bicycle
+brookfield-corporation,Brookfield Corporation,brookfield corporation,,,brookfield.com,,,wikidata,,756,Brookfield Corporation
+brooks-brothers,Brooks Brothers,brooks brothers,,,brooksbrothers.com,,,wikidata,,757,Brooks Brothers
+brooks-england,Brooks England,brooks england,,,brooksengland.com,,,wikidata,,758,Brooks England
+brother-industries,Brother Industries,brother industries,,,global.brother,,,wikidata,,759,Brother Industries
+browning-arms-company,Browning Arms Company,browning arms company,,,browning.com,,,wikidata,,760,Browning Arms Company
+browserstack,BrowserStack,browserstack,,,browserstack.com,,,wikidata,,761,BrowserStack
+brunello-cucinelli,Brunello Cucinelli,brunello cucinelli,,,brunellocucinelli.com,,,wikidata,,762,Brunello Cucinelli
+brunswick-corporation,Brunswick Corporation,brunswick corporation,,,brunswick.com,,,wikidata,,763,Brunswick Corporation
+brussels-airlines,Brussels Airlines,brussels airlines,,,brusselsairlines.com,,,wikidata,,764,Brussels Airlines
+bsi-group,BSI Group,bsi group,,,bsigroup.com,,,wikidata,,765,BSI Group
+bt-group,BT Group,bt group,,,bt.com,,,wikidata,,766,BT Group
+btg-pactual,BTG Pactual,btg pactual,,,btgpactual.com,,,wikidata,,767,BTG Pactual
+bubba-gump-shrimp-company,Bubba Gump Shrimp Company,bubba gump shrimp company,,,bubbagump.com,,,wikidata,,768,Bubba Gump Shrimp Company
+buddha-air,Buddha Air,buddha air,,,buddhaair.com,,,wikidata,,769,Buddha Air
+budget-rent-a-car,Budget Rent a Car,budget rent a car,,,budget.com,,,wikidata,,770,Budget Rent a Car
+buffalo-airways,Buffalo Airways,buffalo airways,,,buffaloairways.com,,,wikidata,,771,Buffalo Airways
+buffalo-wild-wings,Buffalo Wild Wings,buffalo wild wings,,,buffalowildwings.com,,,wikidata,,772,Buffalo Wild Wings
+buick,Buick,buick,,,buick.com,,,wikidata,,773,Buick
+build-a-bear-workshop,Build-A-Bear Workshop,build a bear workshop,,,buildabear.com,,,wikidata,,774,Build-A-Bear Workshop
+bulova-watch-company,Bulova Watch Company,bulova watch company,,,bulova.com,,,wikidata,,775,Bulova Watch Company
+bumble,Bumble,bumble,,,bumble.com,,,wikidata,,776,Bumble
+bunge-limited,Bunge Limited,bunge limited,,,bunge.com,,,wikidata,,777,Bunge Limited
+buraq-air,Buraq Air,buraq air,,,buraq.aero,,,wikidata,,778,Buraq Air
+burberry,Burberry,burberry,,,burberry.com,,,wikidata,,779,Burberry
+burgeranch,Burgeranch,burgeranch,,,burgeranch.co.il,,,wikidata,,780,Burgeranch
+burrda,Burrda,burrda,,,burrda.com,,,wikidata,,781,Burrda
+bursa-malaysia,Bursa Malaysia,bursa malaysia,,,bursamalaysia.com,,,wikidata,,782,Bursa Malaysia
+burson,Burson,burson,,,bursonglobal.com,,,wikidata,,783,Burson
+burton-snowboards,Burton Snowboards,burton snowboards,,,burton.com,,,wikidata,,784,Burton Snowboards
+bushiroad,Bushiroad,bushiroad,,,bushiroad.com,,,wikidata,,785,Bushiroad
+business-air,Business Air,business air,,,businessaircenter.com,,,wikidata,,786,Business Air
+buzzfeed,BuzzFeed,buzzfeed,,,buzzfeed.com,,,wikidata,,787,BuzzFeed
+bwt-ag,BWT AG,bwt ag,,,bwt.com,,,wikidata,,788,BWT AG
+bybit,Bybit,bybit,,,bybit.com,,,wikidata,,789,Bybit
+byd,BYD,byd,,,byd.com,,,wikidata,,790,BYD
+byju-s,BYJU'S,byju s,,,byjus.com,,,wikidata,,791,BYJU'S
+bytedance,ByteDance,bytedance,,,bytedance.com,,,wikidata,,792,ByteDance
+c-h-robinson-worldwide,C. H. Robinson Worldwide,c h robinson worldwide,,,chrobinson.com,,,wikidata,,793,C. H. Robinson Worldwide
+cabify,Cabify,cabify,,,cabify.com,,,wikidata,,794,Cabify
+cabo-verde-airlines,Cabo Verde Airlines,cabo verde airlines,,,caboverdeairlines.com,,,wikidata,,795,Cabo Verde Airlines
+caci,CACI,caci,,,caci.com,,,wikidata,,796,CACI
+cadence-design-systems,Cadence Design Systems,cadence design systems,,,cadence.com,,,wikidata,,797,Cadence Design Systems
+cae-inc,CAE Inc.,cae inc,,,cae.com,,,wikidata,,798,CAE Inc.
+cage-warriors,Cage Warriors,cage warriors,,,cagewarriors.com,,,wikidata,,799,Cage Warriors
+cainiao,Cainiao,cainiao,,,cainiao.com,,,wikidata,,800,Cainiao
+cairo-aviation,Cairo Aviation,cairo aviation,,,cairoaviation.com,,,wikidata,,801,Cairo Aviation
+caixabank,CaixaBank,caixabank,,,caixabank.cat,,,wikidata,,802,CaixaBank
+calbee,Calbee,calbee,,,calbee.co.jp,,,wikidata,,803,Calbee
+calico,Calico,calico,,,calicolabs.com,,,wikidata,,804,Calico
+callaway-golf-company,Callaway Golf Company,callaway golf company,,,callawaygolf.com,,,wikidata,,805,Callaway Golf Company
+calm-air,Calm Air,calm air,,,calmair.com,,,wikidata,,806,Calm Air
+calpis,Calpis,calpis,,,calpis.info,,,wikidata,,807,Calpis
+calvin-klein,Calvin Klein,calvin klein,,,calvinklein.com,,,wikidata,,808,Calvin Klein
+cameco,Cameco,cameco,,,cameco.com,,,wikidata,,809,Cameco
+campagnolo,Campagnolo,campagnolo,,,campagnolo.com,,,wikidata,,810,Campagnolo
+campari-group,Campari Group,campari group,,,camparigroup.com,,,wikidata,,811,Campari Group
+campbell-s,Campbell's,campbell s,,,campbells.com,,,wikidata,,812,Campbell's
+camper,Camper,camper,,,camper.com,,,wikidata,,813,Camper
+canada-goose-inc,Canada Goose Inc.,canada goose inc,,,canadagoose.com,,,wikidata,,814,Canada Goose Inc.
+canadian-bank-note-company,Canadian Bank Note Company,canadian bank note company,,,cbnco.com,,,wikidata,,815,Canadian Bank Note Company
+canadian-north,Canadian North,canadian north,,,canadiannorth.com,,,wikidata,,816,Canadian North
+canadian-tire,Canadian Tire,canadian tire,,,canadiantire.ca,,,wikidata,,817,Canadian Tire
+canali,Canali,canali,,,canali.com,,,wikidata,,818,Canali
+candy,Candy,candy,,,candy-home.com,,,wikidata,,819,Candy
+cannondale-bicycle-corporation,Cannondale Bicycle Corporation,cannondale bicycle corporation,,,cannondale.com,,,wikidata,,820,Cannondale Bicycle Corporation
+canon,Canon,canon,,,canon.com,,,wikidata,,821,Canon
+canonical-ltd,Canonical Ltd.,canonical ltd,,,canonical.com,,,wikidata,,822,Canonical Ltd.
+canopy-growth-corporation,Canopy Growth Corporation,canopy growth corporation,,,canopygrowth.com,,,wikidata,,823,Canopy Growth Corporation
+canterbury-of-new-zealand,Canterbury of New Zealand,canterbury of new zealand,,,canterbury.com,,,wikidata,,824,Canterbury of New Zealand
+cantor-fitzgerald,Cantor Fitzgerald,cantor fitzgerald,,,cantorfitzgerald.com,,,wikidata,,825,Cantor Fitzgerald
+canva,Canva,canva,,,canva.com,,,wikidata,,826,Canva
+canyon-bicycles,Canyon Bicycles,canyon bicycles,,,canyon.com,,,wikidata,,827,Canyon Bicycles
+capcom,Capcom,capcom,,,capcom.com,,,wikidata,,828,Capcom
+cape-air,Cape Air,cape air,,,capeair.com,,,wikidata,,829,Cape Air
+capgemini,Capgemini,capgemini,,,capgemini.com,,,wikidata,,830,Capgemini
+capital-one,Capital One,capital one,,,capitalone.com,,,wikidata,,831,Capital One
+capitaland,CapitaLand,capitaland,,,capitaland.com,,,wikidata,,832,CapitaLand
+capri-holdings,Capri Holdings,capri holdings,,,capriholdings.com,,,wikidata,,833,Capri Holdings
+caran-d-ache,Caran d'Ache,caran d ache,,,carandache.com,,,wikidata,,834,Caran d'Ache
+cardinal-health,Cardinal Health,cardinal health,,,cardinalhealth.com,,,wikidata,,835,Cardinal Health
+cards-against-humanity,Cards Against Humanity,cards against humanity,,,cardsagainsthumanity.com,,,wikidata,,836,Cards Against Humanity
+careem,Careem,careem,,,careem.com,,,wikidata,,837,Careem
+cargill,Cargill,cargill,,,cargill.com,,,wikidata,,838,Cargill
+cargojet,Cargojet,cargojet,,,cargojet.com,,,wikidata,,839,Cargojet
+cargolux,Cargolux,cargolux,,,cargolux.com,,,wikidata,,840,Cargolux
+carhartt,Carhartt,carhartt,,,carhartt.com,,,wikidata,,841,Carhartt
+carl-s-jr,Carl's Jr.,carl s jr,,,carlsjr.com,,,wikidata,,842,Carl's Jr.
+carl-walther-gmbh,Carl Walther GmbH,carl walther gmbh,,,carl-walther.com,,,wikidata,,843,Carl Walther GmbH
+carl-zeiss-ag,Carl Zeiss AG,carl zeiss ag,,,zeiss.com,,,wikidata,,844,Carl Zeiss AG
+carlsberg-group,Carlsberg Group,carlsberg group,,,carlsberggroup.com,,,wikidata,,845,Carlsberg Group
+carlson,Carlson,carlson,,,carlson.com,,,wikidata,,846,Carlson
+carlson-wagonlit-travel,Carlson Wagonlit Travel,carlson wagonlit travel,,,mycwt.com,,,wikidata,,847,Carlson Wagonlit Travel
+carlyle-group,Carlyle Group,carlyle group,,,carlyle.com,,,wikidata,,848,Carlyle Group
+carnival-corporation,Carnival Corporation,carnival corporation,,,carnivalcorp.com,,,wikidata,,849,Carnival Corporation
+carpatair,Carpatair,carpatair,,,carpatair.com,,,wikidata,,850,Carpatair
+carphone-warehouse,Carphone Warehouse,carphone warehouse,,,carphonewarehouse.com,,,wikidata,,851,Carphone Warehouse
+carrefour,Carrefour,carrefour,,,carrefour.com,,,wikidata,,852,Carrefour
+carrier,Carrier,carrier,,,carrier.com,,,wikidata,,853,Carrier
+case-ih,Case IH,case ih,,,caseih.com,,,wikidata,,854,Case IH
+cash-app,Cash App,cash app,,,cash.app,,,wikidata,,855,Cash App
+cashfree-payments,Cashfree Payments,cashfree payments,,,cashfree.com,,,wikidata,,856,Cashfree Payments
+casio,Casio,casio,,,casio.com,,,wikidata,,857,Casio
+cassina-s-p-a,Cassina S.p.A.,cassina s p a,,,cassina.com,,,wikidata,,858,Cassina S.p.A.
+castore,Castore,castore,,,castore.com,,,wikidata,,859,Castore
+castrol,Castrol,castrol,,,castrol.com,,,wikidata,,860,Castrol
+caterham-cars,Caterham Cars,caterham cars,,,caterhamcars.com,,,wikidata,,861,Caterham Cars
+caterpillar,Caterpillar,caterpillar,,,cat.com,,,wikidata,,862,Caterpillar
+cathay-pacific,Cathay Pacific,cathay pacific,,,cathaypacific.com,,,wikidata,,863,Cathay Pacific
+cavok-air,CAVOK Air,cavok air,,,cavok.aero,,,wikidata,,864,CAVOK Air
+cayman-airways,Cayman Airways,cayman airways,,,caymanairways.com,,,wikidata,,865,Cayman Airways
+cbr,CBR,cbr,,,cbr.com,,,wikidata,,866,CBR
+cbre-group,CBRE Group,cbre group,,,cbre.com,,,wikidata,,867,CBRE Group
+ccm,CCM,ccm,,,ccmhockey.com,,,wikidata,,868,CCM
+cd-projekt,CD Projekt,cd projekt,,,cdprojekt.com,,,wikidata,,869,CD Projekt
+cdw,CDW,cdw,,,cdw.com,,,wikidata,,870,CDW
+ceat,CEAT,ceat,,,ceat.com,,,wikidata,,871,CEAT
+cebu-pacific,Cebu Pacific,cebu pacific,,,cebupacificair.com,,,wikidata,,872,Cebu Pacific
+celanese-corporation,Celanese Corporation,celanese corporation,,,celanese.com,,,wikidata,,873,Celanese Corporation
+celcomdigi,CelcomDigi,celcomdigi,,,celcomdigi.com,,,wikidata,,874,CelcomDigi
+celebrity-cruises,Celebrity Cruises,celebrity cruises,,,celebritycruises.com,,,wikidata,,875,Celebrity Cruises
+celestica,Celestica,celestica,,,celestica.com,,,wikidata,,876,Celestica
+celestron,Celestron,celestron,,,celestron.com,,,wikidata,,877,Celestron
+celgene,Celgene,celgene,,,celgene.com,,,wikidata,,878,Celgene
+cellcom-israel-ltd,Cellcom Israel Ltd.,cellcom israel ltd,,,cellcom.co.il,,,wikidata,,879,Cellcom Israel Ltd.
+cellebrite,Cellebrite,cellebrite,,,cellebrite.com,,,wikidata,,880,Cellebrite
+cellnex-telecom,Cellnex Telecom,cellnex telecom,,,cellnex.com,,,wikidata,,881,Cellnex Telecom
+celonis,Celonis,celonis,,,celonis.com,,,wikidata,,882,Celonis
+cemair,CemAir,cemair,,,cemair.co.za,,,wikidata,,883,CemAir
+cemex,Cemex,cemex,,,cemex.com,,,wikidata,,884,Cemex
+cencora,Cencora,cencora,,,cencora.com,,,wikidata,,885,Cencora
+cencosud,Cencosud,cencosud,,,cencosud.com,,,wikidata,,886,Cencosud
+cengage-group,Cengage Group,cengage group,,,cengagegroup.com,,,wikidata,,887,Cengage Group
+centerra-gold,Centerra Gold,centerra gold,,,centerragold.com,,,wikidata,,888,Centerra Gold
+central-group,Central Group,central group,,,centralgroup.com,,,wikidata,,889,Central Group
+central-japan-railway-company,Central Japan Railway Company,central japan railway company,,,jr-central.co.jp,,,wikidata,,890,Central Japan Railway Company
+centrica,Centrica,centrica,,,centrica.com,,,wikidata,,891,Centrica
+cerberus-capital-management,Cerberus Capital Management,cerberus capital management,,,cerberuscapital.com,,,wikidata,,892,Cerberus Capital Management
+cerner,Cerner,cerner,,,cerner.com,,,wikidata,,893,Cerner
+cerruti-1881,Cerruti 1881,cerruti 1881,,,cerruti.com,,,wikidata,,894,Cerruti 1881
+certina-kurth-fr-res,Certina Kurth Frères,certina kurth fr res,,,certina.com,,,wikidata,,895,Certina Kurth Frères
+cerwin-vega,Cerwin-Vega,cerwin vega,,,cerwinvega.com,,,wikidata,,896,Cerwin-Vega
+ceva-logistics,CEVA Logistics,ceva logistics,,,cevalogistics.com,,,wikidata,,897,CEVA Logistics
+cf-industries,CF Industries,cf industries,,,cfindustries.com,,,wikidata,,898,CF Industries
+cf-moto,CF MOTO,cf moto,,,cfmoto.com,,,wikidata,,899,CF MOTO
+cgi-group,CGI Group,cgi group,,,cgi.com,,,wikidata,,900,CGI Group
+cham-wings-airlines,Cham Wings Airlines,cham wings airlines,,,chamwings.com,,,wikidata,,901,Cham Wings Airlines
+champagne-krug,Champagne Krug,champagne krug,,,krug.com,,,wikidata,,902,Champagne Krug
+chan-zuckerberg-initiative,Chan Zuckerberg Initiative,chan zuckerberg initiative,,,chanzuckerberg.com,,,wikidata,,903,Chan Zuckerberg Initiative
+chanel,Chanel,chanel,,,chanel.com,,,wikidata,,904,Chanel
+changan-automobile,Changan Automobile,changan automobile,,,globalchangan.com,,,wikidata,,905,Changan Automobile
+changhe,Changhe,changhe,,,changheauto.com,,,wikidata,,906,Changhe
+changhe-aircraft-industries-corporation,Changhe Aircraft Industries Corporation,changhe aircraft industries corporation,,,changhe.com,,,wikidata,,907,Changhe Aircraft Industries Corporation
+changhong,Changhong,changhong,,,changhong.com,,,wikidata,,908,Changhong
+chaosium,Chaosium,chaosium,,,chaosium.com,,,wikidata,,909,Chaosium
+chargebee,Chargebee,chargebee,,,chargebee.com,,,wikidata,,910,Chargebee
+charles-schwab,Charles Schwab,charles schwab,,,schwab.com,,,wikidata,,911,Charles Schwab
+charoen-pokphand-foods,Charoen Pokphand Foods,charoen pokphand foods,,,cpfworldwide.com,,,wikidata,,912,Charoen Pokphand Foods
+charter-communications,Charter Communications,charter communications,,,charter.com,,,wikidata,,913,Charter Communications
+chase-bank,Chase Bank,chase bank,,,chase.com,,,wikidata,,914,Chase Bank
+chatime,Chatime,chatime,,,chatimejapan.com,,,wikidata,,915,Chatime
+check-point,Check Point,check point,,,checkpoint.com,,,wikidata,,916,Check Point
+checkout-com,Checkout.com,checkout com,,,checkout.com,,,wikidata,,917,Checkout.com
+chery,Chery,chery,,,cheryinternational.com,,,wikidata,,918,Chery
+chess-com,Chess.com,chess com,,,chess.com,,,wikidata,,919,Chess.com
+chessbase,ChessBase,chessbase,,,chessbase.com,,,wikidata,,920,ChessBase
+chevron-corporation,Chevron Corporation,chevron corporation,,,chevron.com,,,wikidata,,921,Chevron Corporation
+chicago-board-of-trade,Chicago Board of Trade,chicago board of trade,,,cbot.com,,,wikidata,,922,Chicago Board of Trade
+chicago-board-options-exchange,Chicago Board Options Exchange,chicago board options exchange,,,cboe.com,,,wikidata,,923,Chicago Board Options Exchange
+chicago-mercantile-exchange,Chicago Mercantile Exchange,chicago mercantile exchange,,,cme.com,,,wikidata,,924,Chicago Mercantile Exchange
+chime,Chime,chime,,,chime.com,,,wikidata,,925,Chime
+chimei-corporation,CHIMEI Corporation,chimei corporation,,,chimeicorp.com,,,wikidata,,926,CHIMEI Corporation
+china-airlines,China Airlines,china airlines,,,china-airlines.com,,,wikidata,,927,China Airlines
+china-construction-bank,China Construction Bank,china construction bank,,,ccb.com,,,wikidata,,928,China Construction Bank
+china-eastern-airlines,China Eastern Airlines,china eastern airlines,,,ceair.com,,,wikidata,,929,China Eastern Airlines
+china-express-airlines,China Express Airlines,china express airlines,,,chinaexpressair.com,,,wikidata,,930,China Express Airlines
+china-merchants-bank,China Merchants Bank,china merchants bank,,,cmbchina.com,,,wikidata,,931,China Merchants Bank
+china-ocean-shipping-co-ltd,"China Ocean Shipping Co., Ltd.",china ocean shipping co ltd,,,coscoshipping.com,,,wikidata,,932,"China Ocean Shipping Co., Ltd."
+china-southern-airlines,China Southern Airlines,china southern airlines,,,csair.com,,,wikidata,,933,China Southern Airlines
+china-telecom,China Telecom,china telecom,,,chinatelecom-h.com,,,wikidata,,934,China Telecom
+china-united-airlines,China United Airlines,china united airlines,,,flycua.com,,,wikidata,,935,China United Airlines
+china-xinhua-airlines,China Xinhua Airlines,china xinhua airlines,,,chinaxinhuaair.com,,,wikidata,,936,China Xinhua Airlines
+chipotle-mexican-grill,Chipotle Mexican Grill,chipotle mexican grill,,,chipotle.com,,,wikidata,,937,Chipotle Mexican Grill
+chiquita-brands-international,Chiquita Brands International,chiquita brands international,,,chiquita.com,,,wikidata,,938,Chiquita Brands International
+chisso,Chisso,chisso,,,chisso.co.jp,,,wikidata,,939,Chisso
+chobani,Chobani,chobani,,,chobani.com,,,wikidata,,940,Chobani
+choice-hotels,Choice Hotels,choice hotels,,,choicehotels.com,,,wikidata,,941,Choice Hotels
+chowking,Chowking,chowking,,,chowkingusa.com,,,wikidata,,942,Chowking
+christian-dior,Christian Dior,christian dior,,,dior.com,,,wikidata,,943,Christian Dior
+chs-inc,CHS Inc.,chs inc,,,chsinc.com,,,wikidata,,944,CHS Inc.
+chubb-corp,Chubb Corp.,chubb corp,,,chubb.com,,,wikidata,,945,Chubb Corp.
+chuck-e-cheese,Chuck E. Cheese,chuck e cheese,,,chuckecheese.com,,,wikidata,,946,Chuck E. Cheese
+chupa-chups,Chupa Chups,chupa chups,,,chupachups.com,,,wikidata,,947,Chupa Chups
+chuwi-company,CHUWI Company,chuwi company,,,chuwi.com,,,wikidata,,948,CHUWI Company
+ci-games-s-a,CI Games S.A.,ci games s a,,,cigames.com,,,wikidata,,949,CI Games S.A.
+cigna,Cigna,cigna,,,cigna.com,,,wikidata,,950,Cigna
+cimb-group,CIMB Group,cimb group,,,cimb.com,,,wikidata,,951,CIMB Group
+cineflix,Cineflix,cineflix,,,cineflix.com,,,wikidata,,952,Cineflix
+cinemark,Cinemark,cinemark,,,cinemark.com,,,wikidata,,953,Cinemark
+cineworld,Cineworld,cineworld,,,cineworld.co.uk,,,wikidata,,954,Cineworld
+cipla,Cipla,cipla,,,cipla.com,,,wikidata,,955,Cipla
+cipsoft-gmbh,CipSoft GmbH,cipsoft gmbh,,,cipsoft.com,,,wikidata,,956,CipSoft GmbH
+circle,Circle,circle,,,circle.com,,,wikidata,,957,Circle
+circuit-city-stores,Circuit City Stores,circuit city stores,,,circuitcity.com,,,wikidata,,958,Circuit City Stores
+cirrus-logic,Cirrus Logic,cirrus logic,,,cirrus.com,,,wikidata,,959,Cirrus Logic
+cisco,Cisco,cisco,,,cisco.com,,,wikidata,,960,Cisco
+cit-group,CIT Group,cit group,,,cit.com,,,wikidata,,961,CIT Group
+citadel-llc,Citadel LLC,citadel llc,,,citadel.com,,,wikidata,,962,Citadel LLC
+citgo,Citgo,citgo,,,citgo.com,,,wikidata,,963,Citgo
+citibank,Citibank,citibank,,,citi.com,,,wikidata,,964,Citibank
+citic-limited,CITIC Limited,citic limited,,,citic.com,,,wikidata,,965,CITIC Limited
+citigroup,Citigroup,citigroup,,,citigroup.com,,,wikidata,,966,Citigroup
+citilink,Citilink,citilink,,,citilink.co.id,,,wikidata,,967,Citilink
+citizen-watch,Citizen Watch,citizen watch,,,citizen.co.jp,,,wikidata,,968,Citizen Watch
+citrix-systems,Citrix Systems,citrix systems,,,citrix.com,,,wikidata,,969,Citrix Systems
+city-football-group,City Football Group,city football group,,,cityfootballgroup.com,,,wikidata,,970,City Football Group
+cityjet,CityJet,cityjet,,,cityjet.com,,,wikidata,,971,CityJet
+cj-enm,CJ ENM,cj enm,,,cjenm.com,,,wikidata,,972,CJ ENM
+claas,Claas,claas,,,claas.com,,,wikidata,,973,Claas
+clariant,Clariant,clariant,,,clariant.com,,,wikidata,,974,Clariant
+clarion,Clarion,clarion,,,clarion.com,,,wikidata,,975,Clarion
+claris,Claris,claris,,,claris.com,,,wikidata,,976,Claris
+clarivate,Clarivate,clarivate,,,clarivate.com,,,wikidata,,977,Clarivate
+clearstream,Clearstream,clearstream,,,clearstream.com,,,wikidata,,978,Clearstream
+cleartax,ClearTax,cleartax,,,cleartax.in,,,wikidata,,979,ClearTax
+cleartrip,Cleartrip,cleartrip,,,cleartrip.com,,,wikidata,,980,Cleartrip
+clevertap,CleverTap,clevertap,,,clevertap.com,,,wikidata,,981,CleverTap
+clickteam,Clickteam,clickteam,,,clickteam.com,,,wikidata,,982,Clickteam
+clifford-chance,Clifford Chance,clifford chance,,,cliffordchance.com,,,wikidata,,983,Clifford Chance
+clinique-laboratories-llc,"Clinique Laboratories, LLC",clinique laboratories llc,,,clinique.com,,,wikidata,,984,"Clinique Laboratories, LLC"
+clorox,Clorox,clorox,,,thecloroxcompany.com,,,wikidata,,985,Clorox
+cloudera,Cloudera,cloudera,,,cloudera.com,,,wikidata,,986,Cloudera
+cloudflare,Cloudflare,cloudflare,,,cloudflare.com,,,wikidata,,987,Cloudflare
+clp-group,CLP Group,clp group,,,clpgroup.com,,,wikidata,,988,CLP Group
+cme-group,CME Group,cme group,,,cmegroup.com,,,wikidata,,989,CME Group
+cmoc-group-limited,CMOC Group Limited,cmoc group limited,,,cmoc.com,,,wikidata,,990,CMOC Group Limited
+cnh-industrial,CNH Industrial,cnh industrial,,,cnh.com,,,wikidata,,991,CNH Industrial
+coach,Coach,coach,,,coach.com,,,wikidata,,992,Coach
+coal-india,Coal India,coal india,,,coalindia.in,,,wikidata,,993,Coal India
+coats-plc,Coats PLC,coats plc,,,coats.com,,,wikidata,,994,Coats PLC
+cobra-beer,Cobra Beer,cobra beer,,,cobrabeer.com,,,wikidata,,995,Cobra Beer
+coca-cola-hbc,Coca-Cola HBC,coca cola hbc,,,coca-colahellenic.com,,,wikidata,,996,Coca-Cola HBC
+cochin-shipyard,Cochin Shipyard,cochin shipyard,,,cochinshipyard.com,,,wikidata,,997,Cochin Shipyard
+codecademy,Codecademy,codecademy,,,codecademy.com,,,wikidata,,998,Codecademy
+codegear,CodeGear,codegear,,,codegear.com,,,wikidata,,999,CodeGear
+codelco,Codelco,codelco,,,codelco.com,,,wikidata,,1000,Codelco

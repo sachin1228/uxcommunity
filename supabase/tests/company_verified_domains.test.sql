@@ -28,7 +28,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(104);
+select plan(118);
 
 -- ─── Fixture ────────────────────────────────────────────────
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
@@ -880,13 +880,19 @@ select is(
 -- mailbox — and what it may not: own a domain, answer a domain search, or
 -- stand in for the emailed code.
 
--- Two directory entries exactly as that seed writes them: a company, plus an
--- unproved domain. Nothing here verifies anything.
+-- Two directory entries as that seed writes them: a company, plus an unproved
+-- domain. Nothing here verifies anything.
+--
+-- The two claims differ in one way on purpose. `hintco.test` has the confidence
+-- a bulk directory row has (unknown: nobody has checked it), and
+-- `reserved.test` has medium: a reviewed source saying it is this company's
+-- domain. Only the second kind may keep another company from being created
+-- (supabase/migrations/20260929150000_company_domain_stewardship.sql).
 insert into public.companies (name, slug) values ('Hintco', 'hintco'), ('Reserved Co', 'reserved-co');
-insert into public.company_domains (company_id, domain)
-select id, 'hintco.test' from public.companies where slug = 'hintco';
-insert into public.company_domains (company_id, domain)
-select id, 'reserved.test' from public.companies where slug = 'reserved-co';
+insert into public.company_domains (company_id, domain, evidence_confidence)
+select id, 'hintco.test', 'unknown' from public.companies where slug = 'hintco';
+insert into public.company_domains (company_id, domain, evidence_confidence)
+select id, 'reserved.test', 'medium' from public.companies where slug = 'reserved-co';
 
 select is(
   (select domain from public.search_companies('Hintco')),
@@ -928,8 +934,12 @@ select is(
   'a directory hint is enough to open a work-email challenge'
 );
 
--- Proving the mailbox is still what turns the hint into a claim: the challenge
--- above only exists because a code has to come back.
+-- The code comes back. What it proves is the MAILBOX: this member really does
+-- read asha@hintco.test. It does not prove that the directory's mapping of
+-- hintco.test to Hintco is right — nobody has checked that row — so the answer
+-- is domain control and nothing else. Both halves matter: the member is not
+-- silently mapped to a company on the strength of a guess, and nothing is lost,
+-- because the observation is recorded.
 select is(
   (select status from public.confirm_company_verification(
     'c0c0c0c0-0000-4000-8000-000000000007',
@@ -937,20 +947,72 @@ select is(
       where user_id = 'c0c0c0c0-0000-4000-8000-000000000007' and consumed_at is null),
     'hash-asha'
   )),
-  'verified',
-  'confirming the code promotes the directory hint'
+  'domain_control_only',
+  'a correct code on an unchecked directory hint grants domain control, not the company'
+);
+
+select is(
+  (select verified from public.company_domains where domain = 'hintco.test'),
+  false,
+  'the unchecked hint stays unverified: a mailbox cannot promote a guess to a proof'
 );
 
 select is(
   (select count(*)::int from public.company_domains where domain = 'hintco.test'),
   1,
-  'the hint row is promoted, not duplicated'
+  'the hint row is neither promoted nor duplicated'
+);
+
+select is(
+  (select name from public.get_user_company('c0c0c0c0-0000-4000-8000-000000000007')),
+  null,
+  'the member is not silently mapped to a company on weak evidence'
+);
+
+select is(
+  (select count(*)::int from public.company_members as m
+    join public.companies as c on c.id = m.company_id
+   where c.slug = 'hintco' and m.verified),
+  0,
+  'and no membership was created'
+);
+
+select is(
+  (select count(*)::int from public.domain_evidence
+    where domain = 'hintco.test' and evidence_type = 'work_email_otp'
+      and source = 'member_domain_control'),
+  1,
+  'what the member did prove is kept as an observation, attributed to what it shows'
+);
+
+-- With checked evidence behind the claim — the review the observation above
+-- feeds — the same member's proved mailbox is exactly what promotes it. This is
+-- the intended route from a directory guess to a verified company, and the only
+-- one: a person has to check the mapping, or the company itself has to say it.
+update public.company_domains as d
+set evidence_confidence = 'medium'
+where d.domain = 'hintco.test';
+
+select is(
+  (select status from public.confirm_company_verification(
+    'c0c0c0c0-0000-4000-8000-000000000007',
+    (select verification_id from public.start_company_verification(
+      p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000007',
+      p_domain     => 'hintco.test',
+      p_work_email => 'asha@hintco.test',
+      p_code_hash  => 'hash-asha-2',
+      p_company_id => (select id from public.companies where slug = 'hintco')
+    )),
+    'hash-asha-2'
+  )),
+  'verified',
+  'once a reviewed source backs the claim, the mailbox proof promotes it'
 );
 
 select is(
   (select verified from public.company_domains where domain = 'hintco.test'),
   true,
-  'the promoted domain row is verified by the member''s proof'
+  'and the claim is now the member-proved one'
 );
 
 select is(
@@ -1085,6 +1147,66 @@ select is(
   'joining promotes that company''s own hint to a verified claim'
 );
 
+-- ...but only a claim somebody has actually backed may reserve a domain. A
+-- weak (unknown-confidence) claim is evidence, not a reservation: the 4,574
+-- seeded rows all look like this, and a bad seed must never be able to keep a
+-- real company out of the directory.
+insert into public.company_domains (company_id, domain, evidence_confidence)
+select id, 'weakhint.test', 'unknown' from public.companies where slug = 'hintco';
+
+select is(
+  (select domain from public.search_companies('Hintco')),
+  'hintco.test',
+  'search still reports the strong claim the company is known by'
+);
+
+select is(
+  (select evidence_confidence from public.search_companies('Reserved Co')),
+  'medium',
+  'search reports how strong the claim behind the domain is'
+);
+
+select is(
+  (select company_id from public.start_company_verification(
+    p_user_id      => 'c0c0c0c0-0000-4000-8000-000000000008',
+    p_domain       => 'weakhint.test',
+    p_work_email   => 'vikram@weakhint.test',
+    p_code_hash    => 'hash-weakhint',
+    p_company_name => 'Weakhint Two'
+  )),
+  null::uuid,
+  'a weak claim does not reserve a domain: naming a new company opens a challenge'
+);
+
+select is(
+  (select count(*)::int from public.companies where lower(name) = 'weakhint two'),
+  0,
+  'and nothing is created until the code comes back'
+);
+
+select is(
+  (select status from public.confirm_company_verification(
+    'c0c0c0c0-0000-4000-8000-000000000008',
+    (select id from public.company_email_verifications
+      where user_id = 'c0c0c0c0-0000-4000-8000-000000000008' and consumed_at is null),
+    'hash-weakhint'
+  )),
+  'verified',
+  'the proof creates the company the weak claim could not keep out'
+);
+
+select is(
+  (select count(*)::int from public.company_domains where domain = 'weakhint.test'),
+  2,
+  'both claims survive: the weak one is evidence the proof superseded, not data lost'
+);
+
+select is(
+  (select name from public.company_domain_steward('weakhint.test')),
+  'Weakhint Two',
+  'and the proof, not the seed, decides who stewards the domain'
+);
+
 -- The directory itself has to be there: the picker is only useful if the seed
 -- applied, and what it plants has to be a hint rather than a claim.
 select is(
@@ -1111,18 +1233,19 @@ select ok(
 
 select is(
   (select count(*)::int from public.companies as c
-    where c.created_by is null
+    where c.source = 'wikidata-p856'
       and not exists (select 1 from public.company_domains as d where d.company_id = c.id)),
   0,
-  'every directory entry has a domain a member can prove'
+  'every seeded directory entry carries the domain it is known by'
 );
 
+-- Scoped to the seed's own rows (the provenance the backfill writes), because
+-- other test files add their own fixtures to the same database.
 select is(
   (select count(*)::int from (
      select d.domain
      from public.company_domains as d
-     join public.companies as c on c.id = d.company_id
-     where c.created_by is null
+     where d.source = 'wikidata-p856'
      group by d.domain
      having count(*) > 1
    ) as duplicates),

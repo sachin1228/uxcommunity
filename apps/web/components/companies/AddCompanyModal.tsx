@@ -274,7 +274,11 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
         return;
       }
 
-      if (data.error === "domain_already_verified" || data.error === "domain_not_verified") {
+      if (
+        data.error === "domain_already_verified" ||
+        data.error === "domain_not_verified" ||
+        data.error === "domain_control_only"
+      ) {
         // The domain moved out from under this challenge: send the member back
         // to search with the reason, rather than letting them retry a code that
         // can no longer grant membership.

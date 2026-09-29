@@ -37,6 +37,7 @@ const STATUS_FOR_CONFIRM: Record<Exclude<ConfirmStatus, "verified">, number> = {
   company_inactive: 410,
   domain_not_verified: 409,
   domain_already_verified: 409,
+  domain_control_only: 409,
   not_installed: 503,
   unexpected: 500,
 };
@@ -64,6 +65,12 @@ function statusMessage(
       return "That domain is no longer verified for this company. Start again from search.";
     case "domain_already_verified":
       return "Someone verified that domain first. Search for the company and join it instead.";
+    case "domain_control_only":
+      // The code was right, so the member really does hold this mailbox. What
+      // the directory could not establish is that the domain is that company's:
+      // every seeded row is a guess, and a mailbox does not turn a guess into a
+      // proof. Say exactly that, and say what happens next.
+      return "That code was correct, so the mailbox is yours — but we can't yet confirm that this domain belongs to that company, so no company was added. We've noted the check for review.";
     case "not_installed":
       return "Adding a company isn't available right now. Please try again later.";
     default:

@@ -131,6 +131,7 @@ export type ConfirmStatus =
   | "company_inactive"
   | "domain_not_verified"
   | "domain_already_verified"
+  | "domain_control_only"
   | "not_installed"
   | "unexpected";
 
