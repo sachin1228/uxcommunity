@@ -981,16 +981,22 @@ repository:
 the reason, the timestamp and the confidence before/after recorded, service-role
 only, and unable to write `verified`. Migration 152000, 40 assertions. This is
 what makes the promotion threshold a route rather than a dead end.
-9. **The runtime half of the report**: `scripts/company-directory-metrics.sql` —
+9. **The retirement of the bootstrap directory** (153000): the 4,574 seeded
+   companies are removed, by a guarded, idempotent, dry-runnable transition that
+   keeps — and reports — any seed row a member or an operator has touched.
+   [company-directory-seed-retirement.md](company-directory-seed-retirement.md)
+   is the audit, the strategy, the execution order, the rollback and the
+   validation queries.
+10. **The runtime half of the report**: `scripts/company-directory-metrics.sql` —
    read-only, safe against production, and the only way to answer "how many
    domains are waiting on a person, how many members have actually verified, how
    many attempts failed" (§10).
 
-Deliberately NOT in this PR: the 500k import, any licensed source adapter, typed
-aliases/relationships in the import path (the CSVs carry one alias string and no
-type, so they are imported once the layer files exist), a reviewer role or
-admin UI, bulk or automatic promotion, and anything that changes what `verified`
-means.
+Deliberately NOT in this PR: the 500k import, any licensed source adapter, a
+reviewer role or admin UI, bulk or automatic promotion, and anything that
+changes what `verified` means. The import path loads `company_aliases.csv` and
+`company_relationships.csv` when a directory supplies them; the generator does
+not emit them yet, and the dry run says so rather than pretending otherwise.
 
 ### Unresolved (no decision made here)
 

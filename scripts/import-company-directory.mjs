@@ -9,6 +9,11 @@
  *   flags:  --dry-run        stage and validate, then roll back
  *           --report <file>  write the JSON report here as well as to stdout
  *
+ *   The export is `companies.csv`, `company_domains.csv` and
+ *   `domain_evidence.csv`, plus `company_aliases.csv` and
+ *   `company_relationships.csv` when a directory has them (both optional; the
+ *   report says which were supplied).
+ *
  *   COMPANY_IMPORT_DEBUG=1 additionally writes the generated psql script to
  *   /tmp/company-import-script.sql, which is how the missing semicolon in this
  *   file was found (see docs/company-directory-architecture.md §9).
@@ -33,7 +38,19 @@
  *     domain away from the company that proved it;
  *   * delete anything, or drop a claim for disagreeing with another one;
  *   * invent a company for a domain whose company is missing — that row is
- *     reported as a rejected import, not silently merged.
+ *     reported as a rejected import, not silently merged;
+ *   * hang an alias or a relationship on a company a member created, or delete a
+ *     relationship the export no longer states: the import adds structure, and
+ *     removing it is an operator's decision with an audit trail.
+ *
+ * THE DRY RUN
+ *   `--dry-run` stages the export, validates every row, and rolls back. What it
+ *   reports is the point of it: input rows per file, unique and duplicate
+ *   companies, unique and duplicate domains (a domain two companies claim),
+ *   companies with no domain, claims with no evidence behind them, rejected rows
+ *   by reason, and ambiguous or unresolved identity matches. The same numbers
+ *   are in the report on a real load, so a stage run and a load can be compared
+ *   line by line before anyone commits.
  *
  * DETERMINISTIC IDS
  *   Company ids are UUIDv5 of the slug under a frozen namespace, computed here
@@ -89,8 +106,22 @@ const STAGING = {
   identity_map: "_company_identity_stage",
   domains: "_company_domain_stage",
   evidence: "_company_evidence_stage",
+  aliases: "_company_alias_stage",
+  relationships: "_company_relationship_stage",
   rejected: "_company_directory_rejected"
 };
+
+/** The kinds the tables accept. An export cannot invent a sixth one. */
+const ALIAS_TYPES = ["alias", "former_name", "brand", "abbreviation", "transliteration"];
+const RELATIONSHIP_TYPES = ["parent", "subsidiary", "brand", "division", "acquired_company", "former_name"];
+
+/**
+ * A claim is "evidenced" when its confidence is one a mailbox proof may act on
+ * (`high`/`medium` — see the promotion threshold in the stewardship migration).
+ * Everything else is a lead, and the dry run has to be able to say how many of
+ * the export's claims are in each bucket before a single row is written.
+ */
+const EVIDENCED_CONFIDENCE = new Set(["high", "medium"]);
 
 /* ── CSV reading (the generator writes simple RFC-4180-ish rows) ─────────── */
 
@@ -168,7 +199,11 @@ const DOMAIN_PATTERN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 const DDL = `
 begin;
-drop table if exists ${STAGING.companies}, ${STAGING.domains}, ${STAGING.evidence}, ${STAGING.rejected}, ${STAGING.identity_map};
+-- Every staging table the run creates is dropped first, so a rerun never
+-- collides with what a previous run left behind (the tables are unlogged and
+-- outlive the transaction deliberately: the report reads them after the merge).
+drop table if exists ${STAGING.companies}, ${STAGING.domains}, ${STAGING.evidence},
+  ${STAGING.aliases}, ${STAGING.relationships}, ${STAGING.rejected}, ${STAGING.identity_map};
 
 create unlogged table ${STAGING.companies} (
   id uuid primary key,
@@ -225,6 +260,22 @@ create unlogged table ${STAGING.evidence} (
 
 -- Rejections are a table, not a log line: the run reports the count and the
 -- reasons, and nothing is dropped without a record.
+create unlogged table ${STAGING.aliases} (
+  company_slug text not null,
+  alias text not null,
+  alias_type text not null default 'alias',
+  source text
+);
+
+-- Structure, never ownership: a relationship row says who owns whom and nothing
+-- about whose mail runs where (see the table's comment).
+create unlogged table ${STAGING.relationships} (
+  parent_slug text not null,
+  child_slug text not null,
+  relationship_type text not null,
+  source text
+);
+
 create unlogged table ${STAGING.rejected} (
   source_file text not null,
   row_key text,
@@ -316,6 +367,37 @@ on conflict on constraint company_domains_company_domain_key do update set
   source              = excluded.source
 where not d.verified;
 
+-- ── Aliases ──────────────────────────────────────────────────────────────
+-- Search names, and the one place a merge would be tempting: a FORMER NAME
+-- ("Facebook Inc.") must not collapse the Facebook brand entity into Meta
+-- Platforms, which is why the type travels with the row instead of being
+-- inferred from the string.
+insert into public.company_aliases as a (company_id, alias, alias_type, source)
+select m.company_id, s.alias, s.alias_type, s.source
+from ${STAGING.aliases} as s
+join ${STAGING.identity_map} as m on m.stage_slug = s.company_slug
+-- A company a member created is theirs; the import does not hang names on it.
+join public.companies as c on c.id = m.company_id and c.created_by is null
+on conflict on constraint company_aliases_company_alias_key do update set
+  alias_type = excluded.alias_type,
+  source     = coalesce(excluded.source, a.source);
+
+-- ── Relationships ──────────────────────────────────────────────────────────
+-- Who owns whom. Insert-only: an acquisition that ends is a fact the export no
+-- longer states, and this path is not the place to decide what that means — a
+-- relationship is never deleted by an import, and never inferred from one.
+insert into public.company_relationships as rel (
+  parent_company_id, child_company_id, relationship_type, source
+)
+select p.company_id, k.company_id, s.relationship_type, s.source
+from ${STAGING.relationships} as s
+join ${STAGING.identity_map} as p on p.stage_slug = s.parent_slug
+join ${STAGING.identity_map} as k on k.stage_slug = s.child_slug
+join public.companies as pc on pc.id = p.company_id and pc.created_by is null
+join public.companies as cc on cc.id = k.company_id and cc.created_by is null
+where p.company_id <> k.company_id
+on conflict on constraint company_relationships_unique do nothing;
+
 -- ── Evidence ──────────────────────────────────────────────────────────────
 -- Observations are added, never rewritten into agreement. Re-running the
 -- import refreshes checked/observed_at on the same observation and inserts
@@ -333,7 +415,7 @@ on conflict (company_id, domain, evidence_type, (coalesce(source_url, ''))) do u
 
 /* ── Build the staged files, validating as we go ─────────────────────────── */
 
-export function stageRows({ companies, domains, evidence }) {
+export function stageRows({ companies, domains, evidence, aliases = [], relationships = [] }) {
   const rejected = [];
   const companyRows = [];
   const bySlug = new Map();
@@ -414,7 +496,174 @@ export function stageRows({ companies, domains, evidence }) {
     });
   }
 
-  return { companyRows, domainRows, evidenceRows, rejected };
+  const aliasRows = [];
+  const seenAlias = new Set();
+  for (const row of aliases) {
+    const slug = row.company_id;
+    const alias = (row.alias || "").trim();
+    const aliasType = (row.alias_type || "alias").trim() || "alias";
+    if (!bySlug.has(slug)) {
+      rejected.push(["company_aliases.csv", `${slug}/${alias}`, "unknown_company", ""]);
+      continue;
+    }
+    if (alias === "" || alias.length > 120) {
+      rejected.push(["company_aliases.csv", `${slug}/${alias}`, "invalid_alias", ""]);
+      continue;
+    }
+    if (!ALIAS_TYPES.includes(aliasType)) {
+      rejected.push(["company_aliases.csv", `${slug}/${alias}`, "invalid_alias_type", aliasType]);
+      continue;
+    }
+    const key = `${slug}\u0000${alias.toLowerCase()}`;
+    if (seenAlias.has(key)) {
+      rejected.push(["company_aliases.csv", `${slug}/${alias}`, "duplicate_alias_in_export", ""]);
+      continue;
+    }
+    seenAlias.add(key);
+    aliasRows.push({ company_slug: slug, alias, alias_type: aliasType, source: row.source || "" });
+  }
+
+  const relationshipRows = [];
+  const seenRelationship = new Set();
+  for (const row of relationships) {
+    const parent = row.parent_company_id;
+    const child = row.child_company_id;
+    const type = (row.relationship_type || "").trim();
+    if (!bySlug.has(parent) || !bySlug.has(child)) {
+      // Never invent an entity to hang a relationship on: a dangling edge would
+      // state who owns whom about a company this export never described.
+      rejected.push(["company_relationships.csv", `${parent}->${child}`, "unknown_company", ""]);
+      continue;
+    }
+    if (parent === child) {
+      rejected.push(["company_relationships.csv", `${parent}->${child}`, "self_relationship", ""]);
+      continue;
+    }
+    if (!RELATIONSHIP_TYPES.includes(type)) {
+      rejected.push(["company_relationships.csv", `${parent}->${child}`, "invalid_relationship_type", type]);
+      continue;
+    }
+    const key = `${parent}\u0000${child}\u0000${type}`;
+    if (seenRelationship.has(key)) {
+      rejected.push(["company_relationships.csv", `${parent}->${child}`, "duplicate_relationship_in_export", ""]);
+      continue;
+    }
+    seenRelationship.add(key);
+    relationshipRows.push({
+      parent_slug: parent,
+      child_slug: child,
+      relationship_type: type,
+      source: row.source || ""
+    });
+  }
+
+  return { companyRows, domainRows, evidenceRows, aliasRows, relationshipRows, rejected };
+}
+
+/**
+ * What the dry run has to be able to say about the export before anything is
+ * written: how big it is, what it does not agree with itself about, and how much
+ * of it is evidence rather than a lead. Pure — no database, no writes — so the
+ * same numbers can be produced from a saved export in a test.
+ */
+export function datasetReport({
+  companies = [],
+  domains = [],
+  evidence = [],
+  aliases = [],
+  relationships = [],
+  staged
+}) {
+  const bySlug = new Map();
+  let duplicateCompanies = 0;
+  for (const row of companies) {
+    const slug = row.company_id;
+    if (!slug) continue;
+    if (bySlug.has(slug)) {
+      duplicateCompanies += 1;
+      continue;
+    }
+    bySlug.set(slug, row);
+  }
+
+  const domainsPerCompany = new Map();
+  const companiesPerDomain = new Map();
+  let duplicateDomainRows = 0;
+  const seenDomainPairs = new Set();
+  for (const row of domains) {
+    const slug = row.company_id;
+    const domain = (row.domain || "").toLowerCase();
+    if (!slug || !domain) continue;
+    const pair = `${slug}\u0000${domain}`;
+    if (seenDomainPairs.has(pair)) {
+      duplicateDomainRows += 1;
+      continue;
+    }
+    seenDomainPairs.add(pair);
+    domainsPerCompany.set(slug, (domainsPerCompany.get(slug) ?? 0) + 1);
+    if (!companiesPerDomain.has(domain)) companiesPerDomain.set(domain, new Set());
+    companiesPerDomain.get(domain).add(slug);
+  }
+
+  const evidencedDomains = new Set();
+  for (const row of evidence) {
+    if (row.company_id && row.domain) evidencedDomains.add(`${row.company_id}\u0000${row.domain.toLowerCase()}`);
+  }
+
+  // A claim is under-evidenced when it is below the promotion threshold and no
+  // observation was supplied for it. That is not an error — a website-only claim
+  // is a legitimate lead — but it must be counted, because it is the number that
+  // decides whether a proof at that domain can do anything at all. Counted per
+  // (company, domain) claim, so a repeated row is a duplicate, not a second claim.
+  const underEvidencedClaims = new Set();
+  for (const row of domains) {
+    const slug = row.company_id;
+    const domain = (row.domain || "").toLowerCase();
+    if (!slug || !domain) continue;
+    const pair = `${slug}\u0000${domain}`;
+    if (!EVIDENCED_CONFIDENCE.has(row.evidence_confidence || "unknown") && !evidencedDomains.has(pair)) {
+      underEvidencedClaims.add(pair);
+    }
+  }
+
+  let companiesWithoutDomains = 0;
+  for (const slug of bySlug.keys()) {
+    if (!domainsPerCompany.has(slug)) companiesWithoutDomains += 1;
+  }
+
+  const byReason = {};
+  for (const [, , reason] of staged?.rejected ?? []) {
+    byReason[reason] = (byReason[reason] ?? 0) + 1;
+  }
+
+  const domainOwners = [...companiesPerDomain.values()].filter((owners) => owners.size > 1);
+
+  return {
+    input_rows: {
+      companies: companies.length,
+      domains: domains.length,
+      evidence: evidence.length,
+      aliases: aliases.length,
+      relationships: relationships.length,
+      total: companies.length + domains.length + evidence.length + aliases.length + relationships.length
+    },
+    unique_companies: bySlug.size,
+    duplicate_companies: duplicateCompanies,
+    unique_domains: companiesPerDomain.size,
+    duplicate_domains: domainOwners.length,
+    duplicate_domain_rows: duplicateDomainRows,
+    companies_without_domains: companiesWithoutDomains,
+    domains_without_sufficient_evidence: underEvidencedClaims.size,
+    rejected_rows: (staged?.rejected ?? []).length,
+    rejected_by_reason: byReason,
+    staged_rows: {
+      companies: staged?.companyRows.length ?? 0,
+      domains: staged?.domainRows.length ?? 0,
+      evidence: staged?.evidenceRows.length ?? 0,
+      aliases: staged?.aliasRows.length ?? 0,
+      relationships: staged?.relationshipRows.length ?? 0
+    }
+  };
 }
 
 function copyList(rows, columns) {
@@ -446,7 +695,9 @@ function main() {
   const files = {
     companies: join(INPUT_DIR, "companies.csv"),
     domains: join(INPUT_DIR, "company_domains.csv"),
-    evidence: join(INPUT_DIR, "domain_evidence.csv")
+    evidence: join(INPUT_DIR, "domain_evidence.csv"),
+    aliases: join(INPUT_DIR, "company_aliases.csv"),
+    relationships: join(INPUT_DIR, "company_relationships.csv")
   };
 
   const read = (path) => {
@@ -461,11 +712,42 @@ function main() {
     }
   };
 
+  /**
+   * Aliases and relationships are optional feeds: the generator does not emit
+   * them yet, and a stage run must not fail because a directory has no
+   * corporate tree to state. Their absence is REPORTED rather than assumed.
+   */
+  const readOptional = (path) => {
+    try {
+      return { supplied: true, rows: parseCsv(readFileSync(path, "utf8")) };
+    } catch (error) {
+      if (error.code === "ENOENT") return { supplied: false, rows: [] };
+      throw error;
+    }
+  };
+
   const started = Date.now();
+  const companyRowsIn = read(files.companies);
+  const domainRowsIn = read(files.domains);
+  const evidenceRowsIn = read(files.evidence);
+  const aliasFeed = readOptional(files.aliases);
+  const relationshipFeed = readOptional(files.relationships);
+
   const staged = stageRows({
-    companies: read(files.companies),
-    domains: read(files.domains),
-    evidence: read(files.evidence)
+    companies: companyRowsIn,
+    domains: domainRowsIn,
+    evidence: evidenceRowsIn,
+    aliases: aliasFeed.rows,
+    relationships: relationshipFeed.rows
+  });
+
+  const dataset = datasetReport({
+    companies: companyRowsIn,
+    domains: domainRowsIn,
+    evidence: evidenceRowsIn,
+    aliases: aliasFeed.rows,
+    relationships: relationshipFeed.rows,
+    staged
   });
 
   const stagedDir = STAGED_DIR;
@@ -488,6 +770,18 @@ function main() {
       "company_slug", "domain", "evidence_type", "source_url", "source", "checked", "observed_at"
     ])
   );
+  if (staged.aliasRows.length > 0) {
+    writeFileSync(
+      join(stagedDir, "aliases.csv"),
+      copyList(staged.aliasRows, ["company_slug", "alias", "alias_type", "source"])
+    );
+  }
+  if (staged.relationshipRows.length > 0) {
+    writeFileSync(
+      join(stagedDir, "relationships.csv"),
+      copyList(staged.relationshipRows, ["parent_slug", "child_slug", "relationship_type", "source"])
+    );
+  }
   if (staged.rejected.length > 0) {
     writeFileSync(
       join(stagedDir, "rejected.csv"),
@@ -521,6 +815,12 @@ function main() {
     copy(STAGING.evidence, "evidence.csv", [
       "company_slug", "domain", "evidence_type", "source_url", "source", "checked", "observed_at"
     ]),
+    staged.aliasRows.length > 0
+      ? copy(STAGING.aliases, "aliases.csv", ["company_slug", "alias", "alias_type", "source"])
+      : "",
+    staged.relationshipRows.length > 0
+      ? copy(STAGING.relationships, "relationships.csv", ["parent_slug", "child_slug", "relationship_type", "source"])
+      : "",
     staged.rejected.length > 0
       ? copy(STAGING.rejected, "rejected.csv", ["source_file", "row_key", "reason", "detail"])
       : "",
@@ -531,6 +831,8 @@ function main() {
        'claims_after', (select count(*) from public.company_domains),
        'verified_after', (select count(*) from public.company_domains where verified),
        'evidence_after', (select count(*) from public.domain_evidence),
+       'aliases_after', (select count(*) from public.company_aliases),
+       'relationships_after', (select count(*) from public.company_relationships),
        'companies_matched_by_registry_identity', (
          select count(*) from ${STAGING.identity_map} where matched_by = 'registry_identity'),
        'companies_that_changed_slug', (
@@ -556,6 +858,13 @@ function main() {
          join ${STAGING.identity_map} as m on m.stage_slug = s.company_slug
          join public.company_domains as d on d.company_id = m.company_id and d.domain = s.domain
          where d.verified),
+       'skipped_member_relationships', (
+         select count(*) from ${STAGING.relationships} as s
+         join ${STAGING.identity_map} as p on p.stage_slug = s.parent_slug
+         join ${STAGING.identity_map} as k on k.stage_slug = s.child_slug
+         join public.companies as pc on pc.id = p.company_id
+         join public.companies as cc on cc.id = k.company_id
+         where pc.created_by is not null or cc.created_by is not null),
        'rejected', (select count(*) from ${STAGING.rejected}));`,
     flags.has("--dry-run") ? "rollback;" : "commit;"
   ]
@@ -573,7 +882,17 @@ function main() {
       companies: staged.companyRows.length,
       domains: staged.domainRows.length,
       evidence: staged.evidenceRows.length,
+      aliases: staged.aliasRows.length,
+      relationships: staged.relationshipRows.length,
       rejected: staged.rejected.length
+    },
+    // What the export says about itself, before any row is written. The dry run
+    // is where these numbers are meant to be read: an import that only reports
+    // after committing cannot be reviewed.
+    dataset,
+    feeds: {
+      aliases: aliasFeed.supplied ? "supplied" : "not supplied",
+      relationships: relationshipFeed.supplied ? "supplied" : "not supplied"
     },
     before: JSON.parse(before),
     after: measured,

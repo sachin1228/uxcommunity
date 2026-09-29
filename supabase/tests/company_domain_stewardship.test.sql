@@ -325,8 +325,9 @@ select is(
   'a domain nobody claims resolves to no steward'
 );
 
--- The seed's own row for meta.com, plus the curated claim: the stronger claim
--- wins and the domain is not contested, because they do not tie.
+-- The curated claim on meta.com, and nothing else since the v1 directory seed
+-- was retired (20260929153000): the steward is that claim, and one claim alone
+-- can never be a contest.
 select is(
   (select name from public.company_domain_steward('meta.com')),
   'Meta Platforms',
@@ -345,10 +346,14 @@ select is(
   'an unproved domain with one best claim resolves as a claim, not a proof'
 );
 
+-- Several claims on one domain are still the norm and still covered — by
+-- conflict.test below, by the superseded-claim assertions, and by the rival a
+-- reassignment keeps. What changed is only that a database this fresh no longer
+-- inherits a second meta.com claim from a retired seed.
 select is(
   (select claim_count from public.company_domain_steward('meta.com')),
-  2,
-  'both claims on meta.com are visible to the resolver'
+  1,
+  'the resolver sees the one claim this database holds for meta.com'
 );
 
 select is(
@@ -432,10 +437,14 @@ select is(
   'A. a proof resolves the steward'
 );
 
+-- A proof of the only claim on a domain supersedes nothing: it verifies the row
+-- it was given. That a rival claim is KEPT and marked superseded rather than
+-- deleted is asserted where a rival exists (conflict.test, weakclaim.test,
+-- contested-weak.test, and the reassignment in case I).
 select is(
-  (select count(*)::int from public.company_domain_claims('meta.com') where superseded),
+  (select count(*)::int from public.company_domain_claims('meta.com')),
   1,
-  'A. the weaker claim is superseded by the proof and KEPT, not deleted'
+  'A. the proof finished the claim it was given instead of adding or removing one'
 );
 
 select is(

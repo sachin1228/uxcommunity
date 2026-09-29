@@ -28,7 +28,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(118);
+select plan(116);
 
 -- ─── Fixture ────────────────────────────────────────────────
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
@@ -1207,60 +1207,54 @@ select is(
   'and the proof, not the seed, decides who stewards the domain'
 );
 
--- The directory itself has to be there: the picker is only useful if the seed
--- applied, and what it plants has to be a hint rather than a claim.
-select is(
-  (select count(*)::int from public.companies where slug = 'flipkart'),
-  1,
-  'the default company directory is loaded'
-);
-
-select is(
-  (select d.verified from public.company_domains as d
-    join public.companies as c on c.id = d.company_id
-   where c.slug = 'flipkart' and d.domain = 'flipkart.com'),
-  false,
-  'a seeded domain starts as an unproved hint'
-);
-
--- The invariants the generator has to keep. Each one, if it broke, would put a
--- dead end in the picker: a listed company nobody can join, a domain two
--- companies both claim, or a consumer mailbox offered as an employer.
-select ok(
-  (select count(*) from public.companies where created_by is null) >= 1000,
-  'the directory is a real list, not a stub'
-);
-
+-- The bootstrap directory is RETIRED (20260929153000). The picker is served by
+-- the imported directory now, so what has to hold is that no trace of the seed
+-- survives as live directory data — and that the record of what it contained is
+-- intact for anything that still asks "was this one of the bootstrap rows?".
 select is(
   (select count(*)::int from public.companies as c
-    where c.source = 'wikidata-p856'
-      and not exists (select 1 from public.company_domains as d where d.company_id = c.id)),
+    join public.company_directory_seed_retired as r on r.slug = c.slug
+   where c.created_by is null),
   0,
-  'every seeded directory entry carries the domain it is known by'
+  'no seeded company survives as a live directory row'
 );
 
--- Scoped to the seed's own rows (the provenance the backfill writes), because
--- other test files add their own fixtures to the same database.
+-- Scoped through the retirement's own identification rather than a bare count
+-- of `source = 'wikidata-p856'`: other test files add fixtures with the same
+-- provenance to this shared database, and a global count would be measuring
+-- them. What must hold is that the retirement has nothing left to do.
+select is(
+  (select row(d.companies_removed, d.companies_retained)
+     from public.retire_company_directory_seed(true) as d),
+  row(0::bigint, 0::bigint),
+  'the retirement has nothing left to remove or to keep: the seed is fully retired'
+);
+
+select is(
+  (select count(*)::int from public.company_directory_seed_retired),
+  4574,
+  'the record of the retired seed is complete: 4,574 companies'
+);
+
+-- The invariants the bootstrap list had to keep, now asserted against the
+-- record rather than the live table. Each one, if it broke, would have put a
+-- dead end in the picker: a domain two entries both offered, or a consumer
+-- mailbox offered as an employer.
 select is(
   (select count(*)::int from (
-     select d.domain
-     from public.company_domains as d
-     where d.source = 'wikidata-p856'
-     group by d.domain
-     having count(*) > 1
+     select domain from public.company_directory_seed_retired
+     group by domain having count(*) > 1
    ) as duplicates),
   0,
-  'no domain is offered by two directory entries'
+  'no domain was offered by two directory entries'
 );
 
 select is(
-  (select count(*)::int from public.company_domains as d
-    join public.companies as c on c.id = d.company_id
-   where c.created_by is null
-     and d.domain in ('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
-                      'icloud.com', 'proton.me', 'mail.ru', 'qq.com')),
+  (select count(*)::int from public.company_directory_seed_retired
+    where domain in ('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
+                     'icloud.com', 'proton.me', 'mail.ru', 'qq.com')),
   0,
-  'no consumer mailbox domain is offered as a company domain'
+  'no consumer mailbox domain was offered as a company domain'
 );
 
 select * from finish();

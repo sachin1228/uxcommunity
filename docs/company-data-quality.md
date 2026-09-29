@@ -210,6 +210,7 @@ the Meta family.
 | Measured yield at 10k/50k/100k | no coverage claim is available above 1k | staged plan, architecture doc §10 |
 | Streaming generator output | 500k rows cost ~530 MB of node heap | storage strategy, architecture doc §9 |
 | **Done, no longer a gap** — deterministic company ids | re-imports update in place (UUIDv5 of the slug) | shipped, architecture doc §9 |
+| **Done, by design** — the bootstrap seed is retired | 4,574 unproven rows are not a directory; what survives is what a person or an operator touched | [seed retirement](company-directory-seed-retirement.md) |
 
 ---
 
