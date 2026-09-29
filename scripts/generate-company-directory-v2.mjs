@@ -3,17 +3,18 @@
  * query, and keeps WEBSITE domains apart from EMPLOYEE EMAIL domains.
  *
  * WHY A SECOND GENERATOR EXISTS
- *   scripts/generate-company-directory.mjs asks Wikidata for one official
- *   website (P856) per organisation and stores that website's registrable
- *   domain as "the domain this company's work emails use". Wikidata P856 means
- *   "official website". It does not mean "employee email domain", and the two
- *   come apart exactly where the directory matters most: a holding company, a
- *   subsidiary, a brand, a conglomerate, a bank and a university can all have
- *   several domains that real employees receive mail on, and the website is
- *   often not one of them (Alphabet's site is abc.xyz; nobody has mail there).
- *   The v1 generator also drops every organisation whose only domain is a bare
- *   country TLD (`example.de`, `example.in`, `example.io`), because its
- *   "truncated URL" heuristic cannot tell those from a mistake.
+ *   The v1 generator (removed from the repository together with the seed
+ *   migration it wrote) asked Wikidata for one official website (P856) per
+ *   organisation and stored that website's registrable domain as "the domain
+ *   this company's work emails use". Wikidata P856 means "official website".
+ *   It does not mean "employee email domain", and the two come apart exactly
+ *   where the directory matters most: a holding company, a subsidiary, a brand,
+ *   a conglomerate, a bank and a university can all have several domains that
+ *   real employees receive mail on, and the website is often not one of them
+ *   (Alphabet's site is abc.xyz; nobody has mail there). The v1 generator also
+ *   dropped every organisation whose only domain is a bare country TLD
+ *   (`example.de`, `example.in`, `example.io`), because its "truncated URL"
+ *   heuristic cannot tell those from a mistake.
  *
  *   This script keeps the trust model untouched. It changes what a directory
  *   ROW means: a company, a domain, the type of that domain, and the evidence
@@ -41,9 +42,6 @@
  *      output is an artifact to review, not a seed to apply.
  *
  * HOW TO RUN
- *   node scripts/generate-company-directory-v2.mjs --export-seed
- *       # refresh data/company-directory/seeds/wikidata-p856.json from the
- *       # committed v1 migration (names + website domains)
  *   node scripts/generate-company-directory-v2.mjs --sample 1000
  *       # build the 1,000-company prototype into data/company-directory/out
  *   node scripts/generate-company-directory-v2.mjs --check
@@ -53,6 +51,14 @@
  *
  * The output is deterministic: the same inputs produce byte-identical files,
  * which is what makes a reviewable diff possible at any directory size.
+ *
+ * THE SEED LAYER IS DATA, NOT A MIGRATION
+ *   data/company-directory/seeds/wikidata-p856.json holds the v1 seed's 4,574
+ *   (name, website domain) pairs. It was exported from the v1 seed migration
+ *   before that migration was removed, and it is now the layer's only copy: the
+ *   same file generates the directory and names the rows the directory reset
+ *   removes (scripts/generate-company-directory-reset.mjs). There is no
+ *   `--export-seed` any more, because there is no migration left to export from.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
@@ -66,7 +72,6 @@ const SEED_DIR = join(DATA_DIR, "seeds");
 // (it is where build output goes), and this directory is a reviewable artifact.
 const OUT_DIR = join(DATA_DIR, "prototype");
 const DOMAINS_SOURCE = join(ROOT, "apps/web/lib/companies/domains.ts");
-const V1_MIGRATION = join(ROOT, "supabase/migrations/20260929140000_company_directory.sql");
 
 /**
  * Domain types a company-domain row can carry. Exactly one of these is an
@@ -1568,47 +1573,6 @@ export function proposedSql(companies, owners) {
 }
 
 /* ---------------------------------------------------------------------------
- * Seed export from the v1 migration
- * ------------------------------------------------------------------------ */
-
-/**
- * Reads the committed v1 seed into the v2 layer shape. The migration writes
- * name + website domain pairs grouped under region headings, and it is the only
- * place that data exists, so the export parses it rather than re-querying
- * Wikidata (which would not reproduce the committed rows - the v1 generator
- * changed since, and 53 of its rows no longer pass its own gates).
- */
-export function parseSeedMigration(sql) {
-  const body = sql.slice(sql.indexOf("do $directory_seed$"));
-  const entities = [];
-  let region = null;
-  for (const line of body.split("\n")) {
-    const heading = line.match(/^-- ─── (.+?) \(\d+\) ──/);
-    if (heading) {
-      region = heading[1] === "No country recorded" ? null : heading[1];
-      continue;
-    }
-    const row = line.match(/^  \('((?:[^']|'')*)', '([^']+)'\)(,|;)?$/);
-    if (!row) continue;
-    const name = row[1].replace(/''/g, "'");
-    entities.push({
-      id: slugify(name),
-      name,
-      aliases: [],
-      country: null,
-      industry: null,
-      status: "unknown",
-      website_domain: row[2],
-      source: "wikidata",
-      source_url: "https://www.wikidata.org/wiki/Property:P856",
-      region,
-      domains: [{ domain: row[2], domain_type: "primary_website", evidence: [], evidence_checked: false }]
-    });
-  }
-  return entities;
-}
-
-/* ---------------------------------------------------------------------------
  * Main
  * ------------------------------------------------------------------------ */
 
@@ -1712,33 +1676,6 @@ function main() {
     const licensing = existsSync(join(DATA_DIR, "licensing.json")) ? readJson(join(DATA_DIR, "licensing.json")) : { sources: {} };
     writeFileSync(join(ROOT, "docs/company-data-sources.md"), sourcesMarkdown(registry, licensing));
     console.log("Wrote docs/company-data-sources.md from the source registry");
-    return;
-  }
-
-  if (args.has("--export-seed")) {
-    const entities = parseSeedMigration(readFileSync(V1_MIGRATION, "utf8"));
-    mkdirSync(SEED_DIR, { recursive: true });
-    // One entity per line rather than one field per line: the file is 4,574
-    // records today and will be hundreds of thousands later, and a per-record
-    // line keeps a regeneration diff readable and small.
-    const header = {
-      source: "wikidata",
-      layer: "A discovery + B website domain",
-      note: "Exported from the committed v1 seed migration by --export-seed. P856 is the official WEBSITE: every domain here is a primary_website hint with no email evidence, which is what the v2 pipeline is built to keep distinct from an employee email domain.",
-      generated_from: "supabase/migrations/20260929140000_company_directory.sql",
-      entity_count: entities.length
-    };
-    const body = [
-      "{",
-      ...Object.entries(header).map(([key, value]) => `  ${JSON.stringify(key)}: ${JSON.stringify(value)},`),
-      "  \"entities\": [",
-      entities.map((entity) => "    " + JSON.stringify(entity)).join(",\n"),
-      "  ]",
-      "}",
-      ""
-    ].join("\n");
-    writeFileSync(join(SEED_DIR, "wikidata-p856.json"), body);
-    console.log(`Exported ${entities.length} entities to data/company-directory/seeds/wikidata-p856.json`);
     return;
   }
 

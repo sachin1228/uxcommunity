@@ -5,9 +5,11 @@
  *     node scripts/bench-company-directory-import.mjs --n 500000
  *
  * WHY THIS EXISTS
- *   The directory is designed to be committed as layer files and generated into
- *   a migration, which is exactly right at 4,574 rows (today's file is ~170 KB).
- *   It stops being obviously right somewhere between there and 500,000, and the
+ *   The directory is built from committed layer files. Committing it as a
+ *   generated migration was exactly right at the v1 seed's 4,574 rows (~170 KB),
+ *   and that migration has since been removed from the repository precisely
+ *   because the shape does not hold as the data grows; it stops being obviously
+ *   right somewhere between 4,574 and 500,000, and the
  *   brief's instruction is not to guess: the three candidate shapes are built,
  *   loaded and timed against a real PostgreSQL instance, and the numbers decide.
  *

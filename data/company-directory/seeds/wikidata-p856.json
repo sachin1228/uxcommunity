@@ -1,8 +1,8 @@
 {
   "source": "wikidata",
   "layer": "A discovery + B website domain",
-  "note": "Exported from the committed v1 seed migration by --export-seed. P856 is the official WEBSITE: every domain here is a primary_website hint with no email evidence, which is what the v2 pipeline is built to keep distinct from an employee email domain.",
-  "generated_from": "supabase/migrations/20260929140000_company_directory.sql",
+  "note": "Exported from the v1 seed migration by --export-seed, before that migration was removed from the repository; this file is now the seed layer's only copy, and it is what names the rows the directory reset removes. P856 is the official WEBSITE: every domain here is a primary_website hint with no email evidence, which is what the v2 pipeline is built to keep distinct from an employee email domain.",
+  "generated_from": "supabase/migrations/20260929140000_company_directory.sql (removed from the repository; see docs/company-directory-reset.md)",
   "entity_count": 4574,
   "entities": [
     {"id":"99acres","name":"99acres","aliases":[],"country":null,"industry":null,"status":"unknown","website_domain":"99acres.com","source":"wikidata","source_url":"https://www.wikidata.org/wiki/Property:P856","region":"India","domains":[{"domain":"99acres.com","domain_type":"primary_website","evidence":[],"evidence_checked":false}]},

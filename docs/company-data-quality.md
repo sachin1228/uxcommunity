@@ -96,10 +96,12 @@ instead of guessing.
 Measured on the current inputs: 4,594 rows in, 18 merges, 4,576 companies out,
 0 duplicate normalised names left, 0 conflicts.
 
-## 4b. What a backfill may never do
+## 4b. What an attribution pass may never do
 
-The 4,574 seeded rows are attributed by a generated migration (151000), and it is
-written to be safe to re-run forever:
+The migration that attributed the v1 seed's claims (151000) was removed from the
+repository with the seed itself, but the statement it ran is reproduced in the
+stewardship suite because the rules it had to obey outlive it — any future
+attribution or provenance pass must be safe to re-run forever:
 
 - **no `delete`, no `drop`, no `truncate`** anywhere in the file (asserted, so a
   future statement cannot slip one in);
@@ -210,7 +212,7 @@ the Meta family.
 | Measured yield at 10k/50k/100k | no coverage claim is available above 1k | staged plan, architecture doc §10 |
 | Streaming generator output | 500k rows cost ~530 MB of node heap | storage strategy, architecture doc §9 |
 | **Done, no longer a gap** — deterministic company ids | re-imports update in place (UUIDv5 of the slug) | shipped, architecture doc §9 |
-| **Done, by design** — the bootstrap seed is retired | 4,574 unproven rows are not a directory; what survives is what a person or an operator touched | [seed retirement](company-directory-seed-retirement.md) |
+| **Done, by design** — the bootstrap seed is gone | 4,574 unproven rows are not a directory; a database built from this repository never has them, and a database that already applied the seed is reset by one explicit operation, which keeps (and reports) whatever a person or an operator touched | [the reset](company-directory-reset.md) |
 
 ---
 

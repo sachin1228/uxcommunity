@@ -874,11 +874,13 @@ select is(
 
 -- ─── 11. The default directory: a hint is a name to prove ───
 
--- 20260929140000_company_directory.sql seeds companies with the domain each is
--- known by, as UNVERIFIED rows: hints. These assertions pin what a hint may
--- do — be found, be joined, and be promoted by the first member who proves the
--- mailbox — and what it may not: own a domain, answer a domain search, or
--- stand in for the emailed code.
+-- The v1 seed (20260929140000, removed from the repository) wrote companies
+-- with the domain each is known by, as UNVERIFIED rows: hints. Bulk directory
+-- data still arrives that way — through the seed layer now, and through the
+-- import later — so these assertions pin what a hint may do: be found, be
+-- joined, and be promoted by the first member who proves the mailbox. And what
+-- it may not: own a domain, answer a domain search, or stand in for the emailed
+-- code.
 
 -- Two directory entries as that seed writes them: a company, plus an unproved
 -- domain. Nothing here verifies anything.
@@ -1148,8 +1150,8 @@ select is(
 );
 
 -- ...but only a claim somebody has actually backed may reserve a domain. A
--- weak (unknown-confidence) claim is evidence, not a reservation: the 4,574
--- seeded rows all look like this, and a bad seed must never be able to keep a
+-- weak (unknown-confidence) claim is evidence, not a reservation: the v1 seed's
+-- 4,574 rows all looked like this, and a bad seed must never be able to keep a
 -- real company out of the directory.
 insert into public.company_domains (company_id, domain, evidence_confidence)
 select id, 'weakhint.test', 'unknown' from public.companies where slug = 'hintco';
@@ -1207,10 +1209,12 @@ select is(
   'and the proof, not the seed, decides who stewards the domain'
 );
 
--- The bootstrap directory is RETIRED (20260929153000). The picker is served by
--- the imported directory now, so what has to hold is that no trace of the seed
--- survives as live directory data — and that the record of what it contained is
--- intact for anything that still asks "was this one of the bootstrap rows?".
+-- The bootstrap directory is GONE. The seed migration was removed from the
+-- repository, so a database built from it never has those rows at all, and
+-- supabase/reset/company_directory_seed_reset.sql removes them from a database
+-- that already applied the seed. What has to hold is that the record of what the
+-- seed contained is intact for anything that still asks "was this one of the
+-- bootstrap rows?", and that a run of the reset has nothing left to do.
 select is(
   (select count(*)::int from public.companies as c
     join public.company_directory_seed_retired as r on r.slug = c.slug

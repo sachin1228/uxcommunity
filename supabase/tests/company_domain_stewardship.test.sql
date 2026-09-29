@@ -1,8 +1,11 @@
 -- ============================================================
 -- Company domain stewardship — claims, stewards, delegations
 --
--- Migrations under test: 20260929150000_company_domain_stewardship.sql and
--- 20260929151000_company_directory_backfill.sql
+-- Migration under test: 20260929150000_company_domain_stewardship.sql.
+--
+-- The v1 seed and the migration that attributed its domains (20260929151000)
+-- were removed from the repository, so the shape they produced is reproduced
+-- inline in section 8 instead of being read from a file that no longer exists.
 --
 -- The model this file pins down:
 --
@@ -23,9 +26,9 @@
 --     domain, and accepted through another company's domain only via a
 --     REVIEWED delegation with checked, non-supporting evidence;
 --   * MX records and redirects establish nothing;
---   * a weak (low/unknown) claim — the shape the whole 4,574-row directory seed
---     has — never blocks a real company from being created and never reserves a
---     domain, while a medium-or-better one does;
+--   * a weak (low/unknown) claim — the shape the v1 seed's 4,574 rows had — never
+--     blocks a real company from being created and never reserves a domain,
+--     while a medium-or-better one does;
 --   * nothing in the import path can mark a domain verified, and no import can
 --     downgrade a domain a member has proved.
 --
@@ -101,8 +104,8 @@ insert into public.companies (id, name, slug) values
 -- evidence rows below); nothing here is 'high', which is reserved for a
 -- company's own published mail-domain statement.
 --
--- The weak rows are the shape of the whole 4,574-row directory seed: a website
--- guess. They are what the OTP must not be able to promote (section 5).
+-- The weak rows are the shape the v1 seed's 4,574 rows had: a website guess.
+-- They are what the OTP must not be able to promote (section 5).
 insert into public.company_domains (company_id, domain, domain_type, evidence_confidence, source) values
   ('c1c1c1c1-0000-4000-8000-000000000001', 'meta.com',            'corporate_email', 'medium',  'curated'),
   ('c1c1c1c1-0000-4000-8000-000000000002', 'facebook.com',        'brand',           'medium',  'curated'),
@@ -325,9 +328,8 @@ select is(
   'a domain nobody claims resolves to no steward'
 );
 
--- The curated claim on meta.com, and nothing else since the v1 directory seed
--- was retired (20260929153000): the steward is that claim, and one claim alone
--- can never be a contest.
+-- The curated claim on meta.com, and nothing else since the v1 seed's rows were
+-- reset: the steward is that claim, and one claim alone can never be a contest.
 select is(
   (select name from public.company_domain_steward('meta.com')),
   'Meta Platforms',
@@ -513,8 +515,8 @@ select is(
   'H. the refusal created no company'
 );
 
--- H. a WEAK claim does not block: the whole 4,574-row directory seed is this
--- shape, and a bad seed must never reserve a domain a real company can prove.
+-- H. a WEAK claim does not block: the v1 seed's 4,574 rows were this shape,
+-- and a bad seed must never reserve a domain a real company can prove.
 select is(
   (select company_id from public.start_company_verification(
     p_user_id      => 'e0e0e0e0-0000-4000-8000-000000000004',
@@ -1460,10 +1462,12 @@ select is(
 
 -- ─── 8. The backfill: attributes, never verifies, never downgrades ──────────
 
--- The same statement shape as 20260929151000 with a two-domain list, so the
--- guards under test are the ones the migration uses. `backfill-weak.test` is an
--- unverified null-source claim; `moveme.test` has just been re-proved by its
--- new owner, so it is verified and must be left exactly as it is.
+-- The same statement shape the v1 seed's attribution migration used, with a
+-- two-domain list. That migration is gone (it existed only to attribute the v1
+-- seed), but the shape is kept because any future attribution pass must obey the
+-- same guards. `backfill-weak.test` is an unverified null-source claim;
+-- `moveme.test` has just been re-proved by its new owner, so it is verified and
+-- must be left exactly as it is.
 insert into public.company_domains (company_id, domain, evidence_confidence)
 values ('c1c1c1c1-0000-4000-8000-000000000011', 'backfill-weak.test', 'unknown');
 

@@ -27,8 +27,11 @@
  *
  *     source files → generator → CSV → unlogged staging → set-based merge
  *
- *   The migration history keeps the 4,574-row seed it already has; bulk data
- *   goes through here.
+ *   The migration history carries no seed at all any more — the v1 seed's
+ *   migrations were removed from the repository, so a database built from it
+ *   starts empty — and bulk data goes through here rather than through a
+ *   migration. A database that already applied the old seed has it removed by
+ *   the reset operation first (docs/company-directory-reset.md).
  *
  * WHAT IT WILL NOT DO
  *   * write `verified = true` — a row that claims it is REFUSED, because only a

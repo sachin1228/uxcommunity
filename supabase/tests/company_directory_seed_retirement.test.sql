@@ -1,13 +1,15 @@
 -- ============================================================
--- Retiring the seeded company directory
+-- Resetting the seeded company directory
 --
--- Migration under test: 20260929153000_company_directory_seed_retirement.sql.
+-- Operation under test: supabase/reset/company_directory_seed_reset.sql, applied
+-- by supabase/tests/run-local.sh the way an operator applies it. It is NOT a
+-- migration, and applying it deletes nothing.
 --
--- By the time this file runs, the migration has already retired the real seed,
--- so the test rebuilds a small version of the situation it was written for:
--- seeded companies with the seed's own slugs and domains, one of each way a
--- person or an operator can touch a row, and one company that is not part of the
--- seed at all.
+-- THIS DATABASE HAS NO SEED. The v1 seed migration was removed from the
+-- repository, so `companies` is empty here and the test builds its own small
+-- version of the situation the reset was written for: seeded companies with the
+-- seed's own slugs and domains, one of each way a person or an operator can
+-- touch a row, and one company that is not part of the seed at all.
 --
 -- What these assertions are really guarding:
 --
@@ -16,21 +18,28 @@
 --   * application data is not directory data: a membership, a verification
 --     record, a profile pointer, an operator decision, a delegation or an
 --     observation keeps the company, and the retained view says why;
+--   * a claim with NO provenance is the seed's own claim (the migration that
+--     attributed them never ran everywhere, production included), while a SECOND
+--     claim on the company is another layer's assertion and keeps it;
+--   * directory STRUCTURE (an alias, a relationship) travels with a removable
+--     row instead of keeping it, and the plan reports it before the removal;
+--   * while one retained row exists the removal REFUSES to run, and deletes
+--     nothing: the operator acknowledges it with `p_allow_retained`;
 --   * a member's company is never a seed row, even when the name matches;
 --   * nothing outside the seed list is touched, and no claim is left orphaned;
 --   * re-running deletes nothing, and the dry run deletes nothing while still
 --     reporting what it would do;
---   * the transition is service-role only.
+--   * the operation is service-role only.
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(42);
+select plan(52);
 
 -- ─── Fixture ────────────────────────────────────────────────
 
 delete from public.companies
  where slug in ('google', 'microsoft', 'apple', 'netflix', 'spotify', 'stripe',
-                'shopify', 'adobe', 'amazon', 'trustpilot', 'oracle',
+                'shopify', 'adobe', 'amazon', 'trustpilot', 'oracle', 'figma',
                 'retirement-bystander', 'a-member-company');
 delete from public.users where email like '%@seed-retirement.test';
 
@@ -50,14 +59,28 @@ insert into public.companies (name, slug, source, source_confidence)
 select r.name, r.slug, 'wikidata-p856', 'unknown'
 from public.company_directory_seed_retired as r
 where r.slug in ('google', 'microsoft', 'apple', 'netflix', 'spotify', 'stripe',
-                 'shopify', 'adobe', 'amazon', 'trustpilot', 'oracle');
+                 'shopify', 'adobe', 'amazon', 'trustpilot', 'oracle', 'figma');
 
 insert into public.company_domains (company_id, domain, domain_type, evidence_confidence, source)
 select c.id, r.domain, 'primary_website', 'unknown', 'wikidata-p856'
 from public.companies as c
 join public.company_directory_seed_retired as r on r.slug = c.slug
 where c.slug in ('google', 'microsoft', 'apple', 'netflix', 'spotify', 'stripe',
-                 'shopify', 'adobe', 'amazon', 'trustpilot', 'oracle');
+                 'shopify', 'adobe', 'amazon', 'trustpilot', 'oracle', 'figma');
+
+-- The attribution migration that marked the seed's claims as `wikidata-p856` is
+-- gone from the repository, and it never ran on every database that applied the
+-- seed (production is one of them: its claims have no source at all). A claim
+-- with NULL provenance is still the seed's own claim, not a claim another layer
+-- wrote, so it must not stop the reset. trustpilot carries that shape.
+update public.company_domains set source = null where domain = 'trustpilot.com';
+
+-- figma: the seed's own claim, plus a second domain another layer asserted. A
+-- company can only gain a claim from a proof (verified, counted separately) or
+-- from an import or an operator, and both are touches.
+insert into public.company_domains (company_id, domain, domain_type, evidence_confidence, source)
+select c.id, 'figma.design', 'brand', 'medium', 'curated'
+from public.companies as c where c.slug = 'figma';
 
 -- The one company that is not from the seed. It must survive untouched, and it
 -- also grants the delegation below, so the delegation guards exactly one row.
@@ -121,6 +144,20 @@ from public.companies as c where c.slug = 'adobe';
 update public.companies
 set source = 'companies_house', source_id = '01234567', jurisdiction = 'GB'
 where slug = 'amazon';
+
+-- google: an alias. Directory structure, not application data — it is reported
+-- by the plan as something that goes WITH the company, and never as a reason to
+-- keep it.
+insert into public.company_aliases (company_id, alias, alias_type, source)
+select c.id, 'Alphabet Inc.', 'brand', 'test'
+from public.companies as c where c.slug = 'google';
+
+-- oracle: a relationship to a company outside the seed. Same reasoning, and the
+-- relationship row has to go with whichever end is removed.
+insert into public.company_relationships (parent_company_id, child_company_id, relationship_type, source)
+select p.id, c.id, 'subsidiary', 'test'
+from public.companies as p, public.companies as c
+where p.slug = 'retirement-bystander' and c.slug = 'oracle';
 
 
 -- ─── 1. The identification ──────────────────────────────────
@@ -204,8 +241,40 @@ select is(
 
 select is(
   (select count(*)::int from public.company_directory_seed_retained),
-  8,
+  9,
   'the retained view lists exactly the seed rows a guard keeps'
+);
+
+select is(
+  (select plan.disposable
+     from public.company_directory_seed_retirement_plan() as plan
+    where plan.slug = 'trustpilot'),
+  true,
+  'a seeded claim with no attribution is still the seed''s own claim, not another layer''s'
+);
+
+select is(
+  (select plan.reason
+     from public.company_directory_seed_retirement_plan() as plan
+    where plan.slug = 'figma'),
+  'claim_the_seed_did_not_write',
+  'a second domain on the company keeps it: that claim is somebody else''s assertion'
+);
+
+select is(
+  (select row(plan.aliases, plan.disposable)
+     from public.company_directory_seed_retirement_plan() as plan
+    where plan.slug = 'google'),
+  row(1, true),
+  'the plan reports the alias that would go with a removable company'
+);
+
+select is(
+  (select row(plan.relationships, plan.disposable)
+     from public.company_directory_seed_retirement_plan() as plan
+    where plan.slug = 'oracle'),
+  row(1, true),
+  'and the relationship it is part of: structure is not a reason to keep a row'
 );
 
 select is(
@@ -218,10 +287,10 @@ select is(
 -- ─── 2. The dry run ─────────────────────────────────────────
 
 select is(
-  (select row(d.companies_removed, d.claims_removed, d.dry_run)
-     from public.retire_company_directory_seed(true) as d),
-  row(3::bigint, 3::bigint, true),
-  'the dry run reports what it would remove'
+  (select row(d.companies_removed, d.claims_removed, d.dependents_removed, d.companies_retained, d.dry_run)
+     from public.retire_company_directory_seed(p_dry_run => true) as d),
+  row(3::bigint, 3::bigint, 2::bigint, 9::bigint, true),
+  'the dry run reports what it would remove, what would go with it, and what it would keep'
 );
 
 select is(
@@ -231,13 +300,36 @@ select is(
   'and removes nothing'
 );
 
+-- The gate. While a seeded company is still referenced by application data the
+-- removal refuses to run at all: not a warning in a log, an exception, with
+-- nothing deleted, naming the view an operator has to review first.
+select throws_ok(
+  $$select * from public.retire_company_directory_seed()$$,
+  'P0001',
+  'seed_reset_retained_rows_present',
+  'the removal refuses to run while a seeded company is still referenced'
+);
+
+select is(
+  (select count(*)::int from public.companies
+    where slug in ('google', 'oracle', 'trustpilot')),
+  3,
+  'and the refusal deleted nothing at all'
+);
+
+select is(
+  (select count(*)::int from public.company_directory_seed_retained),
+  9,
+  'the view an operator reviews names every row the refusal was about'
+);
+
 -- ─── 3. The removal ─────────────────────────────────────────
 
 select is(
   (select row(d.companies_removed, d.claims_removed, d.dependents_removed, d.companies_retained, d.dry_run)
-     from public.retire_company_directory_seed(false) as d),
-  row(3::bigint, 3::bigint, 0::bigint, 8::bigint, false),
-  'the removal takes the untouched seeded rows, their claims, and nothing else'
+     from public.retire_company_directory_seed(p_allow_retained => true) as d),
+  row(3::bigint, 3::bigint, 2::bigint, 9::bigint, false),
+  'the operator''s acknowledgement takes the untouched seeded rows, their claims and their structure, and nothing else'
 );
 
 select is(
@@ -255,17 +347,23 @@ select is(
 );
 
 select is(
+  (select count(*)::int from public.company_aliases where alias = 'Alphabet Inc.'),
+  0,
+  'an alias went with the company it described, and did not keep it'
+);
+
+select is(
   (select count(*)::int from public.companies
-    where slug in ('microsoft', 'apple', 'netflix', 'spotify', 'stripe', 'shopify', 'adobe', 'amazon')),
-  8,
+    where slug in ('microsoft', 'apple', 'netflix', 'spotify', 'stripe', 'shopify', 'adobe', 'amazon', 'figma')),
+  9,
   'every company a guard named is still there'
 );
 
 select is(
   (select count(*)::int from public.companies
-    where slug in ('microsoft', 'apple', 'netflix', 'spotify', 'stripe', 'shopify', 'adobe', 'amazon')
+    where slug in ('microsoft', 'apple', 'netflix', 'spotify', 'stripe', 'shopify', 'adobe', 'amazon', 'figma')
       and created_by is null),
-  8,
+  9,
   'and none of them was deleted behind the guard'
 );
 
@@ -367,20 +465,39 @@ select is(
 );
 
 select is(
-  (select d.companies_removed from public.retire_company_directory_seed(false) as d),
-  0::bigint,
-  'a second run deletes nothing: the transition is idempotent'
+  (select count(*)::int
+     from public.company_aliases as a
+     left join public.companies as c on c.id = a.company_id
+    where c.id is null),
+  0,
+  'no alias is orphaned'
 );
 
 select is(
-  (select d.companies_removed from public.retire_company_directory_seed(false) as d),
+  (select count(*)::int
+     from public.company_relationships as rel
+     left join public.companies as p on p.id = rel.parent_company_id
+     left join public.companies as ch on ch.id = rel.child_company_id
+    where p.id is null or ch.id is null),
+  0,
+  'and no relationship is left pointing at a company that is gone'
+);
+
+select is(
+  (select d.companies_removed from public.retire_company_directory_seed(p_allow_retained => true) as d),
+  0::bigint,
+  'a second run deletes nothing: the reset is idempotent'
+);
+
+select is(
+  (select d.companies_removed from public.retire_company_directory_seed(p_allow_retained => true) as d),
   0::bigint,
   'and a third run still deletes nothing'
 );
 
 select is(
   (select count(*)::int from public.company_directory_seed_retained),
-  8,
+  9,
   'the retained view is unchanged by the reruns'
 );
 
@@ -393,8 +510,8 @@ select is(
 -- ─── 6. It is not an anonymous door ─────────────────────────
 
 select is(
-  has_function_privilege('anon', 'public.retire_company_directory_seed(boolean)', 'execute')
-    or has_function_privilege('authenticated', 'public.retire_company_directory_seed(boolean)', 'execute')
+  has_function_privilege('anon', 'public.retire_company_directory_seed(boolean, boolean)', 'execute')
+    or has_function_privilege('authenticated', 'public.retire_company_directory_seed(boolean, boolean)', 'execute')
     or has_function_privilege('anon', 'public.company_directory_seed_retirement_plan()', 'execute')
     or has_function_privilege('authenticated', 'public.company_directory_seed_retirement_plan()', 'execute'),
   false,
@@ -402,7 +519,7 @@ select is(
 );
 
 select is(
-  has_function_privilege('service_role', 'public.retire_company_directory_seed(boolean)', 'execute')
+  has_function_privilege('service_role', 'public.retire_company_directory_seed(boolean, boolean)', 'execute')
     and has_function_privilege('service_role', 'public.company_directory_seed_retirement_plan()', 'execute'),
   true,
   'while the service role can plan it and run it'
@@ -419,7 +536,7 @@ select is(
 
 delete from public.companies
  where slug in ('microsoft', 'apple', 'netflix', 'spotify', 'stripe', 'shopify',
-                'adobe', 'amazon', 'retirement-bystander', 'a-member-company');
+                'adobe', 'amazon', 'figma', 'retirement-bystander', 'a-member-company');
 delete from public.users where email like '%@seed-retirement.test';
 
 select * from finish();

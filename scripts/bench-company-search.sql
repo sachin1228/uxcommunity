@@ -10,7 +10,8 @@
 --   `public.search_companies` (see
 --   supabase/migrations/20260929130000_company_directory_hints.sql) answers the
 --   picker with `name ILIKE '%term%'`, which no ordinary index can serve. That
---   is fine at the 4,574 rows the directory seeds today and unmeasured
+--   was fine at the 4,574 rows the v1 seed wrote (the seed migration is gone
+--   from the repository; see docs/company-directory-reset.md) and unmeasured
 --   everywhere else, and a directory of half a million companies turns the
 --   guess into a decision. This file builds the same SHAPES on synthetic rows
 --   and times them, so the next schema change is argued from numbers.

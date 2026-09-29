@@ -91,6 +91,21 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
   echo "-- $f" >>"$LOG"
   $PSQL -d $DB -f "$f" >>"$LOG" 2>&1
 done
+
+# Operations that are deliberately NOT migrations (supabase/reset/) define the
+# directory reset's own contract: the record of the retired v1 seed, its plan
+# function and its guard view, which the company test files assert against. They
+# DELETE NOTHING by themselves — the removal takes an explicit call — and on a
+# database built from these migrations there is no seed to remove, which is how
+# the tests can show both facts at once.
+if compgen -G "$ROOT/supabase/reset/*.sql" >/dev/null; then
+  echo "=== 2b/3 applying reset operations (no rows are removed by applying them) ==="
+  for f in "$ROOT"/supabase/reset/*.sql; do
+    echo "-- $f" >>"$LOG"
+    $PSQL -d $DB -f "$f" >>"$LOG" 2>&1
+  done
+fi
+
 $PSQL -d $DB -c "grant all on all tables in schema public to service_role;" >/dev/null 2>&1
 
 echo "--- migration errors (normalised; Supabase-only objects are expected) ---"

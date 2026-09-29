@@ -27,7 +27,6 @@ import {
   resolveVerification,
   rankCompanies,
   sampleCompanies,
-  parseSeedMigration,
   loadSources,
   loadCurated,
   loadDelegations,
@@ -769,20 +768,26 @@ test("the seed layer is website domains only", () => {
   }
 });
 
-test("the committed v1 migration parses into the seed layer shape", () => {
-  const sql = readFileSync(
-    new URL("../supabase/migrations/20260929140000_company_directory.sql", import.meta.url),
-    "utf8"
-  );
-  const entities = parseSeedMigration(sql);
+test("the committed seed layer is the v1 seed, kept as data rather than a migration", () => {
+  // The v1 seed migration is gone from the repository and its retained copy is
+  // this layer, so it is now the single source for both the directory build and
+  // the reset that names the rows to remove (docs/company-directory-reset.md).
+  const entities = loadSeeds()[0].entities;
   assert.equal(entities.length, 4574);
   assert.equal(new Set(entities.map((entity) => entity.id)).size, 4574);
+  assert.equal(entities.every((entity) => entity.domains.length === 1), true);
   assert.equal(entities.every((entity) => entity.domains[0].domain_type === "primary_website"), true);
+  // A website domain, never a claim about where employees receive mail.
+  assert.equal(entities.every((entity) => entity.domains[0].evidence.length === 0), true);
+  assert.equal(entities.every((entity) => entity.domains[0].evidence_checked === false), true);
+  assert.equal(entities.every((entity) => entity.website_domain === entity.domains[0].domain), true);
 });
 
 /* ── The two bugs the review found in the shipped seed ──────────────────── */
 
-const SEED_SQL = new URL("../supabase/migrations/20260929140000_company_directory.sql", import.meta.url);
+// The v1 seed migration was removed from the repository; the seed layer is its
+// retained copy and holds exactly the rows these two tests are about.
+const SEED_ENTITIES = loadSeeds()[0].entities;
 
 test("the committed seed passes today's gates, which it did not before", () => {
   // The v1 generator's own deny list rejected 53 of the rows the v1 seed
@@ -790,7 +795,7 @@ test("the committed seed passes today's gates, which it did not before", () => {
   // bypassed the gates), so the committed migration was not reproducible from
   // the committed generator. Every seeded row has to pass the gates now,
   // whichever layer it is read as.
-  const entities = parseSeedMigration(readFileSync(SEED_SQL, "utf8"));
+  const entities = SEED_ENTITIES;
   assert.ok(entities.length >= 4000, "the seed is the real directory");
 
   for (const source of ["website", "curated"]) {
@@ -811,7 +816,7 @@ test("bare country-code domains survive, because the seed is full of them", () =
   // "truncated URL", which silently excluded every company whose site is
   // example.de / example.in / example.co. 47 of the committed seed's rows are
   // exactly that shape, and they all come from the hand-checked core.
-  const entities = parseSeedMigration(readFileSync(SEED_SQL, "utf8"));
+  const entities = SEED_ENTITIES;
   const bare = entities.filter((entity) => /^[a-z0-9-]+\.[a-z]{2}$/.test(entity.website_domain));
   assert.ok(bare.length > 0, "the directory contains two-label ccTLD domains");
 

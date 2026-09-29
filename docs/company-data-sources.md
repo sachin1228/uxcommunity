@@ -91,10 +91,14 @@ layer whose source is not `adopted`, so adding one is a deliberate two-step.
 - **Limitations:**
   - P856 is the official WEBSITE, not the employee email domain - it is a website signal only
   - notability-gated: a company needs Wikipedia sitelinks to be present, so most small and mid-size employers are missing
-  - P856 is occasionally wrong (a successor's site, a landlord's page), which is why scripts/generate-company-directory.mjs refuses low-sitelink entities whose name and domain look unrelated
+  - P856 is occasionally wrong (a successor's site, a landlord's page), which is why the v1 generator (removed with its seed migration) refused low-sitelink entities whose name and domain look unrelated, and why the pipeline keeps that name/domain check as a quality signal and never as ownership proof
   - bulk queries are rate-limited and time out easily; the query service is not an SLA-backed API
 
-Already the source of the committed 4,574-company seed. In v2 it stays the discovery layer, but every domain it supplies is classified `primary_website` with email confidence `unknown`.
+Already the source of the committed seed layer
+(`data/company-directory/seeds/wikidata-p856.json`, 4,574 rows). It stays the
+discovery layer, but every domain it supplies is classified `primary_website`
+with email confidence `unknown` — a website signal is not an employee-email
+signal, which is the whole reason the seed is data and not a verified directory.
 
 ## Candidates (evaluated, not yet wired up)
 

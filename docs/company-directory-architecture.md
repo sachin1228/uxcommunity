@@ -6,11 +6,14 @@ entity model.
 
 Status: **the schema, the verification semantics, the search rewrite and the
 import path are SHIPPED** in `supabase/migrations/20260929150000_company_domain_stewardship.sql`
-and `…20260929151000_company_directory_backfill.sql`, with the behaviour pinned
-by `supabase/tests/company_domain_stewardship.test.sql` (127 assertions, cases
-A–I) and `scripts/generate-company-directory-backfill.test.mjs`. What is still a
-proposal is the data: no bulk tier has been imported, no licensed source is
-wired up, and the prototype still writes only to
+and `…20260929152000_company_domain_review.sql`, with the behaviour pinned
+by `supabase/tests/company_domain_stewardship.test.sql` (161 assertions, cases
+A–I). The v1 seed's migrations are gone from the repository — the directory is
+built from `data/company-directory/seeds/` instead of being seeded by a
+migration, and a database that already applied the old seed is reset by one
+explicit operation ([company-directory-reset.md](company-directory-reset.md)).
+What is still a proposal is the data: no bulk tier has been imported, no licensed
+source is wired up, and the prototype still writes only to
 `data/company-directory/prototype/`. Every number in §8 and §9 is measured on
 the real schema by `scripts/bench-company-directory.sh`.
 
@@ -22,12 +25,12 @@ licensing matrix), [company-domain-resolution.md](company-domain-resolution.md),
 Reproduce everything:
 
 ```bash
-npm run test:companies-db        # the SQL tests: schema, cases A–I, search, backfill
-npm run test:companies-v2        # 50 assertions, incl. the decision table
+npm run test:companies-db        # the SQL tests: schema, cases A–I, search, the reset
+npm run test:companies-v2        # 47 assertions, incl. the decision table
 npm run companies:v2 -- --sample 1000 --sql          # the prototype build
 npm run companies:v2 -- --measure                    # the nine staged metrics
-npm run companies:backfill       # regenerate the seed's attribution migration
-npm run test:companies-db        # 127 + 111 assertions against a real schema
+npm run companies:reset:sql      # regenerate the reset operation from the seed layer
+npm run companies:reset:plan     # the reset's dry run against a real database
 npm run bench:companies-directory                    # search + import at 1k…500k rows
 node scripts/bench-company-directory-import.mjs --n 500000   # the three storage shapes
 ```
@@ -801,8 +804,11 @@ touches a company a member created.
 
 Why not a migration: a single 170 MB statement costs ~1.8 GB of server memory
 and 24 s of CPU, cannot be partially applied, cannot be resumed, and one syntax
-error at row 499,999 rolls back everything. Keep it for what it is good at (the
-4,574-row seed, 170 KB, is still a migration — its attribution is a second one).
+error at row 499,999 rolls back everything. And the repository no longer carries
+a seed migration at all: the 4,574-row bootstrap set is data (the seed layer),
+and the operation that removes it from a database that already has it is
+deliberately outside `supabase/migrations/` so a push cannot run it
+([company-directory-reset.md](company-directory-reset.md)).
 
 At 500k, **71 MB does not belong in git either.** The repository carries the
 pipeline, the reviewed core (thousands of rows) and the id/alias files; a bulk
@@ -882,9 +888,12 @@ psql "$DATABASE_URL" -f scripts/company-directory-metrics.sql   # runtime half
 | verification failures | runtime | `verification_failures_expired` (+ `challenges_open`) |
 | review decisions (promote / reject / defer) | runtime | `review_promotions` / `review_rejections` / `review_needs_more_evidence` |
 
-Measured against the scratch database built from this branch's migrations,
-immediately after the 4,574-row backfill — which is also the production-safety
-assertion that the backfill verified nothing (33 figures, then the queue):
+Measured against a scratch database that had the 4,574-row seed applied, right
+after the attribution migration that has since been removed from the repository
+— an application of the stewardship schema to a populated directory, which is
+also the production-safety assertion that nothing was promoted by it (33 figures,
+then the queue). Those numbers were reproduced for the reset with production's
+own state: see [company-directory-reset.md](company-directory-reset.md) §2–3.
 
 | Metric | Value | Why it is the expected one |
 | --- | --- | --- |
@@ -938,15 +947,16 @@ repository:
    `source`/`source_confidence`/`directory_rank`/`last_checked_at` on companies,
    the full index on `domain`, the prefix index, and **no** unique index on
    hints. Migration 150000.
-2. **Backfill** of the 4,574 seeded rows to `primary_website` /
-   `wikidata-p856` / `unknown`, generated from the seed itself so the domain
-   list cannot drift: migration 151000,
-   `scripts/generate-company-directory-backfill.mjs`, 9 assertions (including
-   that the file contains no `delete`/`drop`/`truncate`, never writes `verified`
-   and never clears `verified_at`). Idempotent, deterministic, never verifies,
-   never touches a proved claim, never deletes; run against a scratch database
-   **three times** in the test suite with a snapshot proving no proved claim was
-   downgraded.
+2. **The v1 seed's migrations are gone.** Migrations `20260929140000` (the
+   4,574-row seed) and `20260929151000` (the attribution pass) were deleted from
+   the repository, together with the two generators that produced them, so a
+   database built from this repository starts with `companies` 0 and
+   `company_domains` 0. The seed's own (name, domain) list survives as the seed
+   layer (`data/company-directory/seeds/wikidata-p856.json`), which is what the
+directory build reads and what the reset is generated from. The shape the
+attribution migration had is reproduced inline in the stewardship suite, because
+its invariant — an attribution pass may never walk a proof backwards — outlives
+the migration.
 3. **Verification semantics** (§6) A–I, including the start-path owner check
    (C), contested claims (D), delegations with the review/evidence/grantor rules
    (F), the weak-claim rules that keep a bad seed from reserving a domain (H),
@@ -981,12 +991,16 @@ repository:
 the reason, the timestamp and the confidence before/after recorded, service-role
 only, and unable to write `verified`. Migration 152000, 40 assertions. This is
 what makes the promotion threshold a route rather than a dead end.
-9. **The retirement of the bootstrap directory** (153000): the 4,574 seeded
-   companies are removed, by a guarded, idempotent, dry-runnable transition that
-   keeps — and reports — any seed row a member or an operator has touched.
-   [company-directory-seed-retirement.md](company-directory-seed-retirement.md)
-   is the audit, the strategy, the execution order, the rollback and the
-   validation queries.
+9. **The reset of the bootstrap directory**, as an explicit operation rather
+   than a migration: `supabase/reset/company_directory_seed_reset.sql` (generated
+   by `scripts/generate-company-directory-reset.mjs`) plus the runner
+   `scripts/reset-company-directory-seed.mjs`. It removes the 4,574 seeded
+   companies from a database that already has them — guarded, idempotent,
+   dry-runnable, refusing to run while any seed row is referenced by application
+   data, and reporting every row it keeps. It is service-role only, it is not read
+   by `db push` or `db reset`, and 52 SQL assertions plus 15 node assertions pin
+   it. [company-directory-reset.md](company-directory-reset.md) is the audit, the
+   strategy, the execution order, the rollback and the validation queries.
 10. **The runtime half of the report**: `scripts/company-directory-metrics.sql` —
    read-only, safe against production, and the only way to answer "how many
    domains are waiting on a person, how many members have actually verified, how
