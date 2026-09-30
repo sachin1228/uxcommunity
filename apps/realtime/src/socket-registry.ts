@@ -23,6 +23,15 @@
  *   USER-scoped: userId → display metadata cached at join, so client-publish
  *   frames never have to deserialize an attachment.
  *
+ * ATTACH/DETACH GENERATION
+ *   `generation` counts every socket that enters or leaves the room, and is
+ *   exposed so presence can tell "this count is still on every attached socket"
+ *   from "these are different sockets holding the same count". A member count
+ *   does not move when one tab is replaced by another — but the replacement has
+ *   never been told the count, so the settled-count shortcut is only valid while
+ *   this number is unchanged. It is the registry's to maintain because track()
+ *   and untrack() are the only places a socket joins or leaves.
+ *
  * Hibernation
  *   `adopt` reads a socket's attachment and registers it, which is what both the
  *   constructor's `blockConcurrencyWhile` rebuild and the post-wake fallback in
@@ -66,10 +75,13 @@ export class SocketRegistry {
   private userSockets = new Map<string, Set<WebSocket>>();
   /** Display metadata cached at join() — client-publish frames never touch attachments. */
   private userMeta = new Map<string, PresenceMeta>();
+  /** Monotonic attach/detach count — see ATTACH/DETACH GENERATION above. */
+  private generation = 0;
 
   /** Register an accepted socket in the socket- and user-scoped maps. */
   track(ws: WebSocket, userId: string): void {
     this.wsToUser.set(ws, userId);
+    this.generation += 1;
 
     let sockets = this.userSockets.get(userId);
     if (!sockets) {
@@ -108,6 +120,9 @@ export class SocketRegistry {
     const userId = this.wsToUser.get(ws);
     this.wsToUser.delete(ws);
     if (userId === undefined) return { userId: undefined, lastSocketForUser: false };
+    // Only a socket that was really in the room moves the generation, so a
+    // duplicate close (already untracked, returned above) cannot look like one.
+    this.generation += 1;
 
     const sockets = this.userSockets.get(userId);
     if (!sockets) return { userId, lastSocketForUser: false };
@@ -154,6 +169,15 @@ export class SocketRegistry {
   /** Sockets per user — the input the presence count folds over. */
   get socketsByUser(): ReadonlyMap<string, ReadonlySet<WebSocket>> {
     return this.userSockets;
+  }
+
+  /**
+   * Bumped by every attach and detach. Presence compares it against the
+   * generation a settled count was measured at: equal count + equal generation
+   * is the only combination that proves every attached socket holds the count.
+   */
+  get socketGeneration(): number {
+    return this.generation;
   }
 
   /** Number of tracked sockets (exposed through the DO's `/stats`). */

@@ -258,6 +258,28 @@ describe("presence counts members, not sockets", () => {
     }
   }, 30_000);
 
+  it("forgets the settled count when the room empties, so the next member is told", async () => {
+    const room = "chat:presence-reset";
+    const first = await harness.connect(room, "pr_first");
+    harness.subscribe(first, room, "message");
+    await waitForPresenceCount(first, 1);
+
+    first.close();
+    await waitForStats(room, (s) => s.sockets === 0);
+    await sleep(400);
+
+    const next = await harness.connect(room, "pr_next");
+    harness.subscribe(next, room, "message");
+    try {
+      await waitUntil(
+        "the next member is told count 1",
+        () => lastPresence(next)?.count === 1,
+      );
+    } finally {
+      closeAll([next]);
+    }
+  }, 30_000);
+
   it("returns to zero when the room empties", async () => {
     const room = "chat:presence-empty";
     const conn = await harness.connect(room, "pe_solo");
@@ -267,6 +289,75 @@ describe("presence counts members, not sockets", () => {
     conn.close();
     const stats = await waitForStats(room, (s) => s.sockets === 0);
     expect(stats.users).toBe(0);
+  }, 30_000);
+});
+
+describe("a socket that arrives while the count is unchanged is still told the count", () => {
+  /**
+   * The production failure this pins: presence is pushed only when it changes,
+   * and a settled count is reused while the sockets it was proven on are the
+   * same ones. A tab that reloads (or a second device that connects) does not
+   * move the member count, so the socket that arrived was never told anything
+   * and rendered "0 online" until some other member joined or left — while
+   * another tab of the same account, which had been told, still showed 1.
+   */
+  it("tells a member's second socket, though their own count did not move", async () => {
+    const room = "chat:presence-second-socket";
+    const alice = await harness.connect(room, "ss_alice");
+    harness.subscribe(alice, room, "message");
+    try {
+      await waitForPresenceCount(alice, 1);
+      // Let the connect-triggered flush settle so the count is "proven" on
+      // every socket before the second one arrives.
+      await sleep(500);
+
+      const aliceSecond = await harness.connect(room, "ss_alice");
+      harness.subscribe(aliceSecond, room, "message");
+      try {
+        const stats = await waitForStats(room, (s) => s.sockets === 2);
+        // One member, two sockets: the count has not moved…
+        expect(stats.users).toBe(1);
+        // …and the socket that arrived must be told anyway.
+        await waitUntil(
+          "the second socket is told count 1",
+          () => lastPresence(aliceSecond)?.count === 1,
+        );
+      } finally {
+        closeAll([aliceSecond]);
+      }
+    } finally {
+      closeAll([alice]);
+    }
+  }, 30_000);
+
+  it("tells a reloaded tab's replacement socket while another member keeps the room online", async () => {
+    const room = "chat:presence-replacement";
+    const bob = await harness.connect(room, "rp_bob");
+    harness.subscribe(bob, room, "message");
+    const alice = await harness.connect(room, "rp_alice");
+    harness.subscribe(alice, room, "message");
+    try {
+      await waitForPresenceCount(bob, 2);
+      await sleep(500);
+
+      // Alice reloads: her socket goes and its replacement takes over inside the
+      // same coalescing window, so the room never drops below two members and
+      // the count reads 2 before the flush and after it.
+      alice.close();
+      const aliceReloaded = await harness.connect(room, "rp_alice");
+      harness.subscribe(aliceReloaded, room, "message");
+      try {
+        await waitUntil(
+          "the replacement socket is told count 2",
+          () => lastPresence(aliceReloaded)?.count === 2,
+        );
+        expect(lastPresence(bob)?.count).toBe(2);
+      } finally {
+        closeAll([aliceReloaded]);
+      }
+    } finally {
+      closeAll([alice, bob]);
+    }
   }, 30_000);
 });
 

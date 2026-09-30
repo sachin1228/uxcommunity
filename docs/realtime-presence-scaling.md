@@ -100,6 +100,43 @@ This is the change that moved the 5,000-socket stage: before it, one timer callb
 wrote 4,351 frames back to back and the object never got to the 4,351 queued `join`
 frames (only 42 sockets ever received `hello`).
 
+#### A settled count is only reused while the sockets are the same ones
+
+Fixed after a production report — "the online count works locally but always shows
+zero in production" — that reproduced in two tabs: with the community open in tab A,
+reloading tab B left **tab B at `0 online`** while tab A still read `1 online`.
+
+The reuse above ("no lap is in progress and the count has not moved, so every socket
+already has it") was decided from the **count alone**. But a count does not say *which
+sockets* hold it, and the socket population moves without moving the count at all:
+
+* a tab reloads — one socket goes and its replacement arrives, same member;
+* a member opens a second tab or a second device;
+* a member's heartbeat reconnect replaces their socket;
+* one member leaves exactly as another joins (same count, same socket count).
+
+Each of those arrived at a flush with `count === stableCount`, so the broadcast was
+skipped and the socket that had just connected was never told anything. Nothing else
+was owed to it either: presence is a push, so with the room otherwise quiet that client
+renders `0 online` until some *other* member joins or leaves. Locally this hid behind
+`next dev`'s StrictMode churn (mount → unmount → mount closes and reopens sockets, so
+the count transiently moves and the first flush is fresh); in production a single tab
+also hid it, because a room that empties resets the settled count — it takes a second
+socket (another tab, another device, another member) for the room to stay non-empty
+across the reload.
+
+`SocketRegistry` now counts every attach and detach (`generation`, exposed as
+`socketGeneration`), and a settled count is only reused when **both** the count and that
+generation are unchanged; a lap likewise only records the count as settled when the
+generation it started with is still current. The optimization is otherwise intact: a
+`join` frame that re-stamps a member's metadata moves neither, so a genuinely quiet room
+still skips (`presenceSkipped`) instead of re-broadcasting. The payload and the
+per-window budget are untouched, so the cost at 2,500 sockets is the same shape as §5.
+
+Pinned by `apps/realtime/__tests__/presence-broadcast.test.ts` (fake timers: second
+socket, same-size replacement, emptied room, and the surviving skip) and by three cases
+in `presence-scaling.test.ts` over a real Durable Object.
+
 ### 2.3 Clients
 
 Both clients now treat presence as a count:
