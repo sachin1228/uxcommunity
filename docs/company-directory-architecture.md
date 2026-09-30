@@ -457,47 +457,48 @@ so a rename does not silently change a company's URL.
 ## 6. Verification semantics (the decision table)
 
 The executable form of this table is `resolveVerification` in the prototype and
-the assertions in `supabase/tests/company_domain_stewardship.test.sql` (161
-assertions) and `supabase/tests/company_verified_domains.test.sql` (118). Every
-row states the outcome, the status code the route should return, and what has to
+the assertions in `supabase/tests/company_domain_stewardship.test.sql` (161assertions),
+`supabase/tests/company_verified_domains.test.sql` (115) and
+`supabase/tests/company_verification_explicit_company.test.sql` (32). Every row
+states the outcome, the status code the route should return, and what has to
 change in SQL.
 
-**The promotion threshold comes first.** A proof promotes an existing claim only
-when that claim's own evidence is `high` or `medium`
-(`public.company_confidence_meets_threshold`). Against a `low` or `unknown` claim
-— every one of the 4,574 seeded rows — a correct code returns
-**`domain_control_only`**: the observation is recorded as `domain_evidence`
-(`source = 'member_domain_control'`, deliberately excluded from the resolver's
-weighting), the challenge is consumed, and **no claim becomes verified and no
-membership is created**.
+**The explicit selection comes first.** When a member selects a company and
+proves a mailbox on a domain registered to that company, the proof promotes the
+claim and creates the membership — for **any** confidence, including `low` and
+`unknown`. `confirm_company_verification` no longer consults
+`company_confidence_meets_threshold`: the selected company is the target, the
+matching domain is fixed at `start`, and the mailbox settles it.
 
-Why that is the right line: a mailbox proves *control of the domain*. It cannot
-prove that the directory mapped that domain to the right company, and if it
-could, then whichever wrong seed row exists would become verified company
-ownership for the first person to sign up at that domain. The failure mode this
-prevents is exactly:
+Why that is the right line: the OTP proves *control of the domain*, and against
+an explicitly selected company that is a statement about the member and the
+company, not a guess about a mapping. `evidence_confidence` still ranks the
+directory — it feeds search, discovery, the resolver and operator review — it just
+never blocks a member's own proved workplace. Refusing there would leave every
+bulk-directory company unverifiable by the one person who works there.
+
+The failure that is still prevented is a **mismatch**, not a weak claim:
 
 ```
 directory says   Company A  ←  abc.com     (confidence: unknown)
 reality          Company B  ←  abc.com
 someone selects Company A, holds user@abc.com, enters the code
-  → domain control recorded, Company A NOT verified   (the mapping is unproven)
+  → Company A IS verified: they selected it and proved the mailbox
+but someone selecting Company C (no claim on abc.com) with user@abc.com
+  → domain_not_verified: the domain is not C's
 ```
 
-The route between a guess and a verified company is a **review**, not a code:
-a person (or the evidence resolver) checks the mapping and lifts the claim's
-evidence to `medium`, and from then on the mailbox proof promotes it. The
-`member_domain_control` rows are the queue for that review, and the queue, the
-decision and its audit trail are **shipped** in `20260929152000` — §6a. What is
-still missing is the operator *screen* over it, not the mechanism.
+`member_domain_control` rows (the old "control only" marker) remain the queue for
+operator review of domains whose mapping is itself in question; the queue, the
+decision and its audit trail are **shipped** in `20260929152000` — §6a.
 
 | # | Situation | Outcome | Status / behaviour | SQL change needed |
 | --- | --- | --- | --- | --- |
 | **A** | Selected company's domain is **verified** by it | verify as selected | OTP; membership for that company | none |
 | **B** | Selected company's domain is its own **unverified claim** with `high`/`medium` evidence | verify as selected | OTP; on success the claim becomes verified, this company becomes steward | none |
-| **B′** | Selected company's domain is its own **weak claim** (`low`/`unknown`) — the shape of all 4,574 seeded rows | **domain control only** | OTP; `domain_control_only`; the observation is recorded, nothing is verified, no membership | **yes**: the threshold check in `confirm_company_verification` |
+| **B′** | Selected company's domain is its own **weak claim** (`low`/`unknown`) — the shape of all 4,574 seeded rows | **verify as selected** | OTP; the claim becomes verified and the membership is created, whatever the confidence | none: `confirm_company_verification` no longer gates on `evidence_confidence` |
 | **C** | Domain is **verified by another company** | refuse, offer the owner | `domain_already_verified` with the owner in `detail` | **yes**: `start_company_verification` must check a verified owner first. Today it can open a challenge that only fails at confirm with `domain_not_verified` |
-| **D** | Domain has **conflicting unverified claims** (no proof) | the strongest claim wins the steward; a proof from that claimant verifies, a proof from a weaker one is domain control only | OTP; conflicting claims stay as evidence and are reported `superseded` | **yes**: record the contest in the challenge detail; never delete a competing claim |
+| **D** | Domain has **conflicting unverified claims** (no proof) | the member's selected claimant wins: its proved mailbox verifies the claim and it becomes the steward | OTP; conflicting claims stay as evidence and the loser is reported `superseded` | none: never delete a competing claim |
 | **E** | Domain belongs to the **parent**, member is at the parent | verify as selected | normal path | none |
 | **F** | Domain belongs to the **parent**, member selected the **subsidiary** | refuse unless a **reviewed delegation** exists; with one, verify as the subsidiary and record the steward | `domain_unclaimed_by_selected` (`reason: not_a_company_domain`) or `verify_via_delegation` | **yes**: the delegations table plus checks in `start`/`confirm`; the verification records `domain_owner_company_id` |
 | **G** | Domain is **not in the directory** | create path | name must relate to the domain; then A/B apply | **yes** (with H) |
@@ -519,6 +520,43 @@ Invariants that hold across every row:
    `low` and `unknown` claims are searchable and selectable, and they establish
    domain control only.
 
+### What an import may touch on a row that is somebody's
+
+The importer guards its merge with two different columns, and the difference is
+not an oversight:
+
+| Table | Guard on an existing row | Why that column |
+| --- | --- | --- |
+| `companies` | `created_by is null` | the row is the member's company; an import owns directory rows, not people's companies |
+| `company_aliases` | `created_by is null` (on the company) | an alias changes what a company is CALLED in search — structure the member did not ask for |
+| `company_relationships` | `created_by is null` (on both ends) | a relationship asserts who owns whom, which is a claim about the member's company, not about a domain |
+| `company_domains` | `verified = false` | a claim is directory DATA about a domain; the member's protection here is the proof, which is strictly stronger |
+| `domain_evidence` | nothing to guard | an observation is only ever ADDED, or has `checked`/`observed_at` refreshed; it is the provenance of a claim, so it follows that claim |
+
+**A domain claim and its evidence MAY land on a company a member created.**
+That is what "adopt the member's row instead of duplicating it" requires
+([company-directory-reset.md](company-directory-reset.md) §6): the importer
+recognises a company by registry number or by slug, and when the slug is one a
+member already created, attaching the directory's claims to that row is the only
+alternative to creating a second company or dropping the fact. It is safe because
+of three properties, each of which is load-bearing:
+
+1. **A claim never verifies.** The statement hard-codes `verified = false`, and a
+   CSV row that claims otherwise is refused outright.
+2. **The member's own claim is always verified.** Every claim a member path
+   creates sets `verified = true, verified_at = now()` at the moment of proof
+   (`member_verification`), so it is already out of an import's reach — there is
+   no member-authored unverified claim for an import to overwrite.
+3. **A proof always outranks a directory claim.** If a directory claim competes
+   with a proof — on the same company or on a different one — the proof stays the
+   steward and the rival claim is recorded `superseded`, never deleted
+   (invariant 5).
+
+An alias or a relationship, by contrast, has no equivalent proof to defer to: it
+would silently rename a member's company in search results, or state that their
+company is owned by someone. Those are refused, and the import's own report counts
+them (`skipped_member_companies`, `skipped_member_relationships`).
+
 ## 6a. The promotion policy, and the review queue that implements it
 
 **Shipped** in `supabase/migrations/20260929152000_company_domain_review.sql`,
@@ -531,8 +569,8 @@ assertions).
 | --- | --- | --- | --- |
 | `high` | first-party evidence a person or the resolver checked | **promotes** the claim: `verified` + membership | already eligible |
 | `medium` | reviewed external/registry evidence, checked | **promotes** | already eligible |
-| `low` | one observation, or supporting-only evidence (MX, CT) | `domain_control_only`: observation recorded, nothing verified, no membership | operator review + evidence that meets the gate |
-| `unknown` | nothing observed — **every one of the 4,574 seeded rows** | `domain_control_only` | operator review + evidence that meets the gate |
+| `low` | one observation, or supporting-only evidence (MX, CT) | **promotes** when the member explicitly selected the company whose claim this is | directory data quality only |
+| `unknown` | nothing observed — **every one of the 4,574 seeded rows** | **promotes** on the selected company's own domain | directory data quality only |
 
 Two rules produce that table, and neither is a threshold anyone tuned:
 
@@ -549,27 +587,22 @@ sets it).
 ### The state machine
 
 ```
-member proves a mailbox on a domain
+member selects a company and proves a mailbox on its registered domain
         │
-        ├── the claim's evidence is high/medium ────────────► VERIFIED
-        │                                                     (company_domains.verified,
-        │                                                      membership created)
+        ├── the selected company claims the domain ─────────► VERIFIED
+        │   (any evidence_confidence)                         (company_domains.verified,
+        │                                                      membership created;
+        │                                                      evidence: member_verification)
         │
-        └── the claim's evidence is low/unknown
-                   │
-                   │ domain_evidence(work_email_otp,
-                   │                 source = 'member_domain_control', checked)
-                   ▼
-            domain_control_only ──► operator review queue
-                                        │
-                  ┌─────────────────────┼───────────────────────┐
-              promote                 reject            needs_more_evidence
-                  │                     │                       │
-     evidence_confidence →            nothing changes:        nothing changes;
-     high (or medium) — no            claim and evidence      the item stays
-     verified, no membership          exactly as they were     queued
-                  │
-      a later proved mailbox ──────────────────────────────► VERIFIED
+        ├── the domain is NOT the selected company's ────────► domain_not_verified
+        │
+        └── the domain is verified for another company ──────► domain_already_verified
+                                                                (offer the owner to join)
+
+separately, a domain whose company mapping is itself in question stays an
+operator concern: member_domain_control observations feed
+company_domain_review_queue, and review_company_domain may lift a claim's
+confidence (never `verified`).
 ```
 
 ### What the queue shows, and what it deliberately refuses
@@ -963,13 +996,18 @@ the migration.
    and `reassign_company_domain` for a domain whose owner changed (I) — which now
    also *retires* the old claim as evidence instead of leaving two equal claims
    tying for the steward.
-4. **The promotion threshold** (§6, B′): `confirm_company_verification` promotes a
-   claim only when its evidence is `high`/`medium`. Against `low`/`unknown` — all
-   4,574 seeded rows — a correct code answers `domain_control_only`, records the
-   observation as `member_domain_control` evidence and grants nothing. Covered by
-   nine assertions in the stewardship suite and three in the verified-domains
-   suite, including the "wrong claimant cannot take a domain a better claim
-   holds" case.
+4. **Explicit company selection** (§6, B′): `confirm_company_verification`
+   promotes the selected company's registered claim and creates the membership on
+   a correct code, for any `evidence_confidence`. `evidence_confidence` stays a
+   directory-quality signal (search, discovery, resolver, review) and never gates
+   a member's own proved workplace; a domain that is not the selected company's is
+   still refused (`domain_not_verified`), and one verified for another company
+   still refuses (`domain_already_verified`, owner offered). Covered by the
+   stewardship and verified-domains suites and by
+   `supabase/tests/company_verification_explicit_company.test.sql` (32
+   assertions: HDFC Bank, WhatsApp, Google and Microsoft, low/unknown/medium, the
+   mismatch / no-match / already-verified refusals, idempotency, member-created
+   companies and the import guard).
 5. **Entity identity** (§5): `source_id` + `jurisdiction` on `companies`, the
    partial unique index on `(source, source_id)`, jurisdiction-scoped duplicate
    merging in the pipeline, and an importer that resolves and reports identity
@@ -986,11 +1024,12 @@ the migration.
    measures it at every tier.
 8. **The operator review queue** (§6a): `company_domain_reviews`,
    `company_domain_review_queue`, `company_domain_evidence_supports_promotion`
-   and `review_company_domain` — the state transition from
-   `domain_control_only` to a promoted or rejected claim, with the reviewer,
-the reason, the timestamp and the confidence before/after recorded, service-role
-only, and unable to write `verified`. Migration 152000, 40 assertions. This is
-what makes the promotion threshold a route rather than a dead end.
+   and `review_company_domain` — the operator path for a domain whose company
+   mapping is itself in question: a claim can be promoted, rejected or deferred,
+   with the reviewer, the reason, the timestamp and the confidence before/after
+   recorded, service-role only, and unable to write `verified`. Migration 152000,
+   40 assertions. It keeps the directory's confidence honest without ever gating
+   a member's own proved workplace.
 9. **The reset of the bootstrap directory**, as an explicit operation rather
    than a migration: `supabase/reset/company_directory_seed_reset.sql` (generated
    by `scripts/generate-company-directory-reset.mjs`) plus the runner
@@ -1008,9 +1047,31 @@ what makes the promotion threshold a route rather than a dead end.
 
 Deliberately NOT in this PR: the 500k import, any licensed source adapter, a
 reviewer role or admin UI, bulk or automatic promotion, and anything that
-changes what `verified` means. The import path loads `company_aliases.csv` and
-`company_relationships.csv` when a directory supplies them; the generator does
-not emit them yet, and the dry run says so rather than pretending otherwise.
+changes what `verified` means.
+
+### The export contract: one canonical place per fact
+
+The generator emits five files and the importer reads all five by header name.
+No fact appears in two of them, so there is no column the importer ignores and
+nothing keeps honest — which is exactly how `companies.csv` used to carry a
+`website_domain`, an `employee_email_domains`, a `parent_company_id` and a
+`;`-joined `aliases` column that the import never read.
+
+| File | Canonical for | Notable absences |
+| --- | --- | --- |
+| `companies.csv` | the entity: `company_id`, name, country, industry, registry identity, rank | no domains, no aliases, no parent column |
+| `company_domains.csv` | **every** domain claim — official website and employee email alike, separated by `domain_type`, with `evidence_confidence` and `source` | the importer never derives one type from another |
+| `domain_evidence.csv` | the observations behind a claim, with their URL | — |
+| `company_aliases.csv` | `alias` / `former_name` / `brand` search names, typed | the canonical name is not repeated |
+| `company_relationships.csv` | parent / subsidiary / brand / division structure | — |
+
+The split mirrors the schema: `company_domains`, `domain_evidence`,
+`company_aliases` and `company_relationships` are tables, so each gets a file,
+and `companies` gets the entity. An employee email domain is never inferred from
+a website domain. A duplicated edge or alias is collapsed; a relationship whose
+endpoint is missing, that points at itself, or whose type is outside the
+database's vocabulary fails the generator (and `--check`) instead of arriving as
+a rejected row.
 
 ### Unresolved (no decision made here)
 
@@ -1020,11 +1081,10 @@ not emit them yet, and the dry run says so rather than pretending otherwise.
 - **Whether `low`-confidence claims may pre-select a company** in the picker.
   The prototype says no; only name search surfaces them.
 - **The operator *screen* over the review queue.** The mechanism is shipped
-  (§6a) and the queue is readable, but no UI reads it yet, so a legitimate
-  employee at a weakly-claimed domain is still told "not yet" until somebody
-  runs the query and decides. Until that screen exists, the promotion threshold
-  is fair only as fast as an operator is willing to look — which is the strongest
-  argument for building it first in the next phase.
+  (§6a) and the queue is readable, but no UI reads it yet. A member's own proved
+  workplace no longer waits on it (explicit selection verifies outright, §6 B′),
+  so the queue is for mapping *disputes* — the domains where the company↔domain
+  mapping itself is questioned — which is still worth a screen.
 - **Whether a promotion should require a second reviewer** above some blast
   radius (e.g. promoting a claim is fine, but promoting a domain that many
   members have already proved control of is not a one-person decision). Nothing
@@ -1067,7 +1127,7 @@ domain claims  ── claim per (company, domain), typed, never verified here
     ↓
 confidence resolver  ── evidence weights → high/medium/low/unknown; conflicts reported, never resolved by deleting
     ↓
-review queue  ── the weak claims a member actually challenged
+review queue  ── the domain mappings a member's proof brought into question
     ↓
 measurement  ── the layer half + the runtime half (§10), then and only then a projection
 ```

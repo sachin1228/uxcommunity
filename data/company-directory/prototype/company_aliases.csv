@@ -1,0 +1,32 @@
+company_id,alias,alias_type,source
+alphabet,Alphabet,alias,curated
+amazon,Amazon.com,alias,curated
+amazon,Amazon.com Inc.,alias,curated
+amazon-web-services,AWS,alias,curated
+apollo-hospitals,Apollo Hospitals Enterprise Limited,alias,curated
+audi,Audi AG,alias,curated
+bharti-airtel,Airtel,alias,curated
+bharti-airtel,Bharti Airtel Limited,alias,curated
+facebook,Facebook App,alias,curated
+google,Google Inc.,alias,curated
+google,Google LLC,alias,curated
+hdfc-bank,HDFC Bank Limited,alias,curated
+hsbc,Hongkong and Shanghai Banking Corporation,alias,curated
+hsbc,HSBC Holdings plc,alias,curated
+iit-bombay,IIT Bombay,alias,curated
+iit-bombay,IITB,alias,curated
+instagram,Instagram Inc.,alias,curated
+meta-platforms,Facebook Inc.,former_name,curated
+meta-platforms,"Facebook, Inc.",former_name,curated
+meta-platforms,Meta,alias,curated
+meta-platforms,Meta Platforms Inc.,alias,curated
+microsoft,Microsoft Corporation,alias,curated
+microsoft,MSFT,alias,curated
+porsche,Dr. Ing. h.c. F. Porsche AG,alias,curated
+porsche,Porsche AG,alias,curated
+tata-consultancy-services,Tata Consultancy Services Ltd.,alias,curated
+tata-consultancy-services,TCS,alias,curated
+tata-sons,Tata Group,alias,curated
+volkswagen-group,Volkswagen AG,alias,curated
+whatsapp,WhatsApp LLC,alias,curated
+whatsapp,WhatsApp Messenger,alias,curated

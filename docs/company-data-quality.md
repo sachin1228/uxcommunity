@@ -231,7 +231,8 @@ or an assertion in the shipped migrations
 | the full claim set, with superseded claims kept | `public.company_domain_claims(domain)` |
 | another company's domain is usable only through a reviewed delegation with checked, non-supporting evidence, granted by a claimant | `public.company_domain_delegation_allowed(company_id, domain)` |
 | the steward keeps the domain even when a delegation is used | `company_domains` is not written by the delegation path at all |
-| a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H) and `confirm_company_verification` |
+| a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H, the create path) |
+| a member who explicitly selects a company and proves a mailbox on its registered domain IS verified, whatever the claim's confidence | `confirm_company_verification` (no `evidence_confidence` gate); `supabase/tests/company_verification_explicit_company.test.sql` |
 | a proof is the only thing that sets `verified` | both RPCs; the import refuses an export that claims it; `review_company_domain` writes no such column |
 | a domain whose owner changed | `public.reassign_company_domain(...)` |
 | a weak claim that a member proved control of is reviewable, attributable and reversible | `public.company_domain_review_queue(...)`, `public.review_company_domain(...)`, `public.company_domain_evidence_supports_promotion(...)` |
@@ -239,5 +240,6 @@ or an assertion in the shipped migrations
 | a rejection never deletes evidence, and a rejected item returns only on new evidence | the queue's filter over `company_domain_reviews` |
 
 Assertions: `supabase/tests/company_domain_stewardship.test.sql` (161),
-`supabase/tests/company_verified_domains.test.sql` (118),
+`supabase/tests/company_verified_domains.test.sql` (115),
+`supabase/tests/company_verification_explicit_company.test.sql` (32),
 `supabase/tests/company_domain_review.test.sql` (40).
