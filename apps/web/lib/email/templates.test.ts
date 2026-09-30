@@ -92,6 +92,20 @@ const RETIRED_PALETTE = [
 
 const has = (html: string, value: string) => html.toLowerCase().includes(value.toLowerCase());
 
+/** WCAG relative luminance of a `#RRGGBB` colour. */
+function luminance(hex: string): number {
+  const channels = [1, 3, 5]
+    .map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
+    .map((value) => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
+
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrast(foreground: string, background: string): number {
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 const PALETTE_TOKENS = ["page", "card", "heading", "text", "divider"] as const;
 
 function paletteEntries(palette: typeof emailPalettes.light) {
@@ -110,6 +124,29 @@ test("every email carries the dark palette for a client that asks for it", () =>
   for (const [name, email] of RENDERED) {
     for (const [token, colour] of paletteEntries(emailPalettes.dark)) {
       assert.ok(has(email.html, colour), `${name} email is missing the dark ${token} colour ${colour}`);
+    }
+  }
+});
+
+test("every text and surface pair clears AA in both themes", () => {
+  // The pairs a reader actually has to read: body copy and headings on the
+  // card, the code in its well, and the labels on both actions. This is the
+  // check that caught the dark body tone sitting at 3.67:1.
+  for (const [scheme, palette] of Object.entries(emailPalettes)) {
+    const pairs: Array<[what: string, foreground: string, background: string]> = [
+      ["body copy", palette.text, palette.card],
+      ["heading", palette.heading, palette.card],
+      ["the code", palette.heading, palette.well],
+      ["the primary action", palette.accentText, palette.accent],
+      ["the quiet action", palette.secondaryText, palette.secondary],
+    ];
+
+    for (const [what, foreground, background] of pairs) {
+      const measured = contrast(foreground, background);
+      assert.ok(
+        measured >= 4.5,
+        `${scheme} ${what} (${foreground} on ${background}) measures ${measured.toFixed(2)}:1, under AA`
+      );
     }
   }
 });

@@ -5,6 +5,7 @@ import {
   fontWeight,
   lightTheme,
   lineHeight,
+  neutral,
   radius,
 } from "@uxcommunity/design-system";
 
@@ -45,15 +46,17 @@ export interface EmailPalette {
  * A design-system theme as the literal values email clients understand.
  *
  * The mapping is identical for both themes, so the two can only ever differ in
- * colour — there is no chance of light mode quietly changing a layout.
+ * colour — there is no chance of light mode quietly changing a layout. The one
+ * value each theme has to state for itself is its body tone, because the
+ * theme's own muted foreground is not readable enough in both.
  */
-function palette(theme: typeof lightTheme | typeof darkTheme): EmailPalette {
+function palette(theme: typeof lightTheme | typeof darkTheme, bodyText: string): EmailPalette {
   return {
     page: theme.background,
     card: theme.surfaceRaised,
     well: theme.background,
     heading: theme.foreground,
-    text: theme.foregroundMuted,
+    text: bodyText,
     divider: theme.border,
     accent: theme.accent,
     accentText: theme.accentForeground,
@@ -71,10 +74,18 @@ function palette(theme: typeof lightTheme | typeof darkTheme): EmailPalette {
  * media query. Light is also the safer base: a client that renders neither
  * (Outlook's Word engine discards the block entirely) still shows an email
  * designed for the white background it is going to paint anyway.
+ *
+ * DARK'S BODY TONE IS NOT ITS `foregroundMuted`. That grey is #737373, and a
+ * grey that dark tops out at 4.43:1 against PURE BLACK — so no background can
+ * lift it to the 4.5:1 this copy needs, and on the dark card (#1A1A1A) it
+ * measures 3.67:1. It steps up the neutral ramp to #A8A8A8 instead: 7.32:1 on
+ * the card, within a hair of the 7.17:1 the light theme's muted text already
+ * reads at, so the two themes carry the same weight and neither one outshouts
+ * the heading above it.
  */
 export const emailPalettes = {
-  light: palette(lightTheme),
-  dark: palette(darkTheme),
+  light: palette(lightTheme, lightTheme.foregroundMuted),
+  dark: palette(darkTheme, neutral[400]),
 } as const;
 
 /**
