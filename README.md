@@ -178,6 +178,16 @@ The worker uses `API_URL` + `API_SECRET` for its internal membership checks, so 
 
 **Troubleshooting:** if messages, typing, and reactions only appear after a reload or tab focus, the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
 
+That check is automated — the same view, driven headlessly against a running app + worker:
+
+```bash
+npm run test:e2e-realtime                                        # the dashboard, as it stands
+npm run test:e2e-realtime -- --strict                            # also gate on no cancelled/duplicate sockets
+npm run test:e2e-realtime -- --path /dashboard/communities/<id>  # cover the community chat rooms
+```
+
+It signs in, loads the page and records every handshake over the Chrome DevTools Protocol: that the socket is authorized by the session cookie (proved against the Worker's own socket count rather than the DevTools header — Chrome hides `Cookie` on cross-origin handshakes), that each room opens exactly one socket, and that nothing is refused or torn down. The session comes from whichever of `E2E_SESSION_COOKIE`, `E2E_EMAIL` + `E2E_PASSWORD`, or `SESSION_SECRET` (from `apps/web/.dev.vars`) is configured — the last one covers the socket lifecycle without an account. `--strict` is meant for a production build or a deployed target: under `next dev`, React StrictMode deliberately cancels one in-flight handshake per community room.
+
 In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `apps/web/wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
 
 ### Cloudflare deployment targets
