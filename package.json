@@ -21,6 +21,8 @@
     "smoke:realtime": "node scripts/smoke-realtime.mjs",
     "test:smoke-realtime": "node --test scripts/smoke-realtime.test.mjs",
     "test:e2e-realtime": "node apps/web/e2e/realtime-sockets.test.mjs",
+    "test:e2e-seed-member": "node --test apps/web/e2e/seed-member.test.mjs",
+    "seed:e2e-member": "node apps/web/e2e/seed-member.mjs",
     "audit:comments": "node scripts/audit-comments.mjs",
     "audit:vercel": "node scripts/audit-vercel.mjs",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",

@@ -213,6 +213,10 @@ jobs:
         run: |
           npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
           npx tsx --test lib/request-cache.test.ts
+          # The browser test's seeder resolves its target BEFORE it writes, so
+          # these are the guards that decide what a shared project is allowed to
+          # receive (e2e/seed-member.mjs). No database, no browser.
+          node --test e2e/seed-member.test.mjs
 
       - name: Deploy web worker
         working-directory: apps/web

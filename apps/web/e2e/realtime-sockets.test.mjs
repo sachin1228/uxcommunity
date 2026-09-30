@@ -59,40 +59,54 @@
  *   sockets survive it by design — a room teardown never closes them — which is
  *   why a community-less session shows no churn at all.)
  *
- * COVERING COMMUNITY SOCKETS WITHOUT A MEMBER ACCOUNT
+ * ASSERTED IN --seed-member (real, accepted community sockets)
+ *   - every seeded community produced a socket, and it is a LIVE 101: the whole
+ *     accepted path, not a refusal;
+ *   - the Worker's own Durable Object for each seeded community holds that
+ *     socket AND a subscription on it — accounting the client cannot fake;
+ *   - the seeded rows are removed again when the run ends.
+ *
+ * COVERING COMMUNITY SOCKETS
  *   A member's dashboard opens one socket PER COMMUNITY, and that fan-out is
- *   where StrictMode's churn lives. `--mock-communities N` answers
- *   `/api/communities` with N synthetic communities, so the client fans out N
- *   community sockets exactly as it does for a member — no account, no database.
- *   The Worker refuses them (it checks membership), and that refusal is the
- *   point of the check: the socket URL carries no token, so a 403 there proves
- *   the session cookie authenticated the handshake while membership was denied
- *   (a missing cookie answers 401 instead), and a 101 would mean the Worker let
- *   a non-member into a room.
+ *   where StrictMode's churn lives. Two ways in, answering different questions:
  *
- *   For ACCEPTED community sockets, point the test at a member instead of a
- *   mock. The session is minted locally from SESSION_SECRET, so no password is
- *   involved — either seed a member with `npm run k6:seed`, which writes users
- *   AND their community memberships, and use E2E_EMAIL + E2E_PASSWORD from
- *   k6/data/test-users.json, or set E2E_USER_ID to an existing member's uuid and
- *   add --require-community-sockets.
+ *   --seed-member [--seed-communities N] — ACCEPTED sockets.
+ *     seed-member.mjs writes a throwaway member, N private communities and its
+ *     memberships into the database the app reads, this file mints that member's
+ *     session from SESSION_SECRET, and the dashboard loads as them. The Worker's
+ *     membership check finds the rows, so every community socket is a 101. No
+ *     account and no credentials: the service-role key is the one already in
+ *     apps/web/.env.local, and the account it creates has no usable password.
+ *     Seeding a shared project (the usual local setup — apps/web/wrangler.toml
+ *     points the deployed app at the same project) additionally needs
+ *     E2E_SEED_ALLOW_REMOTE=1; the rows are deleted when the run ends.
  *
- * SESSION (first source that is configured wins)
- *   1. E2E_SESSION_COOKIE — a `uxcommunity_session` value you already have
+ *   --mock-communities N — fan-out and REFUSAL, no database.
+ *     Answers `/api/communities` with N synthetic communities, so the client
+ *     fans out N community sockets exactly as it does for a member. The Worker
+ *     refuses them (it checks membership), and that refusal is the point: the
+ *     socket URL carries no token, so a 403 proves the session cookie
+ *     authenticated the handshake while membership was denied (a missing cookie
+ *     answers 401 instead, and a 101 would mean a non-member was let in).
+ *
+ * SESSION (first source that is configured wins; --seed-member overrides all)
+ *   1. the seeded member — SESSION_SECRET read from the environment or
+ *      apps/web/.dev.vars signs a session for the row --seed-member just wrote.
+ *   2. E2E_SESSION_COOKIE — a `uxcommunity_session` value you already have
  *      (DevTools → Application → Cookies). Works against any target, local or
  *      deployed, and needs no secrets or database access.
- *   2. E2E_EMAIL + E2E_PASSWORD — signs in through `POST /api/auth/login`, so
+ *   3. E2E_EMAIL + E2E_PASSWORD — signs in through `POST /api/auth/login`, so
  *      the real login path produces the cookie under test. Use an account that
  *      belongs to at least one community to cover the chat rooms too.
- *   3. SESSION_SECRET (+ optional E2E_USER_ID) — mints the same JWT the web app
- *      issues, read from the environment or `apps/web/.dev.vars`. This proves
- *      the client's socket lifecycle (identity, cookie, one socket, no churn)
- *      without touching the database; a community-less dashboard simply has
- *      fewer rooms.
+ *   4. SESSION_SECRET (+ optional E2E_USER_ID) — mints the same JWT the web app
+ *      issues. This proves the client's socket lifecycle (identity, cookie, one
+ *      socket, no churn) without touching the database; a community-less
+ *      dashboard simply has fewer rooms.
  *
  * USAGE
  *   npm run test:e2e-realtime
  *   npm run test:e2e-realtime -- --mock-communities 3
+ *   E2E_SEED_ALLOW_REMOTE=1 npm run test:e2e-realtime -- --seed-member --seed-communities 3
  *   npm run test:e2e-realtime -- --path /dashboard/communities/<id> --strict
  *
  *   Run the file directly (as the npm script does) and the flags above work;
@@ -113,6 +127,15 @@ import { decodeJwt } from "jose";
 import { chromium } from "playwright";
 
 import { buildSmokeToken, parseDevVars, SENTINEL_USER_ID } from "../../../scripts/smoke-realtime.mjs";
+import {
+  clearSeed,
+  readEnvFile,
+  remoteSeedRefusal,
+  resolveSeedTarget,
+  seedMember,
+  SEED_EMAIL,
+  WEB_ENV_FILE,
+} from "./seed-member.mjs";
 
 const SESSION_COOKIE = "uxcommunity_session";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -177,6 +200,19 @@ const MOCK_COMMUNITIES = Math.max(
   Math.min(15, Number(argValue("--mock-communities") ?? process.env.E2E_MOCK_COMMUNITIES ?? 0) || 0),
 );
 
+/**
+ * Sign in as a member this test creates itself (see seed-member.mjs). It is the
+ * only option that covers ACCEPTED community sockets without depending on an
+ * account, a password or a fixture somebody has to maintain.
+ */
+const SEED_MEMBER = process.argv.includes("--seed-member") || process.env.E2E_SEED_MEMBER === "1";
+const SEED_COMMUNITIES = Math.max(
+  1,
+  Math.min(15, Number(argValue("--seed-communities") ?? process.env.E2E_SEED_COMMUNITIES ?? 1) || 1),
+);
+/** Leave the seeded rows in place instead of removing them at the end. */
+const KEEP_SEED = process.argv.includes("--keep-seed") || process.env.E2E_KEEP_SEED === "1";
+
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 function readDevVars(file) {
@@ -214,6 +250,30 @@ async function loginForCookie() {
   return cookie.slice(SESSION_COOKIE.length + 1);
 }
 
+/** SESSION_SECRET, from the environment or the app's own dev vars. */
+function sessionSecret() {
+  const devVars = readDevVars(WEB_DEV_VARS);
+  return {
+    secret: process.env.SESSION_SECRET || devVars?.SESSION_SECRET || "",
+    source: process.env.SESSION_SECRET ? "SESSION_SECRET (environment)" : "SESSION_SECRET (apps/web/.dev.vars)",
+  };
+}
+
+/**
+ * The seeded member's session. Minted from SESSION_SECRET, because the seeded
+ * row deliberately has no password anybody knows (seed-member.mjs hashes a
+ * throwaway secret) — which is exactly why this run needs no credentials.
+ */
+async function seededSession(userId) {
+  const { secret, source } = sessionSecret();
+  if (!secret) {
+    throw new Error(
+      "--seed-member needs SESSION_SECRET to mint the seeded member's session: set it, or keep it in apps/web/.dev.vars",
+    );
+  }
+  return { cookie: await buildSmokeToken(secret, userId), source: `${source}, as the seeded member ${userId}` };
+}
+
 /** Resolve the session under test, plus the user id it belongs to. */
 async function resolveSession() {
   if (process.env.E2E_SESSION_COOKIE) {
@@ -223,19 +283,29 @@ async function resolveSession() {
   const loggedIn = await loginForCookie();
   if (loggedIn) return { cookie: loggedIn, source: "POST /api/auth/login" };
 
-  const devVars = readDevVars(WEB_DEV_VARS);
-  const secret = process.env.SESSION_SECRET || devVars?.SESSION_SECRET || "";
+  const { secret, source } = sessionSecret();
   if (secret) {
     const userId = process.env.E2E_USER_ID || SENTINEL_USER_ID;
-    return {
-      cookie: await buildSmokeToken(secret, userId),
-      source: process.env.SESSION_SECRET ? "SESSION_SECRET (environment)" : "SESSION_SECRET (apps/web/.dev.vars)",
-    };
+    return { cookie: await buildSmokeToken(secret, userId), source };
   }
 
   throw new Error(
     "no session available: set E2E_SESSION_COOKIE, or E2E_EMAIL + E2E_PASSWORD, or SESSION_SECRET",
   );
+}
+
+/**
+ * Write the throwaway member this run signs in as. The target is resolved the
+ * way the app resolves it (environment, then its own .env.local), and a shared
+ * project is refused unless the operator acknowledged it — see seed-member.mjs.
+ */
+async function seedForRun() {
+  const target = resolveSeedTarget({ envText: readEnvFile(WEB_ENV_FILE) });
+  const refusal = remoteSeedRefusal(target);
+  if (refusal) throw new Error(refusal);
+  console.log(`  seeding → ${target.supabaseUrl} (${target.local ? "local" : "shared/remote, acknowledged"})`);
+  const seeded = await seedMember({ target, communities: SEED_COMMUNITIES, log: (line) => console.log(`  ${line}`) });
+  return { ...seeded, target };
 }
 
 // ── Collection ──────────────────────────────────────────────────────────────
@@ -264,7 +334,15 @@ function isRealtimeSocket(url) {
 
 /** Launch a browser, sign in, load the page and record every socket it opens. */
 async function collectSockets() {
-  const session = await resolveSession();
+  if (SEED_MEMBER && MOCK_COMMUNITIES) {
+    throw new Error(
+      "--seed-member and --mock-communities cannot be combined: the mock replaces the very /api/communities " +
+        "response the seeded member's communities have to arrive in",
+    );
+  }
+
+  const seed = SEED_MEMBER ? await seedForRun() : null;
+  const session = seed ? await seededSession(seed.userId) : await resolveSession();
   let userId;
   try {
     userId = decodeJwt(session.cookie).userId;
@@ -369,8 +447,59 @@ async function collectSockets() {
     };
   }
 
+  // The seeded member's own communities, asked of each COMMUNITY Durable Object:
+  // this is the accepted path proven from the Worker's side. The membership API
+  // had to answer ok for the socket to be in the room at all, and a subscription
+  // ref can only come from the `subscribe` frame the client sends after 101.
+  const seededDoView = [];
+  let seededDoViewSkipReason = null;
+  if (seed) {
+    if (!target?.publishSecret) {
+      seededDoViewSkipReason =
+        "REALTIME_PUBLISH_SECRET is not configured (environment or apps/realtime/.dev.vars)";
+    } else {
+      const views = await Promise.all(
+        seed.communityIds.map((id) => doStats(target.httpOrigin, target.publishSecret, `chat:${id}`)),
+      );
+      views.forEach((view, index) => {
+        seededDoView.push({
+          room: `chat:${seed.communityIds[index]}`,
+          sockets: view.sockets,
+          subscriptionRefs: view.subscriptionRefs,
+        });
+      });
+    }
+  }
+
   const finalUrl = page.url();
   await browser.close();
+
+  // Remove the seeded rows now. Everything the assertions need is already
+  // recorded, so a failing assertion cannot be what decides whether a shared
+  // database keeps a test member — but a failing CLEANUP is itself asserted.
+  let seedCleanup = null;
+  if (seed) {
+    if (KEEP_SEED) {
+      seedCleanup = {
+        removed: false,
+        users: 0,
+        communities: 0,
+        detail: `left behind (--keep-seed): ${SEED_EMAIL} and communities ${seed.communityIds.join(", ")}`,
+      };
+    } else {
+      try {
+        const { removed } = await clearSeed({ target: seed.target, log: () => {} });
+        seedCleanup = {
+          removed: true,
+          users: removed.users,
+          communities: removed.communities,
+          detail: `removed ${removed.users} member(s) and ${removed.communities} community(ies)`,
+        };
+      } catch (error) {
+        seedCleanup = { removed: false, users: 0, communities: 0, detail: `cleanup failed — ${error.message}` };
+      }
+    }
+  }
 
   return {
     session,
@@ -380,6 +509,10 @@ async function collectSockets() {
     finalUrl,
     doView,
     doViewSkipReason,
+    seededDoView,
+    seededDoViewSkipReason,
+    seed: seed ? { userId: seed.userId, communityIds: seed.communityIds } : null,
+    seedCleanup,
     mockedCommunityIds,
   };
 }
@@ -502,6 +635,12 @@ before(async () => {
         `to be refused with 403 (the session is not a member of them)`,
     );
   }
+  if (result.seed) {
+    console.log(
+      `  seeded member: ${result.seed.userId} with ${result.seed.communityIds.length} community(ies) — their chat ` +
+        "sockets are expected to be ACCEPTED (101)",
+    );
+  }
   if (result.doView) {
     console.log(
       `  worker view: user:${result.userId} holds ${result.doView.mine.sockets} socket(s) ` +
@@ -509,6 +648,17 @@ before(async () => {
     );
   } else {
     console.log(`  worker view: not checked — ${result.doViewSkipReason}`);
+  }
+  if (result.seed) {
+    console.log(
+      result.seededDoView.length
+        ? "  worker view (seeded communities): " +
+            result.seededDoView
+              .map((view) => `${view.room} sockets=${view.sockets} subscriptionRefs=${view.subscriptionRefs}`)
+              .join("; ")
+        : `  worker view (seeded communities): not checked — ${result.seededDoViewSkipReason}`,
+    );
+    console.log(`  seeded member cleanup: ${result.seedCleanup.detail}`);
   }
 });
 
@@ -564,6 +714,90 @@ test("every attempted room ends with a live, opened socket", () => {
     const opened = sockets.filter((socket) => roomOf(socket.url) === room && socket.status === 101 && !socket.closed);
     assert.ok(opened.length > 0, `room ${room} was attempted but has no open (101) socket left`);
   }
+});
+
+// ── Seeded-member coverage (--seed-member) ──────────────────────────────────
+// The other half of the community coverage: a member the Worker ADMITS. The
+// membership check runs in the app (a server-to-server call from the Durable
+// Object), so these sockets only open when the seeded rows are really there — a
+// 101 cannot be faked by the client, and the Durable Object view below is the
+// Worker's own accounting of what is inside the room.
+
+test("each seeded community socket is accepted, not refused (--seed-member)", (t) => {
+  if (!result.seed) return t.skip("run with --seed-member to cover accepted community sockets");
+
+  const missing = [];
+  const refused = [];
+  for (const id of result.seed.communityIds) {
+    const room = `chat:${id}`;
+    const sockets = realtimeSockets(result.sockets).filter((socket) => roomOf(socket.url) === room);
+    if (!sockets.length) {
+      missing.push(room);
+      continue;
+    }
+    if (!sockets.some((socket) => socket.status === 101 && !socket.closed)) {
+      refused.push(`${room} → ${sockets.map((socket) => refusalStatusOf(socket) ?? "no response").join(", ")}`);
+    }
+  }
+
+  assert.deepEqual(
+    missing,
+    [],
+    `${missing.length} of ${result.seed.communityIds.length} seeded community(ies) produced no socket at all: ` +
+      "the seeded member's communities never reached the sidebar",
+  );
+  assert.deepEqual(
+    refused,
+    [],
+    `the Worker refused ${refused.length} community(ies) the seeded member belongs to: ` +
+      `${refused.join("; ")} — the membership check did not see the seeded rows (is the Worker's API_URL the app ` +
+      "that reads this database?)",
+  );
+});
+
+test("the Worker's Durable Objects hold the seeded member's sockets (--seed-member)", (t) => {
+  if (!result.seed) return t.skip("run with --seed-member to cover accepted community sockets");
+  if (!result.seededDoView.length) return t.skip(result.seededDoViewSkipReason);
+
+  const empty = result.seededDoView.filter((view) => view.sockets < 1).map((view) => view.room);
+  assert.deepEqual(
+    empty,
+    [],
+    `${empty.join(", ")} hold no socket: the handshake never reached the room, so the membership check must ` +
+      "have refused it first",
+  );
+
+  const silent = result.seededDoView.filter((view) => view.subscriptionRefs < 1).map((view) => view.room);
+  assert.deepEqual(
+    silent,
+    [],
+    `${silent.join(", ")} hold a socket that never subscribed: the client opened the room and stalled — the ` +
+      "`join`/`subscribe` frames did not arrive",
+  );
+});
+
+test("the seeded member is removed again (--seed-member)", (t) => {
+  if (!result.seed) return t.skip("run with --seed-member to cover accepted community sockets");
+  if (KEEP_SEED) return t.skip("--keep-seed: the seeded rows are meant to stay");
+
+  const cleanup = result.seedCleanup;
+  assert.ok(
+    cleanup?.removed,
+    `the seeded rows are still in the database: ${cleanup?.detail} — remove them with ` +
+      "`node apps/web/e2e/seed-member.mjs --cleanup`",
+  );
+  // Counted, not assumed: a delete whose filter matches nothing also succeeds.
+  assert.equal(
+    cleanup.users,
+    1,
+    `cleanup deleted ${cleanup.users} member(s), not the one it seeded — ${SEED_EMAIL} was already gone, or the ` +
+      "wrong rows were touched",
+  );
+  assert.equal(
+    cleanup.communities,
+    result.seed.communityIds.length,
+    `cleanup deleted ${cleanup.communities} of the ${result.seed.communityIds.length} seeded community(ies)`,
+  );
 });
 
 // ── Mocked-community coverage (--mock-communities N) ─────────────────────────
