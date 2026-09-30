@@ -117,11 +117,22 @@ jobs:
       # The target is the SAME origin the client bundle is built against — the
       # value in apps/web/wrangler.toml [vars] — so a route that works for CI but
       # not for browsers cannot pass.
+      #
+      # API_URL / API_SECRET are passed for the same reason: the smoke test now
+      # also proves the MEMBERSHIP endpoint with them, because the socket checks
+      # above are all user-scoped and user rooms skip the membership gate. A
+      # wrong pair here — an API_URL that is a stale deployment, an API_SECRET
+      # the web app does not recognize — refuses every COMMUNITY socket in the
+      # product while every other check stays green, which is exactly how this
+      # went unnoticed. Both come from the same GitHub secrets the step above
+      # pushed, so the failure names the secret that is wrong.
       - name: Smoke-test the deployed realtime worker
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
           REALTIME_URL: ${{ secrets.REALTIME_URL }}
+          API_URL: ${{ secrets.API_URL }}
+          API_SECRET: ${{ secrets.API_SECRET }}
         run: |
           origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
           node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"

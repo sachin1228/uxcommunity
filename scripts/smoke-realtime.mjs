@@ -20,7 +20,20 @@
  *      the right Durable Object wired the socket;
  *   4. the socket's subscription shows up in that Durable Object's own index;
  *   5. a secret-authenticated `POST /publish` is delivered back over the socket
- *      as an `event` frame — the whole path a notification or chat message takes.
+ *      as an `event` frame — the whole path a notification or chat message takes;
+ *   6. the membership endpoint the Worker authorizes COMMUNITY sockets against
+ *      (`${API_URL}/api/communities/:id/members/:userId/check`, authenticated
+ *      with `API_SECRET`) answers what the app answers — `403 {"ok":false}` for a
+ *      sentinel non-member — and names the wrong secret when it does not.
+ *
+ *   Check 6 exists because checks 1-5 all pass while the product is dead: every
+ *   room they exercise is USER-scoped, and user rooms skip the membership gate
+ *   (see `Room.upgrade`). A membership API that was never reachable from the
+ *   Worker — a stale `API_URL`, an `API_SECRET` that does not match the web
+ *   app's — therefore refused every community socket in production while this
+ *   harness stayed green. It is checked against the SAME two secrets the deploy
+ *   just pushed to the Worker, so it fails on the misconfiguration, not on a
+ *   copy of it.
  *
  *   It uses a SENTINEL user and a fixed instance name on purpose: the test does
  *   not touch a real member's state, and reusing one instance means the check
@@ -41,7 +54,10 @@
  *
  *   SESSION_SECRET and REALTIME_PUBLISH_SECRET come from the environment; when
  *   either is missing they are read from apps/realtime/.dev.vars, so the same
- *   command works against a local `wrangler dev`.
+ *   command works against a local `wrangler dev`. API_URL and API_SECRET are
+ *   read the same way; check 6 is skipped (never failed) when the pair is
+ *   absent, because a local run may legitimately have no web app to check
+ *   against — CI passes both, so it always runs there.
  *
  * EXIT CODE
  *   1 when any check fails, 0 when the path is proven. CI blocks on it.
@@ -57,6 +73,8 @@ const DEV_VARS_PATH = path.join(ROOT, "apps", "realtime", ".dev.vars");
 
 /** Stable identity for the probe — never a real member. */
 export const SENTINEL_USER_ID = "00000000-0000-0000-0000-0000000000ff";
+/** Sentinel community for the membership probe — never a real community. */
+export const SENTINEL_COMMUNITY_ID = "00000000-0000-0000-0000-0000000000cc";
 /** The logical room the socket subscribes to; the Worker routes it to UserDO. */
 export const LOGICAL_ROOM_PREFIX = "notifications:";
 /** Short enough that a leaked URL token is useless almost immediately. */
@@ -220,6 +238,138 @@ async function diagnoseHandshake(httpOrigin, token) {
   }
 }
 
+/**
+ * Resolve the membership configuration this probe needs — the same two values
+ * `wrangler secret put API_URL` / `API_SECRET` hand the Worker, preferred from
+ * the environment so CI tests the deployed pair. Absent configuration is a
+ * legitimate local run, so the caller skips the check rather than failing it.
+ */
+export function resolveMembershipConfig(env, devVars) {
+  const apiUrl = (env.API_URL || devVars?.API_URL || "").trim().replace(/\/+$/, "");
+  const apiSecret = env.API_SECRET || devVars?.API_SECRET || "";
+  const missing = [];
+  if (!apiUrl) missing.push("API_URL");
+  if (!apiSecret) missing.push("API_SECRET");
+  return { apiUrl, apiSecret, missing };
+}
+
+/**
+ * The membership URL the Worker itself builds. Returns null for anything that
+ * is not an http(s) origin, so a typo in `API_URL` fails loudly here instead of
+ * probing somewhere unexpected.
+ */
+export function membershipProbeUrl(
+  apiUrl,
+  communityId = SENTINEL_COMMUNITY_ID,
+  userId = SENTINEL_USER_ID,
+) {
+  if (typeof apiUrl !== "string") return null;
+  const trimmed = apiUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  } catch {
+    return null;
+  }
+  return `${trimmed}/api/communities/${encodeURIComponent(communityId)}/members/${encodeURIComponent(userId)}/check`;
+}
+
+/** Parse a JSON object body; null for anything else (including an HTML page). */
+function parseJsonObject(body) {
+  try {
+    const parsed = JSON.parse(String(body));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide what the membership endpoint's answer means, and NAME the wrong secret
+ * when it is not the app's answer.
+ *
+ * The app's own `/check` route sends exactly two things a healthy deploy can
+ * see: `200 {"ok":true}` for a member and `403 {"ok":false}` for a non-member
+ * (its 401/500 shapes carry an `error` field and mean the caller is wrong, not
+ * the user). Everything else is a misconfiguration, and the status says which
+ * one: 401 is an `API_SECRET` the app does not recognize, and a 404 — or any
+ * non-JSON body, which is what a stale Vercel host or another Worker on the
+ * same domain answers — is an `API_URL` that is not the app.
+ */
+export function classifyMembershipProbe({ status, contentType = "", body = "" }) {
+  const json = parseJsonObject(body);
+  if (status === 200 && json?.ok === true) {
+    return { ok: true, message: "membership API accepted the deployed API_SECRET" };
+  }
+  if (status === 403 && json && json.ok === false && json.error === undefined) {
+    return {
+      ok: true,
+      message: "membership API reachable and API_SECRET accepted (sentinel correctly treated as a non-member)",
+    };
+  }
+  if (status === 401) {
+    return {
+      ok: false,
+      message:
+        "401 unauthorized — the Worker's API_SECRET is not the web app's, so every community socket is refused (fix the API_SECRET GitHub secret, then redeploy the realtime worker)",
+    };
+  }
+  if (json === null || status === 404) {
+    return {
+      ok: false,
+      message: `${status} ${json === null ? "without a JSON body" : "at this path"} (content-type ${JSON.stringify(contentType || "none")}) — API_URL does not point at the app: a stale deployment (the old Vercel host, another Worker) answers here, so the membership check can never authorize (set the API_URL GitHub secret to the app origin)`,
+    };
+  }
+  if (status >= 500) {
+    return {
+      ok: false,
+      message: `${status} ${json?.error ?? "internal error"} — the app could not answer the membership check; see the web app's logs`,
+    };
+  }
+  return {
+    ok: false,
+    message: `${status} ${json?.error ?? "unexpected answer"} — the membership API answered something the app never sends`,
+  };
+}
+
+/**
+ * Prove the deploy can authorize a COMMUNITY socket, the check the harness was
+ * missing: it calls the membership endpoint with the same URL and secret the
+ * Worker was just given, using a sentinel community and user, and requires the
+ * app's own non-member answer. A wrong `API_URL` or `API_SECRET` cannot pass.
+ */
+async function proveMembershipEndpoint({ apiUrl, apiSecret, report }) {
+  const url = membershipProbeUrl(apiUrl);
+  if (!url) {
+    throw new Error(`API_URL is not an http(s) origin (${JSON.stringify(apiUrl)}), so the Worker cannot check membership at all`);
+  }
+
+  let response;
+  let body = "";
+  try {
+    response = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiSecret}` },
+      redirect: "follow",
+      signal: AbortSignal.timeout(FRAME_TIMEOUT_MS),
+    });
+    body = await response.text();
+  } catch (error) {
+    throw new Error(
+      `the membership endpoint could not be reached at ${new URL(url).host} (${error.message}) — with an unreachable API_URL the Worker refuses every community socket`,
+    );
+  }
+
+  const verdict = classifyMembershipProbe({
+    status: response.status,
+    contentType: response.headers.get("content-type") ?? "",
+    body,
+  });
+  if (!verdict.ok) throw new Error(verdict.message);
+  report(verdict.message);
+}
+
 /** One HTTP request; throws with the status so a failure reads clearly. */
 async function httpGet(url, headers, expected) {
   const response = await fetch(url, { headers, signal: AbortSignal.timeout(FRAME_TIMEOUT_MS) });
@@ -352,6 +502,7 @@ function readDevVarsIfPresent() {
 async function main() {
   if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log("Usage: node scripts/smoke-realtime.mjs --url <https origin> [--attempts N]");
+    console.log("  Env: SESSION_SECRET, REALTIME_PUBLISH_SECRET (required), API_URL, API_SECRET (community-socket check)");
     return;
   }
 
@@ -365,7 +516,8 @@ async function main() {
   }
   const httpOrigin = wsOrigin.replace(/^ws/, "http");
 
-  const secrets = resolveSecrets(process.env, readDevVarsIfPresent());
+  const devVars = readDevVarsIfPresent();
+  const secrets = resolveSecrets(process.env, devVars);
   if (secrets.missing.length) {
     console.error(`✗ missing ${secrets.missing.join(", ")} (environment or apps/realtime/.dev.vars)`);
     process.exitCode = 1;
@@ -379,6 +531,23 @@ async function main() {
   // an unauthenticated upgrade must never be accepted.
   await awaitDeployedVersion(httpOrigin);
   console.log("  ok   unauthenticated upgrade refused with 401");
+
+  // The version just published is the one answering. Before proving the socket
+  // path, prove the layer every USER-scoped check above skips: community rooms
+  // are authorized against API_URL/API_SECRET, so a wrong pair there refuses
+  // every community socket in the product while everything else stays green.
+  const membership = resolveMembershipConfig(process.env, devVars);
+  if (membership.missing.length) {
+    console.log(
+      `  skip membership endpoint check (no ${membership.missing.join(", ")} in the environment or apps/realtime/.dev.vars)`,
+    );
+  } else {
+    await proveMembershipEndpoint({
+      apiUrl: membership.apiUrl,
+      apiSecret: membership.apiSecret,
+      report: (line) => console.log(`  ok   ${line}`),
+    });
+  }
 
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
