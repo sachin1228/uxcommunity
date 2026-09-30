@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { emailTheme } from "./theme";
 import { EMAIL_LOGO_PATH } from "./layout";
+import type { RenderedEmail } from "./document";
 import {
   renderCompanyVerificationEmail,
   renderInvitationEmail,
@@ -9,7 +10,6 @@ import {
   renderRejectionEmail,
   renderResumeSignupEmail,
   renderWelcomeEmail,
-  type RenderedEmail,
 } from "./templates";
 
 /**
@@ -23,6 +23,9 @@ import {
  * theme — including a theme that has drifted from the design system. Asking for
  * the design system's own hexes means a change there has to be acknowledged
  * here, deliberately.
+ *
+ * Both bodies are checked. The plain-text part is the one that quietly rots,
+ * because nothing in the product renders it and only the mail client does.
  */
 
 const APP_URL = "https://app.uxcommunity.in";
@@ -206,8 +209,54 @@ test("each email links to the page its call to action belongs to", () => {
   ];
 
   for (const [name, href] of expectedLinks) {
-    const email = RENDERED.find(([label]) => label === name);
+    const email = RENDERED.find(([label]) => label === name)?.[1];
     assert.ok(email, `no rendered email named ${name}`);
-    assert.ok(email[1].html.includes(`href="${href}"`), `${name} email does not link to ${href}`);
+    assert.ok(email.html.includes(`href="${href}"`), `${name} email does not link to ${href}`);
+    assert.ok(email.text.includes(href), `${name} text body does not link to ${href}`);
+  }
+});
+
+test("every email has a plain-text body with no markup in it", () => {
+  for (const [name, email] of RENDERED) {
+    assert.ok(email.text.trim().length > 40, `${name} email has no text body`);
+    assert.ok(
+      !/<\/?[a-z][^>]*>/i.test(email.text),
+      `${name} text body still carries HTML`
+    );
+    assert.ok(!email.text.includes("**"), `${name} text body leaked an emphasis marker`);
+    assert.ok(!email.text.includes("&nbsp;"), `${name} text body leaked an entity`);
+    assert.ok(
+      email.text.includes(`© ${new Date().getFullYear()} uxcommunity`),
+      `${name} text body has no footer`
+    );
+  }
+});
+
+test("the text body says what the heading and the blocks say", () => {
+  for (const [name, email] of RENDERED) {
+    const heading = email.html.match(/<h1[^>]*>(.*?)<\/h1>/)?.[1];
+    assert.ok(heading, `${name} email has no heading`);
+    assert.ok(
+      email.text.startsWith(heading),
+      `${name} text body does not open with its heading`
+    );
+  }
+
+  const verification = RENDERED.find(([name]) => name === "company verification")?.[1];
+  assert.ok(verification, "no rendered verification email");
+  assert.ok(verification.text.includes("482913"), "the code is missing from the text body");
+});
+
+test("plain-text lines stay inside the width mail clients read at", () => {
+  // A URL is allowed to run long: folding it would break the only thing the
+  // reader has to act on.
+  const overlong = (text: string) =>
+    text
+      .split("\n")
+      .filter((line) => line.length > 78 && !line.includes("http"))
+      .map((line) => `${line.length} cols: ${line}`);
+
+  for (const [name, email] of RENDERED) {
+    assert.deepEqual(overlong(email.text), [], `${name} text body has an overlong line`);
   }
 });

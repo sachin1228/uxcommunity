@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { appLink } from "./layout";
+import type { RenderedEmail } from "./document";
 import {
   renderCompanyVerificationEmail,
   renderInvitationEmail,
@@ -7,13 +8,12 @@ import {
   renderRejectionEmail,
   renderResumeSignupEmail,
   renderWelcomeEmail,
-  type RenderedEmail,
 } from "./templates";
 
 /**
  * Sending, and nothing else.
  *
- * The markup lives in `./templates`, so a change of brand touches one layout
+ * The content lives in `./templates`, so a change of brand touches one layout
  * instead of six copies of it, and every email can be rendered and inspected
  * without an API key or a network call.
  */
@@ -40,11 +40,15 @@ const getAppUrl = () => {
 const invitationExpiryDays = () => Number(process.env.INVITATION_EXPIRY_DAYS ?? 7);
 
 async function send(to: string, email: RenderedEmail): Promise<void> {
+  // Both bodies go out on every send: `html` is what a mail client shows, and
+  // `text` is what a client with HTML off, a smartwatch, or a filter scoring
+  // the message reads instead.
   await getResend().emails.send({
     from: getFrom(),
     to,
     subject: email.subject,
     html: email.html,
+    text: email.text,
   });
 }
 

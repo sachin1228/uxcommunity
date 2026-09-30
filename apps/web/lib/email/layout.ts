@@ -1,12 +1,21 @@
 import { APP_NAME } from "@uxcommunity/shared";
+import { emphasizeHtml, type EmailBlock, type EmailDocument } from "./document";
 import { emailTheme as theme } from "./theme";
+
+/**
+ * The HTML body: one shell and one renderer per block kind.
+ *
+ * Keeping a single shell is what makes a change of brand a change in one place —
+ * before this, six templates each carried their own copy of the header and the
+ * footer, and the palette in them had already drifted away from the product.
+ */
 
 /**
  * The brand mark the emails carry, served from the web app's `public`
  * directory.
  *
  * It is the same artwork as the in-app logo mark, as a raster: no email client
- * renders the inline SVG the app uses, and PNG is the one format all of them
+ * renders the inline SVG the app draws, and PNG is the one format all of them
  * agree on. The file is a rounded tile that is transparent outside its corners,
  * so it sits on the dark card without a plate behind it.
  */
@@ -26,29 +35,19 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
-export interface EmailButton {
-  href: string;
-  label: string;
-  /**
-   * `primary` is the white action the product uses in dark mode; `secondary`
-   * is a quiet one for an email whose ask is optional.
-   */
-  variant?: "primary" | "secondary";
-}
-
 /** A bulletproof call to action: the background lives on the cell, not the link. */
-export function emailButton({ href, label, variant = "primary" }: EmailButton): string {
-  const background = variant === "primary" ? theme.accent : theme.secondary;
-  const color = variant === "primary" ? theme.accentText : theme.secondaryText;
+function actionBlock(block: Extract<EmailBlock, { kind: "action" }>): string {
+  const primary = (block.variant ?? "primary") === "primary";
+  const background = primary ? theme.accent : theme.secondary;
+  const color = primary ? theme.accentText : theme.secondaryText;
 
-  return `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
   <tr>
     <td style="background-color:${background};border-radius:${theme.radius.button};">
-      <a href="${href}" style="display:inline-block;padding:13px 26px;font-family:${theme.font};font-size:${theme.size.body};font-weight:${theme.weight.semibold};line-height:1;color:${color};text-decoration:none;border-radius:${theme.radius.button};">${label}</a>
+      <a href="${block.href}" style="display:inline-block;padding:13px 26px;font-family:${theme.font};font-size:${theme.size.body};font-weight:${theme.weight.semibold};line-height:1;color:${color};text-decoration:none;border-radius:${theme.radius.button};">${block.label}</a>
     </td>
   </tr>
-</table>`.trim();
+</table>`;
 }
 
 /**
@@ -57,61 +56,51 @@ export function emailButton({ href, label, variant = "primary" }: EmailButton): 
  * The letterspacing is part of the security story, not decoration: it makes the
  * digits easy to read one at a time when retyping them by hand.
  */
-export function emailCode(code: string): string {
-  return `<p style="margin:0 0 16px;padding:18px 20px;background-color:${theme.well};border-radius:${theme.radius.well};font-family:${theme.font};font-size:${theme.size.code};font-weight:${theme.weight.semibold};letter-spacing:0.26em;line-height:${theme.leading.tight};color:${theme.heading};text-align:center;">${code}</p>`;
+function codeBlock(block: Extract<EmailBlock, { kind: "code" }>): string {
+  return `<p style="margin:0 0 16px;padding:18px 20px;background-color:${theme.well};border-radius:${theme.radius.well};font-family:${theme.font};font-size:${theme.size.code};font-weight:${theme.weight.semibold};letter-spacing:0.26em;line-height:${theme.leading.tight};color:${theme.heading};text-align:center;">${block.value}</p>`;
 }
 
 /**
- * A body paragraph. `html` may carry emphasis (`<strong>`) — it is authored in
- * this repository, never user input.
- *
- * `spaced` opens the larger gap that has to precede a call to action — a button
- * or the code well: margins on the element itself are unreliable in Outlook's
- * renderer, so the space is taken from the paragraph above it.
+ * A paragraph sits close to the text it belongs with, and opens a wider gap
+ * before a call to action — a button or the code well. The space comes from the
+ * paragraph because a margin on the element itself is unreliable in Outlook's
+ * renderer.
  */
-export function emailParagraph(html: string, options: { spaced?: boolean } = {}): string {
-  const margin = options.spaced ? "0 0 26px" : "0 0 14px";
+function paragraphBlock(
+  block: Extract<EmailBlock, { kind: "paragraph" }>,
+  next: EmailBlock | undefined
+): string {
+  const spaced = next?.kind === "action" || next?.kind === "code";
+  const margin = spaced ? "0 0 26px" : "0 0 14px";
 
-  return `<p style="margin:${margin};font-family:${theme.font};font-size:${theme.size.body};line-height:${theme.leading.relaxed};color:${theme.text};">${html}</p>`;
-}
-
-/** Emphasis that reads as foreground rather than as the muted body tone. */
-export function emailStrong(text: string): string {
-  return `<strong style="color:${theme.heading};font-weight:${theme.weight.semibold};">${text}</strong>`;
+  return `<p style="margin:${margin};font-family:${theme.font};font-size:${theme.size.body};line-height:${theme.leading.relaxed};color:${theme.text};">${emphasizeHtml(block.text)}</p>`;
 }
 
 /** The small print under a call to action. */
-export function emailFinePrint(html: string): string {
-  return `<p style="margin:22px 0 0;font-family:${theme.font};font-size:${theme.size.small};line-height:${theme.leading.normal};color:${theme.text};">${html}</p>`;
+function finePrintBlock(block: Extract<EmailBlock, { kind: "finePrint" }>): string {
+  return `<p style="margin:22px 0 0;font-family:${theme.font};font-size:${theme.size.small};line-height:${theme.leading.normal};color:${theme.text};">${emphasizeHtml(block.text)}</p>`;
 }
 
-export interface EmailLayout {
-  /** Origin that the links and the brand mark are addressed against. */
-  appUrl: string;
-  subject: string;
-  /** Inbox preview line — shown beside the subject, hidden inside the body. */
-  preheader: string;
-  heading: string;
-  /** Body blocks, already rendered by the helpers above. */
-  content: string;
+function renderBlock(block: EmailBlock, next: EmailBlock | undefined): string {
+  switch (block.kind) {
+    case "paragraph":
+      return paragraphBlock(block, next);
+    case "code":
+      return codeBlock(block);
+    case "action":
+      return actionBlock(block);
+    case "finePrint":
+      return finePrintBlock(block);
+  }
 }
 
-/**
- * The shell every email shares: brand header, card, content, legal footer.
- *
- * Keeping one shell is what makes a change of brand a change in one place —
- * before this, six templates each carried their own copy of the header and the
- * footer, and the palette in them had already drifted away from the product.
- */
-export function renderEmailLayout({
-  appUrl,
-  subject,
-  preheader,
-  heading,
-  content,
-}: EmailLayout): string {
+export function renderEmailHtml(document: EmailDocument): string {
+  const { appUrl, subject, preheader, heading, blocks } = document;
   const origin = appLink(appUrl);
   const year = new Date().getFullYear();
+  const content = blocks
+    .map((block, index) => renderBlock(block, blocks[index + 1]))
+    .join("\n");
 
   return `<!DOCTYPE html>
 <html lang="en">
