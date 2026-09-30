@@ -1,0 +1,18 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "http://localhost:3000",
+          "https://app.uxcommunity.in",
+          "https://uxcommunity.in",
+          "https://*.workers.dev"
+        ],
+        "methods": ["PUT", "GET", "HEAD"],
+        "headers": ["Content-Type", "x-amz-checksum-crc32", "x-amz-sdk-checksum-algorithm"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
