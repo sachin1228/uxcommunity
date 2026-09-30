@@ -1,4 +1,4 @@
-import { emailTheme as theme } from "./theme";
+import { emailPalettes, emailTheme as theme } from "./theme";
 import { renderEmailHtml } from "./layout";
 import { renderEmailText } from "./text";
 
@@ -42,11 +42,14 @@ export interface RenderedEmail {
  */
 const EMPHASIS = /\*\*([^*]+)\*\*/g;
 
-/** `**bold**` as the HTML the layout can style. */
+/**
+ * `**bold**` as the HTML the layout can style. It carries the heading class as
+ * well, because the colour it stands out with is the themed one.
+ */
 export function emphasizeHtml(text: string): string {
   return text.replace(
     EMPHASIS,
-    `<strong style="color:${theme.heading};font-weight:${theme.weight.semibold};">$1</strong>`
+    `<strong class="uxc-heading" style="color:${emailPalettes.light.heading};font-weight:${theme.weight.semibold};">$1</strong>`
   );
 }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emailTheme } from "./theme";
+import { emailPalettes } from "./theme";
 import { EMAIL_LOGO_PATH } from "./layout";
 import type { RenderedEmail } from "./document";
 import {
@@ -92,16 +92,24 @@ const RETIRED_PALETTE = [
 
 const has = (html: string, value: string) => html.toLowerCase().includes(value.toLowerCase());
 
-test("every email carries the design system's dark palette", () => {
+const PALETTE_TOKENS = ["page", "card", "heading", "text", "divider"] as const;
+
+function paletteEntries(palette: typeof emailPalettes.light) {
+  return PALETTE_TOKENS.map((token) => [token, palette[token]] as const);
+}
+
+test("every email inks the design system's light palette", () => {
   for (const [name, email] of RENDERED) {
-    for (const [token, colour] of Object.entries({
-      page: emailTheme.page,
-      card: emailTheme.card,
-      heading: emailTheme.heading,
-      body: emailTheme.text,
-      divider: emailTheme.divider,
-    })) {
-      assert.ok(has(email.html, colour), `${name} email is missing the ${token} colour ${colour}`);
+    for (const [token, colour] of paletteEntries(emailPalettes.light)) {
+      assert.ok(has(email.html, colour), `${name} email is missing the light ${token} colour ${colour}`);
+    }
+  }
+});
+
+test("every email carries the dark palette for a client that asks for it", () => {
+  for (const [name, email] of RENDERED) {
+    for (const [token, colour] of paletteEntries(emailPalettes.dark)) {
+      assert.ok(has(email.html, colour), `${name} email is missing the dark ${token} colour ${colour}`);
     }
   }
 });
@@ -128,13 +136,13 @@ test("every email shows the logo mark, not just a text wordmark", () => {
   }
 });
 
-test("every email is a complete, dark-scheme document with a hidden preheader", () => {
+test("every email is a complete document with a hidden preheader", () => {
   for (const [name, email] of RENDERED) {
     assert.ok(email.html.startsWith("<!DOCTYPE html>"), `${name} email is not a document`);
     assert.ok(email.html.trimEnd().endsWith("</html>"), `${name} email is not closed`);
     assert.ok(
-      email.html.includes('content="dark"'),
-      `${name} email does not declare the dark colour scheme`
+      email.html.includes('content="light dark"'),
+      `${name} email does not declare both colour schemes`
     );
     assert.match(
       email.html,
@@ -152,29 +160,61 @@ test("every email is a complete, dark-scheme document with a hidden preheader", 
 /** Emails whose ask is a single primary action — the code email has none. */
 const PRIMARY_ACTION_EMAILS = ["password reset", "invitation", "welcome", "resumed signup"];
 
-test("a primary call to action is the product's white-on-black action", () => {
+test("a primary call to action is the product's accent, inverted in dark", () => {
   for (const name of PRIMARY_ACTION_EMAILS) {
     const email = RENDERED.find(([label]) => label === name)?.[1];
     assert.ok(email, `no rendered email named ${name}`);
     assert.ok(
-      email.html.includes(`background-color:${emailTheme.accent}`) &&
-        email.html.includes(`color:${emailTheme.accentText}`),
-      `${name} email does not use the primary action style`
+      has(email.html, `background-color:${emailPalettes.light.accent}`),
+      `${name} email does not inline the light primary action`
+    );
+    assert.ok(email.html.includes('class="uxc-accent"'), `${name} email has no primary action hook`);
+    assert.ok(
+      has(email.html, `.uxc-accent { background-color: ${emailPalettes.dark.accent} !important; }`),
+      `${name} email does not invert its primary action in dark`
     );
   }
 });
 
 test("the rejection email offers a quieter action than a primary one", () => {
-  const rejection = RENDERED.find(([name]) => name === "rejection");
-  assert.ok(rejection);
+  const rejection = RENDERED.find(([name]) => name === "rejection")?.[1];
+  assert.ok(rejection, "no rendered rejection email");
+  assert.ok(rejection.html.includes('class="uxc-secondary"'), "the rejection email has no quiet action");
   assert.ok(
-    rejection[1].html.includes(`background-color:${emailTheme.secondary}`),
-    "the rejection email has no secondary action"
-  );
-  assert.ok(
-    !rejection[1].html.includes(`background-color:${emailTheme.accent};`),
+    !rejection.html.includes('class="uxc-accent"'),
     "the rejection email should not lead with the primary action"
   );
+});
+
+test("the shell asks for both schemes and every dark rule beats the inline style", () => {
+  for (const [name, email] of RENDERED) {
+    assert.ok(email.html.includes("color-scheme: light dark"), `${name} email has no color-scheme`);
+
+    const darkBlock =
+      email.html.match(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+    const rules = darkBlock
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.endsWith("}"));
+
+    assert.ok(rules.length >= 10, `${name} email carries only ${rules.length} dark rules`);
+    for (const rule of rules) {
+      const declarations = rule
+        .slice(rule.indexOf("{") + 1, rule.lastIndexOf("}"))
+        .split(";")
+        .map((declaration) => declaration.trim())
+        .filter(Boolean);
+
+      // Per declaration, not per rule: a rule where only the last property is
+      // important leaves every earlier one losing to the inline style.
+      for (const declaration of declarations) {
+        assert.ok(
+          declaration.endsWith("!important"),
+          `${name} declaration would lose to the inline style: ${declaration}`
+        );
+      }
+    }
+  }
 });
 
 test("a link never doubles the slash when the app origin ends in one", () => {
