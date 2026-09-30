@@ -77,6 +77,7 @@ uxcommunity/
 
 | Doc | What it covers |
 |---|---|
+| `docs/pending-work.md` | Deferred work with its current state, why it matters and what "done" looks like |
 | `docs/architecture-refactor.md` | Dependency-direction refactor: domain models, membership gate, `CommunityChat` split |
 | `docs/mobile-architecture.md` | Expo routing, auth gates, realtime chat and push notifications |
 | `docs/mobile-design-system.md` | How the mobile app consumes the shared design tokens |
