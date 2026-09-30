@@ -72,6 +72,21 @@ jobs:
       # Workers' copies from one GitHub secret is what keeps them provably in
       # sync.
       #
+      # WHY `secret put` AND NOT `versions secret put` (this is load-bearing):
+      # `wrangler versions secret put` stages the value into a NEW version of the
+      # Worker and deliberately does NOT deploy it — it exists for gradual
+      # rollouts, which this Worker does not use. So every run of this step used
+      # to write the four secrets into a version nobody served, leaving the live
+      # version on whatever it already had: rotating a GitHub secret silently
+      # changed nothing in production, and a Worker that is running without
+      # SESSION_SECRET refuses every handshake with a 401 that no log explains
+      # (see apps/realtime/src/session-config.ts). `wrangler secret put`
+      # publishes the version it creates, which is what this step means.
+      #
+      # The value is written with `printf '%s'` rather than `echo`, which appends
+      # a newline: a secret that arrives with a trailing \n still signs nothing
+      # the web app can verify.
+      #
       # API_URL / API_SECRET are the membership check's configuration. The
       # realtime Worker FAILS CLOSED without them (audit M-8): with API_URL
       # missing or unreachable, or API_SECRET not matching the web app's, every
@@ -82,10 +97,10 @@ jobs:
       - name: Set realtime worker secrets
         working-directory: apps/realtime
         run: |
-          echo "${{ secrets.SESSION_SECRET }}" | npx wrangler versions secret put SESSION_SECRET
-          echo "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler versions secret put REALTIME_PUBLISH_SECRET
-          echo "${{ secrets.API_URL }}" | npx wrangler versions secret put API_URL
-          echo "${{ secrets.API_SECRET }}" | npx wrangler versions secret put API_SECRET
+          printf '%s' "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
+          printf '%s' "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
+          printf '%s' "${{ secrets.API_URL }}" | npx wrangler secret put API_URL
+          printf '%s' "${{ secrets.API_SECRET }}" | npx wrangler secret put API_SECRET
 
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files

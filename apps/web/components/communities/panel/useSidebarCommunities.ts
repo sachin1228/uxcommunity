@@ -45,9 +45,19 @@ export function useSidebarCommunities(userId: string) {
 
   // Initialize the realtime pool with the current user on first mount.
   // This must happen before any component calls realtimePool.acquire().
+  //
+  // init() only — and that is deliberate. This hook does not own the realtime
+  // client, and `destroyAll()` tears down the app-wide singleton: every room and
+  // every socket, including ones registered by other components (the chat's
+  // rooms, the right sidebar's rules room, the notification bell's socket).
+  // Running it from an effect cleanup meant an unmount here — including the
+  // unmount half of React's StrictMode double-invoke, which is exactly the
+  // stack in the dev console — closed sockets those hooks still depended on and
+  // dropped room state out from under handlers that stayed registered. Session
+  // end is what should tear the client down, so that now lives in the logout
+  // flow (components/ui/useLogout.ts).
   useEffect(() => {
     realtimePool.init({ id: userId, name: null, avatar: null });
-    return () => realtimePool.destroyAll();
   }, [userId]);
 
   const activeCommunityId = pathname.match(

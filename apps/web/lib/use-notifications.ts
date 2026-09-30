@@ -134,6 +134,18 @@ export function useNotifications(userId: string) {
 
   useEffect(() => {
     if (!isVisible) return;
+    // Identity BEFORE the first subscribe. Every user-scoped room multiplexes
+    // over one socket keyed `user:${userId}` (see RealtimeClient
+    // .userConnectionKey), so subscribing while the client still has no user
+    // opens that socket under the `user:global` placeholder — a Durable Object
+    // the server never publishes to — and the next init() then closes it
+    // mid-handshake and re-keys it. That race is the
+    // "ws://…?room=user%3Aglobal … closed before the connection is
+    // established" warning on every dashboard load, and it costs a wasted
+    // handshake each time. The notifications hook is the first user-scoped
+    // subscriber to run (child effects run before the sidebar's), so it is the
+    // one that has to establish identity.
+    realtimeClient.init({ id: userId, name: null, avatar: null });
     const room = realtimeRooms.notifications(userId);
 
     const unsubscribes: Array<() => void> = [];

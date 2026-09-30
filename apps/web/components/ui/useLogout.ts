@@ -3,6 +3,28 @@
 import { useCallback, useState } from "react";
 
 /**
+ * Tear the realtime client down on the way out.
+ *
+ * The full document navigation in useLogout would take the sockets with it, so
+ * this is not load-bearing for correctness — it is what lets a COMPONENT never
+ * be responsible for destroying the shared client (see useSidebarCommunities: an
+ * effect cleanup that called destroyAll() closed sockets other hooks still held,
+ * and under React StrictMode's mount → unmount → mount it did so on every dev
+ * page load). Session end is the real teardown point, and it lives here.
+ *
+ * Best-effort: a failure must never strand the user behind the logging-out
+ * overlay, and the navigation closes every socket anyway.
+ */
+async function closeRealtime(): Promise<void> {
+  try {
+    const { realtimePool } = await import("@/lib/realtime/pool");
+    realtimePool.destroyAll();
+  } catch {
+    // Ignore — the navigation below ends the session regardless.
+  }
+}
+
+/**
  * Logout flow shared by every "Sign out" button in the app.
  *
  * Shows the full-screen "Logging out" state (see BrandedLoadingScreen), posts
@@ -27,6 +49,7 @@ export function useLogout() {
       await fetch("/api/auth/logout", { method: "POST" });
       const { resetClientSessionCaches } = await import("@/lib/session-cache");
       resetClientSessionCaches();
+      await closeRealtime();
       window.location.replace("/login");
     } catch {
       // Stay on the page if the request fails — don't trap the user behind
