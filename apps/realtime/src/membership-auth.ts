@@ -58,6 +58,61 @@ interface MembershipCacheEntry {
  */
 let warnedMissingMembershipApi = false;
 
+/**
+ * Statuses already reported for the membership endpoint, per isolate.
+ *
+ * A membership API that answers something the app never answers (404 from a
+ * stale `API_URL`, 401 from a mismatched `API_SECRET`) refuses EVERY community
+ * socket in the product. That used to be entirely silent — every refusal looked
+ * like an ordinary "not a member" and nothing in these logs said otherwise, so
+ * the only symptom was a browser console full of failed sockets (see the
+ * incident this comment documents). Reported once per status per isolate so the
+ * signal stays readable, keyed by status so `401` and `404` cannot mask each
+ * other.
+ */
+const reportedMembershipDenials = new Set<number>();
+
+/**
+ * Report an answer the web app never sends for this endpoint.
+ *
+ * Only ids, a status and the API's HOSTNAME are logged — never the API secret,
+ * the full URL or the response body, which can echo request data.
+ */
+function warnMembershipApiDeniedOnce(status: number, apiUrl: string, reason: string): void {
+  if (reportedMembershipDenials.has(status)) return;
+  reportedMembershipDenials.add(status);
+  let apiHost = "unknown";
+  try {
+    apiHost = new URL(apiUrl).host;
+  } catch {
+    // `resolveMembershipConfig` already validated the URL; keep the fallback.
+  }
+  logEvent("error", {
+    event: "realtime.membership.api_denied",
+    status,
+    api_host: apiHost,
+    reason,
+  });
+}
+
+/** What the app's `/check` route answers with. */
+interface MembershipCheckBody {
+  ok?: boolean;
+  error?: string;
+}
+
+/** Parse a JSON body, treating anything unparseable as absent. */
+async function readJsonBody(
+  response: Response,
+): Promise<MembershipCheckBody | null> {
+  try {
+    const body = (await response.json()) as MembershipCheckBody;
+    return body && typeof body === "object" ? body : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface MembershipAuthorizerDeps {
   /** Durable Object storage, for the persisted re-check cache. */
   storage: DurableObjectStorage;
@@ -149,14 +204,29 @@ export class MembershipAuthorizer {
         },
       );
 
+      // Classify the answer against the two responses the app's own
+      // `/check` route actually sends — `200 {ok:true}` for a member and
+      // `403 {ok:false}` for a non-member. Anything else (a 404 from a stale
+      // `API_URL`, a 401 from a mismatched `API_SECRET`, an HTML error page, a
+      // 5xx) is a misconfiguration, not a verdict about this user, so it is
+      // reported instead of being silently folded into "denied".
       let authorized = false;
-      if (response.ok) {
-        try {
-          const body = await response.json() as { ok?: boolean };
-          authorized = body.ok === true;
-        } catch {
+      if (response.status === 403) {
+        const body = await readJsonBody(response);
+        if (body && body.ok === false && body.error === undefined) {
+          // A genuine non-member — the app's documented answer.
           authorized = false;
+        } else {
+          warnMembershipApiDeniedOnce(403, config.apiUrl, body ? "unexpected_body" : "non_json_body");
         }
+      } else if (response.ok) {
+        const body = await readJsonBody(response);
+        authorized = body?.ok === true;
+        if (!authorized) {
+          warnMembershipApiDeniedOnce(response.status, config.apiUrl, body ? "unexpected_body" : "non_json_body");
+        }
+      } else {
+        warnMembershipApiDeniedOnce(response.status, config.apiUrl, "unexpected_status");
       }
 
       this.setCache(cacheKey, { ok: authorized, ts: Date.now() });

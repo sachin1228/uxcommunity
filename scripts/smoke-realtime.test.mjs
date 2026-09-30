@@ -19,9 +19,13 @@ import { jwtVerify } from "jose";
 
 import {
   buildSmokeToken,
+  classifyMembershipProbe,
+  membershipProbeUrl,
   parseDevVars,
   parseFrame,
+  resolveMembershipConfig,
   resolveSecrets,
+  SENTINEL_COMMUNITY_ID,
   SENTINEL_USER_ID,
   toWebSocketOrigin,
   TOKEN_TTL_SECONDS,
@@ -81,6 +85,88 @@ test("missing secrets are reported by name, never by value", () => {
   assert.deepEqual(resolved.missing, ["REALTIME_PUBLISH_SECRET"]);
   const empty = resolveSecrets({}, {});
   assert.deepEqual(empty.missing, ["SESSION_SECRET", "REALTIME_PUBLISH_SECRET"]);
+});
+
+// ── The membership endpoint community sockets are authorized against ────────
+
+test("the membership check reads the same API_URL/API_SECRET pair the Worker gets", () => {
+  const fromEnv = resolveMembershipConfig(
+    { API_URL: "https://app.uxcommunity.in", API_SECRET: "app-secret" },
+    { API_URL: "http://localhost:3000", API_SECRET: "dev-secret" },
+  );
+  assert.deepEqual(fromEnv, { apiUrl: "https://app.uxcommunity.in", apiSecret: "app-secret", missing: [] });
+
+  // A local run with no membership API configured SKIPS the check, so an
+  // absent pair is reported by name rather than turned into a failure.
+  const absent = resolveMembershipConfig({}, { API_SECRET: "dev-secret" });
+  assert.deepEqual(absent.missing, ["API_URL"]);
+  assert.deepEqual(resolveMembershipConfig({}, null).missing, ["API_URL", "API_SECRET"]);
+});
+
+test("the probe URL is the Worker's own membership URL, trailing slash and all", () => {
+  assert.equal(
+    membershipProbeUrl("https://app.uxcommunity.in/"),
+    `https://app.uxcommunity.in/api/communities/${SENTINEL_COMMUNITY_ID}/members/${SENTINEL_USER_ID}/check`,
+  );
+  for (const value of ["", "   ", "app.uxcommunity.in", "ftp://example.com", null, undefined]) {
+    assert.equal(membershipProbeUrl(value), null, `${JSON.stringify(value)} must not produce a probe`);
+  }
+});
+
+test("the app's own two answers pass the check", () => {
+  const member = classifyMembershipProbe({ status: 200, contentType: "application/json", body: '{"ok":true}' });
+  assert.equal(member.ok, true);
+
+  const nonMember = classifyMembershipProbe({
+    status: 403,
+    contentType: "application/json; charset=utf-8",
+    body: '{"ok":false}',
+  });
+  assert.equal(nonMember.ok, true);
+});
+
+test("a mismatched API_SECRET fails with the secret to fix", () => {
+  const verdict = classifyMembershipProbe({
+    status: 401,
+    contentType: "application/json",
+    body: '{"ok":false,"error":"unauthorized"}',
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /API_SECRET/);
+});
+
+test("an API_URL that is not the app fails with the secret to fix", () => {
+  // What a stale deployment answers: the old Vercel host 404s the route, and a
+  // sibling Worker (rt.uxcommunity.in) answers plain "Not found".
+  const vercel = classifyMembershipProbe({
+    status: 404,
+    contentType: "text/html; charset=utf-8",
+    body: "<!DOCTYPE html><html>…</html>",
+  });
+  assert.equal(vercel.ok, false);
+  assert.match(vercel.message, /API_URL/);
+
+  const worker = classifyMembershipProbe({ status: 404, contentType: "text/plain", body: "Not found" });
+  assert.equal(worker.ok, false);
+  assert.match(worker.message, /API_URL/);
+
+  // A 403 that is not the app's shape (a WAF page, another app's refusal) must
+  // not be mistaken for the app's non-member answer.
+  const notTheApp = classifyMembershipProbe({ status: 403, contentType: "text/html", body: "<html>blocked</html>" });
+  assert.equal(notTheApp.ok, false);
+});
+
+test("the web app's own misconfiguration is reported, not swallowed", () => {
+  const noSecret = classifyMembershipProbe({
+    status: 500,
+    contentType: "application/json",
+    body: '{"ok":false,"error":"API_SECRET not configured"}',
+  });
+  assert.equal(noSecret.ok, false);
+  assert.match(noSecret.message, /API_SECRET not configured/);
+
+  const unexpected = classifyMembershipProbe({ status: 200, contentType: "application/json", body: '{"ok":false}' });
+  assert.equal(unexpected.ok, false);
 });
 
 // ── The token the Worker must accept ────────────────────────────────────────
