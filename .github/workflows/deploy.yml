@@ -102,6 +102,30 @@ jobs:
           printf '%s' "${{ secrets.API_URL }}" | npx wrangler secret put API_URL
           printf '%s' "${{ secrets.API_SECRET }}" | npx wrangler secret put API_SECRET
 
+      # The smoke check chooses the origin it probes, mints the session token and
+      # picks which secrets to sign with — a mistake there would fail a HEALTHY
+      # deploy, so its helpers are pinned down before it is allowed to gate one.
+      - name: Unit-test the realtime smoke harness
+        run: node --test scripts/smoke-realtime.test.mjs
+
+      # Prove the version just published actually works, BEFORE the web worker
+      # ships against it. A deploy that answers `/publish` with "ok" while
+      # refusing every WebSocket handshake (a secret that never reached the live
+      # version, a broken custom-domain route) used to look like a successful
+      # release; this turns it into a red build. Blocks on exit code 1.
+      #
+      # The target is the SAME origin the client bundle is built against — the
+      # value in apps/web/wrangler.toml [vars] — so a route that works for CI but
+      # not for browsers cannot pass.
+      - name: Smoke-test the deployed realtime worker
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
+          REALTIME_URL: ${{ secrets.REALTIME_URL }}
+        run: |
+          origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
+          node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"
+
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files
         working-directory: apps/web

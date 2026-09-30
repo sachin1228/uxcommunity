@@ -186,6 +186,13 @@ Two Workers deploy from this repository, both from `.github/workflows/deploy.yml
 
 Neither Worker has a Cloudflare Git integration connected. Cloudflare's own build system runs one build command and one deploy command per Worker, which cannot express realtime's secrets being pushed between the two deploys, nor gate on the type check and unit tests, so the GitHub Actions pipeline owns both. Locally, `npm run deploy:realtime` and `npm run deploy:web` each target their own config file.
 
+Every deploy ends by asking the version it just published to do the one thing it exists for — `scripts/smoke-realtime.mjs` (the **Smoke-test the deployed realtime worker** step) proves an unauthenticated upgrade is refused, an authenticated one completes, `join` is acknowledged, the subscription is indexed, and a published event arrives back over the socket. A Worker that answers `/publish` with "ok" while refusing every handshake used to look like a successful release; now it fails the build. The same check runs against a local worker:
+
+```bash
+npm run smoke:realtime -- --url http://localhost:8787   # secrets from apps/realtime/.dev.vars
+npm run test:smoke-realtime                             # the harness's own helpers
+```
+
 ## Building the Android APK locally (no Expo cloud)
 
 The mobile app lives in `expo-app-standalone 3/` (Expo / React Native, managed workflow). To produce an installable APK on your own machine you need:
