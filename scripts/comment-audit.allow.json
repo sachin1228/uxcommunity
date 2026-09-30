@@ -117,6 +117,35 @@
       "reason": "the same pattern: this document narrates the script's deletion and names it in its change table, so the path is deliberately absent"
     },
     {
+      "rule": "stale-path",
+      "match": "20260929140000_company_directory.sql",
+      "reason": "the v1 directory seed migration, deleted by 04c3611e after its data was exported to data/company-directory/seeds/wikidata-p856.json; every remaining mention narrates that removal (the reset audit table, the generator's history note, the stewardship migration's applied-to note and the reset's rollback recipe, which restores the rows by git-showing the migration from history)"
+    },
+    {
+      "rule": "stale-path",
+      "match": "20260929151000_company_directory_backfill.sql",
+      "file": "docs/company-directory-reset.md",
+      "reason": "the seed attribution migration, deleted by the same commit as the seed itself; the reset audit table names it to say what was removed from the repository"
+    },
+    {
+      "rule": "stale-path",
+      "match": "20260929153000_company_directory_seed_retirement.sql",
+      "file": "docs/company-directory-reset.md",
+      "reason": "the earlier retirement migration, moved out of supabase/migrations/ into supabase/reset/ and rewritten as the operation; the audit table names its old path to trace that move"
+    },
+    {
+      "rule": "stale-path",
+      "match": "generate-company-directory.mjs",
+      "file": "docs/company-directory-reset.md",
+      "reason": "the v1 generator, deleted because its only output was the seed migration; named in the audit table to say so"
+    },
+    {
+      "rule": "stale-path",
+      "match": "generate-company-directory-backfill.mjs",
+      "file": "docs/company-directory-reset.md",
+      "reason": "the backfill generator, deleted with its migration for the same reason; named in the audit table to say so"
+    },
+    {
       "rule": "banned-phrase",
       "match": "Supabase Realtime",
       "file": "expo-app-standalone 3/hooks/useCommunities.ts",
