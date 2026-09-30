@@ -133,6 +133,24 @@ const RELATIONSHIP_TYPES = ["parent", "subsidiary", "brand", "division", "acquir
 /** The layer every alias and every relationship in the export comes from. */
 const CURATED_SOURCE = "curated";
 
+/**
+ * Layer entities that exist only to be a COUNTER-EXAMPLE: they document a rule
+ * by being the case it must reject. They stay in the layer file so the tests and
+ * the coverage report can name them, but they are filtered out before anything
+ * is merged or written, because an export is a production candidate and a
+ * knowingly fake company in the picker is worse than a missing one.
+ *
+ * The entity's `source` is the marker rather than a per-entity flag, so a
+ * fixture cannot be half-configured: `sources.json` already registers this one
+ * as "Counter-example fixture (not for production)".
+ */
+const FIXTURE_SOURCES = new Set(["example"]);
+
+/** True when a layer record may reach the export. */
+export function isProductionRecord(record) {
+  return !FIXTURE_SOURCES.has(record.source);
+}
+
 /** Evidence kinds, with the weight each contributes and whether it may stand alone. */
 const EVIDENCE_WEIGHTS = {
   // First-party: the company published the address on its own property.
@@ -1362,6 +1380,7 @@ export function coverageReport({
   relationships = [],
   aliases = [],
   merges = [],
+  excludedFixtures = [],
   inputRows = 0
 }) {
   const withWebsite = companies.filter((company) => company.website_domain).length;
@@ -1410,6 +1429,13 @@ export function coverageReport({
   lines.push(`| Duplicate entities merged into one | ${merges.length.toLocaleString("en-US")} |`);
   lines.push(`| Same name within one jurisdiction after merging (to review) | ${duplicateNames.toLocaleString("en-US")} |`);
   lines.push(`| Rows carrying a registry identity (source + source_id) | ${withRegistryIdentity.toLocaleString("en-US")} |`);
+  if (excludedFixtures.length > 0) {
+    lines.push("");
+    lines.push(
+      `Fixtures excluded from the export (counter-examples, never production data): ` +
+        excludedFixtures.map((id) => `\`${id}\``).join(", ")
+    );
+  }
   if (merges.length > 0) {
     lines.push("");
     lines.push("Merged (the survivor keeps its evidence, the merged row's domains survive as hints):");
@@ -1812,8 +1838,16 @@ export function buildDirectory({ sample = null } = {}) {
   const layerStats = {};
   const byId = new Map();
 
+  // Fixtures are removed here, before anything is merged, so nothing derived
+  // from one - a domain, a claim, an alias, an edge - can reach a feed. They are
+  // counted rather than silently dropped, and the report names them.
+  const curatedRecords = loadCurated();
+  const excludedFixtures = curatedRecords
+    .filter((record) => !isProductionRecord(record))
+    .map((record) => record.id);
+
   const layers = [
-    { layer: "curated", records: loadCurated() },
+    { layer: "curated", records: curatedRecords.filter(isProductionRecord) },
     ...loadSeeds().map((seed) => ({ layer: "seed", records: seed.entities ?? seed.companies ?? [] }))
   ];
 
@@ -1884,6 +1918,7 @@ export function buildDirectory({ sample = null } = {}) {
     sources,
     relationships,
     merges,
+    excludedFixtures,
     inputRows: inputRows.length,
     freeEmail
   };
@@ -1902,7 +1937,15 @@ function main() {
   }
 
   const result = buildDirectory({ sample });
-  const { companies, owners, statuses, conflicts, delegations, rejected, layerStats, sources, relationships, merges } = result;
+  const { companies, owners, statuses, conflicts, delegations, rejected, layerStats, sources, relationships, merges, excludedFixtures } = result;
+
+  // The invariant the fixture filter exists to keep, checked on the rows about
+  // to be reported or written rather than only where they were loaded: a
+  // production candidate never contains a fixture, whatever layer introduced it.
+  const leakedFixtures = companies.filter((company) => FIXTURE_SOURCES.has(company.source));
+  if (leakedFixtures.length > 0) {
+    throw new Error(`fixture companies reached the export: ${leakedFixtures.map((company) => company.id).join(", ")}`);
+  }
 
   // Built and validated once, before anything is written: the alias and
   // relationship feeds are the two that used to be dropped, and a layer bug in
@@ -1925,6 +1968,7 @@ function main() {
     relationships,
     aliases: aliasRows,
     merges,
+    excludedFixtures,
     inputRows: result.inputRows
   });
 

@@ -50,7 +50,10 @@ import { parseCsv, uuidv5 } from "./import-company-directory.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const GENERATOR = join(ROOT, "scripts/generate-company-directory-v2.mjs");
 const IMPORTER = join(ROOT, "scripts/import-company-directory.mjs");
-const SAMPLE = "1000";
+// 1,000 rows is the reviewable prototype scale; the full dataset is a bigger
+// cap that still exercises every assertion, because none of them is count-based.
+// COMPANY_DIRECTORY_SAMPLE=10000 runs this same suite over the whole export.
+const SAMPLE = process.env.COMPANY_DIRECTORY_SAMPLE ?? "1000";
 const MAX_BUFFER = 64 * 1024 * 1024;
 
 /** The exact table counts. An orphan or a duplicate moves these and nothing else does. */

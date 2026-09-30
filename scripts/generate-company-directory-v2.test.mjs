@@ -41,7 +41,8 @@ import {
   companyAliasesCsv,
   companyRelationshipRows,
   companyRelationshipsCsv,
-  stagedMetrics
+  stagedMetrics,
+  isProductionRecord
 } from "./generate-company-directory-v2.mjs";
 import { readFileSync } from "node:fs";
 
@@ -937,4 +938,43 @@ test("bare country-code domains survive, because the seed is full of them", () =
     assert.deepEqual(result.problems, [], `${entity.website_domain} must be usable`);
     assert.equal(result.domain, entity.website_domain, "and must not be reduced to anything else");
   }
+});
+
+/* ── Fixtures never reach the export ────────────────────────────────────── */
+
+test("a counter-example fixture is excluded from the built directory", () => {
+  const { companies, excludedFixtures } = buildDirectory({ sample: null });
+
+  // curated.json keeps the fixture so the rule stays documented, and the
+  // pipeline says so by name rather than dropping it silently.
+  assert.ok(
+    loadCurated().some((entity) => entity.id === "acme-technologies-example"),
+    "the fixture still lives in the layer, where it documents the counter-example"
+  );
+  assert.ok(excludedFixtures.includes("acme-technologies-example"), "and is reported as excluded, by id");
+
+  // And it is nowhere in the output: no company, no domain, no fixture source.
+  assert.ok(
+    !companies.some((company) => company.id === "acme-technologies-example"),
+    "the fixture is not an exported company"
+  );
+  assert.ok(companies.every((company) => company.source !== "example"), "no exported company carries the fixture source");
+  assert.ok(
+    companies.every((company) => !company.domains.some((row) => row.domain === "acmetech.io")),
+    "the fixture's domain is gone with it"
+  );
+
+  // companies.csv is written from the same rows, so the feed cannot disagree.
+  const csv = companiesCsv(companies);
+  assert.ok(!csv.includes("acme-technologies-example"), "companies.csv does not name the fixture");
+  assert.ok(csv.split("\n").every((line) => !line.split(",")[4] || line.split(",")[4] !== "example"), "no row is typed as an example");
+});
+
+test("the production predicate is what keeps a fixture out", () => {
+  // main() re-checks the rows about to be written against this predicate, so a
+  // future layer cannot quietly re-admit a fixture.
+  assert.equal(isProductionRecord({ id: "x", source: "example" }), false);
+  assert.equal(isProductionRecord({ id: "x", source: "curated" }), true);
+  assert.equal(isProductionRecord({ id: "x", source: "wikidata" }), true);
+  assert.equal(isProductionRecord({ id: "x" }), true, "a record with no source is not a fixture");
 });
