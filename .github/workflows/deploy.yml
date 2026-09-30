@@ -72,6 +72,21 @@ jobs:
       # Workers' copies from one GitHub secret is what keeps them provably in
       # sync.
       #
+      # WHY `secret put` AND NOT `versions secret put` (this is load-bearing):
+      # `wrangler versions secret put` stages the value into a NEW version of the
+      # Worker and deliberately does NOT deploy it — it exists for gradual
+      # rollouts, which this Worker does not use. So every run of this step used
+      # to write the four secrets into a version nobody served, leaving the live
+      # version on whatever it already had: rotating a GitHub secret silently
+      # changed nothing in production, and a Worker that is running without
+      # SESSION_SECRET refuses every handshake with a 401 that no log explains
+      # (see apps/realtime/src/session-config.ts). `wrangler secret put`
+      # publishes the version it creates, which is what this step means.
+      #
+      # The value is written with `printf '%s'` rather than `echo`, which appends
+      # a newline: a secret that arrives with a trailing \n still signs nothing
+      # the web app can verify.
+      #
       # API_URL / API_SECRET are the membership check's configuration. The
       # realtime Worker FAILS CLOSED without them (audit M-8): with API_URL
       # missing or unreachable, or API_SECRET not matching the web app's, every
@@ -82,10 +97,34 @@ jobs:
       - name: Set realtime worker secrets
         working-directory: apps/realtime
         run: |
-          echo "${{ secrets.SESSION_SECRET }}" | npx wrangler versions secret put SESSION_SECRET
-          echo "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler versions secret put REALTIME_PUBLISH_SECRET
-          echo "${{ secrets.API_URL }}" | npx wrangler versions secret put API_URL
-          echo "${{ secrets.API_SECRET }}" | npx wrangler versions secret put API_SECRET
+          printf '%s' "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
+          printf '%s' "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
+          printf '%s' "${{ secrets.API_URL }}" | npx wrangler secret put API_URL
+          printf '%s' "${{ secrets.API_SECRET }}" | npx wrangler secret put API_SECRET
+
+      # The smoke check chooses the origin it probes, mints the session token and
+      # picks which secrets to sign with — a mistake there would fail a HEALTHY
+      # deploy, so its helpers are pinned down before it is allowed to gate one.
+      - name: Unit-test the realtime smoke harness
+        run: node --test scripts/smoke-realtime.test.mjs
+
+      # Prove the version just published actually works, BEFORE the web worker
+      # ships against it. A deploy that answers `/publish` with "ok" while
+      # refusing every WebSocket handshake (a secret that never reached the live
+      # version, a broken custom-domain route) used to look like a successful
+      # release; this turns it into a red build. Blocks on exit code 1.
+      #
+      # The target is the SAME origin the client bundle is built against — the
+      # value in apps/web/wrangler.toml [vars] — so a route that works for CI but
+      # not for browsers cannot pass.
+      - name: Smoke-test the deployed realtime worker
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
+          REALTIME_URL: ${{ secrets.REALTIME_URL }}
+        run: |
+          origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
+          node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"
 
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files
@@ -174,6 +213,10 @@ jobs:
         run: |
           npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
           npx tsx --test lib/request-cache.test.ts
+          # The browser test's seeder resolves its target BEFORE it writes, so
+          # these are the guards that decide what a shared project is allowed to
+          # receive (e2e/seed-member.mjs). No database, no browser.
+          node --test e2e/seed-member.test.mjs
 
       - name: Deploy web worker
         working-directory: apps/web

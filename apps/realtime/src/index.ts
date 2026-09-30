@@ -1,6 +1,7 @@
 import { jwtVerify } from "jose";
 import type { Env } from "./env";
 import { resolveRoomTarget } from "./room-routing";
+import { resolveSessionConfig } from "./session-config";
 import { runBoundedPool } from "./subscriptions";
 import { isRetryableStatus, retryWithBackoff } from "./retry";
 import { logEvent } from "./log";
@@ -35,6 +36,22 @@ const FANOUT_RETRY_JITTER = 0.3;
 
 function secretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
+}
+
+/**
+ * One line per isolate when the session secret is missing.
+ *
+ * The membership authorizer already reports its own missing configuration (see
+ * membership-auth.ts `config_missing`); this is the same signal for the layer
+ * ABOVE it, because a Worker that cannot verify a session refuses every socket
+ * in the app while `/publish` keeps answering "ok". Repeated per-connection
+ * logs would be noise, so it fires once per isolate.
+ */
+let warnedMissingSessionSecret = false;
+function warnMissingSessionSecretOnce(): void {
+  if (warnedMissingSessionSecret) return;
+  warnedMissingSessionSecret = true;
+  logEvent("error", { event: "realtime.session.config_missing" });
 }
 
 async function verifyJwt(token: string, secret: string): Promise<{ userId?: string } | null> {
@@ -85,7 +102,16 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
   const cookieToken = cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE);
   const queryToken = url.searchParams.get("token");
   const token = cookieToken ?? queryToken;
-  const session = token ? await verifyJwt(token, env.SESSION_SECRET) : null;
+
+  // FAIL CLOSED on missing configuration, and make it observable: an
+  // unverifiable token must never open a socket, and a Worker running without
+  // SESSION_SECRET — a deploy that staged the secret into a version it did not
+  // publish, for example — otherwise refuses every handshake in the app with a
+  // bare 401 that nothing in these logs explains.
+  const { configured, secret } = resolveSessionConfig(env);
+  if (!configured) warnMissingSessionSecretOnce();
+
+  const session = token && secret ? await verifyJwt(token, secret) : null;
   const userId = session?.userId;
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });

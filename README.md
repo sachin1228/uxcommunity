@@ -178,6 +178,22 @@ The worker uses `API_URL` + `API_SECRET` for its internal membership checks, so 
 
 **Troubleshooting:** if messages, typing, and reactions only appear after a reload or tab focus, the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
 
+That check is automated — the same view, driven headlessly against a running app + worker:
+
+```bash
+npm run test:e2e-realtime                                        # the dashboard, as it stands
+npm run test:e2e-realtime -- --strict                            # also gate on no cancelled/duplicate sockets
+npm run test:e2e-realtime -- --path /dashboard/communities/<id>  # cover the community chat rooms
+npm run test:e2e-realtime -- --mock-communities 3                # cover the community fan-out and its 403 refusal
+E2E_SEED_ALLOW_REMOTE=1 npm run test:e2e-realtime -- --seed-member --seed-communities 3   # accepted community sockets
+```
+
+It signs in, loads the page and records every handshake over the Chrome DevTools Protocol: that the socket is authorized by the session cookie (proved against the Worker's own socket count rather than the DevTools header — Chrome hides `Cookie` on cross-origin handshakes), that each room opens exactly one socket, and that nothing is refused or torn down. The session comes from whichever of `E2E_SESSION_COOKIE`, `E2E_EMAIL` + `E2E_PASSWORD`, or `SESSION_SECRET` (from `apps/web/.dev.vars`) is configured — the last one covers the socket lifecycle without an account, and `--seed-member` overrides all of them. `--strict` is meant for a production build or a deployed target: under `next dev`, React StrictMode deliberately cancels one in-flight handshake per community room.
+
+`--seed-member` covers the sockets that should be *accepted*, with no account and no credentials to configure: `apps/web/e2e/seed-member.mjs` writes a throwaway member plus N private communities and their memberships into the database the app reads (the service-role key is already in `apps/web/.env.local`; the member's password hash is a secret the seeder throws away), the test mints that member's session from `SESSION_SECRET`, and the dashboard loads as them. Each seeded community must produce a live **101** socket, and the Worker's own Durable Object for that room must hold the socket *and* a subscription on it — neither of which the client can fake. The rows are deleted again when the run ends (`--keep-seed` leaves them; `node apps/web/e2e/seed-member.mjs --cleanup` removes them by hand, `--dry-run` prints what would be written and where). The local app usually points at the same Supabase project the deployed app uses, so seeding anything that is not a loopback database stops before writing and says which project it would have touched; set `E2E_SEED_ALLOW_REMOTE=1` to acknowledge that.
+
+Without database access at all, `--mock-communities 3` answers the sidebar's own `/api/communities` fetch with three synthetic communities, so the client fans out one chat socket per community exactly as it does for a member. The Worker refuses those (the session is not a member) and the test asserts the refusal is a **403** and never a **401** — since the socket URL carries no token, a 403 is proof the session cookie authenticated the handshake while membership was denied, and a 401 would mean the cookie never arrived.
+
 In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `apps/web/wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
 
 ### Cloudflare deployment targets
@@ -185,6 +201,13 @@ In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (
 Two Workers deploy from this repository, both from `.github/workflows/deploy.yml`, in that order: `uxcommunity-realtime` (config in `apps/realtime/wrangler.toml`), which owns both Durable Object classes (`Room` for communities, `UserDO` for user rooms), and then `uxcommunity-web` (config in `apps/web/wrangler.toml`), the OpenNext bundle that publishes to it.
 
 Neither Worker has a Cloudflare Git integration connected. Cloudflare's own build system runs one build command and one deploy command per Worker, which cannot express realtime's secrets being pushed between the two deploys, nor gate on the type check and unit tests, so the GitHub Actions pipeline owns both. Locally, `npm run deploy:realtime` and `npm run deploy:web` each target their own config file.
+
+Every deploy ends by asking the version it just published to do the one thing it exists for — `scripts/smoke-realtime.mjs` (the **Smoke-test the deployed realtime worker** step) proves an unauthenticated upgrade is refused, an authenticated one completes, `join` is acknowledged, the subscription is indexed, and a published event arrives back over the socket. A Worker that answers `/publish` with "ok" while refusing every handshake used to look like a successful release; now it fails the build. The same check runs against a local worker:
+
+```bash
+npm run smoke:realtime -- --url http://localhost:8787   # secrets from apps/realtime/.dev.vars
+npm run test:smoke-realtime                             # the harness's own helpers
+```
 
 ## Building the Android APK locally (no Expo cloud)
 

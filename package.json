@@ -18,6 +18,11 @@
     "deploy:web": "npm run deploy --workspace=apps/web",
     "deploy:realtime": "wrangler deploy --config apps/realtime/wrangler.toml",
     "lint": "npm run lint --workspace=apps/web",
+    "smoke:realtime": "node scripts/smoke-realtime.mjs",
+    "test:smoke-realtime": "node --test scripts/smoke-realtime.test.mjs",
+    "test:e2e-realtime": "node apps/web/e2e/realtime-sockets.test.mjs",
+    "test:e2e-seed-member": "node --test apps/web/e2e/seed-member.test.mjs",
+    "seed:e2e-member": "node apps/web/e2e/seed-member.mjs",
     "audit:comments": "node scripts/audit-comments.mjs",
     "audit:vercel": "node scripts/audit-vercel.mjs",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
@@ -98,6 +103,7 @@
     "lottie-react": "^2.4.1"
   },
   "devDependencies": {
+    "playwright": "^1.63.0",
     "tsx": "^4.20.6"
   }
 }
