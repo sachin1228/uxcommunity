@@ -32,7 +32,11 @@
  *   3. A lap only records the count as "stable on every socket" when neither the
  *      count nor the socket population changed while it ran. Otherwise another
  *      window is scheduled. The cursor is never reset, so a busy room keeps
- *      advancing rather than re-refreshing its first window forever.
+ *      advancing rather than re-refreshing its first window forever. A settled
+ *      count is ONLY reused while the socket population is unchanged
+ *      (`socketGeneration`): a replaced tab has never been told the count, and a
+ *      member count does not move when one tab replaces another, so "same count"
+ *      alone would leave that socket showing nothing.
  *   4. A flush with no attached sockets clears the lap bookkeeping, so the next
  *      socket to arrive is told a fresh count.
  *
@@ -86,6 +90,16 @@ export interface PresenceBroadcasterDeps {
   getSockets: () => WebSocket[];
   /** Sockets per user, folded into the online-member count. */
   socketsByUser: ReadonlyMap<string, ReadonlySet<WebSocket>>;
+  /**
+   * Monotonic count of socket attaches and detaches (see socket-registry.ts).
+   *
+   * The online-member count does not move when one socket replaces another — a
+   * tab reload, a reconnect, a second device — but the socket that arrived has
+   * never been told the count. Comparing this against the generation a settled
+   * lap measured is what makes "the count is already on every socket" a fact
+   * about the sockets rather than a guess from the number alone.
+   */
+  socketGeneration: () => number;
   /** The room's name, carried on the frame so a client can route it. */
   roomName: string;
   /** The DO's counters. Presence increments them, never owns them. */
@@ -103,11 +117,14 @@ export class PresenceBroadcaster {
   private seenCount: number | null = null;
   /** Count a finished clean lap proved to sit on every attached socket. */
   private stableCount: number | null = null;
+  /** Socket generation that clean lap measured (see `socketGeneration` dep). */
+  private stableGeneration: number | null = null;
   /** Bumped whenever the observed count changes. */
   private changeSeq = 0;
-  /** Change sequence and socket count captured when the current lap started. */
+  /** Change sequence and socket population captured when the current lap started. */
   private lapChanges = 0;
   private lapSockets = 0;
+  private lapGeneration = 0;
 
   constructor(private readonly deps: PresenceBroadcasterDeps) {}
 
@@ -145,6 +162,11 @@ export class PresenceBroadcaster {
    * declaring the room settled. The cursor is never reset, so a busy room keeps
    * advancing through its sockets rather than refreshing the same first window
    * on every change.
+   *
+   * A settled count is reused (skipped) only while the socket population is
+   * unchanged. Otherwise a member whose tab reloaded, reconnected, or opened a
+   * second one would sit at zero: their count never moved, so nothing would be
+   * sent, and the socket that just arrived would never be told.
    */
   private flushPresence(): void {
     if (!this.dirty) return;
@@ -156,6 +178,7 @@ export class PresenceBroadcaster {
       this.cursor = 0;
       this.seenCount = null;
       this.stableCount = null;
+      this.stableGeneration = null;
       return;
     }
 
@@ -167,14 +190,21 @@ export class PresenceBroadcaster {
     }
 
     const startingLap = this.cursor === 0;
-    // Idle room: every socket holds this count and no lap is in progress.
-    if (startingLap && count === this.stableCount) {
+    // Idle room: every socket holds this count, on this socket population, and
+    // no lap is in progress. Both halves are required — the count alone does not
+    // say which sockets were told it.
+    if (
+      startingLap &&
+      count === this.stableCount &&
+      this.deps.socketGeneration() === this.stableGeneration
+    ) {
       this.deps.metrics.presenceSkipped += 1;
       return;
     }
     if (startingLap) {
       this.lapChanges = this.changeSeq;
       this.lapSockets = sockets.length;
+      this.lapGeneration = this.deps.socketGeneration();
     }
 
     const message = encodePresenceFrame(this.deps.roomName, count);
@@ -206,8 +236,13 @@ export class PresenceBroadcaster {
     }
 
     this.cursor = 0;
-    if (this.changeSeq === this.lapChanges && sockets.length === this.lapSockets) {
+    if (
+      this.changeSeq === this.lapChanges &&
+      sockets.length === this.lapSockets &&
+      this.deps.socketGeneration() === this.lapGeneration
+    ) {
       this.stableCount = count;
+      this.stableGeneration = this.lapGeneration;
     } else {
       this.markPresenceDirty();
     }

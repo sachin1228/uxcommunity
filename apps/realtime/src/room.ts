@@ -108,6 +108,9 @@ export class Room extends DurableObject<Env> {
   private readonly presence = new PresenceBroadcaster({
     getSockets: () => this.ctx.getWebSockets(),
     socketsByUser: this.sockets.socketsByUser,
+    // A replaced/extra socket must be told the count even when the count itself
+    // did not move (see presence.ts) — the registry owns that generation.
+    socketGeneration: () => this.sockets.socketGeneration,
     roomName: this.roomName(),
     metrics: this.metrics,
     onSendFailed: (ws) => this.removeSocket(ws, "send-failed"),
