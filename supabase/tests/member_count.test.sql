@@ -12,6 +12,9 @@
 -- every way membership can change:
 --
 --   * the column and both triggers exist;
+--   * no second counter stack rides alongside them (a duplicate pair applied
+--     by hand outside this repo double-counted every join and leave in the
+--     live project — iasiso showed 4 for 2 members);
 --   * a join, a multi-row join, a leave, a kick, the ON DELETE CASCADE from a
 --     deleted user and a membership moved between two communities each move it
 --     by exactly one;
@@ -20,6 +23,8 @@
 --   * the sidebar and Explore read models return the counter, and Explore still
 --     excludes empty communities and still resolves the caller's own joined
 --     flag per community;
+--   * the backfill reconciles a counter a second trigger stack has inflated
+--     (or deflated), without touching the communities that already agree;
 --   * the backfill reconciles memberships written before the counter existed,
 --     and every community in the database agrees with its membership rows.
 --
@@ -32,7 +37,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(35);
+select plan(40);
 
 -- ─── Helpers ────────────────────────────────────────────────
 
@@ -114,6 +119,46 @@ select ok(
 );
 
 select has_function('public', 'sync_community_member_count');
+
+-- The live project once carried a hand-applied second stack here
+-- (community_members_increment_count / community_members_decrement_count →
+-- update_community_member_count), so every join counted +2 and every leave
+-- −2 and the header said "4 members" over a 2-person Members tab. These pin
+-- exactly one non-internal counter stack on the table.
+
+select is(
+  (
+    select count(*)::integer
+    from pg_trigger t
+    where t.tgrelid = 'public.community_members'::regclass
+      and not t.tgisinternal
+      and pg_get_triggerdef(t.oid) ilike '%member_count%'
+  ),
+  2,
+  'exactly two member-count triggers exist on community_members'
+);
+
+select is(
+  (
+    select count(distinct tgf.proname)::integer
+    from pg_trigger t
+    join pg_proc tgf on tgf.oid = t.tgfoid
+    where t.tgrelid = 'public.community_members'::regclass
+      and not t.tgisinternal
+      and pg_get_triggerdef(t.oid) ilike '%member_count%'
+  ),
+  1,
+  'all member-count triggers call the one maintained function'
+);
+
+select ok(
+  not exists (
+    select 1 from pg_proc
+    where pronamespace = 'public'::regnamespace
+      and proname = 'update_community_member_count'
+  ),
+  'the rogue update_community_member_count function from the live project is gone'
+);
 
 select ok(
   exists (
@@ -305,6 +350,42 @@ where counted.id = c.id
   and c.member_count is distinct from coalesce(counted.total, 0);
 
 select is((select main_count from mc), 4, 'the backfill reconciles memberships that predate the counter');
+
+-- ─── 10b. Reconciling a counter a second stack inflated ──────
+-- The drift the live project actually hit: a hand-applied second trigger pair
+-- moved the counter alongside the maintained one, so joins counted twice.
+-- With the duplicate triggers gone (section 1), no trigger fires here — the
+-- backfill alone must return the inflated counter to the real row count. The
+-- fixture community carries 4 membership rows at this point (its maintained
+-- member plus the three legacy rows from section 10).
+
+savepoint mc_double_counted;
+
+update public.communities
+set member_count = member_count * 2
+where id = (select community_id from mc_fixture);
+
+select is((select main_count from mc), 8, 'the fixture is now double-counted, as iasiso was');
+
+-- Step 2 of 20260927120000_community_member_count.sql, verbatim.
+update public.communities as c
+set member_count = coalesce(counted.total, 0)
+from (
+  select community.id,
+         count(member.user_id)::integer as total
+  from public.communities as community
+  left join public.community_members as member
+    on member.community_id = community.id
+  group by community.id
+) as counted
+where counted.id = c.id
+  and c.member_count is distinct from coalesce(counted.total, 0);
+
+select is((select main_count from mc), 4, 'the backfill reconciles a double-counted community');
+
+rollback to savepoint mc_double_counted;
+
+select is((select main_count from mc), 4, 'rolling the inflation back restores the correct counter');
 
 -- ─── 11. The read models ────────────────────────────────────
 -- The viewer below is position 6: a member of the main community (its
