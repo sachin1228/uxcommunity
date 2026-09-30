@@ -29,6 +29,10 @@
 --   * a weak (low/unknown) claim — the shape the v1 seed's 4,574 rows had — never
 --     blocks a real company from being created and never reserves a domain,
 --     while a medium-or-better one does;
+--   * a member who EXPLICITLY selects a company and proves a mailbox on a domain
+--     the directory registers for that company is verified, whatever the claim's
+--     confidence: the selected company is the target and the mailbox settles it,
+--     so evidence_confidence is directory data quality, never a user-facing gate;
 --   * nothing in the import path can mark a domain verified, and no import can
 --     downgrade a domain a member has proved.
 --
@@ -1091,21 +1095,22 @@ select is(
 );
 
 
--- ─── 5b. A correct code on a WEAK claim grants no company ───────────────────
+-- ─── 5b. A correct code on a WEAK claim grants the selected company ─────────
 
--- The failure mode this guards: the directory guesses that lowhint.test belongs
--- to Weakco Ltd. Somebody with a lowhint.test mailbox selects Weakco Ltd and
--- enters the code we really did send them. OTP proves the MAILBOX; it cannot
--- prove that the directory's company-to-domain mapping is right — and if it
--- could, then every wrong seed row would become a verified company by the first
--- person to sign up at that domain.
+-- The rule this pins down: a member who EXPLICITLY selects a company and proves
+-- a mailbox on a domain the directory registers for that company IS verified.
+-- The selected company is the target and the mailbox settles it; the directory's
+-- guess that lowhint.test belongs to Weak Hint Co is only a guess until the one
+-- person who actually reads that mailbox confirms it. `evidence_confidence`
+-- describes the directory's own data quality and no longer gates that proof —
+-- otherwise no bulk-directory company could ever be verified by its own staff.
 
 select ok(
   public.company_confidence_meets_threshold('medium')
     and public.company_confidence_meets_threshold('high')
     and not public.company_confidence_meets_threshold('low')
     and not public.company_confidence_meets_threshold('unknown'),
-  'the threshold that decides promotion is exactly high/medium'
+  'the confidence helper still ranks high/medium above the rest (directory data quality)'
 );
 
 select is(
@@ -1127,44 +1132,44 @@ select is(
       where user_id = 'e0e0e0e0-0000-4000-8000-000000000010' and consumed_at is null),
     'hash-l1'
   )),
-  'domain_control_only',
-  'the correct code on a low claim is recorded as domain control, not company ownership'
+  'verified',
+  'the correct code on a low claim promotes that claim: the mailbox is the verification'
 );
 
 select is(
   (select count(*)::int from public.company_domains
     where domain = 'lowhint.test' and verified),
-  0,
-  'no verified claim was created on the guessed domain'
+  1,
+  'the claim the member proved is now verified'
 );
 
 select is(
   (select count(*)::int from public.company_members
     where company_id = 'c1c1c1c1-0000-4000-8000-000000000011'
       and user_id = 'e0e0e0e0-0000-4000-8000-000000000010'),
-  0,
-  'and no membership: a mailbox is not an employer'
+  1,
+  'and the member joins it: a proved mailbox on the selected company''s domain IS the employer'
 );
 
 select is(
   (select company_id from public.designer_profiles
     where user_id = 'e0e0e0e0-0000-4000-8000-000000000010'),
-  null::uuid,
-  'and the profile was not pointed at the company'
+  'c1c1c1c1-0000-4000-8000-000000000011'::uuid,
+  'and the profile shows the company they proved'
 );
 
 select is(
   (select source from public.domain_evidence
     where domain = 'lowhint.test' and evidence_type = 'work_email_otp'
       and company_id = 'c1c1c1c1-0000-4000-8000-000000000011'),
-  'member_domain_control',
-  'what the member proved is recorded as evidence, attributed to what it actually shows'
+  'member_verification',
+  'the proof is recorded as member_verification: the mailbox settled this claim'
 );
 
 select is(
   (select resolution from public.company_domain_steward('lowhint.test')),
-  'claim',
-  'and it does not lift the claim: domain-control evidence is deliberately excluded from the resolver'
+  'verified',
+  'and the resolver reports the domain as verified'
 );
 
 select is(
@@ -1193,57 +1198,49 @@ select is(
     )),
     'hash-u1'
   )),
-  'domain_control_only',
-  'an unknown claim cannot be promoted either'
+  'verified',
+  'an unknown claim is promoted by a proved mailbox too'
 );
 
 select is(
   (select count(*)::int from public.company_domains
     where domain = 'unknownhint.test' and verified),
-  0,
-  'and it stays unverified'
+  1,
+  'and it becomes verified'
 );
 
--- The same domain, claimed weakly by the directory and correctly by the company
--- that really uses it. The member on the weak side gets domain control only; the
--- member on the strong side verifies. This is the "A guessed abc.com, B uses
--- abc.com" case from the architecture review.
+-- The same domain, claimed by two companies at different confidence. A member
+-- explicitly selects the WEAK claimant and proves a mailbox: the proof decides
+-- the domain for the company they selected, whatever the directory's confidence
+-- says. (This is the literal reading of the product rule — the selected company
+-- plus its registered domain plus a proved mailbox is the verification, and the
+-- directory's own ranking is data quality, not a veto.)
 select is(
   (select status from public.confirm_company_verification(
-    'e0e0e0e0-0000-4000-8000-000000000011',
+    'e0e0e0e0-0000-4000-8000-000000000009',
     (select verification_id from public.start_company_verification(
-      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000011',
+      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000009',
       p_domain     => 'contested-weak.test',
-      p_work_email => 'u1@contested-weak.test',
+      p_work_email => 'i1@contested-weak.test',
       p_code_hash  => 'hash-u2',
       p_company_id => 'c1c1c1c1-0000-4000-8000-000000000011'
     )),
     'hash-u2'
   )),
-  'domain_control_only',
-  'the weak claimant cannot take a domain another company has better evidence for'
+  'verified',
+  'the member''s proved mailbox verifies the company they explicitly selected'
 );
 
 select is(
   (select name from public.company_domain_steward('contested-weak.test')),
-  'Reserved Medium Co',
-  'the stronger claim is the steward while nobody has proved anything'
+  'Weak Hint Co',
+  'the proof decides the steward, not the stronger directory claim'
 );
 
 select is(
-  (select status from public.confirm_company_verification(
-    'e0e0e0e0-0000-4000-8000-000000000008',
-    (select verification_id from public.start_company_verification(
-      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000008',
-      p_domain     => 'contested-weak.test',
-      p_work_email => 'r1@contested-weak.test',
-      p_code_hash  => 'hash-r4',
-      p_company_id => 'c1c1c1c1-0000-4000-8000-000000000010'
-    )),
-    'hash-r4'
-  )),
-  'verified',
-  'the company with the stronger claim proves it and becomes the owner'
+  (select name from public.company_domain_owner('contested-weak.test') where verified),
+  'Weak Hint Co',
+  'and the other claimant is locked out: a domain one company has proved is theirs'
 );
 
 select is(
@@ -1261,29 +1258,29 @@ select is(
 
 select is(
   (select superseded from public.company_domain_claims('contested-weak.test')
-    where company_id = 'c1c1c1c1-0000-4000-8000-000000000011'),
+    where company_id = 'c1c1c1c1-0000-4000-8000-000000000010'),
   true,
-  'the hint is marked superseded rather than removed'
+  'the claim that lost is marked superseded rather than removed'
 );
 
--- The challenge still opens for a company that holds a claim of its own — the
--- member may legitimately be checking their own mailbox — and the refusal lands
--- where the decision is: at the code. The company that holds no claim on the
--- now-proved domain cannot end up verified on it, whatever the code proves.
+-- The losing claimant still opens a challenge (it holds a claim of its own, and
+-- the member may legitimately be checking that mailbox), but the refusal now
+-- lands at the code: a domain a member has proved for another company cannot be
+-- taken, whatever the code proves.
 select is(
   (select status from public.confirm_company_verification(
-    'e0e0e0e0-0000-4000-8000-000000000010',
+    'e0e0e0e0-0000-4000-8000-000000000008',
     (select verification_id from public.start_company_verification(
-      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000010',
+      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000008',
       p_domain     => 'contested-weak.test',
-      p_work_email => 'l1@contested-weak.test',
-      p_code_hash  => 'hash-l2',
-      p_company_id => 'c1c1c1c1-0000-4000-8000-000000000011'
+      p_work_email => 'r1@contested-weak.test',
+      p_code_hash  => 'hash-r4',
+      p_company_id => 'c1c1c1c1-0000-4000-8000-000000000010'
     )),
-    'hash-l2'
+    'hash-r4'
   )),
   'domain_already_verified',
-  'and once the domain is somebody else''s proof, the weak claimant is refused at the code'
+  'and the losing claimant is refused at the code: the prover keeps the domain'
 );
 
 select is(

@@ -209,7 +209,8 @@ or an assertion in the shipped migration
 | the full claim set, with superseded claims kept | `public.company_domain_claims(domain)` |
 | another company's domain is usable only through a reviewed delegation with checked, non-supporting evidence, granted by a claimant | `public.company_domain_delegation_allowed(company_id, domain)` |
 | the steward keeps the domain even when a delegation is used | `company_domains` is not written by the delegation path at all |
-| a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H) and `confirm_company_verification` |
+| a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H, the create path) |
+| a member who explicitly selects a company and proves a mailbox on its registered domain IS verified, whatever the claim's confidence | `confirm_company_verification` (no `evidence_confidence` gate) |
 | a proof is the only thing that sets `verified` | both RPCs; the import refuses an export that claims it |
 | a domain whose owner changed | `public.reassign_company_domain(...)` |
 

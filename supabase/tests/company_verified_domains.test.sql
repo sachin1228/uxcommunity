@@ -28,7 +28,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(116);
+select plan(115);
 
 -- ─── Fixture ────────────────────────────────────────────────
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
@@ -936,12 +936,12 @@ select is(
   'a directory hint is enough to open a work-email challenge'
 );
 
--- The code comes back. What it proves is the MAILBOX: this member really does
--- read asha@hintco.test. It does not prove that the directory's mapping of
--- hintco.test to Hintco is right — nobody has checked that row — so the answer
--- is domain control and nothing else. Both halves matter: the member is not
--- silently mapped to a company on the strength of a guess, and nothing is lost,
--- because the observation is recorded.
+-- The code comes back. The member explicitly selected Hintco and the domain is
+-- one the directory registers for Hintco, so the proved mailbox IS the
+-- verification: the claim is promoted and the membership is created, whatever
+-- confidence the directory had stamped on that row. `evidence_confidence`
+-- describes the directory's own data quality (for search, discovery and review)
+-- and never blocks a member's own proved workplace.
 select is(
   (select status from public.confirm_company_verification(
     'c0c0c0c0-0000-4000-8000-000000000007',
@@ -949,72 +949,48 @@ select is(
       where user_id = 'c0c0c0c0-0000-4000-8000-000000000007' and consumed_at is null),
     'hash-asha'
   )),
-  'domain_control_only',
-  'a correct code on an unchecked directory hint grants domain control, not the company'
+  'verified',
+  'a correct code on a directory hint verifies the company the member selected'
 );
 
 select is(
   (select verified from public.company_domains where domain = 'hintco.test'),
-  false,
-  'the unchecked hint stays unverified: a mailbox cannot promote a guess to a proof'
+  true,
+  'the hint is promoted to a proved claim'
 );
 
 select is(
   (select count(*)::int from public.company_domains where domain = 'hintco.test'),
   1,
-  'the hint row is neither promoted nor duplicated'
+  'the hint row is promoted, not duplicated'
 );
 
 select is(
   (select name from public.get_user_company('c0c0c0c0-0000-4000-8000-000000000007')),
-  null,
-  'the member is not silently mapped to a company on weak evidence'
+  'Hintco',
+  'the member''s profile shows the company they proved'
 );
 
 select is(
   (select count(*)::int from public.company_members as m
     join public.companies as c on c.id = m.company_id
    where c.slug = 'hintco' and m.verified),
-  0,
-  'and no membership was created'
+  1,
+  'and the membership is created'
 );
 
 select is(
   (select count(*)::int from public.domain_evidence
     where domain = 'hintco.test' and evidence_type = 'work_email_otp'
-      and source = 'member_domain_control'),
+      and source = 'member_verification'),
   1,
-  'what the member did prove is kept as an observation, attributed to what it shows'
-);
-
--- With checked evidence behind the claim — the review the observation above
--- feeds — the same member's proved mailbox is exactly what promotes it. This is
--- the intended route from a directory guess to a verified company, and the only
--- one: a person has to check the mapping, or the company itself has to say it.
-update public.company_domains as d
-set evidence_confidence = 'medium'
-where d.domain = 'hintco.test';
-
-select is(
-  (select status from public.confirm_company_verification(
-    'c0c0c0c0-0000-4000-8000-000000000007',
-    (select verification_id from public.start_company_verification(
-      p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000007',
-      p_domain     => 'hintco.test',
-      p_work_email => 'asha@hintco.test',
-      p_code_hash  => 'hash-asha-2',
-      p_company_id => (select id from public.companies where slug = 'hintco')
-    )),
-    'hash-asha-2'
-  )),
-  'verified',
-  'once a reviewed source backs the claim, the mailbox proof promotes it'
+  'the proof is recorded as member_verification, not as a mere observation'
 );
 
 select is(
-  (select verified from public.company_domains where domain = 'hintco.test'),
-  true,
-  'and the claim is now the member-proved one'
+  (select name from public.company_domain_owner('hintco.test') where verified),
+  'Hintco',
+  'the domain is now proved for Hintco'
 );
 
 select is(
@@ -1024,17 +1000,17 @@ select is(
 );
 
 select is(
-  (select name from public.get_user_company('c0c0c0c0-0000-4000-8000-000000000007')),
-  'Hintco',
-  'the member who proved the hinted domain displays its company'
-);
-
-select is(
   (select count(*)::int from public.company_members as m
     join public.companies as c on c.id = m.company_id
    where c.slug = 'hintco' and m.verified),
   1,
   'the member joins the directory company once'
+);
+
+select is(
+  (select verified from public.search_companies('hintco.test')),
+  true,
+  'and the proved domain now answers a domain search for its company'
 );
 
 -- A hint is not a blanket invitation: Hintco is verified for hintco.test alone,

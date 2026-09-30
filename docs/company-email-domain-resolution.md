@@ -6,45 +6,44 @@ allowed to be approximately right. This is not: a wrong answer here attaches a
 real employee's proof to the wrong company, which is the single failure the
 whole verification model exists to prevent.
 
-## 0. What a proved mailbox does and does not buy
+## 0. What a proved mailbox buys
 
-This is the rule the whole feature hangs on, and it is now enforced in SQL, not
-just stated here:
+This is the rule the whole feature hangs on, and it is enforced in SQL, not just
+stated here:
 
-| A claim's evidence | What a correct OTP at that domain does |
+| The situation | What a correct OTP at that domain does |
 | --- | --- |
-| `high` / `medium` | promotes the claim to **verified** and creates the membership |
-| `low` / `unknown` | **domain control only** (`domain_control_only`): the observation is recorded, nothing is verified, no membership is created |
+| The member **explicitly selects a company** and the domain is registered to it (verified or not) | promotes that company's claim to **verified** and creates the membership — for **any** `evidence_confidence`, including `low` and `unknown` |
+| The domain is **not registered to the selected company** | refused (`domain_not_verified`); nothing is created |
+| The domain is **verified for another company** | refused (`domain_already_verified`), and the owner is offered to join instead |
 
-An OTP proves the member controls that **mailbox**. It does not prove that the
-directory's company → domain mapping is correct, and every seeded row in the
-directory is a mapping nobody has checked. If a code could promote one, then
-whichever seeded row is wrong becomes verified company ownership for the first
-person who signs up at that domain — which is the reverse of the trust model the
-OTP is supposed to enforce.
+The selected company is the verification **target**: `start_company_verification`
+refuses a domain the company does not claim, so by the time a code exists the
+(company, domain) pair is one the directory asserts. The OTP then proves control
+of that mailbox and, with it, the domain — and against an explicitly selected
+company that is a true statement about the member and the company, not a guess
+about a mapping.
 
-So the promotion threshold is part of the trust model:
+**`evidence_confidence` is directory data quality.** It describes how well the
+directory knows the mapping; it feeds search, discovery, the resolver and
+operator review, and it never blocks a member's own proved workplace. A
+`low`/`unknown` row is a guess only until the person who actually reads that
+mailbox settles it — refusing there would leave every bulk-directory company
+unverifiable by its own staff.
 
-```
-evidence >= medium   → the mailbox proof settles it
-evidence <  medium   → the mailbox proves CONTROL OF THE DOMAIN, and the
-                       mapping is queued for review as domain_evidence
-                       with source = 'member_domain_control'
-```
+The proof is still recorded as `domain_evidence` (`work_email_otp`), now with
+`source = 'member_verification'` on the promoting path. `member_domain_control`
+(the old "control only" marker) stays **excluded** from the resolver's weighting
+(`company_domain_steward`), so a bare proved mailbox never raises a claim's
+strength on its own.
 
-That evidence type is deliberately **excluded** from the resolver's weighting
-(`company_domain_steward`): it must not raise a claim's strength, because "somebody
-has a mailbox here" is true for both the right company and the wrong one.
-
-**And it is also excluded from the promotion gate.** The state after a
-`domain_control_only` is not a dead end: the observation is the *queue* for an
-operator review, and a promotion (which lifts the claim's evidence, not its
-`verified` flag) is what lets a later proof settle it. That mechanism is shipped
-— migration `20260929152000`, `company_domain_review_queue` and
-`review_company_domain`, documented in
+**A domain whose mapping itself is in question stays an operator concern.**
+`member_domain_control` observations feed `company_domain_review_queue`, and a
+promotion lifts the claim's evidence, never its `verified` flag. That mechanism
+is shipped — migration `20260929152000`,
+`company_domain_review_queue` and `review_company_domain`, documented in
 [company-directory-architecture.md §6a](company-directory-architecture.md#6a-the-promotion-policy-and-the-review-queue-that-implements-it)
-and held to its rules by `supabase/tests/company_domain_review.test.sql`. The
-short version, because it is easy to get wrong later:
+and held to its rules by `supabase/tests/company_domain_review.test.sql`:
 
 * a promotion may only be backed by **checked, non-OTP** evidence, and the kinds
   it may use are exactly the resolver's first-party/registry kinds below;
@@ -229,8 +228,8 @@ would be a lie — or be stuck. Two controls exist today, and one does not:
 
 | Control | State |
 | --- | --- |
-| a weak claim cannot be proved into verified company ownership | **shipped** (the promotion threshold, §0) |
-| a weak claim that somebody *did* prove control of is queued for an operator, who can promote or reject it with an audit trail | **shipped** (`20260929152000`, architecture §6a) |
+| a mailbox proof never verifies a company it does not belong to: the selected company must register the domain, and an unrelated domain is refused (`domain_not_verified`) | **shipped** (`confirm_company_verification`, §0) |
+| a domain whose mapping is in question is queued for an operator, who can promote or reject it with an audit trail | **shipped** (`20260929152000`, architecture §6a) |
 | a member-facing "this mapping is wrong" report | **not built** — at 500k hints this is the highest-value quality signal available, and it is listed as an open decision in [company-directory-architecture.md](company-directory-architecture.md) |
 
 Until the third exists, the feedback path runs through support, and the review
@@ -256,9 +255,11 @@ or an assertion in the shipped migration
 | a promotion can never write `verified` | `public.review_company_domain` updates `evidence_confidence` and `last_checked_at` only; asserted |
 | every promotion/rejection is attributable | `company_domain_reviews.reviewer_id` (not null → `users`), `reason` 3–1000 chars, `before`/`after_confidence`; a reviewer-less call raises |
 | no client role can review | `revoke all … from public, anon, authenticated` + `grant execute … to service_role` on the table and both functions |
-| a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H) and `confirm_company_verification` |
+| a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H, the create path) |
+| a member who explicitly selects a company and proves a mailbox on its registered domain IS verified | `confirm_company_verification` (no `evidence_confidence` gate) |
 | a proof is the only thing that sets `verified` | both RPCs; the import refuses an export that claims it |
 | a domain whose owner changed | `public.reassign_company_domain(...)` |
 
-Assertions: `supabase/tests/company_domain_stewardship.test.sql` (127),
-`supabase/tests/company_verified_domains.test.sql` (111).
+Assertions: `supabase/tests/company_domain_stewardship.test.sql` (161),
+`supabase/tests/company_verified_domains.test.sql` (115),
+`supabase/tests/company_verification_explicit_company.test.sql` (32).
