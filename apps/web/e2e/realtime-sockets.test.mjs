@@ -59,6 +59,24 @@
  *   sockets survive it by design — a room teardown never closes them — which is
  *   why a community-less session shows no churn at all.)
  *
+ * COVERING COMMUNITY SOCKETS WITHOUT A MEMBER ACCOUNT
+ *   A member's dashboard opens one socket PER COMMUNITY, and that fan-out is
+ *   where StrictMode's churn lives. `--mock-communities N` answers
+ *   `/api/communities` with N synthetic communities, so the client fans out N
+ *   community sockets exactly as it does for a member — no account, no database.
+ *   The Worker refuses them (it checks membership), and that refusal is the
+ *   point of the check: the socket URL carries no token, so a 403 there proves
+ *   the session cookie authenticated the handshake while membership was denied
+ *   (a missing cookie answers 401 instead), and a 101 would mean the Worker let
+ *   a non-member into a room.
+ *
+ *   For ACCEPTED community sockets, point the test at a member instead of a
+ *   mock. The session is minted locally from SESSION_SECRET, so no password is
+ *   involved — either seed a member with `npm run k6:seed`, which writes users
+ *   AND their community memberships, and use E2E_EMAIL + E2E_PASSWORD from
+ *   k6/data/test-users.json, or set E2E_USER_ID to an existing member's uuid and
+ *   add --require-community-sockets.
+ *
  * SESSION (first source that is configured wins)
  *   1. E2E_SESSION_COOKIE — a `uxcommunity_session` value you already have
  *      (DevTools → Application → Cookies). Works against any target, local or
@@ -74,6 +92,7 @@
  *
  * USAGE
  *   npm run test:e2e-realtime
+ *   npm run test:e2e-realtime -- --mock-communities 3
  *   npm run test:e2e-realtime -- --path /dashboard/communities/<id> --strict
  *
  *   Run the file directly (as the npm script does) and the flags above work;
@@ -100,6 +119,28 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DEV_VARS = path.resolve(HERE, "..", ".dev.vars");
 const RT_DEV_VARS = path.resolve(HERE, "..", "..", "..", "apps", "realtime", ".dev.vars");
 
+function mockCommunityId(index) {
+  // Deterministic, so the same Durable Object instance is reused instead of a
+  // fresh one per run.
+  return `e2e00000-0000-4000-8000-0000000000${String(index).padStart(2, "0")}`;
+}
+
+function mockCommunityRow(id, index) {
+  return {
+    id,
+    name: `E2E community ${index}`,
+    type: "general",
+    image_url: null,
+    member_count: 3,
+    message_count: 0,
+    mention_count: 0,
+    unread_content_count: 0,
+    is_archived: false,
+    last_read_at: null,
+    last_message: null,
+  };
+}
+
 /**
  * Chrome's own wording when a socket is closed before its handshake finished —
  * what StrictMode's simulated unmount does to an in-flight connect. Anything
@@ -125,6 +166,16 @@ const SETTLE_MS = Number(argValue("--settle-ms") ?? process.env.E2E_SETTLE_MS ??
 const TIMEOUT_MS = Number(argValue("--timeout-ms") ?? process.env.E2E_TIMEOUT_MS ?? 60_000);
 const REQUIRE_COMMUNITY_SOCKETS =
   process.argv.includes("--require-community-sockets") || process.env.E2E_REQUIRE_COMMUNITY_SOCKETS === "1";
+
+/**
+ * How many synthetic communities to serve the sidebar. The sidebar only keeps
+ * SIDEBAR_REALTIME_LIMIT (15) communities live, so more than that would just
+ * leave the extra rows dormant.
+ */
+const MOCK_COMMUNITIES = Math.max(
+  0,
+  Math.min(15, Number(argValue("--mock-communities") ?? process.env.E2E_MOCK_COMMUNITIES ?? 0) || 0),
+);
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -268,6 +319,18 @@ async function collectSockets() {
     if (/websocket/i.test(text)) consoleWsLines.push(text.replace(/\s+/g, " ").trim());
   });
 
+  // The sidebar's community list is a CLIENT fetch, which is what makes the
+  // fan-out reachable without an account: N communities in, N chat sockets out.
+  const mockedCommunityIds = Array.from({ length: MOCK_COMMUNITIES }, (_, i) => mockCommunityId(i + 1));
+  if (mockedCommunityIds.length) {
+    const rows = mockedCommunityIds.map((id, i) => mockCommunityRow(id, i + 1));
+    await page.route(
+      (url) => url.pathname === "/api/communities",
+      (route) =>
+        route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ communities: rows }) }),
+    );
+  }
+
   await page.goto(`${APP_URL}${PAGE_PATH}`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("load").catch(() => {});
 
@@ -309,7 +372,16 @@ async function collectSockets() {
   const finalUrl = page.url();
   await browser.close();
 
-  return { session, userId, sockets: [...sockets.values()], consoleWsLines, finalUrl, doView, doViewSkipReason };
+  return {
+    session,
+    userId,
+    sockets: [...sockets.values()],
+    consoleWsLines,
+    finalUrl,
+    doView,
+    doViewSkipReason,
+    mockedCommunityIds,
+  };
 }
 
 // ── Derived views ───────────────────────────────────────────────────────────
@@ -329,6 +401,21 @@ function refusalMessages(sockets) {
   return realtimeSockets(sockets)
     .flatMap((socket) => socket.frameErrors)
     .filter((message) => !CANCELLED_HANDSHAKE.test(message));
+}
+
+/**
+ * The status the Worker refused a handshake with. Chrome reports it inside the
+ * frame error ("Error during WebSocket handshake: Unexpected response code: 403")
+ * and sends no response event, so the status has to come out of the message.
+ * Null means the socket was never refused — it opened, or it was cancelled.
+ */
+function refusalStatusOf(socket) {
+  for (const message of socket.frameErrors) {
+    const match = /Unexpected response code: (\d{3})/i.exec(message);
+    if (match) return Number(match[1]);
+    if (/authentication failed|no valid credentials/i.test(message)) return 401;
+  }
+  return socket.status !== null && socket.status !== 101 ? socket.status : null;
 }
 
 function churnMessages(sockets) {
@@ -380,6 +467,16 @@ function describeSocket(socket) {
 
 let result;
 
+/** Rooms the mocked run EXPECTS the Worker to refuse (membership is enforced). */
+function mockedRooms() {
+  return new Set(result.mockedCommunityIds.map((id) => `chat:${id}`));
+}
+
+const isExpectedRefusal = (socket) => mockedRooms().has(roomOf(socket.url) ?? "");
+
+/** Every realtime socket that is NOT an expected mocked-community refusal. */
+const unexpectedSockets = () => realtimeSockets(result.sockets).filter((socket) => !isExpectedRefusal(socket));
+
 before(async () => {
   result = await collectSockets();
   console.log(
@@ -398,6 +495,12 @@ before(async () => {
   }
   if (!roomsAttempted(result.sockets).size) {
     console.log("  note: no realtime room was opened — see the assertions below for the likely cause");
+  }
+  if (result.mockedCommunityIds.length) {
+    console.log(
+      `  mocked communities: ${result.mockedCommunityIds.length} served to the sidebar; their chat rooms are expected ` +
+        `to be refused with 403 (the session is not a member of them)`,
+    );
   }
   if (result.doView) {
     console.log(
@@ -451,17 +554,65 @@ test("the session cookie is what authorized the socket (Durable Object view)", (
 });
 
 test("no WebSocket handshake is refused", () => {
-  const refusals = refusalMessages(result.sockets);
+  const refusals = refusalMessages(unexpectedSockets());
   assert.deepEqual(refusals, [], `the realtime Worker refused ${refusals.length} handshake(s): ${refusals.join("; ")}`);
 });
 
 test("every attempted room ends with a live, opened socket", () => {
-  for (const room of roomsAttempted(result.sockets).keys()) {
-    const opened = realtimeSockets(result.sockets).filter(
-      (socket) => roomOf(socket.url) === room && socket.status === 101 && !socket.closed,
-    );
+  const sockets = unexpectedSockets();
+  for (const room of roomsAttempted(sockets).keys()) {
+    const opened = sockets.filter((socket) => roomOf(socket.url) === room && socket.status === 101 && !socket.closed);
     assert.ok(opened.length > 0, `room ${room} was attempted but has no open (101) socket left`);
   }
+});
+
+// ── Mocked-community coverage (--mock-communities N) ─────────────────────────
+// The fan-out a member's dashboard has, without a member account. The Worker
+// refuses these rooms because the session is not a member — which is itself the
+// assertion: the refusal must be 403 (authenticated, membership denied), never
+// 401 (unauthenticated) and never a 101 (a non-member let in).
+
+test("each mocked community gets its own socket (--mock-communities)", (t) => {
+  if (!result.mockedCommunityIds.length) {
+    return t.skip("run with --mock-communities N to cover the community socket fan-out");
+  }
+
+  const attempted = roomsAttempted(result.sockets);
+  const missing = result.mockedCommunityIds.filter((id) => !attempted.has(`chat:${id}`));
+  assert.deepEqual(
+    missing,
+    [],
+    `${missing.length} of ${result.mockedCommunityIds.length} mocked community(ies) produced no socket at all: ` +
+      "the sidebar must fan out one chat socket per community",
+  );
+});
+
+test("a non-member community socket is refused with 403, never 401", (t) => {
+  if (!result.mockedCommunityIds.length) {
+    return t.skip("run with --mock-communities N to cover the community socket refusal path");
+  }
+
+  const statuses = new Set();
+  for (const socket of realtimeSockets(result.sockets)) {
+    if (!isExpectedRefusal(socket)) continue;
+    const status = refusalStatusOf(socket);
+    assert.notEqual(
+      status,
+      101,
+      `${socket.url} was ACCEPTED — the Worker let this session into a community it is not a member of`,
+    );
+    assert.notEqual(
+      status,
+      401,
+      `${socket.url} answered 401: the handshake was unauthenticated, so the session cookie never reached the Worker`,
+    );
+    if (status !== null) statuses.add(status);
+  }
+  assert.ok(
+    statuses.has(403),
+    `no mocked community socket was refused with 403 (saw: ${[...statuses].join(", ") || "no refusal"}) — the membership ` +
+      "check is how this test proves the cookie authenticated the handshake",
+  );
 });
 
 test("the user-scoped socket is keyed to the signed-in user", () => {
@@ -518,7 +669,7 @@ function strictOrReport(name, condition, detail) {
 }
 
 test("every handshake completes (strict)", () => {
-  const cancelled = realtimeSockets(result.sockets).filter((socket) => socket.status !== 101);
+  const cancelled = unexpectedSockets().filter((socket) => socket.status !== 101);
   strictOrReport(
     "cancelled handshakes",
     cancelled.length === 0,
@@ -527,7 +678,7 @@ test("every handshake completes (strict)", () => {
 });
 
 test("each room opens exactly one socket (strict)", () => {
-  const duplicates = [...roomsAttempted(result.sockets)].filter(([, count]) => count > 1);
+  const duplicates = [...roomsAttempted(unexpectedSockets())].filter(([, count]) => count > 1);
   strictOrReport(
     "duplicate sockets",
     duplicates.length === 0,
@@ -536,7 +687,7 @@ test("each room opens exactly one socket (strict)", () => {
 });
 
 test("no opened socket is torn down afterwards (strict)", () => {
-  const torn = realtimeSockets(result.sockets).filter((socket) => socket.status === 101 && socket.closed);
+  const torn = unexpectedSockets().filter((socket) => socket.status === 101 && socket.closed);
   strictOrReport(
     "sockets closed after opening",
     torn.length === 0,
@@ -545,7 +696,11 @@ test("no opened socket is torn down afterwards (strict)", () => {
 });
 
 test("the browser console reports no failed WebSocket (strict)", () => {
-  const failed = result.consoleWsLines.filter((line) => /failed/i.test(line));
+  // A mocked community's refusal is expected (see the mock-communities section),
+  // so it is not a console failure this test should fail on.
+  const failed = result.consoleWsLines.filter(
+    (line) => /failed/i.test(line) && !result.mockedCommunityIds.some((id) => line.includes(id)),
+  );
   strictOrReport("console WebSocket failures", failed.length === 0, failed.join(" | "));
 
   const churn = churnMessages(result.sockets);
