@@ -16,6 +16,8 @@ export interface CommunityActivityEntry {
   actor_avatar_url?: string | null;
   action: string;
   target_user_id: string | null;
+  /** The acted-upon member's current name, attached by the API from target_user_id. */
+  target_user_name?: string | null;
   details: Record<string, unknown>;
   created_at: string;
 }
@@ -24,6 +26,9 @@ export interface CommunityActivityEntry {
 export function describeActivity(entry: CommunityActivityEntry): string {
   const d = entry.details ?? {};
   const target = (v: unknown) => (typeof v === "string" ? v : null);
+  // The member a row acts upon: the write-time name snapshot when the action
+  // stored one, else the current name the API resolved from target_user_id.
+  const actedOn = target(d.member_name) ?? entry.target_user_name ?? "a member";
 
   switch (entry.action) {
     case "admin_promoted":
@@ -55,15 +60,15 @@ export function describeActivity(entry: CommunityActivityEntry): string {
     case "invite_link_regenerated":
       return "regenerated the invite link";
     case "message_deleted":
-      return "deleted a member's chat message";
+      return `deleted ${actedOn}'s chat message`;
     case "thread_deleted":
-      return "deleted a member's thread";
+      return `deleted ${actedOn}'s thread`;
     case "showcase_deleted":
-      return "deleted a member's showcase post";
+      return `deleted ${actedOn}'s showcase post`;
     case "resource_deleted":
-      return "deleted a member's resource";
+      return `deleted ${actedOn}'s resource`;
     case "event_deleted":
-      return "deleted a member's event";
+      return `deleted ${actedOn}'s event`;
     default:
       return entry.action.replace(/_/g, " ");
   }

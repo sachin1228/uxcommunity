@@ -981,7 +981,7 @@ export function CommunityChat({
             isEventChat={displayCommunity?.type === "event"}
           />
         ) : renderedTab === "activity" ? (
-          <ActivityView communityId={communityId} />
+          <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Scrollable message body — a flex sibling of the footer (WhatsApp

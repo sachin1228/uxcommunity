@@ -33,12 +33,20 @@ const entryActorId = (entry: CommunityActivityEntry) =>
  * The owner's management audit trail — who did what, most recent first.
  * Mounted as the owner-only Activity tab (see ChatHeader's showActivityTab).
  */
-export function ActivityView({ communityId }: { communityId: string }) {
+export function ActivityView({
+  communityId,
+  currentUserId,
+}: {
+  communityId: string;
+  currentUserId: string;
+}) {
   const [entries, setEntries] = useState<CommunityActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [actorFilter, setActorFilter] = useState("all");
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +56,7 @@ export function ActivityView({ communityId }: { communityId: string }) {
         if (cancelled) return;
         if (!data) { setError("Failed to load activity."); return; }
         setEntries(data.activity ?? []);
+        setHasMore(Boolean(data.has_more));
       })
       .catch(() => { if (!cancelled) setError("Failed to load activity."); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -60,15 +69,43 @@ export function ActivityView({ communityId }: { communityId: string }) {
     setReloadKey((key) => key + 1);
   }
 
+  // Keyset pagination: ask for rows older than the oldest one loaded. The
+  // cursor is that row's created_at, so fresh activity arriving meanwhile
+  // cannot shift the page.
+  async function loadOlder() {
+    if (loadingMore || entries.length === 0) return;
+    setLoadingMore(true);
+    try {
+      const oldest = entries[entries.length - 1];
+      const res = await fetch(
+        `/api/communities/${communityId}/activity?before=${encodeURIComponent(oldest.created_at)}`,
+      );
+      const data = res.ok ? await res.json() : null;
+      if (!data) return;
+      setEntries((prev) => {
+        const seen = new Set(prev.map((entry) => entry.id));
+        return [
+          ...prev,
+          ...((data.activity ?? []) as CommunityActivityEntry[]).filter((entry) => !seen.has(entry.id)),
+        ];
+      });
+      setHasMore(Boolean(data.has_more));
+    } catch {
+      // Keep the button in place so the click can be retried.
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   // Actor chips are derived from the fetched entries — one per distinct manager.
   const actors = useMemo(() => {
     const seen = new Map<string, string>();
     for (const entry of entries) {
       const id = entryActorId(entry);
-      if (!seen.has(id)) seen.set(id, actorLabel(entry));
+      if (!seen.has(id)) seen.set(id, entry.actor_id === currentUserId ? "You" : actorLabel(entry));
     }
     return [...seen.entries()].map(([id, name]) => ({ id, name }));
-  }, [entries]);
+  }, [entries, currentUserId]);
 
   const visible = useMemo(
     () => (actorFilter === "all" ? entries : entries.filter((entry) => entryActorId(entry) === actorFilter)),
@@ -121,7 +158,7 @@ export function ActivityView({ communityId }: { communityId: string }) {
               Try again
             </button>
           </div>
-        ) : visible.length === 0 ? (
+        ) : visible.length === 0 && !hasMore ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <ShieldCheck strokeWidth={2} size={20} className="text-foreground-muted/50" aria-hidden="true" />
             <p className="max-w-xs font-body text-xs text-foreground-muted leading-relaxed">
@@ -131,43 +168,71 @@ export function ActivityView({ communityId }: { communityId: string }) {
             </p>
           </div>
         ) : (
-          <ul className="px-2 pb-4">
-            {visible.map((entry) => {
-              const isPlatform = entry.actor_role === "platform";
-              return (
-                <li
-                  key={entry.id}
-                  className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised/50"
-                >
-                  <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
-                  >
-                    {isPlatform ? (
-                      "UX"
-                    ) : (
-                      <ChatAvatar
-                        name={entry.actor_name ?? "?"}
-                        url={entry.actor_avatar_url ?? null}
-                        size={6}
-                      />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-body text-xs text-foreground leading-relaxed">
-                      <span className="font-semibold">{actorLabel(entry)}</span>{" "}
-                      {describeActivity(entry)}
-                    </p>
-                    <p className="font-body text-[10px] text-foreground-muted/70 mt-0.5">
-                      {fmtActivityTime(entry.created_at)}
-                      <span className={`ml-1.5 uppercase tracking-wider text-[9px] ${ROLE_TAG[entry.actor_role]}`}>
-                        {entry.actor_role}
+          <>
+            {visible.length === 0 ? (
+              <p className="px-5 pt-8 pb-1 text-center font-body text-xs text-foreground-muted">
+                No activity from this manager in the loaded feed yet.
+              </p>
+            ) : (
+              <ul className="px-2 pb-1">
+                {visible.map((entry) => {
+                  const isPlatform = entry.actor_role === "platform";
+                  const isSelf = Boolean(entry.actor_id && entry.actor_id === currentUserId);
+                  const excerpt =
+                    typeof entry.details?.message_excerpt === "string" ? entry.details.message_excerpt : null;
+                  return (
+                    <li
+                      key={entry.id}
+                      className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised/50"
+                    >
+                      <span
+                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
+                      >
+                        {isPlatform ? (
+                          "UX"
+                        ) : (
+                          <ChatAvatar
+                            name={entry.actor_name ?? "?"}
+                            url={entry.actor_avatar_url ?? null}
+                            size={6}
+                          />
+                        )}
                       </span>
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-xs text-foreground leading-relaxed">
+                          <span className="font-semibold">{isSelf ? "You" : actorLabel(entry)}</span>{" "}
+                          {describeActivity(entry)}
+                        </p>
+                        {excerpt && (
+                          <blockquote className="mt-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs leading-relaxed text-foreground-muted">
+                            “{excerpt}”
+                          </blockquote>
+                        )}
+                        <p className="font-body text-[10px] text-foreground-muted/70 mt-0.5">
+                          {fmtActivityTime(entry.created_at)}
+                          <span className={`ml-1.5 uppercase tracking-wider text-[9px] ${ROLE_TAG[entry.actor_role]}`}>
+                            {entry.actor_role}
+                          </span>
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {hasMore && (
+              <div className="flex justify-center px-5 pb-5 pt-2">
+                <button
+                  type="button"
+                  onClick={loadOlder}
+                  disabled={loadingMore}
+                  className="rounded-lg border border-border px-4 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-60"
+                >
+                  {loadingMore ? <Spinner size={12} /> : "Load older"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

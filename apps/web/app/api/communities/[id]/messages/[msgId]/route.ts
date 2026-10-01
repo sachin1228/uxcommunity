@@ -102,11 +102,11 @@ export async function DELETE(
   // Fetch message and verify ownership
   const { data: msg } = (await db
     .from("community_messages")
-    .select("id, user_id, created_at, image_url")
+    .select("id, user_id, created_at, content, image_url")
     .eq("id", msgId)
     .eq("community_id", communityId)
     .maybeSingle()) as unknown as {
-    data: { id: string; user_id: string; created_at: string; image_url: string | null } | null;
+    data: { id: string; user_id: string; created_at: string; content: string | null; image_url: string | null } | null;
   };
 
   if (!msg) return NextResponse.json({ error: "Message not found." }, { status: 404 });
@@ -152,15 +152,27 @@ export async function DELETE(
     ])
   );
 
-  // Audit trail for manager deletions of other members' messages.
+  // Audit trail for manager deletions of other members' messages. The excerpt
+  // is snapshotted here because the delete wipes the message's content.
   if (!isOwn && canModerate) {
+    const trimmed = msg.content?.trim();
+    const messageExcerpt = trimmed
+      ? trimmed.length > 140
+        ? `${trimmed.slice(0, 140)}…`
+        : trimmed
+      : msg.image_url
+        ? "[image]"
+        : null;
     await logCommunityActivity(db, {
       communityId,
       actorId: userId,
       actorRole: managerActorRole(managerStatus),
       action: "message_deleted",
       targetUserId: msg.user_id,
-      details: { message_id: msgId },
+      details: {
+        message_id: msgId,
+        ...(messageExcerpt ? { message_excerpt: messageExcerpt } : {}),
+      },
     });
   }
 
