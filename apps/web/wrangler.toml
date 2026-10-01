@@ -55,3 +55,17 @@ NEXT_PUBLIC_APP_URL = "https://app.uxcommunity.in"
 # through the server-side service-role client, so it never ships an anon key.
 NEXT_PUBLIC_SUPABASE_URL = "https://eauupthwlnarkauwifmw.supabase.co"
 NEXT_PUBLIC_REALTIME_URL = "https://rt.uxcommunity.in"
+
+# Workers Logs. Keep explicit application logs (console.error/warn and the
+# structured `logEvent()` lines in lib/observability/log.ts), but do NOT emit
+# one billable invocation log per request: this Worker handles every SSR page
+# and API request, so invocation logs are pure volume at scale.
+#
+# `wrangler deploy` replaces the Worker's configuration wholesale, so this block
+# has to stay in the file to stay in effect on production.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = false

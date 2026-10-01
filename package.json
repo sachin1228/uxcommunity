@@ -42,6 +42,7 @@
     "test:content-event-ids": "tsx --test apps/web/lib/communities/content-event-ids.test.ts",
     "test:publish-retry": "tsx --test apps/web/lib/realtime/publish-retry.test.ts apps/web/lib/realtime/publish-url.test.ts",
     "test:observability": "tsx --test apps/web/lib/observability/log.test.ts",
+    "test:server-timing": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/server-timing.test.ts",
     "test:read-manager": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/read-manager.test.ts",
     "test:sidebar-merge": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/panel/sidebar-merge.test.ts",
     "test:sidebar-content": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/panel/sidebar-content.test.ts",

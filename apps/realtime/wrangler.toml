@@ -33,9 +33,15 @@ new_sqlite_classes = []
 # truth for the Worker and has to carry them itself: `wrangler deploy` replaces
 # the Worker's configuration wholesale on every deploy, so omitting this block
 # here is what silently turns realtime logging off.
+#
+# `invocation_logs` is deliberately OFF: every Worker and Durable Object
+# invocation otherwise writes one billable log event, which at realtime scale is
+# hundreds of millions of events per month. Explicit `logEvent()` lines are
+# custom logs, not invocation logs, so errors/warnings/retries still reach
+# Workers Logs with this off.
 [observability]
 enabled = true
 
 [observability.logs]
 enabled = true
-invocation_logs = true
+invocation_logs = false

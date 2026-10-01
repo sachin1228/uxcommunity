@@ -21,3 +21,13 @@ new_sqlite_classes = ["UserDO"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = []
+
+# Same reasoning as wrangler.toml: keep Workers Logs on for the explicit
+# error/warn `logEvent()` lines, but do not emit one log event per invocation —
+# staging runs the same load tests, so its invocation logs are pure volume.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = false

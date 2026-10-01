@@ -5,6 +5,13 @@ type TimingDetails = Record<string, number>
 const encoder = new TextEncoder()
 const round = (value: number) => Math.round(value * 100) / 100
 
+/**
+ * Successful requests faster than this emit no `api.timing` line: per-request
+ * success logging is pure volume at scale. Failures (status >= 400) always log,
+ * and slow requests log regardless of status. Tune in one place only.
+ */
+export const SLOW_REQUEST_THRESHOLD_MS = 500
+
 export function estimateJsonBytes(value: unknown) {
   try {
     return encoder.encode(JSON.stringify(value)).byteLength
@@ -20,9 +27,10 @@ export function estimateJsonBytes(value: unknown) {
  * phase durations on an object that no code path ever read, so the routes were
  * "measured" invisibly. It now does two things with the same data:
  *
- *   1. emits ONE structured `api.timing` log line (stable event name, safe
- *      fields only — label, phase durations, total, status, counts), so slow
- *      routes are visible in the existing log sink; and
+ *   1. emits at most ONE structured `api.timing` log line (stable event name,
+ *      safe fields only — label, phase durations, total, status, counts) for
+ *      requests that failed or ran slow, so those are visible in the existing
+ *      log sink without logging every successful request; and
  *   2. returns the value for an HTTP `Server-Timing` header, so callers that
  *      want to surface the timings to the browser can attach it with
  *      `response.headers.set("Server-Timing", timing)`.
@@ -62,7 +70,8 @@ export function createServerTimer(label: string) {
     },
     /**
      * Finalize the timer. Returns the `Server-Timing` header value and emits
-     * the `api.timing` log line exactly once per timer.
+     * at most one `api.timing` log line per timer — only for failed or slow
+     * requests. Routine successes stay silent.
      */
     finish(extra: TimingDetails = {}): string {
       if (finished) return toServerTiming()
@@ -72,13 +81,17 @@ export function createServerTimer(label: string) {
       details.total = round(performance.now() - startedAt)
 
       const { status, ...phases } = details
-      logEvent("info", {
-        event: "api.timing",
-        route: label,
-        status,
-        total_ms: details.total,
-        phases,
-      })
+      const failed = typeof status === "number" && status >= 400
+      const slow = details.total > SLOW_REQUEST_THRESHOLD_MS
+      if (failed || slow) {
+        logEvent("info", {
+          event: "api.timing",
+          route: label,
+          status,
+          total_ms: details.total,
+          phases,
+        })
+      }
 
       return toServerTiming()
     },
