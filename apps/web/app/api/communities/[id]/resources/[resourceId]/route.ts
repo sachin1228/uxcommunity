@@ -9,6 +9,7 @@ import {
   managerActorRole,
   type CommunityManagerStatus,
 } from "@/lib/communities/manager-role";
+import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const RESOURCE_TYPES = new Set<ResourceType>([
@@ -151,7 +152,7 @@ export async function DELETE(
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
 
-  let existingQuery = db.from("community_resources").select("id, user_id, community_id, is_public").eq("id", resourceId);
+  let existingQuery = db.from("community_resources").select("id, user_id, community_id, is_public, title").eq("id", resourceId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
     : existingQuery.eq("community_id", communityId);
@@ -176,15 +177,29 @@ export async function DELETE(
   const { error } = await db.from("community_resources").delete().eq("id", resourceId);
   if (error) { console.error("[DELETE resource]", error); return NextResponse.json({ error: "Failed to delete resource." }, { status: 500 }); }
 
-  // Audit trail for moderated deletions of other members' resources.
+  // Audit trail for moderated deletions of other members' resources, plus a
+  // removal notice to the author. The title rides in the notice body so the
+  // author sees what was taken down.
   if (!isOwn && moderator) {
+    const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId,
       actorId: userId,
-      actorRole: managerActorRole(moderator),
+      actorRole,
       action: "resource_deleted",
       targetUserId: existing.user_id,
       details: { resource_id: resourceId },
+    });
+    deferNotification({
+      userId: existing.user_id,
+      actorId: userId,
+      communityId,
+      type: "resource_deleted",
+      entityType: "resource",
+      entityId: resourceId,
+      title: () => managerRemovalNotice(actorRole, "resource"),
+      body: typeof existing.title === "string" ? existing.title : null,
+      href: communityHref(communityId),
     });
   }
 

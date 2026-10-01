@@ -12,6 +12,7 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
+import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
 import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -210,7 +211,7 @@ export async function DELETE(
 
   let existingQuery = db
     .from("community_events")
-    .select("id, user_id")
+    .select("id, user_id, title")
     .eq("id", eventId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
@@ -262,15 +263,29 @@ export async function DELETE(
   const { error } = await db.from("community_events").delete().eq("id", eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Audit trail for moderated deletions of other members' events.
+  // Audit trail for moderated deletions of other members' events, plus a
+  // removal notice to the host. The title rides in the notice body so the
+  // host sees what was taken down.
   if (!isOwn && moderator) {
+    const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId,
       actorId: userId,
-      actorRole: managerActorRole(moderator),
+      actorRole,
       action: "event_deleted",
       targetUserId: existing.user_id,
       details: { event_id: eventId },
+    });
+    deferNotification({
+      userId: existing.user_id,
+      actorId: userId,
+      communityId,
+      type: "event_deleted",
+      entityType: "event",
+      entityId: eventId,
+      title: () => managerRemovalNotice(actorRole, "event"),
+      body: typeof existing.title === "string" ? existing.title : null,
+      href: communityHref(communityId),
     });
   }
 

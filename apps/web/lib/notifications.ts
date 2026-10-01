@@ -9,7 +9,8 @@ import type { Json } from "@/lib/supabase/database.types";
 
 /**
  * The notification types the app still generates: engagement on the user's own
- * content (comments, replies, likes) plus event RSVPs.
+ * content (comments, replies, likes), event RSVPs, and manager removals of the
+ * user's content.
  *
  * The community broadcasts ("started a new thread", "shared a new resource",
  * "created a new event") and the chat @mention rows are gone — no route
@@ -24,9 +25,35 @@ export type NotificationType =
   | "resource_reply"
   | "event_comment"
   | "event_reply"
-  | "event_rsvp";
+  | "event_rsvp"
+  | "thread_deleted"
+  | "showcase_deleted"
+  | "resource_deleted"
+  | "event_deleted";
 
-export type NotificationEntityType = "thread" | "resource" | "event";
+export type NotificationEntityType = "thread" | "showcase" | "resource" | "event";
+
+/** The content kinds a removal notice can be about, and how it names them. */
+const REMOVED_CONTENT_LABELS = {
+  thread: "thread",
+  showcase: "showcase post",
+  resource: "resource",
+  event: "event",
+} as const;
+
+/**
+ * Title for a content-removal notice, aimed at the member whose post it was.
+ * Reddit-style: the role speaks, not the person — the manager's name never
+ * rides on removal copy (the row still records actor_id).
+ */
+export function managerRemovalNotice(
+  role: "owner" | "admin" | "moderator",
+  kind: keyof typeof REMOVED_CONTENT_LABELS,
+): string {
+  const actor =
+    role === "owner" ? "The community owner" : role === "admin" ? "An admin" : "A moderator";
+  return `${actor} deleted your ${REMOVED_CONTENT_LABELS[kind]}`;
+}
 
 interface NotificationInput {
   userId: string;
@@ -145,4 +172,12 @@ export function resourceHref(communityId: string, resourceId: string) {
 
 export function eventHref(communityId: string, eventId: string) {
   return `/dashboard/communities/${communityId}/events/${eventId}`;
+}
+
+/**
+ * Removal notices link to the community itself: the content they are about is
+ * gone, so a deep link would only open a not-found page.
+ */
+export function communityHref(communityId: string) {
+  return `/dashboard/communities/${communityId}`;
 }

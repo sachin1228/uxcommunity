@@ -9,6 +9,7 @@ import {
   managerActorRole,
   type CommunityManagerStatus,
 } from "@/lib/communities/manager-role";
+import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 /** Extract attachment URLs from a stored attachments JSON array (for R2 lookups). */
@@ -155,15 +156,29 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { error } = await deleteQuery;
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
 
-  // Audit trail for moderated deletions of other members' posts.
+  // Audit trail for moderated deletions of other members' posts, plus a
+  // removal notice to the author. The title rides in the notice body so the
+  // author sees what was taken down.
   if (!isOwn && moderator) {
+    const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId: id,
       actorId: userId,
-      actorRole: managerActorRole(moderator),
+      actorRole,
       action: "showcase_deleted",
       targetUserId: existing.user_id,
       details: { post_id: postId },
+    });
+    deferNotification({
+      userId: existing.user_id,
+      actorId: userId,
+      communityId: id,
+      type: "showcase_deleted",
+      entityType: "showcase",
+      entityId: postId,
+      title: () => managerRemovalNotice(actorRole, "showcase"),
+      body: typeof existing.title === "string" ? existing.title : null,
+      href: communityHref(id),
     });
   }
 
