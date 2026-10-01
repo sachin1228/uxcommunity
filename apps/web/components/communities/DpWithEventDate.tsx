@@ -8,10 +8,10 @@ import { useNowTick } from "@/lib/use-now-tick";
  *
  * An event's group chat wears the same face everywhere — the sidebar row, the
  * chat header, the event page's chat row — so the badge lives here rather than
- * being re-drawn at each site. It renders whatever DP it is given (the sidebar
- * and header use CommunityDp, the event panel AvatarImg) and adds the badge
- * only when there is a date to show, which keeps every other community's DP
- * exactly as it was.
+ * being re-drawn at each site. It renders whatever DP it is given (the sidebar,
+ * the chat header and the event panel all hand it a CommunityDp) and adds the
+ * badge only when there is a date to show, which keeps every other community's
+ * DP exactly as it was.
  *
  * On the event's own day the tile says TODAY, while it runs it says LIVE,
  * and for a day after it wraps the circle says ENDED in red — the word

@@ -1,3 +1,5 @@
+import { CommunityIcon } from "./CommunityIcon";
+
 interface CommunityPostLabelProps {
   communityId?: string;
   communityName: string;
@@ -28,7 +30,7 @@ export function CommunityPostLabel({
           className="h-4 w-4 shrink-0 rounded-full object-cover"
         />
       ) : (
-        <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full bg-accent/20" />
+        <CommunityIcon size={16} iconSize={9} />
       )}
       <span className={`truncate ${onOpenPreview ? "transition-colors hover:text-foreground" : "text-foreground-muted"}`}>{communityName}</span>
     </div>

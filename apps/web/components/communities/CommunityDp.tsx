@@ -50,7 +50,7 @@ export function CommunityDp({
           onError={() => setImgFailed(true)}
         />
       ) : (
-        <CommunityIcon size={size} className="bg-transparent" />
+        <CommunityIcon size={size} />
       )}
     </div>
   );
