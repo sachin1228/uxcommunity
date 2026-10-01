@@ -235,6 +235,7 @@ export const ChatHeader = memo(function ChatHeader({
                     imageUrl={community.image_url}
                     name={community.name}
                     size={44}
+                    iconSize={18}
                     className="bg-surface-raised"
                   />
                 </DpWithEventDate>

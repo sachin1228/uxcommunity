@@ -22,6 +22,8 @@ export interface CommunityDpProps {
   name: string;
   /** Container diameter in px. */
   size?: number;
+  /** Glyph size inside the no-image fallback; defaults to half the container. */
+  iconSize?: number;
   /** Extra classes for the circular container (background, etc.). */
   className?: string;
 }
@@ -30,6 +32,7 @@ export function CommunityDp({
   imageUrl,
   name,
   size = 40,
+  iconSize,
   className = "bg-surface-raised",
 }: CommunityDpProps) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -50,7 +53,7 @@ export function CommunityDp({
           onError={() => setImgFailed(true)}
         />
       ) : (
-        <CommunityIcon size={size} />
+        <CommunityIcon size={size} iconSize={iconSize} />
       )}
     </div>
   );

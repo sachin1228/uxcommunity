@@ -37,6 +37,7 @@ export function CommunityAvatar({
         imageUrl={imageUrl}
         name={name}
         size={36}
+        iconSize={16}
         className="bg-surface-raised"
       />
     </DpWithEventDate>
