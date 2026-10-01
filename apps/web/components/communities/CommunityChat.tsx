@@ -79,6 +79,10 @@ const ShowcaseView = dynamic(() => import("./showcase/ShowcaseView").then((m) =>
   ssr: false,
   loading: TabLoading,
 });
+const ActivityView = dynamic(() => import("./activity/ActivityView").then((m) => m.ActivityView), {
+  ssr: false,
+  loading: TabLoading,
+});
 const CommunitySettingsView = dynamic(
   () => import("./CommunitySettingsView").then((m) => m.CommunitySettingsView),
   { ssr: false },
@@ -819,15 +823,18 @@ export function CommunityChat({
     [community, sidebarEntry, communityId],
   );
 
-  // "members" is always available; every other tab has to be enabled for this
-  // community, so a switched-off area falls back to Chat.
+  const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+  // "members" is always available and "activity" is owner-only — neither is an
+  // owner-toggleable area, so both skip the feature-flag fallback; every other
+  // tab has to be enabled for this community or it falls back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
     activeTab !== "members" &&
+    activeTab !== "activity" &&
     !isFeatureVisible(activeTab as CommunityFeature, displayCommunity)
       ? "chat"
-      : activeTab;
-
-  const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+      : activeTab === "activity" && !isOwner
+        ? "chat"
+        : activeTab;
   // Role and grants only exist on the loaded read model; the sidebar fallback
   // never carries them, so read them from `community` directly.
   const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
@@ -884,6 +891,7 @@ export function CommunityChat({
           currentUserId={currentUserId}
           onSettingsClick={canOpenSettings ? handleSettingsClick : undefined}
           canOpenSettings={canOpenSettings}
+          showActivityTab={isOwner}
           communityId={communityId}
         />
 
@@ -972,6 +980,8 @@ export function CommunityChat({
             isPrivate={displayCommunity?.is_private ?? false}
             isEventChat={displayCommunity?.type === "event"}
           />
+        ) : renderedTab === "activity" ? (
+          <ActivityView communityId={communityId} />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Scrollable message body — a flex sibling of the footer (WhatsApp

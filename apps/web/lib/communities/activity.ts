@@ -1,5 +1,22 @@
 import { nameInitials } from "@/lib/avatar";
-import type { CommunityActivityEntry } from "./communityTypes";
+
+/**
+ * One row of a community's management audit trail (`community_admin_activity`),
+ * as both the platform admin dashboard and the in-community owner Activity tab
+ * receive it. Actor/target names are snapshotted at write time, so the feed
+ * renders without joins.
+ */
+export interface CommunityActivityEntry {
+  id: string;
+  community_id: string;
+  actor_id: string | null;
+  actor_role: "owner" | "admin" | "moderator" | "platform";
+  actor_name: string | null;
+  action: string;
+  target_user_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
 
 /** Human-readable copy for each recorded management action. */
 export function describeActivity(entry: CommunityActivityEntry): string {

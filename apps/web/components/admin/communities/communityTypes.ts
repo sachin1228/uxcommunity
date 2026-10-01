@@ -75,18 +75,6 @@ export interface CommunityAdmin {
   updated_at: string | null;
 }
 
-export interface CommunityActivityEntry {
-  id: string;
-  community_id: string;
-  actor_id: string | null;
-  actor_role: "owner" | "admin" | "moderator" | "platform";
-  actor_name: string | null;
-  action: string;
-  target_user_id: string | null;
-  details: Record<string, unknown>;
-  created_at: string;
-}
-
 export const TYPE_LABELS: Record<string, string> = {
   city:             "City",
   sector:           "Industry",

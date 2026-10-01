@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { BookMarked, Calendar, ChevronDown, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookMarked, Calendar, ChevronDown, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -40,12 +40,14 @@ interface ChatHeaderProps {
   onSettingsClick?: () => void;
   /** Owner or admin with "edit community settings" permission. */
   canOpenSettings?: boolean;
+  /** Owner-only: shows the Activity (management audit) tab after Members. */
+  showActivityTab?: boolean;
   /** Used to resolve the community Lottie while meta is still loading. */
   communityId?: string;
 }
 
-export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members";
-const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members"];
+export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "activity";
+const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members", "activity"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -132,6 +134,7 @@ export const ChatHeader = memo(function ChatHeader({
   currentUserId,
   onSettingsClick,
   canOpenSettings = false,
+  showActivityTab = false,
   communityId,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
@@ -192,10 +195,15 @@ export const ChatHeader = memo(function ChatHeader({
   }
 
   // Members is not an owner-toggleable area, so it stays visible regardless of
-  // enabled_tabs; every other tab follows the community's own flags.
+  // enabled_tabs; Activity is the owner's audit view and follows the caller's
+  // role; every other tab follows the community's own flags.
   const visibleTabs = community
     ? DEFAULT_TABS.filter(
-        (tab) => tab === "members" || isFeatureVisible(tab as CommunityFeature, community),
+        (tab) =>
+          tab === "members" ||
+          (tab === "activity"
+            ? showActivityTab
+            : isFeatureVisible(tab as CommunityFeature, community)),
       )
     : DEFAULT_TABS;
 
@@ -325,6 +333,7 @@ export const ChatHeader = memo(function ChatHeader({
                 ["resources", "Resources", BookMarked],
                 ["events",    "Events",    Calendar],
                 ["members",   "Members",   Users],
+                ["activity",  "Activity",  Activity],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
                 <button
                   key={tab}

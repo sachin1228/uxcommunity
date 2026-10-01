@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import type { CommunityActivityEntry } from "./communityTypes";
-import { actorInitials, actorLabel, describeActivity, fmtActivityTime } from "./communityActivity";
+import {
+  actorInitials,
+  actorLabel,
+  describeActivity,
+  fmtActivityTime,
+  type CommunityActivityEntry,
+} from "@/lib/communities/activity";
 
 interface Props {
   communityId: string;
