@@ -1,10 +1,8 @@
-import { CheckmarkRegular } from "@fluentui/react-icons/headless/svg/checkmark";
-
 /**
- * Read-receipt double check. Fluent ships no double-tick glyph, so this
- * composes two checkmarks: the second sits down-right, offset by 17% of
- * the box on both axes — the same geometry as the `CheckCheck` icon this
- * app used before the Fluent migration.
+ * Read-receipt double check. Kept in the original lucide `CheckCheck`
+ * geometry (ISC licensed) — same fallback as the brand marks in
+ * BrandIcons — because Fluent ships no double-tick glyph and the
+ * composed two-checkmark variant read worse in the chat bubbles.
  */
 export function DoubleCheckIcon({
   fontSize = 13,
@@ -14,16 +12,20 @@ export function DoubleCheckIcon({
   className?: string;
 }) {
   return (
-    <span className="inline-flex" aria-hidden="true">
-      <CheckmarkRegular fontSize={fontSize} className={className} />
-      <CheckmarkRegular
-        fontSize={fontSize}
-        className={className}
-        style={{
-          marginTop: Math.round(fontSize * 17) / 100,
-          marginLeft: Math.round(fontSize * -83) / 100,
-        }}
-      />
-    </span>
+    <svg
+      width={fontSize}
+      height={fontSize}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M18 6 7 17l-5-5" />
+      <path d="m22 10-7.5 7.5L13 16" />
+    </svg>
   );
 }
