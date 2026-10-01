@@ -682,7 +682,7 @@ export const MessageBubble = memo(function MessageBubble({
                     </div>
                   )}
                   {!imageOnly && (
-                    <div className={`flex items-center ml-4 justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
+                    <div className={`flex items-center justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
                       {msg.edited_at && (
                         <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
                           edited
