@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, ChevronDown, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { PulseRegular, BookmarkMultipleRegular, CalendarRegular, ChevronDownRegular, ChatRegular, ChatMultipleRegular, MoreHorizontalRegular, SettingsRegular, SparkleRegular, PeopleRegular } from "@fluentui/react-icons";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -251,7 +251,7 @@ export const ChatHeader = memo(function ChatHeader({
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
                     <span className="inline-flex items-center gap-1">
-                      <Users strokeWidth={2.5} size={10} /> {community.member_count} member
+                      <PeopleRegular fontSize={10} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
                     </span>
                     {onlineCount > 0 && (
@@ -273,7 +273,7 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-label="Community settings"
                     title="Community settings"
                   >
-                    <Settings strokeWidth={2.5} size={15} />
+                    <SettingsRegular fontSize={15} />
                   </button>
                 )}
                 <div className="relative">
@@ -284,7 +284,7 @@ export const ChatHeader = memo(function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
                     className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
+                    Joined <ChevronDownRegular fontSize={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
                   </button>
                   {openMenu === "joined" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -308,7 +308,7 @@ export const ChatHeader = memo(function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    <MoreHorizontal strokeWidth={2.5} size={16} />
+                    <MoreHorizontalRegular fontSize={16} />
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -327,13 +327,13 @@ export const ChatHeader = memo(function ChatHeader({
             </div>
             <nav className="flex items-center gap-1 overflow-x-auto md:gap-3" aria-label="Community views">
               {([
-                ["chat",      "Chat",      MessageCircle],
-                ["threads",   "Threads",   MessagesSquare],
-                ["showcase",  "Showcase",  Sparkles],
-                ["resources", "Resources", BookMarked],
-                ["events",    "Events",    Calendar],
-                ["members",   "Members",   Users],
-                ["activity",  "Activity",  Activity],
+                ["chat",      "Chat",      ChatRegular],
+                ["threads",   "Threads",   ChatMultipleRegular],
+                ["showcase",  "Showcase",  SparkleRegular],
+                ["resources", "Resources", BookmarkMultipleRegular],
+                ["events",    "Events",    CalendarRegular],
+                ["members",   "Members",   PeopleRegular],
+                ["activity",  "Activity",  PulseRegular],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
                 <button
                   key={tab}
@@ -348,7 +348,7 @@ export const ChatHeader = memo(function ChatHeader({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                    <Icon fontSize={14} aria-hidden="true" />
                     {label}
                   </span>
                 </button>

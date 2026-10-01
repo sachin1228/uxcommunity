@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
+import { ToggleLeftRegular, ToggleRightRegular, DeleteRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 
@@ -83,9 +83,9 @@ export function CommunityActionsPanel({
             {toggleLoading ? (
               <Spinner className="h-3.5 w-3.5" />
             ) : isActive ? (
-              <ToggleRight strokeWidth={2.5} size={14} className="text-green-400" />
+              <ToggleRightRegular fontSize={14} className="text-green-400" />
             ) : (
-              <ToggleLeft strokeWidth={2.5} size={14} className="text-foreground-muted" />
+              <ToggleLeftRegular fontSize={14} className="text-foreground-muted" />
             )}
             {isActive ? "Deactivate" : "Activate"}
           </button>
@@ -103,7 +103,7 @@ export function CommunityActionsPanel({
             onClick={() => setConfirmDelete(true)}
             className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
           >
-            <Trash2 strokeWidth={2.5} size={12} /> Delete
+            <DeleteRegular fontSize={12} /> Delete
           </button>
         </div>
       </div>
@@ -144,7 +144,7 @@ export function CommunityActionsPanel({
                 disabled={deleteLoading}
                 className="modal-btn modal-btn-danger flex-1"
               >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
+                {deleteLoading ? <Spinner className="h-3 w-3" /> : <DeleteRegular fontSize={12} />}
                 Yes, delete
               </button>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useRef, useEffect, useCallback, memo } from "react";
-import { Clock, CheckCheck, X, RefreshCw, Ban } from "lucide-react";
+import { ClockRegular, CheckmarkRegular, DismissRegular, ArrowClockwiseRegular, ProhibitedRegular } from "@fluentui/react-icons";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime, isEmojiOnly, splitEmojiClusters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
@@ -205,7 +205,7 @@ function BubbleImage({
             {fmtTime(createdAt)}
           </span>
           {isMe && (
-            <CheckCheck strokeWidth={2.5} size={11} className="text-white/90" />
+            <CheckmarkRegular fontSize={11} className="text-white/90" />
           )}
         </div>
       )}
@@ -218,7 +218,7 @@ function BubbleImage({
               className="absolute inset-0 flex items-center justify-center text-white"
               aria-label="Cancel upload"
             >
-              <X strokeWidth={2.5} size={14} />
+              <DismissRegular fontSize={14} />
             </button>
           </div>
         </div>
@@ -238,7 +238,7 @@ function RetryIndicator({ onRetry }: { onRetry: () => void }) {
         aria-label="Retry sending"
         title="Tap to retry"
       >
-        <RefreshCw strokeWidth={2.5} size={13} />
+        <ArrowClockwiseRegular fontSize={13} />
       </button>
       <span className="font-body text-[9px] text-red-400 leading-none">Retry</span>
     </div>
@@ -372,7 +372,7 @@ function DeletedBubble({
         <SenderName name={senderName} userId={senderId ?? null} />
       )}
       <div className="flex items-center gap-1.5">
-        <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
+        <ProhibitedRegular fontSize={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
         {/* leading-6 matches the live message text row, so a deleted placeholder
             occupies the same line box and the bubble keeps its rhythm. */}
         <span className={`font-body text-xs leading-6 ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
@@ -577,10 +577,10 @@ export const MessageBubble = memo(function MessageBubble({
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
-                      <Clock strokeWidth={2.5} size={10} className="text-foreground-muted/60 animate-pulse" />
+                      <ClockRegular fontSize={10} className="text-foreground-muted/60 animate-pulse" />
                     )}
                     {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck strokeWidth={2.5} size={11} className="text-foreground-muted/70" />
+                      <CheckmarkRegular fontSize={11} className="text-foreground-muted/70" />
                     )}
                     {isMe && msg.status === "failed" && (
                       <span className="text-[10px] text-red-400">!</span>
@@ -693,10 +693,10 @@ export const MessageBubble = memo(function MessageBubble({
                         {fmtTime(msg.created_at)}
                       </span>
                       {isMe && msg.status === "sending" && (
-                        <Clock strokeWidth={2.5} size={10} className="text-accent-foreground opacity-60 animate-pulse" />
+                        <ClockRegular fontSize={10} className="text-accent-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck strokeWidth={2.5} size={11} className="text-accent-foreground opacity-70" />
+                        <CheckmarkRegular fontSize={11} className="text-accent-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>

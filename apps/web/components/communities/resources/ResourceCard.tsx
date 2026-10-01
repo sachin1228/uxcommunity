@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  Bookmark, Flag,
-  MoreHorizontal, Pencil, Trash2,
-} from "lucide-react";
+import { BookmarkFilled, BookmarkRegular, FlagRegular, MoreHorizontalRegular, EditRegular, DeleteRegular } from "@fluentui/react-icons";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityResource } from "@/lib/communities/models/resources";
@@ -259,30 +256,30 @@ export function ResourceCard({
         aria-label="Resource options"
         className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
       >
-        <MoreHorizontal strokeWidth={2.5} size={15} />
+        <MoreHorizontalRegular fontSize={15} />
       </button>
       {menuOpen && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
           <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-            <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
+            {displayedBookmarked ? <BookmarkFilled fontSize={11} /> : <BookmarkRegular fontSize={11} />}
             {displayedBookmarked ? "Unsave" : "Save"}
           </button>
           {isOwner ? (
             <>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                <Pencil strokeWidth={2.5} size={11} /> Edit
+                <EditRegular fontSize={11} /> Edit
               </button>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
+                <DeleteRegular fontSize={11} />{deleting ? "Deleting…" : "Delete"}
               </button>
             </>
           ) : canModerate ? (
             <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-              <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
+              <DeleteRegular fontSize={11} />{deleting ? "Deleting…" : "Delete"}
             </button>
           ) : (
             <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-              <Flag strokeWidth={2.5} size={11} />{reported ? "Reported" : "Report"}
+              <FlagRegular fontSize={11} />{reported ? "Reported" : "Report"}
             </button>
           )}
         </div>

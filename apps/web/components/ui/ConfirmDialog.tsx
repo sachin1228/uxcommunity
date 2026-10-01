@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { WarningRegular, DeleteRegular } from "@fluentui/react-icons";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -49,7 +49,7 @@ export function ConfirmDialog({
     >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-500">
-          <AlertTriangle strokeWidth={2.5} size={18} />
+          <WarningRegular fontSize={18} />
         </div>
         <p className="font-body text-sm leading-6 text-foreground-muted">{message}</p>
       </div>
@@ -68,7 +68,7 @@ export function ConfirmDialog({
           disabled={pending}
           className="modal-btn modal-btn-danger"
         >
-          {pending ? <Spinner size={14} /> : <Trash2 strokeWidth={2.5} size={14} />}
+          {pending ? <Spinner size={14} /> : <DeleteRegular fontSize={14} />}
           {pending ? "Deleting…" : confirmLabel}
         </button>
       </div>

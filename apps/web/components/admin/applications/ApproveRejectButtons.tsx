@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { CheckmarkRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface Props {
@@ -20,7 +20,7 @@ export function ApproveRejectButtons({ actionLoading, onApprove, onReject }: Pro
         {actionLoading === "approve" ? (
           <Spinner className="h-3 w-3" />
         ) : (
-          <Check strokeWidth={2.5} size={13} />
+          <CheckmarkRegular fontSize={13} />
         )}
         Approve &amp; Send Invite
       </button>
@@ -32,7 +32,7 @@ export function ApproveRejectButtons({ actionLoading, onApprove, onReject }: Pro
         {actionLoading === "reject" ? (
           <Spinner className="h-3 w-3" />
         ) : (
-          <X strokeWidth={2.5} size={13} />
+          <DismissRegular fontSize={13} />
         )}
         Reject
       </button>

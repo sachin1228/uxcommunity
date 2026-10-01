@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, MapPin, PenLine, Star, Layers, BadgeCheck, Plus } from "lucide-react";
+import { BuildingRegular, CameraRegular, LocationRegular, EditRegular, StarRegular, LayerDiagonalRegular, CertificateRegular, AddRegular } from "@fluentui/react-icons";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -58,7 +58,7 @@ export function ProfileCard({
   if (jobTitle) {
     roleParts.push(
       <span key="role" className="flex items-center gap-1">
-        <BadgeCheck strokeWidth={2.5} size={12} className="text-accent" />
+        <CertificateRegular fontSize={12} className="text-accent" />
         {jobTitle}
       </span>
     );
@@ -76,7 +76,7 @@ export function ProfileCard({
             className="flex items-center gap-1 transition-colors hover:text-accent"
             title={company.domain ? `Verified via ${company.domain}` : "Company"}
           >
-            <Building2 strokeWidth={2.5} size={12} className="text-accent" />
+            <BuildingRegular fontSize={12} className="text-accent" />
             {company.name}
           </Link>
         ) : (
@@ -84,7 +84,7 @@ export function ProfileCard({
             className="flex items-center gap-1 text-foreground-subtle"
             title="This company is no longer active"
           >
-            <Building2 strokeWidth={2.5} size={12} />
+            <BuildingRegular fontSize={12} />
             {company.name}
           </span>
         )}
@@ -99,7 +99,7 @@ export function ProfileCard({
         onClick={onAddCompany}
         className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
       >
-        <Plus strokeWidth={2.5} size={11} />
+        <AddRegular fontSize={11} />
         Add your company
       </button>
     );
@@ -108,7 +108,7 @@ export function ProfileCard({
   if (city) {
     roleParts.push(
       <span key="city" className="flex items-center gap-1">
-        <MapPin strokeWidth={2.5} size={12} className="text-accent" />
+        <LocationRegular fontSize={12} className="text-accent" />
         {city}
       </span>
     );
@@ -117,7 +117,7 @@ export function ProfileCard({
   if (sector) {
     roleParts.push(
       <span key="sector" className="flex items-center gap-1">
-        <Layers strokeWidth={2.5} size={12} className="text-accent" />
+        <LayerDiagonalRegular fontSize={12} className="text-accent" />
         {sector}
       </span>
     );
@@ -126,7 +126,7 @@ export function ProfileCard({
   if (experienceLevel) {
     roleParts.push(
       <span key="experience" className="flex items-center gap-1 capitalize">
-        <Star strokeWidth={2.5} size={12} className="text-accent" />
+        <StarRegular fontSize={12} className="text-accent" />
         {experienceLevel.replace(/_/g, " ")}
       </span>
     );
@@ -152,7 +152,7 @@ export function ProfileCard({
           onClick={onOpenBannerPicker}
           className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 font-body text-[11px] font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
         >
-          <Camera strokeWidth={2.5} size={11} />
+          <CameraRegular fontSize={11} />
           {bannerUrl ? "Edit banner" : "Add banner"}
         </button>
       </div>
@@ -172,7 +172,7 @@ export function ProfileCard({
               title="Change profile picture"
               className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
             >
-              <Camera strokeWidth={2.5} size={18} />
+              <CameraRegular fontSize={18} />
             </button>
           </div>
         </div>
@@ -184,7 +184,7 @@ export function ProfileCard({
             href="/dashboard/settings"
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
           >
-            <PenLine strokeWidth={2.5} size={11} />
+            <EditRegular fontSize={11} />
             Edit Profile
           </Link>
         </div>

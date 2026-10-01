@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, Flag, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { BookmarkFilled, BookmarkRegular, FlagRegular, MoreHorizontalRegular, EditRegular, ShareRegular, DeleteRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface EventOptionsMenuProps {
@@ -83,7 +83,7 @@ export function EventOptionsMenu({
            cards — one post-options affordance for the whole feed. */
         className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
       >
-        <MoreHorizontal strokeWidth={2.5} size={15} />
+        <MoreHorizontalRegular fontSize={15} />
       </button>
       {open && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -94,11 +94,11 @@ export function EventOptionsMenu({
             aria-busy={saving}
             className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
           >
-            <Bookmark strokeWidth={2.5} size={11} fill={saved ? "currentColor" : "none"} />
+            {saved ? <BookmarkFilled fontSize={11} /> : <BookmarkRegular fontSize={11} />}
             {saved ? "Unsave" : "Save"}
           </button>
           <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-            <Share2 strokeWidth={2.5} size={11} /> {shared ? "Copied!" : "Share"}
+            <ShareRegular fontSize={11} /> {shared ? "Copied!" : "Share"}
           </button>
           {/* Edit is the host's while the event is still ahead: its start has
               gone by, so there is nothing left to reschedule (the form refuses
@@ -107,18 +107,18 @@ export function EventOptionsMenu({
               down is exactly when a host or moderator wants it. */}
           {canEdit && !past && onEdit && (
             <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-              <Pencil strokeWidth={2.5} size={11} /> Edit
+              <EditRegular fontSize={11} /> Edit
             </button>
           )}
           {canDelete && onDelete && (
             <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-              {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
+              {deleting ? <Spinner size={11} className="text-red-400" /> : <DeleteRegular fontSize={11} />}
               {deleting ? "Deleting…" : "Delete"}
             </button>
           )}
           {!canEdit && !canDelete && onReport && (
             <button type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-              <Flag strokeWidth={2.5} size={11} /> {reported ? "Reported" : "Report"}
+              <FlagRegular fontSize={11} /> {reported ? "Reported" : "Report"}
             </button>
           )}
         </div>

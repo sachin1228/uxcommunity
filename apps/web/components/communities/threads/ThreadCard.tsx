@@ -3,10 +3,7 @@
 import { useState, useRef, useEffect, useId } from "react";
 import TruncateMarkup from "react-truncate-markup";
 import { flattenPreviewText } from "@/lib/communities/preview-text";
-import {
-  Bookmark, Flag,
-  MoreHorizontal, Paperclip, Pencil, Trash2,
-} from "lucide-react";
+import { BookmarkFilled, BookmarkRegular, FlagRegular, MoreHorizontalRegular, AttachRegular, EditRegular, DeleteRegular } from "@fluentui/react-icons";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 
@@ -418,7 +415,7 @@ export function ThreadCard({
               aria-label="Thread options"
               className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
             >
-              <MoreHorizontal strokeWidth={2.5} size={15} />
+              <MoreHorizontalRegular fontSize={15} />
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -432,7 +429,7 @@ export function ThreadCard({
                   aria-busy={saveSyncing}
                   className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                 >
-                  <Bookmark strokeWidth={2.5} size={11} fill={displayedSaved ? "currentColor" : "none"} />
+                  {displayedSaved ? <BookmarkFilled fontSize={11} /> : <BookmarkRegular fontSize={11} />}
                   {displayedSaved ? "Unsave" : "Save"}
                 </button>
                 {isOwner ? (
@@ -442,7 +439,7 @@ export function ThreadCard({
                       onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                     >
-                      <Pencil strokeWidth={2.5} size={11} /> Edit
+                      <EditRegular fontSize={11} /> Edit
                     </button>
                     <button
                       type="button"
@@ -450,7 +447,7 @@ export function ThreadCard({
                       disabled={deleting}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                     >
-                      <Trash2 strokeWidth={2.5} size={11} />
+                      <DeleteRegular fontSize={11} />
                       {deleting ? "Deleting…" : "Delete"}
                     </button>
                   </>
@@ -461,7 +458,7 @@ export function ThreadCard({
                     disabled={deleting}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                   >
-                    <Trash2 strokeWidth={2.5} size={11} />
+                    <DeleteRegular fontSize={11} />
                     {deleting ? "Deleting…" : "Delete"}
                   </button>
                 ) : (
@@ -476,7 +473,7 @@ export function ThreadCard({
                     disabled={reported}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
                   >
-                    <Flag strokeWidth={2.5} size={11} />
+                    <FlagRegular fontSize={11} />
                     {reported ? "Reported" : "Report"}
                   </button>
                 )}
@@ -555,7 +552,7 @@ export function ThreadCard({
                 isDetail ? (
                   <a key={att.url} href={att.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
-                    <Paperclip strokeWidth={2.5} size={12} />
+                    <AttachRegular fontSize={12} />
                     <span className="min-w-0 flex-1 truncate">{att.name}</span>
                     <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
                   </a>
@@ -564,7 +561,7 @@ export function ThreadCard({
                     onClick={(e) => { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); }}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); } }}
                     className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
-                    <Paperclip strokeWidth={2.5} size={12} />
+                    <AttachRegular fontSize={12} />
                     <span className="min-w-0 flex-1 truncate">{att.name}</span>
                     <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
                   </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { CheckmarkRegular, ChevronDownRegular, SearchRegular } from "@fluentui/react-icons";
 
 /** Roughly what the dropdown occupies (search row + the list's max height). */
 const DROPDOWN_HEIGHT = 248;
@@ -148,22 +149,13 @@ export function SearchableSelect({
           ) : null}
           <span className="truncate">{selectedLabel ?? placeholder}</span>
         </span>
-        <svg
+        <ChevronDownRegular
           className={
             "ml-2 h-4 w-4 flex-shrink-0 text-foreground-muted transition-transform duration-150 " +
             (open ? "rotate-180" : "")
           }
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
           aria-hidden="true"
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
-            clipRule="evenodd"
-          />
-        </svg>
+        />
       </button>
 
       {/* Dropdown */}
@@ -177,19 +169,10 @@ export function SearchableSelect({
           {/* Search input */}
             <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">
-              <svg
+              <SearchRegular
                 className="h-3.5 w-3.5 flex-shrink-0 text-foreground-muted"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
                 aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              />
               <input
                 ref={inputRef}
                 type="text"
@@ -238,19 +221,10 @@ export function SearchableSelect({
                   <span className="flex-1 truncate">{option.label}</span>
 
                   {isSelected && (
-                    <svg
+                    <CheckmarkRegular
                       className="h-3.5 w-3.5 shrink-0 text-accent"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
                       aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    />
                   )}
                 </li>
               );
@@ -269,19 +243,10 @@ export function SearchableSelect({
                 }
               >
                 {value === otherValue ? (
-                  <svg
+                  <CheckmarkRegular
                     className="h-3.5 w-3.5 flex-shrink-0 text-accent"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
                     aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  />
                 ) : null}
                 <span className={value === otherValue ? "" : "ml-5.5"}>{otherLabel}</span>
               </li>

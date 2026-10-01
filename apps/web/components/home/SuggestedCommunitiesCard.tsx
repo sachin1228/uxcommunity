@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Users } from "lucide-react";
+import { PeopleRegular } from "@fluentui/react-icons";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { invalidateOnJoin } from "@/lib/communities/cache";
@@ -70,7 +70,7 @@ export function SuggestedCommunitiesCard({
       className="overflow-hidden rounded-xl border border-border bg-background-subtle"
     >
       <div className="flex items-center gap-2 px-4 pb-3 pt-4">
-        <Users size={15} strokeWidth={2.5} className="text-foreground-muted" aria-hidden="true" />
+        <PeopleRegular fontSize={15} className="text-foreground-muted" aria-hidden="true" />
         <h2
           id="home-suggested-heading"
           className="font-display text-sm font-semibold text-foreground"

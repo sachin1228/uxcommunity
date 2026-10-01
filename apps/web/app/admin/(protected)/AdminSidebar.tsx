@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX } from "lucide-react";
+import { ListRegular, LocationRegular, LayerDiagonalRegular, DatabaseRegular, ChevronDownRegular, PeopleRegular, SparkleRegular, ArrowTrendingRegular, CertificateRegular, MoviesAndTvRegular, WrenchRegular, ChatMultipleRegular, GaugeRegular, PersonDeleteRegular } from "@fluentui/react-icons";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -12,12 +12,12 @@ function isMatch(href: string, pathname: string) {
 }
 
 const MASTER_DATA = [
-  { href: "/admin/users",             label: "Users",             icon: Users     },
-  { href: "/admin/cities",            label: "Cities",            icon: MapPin    },
-  { href: "/admin/sectors",           label: "Industry",          icon: Layers    },
-  { href: "/admin/interests",         label: "Interests",         icon: Sparkles  },
-  { href: "/admin/experience-levels", label: "Experience",        icon: TrendingUp },
-  { href: "/admin/job-titles",        label: "Job Titles",        icon: BadgeCheck },
+  { href: "/admin/users",             label: "Users",             icon: PeopleRegular     },
+  { href: "/admin/cities",            label: "Cities",            icon: LocationRegular    },
+  { href: "/admin/sectors",           label: "Industry",          icon: LayerDiagonalRegular    },
+  { href: "/admin/interests",         label: "Interests",         icon: SparkleRegular  },
+  { href: "/admin/experience-levels", label: "Experience",        icon: ArrowTrendingRegular },
+  { href: "/admin/job-titles",        label: "Job Titles",        icon: CertificateRegular },
 ];
 
 export function AdminSidebar() {
@@ -57,7 +57,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <LayoutList strokeWidth={2.5} size={16} className={active("/admin") ? "text-accent" : ""} />
+        <ListRegular fontSize={16} className={active("/admin") ? "text-accent" : ""} />
         Applications
       </Link>
 
@@ -71,7 +71,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <UserX strokeWidth={2.5} size={16} className={active("/admin/signup-attempts") ? "text-accent" : ""} />
+        <PersonDeleteRegular fontSize={16} className={active("/admin/signup-attempts") ? "text-accent" : ""} />
         Incomplete Signups
       </Link>
 
@@ -85,7 +85,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Clapperboard strokeWidth={2.5} size={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
+        <MoviesAndTvRegular fontSize={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
         Lottie Animations
       </Link>
 
@@ -99,7 +99,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <MessagesSquare strokeWidth={2.5} size={16} className={active("/admin/communities") ? "text-accent" : ""} />
+        <ChatMultipleRegular fontSize={16} className={active("/admin/communities") ? "text-accent" : ""} />
         Communities
       </Link>
 
@@ -113,7 +113,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Wrench strokeWidth={2.5} size={16} className={active("/admin/tools") ? "text-accent" : ""} />
+        <WrenchRegular fontSize={16} className={active("/admin/tools") ? "text-accent" : ""} />
         Tools
       </Link>
 
@@ -127,7 +127,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Gauge strokeWidth={2.5} size={16} className={active("/admin/load-test") ? "text-accent" : ""} />
+        <GaugeRegular fontSize={16} className={active("/admin/load-test") ? "text-accent" : ""} />
         Load Test
       </Link>
 
@@ -141,10 +141,10 @@ export function AdminSidebar() {
               : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
           }`}
         >
-          <Database strokeWidth={2.5} size={16} className={masterGroupActive ? "text-accent" : ""} />
+          <DatabaseRegular fontSize={16} className={masterGroupActive ? "text-accent" : ""} />
           <span className="flex-1 text-left">Master Data</span>
-          <ChevronDown
-            size={14}
+          <ChevronDownRegular
+            fontSize={14}
             className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           />
         </button>
@@ -162,7 +162,7 @@ export function AdminSidebar() {
                     : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
                 }`}
               >
-                <Icon size={15} strokeWidth={2.5} className={active(href) ? "text-accent" : ""} />
+                <Icon fontSize={15} className={active(href) ? "text-accent" : ""} />
                 {label}
               </Link>
             ))}

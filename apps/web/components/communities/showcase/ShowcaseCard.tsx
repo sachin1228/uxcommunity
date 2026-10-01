@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Film, Loader2 } from "lucide-react";
+import { FilmstripRegular, SpinnerIosRegular } from "@fluentui/react-icons";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import { communityFeedLayout } from "../feed-layout";
@@ -126,12 +126,12 @@ export function ShowcaseCard({
           <div className="mt-3 flex aspect-video w-full items-center justify-center gap-2 overflow-hidden rounded-xl border border-border bg-black/80">
             {failed ? (
               <>
-                <Film strokeWidth={2} size={20} className="text-foreground-subtle" />
+                <FilmstripRegular fontSize={20} className="text-foreground-subtle" />
                 <span className="font-body text-sm text-foreground-subtle">Video unavailable</span>
               </>
             ) : (
               <>
-                <Loader2 strokeWidth={2} size={20} className="animate-spin text-foreground-muted" />
+                <SpinnerIosRegular fontSize={20} className="animate-spin text-foreground-muted" />
                 <span className="font-body text-sm text-foreground-muted">Processing video…</span>
               </>
             )}
@@ -227,7 +227,6 @@ export function ShowcaseCard({
               <HeartIcon
                 size={16}
                 active={post.user_liked}
-                fill="none"
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
               />
               <span

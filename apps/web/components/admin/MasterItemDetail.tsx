@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
+import { ArrowLeftRegular, EditRegular, CheckmarkRegular, DismissRegular, ToggleLeftRegular, ToggleRightRegular, DeleteRegular, ImageAddRegular, ArrowUploadRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
@@ -211,7 +211,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         onClick={() => router.push(listPath)}
         className="mb-6 flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors"
       >
-        <ArrowLeft strokeWidth={2.5} size={13} />
+        <ArrowLeftRegular fontSize={13} />
         Back to {entity.toLowerCase()}s
       </button>
 
@@ -223,7 +223,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-xl object-cover border border-border" />
           ) : (
             <div className="h-16 w-16 rounded-xl border border-dashed border-border bg-surface-raised flex items-center justify-center">
-              <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
+              <ImageAddRegular fontSize={20} className="text-foreground-muted" />
             </div>
           )}
         </div>
@@ -239,10 +239,10 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                 className="field border-accent font-display text-xl font-semibold flex-1 min-w-0"
               />
               <button onClick={handleEditSave} disabled={editLoading} className="text-green-400 hover:text-green-300 transition-colors shrink-0" aria-label="Save">
-                {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={18} />}
+                {editLoading ? <Spinner className="h-4 w-4" /> : <CheckmarkRegular fontSize={18} />}
               </button>
               <button onClick={() => { setEditing(false); setEditError(null); }} className="text-foreground-muted hover:text-foreground transition-colors shrink-0" aria-label="Cancel">
-                <X strokeWidth={2.5} size={18} />
+                <DismissRegular fontSize={18} />
               </button>
             </div>
           ) : (
@@ -290,7 +290,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             onClick={() => { setEditing(true); setEditName(item.name); }}
             className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <Pencil strokeWidth={2.5} size={12} /> Edit
+            <EditRegular fontSize={12} /> Edit
           </button>
         </div>
 
@@ -313,7 +313,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                   onClick={() => imageInputRef.current?.click()}
                   className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                 >
-                  <Upload strokeWidth={2.5} size={12} />
+                  <ArrowUploadRegular fontSize={12} />
                   {item.image_url ? "Replace" : "Upload"}
                 </button>
                 {item.image_url && (
@@ -351,7 +351,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                   : "border-green-500/30 text-green-400 hover:bg-green-500/10"
               }`}
             >
-              {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight strokeWidth={2.5} size={14} /> : <ToggleLeft strokeWidth={2.5} size={14} />}
+              {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRightRegular fontSize={14} /> : <ToggleLeftRegular fontSize={14} />}
               {item.is_active ? "Deactivate" : "Activate"}
             </button>
           </div>
@@ -370,7 +370,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
               onClick={() => setConfirmDelete(true)}
               className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
             >
-              <Trash2 strokeWidth={2.5} size={12} /> Delete
+              <DeleteRegular fontSize={12} /> Delete
             </button>
           </div>
         )}
@@ -400,7 +400,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                 disabled={deleteLoading}
                 className="modal-btn modal-btn-danger flex-1"
               >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
+                {deleteLoading ? <Spinner className="h-3 w-3" /> : <DeleteRegular fontSize={12} />}
                 Yes, delete
               </button>
             </div>

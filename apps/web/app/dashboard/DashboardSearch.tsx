@@ -1,17 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Bell,
-  Briefcase,
-  Compass,
-  Home,
-  Library,
-  Search,
-  Settings,
-  UserCircle,
-  Users,
-} from "lucide-react";
+import { AlertRegular, BriefcaseRegular, CompassNorthwestRegular, HomeRegular, LibraryRegular, SearchRegular, SettingsRegular, PersonCircleRegular, PeopleRegular } from "@fluentui/react-icons";
 import { ModalPortal } from "@/components/ui/Modal";
 import { sidebarStore } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -34,14 +24,14 @@ import {
  */
 
 /** Icon per quick link. Communities share one — they are one kind of place. */
-const ICONS: Record<string, typeof Search> = {
-  "/dashboard": Home,
-  "/dashboard/communities": Compass,
-  "/dashboard/library": Library,
-  "/dashboard/jobs": Briefcase,
-  "/dashboard/notifications": Bell,
-  "/dashboard/profile": UserCircle,
-  "/dashboard/settings": Settings,
+const ICONS: Record<string, typeof SearchRegular> = {
+  "/dashboard": HomeRegular,
+  "/dashboard/communities": CompassNorthwestRegular,
+  "/dashboard/library": LibraryRegular,
+  "/dashboard/jobs": BriefcaseRegular,
+  "/dashboard/notifications": AlertRegular,
+  "/dashboard/profile": PersonCircleRegular,
+  "/dashboard/settings": SettingsRegular,
 };
 
 const GROUP_LABELS: Record<SearchGroup, string> = {
@@ -147,9 +137,8 @@ export function DashboardSearch({ open, onClose }: Props) {
 
         <div className="relative mx-auto mt-[10vh] w-[min(38rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
           <div className="flex items-center gap-2.5 border-b border-border px-4">
-            <Search
-              size={15}
-              strokeWidth={2.5}
+            <SearchRegular
+              fontSize={15}
               className="shrink-0 text-foreground-muted"
               aria-hidden="true"
             />
@@ -190,7 +179,7 @@ export function DashboardSearch({ open, onClose }: Props) {
               </p>
             ) : (
               results.map((destination, index) => {
-                const Icon = ICONS[destination.href] ?? Users;
+                const Icon = ICONS[destination.href] ?? PeopleRegular;
                 const active = index === activeIndex;
                 // One header per group, emitted on the first row of each.
                 const showHeader =
@@ -222,8 +211,7 @@ export function DashboardSearch({ open, onClose }: Props) {
                       }`}
                     >
                       <Icon
-                        size={15}
-                        strokeWidth={2.5}
+                        fontSize={15}
                         className="shrink-0"
                         aria-hidden="true"
                       />

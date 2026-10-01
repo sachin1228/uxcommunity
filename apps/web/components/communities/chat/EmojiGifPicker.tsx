@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { SearchRegular, DismissRegular } from "@fluentui/react-icons";
 import { fetchEmojiCatalog, type NotoEmoji } from "@/lib/noto-emoji";
 import { NotoEmojiSvg } from "./NotoEmojiSvg";
 
@@ -79,7 +79,7 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
       {/* Search */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search strokeWidth={2.5} size={12} className="text-foreground-muted shrink-0" />
+          <SearchRegular fontSize={12} className="text-foreground-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -91,7 +91,7 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
           {query && (
             <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
-              <X strokeWidth={2.5} size={11} />
+              <DismissRegular fontSize={11} />
             </button>
           )}
         </div>
@@ -203,7 +203,7 @@ export function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void 
       {/* Search */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search strokeWidth={2.5} size={12} className="text-foreground-muted shrink-0" />
+          <SearchRegular fontSize={12} className="text-foreground-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -215,7 +215,7 @@ export function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void 
           {query && (
             <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
-              <X strokeWidth={2.5} size={11} />
+              <DismissRegular fontSize={11} />
             </button>
           )}
         </div>

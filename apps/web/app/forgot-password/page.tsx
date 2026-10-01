@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeftRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
           href="/login"
           className="mb-6 ml-8 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
         >
-          <ArrowLeft strokeWidth={2.5} size={14} />
+          <ArrowLeftRegular fontSize={14} />
           Back to login
         </Link>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
+import { CalendarRegular, CheckmarkRegular, ClockRegular, GlobeRegular, ImageAddRegular, LocationRegular, PeopleRegular, VideoRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -230,7 +230,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             <p className="mt-1 font-body text-sm text-foreground-muted">Update event details.</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={16} />
+            <DismissRegular fontSize={16} />
           </button>
         </div>
 
@@ -266,7 +266,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                     className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                     aria-label="Remove cover image"
                   >
-                    <X strokeWidth={2.5} size={12} />
+                    <DismissRegular fontSize={12} />
                   </button>
                 </div>
               ) : (
@@ -276,7 +276,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   onClick={() => imageInputRef.current?.click()}
                   className="flex min-h-32 w-full flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-raised px-3 text-center text-foreground-muted hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {imageUploading ? <Spinner size={20} /> : <ImagePlus strokeWidth={2.5} size={20} />}
+                  {imageUploading ? <Spinner size={20} /> : <ImageAddRegular fontSize={20} />}
                   <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
                   <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
                 </button>
@@ -303,7 +303,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   picked, beneath the date. */}
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                  <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                  <CalendarRegular fontSize={11} /> Date <span className="text-accent">*</span>
                   <span
                     className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
                     title={`The times you enter are read in ${zoneLabel}`}
@@ -338,7 +338,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
+                    <ClockRegular fontSize={11} /> Start time <span className="text-accent">*</span>
                   </span>
                   <input
                     type="time"
@@ -396,13 +396,13 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             description="Happening virtually via a meeting link."
             checked={isOnline}
             onChange={setIsOnline}
-            icon={<Video strokeWidth={2.5} size={15} />}
+            icon={<VideoRegular fontSize={15} />}
           />
 
           {isOnline ? (
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
+                <VideoRegular fontSize={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
@@ -411,7 +411,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           ) : (
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
+                <LocationRegular fontSize={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input value={location} onChange={(e) => setLocation(e.target.value)}
                 placeholder="Address or venue name"
@@ -421,7 +421,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
 
           <label className="block">
             <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
+              <PeopleRegular fontSize={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
             </span>
             <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="Leave blank for unlimited"
@@ -441,7 +441,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             description="Visible to everyone, not just community members."
             checked={isPublic}
             onChange={setIsPublic}
-            icon={<Globe strokeWidth={2.5} size={15} />}
+            icon={<GlobeRegular fontSize={15} />}
           />
         </div>
 
@@ -454,7 +454,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>
           <button type="submit" disabled={saving} className="modal-btn modal-btn-primary">
-            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <CheckmarkRegular fontSize={15} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, CalendarCheck2, CalendarX2, Plus } from "lucide-react";
+import { CalendarClockRegular, CalendarCheckmarkRegular, CalendarCancelRegular, AddRegular } from "@fluentui/react-icons";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -257,15 +257,15 @@ export function EventsView({
             </p>
           </div>
           <GradientButton onClick={() => setShowCreateModal(true)}>
-            <Plus strokeWidth={2.5} size={14} /> Create Event
+            <AddRegular fontSize={14} /> Create Event
           </GradientButton>
         </div>
 
         {!loading && events.length > 0 && (
           <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
             {[
-              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock, count: upcoming.length },
-              { value: "past" as const, label: "Past", icon: CalendarCheck2, count: past.length },
+              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClockRegular, count: upcoming.length },
+              { value: "past" as const, label: "Past", icon: CalendarCheckmarkRegular, count: past.length },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -276,7 +276,7 @@ export function EventsView({
                   aria-pressed={filter === item.value}
                   className={filterChip(filter === item.value)}
                 >
-                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                  <Icon fontSize={14} aria-hidden="true" />
                   {item.label} ({item.count})
                 </button>
               );
@@ -300,13 +300,13 @@ export function EventsView({
           </div>
         ) : events.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <CalendarCancelRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No events yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
         ) : (filter === "upcoming" && upcoming.length === 0) || (filter === "past" && past.length === 0) ? (
           <div className={communityFeedLayout.emptyState}>
-            <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <CalendarCancelRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No {filter} events</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different event filter.</p>
           </div>

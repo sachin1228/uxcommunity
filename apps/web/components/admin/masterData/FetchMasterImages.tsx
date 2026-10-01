@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Download, ImagePlus, RefreshCw, X } from "lucide-react";
+import { CheckmarkRegular, ArrowDownloadRegular, ImageAddRegular, ArrowClockwiseRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
@@ -120,7 +120,7 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
         onClick={loadPreview}
         className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground hover:bg-surface-raised"
       >
-        <Download strokeWidth={2.5} size={13} />
+        <ArrowDownloadRegular fontSize={13} />
         Fetch images
       </button>
 
@@ -149,7 +149,7 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
                 onClick={loadPreview}
                 className="mb-4 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground hover:bg-surface-raised"
               >
-                <RefreshCw strokeWidth={2.5} size={12} /> Retry
+                <ArrowClockwiseRegular fontSize={12} /> Retry
               </button>
             )}
 
@@ -174,7 +174,7 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
                   Cancel
                 </button>
                 <button onClick={runUpdates} className="modal-btn modal-btn-primary">
-                  <Download strokeWidth={2.5} size={13} />
+                  <ArrowDownloadRegular fontSize={13} />
                   Update {total} {entities}
                 </button>
               </div>
@@ -206,11 +206,11 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
                       <Spinner className="h-3 w-3 shrink-0" />
                     )}
                     {result?.status === "ok" && (
-                      <Check strokeWidth={2.5} size={13} className="shrink-0 text-green-400" />
+                      <CheckmarkRegular fontSize={13} className="shrink-0 text-green-400" />
                     )}
                     {result?.status === "error" && (
                       <span className="flex shrink-0 items-center gap-1 font-body text-[10px] text-red-400">
-                        <X strokeWidth={2.5} size={12} />
+                        <DismissRegular fontSize={12} />
                         {result.error}
                       </span>
                     )}
@@ -269,7 +269,7 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
         {/* No eligible items note */}
         {phase === "confirm" && !loadError && total === 0 && (
           <div className="flex flex-col items-center gap-3 py-6">
-            <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
+            <ImageAddRegular fontSize={20} className="text-foreground-muted" />
             <p className="font-body text-xs text-foreground-muted">
               No eligible items — every entry is the “Other” catch-all option.
             </p>

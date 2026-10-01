@@ -1,22 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  BookMarked,
-  BookOpen,
-  Box,
-  CircleEllipsis,
-  FileText,
-  Grid2X2,
-  Image,
-  LayoutGrid,
-  Palette,
-  Play,
-  Plus,
-  Shapes,
-  Type,
-  Wrench,
-} from "lucide-react";
+import { BookmarkMultipleRegular, BookOpenRegular, BoxRegular, MoreCircleRegular, DocumentTextRegular, GridRegular, ImageRegular, AppsRegular, ColorRegular, PlayRegular, AddRegular, ShapesRegular, TextFontRegular, WrenchRegular } from "@fluentui/react-icons";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
@@ -235,26 +220,26 @@ export function ResourcesView({
             </p>
           </div>
           <GradientButton onClick={() => setShowCreateModal(true)}>
-            <Plus strokeWidth={2.5} size={14} /> Share Resource
+            <AddRegular fontSize={14} /> Share Resource
           </GradientButton>
         </div>
 
         {!loading && resources.length > 0 && (
           <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
-            {[{ value: "all" as const, label: "All", icon: LayoutGrid }, ...RESOURCE_TYPES.filter((item) => typesWithData.has(item.value)).map((item) => ({
+            {[{ value: "all" as const, label: "All", icon: AppsRegular }, ...RESOURCE_TYPES.filter((item) => typesWithData.has(item.value)).map((item) => ({
               ...item,
               icon: {
-                figma: Shapes,
-                article: FileText,
-                tool: Wrench,
-                video: Play,
-                book: BookOpen,
-                font: Type,
-                icon_pack: Grid2X2,
-                color: Palette,
-                template: Box,
-                inspiration: Image,
-                other: CircleEllipsis,
+                figma: ShapesRegular,
+                article: DocumentTextRegular,
+                tool: WrenchRegular,
+                video: PlayRegular,
+                book: BookOpenRegular,
+                font: TextFontRegular,
+                icon_pack: GridRegular,
+                color: ColorRegular,
+                template: BoxRegular,
+                inspiration: ImageRegular,
+                other: MoreCircleRegular,
               }[item.value],
             }))].map((item) => {
               const Icon = item.icon;
@@ -267,7 +252,7 @@ export function ResourcesView({
                   aria-pressed={filter === item.value}
                   className={filterChip(filter === item.value)}
                 >
-                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                  <Icon fontSize={14} aria-hidden="true" />
                   {item.label}
                   <span className="font-mono text-[10px]">{count}</span>
                 </button>
@@ -294,7 +279,7 @@ export function ResourcesView({
           </div>
         ) : resources.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookMarked strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <BookmarkMultipleRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources yet</h3>
             <p className={communityFeedLayout.emptyDescription}>
               Be the first to share a Figma file, article, tool, or anything useful.
@@ -302,7 +287,7 @@ export function ResourcesView({
           </div>
         ) : filtered.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookMarked strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <BookmarkMultipleRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources in this category</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>

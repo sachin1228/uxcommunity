@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare, Pin, Users } from "lucide-react";
+import { CommentRegular, PinRegular, PeopleRegular } from "@fluentui/react-icons";
 import { Modal } from "@/components/ui/Modal";
 
 function fmtEventDate(iso: string) {
@@ -44,7 +44,7 @@ export function EventGroupCreatedModal({
       <ul className="mt-5 flex flex-col gap-3">
         <li className="flex items-start gap-3">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-            <Pin strokeWidth={2.5} size={13} />
+            <PinRegular fontSize={13} />
           </span>
           <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
             It sits at the top of your sidebar, pinned until{" "}
@@ -53,7 +53,7 @@ export function EventGroupCreatedModal({
         </li>
         <li className="flex items-start gap-3">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-            <Users strokeWidth={2.5} size={13} />
+            <PeopleRegular fontSize={13} />
           </span>
           <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
             People join it by RSVP-ing to your event — they are asked, and their RSVP is what puts
@@ -62,7 +62,7 @@ export function EventGroupCreatedModal({
         </li>
         <li className="flex items-start gap-3">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-            <MessageSquare strokeWidth={2.5} size={13} />
+            <CommentRegular fontSize={13} />
           </span>
           <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
             You can post there straight away — say hello, share the plan, answer questions.
@@ -79,7 +79,7 @@ export function EventGroupCreatedModal({
           onClick={onClose}
           className="modal-btn modal-btn-primary"
         >
-          <MessageSquare strokeWidth={2.5} size={15} />
+          <CommentRegular fontSize={15} />
           Open group chat
         </Link>
       </div>

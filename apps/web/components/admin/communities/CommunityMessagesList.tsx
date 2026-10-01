@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { DeleteRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityMessage } from "./communityTypes";
 import { fmtDateTime } from "./communityTypes";
@@ -99,7 +99,7 @@ export function CommunityMessagesList({
                     className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 text-foreground-muted hover:text-red-400 rounded"
                     title="Delete message"
                   >
-                    <Trash2 strokeWidth={2.5} size={12} />
+                    <DeleteRegular fontSize={12} />
                   </button>
                 )}
               </div>

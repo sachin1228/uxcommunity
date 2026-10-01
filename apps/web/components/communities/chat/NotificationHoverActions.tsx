@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Reply, Smile } from "lucide-react";
+import { ArrowReplyRegular, EmojiRegular } from "@fluentui/react-icons";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 import type { MessageReaction } from "@/lib/communities/cache";
 
@@ -104,7 +104,7 @@ export function NotificationHoverActions({
           aria-label="React to this"
           title="React"
         >
-          <Smile strokeWidth={2.5} size={14} />
+          <EmojiRegular fontSize={14} />
         </button>
       </div>
 
@@ -119,7 +119,7 @@ export function NotificationHoverActions({
         aria-label="Reply to this"
         title="Reply"
       >
-        <Reply strokeWidth={2.5} size={14} />
+        <ArrowReplyRegular fontSize={14} />
       </button>
     </div>
   );

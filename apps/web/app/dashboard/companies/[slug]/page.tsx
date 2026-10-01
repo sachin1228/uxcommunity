@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { Building2, Users } from "lucide-react";
+import { BuildingRegular } from "@fluentui/react-icons/headless/svg/building";
+import { PeopleRegular } from "@fluentui/react-icons/headless/svg/people";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCompanyPage } from "@/lib/companies/service";
@@ -80,7 +81,7 @@ export default async function CompanyPage({ params }: Props) {
           </div>
 
           <p className="mt-2 flex items-center gap-1.5 font-body text-sm text-foreground-muted">
-            <Users strokeWidth={2.5} size={12} className="text-accent" />
+            <PeopleRegular fontSize={12} className="text-accent" />
             {company.memberCount} {company.memberCount === 1 ? "member" : "members"}
           </p>
         </div>
@@ -131,7 +132,7 @@ export default async function CompanyPage({ params }: Props) {
       </section>
 
       <p className="mt-6 flex flex-wrap items-center gap-x-1.5 font-body text-xs text-foreground-subtle">
-        <Building2 strokeWidth={2.5} size={11} />
+        <BuildingRegular fontSize={11} />
         Work somewhere else?
         <Link href="/dashboard/settings" className="text-accent hover:underline">
           Add your company

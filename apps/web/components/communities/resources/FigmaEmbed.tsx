@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { ArrowMaximizeRegular, ArrowMinimizeRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
@@ -71,11 +71,11 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
         >
           {isFullscreen ? (
             <>
-              Exit full screen <Minimize2 strokeWidth={2.5} size={12} />
+              Exit full screen <ArrowMinimizeRegular fontSize={12} />
             </>
           ) : (
             <>
-              View full screen <Maximize2 strokeWidth={2.5} size={12} />
+              View full screen <ArrowMaximizeRegular fontSize={12} />
             </>
           )}
         </button>

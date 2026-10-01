@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeftRegular } from "@fluentui/react-icons";
 
 const TOTAL_STEPS = 3;
 
@@ -48,7 +48,7 @@ export function SignupBackButton({
       disabled={disabled}
       className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <ArrowLeft size={15} strokeWidth={2.5} aria-hidden="true" />
+      <ArrowLeftRegular fontSize={15} aria-hidden="true" />
       Back
     </button>
   );

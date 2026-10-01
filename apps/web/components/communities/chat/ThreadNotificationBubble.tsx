@@ -1,15 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ChevronRight,
-  HelpCircle,
-  MessageCircle,
-  Lightbulb,
-  Flag,
-  Video,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRightRegular, QuestionCircleRegular, ChatRegular, LightbulbRegular, FlagRegular, VideoRegular, type FluentIcon } from "@fluentui/react-icons";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime, formatCommenters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
@@ -42,11 +34,11 @@ function categoryLabel(value: string): string {
 }
 
 /** Icon shown in the thumbnail when there is no image attachment. */
-const CATEGORY_ICON: Record<string, LucideIcon> = {
-  question:   HelpCircle,
-  discussion: MessageCircle,
-  idea:       Lightbulb,
-  feedback:   Flag,
+const CATEGORY_ICON: Record<string, FluentIcon> = {
+  question:   QuestionCircleRegular,
+  discussion: ChatRegular,
+  idea:       LightbulbRegular,
+  feedback:   FlagRegular,
 };
 
 /** Picks the first image attachment from a thread, if any. */
@@ -84,7 +76,7 @@ export function ThreadNotificationBubble({
   const posterUrl = imgUrl ? null : videoPosterUrl(event);
   const label   = categoryLabel(event.category);
   const href    = `/dashboard/communities/${communityId}/threads/${event.id}`;
-  const CatIcon = CATEGORY_ICON[event.category] ?? HelpCircle;
+  const CatIcon = CATEGORY_ICON[event.category] ?? QuestionCircleRegular;
   const theme   = KIND_THEME.thread;
   // Discussion on the thread's own page — the count and whoever spoke last,
   // updating live as comments arrive (same footer as the other three kinds).
@@ -177,7 +169,7 @@ export function ThreadNotificationBubble({
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white">
-                        <Video size={12} strokeWidth={2.5} />
+                        <VideoRegular fontSize={12} />
                       </span>
                     </div>
                   </>
@@ -189,8 +181,7 @@ export function ThreadNotificationBubble({
                     }}
                   >
                     <CatIcon
-                      size={24}
-                      strokeWidth={2.5}
+                      fontSize={24}
                       style={{
                         color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
                       }}
@@ -207,7 +198,7 @@ export function ThreadNotificationBubble({
                   }`}
                   style={{ color: isMe ? undefined : theme.accent }}
                 >
-                  <MessageCircle size={12} strokeWidth={2.5} />
+                  <ChatRegular fontSize={12} />
                   Thread
                 </span>
                 <p
@@ -230,9 +221,8 @@ export function ThreadNotificationBubble({
 
               {/* Chevron affordance */}
               <div className="flex items-center pr-2.5">
-                <ChevronRight
-                  size={14}
-                  strokeWidth={2.5}
+                <ChevronRightRegular
+                  fontSize={14}
                   className={isMe ? "text-accent-foreground/60" : "text-foreground-muted"}
                 />
               </div>
@@ -264,7 +254,7 @@ export function ThreadNotificationBubble({
                     : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
                 }
               >
-                <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
+                <ChatRegular fontSize={10} className="shrink-0" />
                 <span className="shrink-0 tabular-nums">{commentCount}</span>
                 {commenterNames && (
                   <span className="truncate">

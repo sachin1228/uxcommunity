@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Plus, ShieldCheck, ShieldOff } from "lucide-react";
+import { ChevronRightRegular, AddRegular, ShieldCheckmarkRegular, ShieldProhibitedRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CommunityAdminSearchModal } from "./CommunityAdminSearchModal";
@@ -79,7 +79,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
           <div>
             <h2 className="font-body text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <ShieldCheck strokeWidth={2.5} size={14} className="text-accent" />
+              <ShieldCheckmarkRegular fontSize={14} className="text-accent" />
               Community admins
               <span className="ml-1 font-mono text-[11px] text-foreground-muted font-normal">
                 {admins.length}
@@ -93,7 +93,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
             onClick={() => setShowAdd(true)}
             className="shrink-0 flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:opacity-90 transition-opacity"
           >
-            <Plus strokeWidth={2.5} size={13} /> Add admin
+            <AddRegular fontSize={13} /> Add admin
           </button>
         </div>
 
@@ -106,7 +106,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
         ) : admins.length === 0 ? (
           <div className="px-5 py-8 flex flex-col items-center justify-center gap-2 text-center">
             <span className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground-muted">
-              <ShieldOff strokeWidth={2.5} size={16} />
+              <ShieldProhibitedRegular fontSize={16} />
             </span>
             <p className="font-body text-xs text-foreground-muted max-w-sm">
               No admins yet. Search the community&apos;s members and promote one to give them
@@ -116,7 +116,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
               onClick={() => setShowAdd(true)}
               className="mt-1 inline-flex items-center gap-1 font-body text-xs text-accent hover:text-accent/80 transition-colors"
             >
-              <Plus strokeWidth={2.5} size={12} /> Add the first admin
+              <AddRegular fontSize={12} /> Add the first admin
             </button>
           </div>
         ) : (
@@ -166,7 +166,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                       onClick={() => router.push(`/admin/communities/${communityId}/admins/${admin.user_id}`)}
                       className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
                     >
-                      Manage <ChevronRight strokeWidth={2.5} size={12} />
+                      Manage <ChevronRightRegular fontSize={12} />
                     </button>
 
                     {confirmingId === admin.user_id ? (
@@ -193,7 +193,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                         title="Remove admin rights (keeps them as a member)"
                         aria-label={`Remove admin rights for ${admin.name}`}
                       >
-                        <ShieldOff strokeWidth={2.5} size={13} />
+                        <ShieldProhibitedRegular fontSize={13} />
                       </button>
                     )}
                   </div>

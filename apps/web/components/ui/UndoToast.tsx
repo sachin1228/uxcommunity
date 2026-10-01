@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Undo2, X } from "lucide-react";
+import { ArrowUndoRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   dismissUndoToast,
@@ -72,7 +72,7 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
           {pending ? (
             <Spinner size={13} />
           ) : (
-            <Undo2 strokeWidth={2.5} size={14} aria-hidden="true" />
+            <ArrowUndoRegular fontSize={14} aria-hidden="true" />
           )}
           {toast.actionLabel}
         </button>
@@ -84,7 +84,7 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
           aria-label="Dismiss"
           className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-background-subtle hover:text-foreground disabled:opacity-60"
         >
-          <X strokeWidth={2.5} size={15} />
+          <DismissRegular fontSize={15} />
         </button>
       </div>
     </div>

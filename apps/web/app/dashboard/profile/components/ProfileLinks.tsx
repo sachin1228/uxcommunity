@@ -1,6 +1,7 @@
 "use client";
 
-import { Linkedin, Globe } from "lucide-react";
+import { GlobeRegular } from "@fluentui/react-icons";
+import { LinkedinIcon } from "@/components/ui/BrandIcons";
 
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
@@ -34,7 +35,7 @@ export function ProfileLinks({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="flex flex-col gap-1.5">
           <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
-            <Linkedin strokeWidth={2.5} size={11} /> LinkedIn
+            <LinkedinIcon fontSize={11} /> LinkedIn
           </label>
           <input
             type="url"
@@ -46,7 +47,7 @@ export function ProfileLinks({
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
-            <Globe strokeWidth={2.5} size={11} /> Portfolio
+            <GlobeRegular fontSize={11} /> Portfolio
           </label>
           <input
             type="url"

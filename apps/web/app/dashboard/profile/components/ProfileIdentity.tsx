@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Layers, Star, Lock } from "lucide-react";
+import { LocationRegular, LayerDiagonalRegular, StarRegular, LockClosedRegular } from "@fluentui/react-icons";
 
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
@@ -29,19 +29,19 @@ export function ProfileIdentity({
       <div className="flex flex-wrap gap-3 mb-3">
         {city && (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <MapPin strokeWidth={2.5} size={13} className="text-accent shrink-0" />
+            <LocationRegular fontSize={13} className="text-accent shrink-0" />
             <span className="font-body text-sm text-foreground">{city}</span>
           </div>
         )}
         {sector && (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <Layers strokeWidth={2.5} size={13} className="text-accent shrink-0" />
+            <LayerDiagonalRegular fontSize={13} className="text-accent shrink-0" />
             <span className="font-body text-sm text-foreground">{sector}</span>
           </div>
         )}
         {experienceLevel && (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <Star strokeWidth={2.5} size={13} className="text-accent shrink-0" />
+            <StarRegular fontSize={13} className="text-accent shrink-0" />
             <span className="font-body text-sm text-foreground capitalize">
               {experienceLevel.replace(/_/g, " ")}
             </span>
@@ -49,7 +49,7 @@ export function ProfileIdentity({
         )}
       </div>
       <p className="flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
-        <Lock strokeWidth={2.5} size={10} />
+        <LockClosedRegular fontSize={10} />
         These are linked to your community membership and can&apos;t be changed here.
       </p>
     </div>

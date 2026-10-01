@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Check, Globe, Linkedin, Loader2, Mail } from "lucide-react";
+import { CalendarRegular, CheckmarkRegular, GlobeRegular, SpinnerIosRegular, MailRegular } from "@fluentui/react-icons";
+import { LinkedinIcon } from "@/components/ui/BrandIcons";
 
 const fieldCls =
   "w-full border-b border-border bg-transparent pb-1 font-body text-xs text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent";
@@ -10,11 +11,11 @@ const labelCls =
   "mb-0.5 flex items-center gap-1 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted";
 
 /** Read-only row, styled like the editable fields so the card reads as one form. */
-function StaticField({ icon: Icon, label, value }: { icon: typeof Mail; label: string; value: string }) {
+function StaticField({ icon: Icon, label, value }: { icon: typeof MailRegular; label: string; value: string }) {
   return (
     <div className="min-w-0">
       <p className={labelCls}>
-        <Icon strokeWidth={2.5} size={9} /> {label}
+        <Icon fontSize={9} /> {label}
       </p>
       <p className="truncate border-b border-border pb-1 font-body text-xs text-foreground-subtle" title={value}>
         {value}
@@ -81,12 +82,12 @@ export function ContactLinksCard({
         </h2>
         {saveState === "saving" && (
           <span className="flex items-center gap-1.5 font-body text-[11px] text-foreground-muted" role="status">
-            <Loader2 strokeWidth={2.5} size={12} className="animate-spin" /> Saving…
+            <SpinnerIosRegular fontSize={12} className="animate-spin" /> Saving…
           </span>
         )}
         {saveState === "saved" && (
           <span className="flex items-center gap-1.5 font-body text-[11px] text-accent" role="status">
-            <Check strokeWidth={2.5} size={12} /> Saved
+            <CheckmarkRegular fontSize={12} /> Saved
           </span>
         )}
         {saveState === "error" && (
@@ -97,12 +98,12 @@ export function ContactLinksCard({
       </div>
 
       <div className="mt-4 flex flex-col gap-5">
-        <StaticField icon={Mail} label="Email" value={email} />
-        {memberSince && <StaticField icon={Calendar} label="Since" value={memberSince} />}
+        <StaticField icon={MailRegular} label="Email" value={email} />
+        {memberSince && <StaticField icon={CalendarRegular} label="Since" value={memberSince} />}
 
         <div className="border-t border-border pt-4">
           <label htmlFor="settings-linkedin" className={labelCls}>
-            <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
+            <LinkedinIcon fontSize={9} /> LinkedIn
           </label>
           <input
             id="settings-linkedin"
@@ -115,7 +116,7 @@ export function ContactLinksCard({
         </div>
         <div>
           <label htmlFor="settings-portfolio" className={labelCls}>
-            <Globe strokeWidth={2.5} size={9} /> Portfolio
+            <GlobeRegular fontSize={9} /> Portfolio
           </label>
           <input
             id="settings-portfolio"

@@ -1,12 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import {
-  Globe,
-  Image as ImageIcon,
-  MessageCircle,
-  X,
-} from "lucide-react";
+import { GlobeRegular, ImageRegular, ChatRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "@/lib/communities/models/threads";
@@ -167,7 +162,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
               </p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
-              <X strokeWidth={2.5} size={16} />
+              <DismissRegular fontSize={16} />
             </button>
           </div>
 
@@ -220,14 +215,14 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
               description="Other members can reply to this thread."
               checked={allowReplies}
               onChange={setAllowReplies}
-              icon={<MessageCircle strokeWidth={2.5} size={15} />}
+              icon={<ChatRegular fontSize={15} />}
             />
             <ToggleRow
               title="Share publicly"
               description="Visible to everyone, not just community members."
               checked={isPublic}
               onChange={setIsPublic}
-              icon={<Globe strokeWidth={2.5} size={15} />}
+              icon={<GlobeRegular fontSize={15} />}
             />
           </div>
         </div>
@@ -263,7 +258,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent/10"
           >
             <div className="flex flex-col items-center gap-2">
-              <ImageIcon strokeWidth={2.5} size={22} className="text-accent" />
+              <ImageRegular fontSize={22} className="text-accent" />
               <span className="font-body text-sm font-medium text-accent">
                 Drop images or files to attach
               </span>

@@ -1,34 +1,32 @@
-import {
-  Figma,
-  FileText,
-  Wrench,
-  Play,
-  BookOpen,
-  Type,
-  Shapes,
-  Palette,
-  LayoutTemplate,
-  Sparkles,
-  Package,
-  type LucideIcon,
-} from "lucide-react";
+import { DocumentTextRegular } from "@fluentui/react-icons/headless/svg/document-text";
+import { WrenchRegular } from "@fluentui/react-icons/headless/svg/wrench";
+import { PlayRegular } from "@fluentui/react-icons/headless/svg/play";
+import { BookOpenRegular } from "@fluentui/react-icons/headless/svg/book-open";
+import { TextFontRegular } from "@fluentui/react-icons/headless/svg/text-font";
+import { ShapesRegular } from "@fluentui/react-icons/headless/svg/shapes";
+import { ColorRegular } from "@fluentui/react-icons/headless/svg/color";
+import { SlideLayoutRegular } from "@fluentui/react-icons/headless/svg/slide-layout";
+import { SparkleRegular } from "@fluentui/react-icons/headless/svg/sparkle";
+import { BoxRegular } from "@fluentui/react-icons/headless/svg/box";
+import type { FluentIcon } from "@fluentui/react-icons/headless";
+import { FigmaIcon } from "@/components/ui/BrandIcons";
 import type { ResourceType } from "@/lib/communities/models/resources";
 
-const iconMap: Record<ResourceType, LucideIcon> = {
-  figma:       Figma,
-  article:     FileText,
-  tool:        Wrench,
-  video:       Play,
-  book:        BookOpen,
-  font:        Type,
-  icon_pack:   Shapes,
-  color:       Palette,
-  template:    LayoutTemplate,
-  inspiration: Sparkles,
-  other:       Package,
+const iconMap: Record<ResourceType, FluentIcon> = {
+  figma:       FigmaIcon,
+  article:     DocumentTextRegular,
+  tool:        WrenchRegular,
+  video:       PlayRegular,
+  book:        BookOpenRegular,
+  font:        TextFontRegular,
+  icon_pack:   ShapesRegular,
+  color:       ColorRegular,
+  template:    SlideLayoutRegular,
+  inspiration: SparkleRegular,
+  other:       BoxRegular,
 };
 
 export function ResourceTypeIcon({ type, size = 14, className }: { type: ResourceType; size?: number; className?: string }) {
-  const Icon = iconMap[type] ?? Package;
-  return <Icon size={size} strokeWidth={2.5} className={className} />;
+  const Icon = iconMap[type] ?? BoxRegular;
+  return <Icon fontSize={size} className={className} />;
 }

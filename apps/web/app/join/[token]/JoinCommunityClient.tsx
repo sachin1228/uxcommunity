@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { invalidateOnJoin } from "@/lib/communities/cache";
-import { Lock, Globe2, Users, Check, MessageSquare } from "lucide-react";
+import { LockClosedRegular, GlobeRegular, PeopleRegular, CheckmarkRegular, CommentRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
@@ -92,9 +92,9 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         <div className="mb-3 flex justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-xs text-foreground-muted">
             {community.is_private ? (
-              <><Lock strokeWidth={2.5} size={11} /> Private community</>
+              <><LockClosedRegular fontSize={11} /> Private community</>
             ) : (
-              <><Globe2 strokeWidth={2.5} size={11} /> Public community</>
+              <><GlobeRegular fontSize={11} /> Public community</>
             )}
           </span>
         </div>
@@ -115,7 +115,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
         {/* Member count */}
         <p className="mt-3 flex items-center justify-center gap-1.5 font-body text-xs text-foreground-subtle">
-          <Users strokeWidth={2.5} size={12} />
+          <PeopleRegular fontSize={12} />
           {community.member_count.toLocaleString()} member{community.member_count !== 1 ? "s" : ""}
         </p>
 
@@ -123,14 +123,14 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         <div className="mt-7">
           {status === "joined" && (
             <div className="flex items-center justify-center gap-2 rounded-xl bg-accent/10 py-3 text-accent">
-              <Check strokeWidth={2.5} size={16} />
+              <CheckmarkRegular fontSize={16} />
               <span className="font-body text-sm font-medium">Joined! Redirecting…</span>
             </div>
           )}
 
           {status === "requested" && (
             <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
-              <Check strokeWidth={2.5} size={18} className="mx-auto mb-2 text-accent" />
+              <CheckmarkRegular fontSize={18} className="mx-auto mb-2 text-accent" />
               <p className="font-body text-sm font-semibold text-foreground">Request sent</p>
               <p className="mt-1 font-body text-xs text-foreground-muted">
                 The community owner will review your request.
@@ -148,9 +148,9 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
                 {status === "loading" ? (
                   <><Spinner size={15} className="text-accent-foreground" /> Joining…</>
                 ) : community.is_private ? (
-                  <><Lock strokeWidth={2.5} size={14} /> Request to join</>
+                  <><LockClosedRegular fontSize={14} /> Request to join</>
                 ) : (
-                  <><MessageSquare strokeWidth={2.5} size={14} /> Join community</>
+                  <><CommentRegular fontSize={14} /> Join community</>
                 )}
               </button>
 

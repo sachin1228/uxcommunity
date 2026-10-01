@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
+import { BriefcaseRegular, CompassNorthwestRegular, HomeRegular, LibraryRegular, CommentRegular, AddRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -108,7 +108,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Home strokeWidth={2.5} size={15} className="shrink-0" />
+              <HomeRegular fontSize={15} className="shrink-0" />
               <span className="flex-1 truncate">Home</span>
             </Link>
           </li>
@@ -121,7 +121,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Compass strokeWidth={2.5} size={15} className="shrink-0" />
+              <CompassNorthwestRegular fontSize={15} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
             </Link>
           </li>
@@ -134,7 +134,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Library strokeWidth={2.5} size={15} className="shrink-0" />
+              <LibraryRegular fontSize={15} className="shrink-0" />
               <span className="flex-1 truncate">Library</span>
             </Link>
           </li>
@@ -147,7 +147,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Briefcase strokeWidth={2.5} size={15} className="shrink-0" />
+              <BriefcaseRegular fontSize={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
             </Link>
           </li>
@@ -168,7 +168,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
             aria-label="Create community"
             title="Create community"
           >
-            <Plus size={11} strokeWidth={2.5} />
+            <AddRegular fontSize={11} />
           </button>
         </div>
 
@@ -183,8 +183,8 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           </div>
         ) : communities.length === 0 ? (
           <div className="px-4 py-6 text-center">
-            <MessageSquare
-              size={24}
+            <CommentRegular
+              fontSize={24}
               className="mx-auto text-foreground-muted mb-2 opacity-40"
             />
             <p className="font-body text-xs text-foreground-muted">No communities yet</p>

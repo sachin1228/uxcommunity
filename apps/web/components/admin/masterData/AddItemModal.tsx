@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, X, ImagePlus } from "lucide-react";
+import { AddRegular, DismissRegular, ImageAddRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { compressImage, compressedFile } from "@/lib/image-client";
@@ -92,7 +92,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
           <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={16} />
+            <DismissRegular fontSize={16} />
           </button>
         </div>
 
@@ -162,7 +162,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-accent/5 py-5 transition-colors"
               >
-                <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
+                <ImageAddRegular fontSize={20} className="text-foreground-muted" />
                 <span className="font-body text-xs text-foreground-muted">Click to upload</span>
                 <span className="font-body text-[10px] text-foreground-muted">
                   PNG, JPG, WebP, SVG · max 5 MB
@@ -189,7 +189,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               {addLoading || imageUploading ? (
                 <Spinner className="h-3 w-3 text-white" />
               ) : (
-                <Plus strokeWidth={2.5} size={13} />
+                <AddRegular fontSize={13} />
               )}
               {imageUploading ? "Uploading…" : `Add ${entity}`}
             </button>

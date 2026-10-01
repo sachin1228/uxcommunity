@@ -2,7 +2,7 @@
 
 import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, ImageIcon, Smile, Link } from "lucide-react";
+import { DismissRegular, ImageRegular, EmojiRegular, LinkRegular, SendRegular } from "@fluentui/react-icons";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
@@ -313,7 +313,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-1 rounded-full hover:bg-surface"
               aria-label="Remove image"
             >
-              <X strokeWidth={2.5} size={14} />
+              <DismissRegular fontSize={14} />
             </button>
           </div>
         )}
@@ -322,7 +322,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         {showLinkPreview && (
           <div className="relative mb-1">
             <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
-              <Link strokeWidth={2.5} size={11} className="text-foreground-muted/60 shrink-0" />
+              <LinkRegular fontSize={11} className="text-foreground-muted/60 shrink-0" />
               <p className="font-body text-[10px] text-foreground-muted/70 truncate flex-1">
                 {(() => { try { return new URL(linkPreviewUrl!).hostname.replace(/^www\./, ""); } catch { return linkPreviewUrl; } })()}
               </p>
@@ -331,7 +331,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-surface"
                 aria-label="Dismiss link preview"
               >
-                <X strokeWidth={2.5} size={12} />
+                <DismissRegular fontSize={12} />
               </button>
             </div>
             <LinkPreview url={linkPreviewUrl!} isMe={false} />
@@ -383,7 +383,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-2 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface"
                   aria-label="Cancel reply"
                 >
-                  <X strokeWidth={2.5} size={18} />
+                  <DismissRegular fontSize={18} />
                 </button>
               </div>
             )}
@@ -411,7 +411,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   aria-label="Open emoji & GIF picker"
                   aria-expanded={pickerOpen}
                 >
-                  <Smile strokeWidth={2.5} size={19} />
+                  <EmojiRegular fontSize={19} />
                 </button>
 
                 <button
@@ -421,7 +421,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Attach image"
                 >
-                  <ImageIcon strokeWidth={2.5} size={19} />
+                  <ImageRegular fontSize={19} />
                 </button>
               </div>
 
@@ -520,14 +520,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   aria-label="Send"
                   title="Send"
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
+                  <SendRegular
                     className="w-[15px] h-[15px]"
                     style={{ marginLeft: "1px" }}
-                  >
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                  </svg>
+                    aria-hidden="true"
+                  />
                 </button>
               )}
             </div>{/* end input row */}

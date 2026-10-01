@@ -1,16 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  AlertCircle,
-  Check,
-  Film,
-  Globe,
-  ImagePlus,
-  MessageCircle,
-  Plus,
-  X,
-} from "lucide-react";
+import { ErrorCircleRegular, CheckmarkRegular, FilmstripRegular, GlobeRegular, ImageAddRegular, ChatRegular, AddRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -79,9 +70,9 @@ function VideoActivityFeed({ items }: { items: VideoActivity[] }) {
         <li key={item.key} className="flex items-start gap-2.5">
           <span className="mt-0.5 shrink-0">
             {item.state === "ready" ? (
-              <Check size={14} strokeWidth={2.5} className="text-emerald-400" />
+              <CheckmarkRegular fontSize={14} className="text-emerald-400" />
             ) : item.state === "failed" ? (
-              <AlertCircle size={14} strokeWidth={2.5} className="text-red-400" />
+              <ErrorCircleRegular fontSize={14} className="text-red-400" />
             ) : (
               <Spinner size={14} />
             )}
@@ -151,12 +142,12 @@ function MediaRow({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.poster} alt={item.name} className="h-full w-full object-cover" />
                     <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow">
-                      <Film strokeWidth={2.5} size={18} fill="currentColor" />
+                      <FilmstripRegular fontSize={18} fill="currentColor" />
                     </span>
                   </div>
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/80 px-1 text-center">
-                    <Film strokeWidth={2.5} size={18} className="text-white" />
+                    <FilmstripRegular fontSize={18} className="text-white" />
                     <span className="w-full truncate px-1 font-body text-[10px] text-white/70">{item.name}</span>
                   </div>
                 )
@@ -170,7 +161,7 @@ function MediaRow({
               className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
               aria-label={`Remove ${item.name}`}
             >
-              <X strokeWidth={2.5} size={10} />
+              <DismissRegular fontSize={10} />
             </button>
           </div>
         );
@@ -186,7 +177,7 @@ function MediaRow({
           {uploading ? (
             <Spinner size={16} />
           ) : (
-            <Plus strokeWidth={2.5} size={18} />
+            <AddRegular fontSize={18} />
           )}
           <span className="text-[11px] font-medium">{uploading ? "Uploading…" : "Add media"}</span>
           <span className="text-[10px] text-foreground-subtle">(Max {SHOWCASE_MEDIA_MAX})</span>
@@ -300,7 +291,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                 </p>
               </div>
               <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
-                <X strokeWidth={2.5} size={16} />
+                <DismissRegular fontSize={16} />
               </button>
             </div>
 
@@ -347,7 +338,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                     disabled={uploading}
                     className="flex h-20 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {uploading ? <Spinner size={15} /> : <ImagePlus strokeWidth={2.5} size={16} />}
+                    {uploading ? <Spinner size={15} /> : <ImageAddRegular fontSize={16} />}
                     {uploading ? "Uploading…" : "Add images or videos (up to 5)"}
                   </button>
                 ) : (
@@ -382,7 +373,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                         aria-pressed={active}
                         className={filterChip(active)}
                       >
-                        <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                        <Icon fontSize={14} aria-hidden="true" />
                         {item.label}
                       </button>
                     );
@@ -397,14 +388,14 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                   description="Other members can comment on this showcase."
                   checked={allowReplies}
                   onChange={setAllowReplies}
-                  icon={<MessageCircle strokeWidth={2.5} size={15} />}
+                  icon={<ChatRegular fontSize={15} />}
                 />
                 <ToggleRow
                   title="Share publicly"
                   description="Visible to everyone, not just community members."
                   checked={isPublic}
                   onChange={setIsPublic}
-                  icon={<Globe strokeWidth={2.5} size={15} />}
+                  icon={<GlobeRegular fontSize={15} />}
                 />
               </div>
 
@@ -429,7 +420,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
               className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent/10"
             >
               <div className="flex flex-col items-center gap-2">
-                <ImagePlus strokeWidth={2.5} size={22} className="text-accent" />
+                <ImageAddRegular fontSize={22} className="text-accent" />
                 <span className="font-body text-sm font-medium text-accent">Drop images or videos to attach</span>
               </div>
             </div>

@@ -6,16 +6,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-  Bell,
-  CalendarDays,
-  CheckCheck,
-  FileText,
-  Heart,
-  MessageCircle,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { AlertRegular, CalendarMonthRegular, CheckmarkRegular, DocumentTextRegular, HeartRegular, ChatRegular, DeleteRegular, PeopleRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   NOTIFICATION_TABS,
@@ -29,19 +20,19 @@ import {
 } from "@/lib/use-notifications";
 
 function iconFor(type: NotificationType) {
-  if (type.endsWith("_deleted")) return Trash2;
-  if (type === "thread_like") return Heart;
-  if (type.includes("event")) return CalendarDays;
-  if (type.includes("resource")) return FileText;
-  if (type.includes("comment") || type.includes("reply")) return MessageCircle;
-  return Users;
+  if (type.endsWith("_deleted")) return DeleteRegular;
+  if (type === "thread_like") return HeartRegular;
+  if (type.includes("event")) return CalendarMonthRegular;
+  if (type.includes("resource")) return DocumentTextRegular;
+  if (type.includes("comment") || type.includes("reply")) return ChatRegular;
+  return PeopleRegular;
 }
 
 /** Icons are a view concern; the tab keys/labels come from the shared module. */
-const TAB_ICONS: Record<NotificationTab, typeof Bell> = {
-  activity: MessageCircle,
-  events: CalendarDays,
-  other: Bell,
+const TAB_ICONS: Record<NotificationTab, typeof AlertRegular> = {
+  activity: ChatRegular,
+  events: CalendarMonthRegular,
+  other: AlertRegular,
 };
 
 function formatRelativeTime(value: string) {
@@ -61,13 +52,13 @@ function EmptyNotifications({
   title,
   hint,
 }: {
-  icon: typeof Bell;
+  icon: typeof AlertRegular;
   title: string;
   hint: string;
 }) {
   return (
     <div className="px-5 py-16 text-center">
-      <Icon strokeWidth={2.5} size={26} className="mx-auto mb-3 text-foreground-muted opacity-50" />
+      <Icon fontSize={26} className="mx-auto mb-3 text-foreground-muted opacity-50" />
       <p className="font-body text-sm font-medium text-foreground">{title}</p>
       <p className="mt-1 font-body text-xs text-foreground-muted">{hint}</p>
     </div>
@@ -107,7 +98,7 @@ export function NotificationsView({ userId }: { userId: string }) {
           disabled={!hasUnread}
           className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40"
         >
-          <CheckCheck strokeWidth={2.5} size={14} />
+          <CheckmarkRegular fontSize={14} />
           Mark all read
         </button>
       </div>
@@ -140,7 +131,7 @@ export function NotificationsView({ userId }: { userId: string }) {
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                  <Icon fontSize={14} aria-hidden="true" />
                   {label}
                   {unread > 0 && (
                     <span
@@ -169,20 +160,20 @@ export function NotificationsView({ userId }: { userId: string }) {
           </div>
         ) : notifications.length === 0 ? (
           <EmptyNotifications
-            icon={Bell}
+            icon={AlertRegular}
             title="No notifications yet"
             hint="Likes, comments and event RSVPs on your posts will appear here."
           />
         ) : visible.length === 0 ? (
           tab === "activity" ? (
             <EmptyNotifications
-              icon={MessageCircle}
+              icon={ChatRegular}
               title="No likes or comments yet"
               hint="Likes and comments on your threads and resources will appear here."
             />
           ) : tab === "events" ? (
             <EmptyNotifications
-              icon={CalendarDays}
+              icon={CalendarMonthRegular}
               title="No event activity yet"
               hint="RSVPs and comments on your events will appear here."
             />
@@ -190,7 +181,7 @@ export function NotificationsView({ userId }: { userId: string }) {
             /* The Other tab renders manager removals — see
                lib/notifications-tabs.ts for where its types get declared. */
             <EmptyNotifications
-              icon={Trash2}
+              icon={DeleteRegular}
               title="No removal notices"
               hint="When an admin or moderator removes your thread, showcase post, resource or event, it will show up here."
             />
@@ -216,7 +207,7 @@ export function NotificationsView({ userId }: { userId: string }) {
                         unread ? "bg-accent-soft text-accent" : "bg-background-subtle text-foreground-muted"
                       }`}
                     >
-                      <Icon size={16} strokeWidth={2.5} />
+                      <Icon fontSize={16} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start gap-2">

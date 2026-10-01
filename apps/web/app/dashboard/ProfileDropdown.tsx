@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { LogOut, Settings, UserCircle } from "lucide-react";
+import { SignOutRegular, SettingsRegular, PersonCircleRegular } from "@fluentui/react-icons";
 import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
@@ -21,8 +21,8 @@ const ROW_CLASS =
 const ROW_ICON_CLASS = "shrink-0 text-overlay-muted";
 
 const MENU_LINKS = [
-  { href: "/dashboard/profile", label: "View profile", icon: UserCircle },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/profile", label: "View profile", icon: PersonCircleRegular },
+  { href: "/dashboard/settings", label: "Settings", icon: SettingsRegular },
 ];
 
 /**
@@ -77,7 +77,7 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
           {MENU_LINKS.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={() => setOpen(false)} className={ROW_CLASS}>
               <span>{label}</span>
-              <Icon strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
+              <Icon fontSize={16} className={ROW_ICON_CLASS} />
             </Link>
           ))}
         </div>
@@ -89,7 +89,7 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
             className={`${ROW_CLASS} disabled:opacity-50`}
           >
             <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
-            <LogOut strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
+            <SignOutRegular fontSize={16} className={ROW_ICON_CLASS} />
           </button>
         </div>
       </DropdownMenu>

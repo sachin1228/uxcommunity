@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, MapPin, Settings, Users, Video } from "lucide-react";
+import { ArrowRightRegular, CalendarMonthRegular, LocationRegular, SettingsRegular, PeopleRegular, VideoRegular } from "@fluentui/react-icons";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { openCommunitySettings } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -161,7 +161,7 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
         onClick={openSettings}
         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
-        <Settings strokeWidth={2.5} size={14} aria-hidden="true" />
+        <SettingsRegular fontSize={14} aria-hidden="true" />
         Make this room your own
       </button>
     </section>
@@ -257,7 +257,7 @@ export function EventRoomSection({
         {/* One row carries the whole schedule — the card does the same, so a
             multi-day event reads the same in both places. The times are the
             viewer's own clock, so the zone rides along with them. */}
-        <Row icon={<CalendarDays strokeWidth={2.5} size={16} />}>
+        <Row icon={<CalendarMonthRegular fontSize={16} />}>
           <span>
             <span
               className="block"
@@ -280,10 +280,10 @@ export function EventRoomSection({
             )}
           </span>
         </Row>
-        <Row icon={event.is_online ? <Video strokeWidth={2.5} size={16} /> : <MapPin strokeWidth={2.5} size={16} />}>
+        <Row icon={event.is_online ? <VideoRegular fontSize={16} /> : <LocationRegular fontSize={16} />}>
           {event.is_online ? "Online event" : event.location ?? "Location shared by the host"}
         </Row>
-        <Row icon={<Users strokeWidth={2.5} size={16} />}>
+        <Row icon={<PeopleRegular fontSize={16} />}>
           {spotsLeft === null
             ? `${attended} going`
             : spotsLeft > 0
@@ -335,7 +335,7 @@ export function EventRoomSection({
         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         View event
-        <ArrowRight strokeWidth={2.5} size={14} aria-hidden="true" />
+        <ArrowRightRegular fontSize={14} aria-hidden="true" />
       </Link>
     </section>
   );

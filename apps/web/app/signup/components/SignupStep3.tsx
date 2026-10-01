@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { Upload } from "lucide-react";
+import { ArrowUploadRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { SignupBackButton } from "./SignupStepper";
 
@@ -87,7 +87,7 @@ export function SignupStep3({
           onClick={() => fileInputRef.current?.click()}
           className="mb-6 flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent hover:text-foreground"
         >
-          <Upload strokeWidth={2.5} aria-hidden="true" />
+          <ArrowUploadRegular aria-hidden="true" />
           <span className="font-body text-sm font-medium">Upload a profile picture</span>
           <span className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP</span>
         </button>

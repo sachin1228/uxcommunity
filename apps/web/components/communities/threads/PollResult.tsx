@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { BarChart3, Check, Loader2 } from "lucide-react";
+import { DataBarVerticalRegular, CheckmarkRegular, SpinnerIosRegular } from "@fluentui/react-icons";
 import type { ThreadPoll } from "@/lib/communities/models/threads";
 
 function zeroCounts(optionCount: number): number[] {
@@ -97,7 +97,7 @@ export function ThreadPollResult({
                       className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white"
                       aria-hidden
                     >
-                      <Check strokeWidth={3} size={12} />
+                      <CheckmarkRegular fontSize={12} />
                     </span>
                   ) : (
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground">
@@ -152,9 +152,8 @@ export function ThreadPollResult({
                 }`}
               >
                 {isPending ? (
-                  <Loader2
-                    size={16}
-                    strokeWidth={2.5}
+                  <SpinnerIosRegular
+                    fontSize={16}
                     className="shrink-0 animate-spin text-accent"
                     aria-hidden
                   />
@@ -190,7 +189,7 @@ export function ThreadPollResult({
               className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-accent transition-colors hover:text-accent-hover hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? (
-                <Loader2 size={11} strokeWidth={2.5} className="animate-spin" aria-hidden />
+                <SpinnerIosRegular fontSize={11} className="animate-spin" aria-hidden />
               ) : (
                 "Undo"
               )}

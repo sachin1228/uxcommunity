@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Globe } from "lucide-react";
+import { GlobeRegular } from "@fluentui/react-icons";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { timeZoneChoices, timeZoneName } from "@/lib/communities/timezone";
 import { formatEventTime } from "@/lib/communities/event-display";
@@ -67,7 +67,7 @@ export function HostTimeZoneField({
   return (
     <div>
       <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-        <Globe strokeWidth={2.5} size={11} /> Timezone
+        <GlobeRegular fontSize={11} /> Timezone
         {overriding && deviceZone && (
           <button
             type="button"

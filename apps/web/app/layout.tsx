@@ -4,6 +4,9 @@ import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
 import "./globals.css";
+// Base styling for Fluent icons imported from the Griffel-free headless API
+// (used by server components, which cannot evaluate the standard entry).
+import "@fluentui/react-icons/headless/styles.css";
 
 /**
  * Geist ships as two vendored variable fonts in ./fonts instead of through

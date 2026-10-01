@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Smile } from "lucide-react";
+import { EmojiRegular, SendRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
@@ -323,7 +323,7 @@ export function CommentComposer<C = unknown>({
                   : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
               }`}
             >
-              <Smile strokeWidth={2} size={18} />
+              <EmojiRegular fontSize={18} />
             </button>
             <textarea
               ref={ref}
@@ -453,7 +453,7 @@ export function CommentComposer<C = unknown>({
                 : "border-border bg-surface text-foreground-subtle hover:text-foreground"
             }`}
           >
-            <Smile strokeWidth={2.5} size={16} />
+            <EmojiRegular fontSize={16} />
           </button>
           <button
             type="submit"
@@ -465,9 +465,7 @@ export function CommentComposer<C = unknown>({
             {saving ? (
               <Spinner size={14} className="text-white" />
             ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]" style={{ marginLeft: 1 }}>
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
+              <SendRegular className="h-[15px] w-[15px]" style={{ marginLeft: 1 }} aria-hidden="true" />
             )}
           </button>
         </div>

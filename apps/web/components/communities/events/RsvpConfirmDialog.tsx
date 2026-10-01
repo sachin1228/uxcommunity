@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LogOut, MessageSquare, Pin, PinOff, UserCheck, UserX } from "lucide-react";
+import { CheckmarkRegular, SignOutRegular, CommentRegular, PinRegular, PinOffRegular, PersonAvailableRegular, PersonDeleteRegular } from "@fluentui/react-icons";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -88,13 +88,13 @@ export function RsvpConfirmDialog({
       <ul className="mt-5 flex flex-col gap-3">
         {joining ? (
           <>
-            <Point icon={<UserCheck strokeWidth={2.5} size={13} />}>
+            <Point icon={<PersonAvailableRegular fontSize={13} />}>
               You count as going, and the host sees your RSVP.
             </Point>
-            <Point icon={<MessageSquare strokeWidth={2.5} size={13} />}>
+            <Point icon={<CommentRegular fontSize={13} />}>
               You join the event&apos;s group chat and can post there straight away.
             </Point>
-            <Point icon={<Pin strokeWidth={2.5} size={13} />}>
+            <Point icon={<PinRegular fontSize={13} />}>
               It is pinned to the top of your sidebar until{" "}
               <span className="font-medium text-foreground">{date}</span>. Leave the RSVP and you
               leave the room.
@@ -102,20 +102,20 @@ export function RsvpConfirmDialog({
           </>
         ) : (
           <>
-            <Point icon={<UserX strokeWidth={2.5} size={13} />}>
+            <Point icon={<PersonDeleteRegular fontSize={13} />}>
               You stop counting as going, and the host sees that you are no longer coming.
             </Point>
             {isOwner ? (
-              <Point icon={<MessageSquare strokeWidth={2.5} size={13} />}>
+              <Point icon={<CommentRegular fontSize={13} />}>
                 You host this event, so the group chat stays yours — you keep it, and everybody
                 going keeps talking in it.
               </Point>
             ) : (
-              <Point icon={<LogOut strokeWidth={2.5} size={13} />}>
+              <Point icon={<SignOutRegular fontSize={13} />}>
                 You leave the event&apos;s group chat and stop getting its messages and previews.
               </Point>
             )}
-            <Point icon={<PinOff strokeWidth={2.5} size={13} />}>
+            <Point icon={<PinOffRegular fontSize={13} />}>
               {isOwner ? (
                 <>
                   It stays pinned in your sidebar until{" "}
@@ -157,9 +157,9 @@ export function RsvpConfirmDialog({
           {pending ? (
             <Spinner size={15} className="text-white" />
           ) : joining ? (
-            <Check strokeWidth={2.5} size={15} />
+            <CheckmarkRegular fontSize={15} />
           ) : (
-            <UserX strokeWidth={2.5} size={15} />
+            <PersonDeleteRegular fontSize={15} />
           )}
           {pending ? (joining ? "Confirming…" : "Withdrawing…") : joining ? "Confirm RSVP" : "Yes, not going"}
         </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MessageSquare } from "lucide-react";
+import { CommentRegular } from "@fluentui/react-icons";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityEvent, EventComment, EventRsvp } from "@/lib/communities/models/events";
@@ -219,7 +219,7 @@ export function EventDetailClient({
                             setComments((prev) => updateCommentReactions(prev, commentId, reactions))}
                           emptyState={
                     <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                      <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                      <CommentRegular fontSize={22} className={communityFeedLayout.emptyIcon} />
                       <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
                     </div>
                   }

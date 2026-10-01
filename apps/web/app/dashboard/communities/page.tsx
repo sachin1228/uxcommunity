@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Check, Lock } from "lucide-react";
+import { CheckmarkRegular, LockClosedRegular, SearchRegular } from "@fluentui/react-icons";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -98,7 +98,7 @@ function CommunityCard({
               onClick={() => router.push(`/dashboard/communities/${c.id}`)}
               className="flex items-center gap-1 rounded-full border border-accent/40 px-3 py-1 font-body text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
             >
-              <Check size={10} strokeWidth={2.5} />
+              <CheckmarkRegular fontSize={10} />
               Joined
             </button>
           ) : locked ? (
@@ -110,7 +110,7 @@ function CommunityCard({
                 onMouseLeave={hideTip}
                 className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
               >
-                <Lock strokeWidth={2.5} size={10} />
+                <LockClosedRegular fontSize={10} />
                 Join
               </button>
               {tipPos && typeof document !== "undefined" && createPortal(
@@ -286,14 +286,11 @@ export default function CommunitiesIndexPage() {
 
         {/* Search */}
         <div className="relative mb-4">
-          <svg
+          <SearchRegular
+            fontSize={13}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
-            width="13" height="13" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
+            aria-hidden="true"
+          />
           <input
             type="text"
             value={search}

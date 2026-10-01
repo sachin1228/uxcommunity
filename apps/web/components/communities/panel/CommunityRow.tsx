@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
-import { Pin } from "lucide-react";
+import { PinRegular } from "@fluentui/react-icons";
 import { CommunityNameBadges } from "../CommunityBadges";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
@@ -135,7 +135,7 @@ export const CommunityRow = memo(function CommunityRow({
                 title="Pinned until the event"
                 className="inline-flex shrink-0 items-center text-foreground-muted"
               >
-                <Pin strokeWidth={2.5} size={11} aria-hidden="true" />
+                <PinRegular fontSize={11} aria-hidden="true" />
               </span>
             )}
             {(c.last_message || lastContent) && !typingText && (

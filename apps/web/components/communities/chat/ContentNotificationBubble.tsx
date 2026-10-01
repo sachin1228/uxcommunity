@@ -1,25 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import {
-  CalendarDays,
-  ChevronRight,
-  Figma,
-  FileText,
-  MessageCircle,
-  Package,
-  Play,
-  Sparkles,
-  Type,
-  Users,
-  Video,
-  Wrench,
-  BookOpen,
-  Shapes,
-  Palette,
-  LayoutTemplate,
-  type LucideIcon,
-} from "lucide-react";
+import { CalendarMonthRegular, ChevronRightRegular, DocumentTextRegular, ChatRegular, BoxRegular, PlayRegular, SparkleRegular, TextFontRegular, PeopleRegular, VideoRegular, WrenchRegular, BookOpenRegular, ShapesRegular, ColorRegular, SlideLayoutRegular, type FluentIcon } from "@fluentui/react-icons";
+import { FigmaIcon } from "@/components/ui/BrandIcons";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime, formatCommenters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
@@ -50,26 +33,26 @@ interface ContentNotificationBubbleProps {
 }
 
 /** Eyebrow / fallback tile icon per content kind. */
-const KIND_ICON: Record<ContentEventKind, LucideIcon> = {
-  thread:    MessageCircle,
-  showcase:  Sparkles,
-  resource:  FileText,
-  event:     CalendarDays,
+const KIND_ICON: Record<ContentEventKind, FluentIcon> = {
+  thread:    ChatRegular,
+  showcase:  SparkleRegular,
+  resource:  DocumentTextRegular,
+  event:     CalendarMonthRegular,
 };
 
 /** Resource-type icon map — mirrors resourceTypeIcons.tsx (raw components). */
-const RESOURCE_TILE_ICON: Record<string, LucideIcon> = {
-  figma:       Figma,
-  article:     FileText,
-  tool:        Wrench,
-  video:       Play,
-  book:        BookOpen,
-  font:        Type,
-  icon_pack:   Shapes,
-  color:       Palette,
-  template:    LayoutTemplate,
-  inspiration: Sparkles,
-  other:       Package,
+const RESOURCE_TILE_ICON: Record<string, FluentIcon> = {
+  figma:       FigmaIcon,
+  article:     DocumentTextRegular,
+  tool:        WrenchRegular,
+  video:       PlayRegular,
+  book:        BookOpenRegular,
+  font:        TextFontRegular,
+  icon_pack:   ShapesRegular,
+  color:       ColorRegular,
+  template:    SlideLayoutRegular,
+  inspiration: SparkleRegular,
+  other:       BoxRegular,
 };
 
 function hrefFor(kind: ContentEventKind, communityId: string, id: string): string {
@@ -108,7 +91,7 @@ function Eyebrow({ event, isMe }: { event: CachedContentEvent; isMe: boolean }) 
       }`}
       style={{ color: isMe ? undefined : theme.accent }}
     >
-      <Icon size={12} strokeWidth={2.5} />
+      <Icon fontSize={12} />
       {resourceLabel ?? theme.label}
     </span>
   );
@@ -261,7 +244,7 @@ export function ContentNotificationBubble({
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white">
-                      <Video size={12} strokeWidth={2.5} />
+                      <VideoRegular fontSize={12} />
                     </span>
                   </div>
                 </>
@@ -273,8 +256,7 @@ export function ContentNotificationBubble({
                   }}
                 >
                   <TileIcon
-                    size={24}
-                    strokeWidth={2.5}
+                    fontSize={24}
                     style={{
                       color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
                     }}
@@ -313,7 +295,7 @@ export function ContentNotificationBubble({
                     isMe ? "text-accent-foreground/80" : "text-foreground-muted"
                   }`}
                 >
-                  <Users size={10} strokeWidth={2.5} />
+                  <PeopleRegular fontSize={10} />
                   {goingLabel}
                 </p>
               )}
@@ -321,9 +303,8 @@ export function ContentNotificationBubble({
 
             {/* Chevron affordance */}
             <div className="flex items-center pr-2.5">
-              <ChevronRight
-                size={14}
-                strokeWidth={2.5}
+              <ChevronRightRegular
+                fontSize={14}
                 className={isMe ? "text-accent-foreground/60" : "text-foreground-muted"}
               />
             </div>
@@ -343,7 +324,7 @@ export function ContentNotificationBubble({
                     : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
                 }
               >
-                <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
+                <ChatRegular fontSize={10} className="shrink-0" />
                 <span className="shrink-0 tabular-nums">{commentCount}</span>
                 {commenterNames && (
                   <span className="truncate">

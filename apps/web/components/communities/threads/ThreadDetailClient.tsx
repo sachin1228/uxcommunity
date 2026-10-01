@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { MessageSquare } from "lucide-react";
+import { CommentRegular } from "@fluentui/react-icons";
 import { BackLink } from "@/components/ui/BackLink";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
@@ -325,7 +325,7 @@ export function ThreadDetailClient({
                     onReactionToggled={handleReactionToggled}
                     emptyState={
                       <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                        <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                        <CommentRegular fontSize={22} className={communityFeedLayout.emptyIcon} />
                         <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
                       </div>
                     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Play, Square, RefreshCw, Users, Gauge, ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { PlayRegular, SquareRegular, ArrowClockwiseRegular, PeopleRegular, GaugeRegular, ChevronDownRegular, ChevronRightRegular, EyeRegular, EyeOffRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ export default function LoadTestPage() {
                     : "text-foreground-muted hover:text-foreground"
                 }`}
               >
-                {t === "test" ? <Gauge strokeWidth={2.5} size={13} /> : <Users strokeWidth={2.5} size={13} />}
+                {t === "test" ? <GaugeRegular fontSize={13} /> : <PeopleRegular fontSize={13} />}
                 {t === "test" ? "Run Test" : "Seed Users"}
               </button>
             ))}
@@ -200,7 +200,7 @@ export default function LoadTestPage() {
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
-                  <ChevronDown strokeWidth={2.5} size={12} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
+                  <ChevronDownRegular fontSize={12} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
                 </div>
                 <p className="font-body text-[11px] text-foreground-muted">
                   {SCENARIOS.find((s) => s.value === scenario)?.desc}
@@ -377,7 +377,7 @@ export default function LoadTestPage() {
                   }}
                   className="font-body text-[11px] text-accent hover:underline flex items-center gap-1"
                 >
-                  <ChevronRight strokeWidth={2.5} size={11} className="rotate-90" />
+                  <ChevronRightRegular fontSize={11} className="rotate-90" />
                   Jump to bottom
                 </button>
               )}
@@ -386,7 +386,7 @@ export default function LoadTestPage() {
                   onClick={() => setLines([])}
                   className="font-body text-[11px] text-foreground-muted hover:text-foreground flex items-center gap-1"
                 >
-                  <RefreshCw strokeWidth={2.5} size={11} />
+                  <ArrowClockwiseRegular fontSize={11} />
                   Clear
                 </button>
               )}
@@ -468,7 +468,7 @@ function PasswordField({
           className="absolute right-2.5 top-2 text-foreground-muted hover:text-foreground"
           tabIndex={-1}
         >
-          {show ? <EyeOff strokeWidth={2.5} size={12} /> : <Eye strokeWidth={2.5} size={12} />}
+          {show ? <EyeOffRegular fontSize={12} /> : <EyeRegular fontSize={12} />}
         </button>
       </div>
     </div>
@@ -485,7 +485,7 @@ function RunButton({
       onClick={onStop}
       className="flex items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 font-body text-xs font-medium text-red-400 transition hover:bg-red-500/20"
     >
-      <Square strokeWidth={2.5} size={12} />
+      <SquareRegular fontSize={12} />
       Stop
     </button>
   ) : (
@@ -493,7 +493,7 @@ function RunButton({
       onClick={onClick}
       className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-xs font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50"
     >
-      <Play strokeWidth={2.5} size={12} />
+      <PlayRegular fontSize={12} />
       {label}
     </button>
   );
