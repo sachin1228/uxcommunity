@@ -56,6 +56,8 @@ interface ResourceCardProps {
   resource: CommunityResource;
   currentUserId: string;
   communityId: string;
+  /** Owner or manager with "moderate resources" — may delete anyone's resource. */
+  canModerate?: boolean;
   onUpdated: (resource: CommunityResource) => void;
   onSaveChanged: (resourceId: string, saved: boolean, newCount: number) => void;
   onBookmarkChanged: (resourceId: string, bookmarked: boolean, newCount: number) => void;
@@ -80,6 +82,7 @@ export function ResourceCard({
   resource,
   currentUserId,
   communityId,
+  canModerate = false,
   onUpdated,
   onSaveChanged,
   onBookmarkChanged,
@@ -273,6 +276,10 @@ export function ResourceCard({
                 <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
               </button>
             </>
+          ) : canModerate ? (
+            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+              <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
+            </button>
           ) : (
             <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
               <Flag strokeWidth={2.5} size={11} />{reported ? "Reported" : "Report"}

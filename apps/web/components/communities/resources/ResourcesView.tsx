@@ -44,9 +44,12 @@ type FilterType = "all" | CommunityResource["resource_type"];
 export function ResourcesView({
   communityId,
   currentUserId,
+  canModerate = false,
 }: {
   communityId: string;
   currentUserId: string;
+  /** Owner or manager with "moderate resources" — may delete any resource. */
+  canModerate?: boolean;
 }) {
   initRequestCache(currentUserId);
   const router = useGuardedRouter();
@@ -311,6 +314,7 @@ export function ResourcesView({
                 resource={resource}
                 currentUserId={currentUserId}
                 communityId={communityId}
+                canModerate={canModerate}
                 onUpdated={handleUpdated}
                 onSaveChanged={handleSaveChanged}
                 onBookmarkChanged={handleBookmarkChanged}

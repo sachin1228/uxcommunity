@@ -10,7 +10,7 @@ import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
 import { ContentNotificationBubble } from "./ContentNotificationBubble";
 import { fmtDate } from "./chatUtils";
 import { CommunityDp } from "../CommunityDp";
-import type { CachedMessage, CachedContentEvent, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
+import type { CachedMessage, CachedContentEvent, CachedThreadEvent, MessageDeletedByRole, MessageReaction } from "@/lib/communities/cache";
 
 type Message = CachedMessage;
 
@@ -63,6 +63,8 @@ interface MessageListProps {
   highlightedMsgId: string | null;
   /** Moderator (owner/admin with delete permission) may delete other members' messages. */
   canModerateMessages?: boolean;
+  /** Viewer's managing role, named in the moderated-delete label. */
+  moderationRole?: MessageDeletedByRole | null;
   onReplyClick: (replyId: string) => void;
   onCancelSend: (msgId: string) => void;
   onRetrySend: (msgId: string) => void;
@@ -74,7 +76,7 @@ interface MessageListProps {
   onContentReply?: (event: CachedContentEvent) => void;
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
-  onDelete: (msgId: string) => void;
+  onDelete: (msgId: string, removedByRole: MessageDeletedByRole | null) => void;
   /** Opens the full-screen image viewer for a chat image URL. */
   onImageClick: (url: string) => void;
 }
@@ -106,6 +108,7 @@ export const MessageList = memo(function MessageList({
   communityId,
   highlightedMsgId,
   canModerateMessages = false,
+  moderationRole = null,
   onReplyClick,
   onCancelSend,
   onRetrySend,
@@ -408,6 +411,7 @@ export const MessageList = memo(function MessageList({
                   onDelete={onDelete}
                   onImageClick={onImageClick}
                   canModerate={canModerateMessages && !isMe}
+                  moderationRole={moderationRole}
                   animate={animateIdsRef.current.has(msg.id)}
                 />
               );

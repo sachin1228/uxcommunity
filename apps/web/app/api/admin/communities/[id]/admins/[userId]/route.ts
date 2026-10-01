@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { logCommunityActivity, type CommunityPermissions } from "@/lib/communities/manager-role";
-
-const PERMISSION_KEYS = [
-  "can_edit_settings",
-  "can_manage_members",
-  "can_delete_messages",
-] as const;
+import { logCommunityActivity } from "@/lib/communities/manager-role";
+import {
+  ALL_COMMUNITY_PERMISSIONS,
+  applyCommunityPermissionPatch,
+  type CommunityPermissions,
+} from "@/lib/communities/permissions";
 
 /**
  * PATCH /api/admin/communities/[id]/admins/[userId]
- * Body: { permissions: { can_edit_settings?: boolean, can_manage_members?: boolean, can_delete_messages?: boolean } }
+ * Body: { permissions: { <any subset of the permission toggles>: boolean } }
+ * Partial bodies are accepted — untouched toggles keep their stored value.
  */
 export async function PATCH(
   req: NextRequest,
@@ -20,26 +20,8 @@ export async function PATCH(
   try { await requireSession("admin"); } catch (e) { return e as Response; }
   const { id, userId } = await params;
 
-  let body: { permissions?: Record<string, unknown> };
+  let body: { permissions?: unknown };
   try { body = await req.json(); } catch { body = {}; }
-  const incoming = body.permissions ?? {};
-
-  const permissions: CommunityPermissions = {
-    can_edit_settings:
-      typeof incoming.can_edit_settings === "boolean"
-        ? incoming.can_edit_settings
-        : false,
-    can_manage_members:
-      typeof incoming.can_manage_members === "boolean"
-        ? incoming.can_manage_members
-        : false,
-    can_delete_messages:
-      typeof incoming.can_delete_messages === "boolean"
-        ? incoming.can_delete_messages
-        : false,
-  };
-  // Accept partial bodies — untouched toggles keep their current value.
-  const untouched = PERMISSION_KEYS.filter((key) => !(key in incoming));
 
   const db = createServiceClient();
 
@@ -53,7 +35,9 @@ export async function PATCH(
       .maybeSingle(),
     db
       .from("community_admin_permissions")
-      .select("can_edit_settings, can_manage_members, can_delete_messages")
+      .select(
+        "can_edit_settings, can_manage_members, can_delete_messages, can_moderate_threads, can_moderate_showcase, can_moderate_resources, can_moderate_events",
+      )
       .eq("community_id", id)
       .eq("user_id", userId)
       .maybeSingle(),
@@ -66,18 +50,26 @@ export async function PATCH(
     return NextResponse.json({ error: "This user is not an admin of this community." }, { status: 404 });
   }
 
-  // Fill in untouched keys from the stored row (defaults when absent).
-  if (untouched.length) {
-    const current = existingPerms
-      ? {
-          can_edit_settings: existingPerms.can_edit_settings,
-          can_manage_members: existingPerms.can_manage_members,
-          can_delete_messages: existingPerms.can_delete_messages,
-        }
-      : undefined;
-    for (const key of untouched) {
-      permissions[key] = current?.[key] ?? true;
-    }
+  // Untouched toggles keep the stored row (defaults to everything-on when no
+  // row exists, matching the promote flow).
+  const base: CommunityPermissions = existingPerms
+    ? {
+        can_edit_settings: existingPerms.can_edit_settings,
+        can_manage_members: existingPerms.can_manage_members,
+        can_delete_messages: existingPerms.can_delete_messages,
+        can_moderate_threads: existingPerms.can_moderate_threads,
+        can_moderate_showcase: existingPerms.can_moderate_showcase,
+        can_moderate_resources: existingPerms.can_moderate_resources,
+        can_moderate_events: existingPerms.can_moderate_events,
+      }
+    : ALL_COMMUNITY_PERMISSIONS;
+
+  const permissions = applyCommunityPermissionPatch(base, body.permissions ?? {});
+  if (!permissions) {
+    return NextResponse.json(
+      { error: "permissions must be an object with boolean toggles." },
+      { status: 422 },
+    );
   }
 
   const { error } = await db
@@ -86,9 +78,7 @@ export async function PATCH(
       {
         community_id: id,
         user_id: userId,
-        can_edit_settings: permissions.can_edit_settings,
-        can_manage_members: permissions.can_manage_members,
-        can_delete_messages: permissions.can_delete_messages,
+        ...permissions,
       },
       { onConflict: "community_id,user_id" },
     );

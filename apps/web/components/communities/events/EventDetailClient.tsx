@@ -40,6 +40,8 @@ interface Props {
   /** When provided, renders a back link above the event (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
+  /** Community moderator with event permissions — can delete others' events. */
+  canModerate?: boolean;
 }
 
 export function EventDetailClient({
@@ -60,6 +62,7 @@ export function EventDetailClient({
   chatCommunityJoined = false,
   backHref,
   backLabel = "Home",
+  canModerate = false,
 }: Props) {
   const router = useGuardedRouter();
   const [event, setEvent] = useState(initialEvent);
@@ -163,6 +166,7 @@ export function EventDetailClient({
               communityName={showCommunityAttribution ? communityName : undefined}
               communityImage={communityImage}
               communityPreviewModal={communityPreviewModal}
+              canModerate={canModerate}
               onUpdated={setEvent}
               onDeleted={() => {
                 invalidateRequest(commentsUrl, currentUserId);

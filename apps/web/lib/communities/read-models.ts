@@ -2,11 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
-import {
-  ALL_COMMUNITY_PERMISSIONS,
-  NO_COMMUNITY_PERMISSIONS,
-  type CommunityPermissions,
-} from "./manager-role";
+import { loadCommunityPermissions, resolveCommunityRole } from "./manager-role";
 import {
   getExperienceLevelNameMap,
   getMasterNameMap,
@@ -80,7 +76,8 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   if (communityError || !community) return { ok: false, status: 404, error: "Community not found." };
 
   // Resolve the caller's community role + effective permissions (owners hold
-  // every capability; platform-appointed admins hold their configured grants).
+  // every capability; platform-appointed admins and owner-appointed moderators
+  // hold their configured grants).
   // An event group chat's DP wears its event's date, and says LIVE while the
   // event is under way (see DpWithEventDate), so the header knows both the day
   // the room is for and the deadline it stops being live at. Read only for
@@ -92,26 +89,8 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     ? await loadEventRoomMeta(db, communityId).catch(() => null)
     : null;
 
-  const isOwner = community.owner_id === userId || membership.role === "owner";
-  const currentUserRole = isOwner ? "owner" : (membership.role === "admin" ? "admin" : "member");
-  let currentUserPermissions: CommunityPermissions = NO_COMMUNITY_PERMISSIONS;
-  if (currentUserRole === "admin") {
-    const { data: perms } = await db
-      .from("community_admin_permissions")
-      .select("can_edit_settings, can_manage_members, can_delete_messages")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    currentUserPermissions = perms
-      ? {
-          can_edit_settings: perms.can_edit_settings,
-          can_manage_members: perms.can_manage_members,
-          can_delete_messages: perms.can_delete_messages,
-        }
-      : ALL_COMMUNITY_PERMISSIONS;
-  } else if (currentUserRole === "owner") {
-    currentUserPermissions = ALL_COMMUNITY_PERMISSIONS;
-  }
+  const currentUserRole = resolveCommunityRole(community.owner_id, membership.role, userId);
+  const currentUserPermissions = await loadCommunityPermissions(db, communityId, userId, currentUserRole);
 
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
   const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows }] = await Promise.all([

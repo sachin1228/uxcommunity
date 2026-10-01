@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import type { CommunityActivityEntry } from "./communityTypes";
-import { actorInitials, actorLabel, describeActivity, fmtActivityTime } from "./communityActivity";
+import {
+  actorInitials,
+  actorLabel,
+  describeActivity,
+  fmtActivityTime,
+  type CommunityActivityEntry,
+} from "@/lib/communities/activity";
 
 interface Props {
   communityId: string;
@@ -16,6 +21,7 @@ interface Props {
 const ROLE_CHIP: Record<CommunityActivityEntry["actor_role"], string> = {
   platform: "bg-surface-raised text-foreground-muted border-border",
   admin: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  moderator: "bg-sky-500/10 text-sky-400 border-sky-500/20",
   owner: "bg-accent/10 text-accent border-accent/20",
 };
 
@@ -105,7 +111,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-border/70">
+        <div className="divide-y divide-border">
           {visible.map((entry) => {
             const isPlatform = entry.actor_role === "platform";
             return (
@@ -128,6 +134,9 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
                     {fmtActivityTime(entry.created_at)}
                     {!isPlatform && entry.actor_role === "admin" && (
                       <span className="ml-1.5 uppercase tracking-wider text-[9px] text-amber-500/70">admin</span>
+                    )}
+                    {!isPlatform && entry.actor_role === "moderator" && (
+                      <span className="ml-1.5 uppercase tracking-wider text-[9px] text-sky-400/70">moderator</span>
                     )}
                     {!isPlatform && entry.actor_role === "owner" && (
                       <span className="ml-1.5 uppercase tracking-wider text-[9px] text-accent/70">owner</span>

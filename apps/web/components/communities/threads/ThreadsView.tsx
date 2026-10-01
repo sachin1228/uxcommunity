@@ -34,11 +34,14 @@ const THREAD_PAGE_SIZE = 50;
 export function ThreadsView({
   communityId,
   currentUserId,
+  canModerate = false,
   onThreadCreated,
   onThreadDeleted,
 }: {
   communityId: string;
   currentUserId: string;
+  /** Owner or manager with "moderate threads" — may delete any thread. */
+  canModerate?: boolean;
   onThreadCreated?: (thread: CommunityThread) => void;
   onThreadDeleted?: (threadId: string) => void;
 }) {
@@ -362,6 +365,7 @@ export function ThreadsView({
                   thread={thread}
                   currentUserId={currentUserId}
                   communityId={communityId}
+                  canModerate={canModerate}
                   onUpdated={handleUpdated}
                   onLikeChanged={handleLikeChanged}
                   onSaveChanged={handleSaveChanged}

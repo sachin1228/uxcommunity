@@ -5,7 +5,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
-import type { CachedContentEvent, CachedMessage, CachedThreadEvent, ContentEventKind, MessageMention, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedContentEvent, CachedMessage, CachedThreadEvent, ContentEventKind, MessageDeletedByRole, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { applyContentCommentCount, pickOptimisticMatch } from "./chatUtils";
@@ -317,13 +317,24 @@ export function useRealtimeChat({
         const updated = data as {
           id: string;
           deleted_at: string | null;
+          deleted_by?: string | null;
+          deleted_by_role?: MessageDeletedByRole | null;
         };
         if (!updated.deleted_at) return;
         setMessages((prev) => {
           if (!prev.some((m) => m.id === updated.id)) return prev;
           const next = prev.map((m) =>
             m.id === updated.id
-              ? { ...m, deleted_at: updated.deleted_at, content: "", image_url: null, reply_to: null, reactions: [] }
+              ? {
+                  ...m,
+                  deleted_at: updated.deleted_at,
+                  deleted_by: updated.deleted_by ?? null,
+                  deleted_by_role: updated.deleted_by_role ?? null,
+                  content: "",
+                  image_url: null,
+                  reply_to: null,
+                  reactions: [],
+                }
               : m
           );
           msgCache.set(communityId, next);

@@ -11,8 +11,15 @@ import {
   normalizeTags,
 } from "@/lib/communities/thread-body";
 import { isPublicContentScope } from "@/lib/content-scope";
+import {
+  loadCommunityPermissionCheck,
+  logCommunityActivity,
+  managerActorRole,
+  type CommunityManagerStatus,
+} from "@/lib/communities/manager-role";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
 
 async function enrichThread(
   db: ReturnType<typeof createServiceClient>,
@@ -191,17 +198,31 @@ export async function DELETE(
 
   let existingQuery = db
     .from("community_threads")
-    .select("id, user_id, community_id")
+    .select("id, user_id, community_id, title")
     .eq("id", threadId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
     : existingQuery.eq("community_id", communityId);
   const { data: existing } = (await existingQuery.maybeSingle()) as unknown as {
-    data: { id: string; user_id: string; community_id: string | null } | null;
+    data: { id: string; user_id: string; community_id: string | null; title: string | null } | null;
   };
 
   if (!existing) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
-  if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
+
+  // Authors delete their own threads; community managers holding the
+  // "moderate threads" permission may delete anyone's. Public-scope content
+  // lives outside any community, so only its author can delete it.
+  const isOwn = existing.user_id === userId;
+  let moderator: CommunityManagerStatus | null = null;
+  if (!isOwn) {
+    const check = publicScope
+      ? { allowed: false, status: null }
+      : await loadCommunityPermissionCheck(db, communityId, userId, "can_moderate_threads");
+    if (!check.allowed) {
+      return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
+    }
+    moderator = check.status;
+  }
 
   const { data: threadRow } = await db
     .from("community_threads")
@@ -211,6 +232,32 @@ export async function DELETE(
 
   const { error } = await db.from("community_threads").delete().eq("id", threadId);
   if (error) { console.error("[DELETE thread]", error); return NextResponse.json({ error: "Failed to delete thread." }, { status: 500 }); }
+
+  // Audit trail for moderated deletions of other members' threads, plus a
+  // removal notice to the author. The title rides in the notice body so the
+  // author sees what was taken down.
+  if (!isOwn && moderator) {
+    const actorRole = managerActorRole(moderator);
+    await logCommunityActivity(db, {
+      communityId,
+      actorId: userId,
+      actorRole,
+      action: "thread_deleted",
+      targetUserId: existing.user_id,
+      details: { thread_id: threadId },
+    });
+    deferNotification({
+      userId: existing.user_id,
+      actorId: userId,
+      communityId,
+      type: "thread_deleted",
+      entityType: "thread",
+      entityId: threadId,
+      title: () => managerRemovalNotice(actorRole, "thread"),
+      body: existing.title,
+      href: communityHref(communityId),
+    });
+  }
 
   const attachments = Array.isArray(threadRow?.attachments) ? threadRow.attachments as Array<{ url?: string }> : [];
   for (const attachment of attachments) {

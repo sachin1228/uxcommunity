@@ -198,6 +198,8 @@ interface EventCardProps {
   event: CommunityEvent;
   currentUserId: string;
   communityId: string;
+  /** Owner or manager with "moderate events" — may delete anyone's event. */
+  canModerate?: boolean;
   onUpdated: (event: CommunityEvent) => void;
   onDeleted: (eventId: string) => void;
   onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void;
@@ -240,6 +242,7 @@ export function EventCard({
   event,
   currentUserId,
   communityId,
+  canModerate = false,
   onUpdated,
   onDeleted,
   onRsvpChanged,
@@ -724,7 +727,8 @@ export function EventCard({
             saved={saved}
             shared={shared}
             reported={reported}
-            isOwner={isOwner}
+            canEdit={isOwner}
+            canDelete={isOwner || canModerate}
             past={past}
             deleting={deleting}
             saving={savePending}

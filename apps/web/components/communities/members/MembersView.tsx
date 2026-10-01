@@ -5,8 +5,13 @@ import { Check, ClipboardList, MoreHorizontal, Search, Users, X } from "lucide-r
 import { EVENT_JOIN_QUESTIONS } from "@/lib/communities/event-join-questions";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { Spinner } from "@/components/ui/Spinner";
-import { fetchJsonCached, getCachedRequest } from "@/lib/request-cache";
+import { ModeratorPermissionsModal } from "./ModeratorPermissionsModal";
+import { fetchJsonCached, getCachedRequest, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import {
+  NO_COMMUNITY_PERMISSIONS,
+  type CommunityPermissions,
+} from "@/lib/communities/permissions";
 
 interface CommunityMember {
   user_id:     string;
@@ -15,6 +20,8 @@ interface CommunityMember {
   designation: string | null;
   joined_at:   string;
   role:        string;
+  /** Effective grants — sent for moderator rows when the caller is the owner. */
+  permissions?: CommunityPermissions | null;
 }
 
 interface PendingRequest {
@@ -41,7 +48,7 @@ interface MembersViewProps {
   communityId: string;
   currentUserId: string;
   isOwner?:    boolean;
-  /** Owner or admin granted "manage members" — may remove members & decide requests. */
+  /** Owner or manager granted "manage members" — may remove members & decide requests. */
   canManageMembers?: boolean;
   isPrivate?:  boolean;
   /** Event group chats record each member's answers to the host's join questions. */
@@ -64,7 +71,8 @@ function timeAgo(iso: string): string {
 }
 
 export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, isPrivate = false, isEventChat = false }: MembersViewProps) {
-  // Owners can do everything; admins act within their granted permissions.
+  // Owners can do everything; moderators/admins act within their granted
+  // permissions. Only the owner appoints or edits moderators.
   const manager = isOwner || canManageMembers;
   const requestUrl = `/api/communities/${communityId}/members?page=0`;
   const hydrated = getCachedRequest<{ members?: CommunityMember[]; has_more?: boolean }>(requestUrl, currentUserId);
@@ -94,6 +102,12 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
   // fire the same mutation twice. Cleared on success and on failure.
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
   const menuRef = useRef<HTMLUListElement>(null);
+
+  // Moderator permissions modal (owner only): the member + mode it is open for.
+  const [moderatorModalFor, setModeratorModalFor] = useState<CommunityMember | null>(null);
+  const [moderatorModalMode, setModeratorModalMode] = useState<"promote" | "edit">("promote");
+  const [moderatorSaving, setModeratorSaving] = useState(false);
+  const [moderatorError, setModeratorError] = useState<string | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const abortRef    = useRef<AbortController | null>(null);
@@ -276,8 +290,77 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
     if (res.ok) setMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
+  /**
+   * Rewrites one row in the list and both caches it paints from (the module
+   * cache + the hydrated page-0 request cache), so a tab switch right after a
+   * role change never shows the old badge.
+   */
+  function applyMemberUpdate(userId: string, patch: Partial<CommunityMember>) {
+    setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, ...patch } : m)));
+    const cached = membersCache.get(communityId);
+    if (cached) {
+      membersCache.set(communityId, {
+        ...cached,
+        data: cached.data.map((m) => (m.user_id === userId ? { ...m, ...patch } : m)),
+      });
+    }
+    patchCachedRequest<{ members?: CommunityMember[]; has_more?: boolean }>(
+      requestUrl,
+      (current) =>
+        current && Array.isArray(current.members)
+          ? { ...current, members: current.members.map((m) => (m.user_id === userId ? { ...m, ...patch } : m)) }
+          : current,
+      currentUserId,
+    );
+  }
+
+  function openModeratorModal(member: CommunityMember, mode: "promote" | "edit") {
+    setOpenMenuFor(null);
+    setModeratorError(null);
+    setModeratorModalMode(mode);
+    setModeratorModalFor(member);
+  }
+
+  async function handleSaveModerator(permissions: CommunityPermissions) {
+    if (!moderatorModalFor || moderatorSaving) return;
+    setModeratorSaving(true);
+    setModeratorError(null);
+    try {
+      const res = await dedupeFetch(`/api/communities/${communityId}/members/${moderatorModalFor.user_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "moderator", permissions }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setModeratorError(data?.error ?? "Failed to save permissions. Try again.");
+        return;
+      }
+      const saved: CommunityPermissions = data?.member?.permissions ?? permissions;
+      applyMemberUpdate(moderatorModalFor.user_id, { role: "moderator", permissions: saved });
+      setModeratorModalFor(null);
+    } catch {
+      setModeratorError("Network error. Try again.");
+    } finally {
+      setModeratorSaving(false);
+    }
+  }
+
+  async function handleDismissModerator(member: CommunityMember) {
+    setOpenMenuFor(null);
+    const res = await dedupeFetch(`/api/communities/${communityId}/members/${member.user_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "member" }),
+    });
+    if (res.ok) {
+      applyMemberUpdate(member.user_id, { role: "member", permissions: null });
+    }
+  }
+
   const orderedMembers = [...members].sort((a, b) => {
-    const roleRank = (role: string) => role === "owner" ? 0 : role === "admin" ? 1 : 2;
+    const roleRank = (role: string) =>
+      role === "owner" ? 0 : role === "admin" ? 1 : role === "moderator" ? 2 : 3;
     return roleRank(a.role) - roleRank(b.role);
   });
 
@@ -376,14 +459,23 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             )}
             <ul className="px-3 py-2" ref={manager ? menuRef : undefined}>
               {orderedMembers.map((member) => {
-                const isOwnerRow  = member.role === "owner";
-                const isAdminRow  = member.role === "admin";
-                // Owners may remove anyone except other owners / themselves.
-                // Admins may remove regular members only (never other admins).
+                const isOwnerRow     = member.role === "owner";
+                const isAdminRow     = member.role === "admin";
+                const isModeratorRow = member.role === "moderator";
+                // Managers can remove regular members; only the owner may
+                // remove another moderator or an admin. Never yourself or the
+                // owner.
                 const canRemoveRow =
                   member.user_id !== currentUserId &&
                   !isOwnerRow &&
-                  !(isAdminRow && !isOwner);
+                  !((isAdminRow || isModeratorRow) && !isOwner);
+                // Only the owner appoints moderators, edits their permissions
+                // and dismisses them. Platform-managed admins are off limits.
+                const canModerateRow =
+                  isOwner &&
+                  member.user_id !== currentUserId &&
+                  !isOwnerRow &&
+                  !isAdminRow;
                 return (
                   <Fragment key={member.user_id}>
                   <li
@@ -403,6 +495,10 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
                             Admin
                           </span>
+                        ) : isModeratorRow ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
+                            Moderator
+                          </span>
                         ) : null}
                       </div>
                       {member.designation && (
@@ -411,8 +507,9 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         </span>
                       )}
                     </div>
-                    {/* Remove button — managers only, protected rows excluded */}
-                    {manager && canRemoveRow && (
+                    {/* Row menu — managers only; each action checks its own
+                        protected rows (see canRemoveRow / canModerateRow). */}
+                    {manager && (canRemoveRow || canModerateRow) && (
                       <div className="relative shrink-0">
                         <button
                           type="button"
@@ -423,14 +520,46 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                           <MoreHorizontal strokeWidth={2.5} size={14} />
                         </button>
                         {openMenuFor === member.user_id && (
-                          <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveMember(member.user_id)}
-                              className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
-                            >
-                              Remove from community
-                            </button>
+                          <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-48 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                            {canModerateRow && !isModeratorRow && (
+                              <button
+                                type="button"
+                                onClick={() => openModeratorModal(member, "promote")}
+                                className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-surface transition-colors"
+                              >
+                                Make moderator
+                              </button>
+                            )}
+                            {canModerateRow && isModeratorRow && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openModeratorModal(member, "edit")}
+                                  className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-surface transition-colors"
+                                >
+                                  Moderator permissions
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDismissModerator(member)}
+                                  className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-foreground-muted hover:bg-surface hover:text-foreground transition-colors"
+                                >
+                                  Dismiss as moderator
+                                </button>
+                              </>
+                            )}
+                            {canRemoveRow && (
+                              <>
+                                {canModerateRow && <div className="my-1 h-px bg-white/[0.08]" />}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMember(member.user_id)}
+                                  className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                                >
+                                  Remove from community
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -503,6 +632,24 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
           </>
         )}
       </div>
+
+      {moderatorModalFor !== null && (
+        <ModeratorPermissionsModal
+          key={`${moderatorModalFor.user_id}:${moderatorModalMode}`}
+          open
+          onClose={() => { setModeratorModalFor(null); setModeratorError(null); }}
+          member={moderatorModalFor}
+          mode={moderatorModalMode}
+          initialPermissions={
+            moderatorModalMode === "edit"
+              ? (moderatorModalFor.permissions ?? NO_COMMUNITY_PERMISSIONS)
+              : undefined
+          }
+          saving={moderatorSaving}
+          error={moderatorError}
+          onSave={handleSaveModerator}
+        />
+      )}
     </div>
   );
 }

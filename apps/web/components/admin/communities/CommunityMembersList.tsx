@@ -164,7 +164,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
           No members match “{query.trim()}”.
         </p>
       ) : hasQuery && visibleRows ? (
-        <div className="divide-y divide-border/70">
+        <div className="divide-y divide-border">
           {visibleRows.map((m) => (
             <div
               key={m.user_id}
@@ -191,7 +191,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
       ) : members.length === 0 ? (
         <p className="px-5 py-6 font-body text-xs text-foreground-muted">No members yet.</p>
       ) : (
-        <div className="divide-y divide-border/70">
+        <div className="divide-y divide-border">
           {members.map((m) => (
             <div
               key={m.id}
@@ -218,7 +218,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
       )}
 
       {hasQuery && visibleRows && hasMore && (
-        <div className="border-t border-border/70 px-5 py-3">
+        <div className="border-t border-border px-5 py-3">
           <button
             onClick={loadMore}
             disabled={busy}

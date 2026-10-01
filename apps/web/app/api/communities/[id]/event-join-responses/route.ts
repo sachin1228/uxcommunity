@@ -8,10 +8,10 @@ import { loadEventJoinResponses } from "@/lib/communities/event-join-responses";
  * GET /api/communities/[id]/event-join-responses
  *
  * Every member's recorded answers to the event's compulsory join questions.
- * Hosts only: the owner, or an admin granted "manage members" — the same rule
- * the members tab's management actions follow. A community that is not an
- * event's group chat answers with an empty list rather than an error, so the
- * tab can skip the section outright.
+ * Managers only: the owner, or an admin/moderator granted "manage members" —
+ * the same rule the members tab's management actions follow. A community that
+ * is not an event's group chat answers with an empty list rather than an
+ * error, so the tab can skip the section outright.
  */
 export async function GET(
   _req: Request,
@@ -26,11 +26,8 @@ export async function GET(
   // Verify caller is a manager with member-management rights
   const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
   if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  const canSeeResponses =
-    managerStatus.isOwner ||
-    (managerStatus.role === "admin" && managerStatus.permissions.can_manage_members);
-  if (!canSeeResponses) {
-    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  if (!managerStatus.isOwner && !managerStatus.permissions.can_manage_members) {
+    return NextResponse.json({ error: "You don't have permission to manage members." }, { status: 403 });
   }
 
   const responses = await loadEventJoinResponses(db, communityId);

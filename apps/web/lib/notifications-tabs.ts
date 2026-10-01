@@ -30,9 +30,10 @@ const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
  *   comment/reply anywhere in the thread under what they posted.
  * - `events` — everything about the user's events: RSVPs plus the
  *   comments/replies posted on them.
- * - `other` — intentionally EMPTY. The tab is a visible placeholder; add the
- *   types that belong in it here (and update the tab's empty-state copy in
- *   NotificationsView) to populate it.
+ * - `other` — manager removals: a community owner/admin/moderator deleted
+ *   the user's content (the routes that log thread_deleted & co. also send
+ *   the author a notification). Add any further types here; update the
+ *   tab's empty-state copy in NotificationsView to match.
  *
  * Nothing renders until a tab claims its type, so an unlisted type stays
  * invisible rather than leaking into a tab that did not ask for it.
@@ -46,7 +47,12 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "resource_reply",
   ]),
   events: EVENT_TYPES,
-  other: new Set(),
+  other: new Set([
+    "thread_deleted",
+    "showcase_deleted",
+    "resource_deleted",
+    "event_deleted",
+  ]),
 };
 
 /** The tab a type renders under, or null while no tab claims it yet. */

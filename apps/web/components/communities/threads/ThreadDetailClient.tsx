@@ -30,6 +30,8 @@ interface Props {
   communityId: string;
   communityName: string;
   communityImage?: string | null;
+  /** Owner or manager with "moderate threads" — may delete anyone's thread. */
+  canModerate?: boolean;
   showCommunityAttribution?: boolean;
   /** Opens the "posted in" label's community preview popup in place (modal). */
   communityPreviewModal?: boolean;
@@ -47,6 +49,7 @@ export function ThreadDetailClient({
   communityId,
   communityName,
   communityImage,
+  canModerate = false,
   showCommunityAttribution = false,
   communityPreviewModal = false,
   backHref,
@@ -295,6 +298,7 @@ export function ThreadDetailClient({
               thread={thread}
               currentUserId={currentUserId}
               communityId={communityId}
+              canModerate={canModerate}
               communityName={showCommunityAttribution ? communityName : undefined}
               communityImage={showCommunityAttribution ? communityImage : undefined}
               communityNamePlacement="below"

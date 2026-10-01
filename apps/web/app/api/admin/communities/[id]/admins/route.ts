@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { ALL_COMMUNITY_PERMISSIONS, logCommunityActivity } from "@/lib/communities/manager-role";
+import { ALL_COMMUNITY_PERMISSIONS } from "@/lib/communities/permissions";
+import { logCommunityActivity } from "@/lib/communities/manager-role";
 
 /**
  * GET /api/admin/communities/[id]/admins
@@ -27,7 +28,7 @@ export async function GET(
       .order("joined_at", { ascending: true }),
     db
       .from("community_admin_permissions")
-      .select("community_id, user_id, can_edit_settings, can_manage_members, can_delete_messages, granted_at, granted_by, updated_at")
+      .select("community_id, user_id, can_edit_settings, can_manage_members, can_delete_messages, can_moderate_threads, can_moderate_showcase, can_moderate_resources, can_moderate_events, granted_at, granted_by, updated_at")
       .eq("community_id", id),
   ]);
 
@@ -59,6 +60,10 @@ export async function GET(
           can_edit_settings: perms?.can_edit_settings ?? ALL_COMMUNITY_PERMISSIONS.can_edit_settings,
           can_manage_members: perms?.can_manage_members ?? ALL_COMMUNITY_PERMISSIONS.can_manage_members,
           can_delete_messages: perms?.can_delete_messages ?? ALL_COMMUNITY_PERMISSIONS.can_delete_messages,
+          can_moderate_threads: perms?.can_moderate_threads ?? ALL_COMMUNITY_PERMISSIONS.can_moderate_threads,
+          can_moderate_showcase: perms?.can_moderate_showcase ?? ALL_COMMUNITY_PERMISSIONS.can_moderate_showcase,
+          can_moderate_resources: perms?.can_moderate_resources ?? ALL_COMMUNITY_PERMISSIONS.can_moderate_resources,
+          can_moderate_events: perms?.can_moderate_events ?? ALL_COMMUNITY_PERMISSIONS.can_moderate_events,
         },
         granted_at: perms?.granted_at ?? m.joined_at,
         updated_at: perms?.updated_at ?? null,

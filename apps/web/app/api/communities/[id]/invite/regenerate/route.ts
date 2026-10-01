@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
+import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
 
 /**
  * POST /api/communities/[id]/invite/regenerate
- * Regenerate the invite token. Owner or admin with "edit community settings".
+ * Regenerate the invite token. Owner or manager with "edit community settings".
  */
 export async function POST(
   _req: NextRequest,
@@ -29,12 +29,9 @@ export async function POST(
 
   const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
   if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  const canRegenerate =
-    managerStatus.isOwner ||
-    (managerStatus.role === "admin" && managerStatus.permissions.can_edit_settings);
-  if (!canRegenerate) {
+  if (!managerStatus.isOwner && !managerStatus.permissions.can_edit_settings) {
     return NextResponse.json(
-      { error: "Owner or community admin only." },
+      { error: "You don't have permission to edit community settings." },
       { status: 403 },
     );
   }
@@ -48,12 +45,10 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: "Failed to regenerate link." }, { status: 500 });
 
-  const { data: actor } = await db.from("users").select("name").eq("id", userId).maybeSingle();
   await logCommunityActivity(db, {
     communityId,
     actorId: userId,
-    actorRole: managerStatus.isOwner ? "owner" : "admin",
-    actorName: actor?.name ?? null,
+    actorRole: managerActorRole(managerStatus),
     action: "invite_link_regenerated",
   });
 

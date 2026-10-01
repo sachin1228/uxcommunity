@@ -29,9 +29,11 @@ interface Props {
   /** When provided, renders a back link above the resource (e.g. community tab context). */
   backHref?: string;
   backLabel?: string;
+  /** Community moderator with resource permissions — can delete others' resources. */
+  canModerate?: boolean;
 }
 
-export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, communityPreviewModal = false, backHref, backLabel = "Resources" }: Props) {
+export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, communityPreviewModal = false, backHref, backLabel = "Resources", canModerate = false }: Props) {
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
@@ -123,6 +125,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
             communityName={showCommunityAttribution ? communityName : undefined}
             communityImage={communityImage}
             communityPreviewModal={communityPreviewModal}
+            canModerate={canModerate}
             onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
             onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
             onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}

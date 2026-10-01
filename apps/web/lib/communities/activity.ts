@@ -1,10 +1,34 @@
 import { nameInitials } from "@/lib/avatar";
-import type { CommunityActivityEntry } from "./communityTypes";
+
+/**
+ * One row of a community's management audit trail (`community_admin_activity`),
+ * as both the platform admin dashboard and the in-community owner Activity tab
+ * receive it. Actor/target names are snapshotted at write time, so the feed
+ * renders without joins.
+ */
+export interface CommunityActivityEntry {
+  id: string;
+  community_id: string;
+  actor_id: string | null;
+  actor_role: "owner" | "admin" | "moderator" | "platform";
+  actor_name: string | null;
+  /** Attached by each API from designer_profiles — the audit row only snapshots the name. */
+  actor_avatar_url?: string | null;
+  action: string;
+  target_user_id: string | null;
+  /** The acted-upon member's current name, attached by the API from target_user_id. */
+  target_user_name?: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
 
 /** Human-readable copy for each recorded management action. */
 export function describeActivity(entry: CommunityActivityEntry): string {
   const d = entry.details ?? {};
   const target = (v: unknown) => (typeof v === "string" ? v : null);
+  // The member a row acts upon: the write-time name snapshot when the action
+  // stored one, else the current name the API resolved from target_user_id.
+  const actedOn = target(d.member_name) ?? entry.target_user_name ?? "a member";
 
   switch (entry.action) {
     case "admin_promoted":
@@ -13,6 +37,12 @@ export function describeActivity(entry: CommunityActivityEntry): string {
       return `removed ${target(d.admin_name) ?? "an admin"}'s admin rights`;
     case "admin_permissions_updated":
       return `changed ${target(d.admin_name) ?? "an admin"}'s permissions`;
+    case "moderator_promoted":
+      return `made ${target(d.member_name) ?? "a member"} a moderator`;
+    case "moderator_dismissed":
+      return `removed ${target(d.member_name) ?? "a moderator"}'s moderator role`;
+    case "moderator_permissions_updated":
+      return `changed ${target(d.member_name) ?? "a moderator"}'s moderator permissions`;
     case "member_removed":
       return `removed ${target(d.member_name) ?? "a member"} from the community`;
     case "join_request_accepted":
@@ -30,7 +60,15 @@ export function describeActivity(entry: CommunityActivityEntry): string {
     case "invite_link_regenerated":
       return "regenerated the invite link";
     case "message_deleted":
-      return "deleted a member's chat message";
+      return `deleted ${actedOn}'s chat message`;
+    case "thread_deleted":
+      return `deleted ${actedOn}'s thread`;
+    case "showcase_deleted":
+      return `deleted ${actedOn}'s showcase post`;
+    case "resource_deleted":
+      return `deleted ${actedOn}'s resource`;
+    case "event_deleted":
+      return `deleted ${actedOn}'s event`;
     default:
       return entry.action.replace(/_/g, " ");
   }

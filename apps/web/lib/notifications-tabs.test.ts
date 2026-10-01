@@ -31,6 +31,10 @@ const ALL_TYPES: NotificationType[] = [
   "event_comment",
   "event_reply",
   "event_rsvp",
+  "thread_deleted",
+  "showcase_deleted",
+  "resource_deleted",
+  "event_deleted",
 ];
 
 test("every generated notification type lands in a tab", () => {
@@ -57,16 +61,26 @@ test("all event types render under the events tab", () => {
   }
 });
 
-// The Other tab is a static placeholder: it claims no types yet, so a type it
-// is not given stays invisible instead of leaking into the first tab.
-test("the Other tab renders nothing until it claims a type", () => {
+// The Other tab renders manager removals of the user's content; a type it is
+// not given stays invisible instead of leaking into another tab.
+test("content-removal notices render under the Other tab", () => {
+  for (const type of [
+    "thread_deleted",
+    "showcase_deleted",
+    "resource_deleted",
+    "event_deleted",
+  ] as NotificationType[]) {
+    assert.equal(notificationTabFor(type), "other", type);
+  }
+
   const page = splitNotificationsByTab([
-    item("n1", "thread_like", "2026-09-15T10:00:00Z"),
-    item("n2", "event_rsvp", "2026-09-15T09:00:00Z"),
+    item("n1", "thread_deleted", "2026-09-15T10:00:00Z"),
+    item("n2", "thread_like", "2026-09-15T09:00:00Z"),
+    item("n3", "resource_deleted", "2026-09-15T08:00:00Z", "2026-09-15T08:30:00Z"),
   ]);
 
-  assert.equal(page.other.length, 0);
-  assert.equal(page.unreadByTab.other, 0);
+  assert.deepEqual(page.other.map((n) => n.id), ["n1", "n3"]);
+  assert.equal(page.unreadByTab.other, 1);
 });
 
 test("a type no tab declares stays invisible", () => {

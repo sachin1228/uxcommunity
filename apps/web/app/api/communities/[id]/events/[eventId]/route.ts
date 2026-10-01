@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
+import {
+  loadCommunityPermissionCheck,
+  logCommunityActivity,
+  managerActorRole,
+  type CommunityManagerStatus,
+} from "@/lib/communities/manager-role";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
+import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
 import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -204,7 +211,7 @@ export async function DELETE(
 
   let existingQuery = db
     .from("community_events")
-    .select("id, user_id")
+    .select("id, user_id, title")
     .eq("id", eventId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
@@ -212,7 +219,21 @@ export async function DELETE(
   const { data: existing } = await existingQuery.maybeSingle();
 
   if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
-  if (existing.user_id !== userId) return NextResponse.json({ error: "Not the event owner." }, { status: 403 });
+
+  // Hosts delete their own events; managers holding "moderate events" may
+  // delete anyone's. Public-scope content lives outside any community, so
+  // only its host can delete it.
+  const isOwn = existing.user_id === userId;
+  let moderator: CommunityManagerStatus | null = null;
+  if (!isOwn) {
+    const check = publicScope
+      ? { allowed: false, status: null }
+      : await loadCommunityPermissionCheck(db, communityId, userId, "can_moderate_events");
+    if (!check.allowed) {
+      return NextResponse.json({ error: "Not the event owner." }, { status: 403 });
+    }
+    moderator = check.status;
+  }
 
   const { data: eventRow } = await db
     .from("community_events")
@@ -241,6 +262,32 @@ export async function DELETE(
 
   const { error } = await db.from("community_events").delete().eq("id", eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Audit trail for moderated deletions of other members' events, plus a
+  // removal notice to the host. The title rides in the notice body so the
+  // host sees what was taken down.
+  if (!isOwn && moderator) {
+    const actorRole = managerActorRole(moderator);
+    await logCommunityActivity(db, {
+      communityId,
+      actorId: userId,
+      actorRole,
+      action: "event_deleted",
+      targetUserId: existing.user_id,
+      details: { event_id: eventId },
+    });
+    deferNotification({
+      userId: existing.user_id,
+      actorId: userId,
+      communityId,
+      type: "event_deleted",
+      entityType: "event",
+      entityId: eventId,
+      title: () => managerRemovalNotice(actorRole, "event"),
+      body: typeof existing.title === "string" ? existing.title : null,
+      href: communityHref(communityId),
+    });
+  }
 
   // communities.image_url is checked as well as community_events: the event's
   // group chat wears the event's cover as its own DP (see

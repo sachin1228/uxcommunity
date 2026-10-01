@@ -31,9 +31,12 @@ const STALE = 30_000;
 export function ShowcaseView({
   communityId,
   currentUserId,
+  canModerate = false,
 }: {
   communityId: string;
   currentUserId: string;
+  /** Owner or manager with "moderate showcase" — may delete any post. */
+  canModerate?: boolean;
 }) {
   const router = useGuardedRouter();
   initRequestCache(currentUserId);
@@ -262,6 +265,7 @@ export function ShowcaseView({
                 currentUserId={currentUserId}
                 isLast={index === visible.length - 1}
                 communityId={communityId}
+                canModerate={canModerate}
                 onOpen={() => open(post)}
                 onLikeChanged={(liked, count) => patch(post.id, { user_liked: liked, like_count: count })}
                 onSaveChanged={(saved) => patch(post.id, { user_saved: saved })}

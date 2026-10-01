@@ -13,6 +13,7 @@ import {
   FileText,
   Heart,
   MessageCircle,
+  Trash2,
   Users,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/use-notifications";
 
 function iconFor(type: NotificationType) {
+  if (type.endsWith("_deleted")) return Trash2;
   if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;
   if (type.includes("resource")) return FileText;
@@ -185,12 +187,12 @@ export function NotificationsView({ userId }: { userId: string }) {
               hint="RSVPs and comments on your events will appear here."
             />
           ) : (
-            /* The Other tab renders nothing yet on purpose — see
+            /* The Other tab renders manager removals — see
                lib/notifications-tabs.ts for where its types get declared. */
             <EmptyNotifications
-              icon={Bell}
-              title="Nothing here yet"
-              hint="Other kinds of notifications will show up here."
+              icon={Trash2}
+              title="No removal notices"
+              hint="When an admin or moderator removes your thread, showcase post, resource or event, it will show up here."
             />
           )
         ) : (

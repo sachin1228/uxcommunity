@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth/session";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
+import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
+import { NO_COMMUNITY_PERMISSIONS, type CommunityPermissions } from "@/lib/communities/permissions";
 
 /** Rows per page. The server owns this, so a caller cannot widen a page. */
 const PAGE_SIZE = 30;
@@ -36,15 +38,10 @@ export async function GET(
 
   const db = createServiceClient();
 
-  // Auth guard — caller must be a member.
-  const { data: membership } = await db
-    .from("community_members")
-    .select("user_id")
-    .eq("community_id", communityId)
-    .eq("user_id", callerId)
-    .maybeSingle();
-
-  if (!membership) {
+  // Auth guard — caller must be a member. The loaded status also tells us
+  // whether they are the owner (the only role that sees moderator grants).
+  const managerStatus = await loadCommunityManagerStatus(db, communityId, callerId);
+  if (!managerStatus || !managerStatus.role) {
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
@@ -84,15 +81,48 @@ export async function GET(
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.user_id, p]));
 
+  // Moderator grants ride along with the page for the owner only — they are
+  // what the "Edit moderator permissions" dialog prefills from.
+  const permissionsByUser = new Map<string, CommunityPermissions>();
+  if (managerStatus.isOwner) {
+    const moderatorIds = rows
+      .filter((m) => (m.role ?? "member") === "moderator")
+      .map((m) => m.user_id);
+    if (moderatorIds.length) {
+      const { data: permRows } = await db
+        .from("community_admin_permissions")
+        .select(
+          "user_id, can_edit_settings, can_manage_members, can_delete_messages, can_moderate_threads, can_moderate_showcase, can_moderate_resources, can_moderate_events",
+        )
+        .eq("community_id", communityId)
+        .in("user_id", moderatorIds);
+      for (const row of permRows ?? []) {
+        permissionsByUser.set(row.user_id, {
+          can_edit_settings: row.can_edit_settings,
+          can_manage_members: row.can_manage_members,
+          can_delete_messages: row.can_delete_messages,
+          can_moderate_threads: row.can_moderate_threads,
+          can_moderate_showcase: row.can_moderate_showcase,
+          can_moderate_resources: row.can_moderate_resources,
+          can_moderate_events: row.can_moderate_events,
+        });
+      }
+    }
+  }
+
   const members = rows.map((m) => {
     const p = profileMap[m.user_id];
+    const role = m.role ?? "member";
     return {
       user_id:     m.user_id,
       joined_at:   m.joined_at,
-      role:        m.role ?? "member",
+      role,
       name:        m.name,
       avatar_url:  p?.avatar_url ?? null,
       designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+      ...(role === "moderator" && managerStatus.isOwner
+        ? { permissions: permissionsByUser.get(m.user_id) ?? NO_COMMUNITY_PERMISSIONS }
+        : {}),
     };
   });
 

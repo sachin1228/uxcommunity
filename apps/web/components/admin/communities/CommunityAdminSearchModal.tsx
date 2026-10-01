@@ -190,7 +190,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
               {debouncedQ ? "No members match your search." : "This community has no members yet."}
             </p>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul className="divide-y divide-border">
               {members.map((member) => {
                 const isOwner = member.role === "owner";
                 const isAdmin = member.role === "admin";

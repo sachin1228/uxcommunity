@@ -5,7 +5,8 @@ import { Bookmark, Flag, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 export function ShowcaseOptionsMenu({
   saved,
-  canManage,
+  canEdit,
+  canDelete,
   reported = false,
   busy = false,
   onToggleSave,
@@ -14,7 +15,10 @@ export function ShowcaseOptionsMenu({
   onReport,
 }: {
   saved: boolean;
-  canManage: boolean;
+  /** Author — offers Edit. */
+  canEdit: boolean;
+  /** Author or manager with "moderate showcase" — offers Delete. */
+  canDelete: boolean;
   /** Acknowledged state of the Report item, like the thread and event menus. */
   reported?: boolean;
   /**
@@ -26,7 +30,7 @@ export function ShowcaseOptionsMenu({
   onToggleSave: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  /** Offered instead of Edit/Delete when the viewer isn't the author. */
+  /** Offered instead of Edit/Delete when the viewer has neither. */
   onReport?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -77,33 +81,33 @@ export function ShowcaseOptionsMenu({
             <Bookmark strokeWidth={2.5} size={11} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave" : "Save"}
           </button>
-          {canManage && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onEdit();
-                }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-              >
-                <Pencil strokeWidth={2.5} size={11} />
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onDelete();
-                }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-              >
-                <Trash2 strokeWidth={2.5} size={11} />
-                Delete
-              </button>
-            </>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+            >
+              <Pencil strokeWidth={2.5} size={11} />
+              Edit
+            </button>
           )}
-          {!canManage && onReport && (
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+            >
+              <Trash2 strokeWidth={2.5} size={11} />
+              Delete
+            </button>
+          )}
+          {!canEdit && !canDelete && onReport && (
             <button
               type="button"
               onClick={() => {

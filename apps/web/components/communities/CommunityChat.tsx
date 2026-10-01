@@ -12,6 +12,7 @@ import {
   type CachedContentEvent,
   type CachedMessage,
   type CachedMeta,
+  type MessageDeletedByRole,
   type MessageMention,
   type ReplyPreview,
 } from "@/lib/communities/cache";
@@ -19,6 +20,7 @@ import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas
 import type { MentionCandidate } from "@/lib/communities/mentions";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { initRequestCache } from "@/lib/request-cache";
+import type { CommunityPermission } from "@/lib/communities/permissions";
 import type { SSRCommunitySections } from "@/lib/communities/server";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
@@ -74,6 +76,10 @@ const MembersView = dynamic(() => import("./members/MembersView").then((m) => m.
   loading: TabLoading,
 });
 const ShowcaseView = dynamic(() => import("./showcase/ShowcaseView").then((m) => m.ShowcaseView), {
+  ssr: false,
+  loading: TabLoading,
+});
+const ActivityView = dynamic(() => import("./activity/ActivityView").then((m) => m.ActivityView), {
   ssr: false,
   loading: TabLoading,
 });
@@ -249,14 +255,24 @@ export function CommunityChat({
     [],
   );
 
-  const handleDelete = useCallback(async (msgId: string) => {
-    // Optimistic update: mark as deleted locally immediately
+  const handleDelete = useCallback(async (msgId: string, removedByRole: MessageDeletedByRole | null) => {
+    // Optimistic update: mark as deleted locally immediately, stamping the
+    // acting role so the tombstone reads the same as the server's broadcast.
     let previousMessage: CachedMessage | null = null;
     setMessages((prev) => {
       previousMessage = prev.find((m) => m.id === msgId) ?? null;
       const next = prev.map((m) =>
         m.id === msgId
-          ? { ...m, deleted_at: new Date().toISOString(), content: "", image_url: null, reply_to: null, reactions: [] }
+          ? {
+              ...m,
+              deleted_at: new Date().toISOString(),
+              deleted_by: currentUserId,
+              deleted_by_role: removedByRole,
+              content: "",
+              image_url: null,
+              reply_to: null,
+              reactions: [],
+            }
           : m
       );
       msgCache.set(communityId, next);
@@ -282,7 +298,7 @@ export function CommunityChat({
         return prev.map((m) => (m.id === msgId ? previousMessage! : m));
       });
     }
-  }, [communityId, setMessages]);
+  }, [communityId, setMessages, currentUserId]);
 
   const currentUserMember = members.find((member) => member.user_id === currentUserId);
   const resolvedUserName = currentUserMember?.users?.name ?? currentUserName ?? "Someone";
@@ -807,26 +823,38 @@ export function CommunityChat({
     [community, sidebarEntry, communityId],
   );
 
-  // "members" is always available; every other tab has to be enabled for this
-  // community, so a switched-off area falls back to Chat.
+  const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+  // "members" is always available and "activity" is owner-only — neither is an
+  // owner-toggleable area, so both skip the feature-flag fallback; every other
+  // tab has to be enabled for this community or it falls back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
     activeTab !== "members" &&
+    activeTab !== "activity" &&
     !isFeatureVisible(activeTab as CommunityFeature, displayCommunity)
       ? "chat"
-      : activeTab;
-
-  const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+      : activeTab === "activity" && !isOwner
+        ? "chat"
+        : activeTab;
   // Role and grants only exist on the loaded read model; the sidebar fallback
   // never carries them, so read them from `community` directly.
   const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
   const myPerms = community?.current_user_permissions;
-  // Platform-appointed admins of app-created communities get the same
-  // management UI as a private-group creator, scoped by their grants.
-  const isAdminWith = (permission: "can_edit_settings" | "can_manage_members" | "can_delete_messages") =>
-    myRole === "admin" && Boolean(myPerms?.[permission]);
-  const canOpenSettings = isOwner || isAdminWith("can_edit_settings");
-  const canManageMembers = isOwner || isAdminWith("can_manage_members");
-  const canModerateMessages = isOwner || isAdminWith("can_delete_messages");
+  // The owner, platform-appointed admins and in-app moderators share the same
+  // management UI, each capability scoped by the member's grants.
+  const isManagerWith = (permission: CommunityPermission) =>
+    (myRole === "admin" || myRole === "moderator") && Boolean(myPerms?.[permission]);
+  const canOpenSettings = isOwner || isManagerWith("can_edit_settings");
+  const canManageMembers = isOwner || isManagerWith("can_manage_members");
+  const canModerateMessages = isOwner || isManagerWith("can_delete_messages");
+  const canModerateThreads = isOwner || isManagerWith("can_moderate_threads");
+  const canModerateShowcase = isOwner || isManagerWith("can_moderate_showcase");
+  const canModerateResources = isOwner || isManagerWith("can_moderate_resources");
+  const canModerateEvents = isOwner || isManagerWith("can_moderate_events");
+  // Deleting another member's message is a moderation act — the flow names the
+  // role it is performed in, and the delete stamps it on the message so the
+  // tombstone can attribute the removal.
+  const moderationRole: MessageDeletedByRole | null =
+    myRole === "owner" || myRole === "admin" || myRole === "moderator" ? myRole : null;
 
   // Stable header callbacks — inline arrows would recreate every render and
   // defeat the memoized ChatHeader's bail-out on keystrokes.
@@ -863,6 +891,7 @@ export function CommunityChat({
           currentUserId={currentUserId}
           onSettingsClick={canOpenSettings ? handleSettingsClick : undefined}
           canOpenSettings={canOpenSettings}
+          showActivityTab={isOwner}
           communityId={communityId}
         />
 
@@ -925,18 +954,23 @@ export function CommunityChat({
           />
         )}
         {renderedTab === "showcase" ? (
-          <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
+          <ShowcaseView
+            communityId={communityId}
+            currentUserId={currentUserId}
+            canModerate={canModerateShowcase}
+          />
         ) : renderedTab === "threads" ? (
           <ThreadsView
             communityId={communityId}
             currentUserId={currentUserId}
+            canModerate={canModerateThreads}
             onThreadCreated={handleThreadCreated}
             onThreadDeleted={handleThreadDeleted}
           />
         ) : renderedTab === "events" ? (
-          <EventsView communityId={communityId} currentUserId={currentUserId} />
+          <EventsView communityId={communityId} currentUserId={currentUserId} canModerate={canModerateEvents} />
         ) : renderedTab === "resources" ? (
-          <ResourcesView communityId={communityId} currentUserId={currentUserId} />
+          <ResourcesView communityId={communityId} currentUserId={currentUserId} canModerate={canModerateResources} />
         ) : renderedTab === "members" ? (
           <MembersView
             communityId={communityId}
@@ -946,6 +980,8 @@ export function CommunityChat({
             isPrivate={displayCommunity?.is_private ?? false}
             isEventChat={displayCommunity?.type === "event"}
           />
+        ) : renderedTab === "activity" ? (
+          <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Scrollable message body — a flex sibling of the footer (WhatsApp
@@ -997,6 +1033,7 @@ export function CommunityChat({
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
               canModerateMessages={canModerateMessages}
+              moderationRole={moderationRole}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
               onRetrySend={handleRetrySend}
