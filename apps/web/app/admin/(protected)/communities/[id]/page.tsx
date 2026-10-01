@@ -2,20 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Pencil,
-  Check,
-  X,
-  Users,
-  MessageSquare,
-  ImagePlus,
-  LayoutGrid,
-  ScrollText,
-  ShieldCheck,
-  Activity,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowLeftRegular, EditRegular, CheckmarkRegular, DismissRegular, PeopleRegular, CommentRegular, ImageAddRegular, AppsRegular, DocumentBulletListRegular, ShieldCheckmarkRegular, PulseRegular, type FluentIcon } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityActionsPanel } from "@/components/admin/communities/CommunityActionsPanel";
@@ -36,7 +23,7 @@ type TabId = "overview" | "members" | "admins" | "activity" | "messages" | "rule
 interface TabDef {
   id: TabId;
   label: string;
-  icon: LucideIcon;
+  icon: FluentIcon;
   count?: number;
 }
 
@@ -169,7 +156,7 @@ export default function CommunityDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-5 w-5" />
+        <Spinner className="h-[22px] w-[22px]" />
       </div>
     );
   }
@@ -191,16 +178,16 @@ export default function CommunityDetailPage() {
   const appCreated = community.is_app_created ?? community.type !== "user";
 
   const tabs: TabDef[] = [
-    { id: "overview", label: "Overview", icon: LayoutGrid },
-    { id: "members", label: "Members", icon: Users, count: community.member_count },
+    { id: "overview", label: "Overview", icon: AppsRegular },
+    { id: "members", label: "Members", icon: PeopleRegular, count: community.member_count },
     ...(appCreated
       ? [
-          { id: "admins", label: "Admins", icon: ShieldCheck },
-          { id: "activity", label: "Activity", icon: Activity },
+          { id: "admins", label: "Admins", icon: ShieldCheckmarkRegular },
+          { id: "activity", label: "Activity", icon: PulseRegular },
         ] as TabDef[]
       : []),
-    { id: "messages", label: "Messages", icon: MessageSquare, count: community.message_count },
-    { id: "rules", label: "Rules", icon: ScrollText },
+    { id: "messages", label: "Messages", icon: CommentRegular, count: community.message_count },
+    { id: "rules", label: "Rules", icon: DocumentBulletListRegular },
   ];
 
   const typeClasses = TYPE_COLORS_WITH_BORDER[community.type] ??
@@ -213,7 +200,7 @@ export default function CommunityDetailPage() {
         onClick={() => router.push("/admin/communities")}
         className="flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors w-fit"
       >
-        <ArrowLeft strokeWidth={2.5} size={13} /> Communities
+        <ArrowLeftRegular fontSize={15} /> Communities
       </button>
 
       {/* Hero */}
@@ -252,13 +239,13 @@ export default function CommunityDetailPage() {
                   disabled={editLoading}
                   className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
                 >
-                  {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={15} />}
+                  {editLoading ? <Spinner className="h-[18px] w-[18px]" /> : <CheckmarkRegular fontSize={17} />}
                 </button>
                 <button
                   onClick={() => { setEditing(false); setEditError(null); }}
                   className="p-1 text-foreground-muted hover:text-foreground"
                 >
-                  <X strokeWidth={2.5} size={15} />
+                  <DismissRegular fontSize={17} />
                 </button>
               </div>
             ) : (
@@ -271,7 +258,7 @@ export default function CommunityDetailPage() {
                   className="shrink-0 p-1 text-foreground-muted hover:text-foreground transition-colors"
                   title="Rename community"
                 >
-                  <Pencil strokeWidth={2.5} size={13} />
+                  <EditRegular fontSize={15} />
                 </button>
               </div>
             )}
@@ -324,7 +311,7 @@ export default function CommunityDetailPage() {
                 isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
               }`}
             >
-              <Icon size={13} strokeWidth={2.5} />
+              <Icon fontSize={15} />
               {t.label}
               {t.count != null && (
                 <span
@@ -381,13 +368,13 @@ export default function CommunityDetailPage() {
                         disabled={editDescLoading}
                         className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                       >
-                        {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
+                        {editDescLoading ? <Spinner className="h-3.5 w-3.5" /> : <CheckmarkRegular fontSize={13} />} Save
                       </button>
                       <button
                         onClick={() => { setEditingDesc(false); setEditDescError(null); }}
                         className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
                       >
-                        <X strokeWidth={2.5} size={11} /> Cancel
+                        <DismissRegular fontSize={13} /> Cancel
                       </button>
                     </div>
                   </div>
@@ -401,7 +388,7 @@ export default function CommunityDetailPage() {
                       className="shrink-0 p-1 text-foreground-muted hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
                       title="Edit description"
                     >
-                      <Pencil strokeWidth={2.5} size={11} />
+                      <EditRegular fontSize={13} />
                     </button>
                   </div>
                 )}
@@ -455,8 +442,8 @@ export default function CommunityDetailPage() {
                         disabled={dpBusy !== null}
                         className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                       >
-                        <ImagePlus strokeWidth={2.5} size={13} />
-                        {dpBusy === "image" ? <Spinner className="h-3 w-3" /> : "Upload image"}
+                        <ImageAddRegular fontSize={15} />
+                        {dpBusy === "image" ? <Spinner className="h-3.5 w-3.5" /> : "Upload image"}
                       </button>
                     </div>
                     <input

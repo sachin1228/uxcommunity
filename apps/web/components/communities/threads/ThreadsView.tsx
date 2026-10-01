@@ -1,15 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  CircleHelp,
-  LayoutGrid,
-  Lightbulb,
-  MessageSquarePlus,
-  MessageSquareText,
-  MessagesSquare,
-  Plus,
-} from "lucide-react";
+import { QuestionCircleRegular, AppsRegular, LightbulbRegular, CommentAddRegular, CommentMultipleRegular, ChatMultipleRegular, AddRegular } from "@fluentui/react-icons";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -287,20 +279,20 @@ export function ThreadsView({
             </p>
           </div>
           <GradientButton onClick={() => setShowCreateModal(true)}>
-            <Plus strokeWidth={2.5} size={14} />
+            <AddRegular fontSize={16} />
             Create Thread
           </GradientButton>
         </div>
 
         {!loading && threads.length > 0 && (
           <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
-            {[{ value: "all" as const, label: "All", icon: LayoutGrid }, ...THREAD_CATEGORIES.map((item) => ({
+            {[{ value: "all" as const, label: "All", icon: AppsRegular }, ...THREAD_CATEGORIES.map((item) => ({
               ...item,
               icon: {
-                question: CircleHelp,
-                discussion: MessagesSquare,
-                idea: Lightbulb,
-                feedback: MessageSquareText,
+                question: QuestionCircleRegular,
+                discussion: ChatMultipleRegular,
+                idea: LightbulbRegular,
+                feedback: CommentMultipleRegular,
               }[item.value],
             }))].map((item) => {
               const Icon = item.icon;
@@ -312,7 +304,7 @@ export function ThreadsView({
                   aria-pressed={filter === item.value}
                   className={filterChip(filter === item.value)}
                 >
-                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                  <Icon fontSize={16} aria-hidden="true" />
                   {item.label}
                 </button>
               );
@@ -334,7 +326,7 @@ export function ThreadsView({
       {loading && (
         <div className={communityFeedLayout.content}>
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading threads">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         </div>
       )}
@@ -342,7 +334,7 @@ export function ThreadsView({
       {!loading && threads.length === 0 && (
         <div className={communityFeedLayout.content}>
           <div className={communityFeedLayout.emptyState}>
-            <MessageSquarePlus strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <CommentAddRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
           </div>
@@ -353,7 +345,7 @@ export function ThreadsView({
         <div className={communityFeedLayout.content}>
           {filteredThreads.length === 0 ? (
             <div className={communityFeedLayout.emptyState}>
-              <MessageSquarePlus strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+              <CommentAddRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
               <h3 className={communityFeedLayout.emptyTitle}>No threads in this category</h3>
               <p className={communityFeedLayout.emptyDescription}>Try a different filter or start a new thread.</p>
             </div>

@@ -24,7 +24,7 @@
  */
 
 import { useCallback } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeftRegular } from "@fluentui/react-icons";
 import { useRouter } from "next/navigation";
 
 interface BackLinkProps {
@@ -62,7 +62,7 @@ export function BackLink({ href, label = "Home", className }: BackLinkProps) {
       onClick={handleClick}
       className={className}
     >
-      <ArrowLeft strokeWidth={2.5} size={14} />
+      <ArrowLeftRegular fontSize={16} />
       {label}
     </a>
   );

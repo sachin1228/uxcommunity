@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, ChevronLeft, ChevronRight, X, Send } from "lucide-react";
+import { SearchRegular, ChevronLeftRegular, ChevronRightRegular, DismissRegular, SendRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface SignupAttempt {
@@ -98,8 +98,8 @@ export default function IncompleteSignupsPage() {
 
       {/* Search */}
       <div className="relative mb-3 max-w-xs">
-        <Search
-          size={13}
+        <SearchRegular
+          fontSize={15}
           className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
         />
         <input
@@ -114,7 +114,7 @@ export default function IncompleteSignupsPage() {
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
           >
-            <X strokeWidth={2.5} size={12} />
+            <DismissRegular fontSize={14} />
           </button>
         )}
       </div>
@@ -123,7 +123,7 @@ export default function IncompleteSignupsPage() {
       <div className="rounded-xl border border-border bg-surface overflow-hidden mb-3">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner className="h-4 w-4" />
+            <Spinner className="h-[18px] w-[18px]" />
           </div>
         ) : attempts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 gap-2">
@@ -203,9 +203,9 @@ export default function IncompleteSignupsPage() {
                         className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {rowStatus[attempt.id]?.state === "sending" ? (
-                          <Spinner className="h-3 w-3" />
+                          <Spinner className="h-3.5 w-3.5" />
                         ) : (
-                          <Send strokeWidth={2.5} size={12} />
+                          <SendRegular fontSize={14} />
                         )}
                         {rowStatus[attempt.id]?.state === "sent" ? "Send again" : "Send link"}
                       </button>
@@ -245,14 +245,14 @@ export default function IncompleteSignupsPage() {
               disabled={page === 1}
               className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              <ChevronLeft strokeWidth={2.5} size={13} /> Prev
+              <ChevronLeftRegular fontSize={15} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              Next <ChevronRight strokeWidth={2.5} size={13} />
+              Next <ChevronRightRegular fontSize={15} />
             </button>
           </div>
         </div>

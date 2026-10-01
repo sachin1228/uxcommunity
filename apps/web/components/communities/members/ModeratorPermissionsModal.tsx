@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheckmarkRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import {
@@ -84,7 +84,7 @@ export function ModeratorPermissionsModal({
           <div key={group}>
             <p className="mb-2 flex items-center gap-1.5 font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
               {group === "Content moderation" && (
-                <ShieldCheck strokeWidth={2.5} size={11} className="text-accent/70" />
+                <ShieldCheckmarkRegular fontSize={13} className="text-accent/70" />
               )}
               {group}
             </p>
@@ -145,7 +145,7 @@ export function ModeratorPermissionsModal({
           disabled={saving || !dirty}
           className="modal-btn modal-btn-primary flex-1"
         >
-          {saving && <Spinner className="h-3 w-3 text-accent-foreground" />}
+          {saving && <Spinner className="h-3.5 w-3.5 text-accent-foreground" />}
           {mode === "promote" ? "Make moderator" : "Save permissions"}
         </button>
       </div>

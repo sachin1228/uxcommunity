@@ -89,6 +89,12 @@
     },
     {
       "rule": "dead-symbol",
+      "match": "CheckCheck",
+      "file": "apps/web/components/ui/DoubleCheckIcon.tsx",
+      "reason": "the upstream lucide icon whose path geometry this component keeps — lucide-react was removed by the Fluent migration, so the name is external provenance, not a repository symbol"
+    },
+    {
+      "rule": "dead-symbol",
       "match": "postgres_changes",
       "file": "supabase/migrations/**",
       "reason": "historical migration describing the retired Supabase Realtime publication"

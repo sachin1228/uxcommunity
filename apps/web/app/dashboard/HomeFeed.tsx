@@ -131,7 +131,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24" role="status" aria-label="Loading feed">
-        <Spinner size={28} />
+        <Spinner size={30} />
       </div>
     );
   }

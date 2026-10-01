@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Link, Copy, CheckCheck } from "lucide-react";
+import { LinkRegular, CopyRegular } from "@fluentui/react-icons";
+import { DoubleCheckIcon } from "@/components/ui/DoubleCheckIcon";
 
 interface Props {
   inviteLink: string;
@@ -20,7 +21,7 @@ export function InviteLinkBox({ inviteLink }: Props) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
       <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-        <Link strokeWidth={2.5} size={12} /> Invitation Link
+        <LinkRegular fontSize={14} /> Invitation Link
       </p>
       <div className="flex items-center gap-2">
         <p className="font-mono text-xs text-foreground-muted bg-surface-raised rounded px-2.5 py-1.5 flex-1 truncate select-all">
@@ -31,9 +32,9 @@ export function InviteLinkBox({ inviteLink }: Props) {
           className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
         >
           {copied ? (
-            <CheckCheck strokeWidth={2.5} size={12} className="text-green-400" />
+            <DoubleCheckIcon fontSize={14} className="text-green-400" />
           ) : (
-            <Copy strokeWidth={2.5} size={12} />
+            <CopyRegular fontSize={14} />
           )}
           {copied ? "Copied!" : "Copy"}
         </button>

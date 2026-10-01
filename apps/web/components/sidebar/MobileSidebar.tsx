@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { NavigationRegular, DismissRegular } from "@fluentui/react-icons";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 
 interface Props {
@@ -40,7 +40,7 @@ export function MobileSidebar({ userId }: Props) {
         aria-expanded={open}
         aria-controls="mobile-dashboard-navigation"
       >
-        <Menu strokeWidth={2.5} size={18} aria-hidden="true" />
+        <NavigationRegular fontSize={20} aria-hidden="true" />
       </button>
 
       {open && (
@@ -67,7 +67,7 @@ export function MobileSidebar({ userId }: Props) {
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label="Close navigation menu"
               >
-                <X strokeWidth={2.5} size={20} aria-hidden="true" />
+                <DismissRegular fontSize={22} aria-hidden="true" />
               </button>
             </div>
             <div className="min-h-0 flex-1" onClick={() => setOpen(false)}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { AtSign, Loader2 } from "lucide-react";
+import { MentionRegular, SpinnerIosRegular } from "@fluentui/react-icons";
 import { ChatAvatar } from "./ChatAvatar";
 import type { MentionCandidate } from "@/lib/communities/mentions";
 
@@ -72,12 +72,12 @@ export function MentionSuggestions({
       >
         {loading && options.length === 0 ? (
           <div className="flex items-center gap-2 px-3 py-2.5">
-            <Loader2 strokeWidth={2.5} size={13} className="animate-spin text-foreground-muted shrink-0" />
+            <SpinnerIosRegular fontSize={15} className="animate-spin text-foreground-muted shrink-0" />
             <p className="font-body text-xs text-foreground-muted">Searching members…</p>
           </div>
         ) : isEmpty ? (
           <div className="flex items-center gap-2 px-3 py-2.5">
-            <AtSign strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+            <MentionRegular fontSize={15} className="text-foreground-muted shrink-0" />
             <p className="font-body text-xs text-foreground-muted">
               No members match “{query}”
             </p>

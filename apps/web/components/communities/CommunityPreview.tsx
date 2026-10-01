@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Clock, Lock, MessageCircle, MessagesSquare, Sparkles } from "lucide-react";
+import { ArrowRightRegular, CheckmarkRegular, ClockRegular, LockClosedRegular, ChatRegular, ChatMultipleRegular, SparkleRegular } from "@fluentui/react-icons";
 import { CommunityDp } from "./CommunityDp";
 import { CommunityNameBadges } from "./CommunityBadges";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -71,7 +71,7 @@ function ViewCommunityRow({ onClick }: { onClick: () => void }) {
       className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       View community
-      <ArrowRight strokeWidth={2.5} size={14} />
+      <ArrowRightRegular fontSize={16} />
     </button>
   );
 }
@@ -80,7 +80,7 @@ function ViewCommunityRow({ onClick }: { onClick: () => void }) {
 function RequestPendingRow() {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-body text-xs text-foreground-muted">
-      <Clock strokeWidth={2.5} size={11} />
+      <ClockRegular fontSize={13} />
       Request sent — waiting for the owner&apos;s approval
     </span>
   );
@@ -90,7 +90,7 @@ function RequestPendingRow() {
 function ClosedRow({ isPrivate }: { isPrivate: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-body text-xs text-foreground-muted">
-      <Lock strokeWidth={2.5} size={11} />
+      <LockClosedRegular fontSize={13} />
       {isPrivate ? "This community is private" : "Update your profile to join"}
     </span>
   );
@@ -165,7 +165,7 @@ function JoinActions({
           disabled={joining}
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
         >
-          <Lock strokeWidth={2.5} size={13} />
+          <LockClosedRegular fontSize={15} />
           Request to join
         </button>
       ) : (
@@ -246,10 +246,10 @@ export function CommunityPreviewCard({
   const isMember = joined || state.joined;
 
   const publicBits = [
-    publicCounts.threads ? { icon: MessagesSquare, label: `${publicCounts.threads} public thread${publicCounts.threads === 1 ? "" : "s"}` } : null,
-    publicCounts.events ? { icon: MessageCircle, label: `${publicCounts.events} public event${publicCounts.events === 1 ? "" : "s"}` } : null,
-    publicCounts.showcase ? { icon: Sparkles, label: `${publicCounts.showcase} public showcase post${publicCounts.showcase === 1 ? "" : "s"}` } : null,
-  ].filter((bit): bit is { icon: typeof MessageCircle; label: string } => bit !== null);
+    publicCounts.threads ? { icon: ChatMultipleRegular, label: `${publicCounts.threads} public thread${publicCounts.threads === 1 ? "" : "s"}` } : null,
+    publicCounts.events ? { icon: ChatRegular, label: `${publicCounts.events} public event${publicCounts.events === 1 ? "" : "s"}` } : null,
+    publicCounts.showcase ? { icon: SparkleRegular, label: `${publicCounts.showcase} public showcase post${publicCounts.showcase === 1 ? "" : "s"}` } : null,
+  ].filter((bit): bit is { icon: typeof ChatRegular; label: string } => bit !== null);
 
   return (
     <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-background-subtle">
@@ -276,7 +276,7 @@ export function CommunityPreviewCard({
             key={label}
             className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted"
           >
-            <Icon strokeWidth={2.5} size={11} className="text-foreground-subtle" />
+            <Icon fontSize={13} className="text-foreground-subtle" />
             {label}
           </span>
         ))}

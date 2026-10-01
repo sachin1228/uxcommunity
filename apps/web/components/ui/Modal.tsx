@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useCallback, useSyncExternalStore } from "react";
-import { X } from "lucide-react";
+import { DismissRegular } from "@fluentui/react-icons";
 
 interface ModalProps {
   open: boolean;
@@ -89,7 +89,7 @@ export function Modal({
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                 aria-label="Close"
               >
-                <X strokeWidth={2.5} size={16} />
+                <DismissRegular fontSize={18} />
               </button>
             )}
           </div>
@@ -100,7 +100,7 @@ export function Modal({
             className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             aria-label="Close"
           >
-            <X strokeWidth={2.5} size={16} />
+            <DismissRegular fontSize={18} />
           </button>
         )}
         {children}

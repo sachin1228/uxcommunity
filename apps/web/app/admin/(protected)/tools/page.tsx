@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, SkipForward, AlertCircle, RefreshCw, Trash2, Database } from "lucide-react";
+import { CheckmarkCircleRegular, NextRegular, ErrorCircleRegular, ArrowClockwiseRegular, DeleteRegular, DatabaseRegular } from "@fluentui/react-icons";
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -75,7 +75,7 @@ export default function ToolsPage() {
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
-            <Database strokeWidth={2.5} size={18} className="text-accent" />
+            <DatabaseRegular fontSize={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">R2 storage health</h2>
@@ -90,12 +90,12 @@ export default function ToolsPage() {
             >
               {r2Status === "running" ? (
                 <>
-                  <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
+                  <ArrowClockwiseRegular fontSize={15} className="animate-spin" />
                   Scanning…
                 </>
               ) : (
                 <>
-                  <Database strokeWidth={2.5} size={13} />
+                  <DatabaseRegular fontSize={15} />
                   {r2Status === "done" ? "Scan again" : "Scan R2 storage"}
                 </>
               )}
@@ -106,10 +106,10 @@ export default function ToolsPage() {
         {r2Status === "done" && r2Summary && (
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex flex-wrap gap-4 mb-4">
-              <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={r2Summary.totalObjects} label="total objects" />
-              <Stat icon={<SkipForward strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={r2Summary.trackedObjects} label="tracked" />
-              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-red-400" />} value={r2Summary.potentialOrphans} label="potential orphans" />
-              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-amber-400" />} value={r2Summary.brokenReferences} label="broken refs" />
+              <Stat icon={<CheckmarkCircleRegular fontSize={13} className="text-green-400" />} value={r2Summary.totalObjects} label="total objects" />
+              <Stat icon={<NextRegular fontSize={13} className="text-foreground-muted" />} value={r2Summary.trackedObjects} label="tracked" />
+              <Stat icon={<ErrorCircleRegular fontSize={13} className="text-red-400" />} value={r2Summary.potentialOrphans} label="potential orphans" />
+              <Stat icon={<ErrorCircleRegular fontSize={13} className="text-amber-400" />} value={r2Summary.brokenReferences} label="broken refs" />
             </div>
             {r2Summary.orphans?.length > 0 && (
               <>
@@ -124,12 +124,12 @@ export default function ToolsPage() {
                   >
                     {r2DeleteStatus === "running" ? (
                       <>
-                        <RefreshCw strokeWidth={2.5} size={12} className="animate-spin" />
+                        <ArrowClockwiseRegular fontSize={14} className="animate-spin" />
                         Deleting…
                       </>
                     ) : (
                       <>
-                        <Trash2 strokeWidth={2.5} size={12} />
+                        <DeleteRegular fontSize={14} />
                         Delete listed orphans
                       </>
                     )}

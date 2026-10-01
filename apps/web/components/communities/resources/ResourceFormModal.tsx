@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
-import { Check, Globe, MessageCircle, X } from "lucide-react";
+import { CheckmarkRegular, GlobeRegular, ChatRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ToggleRow } from "../threads/ThreadComposerControls";
 import { filterChip } from "../filter-chip";
@@ -191,7 +191,7 @@ export function ResourceFormModal({
             </p>
           </div>
           <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={16} />
+            <DismissRegular fontSize={18} />
           </button>
         </div>
 
@@ -225,7 +225,7 @@ export function ResourceFormModal({
                   onClick={() => setResourceType(t.value)}
                   className={filterChip(resourceType === t.value)}
                 >
-                  <ResourceTypeIcon type={t.value} size={11} />
+                  <ResourceTypeIcon type={t.value} size={13} />
                   {t.label}
                 </button>
               ))}
@@ -252,11 +252,11 @@ export function ResourceFormModal({
               />
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <Spinner
-                  size={14}
+                  size={16}
                   className={`transition-opacity duration-150 ${previewLoading ? "opacity-100" : "opacity-0"}`}
                 />
-                <Globe
-                  size={14}
+                <GlobeRegular
+                  fontSize={16}
                   className={`absolute inset-0 text-foreground-subtle transition-opacity duration-150 ${!previewLoading && isValidHttpUrl(url) && !preview ? "opacity-100" : "opacity-0"}`}
                 />
               </div>
@@ -266,7 +266,7 @@ export function ResourceFormModal({
           {/* Figma detection banner */}
           {figmaLink && (
             <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-accent" role="status">
-              <Check strokeWidth={2.5} size={14} aria-hidden="true" />
+              <CheckmarkRegular fontSize={16} aria-hidden="true" />
               <span className="font-body text-xs font-medium">
                 {figmaLink.kind === "prototype" ? "Figma prototype detected — interactive preview enabled" : "Figma file detected"}
               </span>
@@ -280,7 +280,7 @@ export function ResourceFormModal({
             <div className="relative">
               {previewLoading && !preview && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
-                  <Spinner size={14} />
+                  <Spinner size={16} />
                   <span className="font-body text-sm text-foreground-subtle">
                     {fromExistingRequest ? "Loading from existing request…" : "Loading preview…"}
                   </span>
@@ -302,14 +302,14 @@ export function ResourceFormModal({
               description="Other members can comment on this resource."
               checked={allowReplies}
               onChange={setAllowReplies}
-              icon={<MessageCircle strokeWidth={2.5} size={15} />}
+              icon={<ChatRegular fontSize={15} />}
             />
             <ToggleRow
               title="Share publicly"
               description="Visible to everyone, not just community members."
               checked={isPublic}
               onChange={setIsPublic}
-              icon={<Globe strokeWidth={2.5} size={15} />}
+              icon={<GlobeRegular fontSize={15} />}
             />
           </div>
         </div>
@@ -331,7 +331,7 @@ export function ResourceFormModal({
             disabled={saving}
             className="modal-btn modal-btn-primary"
           >
-            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
+            {saving ? <Spinner size={17} className="text-white" /> : <CheckmarkRegular fontSize={17} />}
             {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}
           </button>
         </div>

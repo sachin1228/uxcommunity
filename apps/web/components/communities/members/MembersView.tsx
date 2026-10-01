@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef, useCallback } from "react";
-import { Check, ClipboardList, MoreHorizontal, Search, Users, X } from "lucide-react";
+import { CheckmarkRegular, ClipboardTaskListLtrRegular, MoreHorizontalRegular, SearchRegular, PeopleRegular, DismissRegular } from "@fluentui/react-icons";
 import { EVENT_JOIN_QUESTIONS } from "@/lib/communities/event-join-questions";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { Spinner } from "@/components/ui/Spinner";
@@ -369,7 +369,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
       {/* Search */}
       <div className="px-5 py-3 shrink-0">
         <div className="relative">
-          <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+          <SearchRegular fontSize={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -394,7 +394,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             </p>
             {requestsLoading ? (
               <div className="flex items-center justify-center py-6">
-                <Spinner size={20} />
+                <Spinner size={22} />
               </div>
             ) : (
               <ul className="space-y-1">
@@ -419,7 +419,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         disabled={busyRequestId === req.id}
                         className="inline-flex items-center gap-1 rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1.5 font-body text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Check strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
+                        <CheckmarkRegular fontSize={13} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
                       </button>
                       <button
                         type="button"
@@ -427,7 +427,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         disabled={busyRequestId === req.id}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <X strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
+                        <DismissRegular fontSize={13} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
                       </button>
                     </div>
                   </li>
@@ -441,11 +441,11 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
         {/* Members list */}
         {loading ? (
           <div className="flex items-center justify-center px-5 py-10">
-            <Spinner size={24} />
+            <Spinner size={26} />
           </div>
         ) : members.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-muted py-16">
-            <Users strokeWidth={2.5} size={32} className="opacity-30" />
+            <PeopleRegular fontSize={34} className="opacity-30" />
             <p className="font-body text-sm">
               {debouncedQ ? "No members match your search." : "No members yet."}
             </p>
@@ -517,7 +517,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                           className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
                           aria-label="Member options"
                         >
-                          <MoreHorizontal strokeWidth={2.5} size={14} />
+                          <MoreHorizontalRegular fontSize={16} />
                         </button>
                         {openMenuFor === member.user_id && (
                           <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-48 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -581,7 +581,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                             aria-expanded={expandedAnswersFor === member.user_id}
                             className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-body text-[11px] font-medium text-accent transition-colors hover:bg-accent/10"
                           >
-                            <ClipboardList strokeWidth={2.5} size={12} />
+                            <ClipboardTaskListLtrRegular fontSize={14} />
                             {expandedAnswersFor === member.user_id ? "Hide join answers" : "View join answers"}
                           </button>
                           {expandedAnswersFor === member.user_id && (() => {
@@ -604,7 +604,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         </>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-1.5 py-1 font-body text-[11px] text-foreground-subtle">
-                          <ClipboardList strokeWidth={2.5} size={12} />
+                          <ClipboardTaskListLtrRegular fontSize={14} />
                           No join answers recorded
                         </span>
                       )}
@@ -619,7 +619,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
 
             {loadingMore && (
               <div className="flex items-center justify-center px-5 py-6">
-                <Spinner size={18} />
+                <Spinner size={20} />
               </div>
             )}
 

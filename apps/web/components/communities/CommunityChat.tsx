@@ -3,7 +3,7 @@
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { AtSign, ChevronDown } from "lucide-react";
+import { MentionRegular, ChevronDownRegular } from "@fluentui/react-icons";
 import {
   msgCache,
   patchSidebarMessageContent,
@@ -49,7 +49,7 @@ import { seedCommunityRequestCache } from "./chat/seedCommunityRequestCache";
 function TabLoading() {
   return (
     <div className="flex-1 flex items-center justify-center">
-      <Spinner className="h-5 w-5" />
+      <Spinner className="h-[22px] w-[22px]" />
     </div>
   );
 }
@@ -1060,7 +1060,7 @@ export function CommunityChat({
                 aria-label={`${pendingMentions.length} pending mention${pendingMentions.length === 1 ? "" : "s"} — jump to message`}
                 title="Jump to the message where you were mentioned"
               >
-                <AtSign strokeWidth={2.5} size={15} />
+                <MentionRegular fontSize={17} />
                 <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--ds-blue-900)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
                   {pendingMentions.length > 9 ? "9+" : pendingMentions.length}
                 </span>
@@ -1073,7 +1073,7 @@ export function CommunityChat({
                 className="absolute -top-10 right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Scroll to bottom"
               >
-                <ChevronDown strokeWidth={2.5} size={16} />
+                <ChevronDownRegular fontSize={18} />
               </button>
             )}
             <TypingIndicator users={typingUsers} />

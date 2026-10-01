@@ -1,15 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  BookMarked,
-  Bookmark,
-  Calendar,
-  LayoutGrid,
-  MessagesSquare,
-  Sparkles,
-  type LucideIcon,
-} from "lucide-react";
+import { BookmarkMultipleRegular, BookmarkRegular, CalendarRegular, AppsRegular, ChatMultipleRegular, SparkleRegular, type FluentIcon } from "@fluentui/react-icons";
 import { CommunityFeedList } from "./CommunityFeedList";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "./types";
 import { Spinner } from "@/components/ui/Spinner";
@@ -32,13 +24,13 @@ import { PROFILE_FEED_SCOPES, isProfileFeedScope, type ProfileFeedScope } from "
 /** One profile activity tab per card scope the profile feed RPC serves. */
 export type ProfileActivityTab = ProfileFeedScope;
 
-const TAB_META: Record<ProfileActivityTab, { label: string; icon: LucideIcon }> = {
-  all: { label: "All", icon: LayoutGrid },
-  thread: { label: "Threads", icon: MessagesSquare },
-  showcase: { label: "Showcase", icon: Sparkles },
-  resource: { label: "Resources", icon: BookMarked },
-  event: { label: "Events", icon: Calendar },
-  saved: { label: "Saved", icon: Bookmark },
+const TAB_META: Record<ProfileActivityTab, { label: string; icon: FluentIcon }> = {
+  all: { label: "All", icon: AppsRegular },
+  thread: { label: "Threads", icon: ChatMultipleRegular },
+  showcase: { label: "Showcase", icon: SparkleRegular },
+  resource: { label: "Resources", icon: BookmarkMultipleRegular },
+  event: { label: "Events", icon: CalendarRegular },
+  saved: { label: "Saved", icon: BookmarkRegular },
 };
 
 // Derived from the scopes constant, so a new scope cannot ship without a tab
@@ -206,7 +198,7 @@ function ProfileActivityScope({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" role="status" aria-label="Loading posts">
-        <Spinner size={28} />
+        <Spinner size={30} />
       </div>
     );
   }
@@ -320,7 +312,7 @@ export function ProfileActivityFeed({
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
-              <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+              <Icon fontSize={16} aria-hidden="true" />
               {label}
             </span>
           </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, X } from "lucide-react";
+import { GlobeRegular, DismissRegular } from "@fluentui/react-icons";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 
 interface LinkPreviewCardProps {
@@ -24,7 +24,7 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
           className="absolute right-2 top-2 z-10 rounded-full bg-black/50 p-1 text-white/80 backdrop-blur-sm hover:text-white"
           aria-label="Remove preview"
         >
-          <X strokeWidth={2.5} size={12} />
+          <DismissRegular fontSize={14} />
         </button>
       )}
 
@@ -52,7 +52,7 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
               (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "block");
             }}
           />
-          <Globe strokeWidth={2.5} size={14} className="hidden text-foreground-subtle" />
+          <GlobeRegular fontSize={16} className="hidden text-foreground-subtle" />
           <span className="truncate font-body text-[11px] text-foreground-subtle">
             {domain}
           </span>

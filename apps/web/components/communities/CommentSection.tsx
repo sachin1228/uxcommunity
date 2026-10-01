@@ -1,15 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowUpDown,
-  ChevronDown,
-  ChevronUp,
-  Flag,
-  MoreHorizontal,
-  Smile,
-  Trash2,
-} from "lucide-react";
+import { ArrowSortRegular, ChevronDownRegular, ChevronUpRegular, FlagRegular, MoreHorizontalRegular, EmojiRegular, DeleteRegular } from "@fluentui/react-icons";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CommentComposer, Avatar, renderEmojiText } from "./CommentComposer";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
@@ -319,7 +311,7 @@ function CommentRow<C extends CommunityComment>({
                 aria-label="Comment options"
                 aria-expanded={menuOpen}
               >
-                <MoreHorizontal strokeWidth={2.5} size={16} />
+                <MoreHorizontalRegular fontSize={18} />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -330,7 +322,7 @@ function CommentRow<C extends CommunityComment>({
                       disabled={deleting}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                     >
-                      <Trash2 strokeWidth={2.5} size={11} />
+                      <DeleteRegular fontSize={13} />
                       {deleting ? "Deleting…" : "Delete"}
                     </button>
                   )}
@@ -344,7 +336,7 @@ function CommentRow<C extends CommunityComment>({
                     disabled={reported}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
                   >
-                    <Flag strokeWidth={2.5} size={11} />
+                    <FlagRegular fontSize={13} />
                     {reported ? "Reported" : "Report"}
                   </button>
                 </div>
@@ -389,7 +381,7 @@ function CommentRow<C extends CommunityComment>({
                     aria-label="Add reaction"
                     aria-expanded={pickerOpen}
                   >
-                    <Smile strokeWidth={2} size={16} />
+                    <EmojiRegular fontSize={18} />
                   </button>
                   {pickerOpen && (
                     <div className="absolute bottom-9 left-0 z-20 flex items-center gap-0.5 rounded-xl border border-border bg-surface p-1 shadow-lg">
@@ -487,9 +479,8 @@ function CommentRow<C extends CommunityComment>({
                   {repliesOpen
                     ? "Hide replies"
                     : `View ${(comment.replies ?? []).length} ${(comment.replies ?? []).length === 1 ? "reply" : "replies"}`}
-                  <ChevronUp
-                    strokeWidth={2.5}
-                    size={14}
+                  <ChevronUpRegular
+                    fontSize={16}
                     className={`transition-transform duration-150 ${repliesOpen ? "" : "rotate-180"}`}
                   />
                 </button>
@@ -596,7 +587,7 @@ export function CommentSection<C extends CommunityComment>({
           its own against the right edge. */}
       <div className="mt-3 flex items-center gap-4">
         <label className="flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
-          <ArrowUpDown strokeWidth={2} size={13} />
+          <ArrowSortRegular fontSize={15} />
           <select
             aria-label="Sort comments"
             value={sort}
@@ -606,7 +597,7 @@ export function CommentSection<C extends CommunityComment>({
             <option value="newest">Most recent</option>
             <option value="popular">Most popular</option>
           </select>
-          <ChevronDown strokeWidth={2} size={12} className="-ml-4 pointer-events-none" />
+          <ChevronDownRegular fontSize={14} className="-ml-4 pointer-events-none" />
         </label>
       </div>
 

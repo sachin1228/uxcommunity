@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import {
-  CalendarClock,
-  ChevronDown,
-  Image,
-  Plus,
-} from "lucide-react";
+import { CalendarClockRegular, ChevronDownRegular, ImageRegular, AddRegular } from "@fluentui/react-icons";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
@@ -188,7 +183,7 @@ export function ShowcaseView({
             </p>
           </div>
           <GradientButton onClick={() => setCreating(true)}>
-            <Plus strokeWidth={2.5} size={14} />
+            <AddRegular fontSize={16} />
             Share your work
           </GradientButton>
         </div>
@@ -207,14 +202,14 @@ export function ShowcaseView({
                   aria-pressed={category === item.value}
                   className={filterChip(category === item.value)}
                 >
-                  <Icon size={14} strokeWidth={2.5} />
+                  <Icon fontSize={16} />
                   {item.label}
                 </button>
               );
             })}
             <div className="relative shrink-0">
-              <CalendarClock
-                size={14}
+              <CalendarClockRegular
+                fontSize={16}
                 className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
               />
               <select
@@ -228,8 +223,8 @@ export function ShowcaseView({
                 <option value="newest">Newest first</option>
                 <option value="popular">Most discussed</option>
               </select>
-              <ChevronDown
-                size={14}
+              <ChevronDownRegular
+                fontSize={16}
                 className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
               />
             </div>
@@ -240,7 +235,7 @@ export function ShowcaseView({
       <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading showcase">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         ) : error ? (
           <p className="py-24 text-center font-body text-sm text-foreground-muted">
@@ -248,7 +243,7 @@ export function ShowcaseView({
           </p>
         ) : !visible.length ? (
           <div className={communityFeedLayout.emptyState}>
-            <Image strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <ImageRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>
               No showcase posts yet
             </h3>

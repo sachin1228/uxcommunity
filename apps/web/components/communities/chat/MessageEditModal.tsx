@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Check, CheckCheck, Smile, X } from "lucide-react";
+import { CheckmarkRegular, EmojiRegular, DismissRegular } from "@fluentui/react-icons";
+import { DoubleCheckIcon } from "@/components/ui/DoubleCheckIcon";
 import { Modal } from "@/components/ui/Modal";
 import type { CachedMessage } from "@/lib/communities/cache";
 import { fmtTime, MAX_MESSAGE_CHARS } from "./chatUtils";
@@ -55,7 +56,7 @@ export function MessageEditModal({
             className="rounded-full p-1 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             aria-label="Close edit message dialog"
           >
-            <X size={25} strokeWidth={2.5} />
+            <DismissRegular fontSize={27} />
           </button>
           <h2 className="font-body text-lg font-medium text-foreground">Edit message</h2>
         </div>
@@ -75,7 +76,7 @@ export function MessageEditModal({
             </p>
             <div className="mt-1 flex items-center justify-end gap-1 text-accent-foreground opacity-60">
               <span className="font-mono text-[10px]">{fmtTime(message.created_at)}</span>
-              <CheckCheck strokeWidth={2.5} size={12} />
+              <DoubleCheckIcon fontSize={14} />
             </div>
           </div>
         </div>
@@ -105,7 +106,7 @@ export function MessageEditModal({
               aria-label="Add emoji"
               title="Add emoji"
             >
-              <Smile strokeWidth={2.5} size={21} />
+              <EmojiRegular fontSize={23} />
             </button>
             <button
               type="button"
@@ -115,7 +116,7 @@ export function MessageEditModal({
               aria-label="Save edited message"
               title="Save edit"
             >
-              <Check size={23} strokeWidth={2.5} />
+              <CheckmarkRegular fontSize={25} />
             </button>
           </div>
         </div>

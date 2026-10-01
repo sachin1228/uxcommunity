@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Trash2, Sparkles, Users } from "lucide-react";
+import { SearchRegular, DeleteRegular, SparkleRegular, PeopleRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityRow, type CommunityListItem } from "@/components/admin/communities/CommunityRow";
@@ -10,8 +10,8 @@ import { CommunityRow, type CommunityListItem } from "@/components/admin/communi
 // Main origin tabs: communities the uxcommunity app creates itself vs the
 // personal/public communities members create.
 const MAIN_TABS = [
-  { label: "App-created", value: "app", icon: Sparkles },
-  { label: "Member-created", value: "member", icon: Users },
+  { label: "App-created", value: "app", icon: SparkleRegular },
+  { label: "Member-created", value: "member", icon: PeopleRegular },
 ] as const;
 
 type MainTabValue = typeof MAIN_TABS[number]["value"];
@@ -118,7 +118,7 @@ export default function AdminCommunitiesPage() {
           onClick={() => { setShowResetConfirm(true); setResetResult(null); setResetError(null); }}
           className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
         >
-          <Trash2 strokeWidth={2.5} size={12} />
+          <DeleteRegular fontSize={14} />
           Reset all chat
         </button>
       </div>
@@ -160,7 +160,7 @@ export default function AdminCommunitiesPage() {
                       : "border-transparent text-foreground-muted hover:text-foreground"
                   }`}
                 >
-                  <Icon size={13} strokeWidth={2.5} />
+                  <Icon fontSize={15} />
                   {tab.label}
                   <span
                     className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
@@ -216,8 +216,8 @@ export default function AdminCommunitiesPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search
-          size={13}
+        <SearchRegular
+          fontSize={15}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
         />
         <input
@@ -233,7 +233,7 @@ export default function AdminCommunitiesPage() {
       <div className="rounded-xl border border-border overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5" />
+            <Spinner className="h-[22px] w-[22px]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
@@ -295,7 +295,7 @@ export default function AdminCommunitiesPage() {
                 disabled={resetLoading}
                 className="modal-btn modal-btn-danger flex-1"
               >
-                {resetLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
+                {resetLoading ? <Spinner className="h-3.5 w-3.5" /> : <DeleteRegular fontSize={14} />}
                 Yes, delete all
               </button>
             </div>

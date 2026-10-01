@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDownRegular } from "@fluentui/react-icons";
 import { ApplicationStatusBadge } from "./ApplicationStatusBadge";
 import type { HistoryItem } from "./types";
 
@@ -20,8 +20,8 @@ export function ApplicationHistory({ history }: Props) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors mb-2"
       >
-        <ChevronDown
-          size={13}
+        <ChevronDownRegular
+          fontSize={15}
           className={`transition-transform ${open ? "rotate-180" : ""}`}
         />
         {history.length} previous application{history.length > 1 ? "s" : ""}

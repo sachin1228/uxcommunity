@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BadgeCheck } from "lucide-react";
+import { CertificateRegular } from "@fluentui/react-icons";
 
 /**
  * Company logo, falling back to the company's initial. A company legitimately
@@ -68,7 +68,7 @@ export function VerifiedMark({
   title?: string;
   size?: "xs" | "sm";
 }) {
-  const iconSize = size === "xs" ? 10 : 12;
+  const iconSize = size === "xs" ? 12 : 14;
   return (
     <span
       title={title}
@@ -78,7 +78,7 @@ export function VerifiedMark({
           : "inline-flex items-center gap-1 font-body text-xs font-medium text-accent"
       }
     >
-      <BadgeCheck strokeWidth={2.5} size={iconSize} />
+      <CertificateRegular fontSize={iconSize} />
       {label ? "Verified" : null}
     </span>
   );

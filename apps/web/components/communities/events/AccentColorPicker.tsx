@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { CheckmarkRegular } from "@fluentui/react-icons";
 
 /**
  * Accent color picker shared by the Create and Edit event modals.
@@ -53,7 +53,7 @@ export function AccentColorPicker({
               }`}
               style={{ backgroundColor: preset.value }}
             >
-              {active && <Check strokeWidth={3} size={14} className="text-stone-900" />}
+              {active && <CheckmarkRegular fontSize={16} className="text-stone-900" />}
             </button>
           );
         })}

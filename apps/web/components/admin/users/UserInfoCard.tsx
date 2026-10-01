@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { OpenRegular } from "@fluentui/react-icons";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import type { AdminUser, UserApplication, UserInterest } from "./userTypes";
 import { EXPERIENCE_LABELS, AVATAR_SOURCE_LABELS } from "./userTypes";
@@ -97,7 +97,7 @@ export function UserInfoCard({ user, application, interests }: Props) {
               className="flex items-center gap-1 text-accent hover:underline"
             >
               {application.linkedin_url}
-              <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
+              <OpenRegular fontSize={13} className="shrink-0" />
             </a>
           ) : (
             "—"
@@ -115,7 +115,7 @@ export function UserInfoCard({ user, application, interests }: Props) {
               className="flex items-center gap-1 text-accent hover:underline"
             >
               {application.portfolio_url}
-              <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
+              <OpenRegular fontSize={13} className="shrink-0" />
             </a>
           ) : (
             "—"

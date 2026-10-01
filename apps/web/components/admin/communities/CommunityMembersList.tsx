@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Search, X } from "lucide-react";
+import { OpenRegular, SearchRegular, DismissRegular } from "@fluentui/react-icons";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityMember, CommunityMemberSearchResult } from "./communityTypes";
@@ -129,8 +129,8 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
 
         {communityId && (
           <div className="relative w-full sm:w-72">
-            <Search
-              size={13}
+            <SearchRegular
+              fontSize={15}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
             />
             <input
@@ -146,7 +146,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Clear search"
               >
-                <X strokeWidth={2.5} size={12} />
+                <DismissRegular fontSize={14} />
               </button>
             )}
           </div>
@@ -155,7 +155,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
 
       {busy && !visibleRows ? (
         <div className="flex justify-center py-10">
-          <Spinner className="h-4 w-4" />
+          <Spinner className="h-[18px] w-[18px]" />
         </div>
       ) : error && hasQuery ? (
         <p className="px-5 py-4 font-body text-xs text-red-400">{error}</p>
@@ -175,7 +175,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                   onClick={() => router.push(`/admin/users/${m.user_id}`)}
                   className="font-body text-xs font-medium text-foreground hover:text-accent transition-colors flex items-center gap-1"
                 >
-                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-foreground-muted" />
+                  {m.name} <OpenRegular fontSize={12} className="text-foreground-muted" />
                 </button>
                 <p className="font-body text-[11px] text-foreground-muted truncate">{m.email}</p>
               </div>
@@ -202,7 +202,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                   onClick={() => router.push(`/admin/users/${m.id}`)}
                   className="font-body text-xs font-medium text-foreground hover:text-accent transition-colors flex items-center gap-1"
                 >
-                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-foreground-muted" />
+                  {m.name} <OpenRegular fontSize={12} className="text-foreground-muted" />
                 </button>
                 <p className="font-body text-[11px] text-foreground-muted truncate">{m.email}</p>
               </div>
@@ -224,7 +224,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
             disabled={busy}
             className="w-full rounded-lg border border-border py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
           >
-            {busy ? <Spinner className="mx-auto h-3 w-3" /> : `Load more (${visibleRows.length} of ${total})`}
+            {busy ? <Spinner className="mx-auto h-3.5 w-3.5" /> : `Load more (${visibleRows.length} of ${total})`}
           </button>
         </div>
       )}

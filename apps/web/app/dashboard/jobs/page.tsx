@@ -1,11 +1,11 @@
-import { Briefcase } from "lucide-react";
+import { BriefcaseRegular } from "@fluentui/react-icons/headless/svg/briefcase";
 
 export const metadata = { title: "Jobs — uxcommunity" };
 
 export default function JobsPage() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-      <Briefcase strokeWidth={2.5} size={48} className="text-foreground-muted opacity-40" />
+      <BriefcaseRegular fontSize={50} className="text-foreground-muted opacity-40" />
       <div>
         <h1 className="font-body text-xl font-semibold text-foreground">
           Jobs

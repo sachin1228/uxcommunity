@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, Flag, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { BookmarkFilled, BookmarkRegular, FlagRegular, MoreHorizontalRegular, EditRegular, DeleteRegular } from "@fluentui/react-icons";
 
 export function ShowcaseOptionsMenu({
   saved,
@@ -64,7 +64,7 @@ export function ShowcaseOptionsMenu({
            post-options affordance for the whole feed. */
         className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
       >
-        <MoreHorizontal strokeWidth={2.5} size={15} />
+        <MoreHorizontalRegular fontSize={17} />
       </button>
       {open && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -78,7 +78,7 @@ export function ShowcaseOptionsMenu({
             aria-busy={busy}
             className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
           >
-            <Bookmark strokeWidth={2.5} size={11} fill={saved ? "currentColor" : "none"} />
+            {saved ? <BookmarkFilled fontSize={13} /> : <BookmarkRegular fontSize={13} />}
             {saved ? "Unsave" : "Save"}
           </button>
           {canEdit && (
@@ -90,7 +90,7 @@ export function ShowcaseOptionsMenu({
               }}
               className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
             >
-              <Pencil strokeWidth={2.5} size={11} />
+              <EditRegular fontSize={13} />
               Edit
             </button>
           )}
@@ -103,7 +103,7 @@ export function ShowcaseOptionsMenu({
               }}
               className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
             >
-              <Trash2 strokeWidth={2.5} size={11} />
+              <DeleteRegular fontSize={13} />
               Delete
             </button>
           )}
@@ -117,7 +117,7 @@ export function ShowcaseOptionsMenu({
               disabled={reported}
               className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
             >
-              <Flag strokeWidth={2.5} size={11} />
+              <FlagRegular fontSize={13} />
               {reported ? "Reported" : "Report"}
             </button>
           )}

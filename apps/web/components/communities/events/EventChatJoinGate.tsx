@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Check, MapPin, MessageSquare, Users, Video } from "lucide-react";
+import { CalendarMonthRegular, CheckmarkRegular, LocationRegular, CommentRegular, PeopleRegular, VideoRegular } from "@fluentui/react-icons";
 import { Modal } from "@/components/ui/Modal";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
@@ -98,7 +98,7 @@ export function EventChatJoinGate({
 
           <div className="px-5 py-6 md:px-8 md:py-7">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground-muted">
-              <MessageSquare strokeWidth={2.5} size={11} />
+              <CommentRegular fontSize={13} />
               Event chat
             </span>
 
@@ -111,7 +111,7 @@ export function EventChatJoinGate({
 
             <dl className="mt-5 flex flex-col gap-2.5 font-body text-sm text-foreground-muted">
               <div className="flex items-center gap-2">
-                <CalendarDays strokeWidth={2.5} size={14} className="shrink-0 text-foreground-subtle" />
+                <CalendarMonthRegular fontSize={16} className="shrink-0 text-foreground-subtle" />
                 {/* The viewer's own clock, named — a host in another zone set
                     this time, and this is what it is here. */}
                 <span title={eventZoneTooltip(event.event_date)}>
@@ -124,18 +124,18 @@ export function EventChatJoinGate({
               <div className="flex items-center gap-2">
                 {event.is_online ? (
                   <>
-                    <Video strokeWidth={2.5} size={14} className="shrink-0 text-foreground-subtle" />
+                    <VideoRegular fontSize={16} className="shrink-0 text-foreground-subtle" />
                     <span>Online event</span>
                   </>
                 ) : (
                   <>
-                    <MapPin strokeWidth={2.5} size={14} className="shrink-0 text-foreground-subtle" />
+                    <LocationRegular fontSize={16} className="shrink-0 text-foreground-subtle" />
                     <span>{event.location ?? "Location shared by the host"}</span>
                   </>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Users strokeWidth={2.5} size={14} className="shrink-0 text-foreground-subtle" />
+                <PeopleRegular fontSize={16} className="shrink-0 text-foreground-subtle" />
                 <span>
                   {rsvpCount} going · {memberCount} in this chat
                 </span>
@@ -144,7 +144,7 @@ export function EventChatJoinGate({
 
             <div className="mt-6 flex flex-col items-start gap-3">
               <GradientButton onClick={() => setConfirmOpen(true)} className="h-10 px-4 text-sm">
-                <MessageSquare strokeWidth={2.5} size={15} />
+                <CommentRegular fontSize={17} />
                 Join event chat
               </GradientButton>
               <p className="max-w-md text-pretty font-body text-xs leading-5 text-foreground-subtle">
@@ -188,7 +188,7 @@ export function EventChatJoinGate({
             disabled={joining}
             className="modal-btn modal-btn-primary"
           >
-            <Check strokeWidth={2.5} size={15} />
+            <CheckmarkRegular fontSize={17} />
             Continue
           </button>
         </div>

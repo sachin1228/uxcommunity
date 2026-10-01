@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Search, X, ChevronRight, ImagePlus } from "lucide-react";
+import { AddRegular, SearchRegular, DismissRegular, ChevronRightRegular, ImageAddRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { useRouter } from "next/navigation";
 import { AddItemModal } from "@/components/admin/masterData/AddItemModal";
@@ -164,7 +164,7 @@ export function MasterDataPage({
               onClick={() => setModalOpen(true)}
               className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
             >
-              <Plus strokeWidth={2.5} size={13} />
+              <AddRegular fontSize={15} />
               Add {entity}
             </button>
           )}
@@ -200,8 +200,8 @@ export function MasterDataPage({
 
       {/* Search */}
       <div className="relative mb-3">
-        <Search
-          size={13}
+        <SearchRegular
+          fontSize={15}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
         />
         <input
@@ -216,7 +216,7 @@ export function MasterDataPage({
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
           >
-            <X strokeWidth={2.5} size={12} />
+            <DismissRegular fontSize={14} />
           </button>
         )}
       </div>
@@ -225,7 +225,7 @@ export function MasterDataPage({
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-10">
-            <Spinner className="h-4 w-4" />
+            <Spinner className="h-[18px] w-[18px]" />
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -237,7 +237,7 @@ export function MasterDataPage({
                 onClick={() => setModalOpen(true)}
                 className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
               >
-                <Plus strokeWidth={2.5} size={13} />Add your first {entity.toLowerCase()}
+                <AddRegular fontSize={15} />Add your first {entity.toLowerCase()}
               </button>
             )}
           </div>
@@ -278,7 +278,7 @@ export function MasterDataPage({
                       />
                     ) : (
                       <div className="h-6 w-6 rounded border border-border bg-surface-raised flex items-center justify-center">
-                        <ImagePlus strokeWidth={2.5} size={11} className="text-foreground-muted" />
+                        <ImageAddRegular fontSize={13} className="text-foreground-muted" />
                       </div>
                     )}
                   </td>
@@ -305,7 +305,7 @@ export function MasterDataPage({
                     </span>
                   </td>
                   <td className="px-4 py-2.5 w-6">
-                    <ChevronRight strokeWidth={2.5} size={13} className="text-foreground-muted" />
+                    <ChevronRightRegular fontSize={15} className="text-foreground-muted" />
                   </td>
                 </tr>
               ))}

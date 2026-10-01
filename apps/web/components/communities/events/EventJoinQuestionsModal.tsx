@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ClipboardList } from "lucide-react";
+import { CheckmarkRegular, ClipboardTaskListLtrRegular } from "@fluentui/react-icons";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -148,11 +148,11 @@ export function EventJoinQuestionsModal({
             className="modal-btn modal-btn-primary"
           >
             {pending ? (
-              <Spinner size={15} className="text-white" />
+              <Spinner size={17} className="text-white" />
             ) : ready ? (
-              <Check strokeWidth={2.5} size={15} />
+              <CheckmarkRegular fontSize={17} />
             ) : (
-              <ClipboardList strokeWidth={2.5} size={15} />
+              <ClipboardTaskListLtrRegular fontSize={17} />
             )}
             {pending
               ? "Submitting…"

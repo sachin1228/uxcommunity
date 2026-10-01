@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeftRegular, ChevronRightRegular } from "@fluentui/react-icons";
 import { FeedVideo } from "@/components/communities/FeedVideo";
 
 interface CarouselImage {
@@ -206,7 +206,7 @@ export function ThreadImageCarousel({
           hasPrev ? "" : "hidden"
         }`}
       >
-        <ChevronLeft size={18} strokeWidth={2.5} />
+        <ChevronLeftRegular fontSize={20} />
       </button>
 
       {/* Next */}
@@ -218,7 +218,7 @@ export function ThreadImageCarousel({
           hasNext ? "" : "hidden"
         }`}
       >
-        <ChevronRight size={18} strokeWidth={2.5} />
+        <ChevronRightRegular fontSize={20} />
       </button>
 
       {/* Pagination indicators (carousel dots) — one per image, clickable */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Pencil, ChevronDown, X, Check } from "lucide-react";
+import { EditRegular, ChevronDownRegular, DismissRegular, CheckmarkRegular } from "@fluentui/react-icons";
 import { INTEREST_EMOJIS, MAX_DESIGN_INTERESTS } from "@/lib/interests";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 
@@ -67,7 +67,7 @@ export function ProfileInterests({
             >
               <span>{INTEREST_EMOJIS[interest.name] ?? "🎨"}</span>
               {interest.name}
-              <X strokeWidth={2.5} size={10} className="opacity-50 group-hover:opacity-100" />
+              <DismissRegular fontSize={12} className="opacity-50 group-hover:opacity-100" />
             </button>
           ))
         )}
@@ -81,9 +81,9 @@ export function ProfileInterests({
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-accent/40 bg-surface-raised px-4 py-2 font-body text-sm text-foreground-muted hover:text-foreground transition-all"
         >
-          <Pencil strokeWidth={2.5} size={12} />
+          <EditRegular fontSize={14} />
           Edit interests
-          <ChevronDown strokeWidth={2.5} size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDownRegular fontSize={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {/* Portal dropdown — always above other content */}
@@ -117,7 +117,7 @@ export function ProfileInterests({
                     }`}
                     aria-hidden="true"
                   >
-                    {selected && <Check size={11} className="text-accent-foreground" strokeWidth={2.5} />}
+                    {selected && <CheckmarkRegular fontSize={13} className="text-accent-foreground" />}
                   </span>
                 </button>
               );

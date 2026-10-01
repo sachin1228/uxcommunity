@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, ShieldCheck, X } from "lucide-react";
+import { SearchRegular, ShieldCheckmarkRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -140,7 +140,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border shrink-0">
           <div>
             <h2 className="font-display text-base font-semibold text-foreground leading-none flex items-center gap-2">
-              <ShieldCheck strokeWidth={2.5} size={16} className="text-accent" /> Add community admin
+              <ShieldCheckmarkRegular fontSize={18} className="text-accent" /> Add community admin
             </h2>
             <p className="font-body text-[11px] text-foreground-muted mt-1">
               Pick a member of <span className="font-medium text-foreground">{communityName}</span> to promote.
@@ -152,14 +152,14 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
             className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
             aria-label="Close"
           >
-            <X strokeWidth={2.5} size={15} />
+            <DismissRegular fontSize={17} />
           </button>
         </div>
 
         {/* Search */}
         <div className="px-5 py-3 shrink-0">
           <div className="relative">
-            <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+            <SearchRegular fontSize={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
             <input
               ref={inputRef}
               type="text"
@@ -183,7 +183,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
           )}
           {busy ? (
             <div className="flex items-center justify-center py-10">
-              <Spinner className="h-4 w-4" />
+              <Spinner className="h-[18px] w-[18px]" />
             </div>
           ) : members.length === 0 ? (
             <p className="px-2 py-6 text-center font-body text-xs text-foreground-muted">
@@ -222,7 +222,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 font-body text-xs font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-60"
                       >
                         {busyUserId === member.user_id ? (
-                          <Spinner className="h-3 w-3" />
+                          <Spinner className="h-3.5 w-3.5" />
                         ) : isPromoted ? (
                           "✓ Promoted"
                         ) : (
@@ -243,7 +243,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                 disabled={loadingMore}
                 className="w-full rounded-lg border border-border py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
               >
-                {loadingMore ? <Spinner className="mx-auto h-3 w-3" /> : `Load more (${members.length} of ${total})`}
+                {loadingMore ? <Spinner className="mx-auto h-3.5 w-3.5" /> : `Load more (${members.length} of ${total})`}
               </button>
             </div>
           )}

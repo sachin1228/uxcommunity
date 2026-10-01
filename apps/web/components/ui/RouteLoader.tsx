@@ -7,7 +7,7 @@ import { Spinner } from "./Spinner";
 export function RouteLoader() {
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
-      <Spinner size={28} />
+      <Spinner size={30} />
     </div>
   );
 }

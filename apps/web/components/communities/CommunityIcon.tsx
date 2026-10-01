@@ -1,4 +1,4 @@
-import { Users } from "lucide-react";
+import { PeopleRegular } from "@fluentui/react-icons/headless/svg/people";
 
 /**
  * Single community avatar fallback, used everywhere a community has no image
@@ -23,9 +23,8 @@ export function CommunityIcon({
       style={{ width: size, height: size }}
       aria-hidden
     >
-      <Users
-        size={iconSize ?? Math.round(size * 0.5)}
-        strokeWidth={2.5}
+      <PeopleRegular
+        fontSize={iconSize ?? Math.round(size * 0.5) + 2}
         className="text-foreground-muted"
       />
     </div>

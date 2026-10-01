@@ -325,7 +325,7 @@ function SignupInner() {
 
         {tokenState.status === "loading" && (
           <div className="flex justify-center py-16">
-            <Spinner className="h-6 w-6" />
+            <Spinner className="h-[26px] w-[26px]" />
           </div>
         )}
 
@@ -421,7 +421,7 @@ export default function SignupPage() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner className="h-6 w-6" />
+        <Spinner className="h-[26px] w-[26px]" />
       </div>
     }>
       <SignupInner />

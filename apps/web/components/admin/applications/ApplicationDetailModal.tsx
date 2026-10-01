@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExternalLink, X } from "lucide-react";
+import { OpenRegular, DismissRegular } from "@fluentui/react-icons";
 import { Modal } from "@/components/ui/Modal";
 import { ApplicationStatusBadge } from "./ApplicationStatusBadge";
 import { InviteLinkBox } from "./InviteLinkBox";
@@ -104,7 +104,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             aria-label="Close"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
           >
-            <X strokeWidth={2.5} size={16} />
+            <DismissRegular fontSize={18} />
           </button>
         </div>
 
@@ -116,7 +116,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <ExternalLink strokeWidth={2.5} size={12} /> LinkedIn
+            <OpenRegular fontSize={14} /> LinkedIn
           </a>
           <a
             href={app.portfolio_url}
@@ -124,7 +124,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <ExternalLink strokeWidth={2.5} size={12} /> Portfolio
+            <OpenRegular fontSize={14} /> Portfolio
           </a>
         </div>
 

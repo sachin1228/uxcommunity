@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  BarChart3,
-  Image as ImageIcon,
-  Paperclip,
-  PenLine,
-  Plus,
-  X,
-} from "lucide-react";
+import { DataBarVerticalRegular, ImageRegular, AttachRegular, EditRegular, AddRegular, DismissRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   POLL_MIN_OPTIONS,
@@ -56,7 +49,7 @@ export function CategoryPicker({
               aria-pressed={active}
               className={filterChip(active)}
             >
-              <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+              <Icon fontSize={16} aria-hidden="true" />
               {item.label}
             </button>
           );
@@ -78,9 +71,9 @@ export function ComposerTabs({
   value: ThreadComposerTab;
   onChange: (value: ThreadComposerTab) => void;
 }) {
-  const tabs: Array<{ value: ThreadComposerTab; label: string; icon: typeof PenLine }> = [
-    { value: "post", label: "Post", icon: PenLine },
-    { value: "poll", label: "Poll", icon: BarChart3 },
+  const tabs: Array<{ value: ThreadComposerTab; label: string; icon: typeof EditRegular }> = [
+    { value: "post", label: "Post", icon: EditRegular },
+    { value: "poll", label: "Poll", icon: DataBarVerticalRegular },
   ];
 
   return (
@@ -106,7 +99,7 @@ export function ComposerTabs({
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
-              <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+              <Icon fontSize={16} aria-hidden="true" />
               {tab.label}
             </span>
           </button>
@@ -151,7 +144,7 @@ export function PollComposer({
   return (
     <div className="rounded-xl border border-border bg-background p-4">
       <div className="flex items-center gap-1.5">
-        <BarChart3 strokeWidth={2.5} size={13} className="text-foreground-muted" />
+        <DataBarVerticalRegular fontSize={15} className="text-foreground-muted" />
         <span className="font-body text-xs font-semibold text-foreground-muted">
           Poll
         </span>
@@ -195,7 +188,7 @@ export function PollComposer({
                   aria-label={`Remove option ${index + 1}`}
                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-subtle hover:text-foreground"
                 >
-                  <X strokeWidth={2.5} size={13} />
+                  <DismissRegular fontSize={15} />
                 </button>
               )}
             </div>
@@ -208,7 +201,7 @@ export function PollComposer({
             onClick={addOption}
             className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
           >
-            <Plus strokeWidth={2.5} size={12} />
+            <AddRegular fontSize={14} />
             Add option
           </button>
         )}
@@ -258,7 +251,7 @@ export function ImageAttachmentsRow({
             className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
             aria-label={`Remove ${image.name}`}
           >
-            <X strokeWidth={2.5} size={10} />
+            <DismissRegular fontSize={12} />
           </button>
         </div>
       ))}
@@ -271,9 +264,9 @@ export function ImageAttachmentsRow({
           className="flex min-w-[112px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border px-3 font-body text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? (
-            <Spinner size={16} />
+            <Spinner size={18} />
           ) : (
-            <Plus strokeWidth={2.5} size={18} />
+            <AddRegular fontSize={20} />
           )}
           <span className="text-[11px] font-medium">{uploading ? "Uploading…" : "Add more"}</span>
           <span className="text-[10px] text-foreground-subtle">(Max {THREAD_IMAGE_MAX})</span>
@@ -298,7 +291,7 @@ export function FileAttachmentList({
           key={file.url}
           className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 font-body text-xs text-foreground-muted"
         >
-          <Paperclip strokeWidth={2.5} size={13} className="shrink-0" />
+          <AttachRegular fontSize={15} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{file.name}</span>
           <button
             type="button"
@@ -306,7 +299,7 @@ export function FileAttachmentList({
             aria-label={`Remove ${file.name}`}
             className="text-foreground-subtle hover:text-foreground"
           >
-            <X strokeWidth={2.5} size={13} />
+            <DismissRegular fontSize={15} />
           </button>
         </div>
       ))}
@@ -341,7 +334,7 @@ export function ComposerMedia({
         disabled={uploading}
         className="flex h-16 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {uploading ? <Spinner size={14} /> : <ImageIcon strokeWidth={2.5} size={15} />}
+        {uploading ? <Spinner size={16} /> : <ImageRegular fontSize={17} />}
         {uploading ? "Uploading…" : "Add photo or file"}
       </button>
     );
@@ -365,7 +358,7 @@ export function ComposerMedia({
           disabled={uploading}
           className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {uploading ? <Spinner size={13} /> : <ImageIcon strokeWidth={2.5} size={13} />}
+          {uploading ? <Spinner size={15} /> : <ImageRegular fontSize={15} />}
           {uploading ? "Uploading…" : "Add photo"}
         </button>
       )}

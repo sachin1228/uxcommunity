@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
+import { ChevronLeftRegular, ChevronRightRegular, PlayRegular, DismissRegular } from "@fluentui/react-icons";
 import { ModalPortal } from "@/components/ui/Modal";
 import type { ShowcaseAttachment } from "./types";
 
@@ -69,7 +69,7 @@ export function ShowcaseMediaLightbox({
             title="Close (Esc)"
             className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
           >
-            <X strokeWidth={2.5} size={18} />
+            <DismissRegular fontSize={20} />
           </button>
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-16 py-4">
@@ -80,7 +80,7 @@ export function ShowcaseMediaLightbox({
                 aria-label="Previous media"
                 className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
               >
-                <ChevronLeft strokeWidth={2.5} size={22} />
+                <ChevronLeftRegular fontSize={24} />
               </button>
             )}
             {isVideo ? (
@@ -96,7 +96,7 @@ export function ShowcaseMediaLightbox({
                 <div className="flex flex-col items-center justify-center gap-3 rounded-sm bg-black/60 px-10 py-16 text-white">
                   {item.status === "failed" ? (
                     <>
-                      <Play strokeWidth={2} size={28} className="text-white/50" />
+                      <PlayRegular fontSize={30} className="text-white/50" />
                       <span className="font-body text-sm text-white/70">Video unavailable</span>
                     </>
                   ) : (
@@ -123,7 +123,7 @@ export function ShowcaseMediaLightbox({
                 aria-label="Next media"
                 className="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
               >
-                <ChevronRight strokeWidth={2.5} size={22} />
+                <ChevronRightRegular fontSize={24} />
               </button>
             )}
           </div>
@@ -151,12 +151,12 @@ export function ShowcaseMediaLightbox({
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={item.poster} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />
                             <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
-                              <Play strokeWidth={2.5} size={16} fill="currentColor" />
+                              <PlayRegular fontSize={18} fill="currentColor" />
                             </span>
                           </span>
                         ) : (
                           <span className="flex h-full w-full items-center justify-center bg-neutral-900 text-white">
-                            <Play strokeWidth={2.5} size={16} fill="currentColor" />
+                            <PlayRegular fontSize={18} fill="currentColor" />
                           </span>
                         )
                       ) : (

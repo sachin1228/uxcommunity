@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { ArrowMaximizeRegular, ArrowMinimizeRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
@@ -45,7 +45,7 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
       <div className={`relative w-full ${compact ? "aspect-[4/3] sm:aspect-video" : "aspect-[4/3] md:aspect-video"}`}>
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-foreground-muted">
-            <Spinner size={16} />
+            <Spinner size={18} />
             <span className="font-body text-sm">Loading Figma prototype…</span>
           </div>
         )}
@@ -71,11 +71,11 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
         >
           {isFullscreen ? (
             <>
-              Exit full screen <Minimize2 strokeWidth={2.5} size={12} />
+              Exit full screen <ArrowMinimizeRegular fontSize={14} />
             </>
           ) : (
             <>
-              View full screen <Maximize2 strokeWidth={2.5} size={12} />
+              View full screen <ArrowMaximizeRegular fontSize={14} />
             </>
           )}
         </button>

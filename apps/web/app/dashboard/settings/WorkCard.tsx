@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, Loader2, Plus } from "lucide-react";
+import { BuildingRegular, SpinnerIosRegular, AddRegular } from "@fluentui/react-icons";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { PendingCompanyVerification, ProfileCompanyView } from "@/components/companies/types";
@@ -86,7 +86,7 @@ export function WorkCard({
                   <span className="font-body text-xs text-foreground-muted">{company.domain}</span>
                 ) : (
                   <span className={labelCls}>
-                    <Building2 strokeWidth={2.5} size={9} /> No verified domain
+                    <BuildingRegular fontSize={11} /> No verified domain
                   </span>
                 )}
                 {company.isActive && company.domainVerified && <VerifiedMark size="xs" />}
@@ -101,7 +101,7 @@ export function WorkCard({
               disabled={removing}
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
             >
-              {removing && <Loader2 strokeWidth={2.5} size={11} className="animate-spin" />}
+              {removing && <SpinnerIosRegular fontSize={13} className="animate-spin" />}
               Remove
             </button>
           </div>
@@ -112,7 +112,7 @@ export function WorkCard({
             className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border px-3.5 py-3 text-left transition-colors hover:border-accent/40"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-raised text-foreground-muted">
-              <Plus strokeWidth={2.5} size={15} />
+              <AddRegular fontSize={17} />
             </span>
             <span className="min-w-0">
               <span className="block font-body text-sm font-medium text-foreground">

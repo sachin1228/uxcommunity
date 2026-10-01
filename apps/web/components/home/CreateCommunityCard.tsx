@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { SparkleRegular } from "@fluentui/react-icons";
 import { openCreateCommunityDialog } from "@/lib/communities/create-community-dialog";
 
 /**
@@ -18,7 +18,7 @@ export function CreateCommunityCard() {
       className="overflow-hidden rounded-xl border border-border bg-background-subtle"
     >
       <div className="flex items-center gap-2 px-4 pt-4">
-        <Sparkles size={15} strokeWidth={2.5} className="text-foreground-muted" aria-hidden="true" />
+        <SparkleRegular fontSize={17} className="text-foreground-muted" aria-hidden="true" />
         <h2
           id="home-create-community-heading"
           className="font-display text-sm font-semibold text-foreground"

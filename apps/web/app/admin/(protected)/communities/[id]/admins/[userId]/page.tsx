@@ -2,18 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Check,
-  ShieldCheck,
-  ShieldOff,
-  Save,
-  Trash2,
-  X,
-  CalendarDays,
-  UserRound,
-  Clock3,
-} from "lucide-react";
+import { ArrowLeftRegular, CheckmarkRegular, ShieldCheckmarkRegular, ShieldProhibitedRegular, SaveRegular, DeleteRegular, DismissRegular, CalendarMonthRegular, PersonRegular, ClockRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -109,7 +98,7 @@ export default function CommunityAdminPermissionsPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-5 w-5" />
+        <Spinner className="h-[22px] w-[22px]" />
       </div>
     );
   }
@@ -117,7 +106,7 @@ export default function CommunityAdminPermissionsPage() {
   if (notFound || !admin || !permissions) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <ShieldOff strokeWidth={2.5} size={24} className="text-foreground-muted/60" />
+        <ShieldProhibitedRegular fontSize={26} className="text-foreground-muted/60" />
         <p className="font-body text-sm text-foreground-muted">
           This member is not an admin of this community (or the community was removed).
         </p>
@@ -140,7 +129,7 @@ export default function CommunityAdminPermissionsPage() {
         onClick={() => router.push(`/admin/communities/${communityId}`)}
         className="flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors w-fit"
       >
-        <ArrowLeft strokeWidth={2.5} size={13} /> {communityName || "Community"}
+        <ArrowLeftRegular fontSize={15} /> {communityName || "Community"}
       </button>
 
       {/* Page header */}
@@ -156,7 +145,7 @@ export default function CommunityAdminPermissionsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-xl font-semibold text-foreground truncate">{admin.name}</h1>
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 font-body text-[10px] font-semibold text-amber-500 shrink-0">
-                <ShieldCheck strokeWidth={2.5} size={10} /> Community admin
+                <ShieldCheckmarkRegular fontSize={12} /> Community admin
               </span>
             </div>
             <p className="font-body text-xs text-foreground-muted mt-0.5 truncate">{admin.email}</p>
@@ -172,7 +161,7 @@ export default function CommunityAdminPermissionsPage() {
           disabled={!dirty || saving}
           className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 font-body text-xs font-medium text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
         >
-          {saving ? <Spinner className="h-3 w-3 text-accent-foreground" /> : <Save strokeWidth={2.5} size={12} />}
+          {saving ? <Spinner className="h-3.5 w-3.5 text-accent-foreground" /> : <SaveRegular fontSize={14} />}
           {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
         </button>
       </div>
@@ -184,7 +173,7 @@ export default function CommunityAdminPermissionsPage() {
           <div className="rounded-xl border border-border bg-surface overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
               <h2 className="font-body text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <ShieldCheck strokeWidth={2.5} size={14} className="text-accent" /> Permissions
+                <ShieldCheckmarkRegular fontSize={16} className="text-accent" /> Permissions
               </h2>
               <p className="font-body text-[11px] text-foreground-muted mt-0.5">
                 These control what {firstName} can do in the app for this community.
@@ -241,7 +230,7 @@ export default function CommunityAdminPermissionsPage() {
 
             <div className="px-5 py-3 border-t border-border bg-surface-raised/40">
               <p className="font-body text-[11px] text-foreground-muted flex items-center gap-1.5">
-                <Check strokeWidth={2.5} size={11} className="text-green-400 shrink-0" />
+                <CheckmarkRegular fontSize={13} className="text-green-400 shrink-0" />
                 Permissions apply instantly — their next action in the app is checked against these.
               </p>
             </div>
@@ -260,21 +249,21 @@ export default function CommunityAdminPermissionsPage() {
             </div>
             <div className="divide-y divide-border">
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <UserRound strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+                <PersonRegular fontSize={15} className="text-foreground-muted shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="font-body text-[11px] text-foreground-muted">Member of {communityName || "this community"}</p>
                   <p className="font-body text-xs text-foreground mt-0.5">since {fmtDate(admin.joined_at)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <CalendarDays strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+                <CalendarMonthRegular fontSize={15} className="text-foreground-muted shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="font-body text-[11px] text-foreground-muted">Admin since</p>
                   <p className="font-body text-xs text-foreground mt-0.5">{fmtDate(admin.granted_at)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <Clock3 strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+                <ClockRegular fontSize={15} className="text-foreground-muted shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="font-body text-[11px] text-foreground-muted">Permissions last changed</p>
                   <p className="font-body text-xs text-foreground mt-0.5">
@@ -296,7 +285,7 @@ export default function CommunityAdminPermissionsPage() {
                 onClick={() => setShowRemoveConfirm(true)}
                 className="mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
               >
-                <Trash2 strokeWidth={2.5} size={12} /> Remove admin
+                <DeleteRegular fontSize={14} /> Remove admin
               </button>
             </div>
           </div>
@@ -312,7 +301,7 @@ export default function CommunityAdminPermissionsPage() {
         >
           <div className="modal-panel w-full max-w-sm p-6">
             <h2 className="font-display text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-              <ShieldOff strokeWidth={2.5} size={15} className="text-red-400" /> Remove {firstName}&apos;s admin rights?
+              <ShieldProhibitedRegular fontSize={17} className="text-red-400" /> Remove {firstName}&apos;s admin rights?
             </h2>
             <p className="font-body text-xs text-foreground-muted mb-5">
               They will remain a member of <span className="text-foreground font-medium">{communityName}</span> but
@@ -324,14 +313,14 @@ export default function CommunityAdminPermissionsPage() {
                 disabled={removing}
                 className="modal-btn modal-btn-secondary flex-1"
               >
-                <span className="inline-flex items-center gap-1"><X strokeWidth={2.5} size={11} /> Cancel</span>
+                <span className="inline-flex items-center gap-1"><DismissRegular fontSize={13} /> Cancel</span>
               </button>
               <button
                 onClick={handleRemoveAdmin}
                 disabled={removing}
                 className="modal-btn modal-btn-danger-soft flex-1"
               >
-                {removing ? <Spinner className="h-3 w-3" /> : <ShieldOff strokeWidth={2.5} size={11} />} Remove admin
+                {removing ? <Spinner className="h-3.5 w-3.5" /> : <ShieldProhibitedRegular fontSize={13} />} Remove admin
               </button>
             </div>
           </div>

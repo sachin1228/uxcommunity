@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Smile } from "lucide-react";
+import { EmojiRegular, SendRegular } from "@fluentui/react-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
@@ -323,7 +323,7 @@ export function CommentComposer<C = unknown>({
                   : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
               }`}
             >
-              <Smile strokeWidth={2} size={18} />
+              <EmojiRegular fontSize={20} />
             </button>
             <textarea
               ref={ref}
@@ -364,7 +364,7 @@ export function CommentComposer<C = unknown>({
                   disabled={saving}
                   className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
+                  {saving ? <Spinner size={16} className="text-white" /> : submitLabel}
                 </button>
               )}
             </div>
@@ -453,7 +453,7 @@ export function CommentComposer<C = unknown>({
                 : "border-border bg-surface text-foreground-subtle hover:text-foreground"
             }`}
           >
-            <Smile strokeWidth={2.5} size={16} />
+            <EmojiRegular fontSize={18} />
           </button>
           <button
             type="submit"
@@ -463,11 +463,9 @@ export function CommentComposer<C = unknown>({
             className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? (
-              <Spinner size={14} className="text-white" />
+              <Spinner size={16} className="text-white" />
             ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]" style={{ marginLeft: 1 }}>
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
+              <SendRegular className="h-[17px] w-[17px]" style={{ marginLeft: 1 }} aria-hidden="true" />
             )}
           </button>
         </div>
