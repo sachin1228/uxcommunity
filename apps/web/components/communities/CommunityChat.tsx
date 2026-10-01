@@ -12,6 +12,7 @@ import {
   type CachedContentEvent,
   type CachedMessage,
   type CachedMeta,
+  type MessageDeletedByRole,
   type MessageMention,
   type ReplyPreview,
 } from "@/lib/communities/cache";
@@ -250,14 +251,24 @@ export function CommunityChat({
     [],
   );
 
-  const handleDelete = useCallback(async (msgId: string) => {
-    // Optimistic update: mark as deleted locally immediately
+  const handleDelete = useCallback(async (msgId: string, removedByRole: MessageDeletedByRole | null) => {
+    // Optimistic update: mark as deleted locally immediately, stamping the
+    // acting role so the tombstone reads the same as the server's broadcast.
     let previousMessage: CachedMessage | null = null;
     setMessages((prev) => {
       previousMessage = prev.find((m) => m.id === msgId) ?? null;
       const next = prev.map((m) =>
         m.id === msgId
-          ? { ...m, deleted_at: new Date().toISOString(), content: "", image_url: null, reply_to: null, reactions: [] }
+          ? {
+              ...m,
+              deleted_at: new Date().toISOString(),
+              deleted_by: currentUserId,
+              deleted_by_role: removedByRole,
+              content: "",
+              image_url: null,
+              reply_to: null,
+              reactions: [],
+            }
           : m
       );
       msgCache.set(communityId, next);
@@ -283,7 +294,7 @@ export function CommunityChat({
         return prev.map((m) => (m.id === msgId ? previousMessage! : m));
       });
     }
-  }, [communityId, setMessages]);
+  }, [communityId, setMessages, currentUserId]);
 
   const currentUserMember = members.find((member) => member.user_id === currentUserId);
   const resolvedUserName = currentUserMember?.users?.name ?? currentUserName ?? "Someone";
@@ -832,9 +843,11 @@ export function CommunityChat({
   const canModerateShowcase = isOwner || isManagerWith("can_moderate_showcase");
   const canModerateResources = isOwner || isManagerWith("can_moderate_resources");
   const canModerateEvents = isOwner || isManagerWith("can_moderate_events");
-  // Deleting another member's message is a moderation act — the message menu
-  // and its confirmation name the role it is performed in.
-  const moderationRole = myRole === "admin" || myRole === "moderator" ? myRole : null;
+  // Deleting another member's message is a moderation act — the flow names the
+  // role it is performed in, and the delete stamps it on the message so the
+  // tombstone can attribute the removal.
+  const moderationRole: MessageDeletedByRole | null =
+    myRole === "owner" || myRole === "admin" || myRole === "moderator" ? myRole : null;
 
   // Stable header callbacks — inline arrows would recreate every render and
   // defeat the memoized ChatHeader's bail-out on keystrokes.

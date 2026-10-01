@@ -512,6 +512,8 @@ export type Database = {
           content: string | null;
           created_at: string;
           deleted_at: string | null;
+          deleted_by: string | null;
+          deleted_by_role: string | null;
           edited_at: string | null;
           id: string;
           image_url: string | null;
@@ -525,6 +527,8 @@ export type Database = {
           content?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          deleted_by?: string | null;
+          deleted_by_role?: string | null;
           edited_at?: string | null;
           id?: string;
           image_url?: string | null;
@@ -538,6 +542,8 @@ export type Database = {
           content?: string | null;
           created_at?: string;
           deleted_at?: string | null;
+          deleted_by?: string | null;
+          deleted_by_role?: string | null;
           edited_at?: string | null;
           id?: string;
           image_url?: string | null;

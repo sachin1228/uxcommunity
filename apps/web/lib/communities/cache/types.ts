@@ -57,10 +57,17 @@ export interface CachedMessage {
   reply_to_content?: ContentReplyPreview | null;
   image_url?: string | null;
   deleted_at?: string | null;
+  /** Who performed the delete (author or manager). */
+  deleted_by?: string | null;
+  /** Role a manager acted in when removing someone else's message — null for author self-deletes. */
+  deleted_by_role?: MessageDeletedByRole | null;
   edited_at?: string | null;
   /** Members @mentioned in this message — `@Name` tokens in `content`. */
   mentions?: MessageMention[];
 }
+
+/** Role a manager acted in when removing someone else's chat message. */
+export type MessageDeletedByRole = "owner" | "admin" | "moderator";
 
 /** A thread-created event shown inline in the chat timeline. */
 export interface CachedThreadEvent {

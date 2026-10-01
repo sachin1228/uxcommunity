@@ -122,12 +122,18 @@ export async function DELETE(
   }
 
   const deletedAt = new Date().toISOString();
+  // A manager removing someone else's message acts in their role — the chat
+  // tombstone names it ("removed by a moderator"). Self-deletes are not
+  // attributed: the byline would only repeat "you".
+  const deletedByRole = !isOwn && canModerate ? managerActorRole(managerStatus) : null;
 
   // Soft delete: stamp deleted_at, wipe content and image so data doesn't linger
   const { error } = await db
     .from("community_messages")
     .update({
       deleted_at: deletedAt,
+      deleted_by: userId,
+      deleted_by_role: deletedByRole,
       content:    null,
       image_url:  null,
       reply_to_id: null,
@@ -164,7 +170,7 @@ export async function DELETE(
       await publishChatEvent({
         communityId,
         topic: "message-delete",
-        data: { id: msgId, deleted_at: deletedAt },
+        data: { id: msgId, deleted_at: deletedAt, deleted_by: userId, deleted_by_role: deletedByRole },
       });
     } catch (err) {
       console.error("[DELETE message] realtime publish error:", err);

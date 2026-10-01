@@ -9,7 +9,7 @@ import { AnimatedEmoji } from "./AnimatedEmoji";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageContent } from "./MessageText";
 
-import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, MessageDeletedByRole, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { ModalPortal } from "@/components/ui/Modal";
 import { userColorVar } from "@/lib/communities/user-color";
 import { KIND_THEME } from "@/lib/communities/content-notifications";
@@ -30,13 +30,13 @@ interface MessageBubbleProps {
   onReply: (msg: CachedMessage) => void;
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
-  onDelete: (msgId: string) => void;
+  onDelete: (msgId: string, removedByRole: MessageDeletedByRole | null) => void;
   /** Opens the full-screen image viewer for a chat image URL. */
   onImageClick: (url: string) => void;
   /** Moderator (owner/admin with delete permission) may delete other members' messages. */
   canModerate?: boolean;
   /** Viewer's managing role when deleting someone else's message — names the role in the flow. */
-  moderationRole?: "admin" | "moderator" | null;
+  moderationRole?: MessageDeletedByRole | null;
   /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
   animate?: boolean;
 }
@@ -254,8 +254,9 @@ function DeleteConfirmDialog({
   onConfirm,
   onCancel,
 }: {
-  /** Set when an admin or moderator deletes someone else's message. */
-  moderationRole: "admin" | "moderator" | null;
+  /** Set when a manager deletes someone else's message. Only admin/moderator
+   *  name the role; the owner's delete stays worded as plain. */
+  moderationRole: MessageDeletedByRole | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -275,7 +276,7 @@ function DeleteConfirmDialog({
             Delete message?
           </p>
           <p className="font-body text-xs text-foreground-muted text-center mt-1">
-            {moderationRole
+            {moderationRole === "admin" || moderationRole === "moderator"
               ? `As ${moderationRole === "admin" ? "an admin" : "a moderator"}, this will delete the message for everyone in this chat.`
               : "This will delete the message for everyone in this chat."}
           </p>
@@ -314,9 +315,26 @@ function SenderName({ name, userId, className = "" }: { name: string; userId: st
   );
 }
 
+/**
+ * Tombstone copy. Author deletes keep the WhatsApp-style "deleted"; a manager
+ * removing someone else's message is attributed Reddit-style ("removed by a
+ * moderator"), so members can tell moderation from a friend's own cleanup.
+ */
+function deletedMessageText(msg: CachedMessage, viewerId: string): string {
+  const role = msg.deleted_by_role;
+  if (role) {
+    if (msg.deleted_by === viewerId) return "You removed this message";
+    const byline =
+      role === "admin" ? "an admin" : role === "owner" ? "the owner" : "a moderator";
+    return `This message was removed by ${byline}`;
+  }
+  return msg.user_id === viewerId ? "You deleted this message" : "This message was deleted";
+}
+
 /** Placeholder shown for soft-deleted messages. */
 function DeletedBubble({
   isMe,
+  text,
   createdAt,
   isFirstInGroup,
   showHeader,
@@ -324,6 +342,8 @@ function DeletedBubble({
   senderId,
 }: {
   isMe: boolean;
+  /** Tombstone copy from deletedMessageText — attributed when a manager acted. */
+  text: string;
   createdAt: string;
   isFirstInGroup: boolean;
   /** Same rule as a live bubble — the name row only opens a run of messages. */
@@ -356,7 +376,7 @@ function DeletedBubble({
         {/* leading-6 matches the live message text row, so a deleted placeholder
             occupies the same line box and the bubble keeps its rhythm. */}
         <span className={`font-body text-xs leading-6 ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
-          {isMe ? "You deleted this message" : "This message was deleted"}
+          {text}
         </span>
       </div>
       <div className="mt-0 flex items-center justify-end gap-1">
@@ -440,12 +460,13 @@ export const MessageBubble = memo(function MessageBubble({
       : 0;
 
   // Deleting your own message is never a moderation act, so the role only
-  // applies to someone else's — the menu item and the dialog agree on it.
+  // applies to someone else's — the menu item, the dialog and the tombstone
+  // the server stores all agree on it.
   const deleteAsRole = isMe ? null : moderationRole;
 
   const handleDeleteConfirm = () => {
     setDeleteConfirmOpen(false);
-    onDelete(msg.id);
+    onDelete(msg.id, deleteAsRole);
   };
 
   // ── Unified layout: own messages right-aligned, others left-aligned ──
@@ -521,6 +542,7 @@ export const MessageBubble = memo(function MessageBubble({
           {isDeleted ? (
             <DeletedBubble
               isMe={isMe}
+              text={deletedMessageText(msg, currentUserId)}
               createdAt={msg.created_at}
               isFirstInGroup={isFirstInGroup}
               showHeader={showHeader}

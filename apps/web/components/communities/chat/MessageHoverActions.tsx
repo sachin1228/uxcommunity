@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Copy, Smile, Trash2, MoreHorizontal, Pencil, Reply } from "lucide-react";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
-import type { CachedMessage } from "@/lib/communities/cache";
+import type { CachedMessage, MessageDeletedByRole } from "@/lib/communities/cache";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 
 const REACTIONS = [
@@ -56,8 +56,9 @@ export function MessageHoverActions({
   showMenu?: boolean;
   /** Moderator may delete other members' messages. */
   canModerate?: boolean;
-  /** Viewer's managing role when deleting someone else's message — the delete item names it. */
-  moderationRole?: "admin" | "moderator" | null;
+  /** Viewer's managing role when deleting someone else's message — admin and
+   *  moderator name it in the delete item; the owner's item stays plain. */
+  moderationRole?: MessageDeletedByRole | null;
   /** Live-arrival entrance animation — hover buttons wait for the word wave. */
   animate?: boolean;
   /** Word count of the animated wave (capped at 24) for the entrance delay. */
@@ -70,9 +71,11 @@ export function MessageHoverActions({
   const canCopy = !!msg.content && !isDeleted;
   const deleteLabel = isMe
     ? "Delete"
-    : moderationRole
-      ? `Delete for everyone as ${moderationRole === "admin" ? "an admin" : "a moderator"}`
-      : "Delete for everyone";
+    : moderationRole === "admin"
+      ? "Delete for everyone as an admin"
+      : moderationRole === "moderator"
+        ? "Delete for everyone as a moderator"
+        : "Delete for everyone";
   const [editAvailable, setEditAvailable] = useState(() => canEditMessage(msg.created_at));
 
   useEffect(() => {
