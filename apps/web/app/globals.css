@@ -395,6 +395,20 @@ body {
   }
 }
 
+/* ─── Fluent icon weight ─────────────────────────────────────────────── */
+/* Fluent 2 Regular glyphs carry their outline weight in the geometry
+   (~1 unit on the 20-unit grid), which reads thinner than the 2.5/24
+   stroke of the icon set they replaced. Painting a 1-unit currentColor
+   stroke over the fill restores the previous optical weight at UI sizes.
+   Both the standard and headless APIs tag every icon with
+   `data-fui-icon`, so one rule covers the whole app. */
+svg[data-fui-icon] {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
 /* ─── Grid theme utilities ───────────────────────────────────────────── */
 @layer utilities {
   .grid-dots {
