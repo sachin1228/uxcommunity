@@ -12,6 +12,8 @@ export interface CommunityActivityEntry {
   actor_id: string | null;
   actor_role: "owner" | "admin" | "moderator" | "platform";
   actor_name: string | null;
+  /** Attached by each API from designer_profiles — the audit row only snapshots the name. */
+  actor_avatar_url?: string | null;
   action: string;
   target_user_id: string | null;
   details: Record<string, unknown>;

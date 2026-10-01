@@ -45,5 +45,23 @@ export async function GET(
     return NextResponse.json({ error: "Failed to load activity." }, { status: 500 });
   }
 
-  return NextResponse.json({ activity: data ?? [] });
+  // Actors' current profile pictures (the audit row only snapshots the name),
+  // resolved in one lookup for all distinct actors on the page.
+  const rows = data ?? [];
+  const actorIds = [...new Set(rows.map((row) => row.actor_id).filter((id): id is string => Boolean(id)))];
+  const avatarByUserId = new Map<string, string | null>();
+  if (actorIds.length) {
+    const { data: profiles } = await db
+      .from("designer_profiles")
+      .select("user_id, avatar_url")
+      .in("user_id", actorIds);
+    for (const profile of profiles ?? []) avatarByUserId.set(profile.user_id, profile.avatar_url ?? null);
+  }
+
+  const activity = rows.map((row) => ({
+    ...row,
+    actor_avatar_url: row.actor_id ? avatarByUserId.get(row.actor_id) ?? null : null,
+  }));
+
+  return NextResponse.json({ activity });
 }

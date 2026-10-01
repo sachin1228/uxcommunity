@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import {
-  actorInitials,
   actorLabel,
   describeActivity,
   fmtActivityTime,
@@ -131,7 +131,7 @@ export function ActivityView({ communityId }: { communityId: string }) {
             </p>
           </div>
         ) : (
-          <ul className="px-5 pb-4">
+          <ul className="px-2 pb-4">
             {visible.map((entry) => {
               const isPlatform = entry.actor_role === "platform";
               return (
@@ -140,9 +140,17 @@ export function ActivityView({ communityId }: { communityId: string }) {
                   className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised/50"
                 >
                   <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-body text-[9px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
                   >
-                    {isPlatform ? "UX" : actorInitials(entry.actor_name ?? "?")}
+                    {isPlatform ? (
+                      "UX"
+                    ) : (
+                      <ChatAvatar
+                        name={entry.actor_name ?? "?"}
+                        url={entry.actor_avatar_url ?? null}
+                        size={6}
+                      />
+                    )}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-body text-xs text-foreground leading-relaxed">
