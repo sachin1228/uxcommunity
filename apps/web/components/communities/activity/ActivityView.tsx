@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
+import { filterChip } from "@/components/communities/filter-chip";
 import {
   actorLabel,
   describeActivity,
@@ -20,7 +21,7 @@ const ROLE_CHIP: Record<CommunityActivityEntry["actor_role"], string> = {
 };
 
 const ROLE_TAG: Record<CommunityActivityEntry["actor_role"], string> = {
-  platform: "text-foreground-muted/70",
+  platform: "text-foreground-muted",
   admin: "text-amber-500/70",
   moderator: "text-sky-400/70",
   owner: "text-accent/70",
@@ -118,7 +119,7 @@ export function ActivityView({
         <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
           Management activity
         </p>
-        <p className="font-body text-xs text-foreground-muted mt-1">
+        <p className="font-body text-sm leading-relaxed text-foreground-muted mt-1">
           Every action taken in this community — who did what, most recent first.
         </p>
       </div>
@@ -130,11 +131,7 @@ export function ActivityView({
               key={actor.id}
               type="button"
               onClick={() => setActorFilter(actor.id)}
-              className={`rounded-full border px-2.5 py-1 font-body text-[11px] transition-colors ${
-                actorFilter === actor.id
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-              }`}
+              className={filterChip(actorFilter === actor.id)}
             >
               {actor.name}
             </button>
@@ -149,7 +146,7 @@ export function ActivityView({
           </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <p className="font-body text-xs text-foreground-muted">{error}</p>
+            <p className="font-body text-sm text-foreground-muted">{error}</p>
             <button
               type="button"
               onClick={retry}
@@ -160,8 +157,8 @@ export function ActivityView({
           </div>
         ) : visible.length === 0 && !hasMore ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            <ShieldCheck strokeWidth={2} size={20} className="text-foreground-muted/50" aria-hidden="true" />
-            <p className="max-w-xs font-body text-xs text-foreground-muted leading-relaxed">
+            <ShieldCheck strokeWidth={2} size={20} className="text-foreground-muted" aria-hidden="true" />
+            <p className="max-w-xs font-body text-sm text-foreground-muted leading-relaxed">
               {actorFilter === "all"
                 ? "No management activity yet. Actions taken by admins and moderators will appear here."
                 : "No activity from this manager yet."}
@@ -170,7 +167,7 @@ export function ActivityView({
         ) : (
           <>
             {visible.length === 0 ? (
-              <p className="px-5 pt-8 pb-1 text-center font-body text-xs text-foreground-muted">
+              <p className="px-5 pt-8 pb-1 text-center font-body text-sm text-foreground-muted">
                 No activity from this manager in the loaded feed yet.
               </p>
             ) : (
@@ -183,7 +180,7 @@ export function ActivityView({
                   return (
                     <li
                       key={entry.id}
-                      className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised/50"
+                      className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised"
                     >
                       <span
                         className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
@@ -199,18 +196,18 @@ export function ActivityView({
                         )}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="font-body text-xs text-foreground leading-relaxed">
+                        <p className="font-body text-sm text-foreground leading-relaxed">
                           <span className="font-semibold">{isSelf ? "You" : actorLabel(entry)}</span>{" "}
                           {describeActivity(entry)}
                         </p>
                         {excerpt && (
-                          <blockquote className="mt-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs leading-relaxed text-foreground-muted">
+                          <blockquote className="mt-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-sm leading-relaxed text-foreground-muted">
                             “{excerpt}”
                           </blockquote>
                         )}
-                        <p className="font-body text-[10px] text-foreground-muted/70 mt-0.5">
+                        <p className="font-body text-xs text-foreground-muted mt-1">
                           {fmtActivityTime(entry.created_at)}
-                          <span className={`ml-1.5 uppercase tracking-wider text-[9px] ${ROLE_TAG[entry.actor_role]}`}>
+                          <span className={`ml-1.5 uppercase tracking-wider text-[10px] ${ROLE_TAG[entry.actor_role]}`}>
                             {entry.actor_role}
                           </span>
                         </p>
