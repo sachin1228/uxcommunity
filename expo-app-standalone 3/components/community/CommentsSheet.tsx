@@ -262,7 +262,7 @@ export function CommentsSheet({
             style={styles.sortTrigger}
           >
             {/* Feather has no single up/down sort glyph, so the web control's
-                `ArrowUpDown` is drawn as its two halves. */}
+                `ArrowSortRegular` is drawn as its two halves. */}
             <View style={styles.sortGlyph}>
               <Feather name="arrow-up" size={12} color={colors.foreground} />
               <Feather name="arrow-down" size={12} color={colors.foreground} style={styles.sortGlyphHalf} />
