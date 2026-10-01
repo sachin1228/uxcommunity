@@ -125,7 +125,7 @@ export function ActivityView({
       </div>
 
       {!loading && !error && actors.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5 px-5 pt-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 px-5 pt-2 pb-1 shrink-0">
           {[{ id: "all", name: "All" }, ...actors].map((actor) => (
             <button
               key={actor.id}
@@ -171,7 +171,7 @@ export function ActivityView({
                 No activity from this manager in the loaded feed yet.
               </p>
             ) : (
-              <ul className="px-2 pb-1">
+              <ul className="px-2 pt-2 pb-1">
                 {visible.map((entry) => {
                   const isPlatform = entry.actor_role === "platform";
                   const isSelf = Boolean(entry.actor_id && entry.actor_id === currentUserId);
