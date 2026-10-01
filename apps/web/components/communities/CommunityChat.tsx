@@ -832,6 +832,9 @@ export function CommunityChat({
   const canModerateShowcase = isOwner || isManagerWith("can_moderate_showcase");
   const canModerateResources = isOwner || isManagerWith("can_moderate_resources");
   const canModerateEvents = isOwner || isManagerWith("can_moderate_events");
+  // Deleting another member's message is a moderation act — the message menu
+  // and its confirmation name the role it is performed in.
+  const moderationRole = myRole === "admin" || myRole === "moderator" ? myRole : null;
 
   // Stable header callbacks — inline arrows would recreate every render and
   // defeat the memoized ChatHeader's bail-out on keystrokes.
@@ -1007,6 +1010,7 @@ export function CommunityChat({
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
               canModerateMessages={canModerateMessages}
+              moderationRole={moderationRole}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
               onRetrySend={handleRetrySend}

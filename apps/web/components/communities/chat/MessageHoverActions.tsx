@@ -35,6 +35,7 @@ export function MessageHoverActions({
   showReaction = true,
   showMenu = true,
   canModerate = false,
+  moderationRole = null,
   animate = false,
   /** Word count of the animated wave (capped at 24) — delays the hover
    * buttons until after the message text has settled. */
@@ -55,6 +56,8 @@ export function MessageHoverActions({
   showMenu?: boolean;
   /** Moderator may delete other members' messages. */
   canModerate?: boolean;
+  /** Viewer's managing role when deleting someone else's message — the delete item names it. */
+  moderationRole?: "admin" | "moderator" | null;
   /** Live-arrival entrance animation — hover buttons wait for the word wave. */
   animate?: boolean;
   /** Word count of the animated wave (capped at 24) for the entrance delay. */
@@ -65,6 +68,11 @@ export function MessageHoverActions({
   const triggerBtnRef = useRef<HTMLButtonElement>(null);
   const myEmoji = msg.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji;
   const canCopy = !!msg.content && !isDeleted;
+  const deleteLabel = isMe
+    ? "Delete"
+    : moderationRole
+      ? `Delete for everyone as ${moderationRole === "admin" ? "an admin" : "a moderator"}`
+      : "Delete for everyone";
   const [editAvailable, setEditAvailable] = useState(() => canEditMessage(msg.created_at));
 
   useEffect(() => {
@@ -253,7 +261,7 @@ export function MessageHoverActions({
                 role="menuitem"
               >
                 <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
-                <span>{isMe ? "Delete" : "Delete for everyone"}</span>
+                <span>{deleteLabel}</span>
               </button>
             </>
           )}

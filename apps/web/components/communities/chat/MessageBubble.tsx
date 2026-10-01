@@ -35,6 +35,8 @@ interface MessageBubbleProps {
   onImageClick: (url: string) => void;
   /** Moderator (owner/admin with delete permission) may delete other members' messages. */
   canModerate?: boolean;
+  /** Viewer's managing role when deleting someone else's message — names the role in the flow. */
+  moderationRole?: "admin" | "moderator" | null;
   /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
   animate?: boolean;
 }
@@ -248,11 +250,12 @@ function RetryIndicator({ onRetry }: { onRetry: () => void }) {
  * Rendered as a fixed overlay so it sits above all message content.
  */
 function DeleteConfirmDialog({
-  isMe,
+  moderationRole,
   onConfirm,
   onCancel,
 }: {
-  isMe: boolean;
+  /** Set when an admin or moderator deletes someone else's message. */
+  moderationRole: "admin" | "moderator" | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -272,7 +275,9 @@ function DeleteConfirmDialog({
             Delete message?
           </p>
           <p className="font-body text-xs text-foreground-muted text-center mt-1">
-            This will delete the message for everyone in this chat.
+            {moderationRole
+              ? `As ${moderationRole === "admin" ? "an admin" : "a moderator"}, this will delete the message for everyone in this chat.`
+              : "This will delete the message for everyone in this chat."}
           </p>
         </div>
 
@@ -387,6 +392,7 @@ export const MessageBubble = memo(function MessageBubble({
   onDelete,
   onImageClick,
   canModerate = false,
+  moderationRole = null,
   animate = false,
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -432,6 +438,10 @@ export const MessageBubble = memo(function MessageBubble({
     animate && msg.content
       ? Math.min(msg.content.trim().split(/\s+/).filter(Boolean).length, 24)
       : 0;
+
+  // Deleting your own message is never a moderation act, so the role only
+  // applies to someone else's — the menu item and the dialog agree on it.
+  const deleteAsRole = isMe ? null : moderationRole;
 
   const handleDeleteConfirm = () => {
     setDeleteConfirmOpen(false);
@@ -481,7 +491,7 @@ export const MessageBubble = memo(function MessageBubble({
       {unreadDivider}
       {deleteConfirmOpen && (
         <DeleteConfirmDialog
-          isMe={isMe}
+          moderationRole={deleteAsRole}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeleteConfirmOpen(false)}
         />
@@ -570,6 +580,7 @@ export const MessageBubble = memo(function MessageBubble({
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
                 canModerate={canModerate}
+                moderationRole={deleteAsRole}
                 animate={animate}
                 waveIndex={waveIndex}
               />
@@ -687,6 +698,7 @@ export const MessageBubble = memo(function MessageBubble({
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
                 canModerate={canModerate}
+                moderationRole={deleteAsRole}
                 animate={animate}
                 waveIndex={waveIndex}
               />
