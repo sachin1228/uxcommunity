@@ -172,16 +172,27 @@ export function ActivityView({
               </p>
             ) : (
               <ul className="px-2 pt-2 pb-1">
-                {visible.map((entry) => {
+                {visible.map((entry, index) => {
                   const isPlatform = entry.actor_role === "platform";
                   const isSelf = Boolean(entry.actor_id && entry.actor_id === currentUserId);
+                  const isFirst = index === 0;
+                  const isLast = index === visible.length - 1;
                   const excerpt =
                     typeof entry.details?.message_excerpt === "string" ? entry.details.message_excerpt : null;
                   return (
                     <li
                       key={entry.id}
-                      className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised"
+                      className="relative flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-surface-raised"
                     >
+                      {/* Timeline segments meet at each row's edges but stop at the avatar
+                          (12px from the top, 40px from the bottom in this py-2.5 row) so
+                          the hairline never shows through the translucent role ring. */}
+                      {!isFirst && (
+                        <span aria-hidden="true" className="absolute left-[26px] top-0 h-3 w-px -translate-x-1/2 bg-border" />
+                      )}
+                      {!isLast && (
+                        <span aria-hidden="true" className="absolute left-[26px] top-10 bottom-0 w-px -translate-x-1/2 bg-border" />
+                      )}
                       <span
                         className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
                       >
