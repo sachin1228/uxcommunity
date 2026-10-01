@@ -44,7 +44,11 @@ export function DashboardHome({ userId, rail }: DashboardHomeProps) {
     <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
       <DashboardSingleColumn>
         <HomeFeedFilters scope={scope} onScopeChange={handleScopeChange} />
+        {/* Keyed by scope: switching tabs remounts the feed, so the new tab
+            either renders from its cached page instantly or shows the standard
+            loader while it loads — the old tab's cards never linger. */}
         <HomeFeed
+          key={scope}
           currentUserId={userId}
           refreshToken={refreshToken}
           scope={scope}
