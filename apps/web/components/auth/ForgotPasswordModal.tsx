@@ -115,7 +115,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
             disabled={loading}
             className="modal-btn modal-btn-primary w-full"
           >
-            {loading && <Spinner size={14} />}
+            {loading && <Spinner size={16} />}
             {loading ? "Sending…" : "Send reset link"}
           </button>
         </form>

@@ -148,11 +148,11 @@ export function EventJoinQuestionsModal({
             className="modal-btn modal-btn-primary"
           >
             {pending ? (
-              <Spinner size={15} className="text-white" />
+              <Spinner size={17} className="text-white" />
             ) : ready ? (
-              <CheckmarkRegular fontSize={15} />
+              <CheckmarkRegular fontSize={17} />
             ) : (
-              <ClipboardTaskListLtrRegular fontSize={15} />
+              <ClipboardTaskListLtrRegular fontSize={17} />
             )}
             {pending
               ? "Submitting…"

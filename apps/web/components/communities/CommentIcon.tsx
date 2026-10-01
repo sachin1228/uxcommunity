@@ -12,5 +12,5 @@ export function CommentIcon({
 }: {
   className?: string;
 }) {
-  return <CommentRegular fontSize={16} className={className} aria-hidden="true" />;
+  return <CommentRegular fontSize={18} className={className} aria-hidden="true" />;
 }

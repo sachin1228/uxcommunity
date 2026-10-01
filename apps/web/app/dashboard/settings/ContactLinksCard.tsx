@@ -15,7 +15,7 @@ function StaticField({ icon: Icon, label, value }: { icon: typeof MailRegular; l
   return (
     <div className="min-w-0">
       <p className={labelCls}>
-        <Icon fontSize={9} /> {label}
+        <Icon fontSize={11} /> {label}
       </p>
       <p className="truncate border-b border-border pb-1 font-body text-xs text-foreground-subtle" title={value}>
         {value}
@@ -82,12 +82,12 @@ export function ContactLinksCard({
         </h2>
         {saveState === "saving" && (
           <span className="flex items-center gap-1.5 font-body text-[11px] text-foreground-muted" role="status">
-            <SpinnerIosRegular fontSize={12} className="animate-spin" /> Saving…
+            <SpinnerIosRegular fontSize={14} className="animate-spin" /> Saving…
           </span>
         )}
         {saveState === "saved" && (
           <span className="flex items-center gap-1.5 font-body text-[11px] text-accent" role="status">
-            <CheckmarkRegular fontSize={12} /> Saved
+            <CheckmarkRegular fontSize={14} /> Saved
           </span>
         )}
         {saveState === "error" && (
@@ -103,7 +103,7 @@ export function ContactLinksCard({
 
         <div className="border-t border-border pt-4">
           <label htmlFor="settings-linkedin" className={labelCls}>
-            <LinkedinIcon fontSize={9} /> LinkedIn
+            <LinkedinIcon fontSize={11} /> LinkedIn
           </label>
           <input
             id="settings-linkedin"
@@ -116,7 +116,7 @@ export function ContactLinksCard({
         </div>
         <div>
           <label htmlFor="settings-portfolio" className={labelCls}>
-            <GlobeRegular fontSize={9} /> Portfolio
+            <GlobeRegular fontSize={11} /> Portfolio
           </label>
           <input
             id="settings-portfolio"

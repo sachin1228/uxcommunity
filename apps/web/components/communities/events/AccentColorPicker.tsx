@@ -53,7 +53,7 @@ export function AccentColorPicker({
               }`}
               style={{ backgroundColor: preset.value }}
             >
-              {active && <CheckmarkRegular fontSize={14} className="text-stone-900" />}
+              {active && <CheckmarkRegular fontSize={16} className="text-stone-900" />}
             </button>
           );
         })}

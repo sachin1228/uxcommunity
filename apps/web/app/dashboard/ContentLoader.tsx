@@ -12,7 +12,7 @@ export function DashboardContentLoader({ header }: { header?: ReactNode }) {
     <DashboardSingleColumn>
       {header}
       <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner size={28} />
+        <Spinner size={30} />
       </div>
     </DashboardSingleColumn>
   );

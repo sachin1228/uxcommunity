@@ -75,7 +75,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Members */}
       <td className="px-4 py-3 text-right">
         <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
-          <PeopleRegular fontSize={11} />
+          <PeopleRegular fontSize={13} />
           {c.member_count.toLocaleString()}
         </span>
       </td>
@@ -83,7 +83,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Messages */}
       <td className="px-4 py-3 text-right">
         <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
-          <CommentRegular fontSize={11} />
+          <CommentRegular fontSize={13} />
           {c.message_count.toLocaleString()}
         </span>
       </td>
@@ -108,7 +108,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
 
       {/* Chevron */}
       <td className="px-4 py-3 text-right">
-        <ChevronRightRegular fontSize={14} className="text-foreground-muted ml-auto" />
+        <ChevronRightRegular fontSize={16} className="text-foreground-muted ml-auto" />
       </td>
     </tr>
   );

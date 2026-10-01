@@ -106,7 +106,7 @@ export function SignupStep2({
 
         <button type="submit" disabled={loading}
           className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed">
-          {loading && <Spinner className="h-4 w-4 text-white" />}
+          {loading && <Spinner className="h-[18px] w-[18px] text-white" />}
           {loading ? "Saving…" : "Continue →"}
         </button>
       </form>

@@ -325,7 +325,7 @@ export function ThreadDetailClient({
                     onReactionToggled={handleReactionToggled}
                     emptyState={
                       <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                        <CommentRegular fontSize={22} className={communityFeedLayout.emptyIcon} />
+                        <CommentRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
                         <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
                       </div>
                     }

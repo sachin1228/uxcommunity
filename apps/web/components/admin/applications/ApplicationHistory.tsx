@@ -21,7 +21,7 @@ export function ApplicationHistory({ history }: Props) {
         className="flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors mb-2"
       >
         <ChevronDownRegular
-          fontSize={13}
+          fontSize={15}
           className={`transition-transform ${open ? "rotate-180" : ""}`}
         />
         {history.length} previous application{history.length > 1 ? "s" : ""}

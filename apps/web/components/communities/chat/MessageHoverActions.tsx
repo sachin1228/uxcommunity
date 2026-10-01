@@ -170,7 +170,7 @@ export function MessageHoverActions({
             aria-label="React to message"
             title="React"
           >
-            <EmojiRegular fontSize={14} />
+            <EmojiRegular fontSize={16} />
           </button>
         </div>
       )}
@@ -198,7 +198,7 @@ export function MessageHoverActions({
           aria-expanded={menuOpen}
           title="More actions"
         >
-          <MoreHorizontalRegular fontSize={14} />
+          <MoreHorizontalRegular fontSize={16} />
         </button>
 
         {/* Portal dropdown — renders at document.body, above all stacking contexts */}
@@ -217,7 +217,7 @@ export function MessageHoverActions({
             className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
             role="menuitem"
           >
-            <ArrowReplyRegular fontSize={14} className="text-foreground-muted shrink-0" />
+            <ArrowReplyRegular fontSize={16} className="text-foreground-muted shrink-0" />
             <span>Reply</span>
           </button>
 
@@ -231,7 +231,7 @@ export function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <CopyRegular fontSize={14} className="text-foreground-muted shrink-0" />
+              <CopyRegular fontSize={16} className="text-foreground-muted shrink-0" />
               <span>Copy</span>
             </button>
           )}
@@ -246,7 +246,7 @@ export function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <EditRegular fontSize={14} className="text-foreground-muted shrink-0" />
+              <EditRegular fontSize={16} className="text-foreground-muted shrink-0" />
               <span>Edit</span>
             </button>
           )}
@@ -263,7 +263,7 @@ export function MessageHoverActions({
                 className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition-colors"
                 role="menuitem"
               >
-                <DeleteRegular fontSize={14} className="shrink-0" />
+                <DeleteRegular fontSize={16} className="shrink-0" />
                 <span>{deleteLabel}</span>
               </button>
             </>

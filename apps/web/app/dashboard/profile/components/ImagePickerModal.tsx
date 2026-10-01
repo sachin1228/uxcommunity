@@ -91,7 +91,7 @@ export function ImagePickerModal({
               aria-label={`Close ${isBanner ? "banner" : "profile picture"} dialog`}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             >
-              <DismissRegular fontSize={16} aria-hidden="true" />
+              <DismissRegular fontSize={18} aria-hidden="true" />
             </button>
           </div>
 
@@ -158,7 +158,7 @@ export function ImagePickerModal({
                   onClick={() => fileInputRef.current?.click()}
                   className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent/50 hover:text-foreground"
                 >
-                  <ArrowUploadRegular aria-hidden="true" />
+                  <ArrowUploadRegular fontSize={26} aria-hidden="true" />
                   <span className="font-body text-sm font-medium">{copy.idle}</span>
                   <span className="font-body text-xs text-foreground-subtle">
                     {isBanner ? "Wide images look best · " : ""}JPEG, PNG or WebP · max 5 MB
@@ -188,7 +188,7 @@ export function ImagePickerModal({
               disabled={saving || !uploadPreview}
               className="modal-btn modal-btn-primary"
             >
-              {saving && <Spinner className="size-3.5" />}
+              {saving && <Spinner className="size-4" />}
               {saving ? "Saving…" : copy.save}
             </button>
           </div>

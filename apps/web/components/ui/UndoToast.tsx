@@ -70,9 +70,9 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
         >
           {pending ? (
-            <Spinner size={13} />
+            <Spinner size={15} />
           ) : (
-            <ArrowUndoRegular fontSize={14} aria-hidden="true" />
+            <ArrowUndoRegular fontSize={16} aria-hidden="true" />
           )}
           {toast.actionLabel}
         </button>
@@ -84,7 +84,7 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
           aria-label="Dismiss"
           className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-background-subtle hover:text-foreground disabled:opacity-60"
         >
-          <DismissRegular fontSize={15} />
+          <DismissRegular fontSize={17} />
         </button>
       </div>
     </div>

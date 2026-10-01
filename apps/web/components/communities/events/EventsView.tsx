@@ -257,7 +257,7 @@ export function EventsView({
             </p>
           </div>
           <GradientButton onClick={() => setShowCreateModal(true)}>
-            <AddRegular fontSize={14} /> Create Event
+            <AddRegular fontSize={16} /> Create Event
           </GradientButton>
         </div>
 
@@ -276,7 +276,7 @@ export function EventsView({
                   aria-pressed={filter === item.value}
                   className={filterChip(filter === item.value)}
                 >
-                  <Icon fontSize={14} aria-hidden="true" />
+                  <Icon fontSize={16} aria-hidden="true" />
                   {item.label} ({item.count})
                 </button>
               );
@@ -296,17 +296,17 @@ export function EventsView({
       <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex items-center justify-center py-24" aria-label="Loading events" role="status">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         ) : events.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <CalendarCancelRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+            <CalendarCancelRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No events yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
         ) : (filter === "upcoming" && upcoming.length === 0) || (filter === "past" && past.length === 0) ? (
           <div className={communityFeedLayout.emptyState}>
-            <CalendarCancelRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+            <CalendarCancelRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No {filter} events</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different event filter.</p>
           </div>

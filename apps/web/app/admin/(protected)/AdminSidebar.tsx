@@ -57,7 +57,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <ListRegular fontSize={16} className={active("/admin") ? "text-accent" : ""} />
+        <ListRegular fontSize={18} className={active("/admin") ? "text-accent" : ""} />
         Applications
       </Link>
 
@@ -71,7 +71,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <PersonDeleteRegular fontSize={16} className={active("/admin/signup-attempts") ? "text-accent" : ""} />
+        <PersonDeleteRegular fontSize={18} className={active("/admin/signup-attempts") ? "text-accent" : ""} />
         Incomplete Signups
       </Link>
 
@@ -85,7 +85,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <MoviesAndTvRegular fontSize={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
+        <MoviesAndTvRegular fontSize={18} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
         Lottie Animations
       </Link>
 
@@ -99,7 +99,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <ChatMultipleRegular fontSize={16} className={active("/admin/communities") ? "text-accent" : ""} />
+        <ChatMultipleRegular fontSize={18} className={active("/admin/communities") ? "text-accent" : ""} />
         Communities
       </Link>
 
@@ -113,7 +113,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <WrenchRegular fontSize={16} className={active("/admin/tools") ? "text-accent" : ""} />
+        <WrenchRegular fontSize={18} className={active("/admin/tools") ? "text-accent" : ""} />
         Tools
       </Link>
 
@@ -127,7 +127,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <GaugeRegular fontSize={16} className={active("/admin/load-test") ? "text-accent" : ""} />
+        <GaugeRegular fontSize={18} className={active("/admin/load-test") ? "text-accent" : ""} />
         Load Test
       </Link>
 
@@ -141,10 +141,10 @@ export function AdminSidebar() {
               : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
           }`}
         >
-          <DatabaseRegular fontSize={16} className={masterGroupActive ? "text-accent" : ""} />
+          <DatabaseRegular fontSize={18} className={masterGroupActive ? "text-accent" : ""} />
           <span className="flex-1 text-left">Master Data</span>
           <ChevronDownRegular
-            fontSize={14}
+            fontSize={16}
             className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           />
         </button>
@@ -162,7 +162,7 @@ export function AdminSidebar() {
                     : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
                 }`}
               >
-                <Icon fontSize={15} className={active(href) ? "text-accent" : ""} />
+                <Icon fontSize={17} className={active(href) ? "text-accent" : ""} />
                 {label}
               </Link>
             ))}

@@ -71,7 +71,7 @@ function ViewCommunityRow({ onClick }: { onClick: () => void }) {
       className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       View community
-      <ArrowRightRegular fontSize={14} />
+      <ArrowRightRegular fontSize={16} />
     </button>
   );
 }
@@ -80,7 +80,7 @@ function ViewCommunityRow({ onClick }: { onClick: () => void }) {
 function RequestPendingRow() {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-body text-xs text-foreground-muted">
-      <ClockRegular fontSize={11} />
+      <ClockRegular fontSize={13} />
       Request sent — waiting for the owner&apos;s approval
     </span>
   );
@@ -90,7 +90,7 @@ function RequestPendingRow() {
 function ClosedRow({ isPrivate }: { isPrivate: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-body text-xs text-foreground-muted">
-      <LockClosedRegular fontSize={11} />
+      <LockClosedRegular fontSize={13} />
       {isPrivate ? "This community is private" : "Update your profile to join"}
     </span>
   );
@@ -165,7 +165,7 @@ function JoinActions({
           disabled={joining}
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
         >
-          <LockClosedRegular fontSize={13} />
+          <LockClosedRegular fontSize={15} />
           Request to join
         </button>
       ) : (
@@ -276,7 +276,7 @@ export function CommunityPreviewCard({
             key={label}
             className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted"
           >
-            <Icon fontSize={11} className="text-foreground-subtle" />
+            <Icon fontSize={13} className="text-foreground-subtle" />
             {label}
           </span>
         ))}

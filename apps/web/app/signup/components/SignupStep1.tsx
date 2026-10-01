@@ -32,11 +32,11 @@ const inputClass =
   "field w-full";
 
 function EyeOpen() {
-  return <EyeRegular fontSize={16} aria-hidden="true" />;
+  return <EyeRegular fontSize={18} aria-hidden="true" />;
 }
 
 function EyeOff() {
-  return <EyeOffRegular fontSize={16} aria-hidden="true" />;
+  return <EyeOffRegular fontSize={18} aria-hidden="true" />;
 }
 
 export function SignupStep1({
@@ -142,7 +142,7 @@ export function SignupStep1({
 
         <button type="submit" disabled={loading}
           className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed">
-          {loading && <Spinner className="h-4 w-4 text-white" />}
+          {loading && <Spinner className="h-[18px] w-[18px] text-white" />}
           {loading ? "Creating account…" : "Continue →"}
         </button>
       </form>

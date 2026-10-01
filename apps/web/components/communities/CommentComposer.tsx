@@ -323,7 +323,7 @@ export function CommentComposer<C = unknown>({
                   : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
               }`}
             >
-              <EmojiRegular fontSize={18} />
+              <EmojiRegular fontSize={20} />
             </button>
             <textarea
               ref={ref}
@@ -364,7 +364,7 @@ export function CommentComposer<C = unknown>({
                   disabled={saving}
                   className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
+                  {saving ? <Spinner size={16} className="text-white" /> : submitLabel}
                 </button>
               )}
             </div>
@@ -453,7 +453,7 @@ export function CommentComposer<C = unknown>({
                 : "border-border bg-surface text-foreground-subtle hover:text-foreground"
             }`}
           >
-            <EmojiRegular fontSize={16} />
+            <EmojiRegular fontSize={18} />
           </button>
           <button
             type="submit"
@@ -463,9 +463,9 @@ export function CommentComposer<C = unknown>({
             className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? (
-              <Spinner size={14} className="text-white" />
+              <Spinner size={16} className="text-white" />
             ) : (
-              <SendRegular className="h-[15px] w-[15px]" style={{ marginLeft: 1 }} aria-hidden="true" />
+              <SendRegular className="h-[17px] w-[17px]" style={{ marginLeft: 1 }} aria-hidden="true" />
             )}
           </button>
         </div>

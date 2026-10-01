@@ -261,7 +261,7 @@ export function CommunitySettingsView({
             </h2>
             <p className="mt-0.5 flex items-center gap-1 font-body text-[11px] text-foreground-muted">
               {community.name}
-              <CommunityNameBadges type={community.type} isPrivate={isPrivate} size={11} />
+              <CommunityNameBadges type={community.type} isPrivate={isPrivate} size={13} />
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export function CommunitySettingsView({
               disabled={saving || !name.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? <Spinner size={12} className="text-accent-foreground" /> : <SaveRegular fontSize={12} />}
+              {saving ? <Spinner size={14} className="text-accent-foreground" /> : <SaveRegular fontSize={14} />}
               Save changes
             </button>
             <button
@@ -280,7 +280,7 @@ export function CommunitySettingsView({
               className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
               aria-label="Close settings"
             >
-              <DismissRegular fontSize={15} />
+              <DismissRegular fontSize={17} />
             </button>
           </div>
         </div>
@@ -316,7 +316,7 @@ export function CommunitySettingsView({
                     {imagePreview ? (
                       <img src={imagePreview} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <ImageAddRegular fontSize={20} />
+                      <ImageAddRegular fontSize={22} />
                     )}
                   </button>
                   <div className="min-w-0 space-y-1">
@@ -406,14 +406,14 @@ export function CommunitySettingsView({
                       active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
                     }`}
                   >
-                    <Icon fontSize={16} className={active ? "text-accent" : "text-foreground-muted"} />
+                    <Icon fontSize={18} className={active ? "text-accent" : "text-foreground-muted"} />
                     <span className="min-w-0">
                       <span className="block font-body text-sm font-semibold text-foreground">{label}</span>
                       <span className="block font-body text-xs text-foreground-muted">{copy}</span>
                     </span>
                     {active && (
                       <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground shrink-0">
-                        <CheckmarkRegular fontSize={10} />
+                        <CheckmarkRegular fontSize={12} />
                       </span>
                     )}
                   </button>
@@ -442,14 +442,14 @@ export function CommunitySettingsView({
                     } ${required ? "cursor-default" : ""}`}
                   >
                     <div className="flex items-center gap-2">
-                      <Icon fontSize={14} className={active ? "text-accent" : "text-foreground-muted"} />
+                      <Icon fontSize={16} className={active ? "text-accent" : "text-foreground-muted"} />
                       <span className="font-body text-sm font-semibold text-foreground">{label}</span>
                     </div>
                     <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">{copy}</p>
                     <span className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border ${
                       active ? "border-accent bg-accent text-accent-foreground" : "border-border"
                     }`}>
-                      {active && <CheckmarkRegular fontSize={9} />}
+                      {active && <CheckmarkRegular fontSize={11} />}
                     </span>
                     {required && (
                       <span className="mt-1.5 inline-block rounded-full bg-surface px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-foreground-muted">
@@ -479,7 +479,7 @@ export function CommunitySettingsView({
                   onClick={() => setAddingRule(true)}
                   className="inline-flex items-center gap-1 font-body text-xs text-accent hover:text-accent-hover transition-colors"
                 >
-                  <AddRegular fontSize={12} /> Add rule
+                  <AddRegular fontSize={14} /> Add rule
                 </button>
               )}
             </div>
@@ -500,7 +500,7 @@ export function CommunitySettingsView({
                       className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded text-foreground-muted hover:text-red-400 transition-all"
                       aria-label="Remove rule"
                     >
-                      <DismissRegular fontSize={12} />
+                      <DismissRegular fontSize={14} />
                     </button>
                   </div>
                 ))}
@@ -548,7 +548,7 @@ export function CommunitySettingsView({
                 {isPrivate ? (
                   <>
                     <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 font-body text-[10px] font-medium text-foreground-muted border border-border">
-                      <LockClosedRegular fontSize={9} /> Private
+                      <LockClosedRegular fontSize={11} /> Private
                     </span>
                     <p className="font-body text-xs text-foreground-muted">
                       Members must request via this link. You approve each request.
@@ -571,7 +571,7 @@ export function CommunitySettingsView({
                   onClick={handleCopyLink}
                   className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                 >
-                  {copiedLink ? <CheckmarkRegular fontSize={12} className="text-green-400" /> : <CopyRegular fontSize={12} />}
+                  {copiedLink ? <CheckmarkRegular fontSize={14} className="text-green-400" /> : <CopyRegular fontSize={14} />}
                   {copiedLink ? "Copied!" : "Copy"}
                 </button>
               </div>
@@ -582,7 +582,7 @@ export function CommunitySettingsView({
                   disabled={regenerating}
                   className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
                 >
-                  {regenerating ? <Spinner size={11} /> : <ArrowClockwiseRegular fontSize={11} />}
+                  {regenerating ? <Spinner size={13} /> : <ArrowClockwiseRegular fontSize={13} />}
                   Regenerate link
                 </button>
                 {regenMsg && (
@@ -603,7 +603,7 @@ export function CommunitySettingsView({
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-400">
-                      <DeleteRegular fontSize={14} />
+                      <DeleteRegular fontSize={16} />
                     </div>
                     <div>
                       <p className="font-body text-sm font-semibold text-foreground">
@@ -630,7 +630,7 @@ export function CommunitySettingsView({
                       disabled={deleting}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                     >
-                      {deleting ? <Spinner size={11} className="text-red-400" /> : <DeleteRegular fontSize={11} />}
+                      {deleting ? <Spinner size={13} className="text-red-400" /> : <DeleteRegular fontSize={13} />}
                       Delete
                     </button>
                   </div>
@@ -648,7 +648,7 @@ export function CommunitySettingsView({
                     onClick={() => setShowDeleteConfirm(true)}
                     className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                   >
-                    <DeleteRegular fontSize={12} /> Delete
+                    <DeleteRegular fontSize={14} /> Delete
                   </button>
                 </div>
               )}

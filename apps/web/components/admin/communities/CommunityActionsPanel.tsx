@@ -81,11 +81,11 @@ export function CommunityActionsPanel({
             className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs font-medium text-foreground-muted hover:bg-surface-raised transition-colors disabled:opacity-50"
           >
             {toggleLoading ? (
-              <Spinner className="h-3.5 w-3.5" />
+              <Spinner className="h-4 w-4" />
             ) : isActive ? (
-              <ToggleRightRegular fontSize={14} className="text-green-400" />
+              <ToggleRightRegular fontSize={16} className="text-green-400" />
             ) : (
-              <ToggleLeftRegular fontSize={14} className="text-foreground-muted" />
+              <ToggleLeftRegular fontSize={16} className="text-foreground-muted" />
             )}
             {isActive ? "Deactivate" : "Activate"}
           </button>
@@ -103,7 +103,7 @@ export function CommunityActionsPanel({
             onClick={() => setConfirmDelete(true)}
             className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
           >
-            <DeleteRegular fontSize={12} /> Delete
+            <DeleteRegular fontSize={14} /> Delete
           </button>
         </div>
       </div>
@@ -144,7 +144,7 @@ export function CommunityActionsPanel({
                 disabled={deleteLoading}
                 className="modal-btn modal-btn-danger flex-1"
               >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <DeleteRegular fontSize={12} />}
+                {deleteLoading ? <Spinner className="h-3.5 w-3.5" /> : <DeleteRegular fontSize={14} />}
                 Yes, delete
               </button>
             </div>

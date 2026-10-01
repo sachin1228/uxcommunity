@@ -48,7 +48,7 @@ export function SignupBackButton({
       disabled={disabled}
       className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <ArrowLeftRegular fontSize={15} aria-hidden="true" />
+      <ArrowLeftRegular fontSize={17} aria-hidden="true" />
       Back
     </button>
   );

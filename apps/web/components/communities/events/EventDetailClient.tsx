@@ -201,7 +201,7 @@ export function EventDetailClient({
             <div className="mt-4">
               {commentsLoading ? (
                 <div className="flex items-center justify-center border-t border-border py-12">
-                  <Spinner size={22} />
+                  <Spinner size={24} />
                 </div>
               ) : (
                 <CommentSection
@@ -219,7 +219,7 @@ export function EventDetailClient({
                             setComments((prev) => updateCommentReactions(prev, commentId, reactions))}
                           emptyState={
                     <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                      <CommentRegular fontSize={22} className={communityFeedLayout.emptyIcon} />
+                      <CommentRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
                       <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
                     </div>
                   }

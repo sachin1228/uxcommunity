@@ -62,7 +62,7 @@ export function BackLink({ href, label = "Home", className }: BackLinkProps) {
       onClick={handleClick}
       className={className}
     >
-      <ArrowLeftRegular fontSize={14} />
+      <ArrowLeftRegular fontSize={16} />
       {label}
     </a>
   );

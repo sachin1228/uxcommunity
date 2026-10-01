@@ -83,7 +83,7 @@ function RuleRow({
         className="h-9 w-9 shrink-0 rounded-lg border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
         aria-label="Remove rule"
       >
-        <DismissRegular fontSize={14} className="mx-auto" />
+        <DismissRegular fontSize={16} className="mx-auto" />
       </button>
     </div>
   );
@@ -184,7 +184,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
       {created ? (
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <CheckmarkRegular fontSize={24} />
+            <CheckmarkRegular fontSize={26} />
           </div>
           <h2 className="font-display text-xl font-semibold text-foreground">
             {created.is_private ? "Invite your first members" : "Your community is live"}
@@ -251,7 +251,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                         active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
                       }`}
                     >
-                      <Icon fontSize={18} className={active ? "text-accent" : "text-foreground-muted"} />
+                      <Icon fontSize={20} className={active ? "text-accent" : "text-foreground-muted"} />
                       <span className="min-w-0">
                         <span className="block font-body text-sm font-semibold text-foreground">{label}</span>
                         <span className="block font-body text-xs text-foreground-muted">{copy}</span>
@@ -282,14 +282,14 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                       } ${required ? "cursor-default" : ""}`}
                     >
                       <div className="flex items-center gap-2">
-                        <Icon fontSize={16} className={active ? "text-accent" : "text-foreground-muted"} />
+                        <Icon fontSize={18} className={active ? "text-accent" : "text-foreground-muted"} />
                         <span className="font-body text-sm font-semibold text-foreground">{label}</span>
                       </div>
                       <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">{copy}</p>
                       <span className={`absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full border ${
                         active ? "border-accent bg-accent text-accent-foreground" : "border-border"
                       }`}>
-                        {active && <CheckmarkRegular fontSize={10} />}
+                        {active && <CheckmarkRegular fontSize={12} />}
                       </span>
                       {required && (
                         <span className="mt-2 inline-block rounded-full bg-surface px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-foreground-muted">
@@ -315,7 +315,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   {imagePreview ? (
                     <img src={imagePreview} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <ImageAddRegular fontSize={20} />
+                    <ImageAddRegular fontSize={22} />
                   )}
                 </button>
                 <div className="min-w-0">
@@ -350,7 +350,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                     disabled={rules.length >= 8}
                     className="inline-flex items-center gap-1 font-body text-xs text-accent disabled:opacity-50"
                   >
-                    <AddRegular fontSize={12} /> Add rule
+                    <AddRegular fontSize={14} /> Add rule
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -398,7 +398,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 disabled={!canContinue || submitting}
                 className="modal-btn modal-btn-primary"
               >
-                {submitting && <Spinner size={14} className="text-accent-foreground" />}
+                {submitting && <Spinner size={16} className="text-accent-foreground" />}
                 {submitting ? "Creating..." : "Create Community"}
               </button>
             )}

@@ -135,7 +135,7 @@ export const CommunityRow = memo(function CommunityRow({
                 title="Pinned until the event"
                 className="inline-flex shrink-0 items-center text-foreground-muted"
               >
-                <PinRegular fontSize={11} aria-hidden="true" />
+                <PinRegular fontSize={13} aria-hidden="true" />
               </span>
             )}
             {(c.last_message || lastContent) && !typingText && (

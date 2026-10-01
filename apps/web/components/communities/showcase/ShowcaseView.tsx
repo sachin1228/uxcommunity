@@ -183,7 +183,7 @@ export function ShowcaseView({
             </p>
           </div>
           <GradientButton onClick={() => setCreating(true)}>
-            <AddRegular fontSize={14} />
+            <AddRegular fontSize={16} />
             Share your work
           </GradientButton>
         </div>
@@ -202,14 +202,14 @@ export function ShowcaseView({
                   aria-pressed={category === item.value}
                   className={filterChip(category === item.value)}
                 >
-                  <Icon fontSize={14} />
+                  <Icon fontSize={16} />
                   {item.label}
                 </button>
               );
             })}
             <div className="relative shrink-0">
               <CalendarClockRegular
-                fontSize={14}
+                fontSize={16}
                 className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
               />
               <select
@@ -224,7 +224,7 @@ export function ShowcaseView({
                 <option value="popular">Most discussed</option>
               </select>
               <ChevronDownRegular
-                fontSize={14}
+                fontSize={16}
                 className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
               />
             </div>
@@ -235,7 +235,7 @@ export function ShowcaseView({
       <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading showcase">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         ) : error ? (
           <p className="py-24 text-center font-body text-sm text-foreground-muted">
@@ -243,7 +243,7 @@ export function ShowcaseView({
           </p>
         ) : !visible.length ? (
           <div className={communityFeedLayout.emptyState}>
-            <ImageRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+            <ImageRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>
               No showcase posts yet
             </h3>

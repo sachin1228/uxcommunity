@@ -181,7 +181,7 @@ export default function CommunityPageLoading() {
                   showFallback={false}
                 />
               )} */}
-              <Spinner size={28} />
+              <Spinner size={30} />
               <span className="sr-only">Loading messages</span>
             </div>
           </div>
@@ -216,7 +216,7 @@ export default function CommunityPageLoading() {
         ) : (
           /* Non-chat tab or detail page — spinner in the middle content area. */
           <div className="flex-1 flex items-center justify-center">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         )}
       </div>

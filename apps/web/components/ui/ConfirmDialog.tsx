@@ -49,7 +49,7 @@ export function ConfirmDialog({
     >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-500">
-          <WarningRegular fontSize={18} />
+          <WarningRegular fontSize={20} />
         </div>
         <p className="font-body text-sm leading-6 text-foreground-muted">{message}</p>
       </div>
@@ -68,7 +68,7 @@ export function ConfirmDialog({
           disabled={pending}
           className="modal-btn modal-btn-danger"
         >
-          {pending ? <Spinner size={14} /> : <DeleteRegular fontSize={14} />}
+          {pending ? <Spinner size={16} /> : <DeleteRegular fontSize={16} />}
           {pending ? "Deleting…" : confirmLabel}
         </button>
       </div>

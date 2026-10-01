@@ -70,7 +70,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
     <div className="rounded-xl border border-border bg-surface overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h2 className="font-body text-xs font-semibold text-foreground flex items-center gap-1.5">
-          <PulseRegular fontSize={13} className="text-accent" />
+          <PulseRegular fontSize={15} className="text-accent" />
           {adminId ? "Admin activity" : "Management activity"}
         </h2>
         <p className="font-body text-[11px] text-foreground-muted mt-0.5">
@@ -99,13 +99,13 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
 
       {loading ? (
         <div className="flex justify-center py-10">
-          <Spinner className="h-4 w-4" />
+          <Spinner className="h-[18px] w-[18px]" />
         </div>
       ) : error ? (
         <p className="px-5 py-4 font-body text-xs text-red-400">{error}</p>
       ) : visible.length === 0 ? (
         <div className="px-5 py-6 flex items-center gap-3">
-          <ShieldCheckmarkRegular fontSize={16} className="text-foreground-muted/50 shrink-0" />
+          <ShieldCheckmarkRegular fontSize={18} className="text-foreground-muted/50 shrink-0" />
           <p className="font-body text-xs text-foreground-muted">
             No management activity recorded yet. Changes made by community admins and the platform will show up here.
           </p>

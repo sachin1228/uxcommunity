@@ -349,7 +349,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
         <div>
           <div className="relative">
             <SearchRegular
-              fontSize={14}
+              fontSize={16}
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground-muted"
             />
             <input
@@ -363,7 +363,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             />
             {searching && (
               <SpinnerIosRegular
-                fontSize={14}
+                fontSize={16}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-foreground-muted"
               />
             )}
@@ -426,7 +426,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-left transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-foreground-muted">
-              <BuildingRegular fontSize={14} />
+              <BuildingRegular fontSize={16} />
             </span>
             <span className="min-w-0">
               <span className="block truncate font-body text-sm font-medium text-foreground">
@@ -450,7 +450,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             onClick={() => setStep("search")}
             className="mb-4 flex items-center gap-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground"
           >
-            <ArrowLeftRegular fontSize={12} />
+            <ArrowLeftRegular fontSize={14} />
             Back to search
           </button>
 
@@ -576,7 +576,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             }
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting && <SpinnerIosRegular fontSize={14} className="animate-spin" />}
+            {submitting && <SpinnerIosRegular fontSize={16} className="animate-spin" />}
             Send verification code
           </button>
         </div>
@@ -628,7 +628,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
 
           {(codeError || verifying) && (
             <p className="mt-2 flex items-center gap-1.5 font-body text-xs text-foreground-muted" role="alert">
-              {verifying && <SpinnerIosRegular fontSize={12} className="animate-spin" />}
+              {verifying && <SpinnerIosRegular fontSize={14} className="animate-spin" />}
               {verifying ? "Verifying…" : codeError}
             </p>
           )}
@@ -664,7 +664,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
         <div>
           <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-3.5 py-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-              <CheckmarkRegular fontSize={16} />
+              <CheckmarkRegular fontSize={18} />
             </span>
             <div className="min-w-0">
               <p className="truncate font-body text-sm font-medium text-foreground">

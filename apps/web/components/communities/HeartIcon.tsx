@@ -17,7 +17,7 @@ import { HeartFilled, HeartRegular } from "@fluentui/react-icons";
  *    hover scale, and never fires on initial mount.
  */
 export function HeartIcon({
-  size = 24,
+  size = 26,
   className,
   active = false,
 }: {

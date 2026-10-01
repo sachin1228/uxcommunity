@@ -77,7 +77,7 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
           {MENU_LINKS.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={() => setOpen(false)} className={ROW_CLASS}>
               <span>{label}</span>
-              <Icon fontSize={16} className={ROW_ICON_CLASS} />
+              <Icon fontSize={18} className={ROW_ICON_CLASS} />
             </Link>
           ))}
         </div>
@@ -89,7 +89,7 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
             className={`${ROW_CLASS} disabled:opacity-50`}
           >
             <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
-            <SignOutRegular fontSize={16} className={ROW_ICON_CLASS} />
+            <SignOutRegular fontSize={18} className={ROW_ICON_CLASS} />
           </button>
         </div>
       </DropdownMenu>

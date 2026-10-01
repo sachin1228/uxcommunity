@@ -35,7 +35,7 @@ export function ProfileLinks({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="flex flex-col gap-1.5">
           <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
-            <LinkedinIcon fontSize={11} /> LinkedIn
+            <LinkedinIcon fontSize={13} /> LinkedIn
           </label>
           <input
             type="url"
@@ -47,7 +47,7 @@ export function ProfileLinks({
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
-            <GlobeRegular fontSize={11} /> Portfolio
+            <GlobeRegular fontSize={13} /> Portfolio
           </label>
           <input
             type="url"

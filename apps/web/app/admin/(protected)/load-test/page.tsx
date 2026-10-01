@@ -176,7 +176,7 @@ export default function LoadTestPage() {
                     : "text-foreground-muted hover:text-foreground"
                 }`}
               >
-                {t === "test" ? <GaugeRegular fontSize={13} /> : <PeopleRegular fontSize={13} />}
+                {t === "test" ? <GaugeRegular fontSize={15} /> : <PeopleRegular fontSize={15} />}
                 {t === "test" ? "Run Test" : "Seed Users"}
               </button>
             ))}
@@ -200,7 +200,7 @@ export default function LoadTestPage() {
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
-                  <ChevronDownRegular fontSize={12} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
+                  <ChevronDownRegular fontSize={14} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
                 </div>
                 <p className="font-body text-[11px] text-foreground-muted">
                   {SCENARIOS.find((s) => s.value === scenario)?.desc}
@@ -377,7 +377,7 @@ export default function LoadTestPage() {
                   }}
                   className="font-body text-[11px] text-accent hover:underline flex items-center gap-1"
                 >
-                  <ChevronRightRegular fontSize={11} className="rotate-90" />
+                  <ChevronRightRegular fontSize={13} className="rotate-90" />
                   Jump to bottom
                 </button>
               )}
@@ -386,7 +386,7 @@ export default function LoadTestPage() {
                   onClick={() => setLines([])}
                   className="font-body text-[11px] text-foreground-muted hover:text-foreground flex items-center gap-1"
                 >
-                  <ArrowClockwiseRegular fontSize={11} />
+                  <ArrowClockwiseRegular fontSize={13} />
                   Clear
                 </button>
               )}
@@ -468,7 +468,7 @@ function PasswordField({
           className="absolute right-2.5 top-2 text-foreground-muted hover:text-foreground"
           tabIndex={-1}
         >
-          {show ? <EyeOffRegular fontSize={12} /> : <EyeRegular fontSize={12} />}
+          {show ? <EyeOffRegular fontSize={14} /> : <EyeRegular fontSize={14} />}
         </button>
       </div>
     </div>
@@ -485,7 +485,7 @@ function RunButton({
       onClick={onStop}
       className="flex items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 font-body text-xs font-medium text-red-400 transition hover:bg-red-500/20"
     >
-      <SquareRegular fontSize={12} />
+      <SquareRegular fontSize={14} />
       Stop
     </button>
   ) : (
@@ -493,7 +493,7 @@ function RunButton({
       onClick={onClick}
       className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-xs font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50"
     >
-      <PlayRegular fontSize={12} />
+      <PlayRegular fontSize={14} />
       {label}
     </button>
   );
@@ -509,7 +509,7 @@ function StatusBadge({ status, lineCount }: { status: Status; lineCount: number 
   const { label, cls } = map[status];
   return (
     <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${cls}`}>
-      {status === "running" && <Spinner size={12} />}
+      {status === "running" && <Spinner size={14} />}
       <span className="font-body text-xs font-medium">{label}</span>
       {lineCount > 0 && (
         <span className="ml-auto font-body text-[11px] opacity-70">{lineCount} lines</span>

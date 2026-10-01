@@ -206,7 +206,7 @@ export function ThreadImageCarousel({
           hasPrev ? "" : "hidden"
         }`}
       >
-        <ChevronLeftRegular fontSize={18} />
+        <ChevronLeftRegular fontSize={20} />
       </button>
 
       {/* Next */}
@@ -218,7 +218,7 @@ export function ThreadImageCarousel({
           hasNext ? "" : "hidden"
         }`}
       >
-        <ChevronRightRegular fontSize={18} />
+        <ChevronRightRegular fontSize={20} />
       </button>
 
       {/* Pagination indicators (carousel dots) — one per image, clickable */}

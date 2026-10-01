@@ -67,7 +67,7 @@ export function HostTimeZoneField({
   return (
     <div>
       <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-        <GlobeRegular fontSize={11} /> Timezone
+        <GlobeRegular fontSize={13} /> Timezone
         {overriding && deviceZone && (
           <button
             type="button"

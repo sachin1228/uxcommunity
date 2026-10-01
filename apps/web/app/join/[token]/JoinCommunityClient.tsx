@@ -92,9 +92,9 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         <div className="mb-3 flex justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-xs text-foreground-muted">
             {community.is_private ? (
-              <><LockClosedRegular fontSize={11} /> Private community</>
+              <><LockClosedRegular fontSize={13} /> Private community</>
             ) : (
-              <><GlobeRegular fontSize={11} /> Public community</>
+              <><GlobeRegular fontSize={13} /> Public community</>
             )}
           </span>
         </div>
@@ -105,7 +105,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
           {/* Default groups (city, sector, experience level, job title, General)
               carry the verified seal here too, so an invite link reads the same
               as the sidebar the member lands in. */}
-          {isVerifiedCommunity && <SignupCommunityBadge size={16} />}
+          {isVerifiedCommunity && <SignupCommunityBadge size={18} />}
         </h1>
         {community.description && (
           <p className="mt-2 text-center font-body text-sm leading-relaxed text-foreground-muted">
@@ -115,7 +115,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
         {/* Member count */}
         <p className="mt-3 flex items-center justify-center gap-1.5 font-body text-xs text-foreground-subtle">
-          <PeopleRegular fontSize={12} />
+          <PeopleRegular fontSize={14} />
           {community.member_count.toLocaleString()} member{community.member_count !== 1 ? "s" : ""}
         </p>
 
@@ -123,14 +123,14 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         <div className="mt-7">
           {status === "joined" && (
             <div className="flex items-center justify-center gap-2 rounded-xl bg-accent/10 py-3 text-accent">
-              <CheckmarkRegular fontSize={16} />
+              <CheckmarkRegular fontSize={18} />
               <span className="font-body text-sm font-medium">Joined! Redirecting…</span>
             </div>
           )}
 
           {status === "requested" && (
             <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
-              <CheckmarkRegular fontSize={18} className="mx-auto mb-2 text-accent" />
+              <CheckmarkRegular fontSize={20} className="mx-auto mb-2 text-accent" />
               <p className="font-body text-sm font-semibold text-foreground">Request sent</p>
               <p className="mt-1 font-body text-xs text-foreground-muted">
                 The community owner will review your request.
@@ -146,11 +146,11 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {status === "loading" ? (
-                  <><Spinner size={15} className="text-accent-foreground" /> Joining…</>
+                  <><Spinner size={17} className="text-accent-foreground" /> Joining…</>
                 ) : community.is_private ? (
-                  <><LockClosedRegular fontSize={14} /> Request to join</>
+                  <><LockClosedRegular fontSize={16} /> Request to join</>
                 ) : (
-                  <><CommentRegular fontSize={14} /> Join community</>
+                  <><CommentRegular fontSize={16} /> Join community</>
                 )}
               </button>
 

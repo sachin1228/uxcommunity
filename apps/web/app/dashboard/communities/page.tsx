@@ -98,7 +98,7 @@ function CommunityCard({
               onClick={() => router.push(`/dashboard/communities/${c.id}`)}
               className="flex items-center gap-1 rounded-full border border-accent/40 px-3 py-1 font-body text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
             >
-              <CheckmarkRegular fontSize={10} />
+              <CheckmarkRegular fontSize={12} />
               Joined
             </button>
           ) : locked ? (
@@ -110,7 +110,7 @@ function CommunityCard({
                 onMouseLeave={hideTip}
                 className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
               >
-                <LockClosedRegular fontSize={10} />
+                <LockClosedRegular fontSize={12} />
                 Join
               </button>
               {tipPos && typeof document !== "undefined" && createPortal(
@@ -287,7 +287,7 @@ export default function CommunitiesIndexPage() {
         {/* Search */}
         <div className="relative mb-4">
           <SearchRegular
-            fontSize={13}
+            fontSize={15}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
             aria-hidden="true"
           />
@@ -332,7 +332,7 @@ export default function CommunitiesIndexPage() {
       <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5" />
+            <Spinner className="h-[22px] w-[22px]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">

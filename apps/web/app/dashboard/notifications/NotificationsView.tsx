@@ -58,7 +58,7 @@ function EmptyNotifications({
 }) {
   return (
     <div className="px-5 py-16 text-center">
-      <Icon fontSize={26} className="mx-auto mb-3 text-foreground-muted opacity-50" />
+      <Icon fontSize={28} className="mx-auto mb-3 text-foreground-muted opacity-50" />
       <p className="font-body text-sm font-medium text-foreground">{title}</p>
       <p className="mt-1 font-body text-xs text-foreground-muted">{hint}</p>
     </div>
@@ -98,7 +98,7 @@ export function NotificationsView({ userId }: { userId: string }) {
           disabled={!hasUnread}
           className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40"
         >
-          <CheckmarkRegular fontSize={14} />
+          <CheckmarkRegular fontSize={16} />
           Mark all read
         </button>
       </div>
@@ -131,7 +131,7 @@ export function NotificationsView({ userId }: { userId: string }) {
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Icon fontSize={14} aria-hidden="true" />
+                  <Icon fontSize={16} aria-hidden="true" />
                   {label}
                   {unread > 0 && (
                     <span
@@ -156,7 +156,7 @@ export function NotificationsView({ userId }: { userId: string }) {
       >
         {loading ? (
           <div className="flex justify-center py-14">
-            <Spinner className="h-4 w-4" />
+            <Spinner className="h-[18px] w-[18px]" />
           </div>
         ) : notifications.length === 0 ? (
           <EmptyNotifications
@@ -207,7 +207,7 @@ export function NotificationsView({ userId }: { userId: string }) {
                         unread ? "bg-accent-soft text-accent" : "bg-background-subtle text-foreground-muted"
                       }`}
                     >
-                      <Icon fontSize={16} />
+                      <Icon fontSize={18} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start gap-2">

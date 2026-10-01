@@ -231,7 +231,7 @@ export const MessageList = memo(function MessageList({
           size={200}
           showFallback={false}
         /> */}
-        <Spinner size={28} />
+        <Spinner size={30} />
         <span className="sr-only">Loading messages</span>
       </div>
     );
@@ -257,7 +257,7 @@ export const MessageList = memo(function MessageList({
           aria-busy={loadingOlder}
         >
           <div className={loadingOlder ? "visible" : "invisible"}>
-            <Spinner size={18} />
+            <Spinner size={20} />
           </div>
         </div>
       )}

@@ -44,7 +44,7 @@ export function EventGroupCreatedModal({
       <ul className="mt-5 flex flex-col gap-3">
         <li className="flex items-start gap-3">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-            <PinRegular fontSize={13} />
+            <PinRegular fontSize={15} />
           </span>
           <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
             It sits at the top of your sidebar, pinned until{" "}
@@ -53,7 +53,7 @@ export function EventGroupCreatedModal({
         </li>
         <li className="flex items-start gap-3">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-            <PeopleRegular fontSize={13} />
+            <PeopleRegular fontSize={15} />
           </span>
           <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
             People join it by RSVP-ing to your event — they are asked, and their RSVP is what puts
@@ -62,7 +62,7 @@ export function EventGroupCreatedModal({
         </li>
         <li className="flex items-start gap-3">
           <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-            <CommentRegular fontSize={13} />
+            <CommentRegular fontSize={15} />
           </span>
           <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
             You can post there straight away — say hello, share the plan, answer questions.
@@ -79,7 +79,7 @@ export function EventGroupCreatedModal({
           onClick={onClose}
           className="modal-btn modal-btn-primary"
         >
-          <CommentRegular fontSize={15} />
+          <CommentRegular fontSize={17} />
           Open group chat
         </Link>
       </div>

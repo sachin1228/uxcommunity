@@ -15,7 +15,7 @@ export function TagSelector({ allTags, selectedTags, onToggle }: Props) {
   return (
     <div>
       <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-        <TagRegular fontSize={12} /> Internal Tags
+        <TagRegular fontSize={14} /> Internal Tags
       </p>
       <div className="flex flex-wrap gap-1.5">
         {allTags.map((tag) => {

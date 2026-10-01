@@ -161,7 +161,7 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
         onClick={openSettings}
         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
-        <SettingsRegular fontSize={14} aria-hidden="true" />
+        <SettingsRegular fontSize={16} aria-hidden="true" />
         Make this room your own
       </button>
     </section>
@@ -280,7 +280,7 @@ export function EventRoomSection({
             )}
           </span>
         </Row>
-        <Row icon={event.is_online ? <VideoRegular fontSize={16} /> : <LocationRegular fontSize={16} />}>
+        <Row icon={event.is_online ? <VideoRegular fontSize={16} /> : <LocationRegular fontSize={18} />}>
           {event.is_online ? "Online event" : event.location ?? "Location shared by the host"}
         </Row>
         <Row icon={<PeopleRegular fontSize={16} />}>
@@ -335,7 +335,7 @@ export function EventRoomSection({
         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         View event
-        <ArrowRightRegular fontSize={14} aria-hidden="true" />
+        <ArrowRightRegular fontSize={16} aria-hidden="true" />
       </Link>
     </section>
   );

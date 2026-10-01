@@ -105,7 +105,7 @@ export function Topbar({ userId, user }: Props) {
         aria-haspopup="dialog"
         className="order-3 flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-lg border border-border font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent min-[500px]:order-2 sm:w-80 sm:justify-start sm:px-2.5"
       >
-        <SearchRegular fontSize={14} className="shrink-0" aria-hidden="true" />
+        <SearchRegular fontSize={16} className="shrink-0" aria-hidden="true" />
         <span className="hidden flex-1 text-left sm:block">Search</span>
         <kbd className="hidden rounded border border-border px-1 py-0.5 font-mono text-[10px] leading-none sm:block">
           {isApple ? "⌘K" : "Ctrl K"}

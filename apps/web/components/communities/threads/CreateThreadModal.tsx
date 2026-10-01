@@ -179,7 +179,7 @@ export function CreateThreadModal({
               </p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
-              <DismissRegular fontSize={16} />
+              <DismissRegular fontSize={18} />
             </button>
           </div>
 
@@ -263,7 +263,7 @@ export function CreateThreadModal({
             disabled={saving || uploading}
             className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent px-3 font-body text-[13px] font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Spinner size={14} className="text-white" />}
+            {saving && <Spinner size={16} className="text-white" />}
             {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
           </button>
         </div>
@@ -275,7 +275,7 @@ export function CreateThreadModal({
             className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent/10"
           >
             <div className="flex flex-col items-center gap-2">
-              <ImageRegular fontSize={22} className="text-accent" />
+              <ImageRegular fontSize={24} className="text-accent" />
               <span className="font-body text-sm font-medium text-accent">
                 Drop images or files to attach
               </span>

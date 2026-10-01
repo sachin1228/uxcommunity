@@ -477,7 +477,7 @@ export function EventCard({
             : `bg-[var(--accent)] ${onAccentText} shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]`
       }`}
     >
-      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <ArrowRightRegular fontSize={14} aria-hidden="true" /></>}
+      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <ArrowRightRegular fontSize={16} aria-hidden="true" /></>}
     </button>
   ) : (
     <span className="font-display text-xs font-medium text-stone-500">This event has ended</span>
@@ -566,7 +566,7 @@ export function EventCard({
             {event.location && (
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3">
                 <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-white">
-                  <LocationRegular fontSize={14} className="shrink-0" aria-hidden="true" />
+                  <LocationRegular fontSize={16} className="shrink-0" aria-hidden="true" />
                   <span className="truncate">{event.location}</span>
                 </p>
               </div>
@@ -590,7 +590,7 @@ export function EventCard({
           {/* Date / time / location stacked rows */}
           <div className="relative mt-3 flex flex-col items-start gap-1.5 font-body text-xs font-medium text-stone-200">
             <span className="inline-flex items-center gap-1.5">
-              <CalendarRegular fontSize={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+              <CalendarRegular fontSize={15} className="shrink-0 text-stone-400" aria-hidden="true" />
               {fmtEventDate(event.event_date)}
             </span>
             {/* The viewer's own clock, with the zone named beside it: the host
@@ -600,7 +600,7 @@ export function EventCard({
               className="inline-flex items-center gap-1.5"
               title={eventZoneTooltip(event.event_date)}
             >
-              <ClockRegular fontSize={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+              <ClockRegular fontSize={15} className="shrink-0 text-stone-400" aria-hidden="true" />
               {formatEventTimeRange(event.event_date, event.end_date)}
               <span className="font-mono text-[10px] text-stone-400">
                 ({eventZoneLabel(event.event_date)})
@@ -619,9 +619,9 @@ export function EventCard({
             {(event.is_online || event.location) && (
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 {event.is_online ? (
-                  <VideoRegular fontSize={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+                  <VideoRegular fontSize={15} className="shrink-0 text-stone-400" aria-hidden="true" />
                 ) : (
-                  <LocationRegular fontSize={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+                  <LocationRegular fontSize={15} className="shrink-0 text-stone-400" aria-hidden="true" />
                 )}
                 <span className="truncate">
                   {event.is_online
@@ -634,7 +634,7 @@ export function EventCard({
             )}
             {event.max_attendees && (
               <span className="inline-flex items-center gap-1.5">
-                <PeopleRegular fontSize={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+                <PeopleRegular fontSize={15} className="shrink-0 text-stone-400" aria-hidden="true" />
                 <span className={event.max_attendees - event.rsvp_count > 0 ? "" : "text-stone-500"}>
                   {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
                 </span>
@@ -799,7 +799,7 @@ export function EventCard({
             aria-pressed={event.user_liked}
             className="group/like flex shrink-0 cursor-pointer items-center gap-2"
           >
-            <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+            <HeartIcon size={18} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
             <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
           </button>
 

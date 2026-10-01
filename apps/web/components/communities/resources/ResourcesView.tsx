@@ -220,7 +220,7 @@ export function ResourcesView({
             </p>
           </div>
           <GradientButton onClick={() => setShowCreateModal(true)}>
-            <AddRegular fontSize={14} /> Share Resource
+            <AddRegular fontSize={16} /> Share Resource
           </GradientButton>
         </div>
 
@@ -252,7 +252,7 @@ export function ResourcesView({
                   aria-pressed={filter === item.value}
                   className={filterChip(filter === item.value)}
                 >
-                  <Icon fontSize={14} aria-hidden="true" />
+                  <Icon fontSize={16} aria-hidden="true" />
                   {item.label}
                   <span className="font-mono text-[10px]">{count}</span>
                 </button>
@@ -275,11 +275,11 @@ export function ResourcesView({
       <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading resources">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         ) : resources.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookmarkMultipleRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+            <BookmarkMultipleRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources yet</h3>
             <p className={communityFeedLayout.emptyDescription}>
               Be the first to share a Figma file, article, tool, or anything useful.
@@ -287,7 +287,7 @@ export function ResourcesView({
           </div>
         ) : filtered.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookmarkMultipleRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+            <BookmarkMultipleRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources in this category</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>

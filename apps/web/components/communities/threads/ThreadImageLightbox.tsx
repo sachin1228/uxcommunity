@@ -97,7 +97,7 @@ export function ThreadImageLightbox({
           title="Close (Esc)"
           className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
         >
-          <DismissRegular fontSize={18} />
+          <DismissRegular fontSize={20} />
         </button>
 
         {/* ── Image canvas + carousel ───────────────────────────────────── */}
@@ -110,7 +110,7 @@ export function ThreadImageLightbox({
                 aria-label="Previous image"
                 className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
               >
-                <ChevronLeftRegular fontSize={22} />
+                <ChevronLeftRegular fontSize={24} />
               </button>
             )}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -127,7 +127,7 @@ export function ThreadImageLightbox({
                 aria-label="Next image"
                 className="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
               >
-                <ChevronRightRegular fontSize={22} />
+                <ChevronRightRegular fontSize={24} />
               </button>
             )}
           </div>

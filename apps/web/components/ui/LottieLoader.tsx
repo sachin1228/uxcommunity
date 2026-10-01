@@ -85,7 +85,7 @@ export function LottieLoader({
   communityId,
   communityType,
   size = 120,
-  spinnerClassName = "h-5 w-5 text-foreground-muted",
+  spinnerClassName = "h-[22px] w-[22px] text-foreground-muted",
   showFallback = true,
 }: Props) {
   const [animationData, setAnimationData] = useState<object | null>(null);

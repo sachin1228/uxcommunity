@@ -81,7 +81,7 @@ export function CommunityMessagesList({
                       className="font-body text-[11px] text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
                     >
                       {deletingMsgId === msg.id ? (
-                        <Spinner className="h-3 w-3" />
+                        <Spinner className="h-3.5 w-3.5" />
                       ) : (
                         "Yes"
                       )}
@@ -99,7 +99,7 @@ export function CommunityMessagesList({
                     className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 text-foreground-muted hover:text-red-400 rounded"
                     title="Delete message"
                   >
-                    <DeleteRegular fontSize={12} />
+                    <DeleteRegular fontSize={14} />
                   </button>
                 )}
               </div>

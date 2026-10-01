@@ -119,7 +119,7 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
                 </span>
               ) : active ? (
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                  <Spinner className="h-4 w-4" />
+                  <Spinner className="h-[18px] w-[18px]" />
                 </span>
               ) : (
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center">

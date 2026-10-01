@@ -31,7 +31,7 @@ const VERIFIED_COLOR = "text-[#1D9BF0]";
  * 16px invite page.
  */
 export function SignupCommunityBadge({
-  size = 13,
+  size = 15,
   className = "",
 }: {
   size?: number;
@@ -50,7 +50,7 @@ export function SignupCommunityBadge({
 /** Earth for a public/discoverable community, lock for a private one. */
 export function CommunityVisibilityIcon({
   kind,
-  size = 12,
+  size = 14,
   className = "",
 }: {
   kind: CommunityVisibilityIcon;
@@ -83,7 +83,7 @@ export function CommunityVisibilityIcon({
 export function CommunityNameBadges({
   type,
   isPrivate,
-  size = 12,
+  size = 14,
   className = "",
 }: {
   type?: string | null;

@@ -68,7 +68,7 @@ export function VerifiedMark({
   title?: string;
   size?: "xs" | "sm";
 }) {
-  const iconSize = size === "xs" ? 10 : 12;
+  const iconSize = size === "xs" ? 12 : 14;
   return (
     <span
       title={title}

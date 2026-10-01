@@ -156,7 +156,7 @@ export default function CommunityDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-5 w-5" />
+        <Spinner className="h-[22px] w-[22px]" />
       </div>
     );
   }
@@ -200,7 +200,7 @@ export default function CommunityDetailPage() {
         onClick={() => router.push("/admin/communities")}
         className="flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors w-fit"
       >
-        <ArrowLeftRegular fontSize={13} /> Communities
+        <ArrowLeftRegular fontSize={15} /> Communities
       </button>
 
       {/* Hero */}
@@ -239,13 +239,13 @@ export default function CommunityDetailPage() {
                   disabled={editLoading}
                   className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
                 >
-                  {editLoading ? <Spinner className="h-4 w-4" /> : <CheckmarkRegular fontSize={15} />}
+                  {editLoading ? <Spinner className="h-[18px] w-[18px]" /> : <CheckmarkRegular fontSize={17} />}
                 </button>
                 <button
                   onClick={() => { setEditing(false); setEditError(null); }}
                   className="p-1 text-foreground-muted hover:text-foreground"
                 >
-                  <DismissRegular fontSize={15} />
+                  <DismissRegular fontSize={17} />
                 </button>
               </div>
             ) : (
@@ -258,7 +258,7 @@ export default function CommunityDetailPage() {
                   className="shrink-0 p-1 text-foreground-muted hover:text-foreground transition-colors"
                   title="Rename community"
                 >
-                  <EditRegular fontSize={13} />
+                  <EditRegular fontSize={15} />
                 </button>
               </div>
             )}
@@ -311,7 +311,7 @@ export default function CommunityDetailPage() {
                 isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
               }`}
             >
-              <Icon fontSize={13} />
+              <Icon fontSize={15} />
               {t.label}
               {t.count != null && (
                 <span
@@ -368,13 +368,13 @@ export default function CommunityDetailPage() {
                         disabled={editDescLoading}
                         className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                       >
-                        {editDescLoading ? <Spinner className="h-3 w-3" /> : <CheckmarkRegular fontSize={11} />} Save
+                        {editDescLoading ? <Spinner className="h-3.5 w-3.5" /> : <CheckmarkRegular fontSize={13} />} Save
                       </button>
                       <button
                         onClick={() => { setEditingDesc(false); setEditDescError(null); }}
                         className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
                       >
-                        <DismissRegular fontSize={11} /> Cancel
+                        <DismissRegular fontSize={13} /> Cancel
                       </button>
                     </div>
                   </div>
@@ -388,7 +388,7 @@ export default function CommunityDetailPage() {
                       className="shrink-0 p-1 text-foreground-muted hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
                       title="Edit description"
                     >
-                      <EditRegular fontSize={11} />
+                      <EditRegular fontSize={13} />
                     </button>
                   </div>
                 )}
@@ -442,8 +442,8 @@ export default function CommunityDetailPage() {
                         disabled={dpBusy !== null}
                         className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                       >
-                        <ImageAddRegular fontSize={13} />
-                        {dpBusy === "image" ? <Spinner className="h-3 w-3" /> : "Upload image"}
+                        <ImageAddRegular fontSize={15} />
+                        {dpBusy === "image" ? <Spinner className="h-3.5 w-3.5" /> : "Upload image"}
                       </button>
                     </div>
                     <input

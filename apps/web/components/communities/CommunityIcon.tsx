@@ -24,7 +24,7 @@ export function CommunityIcon({
       aria-hidden
     >
       <PeopleRegular
-        fontSize={iconSize ?? Math.round(size * 0.5)}
+        fontSize={iconSize ?? Math.round(size * 0.5) + 2}
         className="text-foreground-muted"
       />
     </div>

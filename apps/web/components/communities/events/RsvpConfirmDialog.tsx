@@ -155,11 +155,11 @@ export function RsvpConfirmDialog({
           className="modal-btn modal-btn-primary"
         >
           {pending ? (
-            <Spinner size={15} className="text-white" />
+            <Spinner size={17} className="text-white" />
           ) : joining ? (
-            <CheckmarkRegular fontSize={15} />
+            <CheckmarkRegular fontSize={17} />
           ) : (
-            <PersonDeleteRegular fontSize={15} />
+            <PersonDeleteRegular fontSize={17} />
           )}
           {pending ? (joining ? "Confirming…" : "Withdrawing…") : joining ? "Confirm RSVP" : "Yes, not going"}
         </button>

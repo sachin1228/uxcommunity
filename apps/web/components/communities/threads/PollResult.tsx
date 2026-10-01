@@ -97,7 +97,7 @@ export function ThreadPollResult({
                       className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white"
                       aria-hidden
                     >
-                      <CheckmarkRegular fontSize={12} />
+                      <CheckmarkRegular fontSize={14} />
                     </span>
                   ) : (
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground">
@@ -153,7 +153,7 @@ export function ThreadPollResult({
               >
                 {isPending ? (
                   <SpinnerIosRegular
-                    fontSize={16}
+                    fontSize={18}
                     className="shrink-0 animate-spin text-accent"
                     aria-hidden
                   />
@@ -189,7 +189,7 @@ export function ThreadPollResult({
               className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-accent transition-colors hover:text-accent-hover hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? (
-                <SpinnerIosRegular fontSize={11} className="animate-spin" aria-hidden />
+                <SpinnerIosRegular fontSize={13} className="animate-spin" aria-hidden />
               ) : (
                 "Undo"
               )}

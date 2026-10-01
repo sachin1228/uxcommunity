@@ -313,7 +313,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-1 rounded-full hover:bg-surface"
               aria-label="Remove image"
             >
-              <DismissRegular fontSize={14} />
+              <DismissRegular fontSize={16} />
             </button>
           </div>
         )}
@@ -322,7 +322,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         {showLinkPreview && (
           <div className="relative mb-1">
             <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
-              <LinkRegular fontSize={11} className="text-foreground-muted/60 shrink-0" />
+              <LinkRegular fontSize={13} className="text-foreground-muted/60 shrink-0" />
               <p className="font-body text-[10px] text-foreground-muted/70 truncate flex-1">
                 {(() => { try { return new URL(linkPreviewUrl!).hostname.replace(/^www\./, ""); } catch { return linkPreviewUrl; } })()}
               </p>
@@ -331,7 +331,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-surface"
                 aria-label="Dismiss link preview"
               >
-                <DismissRegular fontSize={12} />
+                <DismissRegular fontSize={14} />
               </button>
             </div>
             <LinkPreview url={linkPreviewUrl!} isMe={false} />
@@ -383,7 +383,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-2 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface"
                   aria-label="Cancel reply"
                 >
-                  <DismissRegular fontSize={18} />
+                  <DismissRegular fontSize={20} />
                 </button>
               </div>
             )}
@@ -411,7 +411,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   aria-label="Open emoji & GIF picker"
                   aria-expanded={pickerOpen}
                 >
-                  <EmojiRegular fontSize={19} />
+                  <EmojiRegular fontSize={21} />
                 </button>
 
                 <button
@@ -421,7 +421,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Attach image"
                 >
-                  <ImageRegular fontSize={19} />
+                  <ImageRegular fontSize={21} />
                 </button>
               </div>
 
@@ -521,7 +521,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   title="Send"
                 >
                   <SendRegular
-                    className="w-[15px] h-[15px]"
+                    className="w-[17px] h-[17px]"
                     style={{ marginLeft: "1px" }}
                     aria-hidden="true"
                   />

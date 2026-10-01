@@ -142,7 +142,7 @@ export function ActivityView({
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center">
-            <Spinner size={20} />
+            <Spinner size={22} />
           </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -157,7 +157,7 @@ export function ActivityView({
           </div>
         ) : visible.length === 0 && !hasMore ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            <ShieldCheckmarkRegular fontSize={20} className="text-foreground-muted" aria-hidden="true" />
+            <ShieldCheckmarkRegular fontSize={22} className="text-foreground-muted" aria-hidden="true" />
             <p className="max-w-xs font-body text-sm text-foreground-muted leading-relaxed">
               {actorFilter === "all"
                 ? "No management activity yet. Actions taken by admins and moderators will appear here."
@@ -236,7 +236,7 @@ export function ActivityView({
                   disabled={loadingMore}
                   className="rounded-lg border border-border px-4 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-60"
                 >
-                  {loadingMore ? <Spinner size={12} /> : "Load older"}
+                  {loadingMore ? <Spinner size={14} /> : "Load older"}
                 </button>
               </div>
             )}

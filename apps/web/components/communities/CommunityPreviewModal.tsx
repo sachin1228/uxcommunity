@@ -64,7 +64,7 @@ export function CommunityPreviewModal({
     >
       {loading ? (
         <div className="flex min-h-48 items-center justify-center">
-          <Spinner size={22} />
+          <Spinner size={24} />
         </div>
       ) : preview ? (
         <div className="px-4 pb-4 pt-7">

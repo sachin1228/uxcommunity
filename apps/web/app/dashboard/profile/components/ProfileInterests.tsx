@@ -67,7 +67,7 @@ export function ProfileInterests({
             >
               <span>{INTEREST_EMOJIS[interest.name] ?? "🎨"}</span>
               {interest.name}
-              <DismissRegular fontSize={10} className="opacity-50 group-hover:opacity-100" />
+              <DismissRegular fontSize={12} className="opacity-50 group-hover:opacity-100" />
             </button>
           ))
         )}
@@ -81,9 +81,9 @@ export function ProfileInterests({
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-accent/40 bg-surface-raised px-4 py-2 font-body text-sm text-foreground-muted hover:text-foreground transition-all"
         >
-          <EditRegular fontSize={12} />
+          <EditRegular fontSize={14} />
           Edit interests
-          <ChevronDownRegular fontSize={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDownRegular fontSize={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {/* Portal dropdown — always above other content */}
@@ -117,7 +117,7 @@ export function ProfileInterests({
                     }`}
                     aria-hidden="true"
                   >
-                    {selected && <CheckmarkRegular fontSize={11} className="text-accent-foreground" />}
+                    {selected && <CheckmarkRegular fontSize={13} className="text-accent-foreground" />}
                   </span>
                 </button>
               );

@@ -81,7 +81,7 @@ export default async function CompanyPage({ params }: Props) {
           </div>
 
           <p className="mt-2 flex items-center gap-1.5 font-body text-sm text-foreground-muted">
-            <PeopleRegular fontSize={12} className="text-accent" />
+            <PeopleRegular fontSize={14} className="text-accent" />
             {company.memberCount} {company.memberCount === 1 ? "member" : "members"}
           </p>
         </div>
@@ -132,7 +132,7 @@ export default async function CompanyPage({ params }: Props) {
       </section>
 
       <p className="mt-6 flex flex-wrap items-center gap-x-1.5 font-body text-xs text-foreground-subtle">
-        <BuildingRegular fontSize={11} />
+        <BuildingRegular fontSize={13} />
         Work somewhere else?
         <Link href="/dashboard/settings" className="text-accent hover:underline">
           Add your company

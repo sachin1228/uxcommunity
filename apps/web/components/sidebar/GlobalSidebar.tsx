@@ -108,7 +108,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <HomeRegular fontSize={15} className="shrink-0" />
+              <HomeRegular fontSize={17} className="shrink-0" />
               <span className="flex-1 truncate">Home</span>
             </Link>
           </li>
@@ -121,7 +121,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <CompassNorthwestRegular fontSize={15} className="shrink-0" />
+              <CompassNorthwestRegular fontSize={17} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
             </Link>
           </li>
@@ -134,7 +134,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <LibraryRegular fontSize={15} className="shrink-0" />
+              <LibraryRegular fontSize={17} className="shrink-0" />
               <span className="flex-1 truncate">Library</span>
             </Link>
           </li>
@@ -147,7 +147,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <BriefcaseRegular fontSize={15} className="shrink-0" />
+              <BriefcaseRegular fontSize={17} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
             </Link>
           </li>
@@ -168,7 +168,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
             aria-label="Create community"
             title="Create community"
           >
-            <AddRegular fontSize={11} />
+            <AddRegular fontSize={13} />
           </button>
         </div>
 
@@ -179,12 +179,12 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner className="h-4 w-4" />
+            <Spinner className="h-[18px] w-[18px]" />
           </div>
         ) : communities.length === 0 ? (
           <div className="px-4 py-6 text-center">
             <CommentRegular
-              fontSize={24}
+              fontSize={26}
               className="mx-auto text-foreground-muted mb-2 opacity-40"
             />
             <p className="font-body text-xs text-foreground-muted">No communities yet</p>

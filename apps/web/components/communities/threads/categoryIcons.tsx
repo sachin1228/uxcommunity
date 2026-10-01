@@ -13,7 +13,7 @@ export const CATEGORY_ICONS: Record<ThreadCategory, React.ElementType> = {
 
 export function CategoryIcon({
   category,
-  size = 12,
+  size = 14,
   className,
 }: {
   category: ThreadCategory;

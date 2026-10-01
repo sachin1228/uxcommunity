@@ -184,7 +184,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             disabled={loading}
             className="modal-btn modal-btn-primary mt-2 w-full"
           >
-            {loading && <Spinner className="h-4 w-4 text-white" />}
+            {loading && <Spinner className="h-[18px] w-[18px] text-white" />}
             {loading ? "Submitting…" : "Submit Application"}
           </button>
 

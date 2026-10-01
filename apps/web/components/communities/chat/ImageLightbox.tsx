@@ -129,7 +129,7 @@ export function ImageLightbox({
             aria-label="Download image"
             title="Download"
           >
-            <ArrowDownloadRegular fontSize={18} />
+            <ArrowDownloadRegular fontSize={20} />
           </button>
           <button
             onClick={onClose}
@@ -137,7 +137,7 @@ export function ImageLightbox({
             aria-label="Close viewer"
             title="Close"
           >
-            <DismissRegular fontSize={18} />
+            <DismissRegular fontSize={20} />
           </button>
         </div>
       </div>
@@ -150,7 +150,7 @@ export function ImageLightbox({
             className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             aria-label="Previous image"
           >
-            <ChevronLeftRegular fontSize={22} />
+            <ChevronLeftRegular fontSize={24} />
           </button>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -166,7 +166,7 @@ export function ImageLightbox({
             className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             aria-label="Next image"
           >
-            <ChevronRightRegular fontSize={22} />
+            <ChevronRightRegular fontSize={24} />
           </button>
         )}
       </div>

@@ -169,7 +169,7 @@ export function ThreadNotificationBubble({
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white">
-                        <VideoRegular fontSize={12} />
+                        <VideoRegular fontSize={14} />
                       </span>
                     </div>
                   </>
@@ -181,7 +181,7 @@ export function ThreadNotificationBubble({
                     }}
                   >
                     <CatIcon
-                      fontSize={24}
+                      fontSize={26}
                       style={{
                         color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
                       }}
@@ -198,7 +198,7 @@ export function ThreadNotificationBubble({
                   }`}
                   style={{ color: isMe ? undefined : theme.accent }}
                 >
-                  <ChatRegular fontSize={12} />
+                  <ChatRegular fontSize={14} />
                   Thread
                 </span>
                 <p
@@ -222,7 +222,7 @@ export function ThreadNotificationBubble({
               {/* Chevron affordance */}
               <div className="flex items-center pr-2.5">
                 <ChevronRightRegular
-                  fontSize={14}
+                  fontSize={16}
                   className={isMe ? "text-accent-foreground/60" : "text-foreground-muted"}
                 />
               </div>
@@ -254,7 +254,7 @@ export function ThreadNotificationBubble({
                     : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
                 }
               >
-                <ChatRegular fontSize={10} className="shrink-0" />
+                <ChatRegular fontSize={12} className="shrink-0" />
                 <span className="shrink-0 tabular-nums">{commentCount}</span>
                 {commenterNames && (
                   <span className="truncate">

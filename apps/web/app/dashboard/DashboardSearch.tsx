@@ -138,7 +138,7 @@ export function DashboardSearch({ open, onClose }: Props) {
         <div className="relative mx-auto mt-[10vh] w-[min(38rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
           <div className="flex items-center gap-2.5 border-b border-border px-4">
             <SearchRegular
-              fontSize={15}
+              fontSize={17}
               className="shrink-0 text-foreground-muted"
               aria-hidden="true"
             />
@@ -211,7 +211,7 @@ export function DashboardSearch({ open, onClose }: Props) {
                       }`}
                     >
                       <Icon
-                        fontSize={15}
+                        fontSize={17}
                         className="shrink-0"
                         aria-hidden="true"
                       />

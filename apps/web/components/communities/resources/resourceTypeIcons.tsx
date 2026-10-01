@@ -26,7 +26,7 @@ const iconMap: Record<ResourceType, FluentIcon> = {
   other:       BoxRegular,
 };
 
-export function ResourceTypeIcon({ type, size = 14, className }: { type: ResourceType; size?: number; className?: string }) {
+export function ResourceTypeIcon({ type, size = 16, className }: { type: ResourceType; size?: number; className?: string }) {
   const Icon = iconMap[type] ?? BoxRegular;
   return <Icon fontSize={size} className={className} />;
 }

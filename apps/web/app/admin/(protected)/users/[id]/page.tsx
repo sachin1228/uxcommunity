@@ -100,7 +100,7 @@ export default function UserDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-5 w-5" />
+        <Spinner className="h-[22px] w-[22px]" />
       </div>
     );
   }
@@ -122,7 +122,7 @@ export default function UserDetailPage() {
         onClick={() => router.push("/admin/users")}
         className="mb-6 flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground transition-colors"
       >
-        <ArrowLeftRegular fontSize={14} />
+        <ArrowLeftRegular fontSize={16} />
         Back to users
       </button>
 
@@ -160,11 +160,11 @@ export default function UserDetailPage() {
             }`}
           >
             {actionLoading === "block" ? (
-              <Spinner className="h-3.5 w-3.5" />
+              <Spinner className="h-4 w-4" />
             ) : user.is_blocked ? (
-              <ShieldCheckmarkRegular fontSize={14} />
+              <ShieldCheckmarkRegular fontSize={16} />
             ) : (
-              <ShieldProhibitedRegular fontSize={14} />
+              <ShieldProhibitedRegular fontSize={16} />
             )}
             {user.is_blocked ? "Unblock" : "Block"}
           </button>
@@ -174,7 +174,7 @@ export default function UserDetailPage() {
             disabled={!!actionLoading}
             className="flex items-center gap-2 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-sm text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
           >
-            <DeleteRegular fontSize={14} />
+            <DeleteRegular fontSize={16} />
             Delete
           </button>
         </div>
@@ -184,7 +184,7 @@ export default function UserDetailPage() {
       <div className="mb-6 flex items-center justify-between rounded-xl border border-border bg-surface px-5 py-4">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-raised">
-            <PeopleRegular fontSize={16} className="text-foreground-muted" />
+            <PeopleRegular fontSize={18} className="text-foreground-muted" />
           </span>
           <div>
             <p className="font-body text-sm font-medium text-foreground">
@@ -208,7 +208,7 @@ export default function UserDetailPage() {
         >
           {allCommunitiesLoading ? (
             <span className="absolute inset-0 flex items-center justify-center">
-              <Spinner className="h-3.5 w-3.5" />
+              <Spinner className="h-4 w-4" />
             </span>
           ) : (
             <span
@@ -255,7 +255,7 @@ export default function UserDetailPage() {
                 disabled={!!actionLoading}
                 className="modal-btn modal-btn-danger flex-1"
               >
-                {actionLoading === "delete" ? <Spinner className="h-4 w-4" /> : null}
+                {actionLoading === "delete" ? <Spinner className="h-[18px] w-[18px]" /> : null}
                 Delete
               </button>
             </div>

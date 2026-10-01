@@ -198,7 +198,7 @@ function ProfileActivityScope({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" role="status" aria-label="Loading posts">
-        <Spinner size={28} />
+        <Spinner size={30} />
       </div>
     );
   }
@@ -312,7 +312,7 @@ export function ProfileActivityFeed({
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
-              <Icon fontSize={14} aria-hidden="true" />
+              <Icon fontSize={16} aria-hidden="true" />
               {label}
             </span>
           </button>

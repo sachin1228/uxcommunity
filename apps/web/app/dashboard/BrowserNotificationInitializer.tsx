@@ -49,7 +49,7 @@ export function BrowserNotificationInitializer() {
           aria-label="Notification status"
           className="mx-[13px] mb-[7px] flex shrink-0 items-center gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2.5 text-foreground"
         >
-          <AlertOffRegular className="size-5 shrink-0 text-accent" aria-hidden="true" />
+          <AlertOffRegular className="size-[22px] shrink-0 text-accent" aria-hidden="true" />
           <p className="min-w-0 flex-1 font-body text-xs leading-relaxed">
             Message notifications are off.{" "}
             <button
@@ -66,7 +66,7 @@ export function BrowserNotificationInitializer() {
             className="flex size-7 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-background/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Dismiss notification reminder"
           >
-            <DismissRegular className="size-5" aria-hidden="true" />
+            <DismissRegular className="size-[22px]" aria-hidden="true" />
           </button>
         </aside>
       )}
@@ -87,11 +87,11 @@ export function BrowserNotificationInitializer() {
               className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               aria-label="Close notification instructions"
             >
-              <DismissRegular fontSize={16} aria-hidden="true" />
+              <DismissRegular fontSize={18} aria-hidden="true" />
             </button>
           
             <div className="flex size-14 items-center justify-center rounded-full bg-surface-raised text-foreground shadow-lg">
-              <CursorRegular className="size-7 -rotate-45" aria-hidden="true" />
+              <CursorRegular className="size-[30px] -rotate-45" aria-hidden="true" />
             </div>
             <div className="flex flex-col gap-2">
               <h2 id="notification-guide-title" className="font-display text-2xl font-semibold text-balance text-foreground sm:text-3xl">

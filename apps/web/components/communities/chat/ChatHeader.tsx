@@ -110,7 +110,7 @@ function ConfirmDialog({
             disabled={busy}
             className="modal-btn modal-btn-danger flex-1"
           >
-            {busy ? <Spinner size={12} /> : null}
+            {busy ? <Spinner size={14} /> : null}
             {copy.cta}
           </button>
         </div>
@@ -245,13 +245,13 @@ export const ChatHeader = memo(function ChatHeader({
                       <CommunityNameBadges
                         type={community.type}
                         isPrivate={community.is_private}
-                        size={13}
+                        size={15}
                       />
                     </span>
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
                     <span className="inline-flex items-center gap-1">
-                      <PeopleRegular fontSize={10} /> {community.member_count} member
+                      <PeopleRegular fontSize={12} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
                     </span>
                     {onlineCount > 0 && (
@@ -273,7 +273,7 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-label="Community settings"
                     title="Community settings"
                   >
-                    <SettingsRegular fontSize={15} />
+                    <SettingsRegular fontSize={17} />
                   </button>
                 )}
                 <div className="relative">
@@ -284,7 +284,7 @@ export const ChatHeader = memo(function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
                     className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    Joined <ChevronDownRegular fontSize={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
+                    Joined <ChevronDownRegular fontSize={15} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
                   </button>
                   {openMenu === "joined" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -308,7 +308,7 @@ export const ChatHeader = memo(function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    <MoreHorizontalRegular fontSize={16} />
+                    <MoreHorizontalRegular fontSize={18} />
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -348,7 +348,7 @@ export const ChatHeader = memo(function ChatHeader({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon fontSize={14} aria-hidden="true" />
+                    <Icon fontSize={16} aria-hidden="true" />
                     {label}
                   </span>
                 </button>
@@ -360,7 +360,7 @@ export const ChatHeader = memo(function ChatHeader({
              skeleton bar. */
           communityId ? (
             <div className="flex items-center justify-center py-2">
-              <Spinner className="h-5 w-5" />
+              <Spinner className="h-[22px] w-[22px]" />
             </div>
           ) : null
         )}

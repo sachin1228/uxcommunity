@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
           href="/login"
           className="mb-6 ml-8 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
         >
-          <ArrowLeftRegular fontSize={14} />
+          <ArrowLeftRegular fontSize={16} />
           Back to login
         </Link>
 
@@ -121,7 +121,7 @@ export default function ForgotPasswordPage() {
                   disabled={loading}
                   className="flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {loading && <Spinner className="h-4 w-4 text-white" />}
+                  {loading && <Spinner className="h-[18px] w-[18px] text-white" />}
                   {loading ? "Sending…" : "Send reset link"}
                 </button>
               </form>

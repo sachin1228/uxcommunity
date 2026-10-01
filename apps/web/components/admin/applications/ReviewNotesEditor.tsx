@@ -15,7 +15,7 @@ export function ReviewNotesEditor({ notes, saving, onChange, onSave }: Props) {
     <div className="flex flex-col gap-3">
       <div>
         <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-          <DocumentTextRegular fontSize={12} /> Internal Review Notes
+          <DocumentTextRegular fontSize={14} /> Internal Review Notes
         </p>
         <textarea
           value={notes}
@@ -30,7 +30,7 @@ export function ReviewNotesEditor({ notes, saving, onChange, onSave }: Props) {
         disabled={saving}
         className="flex items-center justify-center gap-2 rounded-md bg-surface-raised py-2 font-body text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
       >
-        {saving && <Spinner className="h-3 w-3" />}
+        {saving && <Spinner className="h-3.5 w-3.5" />}
         {saving ? "Saving…" : "Save Notes & Tags"}
       </button>
     </div>

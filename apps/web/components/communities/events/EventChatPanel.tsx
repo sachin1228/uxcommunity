@@ -110,7 +110,7 @@ export function EventChatPanel({
             onClick={openChat}
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm text-foreground transition-colors hover:bg-surface-raised"
           >
-            <CommentRegular fontSize={14} />
+            <CommentRegular fontSize={16} />
             Open chat
           </button>
         ) : (
@@ -119,7 +119,7 @@ export function EventChatPanel({
             onClick={() => setConfirmOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3.5 py-2 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20"
           >
-            <CommentRegular fontSize={14} />
+            <CommentRegular fontSize={16} />
             Join event chat
           </button>
         )}
@@ -156,7 +156,7 @@ export function EventChatPanel({
             disabled={joining}
             className="modal-btn modal-btn-primary"
           >
-            <CheckmarkRegular fontSize={15} />
+            <CheckmarkRegular fontSize={17} />
             Continue
           </button>
         </div>

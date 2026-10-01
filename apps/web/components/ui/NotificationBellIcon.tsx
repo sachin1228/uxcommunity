@@ -5,7 +5,7 @@ import { AlertRegular } from "@fluentui/react-icons/headless/svg/alert";
  * entry point (the sidebar bell and its unread badge).
  */
 export function NotificationBellIcon({
-  size = 16,
+  size = 18,
   className,
 }: {
   size?: number;

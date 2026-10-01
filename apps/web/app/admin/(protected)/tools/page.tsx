@@ -75,7 +75,7 @@ export default function ToolsPage() {
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
-            <DatabaseRegular fontSize={18} className="text-accent" />
+            <DatabaseRegular fontSize={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">R2 storage health</h2>
@@ -90,12 +90,12 @@ export default function ToolsPage() {
             >
               {r2Status === "running" ? (
                 <>
-                  <ArrowClockwiseRegular fontSize={13} className="animate-spin" />
+                  <ArrowClockwiseRegular fontSize={15} className="animate-spin" />
                   Scanning…
                 </>
               ) : (
                 <>
-                  <DatabaseRegular fontSize={13} />
+                  <DatabaseRegular fontSize={15} />
                   {r2Status === "done" ? "Scan again" : "Scan R2 storage"}
                 </>
               )}
@@ -124,12 +124,12 @@ export default function ToolsPage() {
                   >
                     {r2DeleteStatus === "running" ? (
                       <>
-                        <ArrowClockwiseRegular fontSize={12} className="animate-spin" />
+                        <ArrowClockwiseRegular fontSize={14} className="animate-spin" />
                         Deleting…
                       </>
                     ) : (
                       <>
-                        <DeleteRegular fontSize={12} />
+                        <DeleteRegular fontSize={14} />
                         Delete listed orphans
                       </>
                     )}

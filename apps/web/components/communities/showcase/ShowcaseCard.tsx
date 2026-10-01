@@ -126,12 +126,12 @@ export function ShowcaseCard({
           <div className="mt-3 flex aspect-video w-full items-center justify-center gap-2 overflow-hidden rounded-xl border border-border bg-black/80">
             {failed ? (
               <>
-                <FilmstripRegular fontSize={20} className="text-foreground-subtle" />
+                <FilmstripRegular fontSize={22} className="text-foreground-subtle" />
                 <span className="font-body text-sm text-foreground-subtle">Video unavailable</span>
               </>
             ) : (
               <>
-                <SpinnerIosRegular fontSize={20} className="animate-spin text-foreground-muted" />
+                <SpinnerIosRegular fontSize={22} className="animate-spin text-foreground-muted" />
                 <span className="font-body text-sm text-foreground-muted">Processing video…</span>
               </>
             )}
@@ -225,7 +225,7 @@ export function ShowcaseCard({
               className="group/like inline-flex cursor-pointer items-center gap-2"
             >
               <HeartIcon
-                size={16}
+                size={18}
                 active={post.user_liked}
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
               />

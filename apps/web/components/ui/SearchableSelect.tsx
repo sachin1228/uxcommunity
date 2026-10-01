@@ -151,7 +151,7 @@ export function SearchableSelect({
         </span>
         <ChevronDownRegular
           className={
-            "ml-2 h-4 w-4 flex-shrink-0 text-foreground-muted transition-transform duration-150 " +
+            "ml-2 h-[18px] w-[18px] flex-shrink-0 text-foreground-muted transition-transform duration-150 " +
             (open ? "rotate-180" : "")
           }
           aria-hidden="true"
@@ -170,7 +170,7 @@ export function SearchableSelect({
             <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">
               <SearchRegular
-                className="h-3.5 w-3.5 flex-shrink-0 text-foreground-muted"
+                className="h-4 w-4 flex-shrink-0 text-foreground-muted"
                 aria-hidden="true"
               />
               <input
@@ -222,7 +222,7 @@ export function SearchableSelect({
 
                   {isSelected && (
                     <CheckmarkRegular
-                      className="h-3.5 w-3.5 shrink-0 text-accent"
+                      className="h-4 w-4 shrink-0 text-accent"
                       aria-hidden="true"
                     />
                   )}
@@ -244,7 +244,7 @@ export function SearchableSelect({
               >
                 {value === otherValue ? (
                   <CheckmarkRegular
-                    className="h-3.5 w-3.5 flex-shrink-0 text-accent"
+                    className="h-4 w-4 flex-shrink-0 text-accent"
                     aria-hidden="true"
                   />
                 ) : null}

@@ -64,7 +64,7 @@ export default function UsersPage() {
       {/* Search */}
       <div className="relative mb-3 max-w-xs">
         <SearchRegular
-          fontSize={13}
+          fontSize={15}
           className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
         />
         <input
@@ -79,7 +79,7 @@ export default function UsersPage() {
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
           >
-            <DismissRegular fontSize={12} />
+            <DismissRegular fontSize={14} />
           </button>
         )}
       </div>
@@ -88,7 +88,7 @@ export default function UsersPage() {
       <div className="rounded-xl border border-border bg-surface overflow-hidden mb-3">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner className="h-4 w-4" />
+            <Spinner className="h-[18px] w-[18px]" />
           </div>
         ) : users.length === 0 ? (
           <p className="py-12 text-center font-body text-xs text-foreground-muted">
@@ -190,14 +190,14 @@ export default function UsersPage() {
               disabled={page === 1}
               className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              <ChevronLeftRegular fontSize={13} /> Prev
+              <ChevronLeftRegular fontSize={15} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              Next <ChevronRightRegular fontSize={13} />
+              Next <ChevronRightRegular fontSize={15} />
             </button>
           </div>
         </div>

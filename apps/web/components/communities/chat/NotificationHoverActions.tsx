@@ -104,7 +104,7 @@ export function NotificationHoverActions({
           aria-label="React to this"
           title="React"
         >
-          <EmojiRegular fontSize={14} />
+          <EmojiRegular fontSize={16} />
         </button>
       </div>
 
@@ -119,7 +119,7 @@ export function NotificationHoverActions({
         aria-label="Reply to this"
         title="Reply"
       >
-        <ArrowReplyRegular fontSize={14} />
+        <ArrowReplyRegular fontSize={16} />
       </button>
     </div>
   );

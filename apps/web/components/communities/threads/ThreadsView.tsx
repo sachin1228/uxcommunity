@@ -279,7 +279,7 @@ export function ThreadsView({
             </p>
           </div>
           <GradientButton onClick={() => setShowCreateModal(true)}>
-            <AddRegular fontSize={14} />
+            <AddRegular fontSize={16} />
             Create Thread
           </GradientButton>
         </div>
@@ -304,7 +304,7 @@ export function ThreadsView({
                   aria-pressed={filter === item.value}
                   className={filterChip(filter === item.value)}
                 >
-                  <Icon fontSize={14} aria-hidden="true" />
+                  <Icon fontSize={16} aria-hidden="true" />
                   {item.label}
                 </button>
               );
@@ -326,7 +326,7 @@ export function ThreadsView({
       {loading && (
         <div className={communityFeedLayout.content}>
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading threads">
-            <Spinner size={28} />
+            <Spinner size={30} />
           </div>
         </div>
       )}
@@ -334,7 +334,7 @@ export function ThreadsView({
       {!loading && threads.length === 0 && (
         <div className={communityFeedLayout.content}>
           <div className={communityFeedLayout.emptyState}>
-            <CommentAddRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+            <CommentAddRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
           </div>
@@ -345,7 +345,7 @@ export function ThreadsView({
         <div className={communityFeedLayout.content}>
           {filteredThreads.length === 0 ? (
             <div className={communityFeedLayout.emptyState}>
-              <CommentAddRegular fontSize={24} className={communityFeedLayout.emptyIcon} />
+              <CommentAddRegular fontSize={26} className={communityFeedLayout.emptyIcon} />
               <h3 className={communityFeedLayout.emptyTitle}>No threads in this category</h3>
               <p className={communityFeedLayout.emptyDescription}>Try a different filter or start a new thread.</p>
             </div>
