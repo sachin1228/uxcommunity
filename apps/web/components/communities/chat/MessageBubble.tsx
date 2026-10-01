@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useState, useRef, useEffect, useCallback, memo } from "react";
-import { ClockRegular, CheckmarkRegular, DismissRegular, ArrowClockwiseRegular, ProhibitedRegular } from "@fluentui/react-icons";
+import { ClockRegular, DismissRegular, ArrowClockwiseRegular, ProhibitedRegular } from "@fluentui/react-icons";
+import { DoubleCheckIcon } from "@/components/ui/DoubleCheckIcon";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime, isEmojiOnly, splitEmojiClusters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
@@ -205,7 +206,7 @@ function BubbleImage({
             {fmtTime(createdAt)}
           </span>
           {isMe && (
-            <CheckmarkRegular fontSize={13} className="text-white/90" />
+            <DoubleCheckIcon fontSize={13} className="text-white/90" />
           )}
         </div>
       )}
@@ -580,7 +581,7 @@ export const MessageBubble = memo(function MessageBubble({
                       <ClockRegular fontSize={12} className="text-foreground-muted/60 animate-pulse" />
                     )}
                     {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckmarkRegular fontSize={13} className="text-foreground-muted/70" />
+                      <DoubleCheckIcon fontSize={13} className="text-foreground-muted/70" />
                     )}
                     {isMe && msg.status === "failed" && (
                       <span className="text-[10px] text-red-400">!</span>
@@ -696,7 +697,7 @@ export const MessageBubble = memo(function MessageBubble({
                         <ClockRegular fontSize={12} className="text-accent-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckmarkRegular fontSize={13} className="text-accent-foreground opacity-70" />
+                        <DoubleCheckIcon fontSize={13} className="text-accent-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>

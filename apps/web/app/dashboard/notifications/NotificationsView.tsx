@@ -6,7 +6,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AlertRegular, CalendarMonthRegular, CheckmarkRegular, DocumentTextRegular, HeartRegular, ChatRegular, DeleteRegular, PeopleRegular } from "@fluentui/react-icons";
+import { AlertRegular, CalendarMonthRegular, DocumentTextRegular, HeartRegular, ChatRegular, DeleteRegular, PeopleRegular } from "@fluentui/react-icons";
+import { DoubleCheckIcon } from "@/components/ui/DoubleCheckIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   NOTIFICATION_TABS,
@@ -98,7 +99,7 @@ export function NotificationsView({ userId }: { userId: string }) {
           disabled={!hasUnread}
           className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40"
         >
-          <CheckmarkRegular fontSize={16} />
+          <DoubleCheckIcon fontSize={16} />
           Mark all read
         </button>
       </div>

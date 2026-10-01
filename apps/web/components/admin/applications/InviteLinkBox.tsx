@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LinkRegular, CopyRegular, CheckmarkRegular } from "@fluentui/react-icons";
+import { LinkRegular, CopyRegular } from "@fluentui/react-icons";
+import { DoubleCheckIcon } from "@/components/ui/DoubleCheckIcon";
 
 interface Props {
   inviteLink: string;
@@ -31,7 +32,7 @@ export function InviteLinkBox({ inviteLink }: Props) {
           className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
         >
           {copied ? (
-            <CheckmarkRegular fontSize={14} className="text-green-400" />
+            <DoubleCheckIcon fontSize={14} className="text-green-400" />
           ) : (
             <CopyRegular fontSize={14} />
           )}
