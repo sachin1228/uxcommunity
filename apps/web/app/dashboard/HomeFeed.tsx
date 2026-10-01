@@ -9,7 +9,7 @@ import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
-import { DEFAULT_HOME_FEED_SCOPE, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
+import { type HomeFeedScope } from "@/lib/feeds/home-feed-options";
 
 interface HomeFeedProps {
   currentUserId: string;
@@ -34,12 +34,12 @@ const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
  */
 export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedProps) {
   initRequestCache(currentUserId);
-  // Matches the fetch URL below for the default filter choice, so the first
-  // render of a revisit can hydrate straight from the request cache.
-  const cached = getCachedRequest<{ items?: FeedItem[] }>(
-    `/api/home/feed?scope=${DEFAULT_HOME_FEED_SCOPE}`,
-    currentUserId,
-  );
+  const feedUrl = `/api/home/feed?scope=${encodeURIComponent(scope)}`;
+
+  // Peek the cache for this scope so a remount (first visit included) can render
+  // straight from the request cache when it has one; otherwise the standard
+  // loader shows until the fetch lands.
+  const cached = getCachedRequest<{ items?: FeedItem[] }>(feedUrl, currentUserId);
   const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +47,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   const [loadingMore, setLoadingMore] = useState(false);
   /** Non-member community preview popup, opened from a card's "posted in …" label. */
   const [previewCommunityId, setPreviewCommunityId] = useState<string | null>(null);
-
-  const feedUrl = `/api/home/feed?scope=${encodeURIComponent(scope)}`;
 
   const fetchFeed = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);

@@ -21,10 +21,16 @@ export function HomeSidebar({ suggested }: HomeSidebarProps) {
   return (
     <aside
       aria-label="Homepage suggestions"
-      className="hidden w-72 shrink-0 flex-col gap-4 pt-8 xl:flex"
+      className="hidden w-72 shrink-0 flex-col gap-4 self-stretch pt-8 xl:flex"
     >
       <CreateCommunityCard />
-      <SuggestedCommunitiesCard communities={suggested} />
+      {/* LinkedIn-style rail: the cards above scroll away with the feed, then
+          this one pins below the topbar — self-stretch above gives it the
+          travel. top-4 keeps the same gap the feed's floating switcher has
+          instead of pinning flush against the header. */}
+      <div className="sticky top-4">
+        <SuggestedCommunitiesCard communities={suggested} />
+      </div>
     </aside>
   );
 }

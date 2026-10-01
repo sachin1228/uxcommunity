@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef } from "react";
+import { Globe2, Lock, type LucideIcon } from "lucide-react";
 import { HOME_FEED_TAB_SCOPES } from "@/lib/feeds/home-feed-options";
 
 /** Labels for the feed source selector (see lib/feeds/home-feed-options). */
@@ -8,7 +9,16 @@ const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
   public: "For You",
   communities: "Your Communities",
 };
-const SCOPES = HOME_FEED_TAB_SCOPES.map((value) => ({ value, label: SCOPE_LABELS[value] }));
+/** Same glyphs the sidebar rows use for a community's visibility. */
+const SCOPE_ICONS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], LucideIcon> = {
+  public: Globe2,
+  communities: Lock,
+};
+const SCOPES = HOME_FEED_TAB_SCOPES.map((value) => ({
+  value,
+  label: SCOPE_LABELS[value],
+  icon: SCOPE_ICONS[value],
+}));
 
 /** Shared classes that pull from the reference palette (see globals.css). */
 const SWITCHER_TRACK = "fb-filter-track";
@@ -29,6 +39,7 @@ const MOTION_EASING = "cubic-bezier(.22, 1, .36, 1)";
 interface Option {
   value: string;
   label: string;
+  icon: LucideIcon;
 }
 
 interface SwitcherProps {
@@ -79,40 +90,39 @@ function Switcher({ label, options, active, onSelect }: SwitcherProps) {
   }, [active, positionIndicator]);
 
   return (
-    <div>
+    <div
+      ref={trackRef}
+      role="group"
+      aria-label={label}
+      className={`relative flex items-center gap-0.5 rounded-xl p-1 ${SWITCHER_TRACK}`}
+    >
+      {/* Sliding highlight */}
       <div
-        ref={trackRef}
-        role="group"
-        aria-label={label}
-        className={`relative flex items-center gap-0.5 rounded-full p-1 ${SWITCHER_TRACK}`}
-      >
-        {/* Sliding pill */}
-        <div
-          ref={pillRef}
-          aria-hidden="true"
-          className={`pointer-events-none absolute top-[4px] h-9 rounded-full ${SWITCHER_PILL}`}
-        />
+        ref={pillRef}
+        aria-hidden="true"
+        className={`pointer-events-none absolute top-[4px] h-9 rounded-lg ${SWITCHER_PILL}`}
+      />
 
-        {options.map((option) => {
-          const isActive = option.value === active;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              ref={(el) => {
-                buttonsRef.current[option.value] = el;
-              }}
-              onClick={() => onSelect(option.value)}
-              aria-pressed={isActive}
-              className={`fb-filter-button relative z-10 h-9 rounded-full px-4 font-body text-xs font-semibold uppercase tracking-wide whitespace-nowrap transition-colors duration-150 sm:px-5 ${
-                isActive ? TEXT_ACTIVE : TEXT_MUTED
-              }`}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      {options.map((option) => {
+        const isActive = option.value === active;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            ref={(el) => {
+              buttonsRef.current[option.value] = el;
+            }}
+            onClick={() => onSelect(option.value)}
+            aria-pressed={isActive}
+            className={`fb-filter-button relative z-10 inline-flex h-9 items-center gap-1.5 rounded-lg px-4 font-body text-xs font-semibold uppercase tracking-wide whitespace-nowrap transition-colors duration-150 sm:px-5 ${
+              isActive ? TEXT_ACTIVE : TEXT_MUTED
+            }`}
+          >
+            <option.icon strokeWidth={2.5} size={12} aria-hidden="true" />
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -124,7 +134,7 @@ interface HomeFeedFiltersProps {
 
 export function HomeFeedFilters({ scope, onScopeChange }: HomeFeedFiltersProps) {
   return (
-    <section className="my-2" aria-label="Feed filters">
+    <section aria-label="Feed filters">
       <div className="flex items-center justify-center px-4 py-3 md:px-5 md:py-4">
         <Switcher
           label="Feed source"
