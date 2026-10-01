@@ -298,7 +298,7 @@ export default function CommunityDetailPage() {
         </div>
 
         {/* Quick stats */}
-        <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border-t border-border/60 sm:grid-cols-4 sm:divide-y-0">
+        <div className="grid grid-cols-2 divide-x divide-y divide-border border-t border-border sm:grid-cols-4 sm:divide-y-0">
           <StatTile label="Members" value={community.member_count.toLocaleString()} />
           <StatTile label="Messages" value={community.message_count.toLocaleString()} />
           <StatTile label="Status" value={
@@ -408,7 +408,7 @@ export default function CommunityDetailPage() {
               </div>
 
               {/* Meta — hairline grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/60 border-t border-border/60">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border/60 border-t border-border">
                 <MetaCell label="Type">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-body text-[11px] font-medium border ${typeClasses}`}>
                     {TYPE_LABELS[community.type] ?? community.type}

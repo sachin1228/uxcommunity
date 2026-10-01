@@ -120,7 +120,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-border/70">
+          <div className="divide-y divide-border">
             {admins.map((admin) => {
               const permKeys = (Object.keys(PERM_CHIP) as CommunityPermissionKey[]).filter(
                 (key) => admin.permissions[key],

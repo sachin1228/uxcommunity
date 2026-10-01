@@ -104,7 +104,7 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
             <li
               key={step.label}
               className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
-                done ? "border-border/60 bg-surface" : "border-transparent bg-transparent"
+                done ? "border-border bg-surface" : "border-transparent bg-transparent"
               }`}
             >
               {done ? (

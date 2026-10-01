@@ -88,7 +88,8 @@ export function ModeratorPermissionsModal({
               )}
               {group}
             </p>
-            <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-surface">
+            {/* `divide-border` only — Tailwind v3 drops opacity modifiers on CSS-var colours. */}
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
               {MODERATOR_PERMISSION_OPTIONS.filter((option) => option.group === group).map(
                 ({ key, label, description }) => {
                   const checked = permissions[key];

@@ -106,7 +106,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-border/70">
+        <div className="divide-y divide-border">
           {visible.map((entry) => {
             const isPlatform = entry.actor_role === "platform";
             return (

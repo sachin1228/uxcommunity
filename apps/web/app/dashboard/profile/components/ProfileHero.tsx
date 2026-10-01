@@ -94,7 +94,7 @@ export function ProfileHero({
             <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
               <Mail strokeWidth={2.5} size={11} /> Email
             </label>
-            <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border/40">{email}</p>
+            <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border">{email}</p>
           </div>
 
           {memberSince && (
@@ -102,7 +102,7 @@ export function ProfileHero({
               <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar strokeWidth={2.5} size={11} /> Member Since
               </label>
-              <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border/40">{memberSince}</p>
+              <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border">{memberSince}</p>
             </div>
           )}
         </div>

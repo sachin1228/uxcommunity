@@ -204,7 +204,7 @@ export default function CommunityAdminPermissionsPage() {
               </div>
             )}
 
-            <div className="divide-y divide-border/70">
+            <div className="divide-y divide-border">
               {PERMISSION_OPTIONS.map(({ key, label, description }) => {
                 const checked = permissions[key];
                 return (
@@ -239,7 +239,7 @@ export default function CommunityAdminPermissionsPage() {
               })}
             </div>
 
-            <div className="px-5 py-3 border-t border-border/70 bg-surface-raised/40">
+            <div className="px-5 py-3 border-t border-border bg-surface-raised/40">
               <p className="font-body text-[11px] text-foreground-muted flex items-center gap-1.5">
                 <Check strokeWidth={2.5} size={11} className="text-green-400 shrink-0" />
                 Permissions apply instantly — their next action in the app is checked against these.
@@ -258,7 +258,7 @@ export default function CommunityAdminPermissionsPage() {
             <div className="px-5 py-4 border-b border-border">
               <h2 className="font-body text-sm font-semibold text-foreground">About</h2>
             </div>
-            <div className="divide-y divide-border/70">
+            <div className="divide-y divide-border">
               <div className="flex items-center gap-3 px-5 py-3.5">
                 <UserRound strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
                 <div className="min-w-0 flex-1">
