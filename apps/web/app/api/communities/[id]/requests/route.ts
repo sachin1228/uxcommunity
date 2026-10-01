@@ -6,7 +6,7 @@ import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
 
 /**
  * GET /api/communities/[id]/requests
- * List pending join requests. Owner or admin with "manage members".
+ * List pending join requests. Owner or manager with "manage members".
  */
 export async function GET(
   _req: NextRequest,
@@ -21,11 +21,8 @@ export async function GET(
   // Verify caller is a manager with member-management rights
   const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
   if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  const canDecideRequests =
-    managerStatus.isOwner ||
-    (managerStatus.role === "admin" && managerStatus.permissions.can_manage_members);
-  if (!canDecideRequests) {
-    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  if (!managerStatus.isOwner && !managerStatus.permissions.can_manage_members) {
+    return NextResponse.json({ error: "You don't have permission to manage members." }, { status: 403 });
   }
 
   // The optional request note ships only once its migration is applied. Each

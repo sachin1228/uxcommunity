@@ -3,6 +3,12 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { ResourceType } from "@/lib/communities/models/resources";
 import { isPublicContentScope } from "@/lib/content-scope";
+import {
+  loadCommunityPermissionCheck,
+  logCommunityActivity,
+  managerActorRole,
+  type CommunityManagerStatus,
+} from "@/lib/communities/manager-role";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const RESOURCE_TYPES = new Set<ResourceType>([
@@ -151,10 +157,36 @@ export async function DELETE(
     : existingQuery.eq("community_id", communityId);
   const { data: existing } = await existingQuery.maybeSingle();
   if (!existing) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
-  if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own resources." }, { status: 403 });
+
+  // Authors delete their own resources; managers holding "moderate resources"
+  // may delete anyone's. Public-scope content lives outside any community, so
+  // only its author can delete it.
+  const isOwn = existing.user_id === userId;
+  let moderator: CommunityManagerStatus | null = null;
+  if (!isOwn) {
+    const check = publicScope
+      ? { allowed: false, status: null }
+      : await loadCommunityPermissionCheck(db, communityId, userId, "can_moderate_resources");
+    if (!check.allowed) {
+      return NextResponse.json({ error: "You can only delete your own resources." }, { status: 403 });
+    }
+    moderator = check.status;
+  }
 
   const { error } = await db.from("community_resources").delete().eq("id", resourceId);
   if (error) { console.error("[DELETE resource]", error); return NextResponse.json({ error: "Failed to delete resource." }, { status: 500 }); }
+
+  // Audit trail for moderated deletions of other members' resources.
+  if (!isOwn && moderator) {
+    await logCommunityActivity(db, {
+      communityId,
+      actorId: userId,
+      actorRole: managerActorRole(moderator),
+      action: "resource_deleted",
+      targetUserId: existing.user_id,
+      details: { resource_id: resourceId },
+    });
+  }
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: { id: resourceId } },

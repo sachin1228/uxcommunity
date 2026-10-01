@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import { enrichEventCards, loadEventRsvps, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { getEventChatCommunity, isEventChatMember } from "@/lib/communities/event-chat";
+import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 
 interface Props {
   params: Promise<{ id: string; eventId: string }>;
@@ -38,12 +39,13 @@ export default async function EventDetailPage({ params }: Props) {
 
   // Shared serializer + shared attendee loader: this page and the feed card
   // render the same payload, built in one place.
-  const [[event], initialRsvps, communityData, userRow, profileRow] = await Promise.all([
+  const [[event], initialRsvps, communityData, userRow, profileRow, managerStatus] = await Promise.all([
     enrichEventCards([data as unknown as Record<string, unknown>], userId),
     loadEventRsvps(eventId),
     db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
+    loadCommunityManagerStatus(db, communityId, userId),
   ]);
 
   // The event's group chat, when it exists, is what the page's Join/Open
@@ -74,6 +76,7 @@ export default async function EventDetailPage({ params }: Props) {
       chatCommunityJoined={chatCommunityJoined}
       backHref={`/dashboard/communities/${communityId}?tab=events`}
       backLabel="Events"
+      canModerate={Boolean(managerStatus?.isOwner || managerStatus?.permissions.can_moderate_events)}
     />
   );
 }

@@ -16,6 +16,7 @@ interface Props {
 const ROLE_CHIP: Record<CommunityActivityEntry["actor_role"], string> = {
   platform: "bg-surface-raised text-foreground-muted border-border",
   admin: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  moderator: "bg-sky-500/10 text-sky-400 border-sky-500/20",
   owner: "bg-accent/10 text-accent border-accent/20",
 };
 
@@ -128,6 +129,9 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
                     {fmtActivityTime(entry.created_at)}
                     {!isPlatform && entry.actor_role === "admin" && (
                       <span className="ml-1.5 uppercase tracking-wider text-[9px] text-amber-500/70">admin</span>
+                    )}
+                    {!isPlatform && entry.actor_role === "moderator" && (
+                      <span className="ml-1.5 uppercase tracking-wider text-[9px] text-sky-400/70">moderator</span>
                     )}
                     {!isPlatform && entry.actor_role === "owner" && (
                       <span className="ml-1.5 uppercase tracking-wider text-[9px] text-accent/70">owner</span>

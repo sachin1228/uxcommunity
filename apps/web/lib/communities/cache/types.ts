@@ -14,6 +14,7 @@
 
 import type { MessageMention } from "../mentions";
 import type { ContentEventMeta } from "../content-notifications";
+import type { CommunityPermission } from "../permissions";
 
 export type { MessageMention } from "../mentions";
 
@@ -105,11 +106,7 @@ export interface CachedContentEvent {
 }
 
 /** Effective community-management grants for the current user. */
-export interface ClientCommunityPermissions {
-  can_edit_settings?: boolean;
-  can_manage_members?: boolean;
-  can_delete_messages?: boolean;
-}
+export type ClientCommunityPermissions = Partial<Record<CommunityPermission, boolean>>;
 
 export interface CachedMeta {
   community: {
@@ -142,9 +139,9 @@ export interface CachedMeta {
     pinned_until?: string | null;
     /** That deadline whether ahead or past — the badge's ENDED day reads it. */
     event_end?: string | null;
-    /** "owner" | "admin" | "member" — the current user's role in this community. */
+    /** "owner" | "admin" | "moderator" | "member" — the current user's role in this community. */
     current_user_role?: string | null;
-    /** Effective permission grants (owners: everything; admins: configured toggles). */
+    /** Effective permission grants (owners: everything; admins and moderators: configured toggles). */
     current_user_permissions?: ClientCommunityPermissions | null;
   };
   members: {

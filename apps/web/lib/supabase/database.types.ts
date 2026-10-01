@@ -263,6 +263,10 @@ export type Database = {
           can_delete_messages: boolean;
           can_edit_settings: boolean;
           can_manage_members: boolean;
+          can_moderate_events: boolean;
+          can_moderate_resources: boolean;
+          can_moderate_showcase: boolean;
+          can_moderate_threads: boolean;
           community_id: string;
           granted_at: string;
           granted_by: string | null;
@@ -273,6 +277,10 @@ export type Database = {
           can_delete_messages?: boolean;
           can_edit_settings?: boolean;
           can_manage_members?: boolean;
+          can_moderate_events?: boolean;
+          can_moderate_resources?: boolean;
+          can_moderate_showcase?: boolean;
+          can_moderate_threads?: boolean;
           community_id: string;
           granted_at?: string;
           granted_by?: string | null;
@@ -283,6 +291,10 @@ export type Database = {
           can_delete_messages?: boolean;
           can_edit_settings?: boolean;
           can_manage_members?: boolean;
+          can_moderate_events?: boolean;
+          can_moderate_resources?: boolean;
+          can_moderate_showcase?: boolean;
+          can_moderate_threads?: boolean;
           community_id?: string;
           granted_at?: string;
           granted_by?: string | null;

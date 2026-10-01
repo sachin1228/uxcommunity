@@ -25,6 +25,7 @@ export function ShowcaseDetailClient({
   communityPreviewModal = false,
   backHref,
   backLabel,
+  canModerate = false,
 }: {
   initialPost: ShowcasePost;
   initialComments: ShowcaseComment[];
@@ -37,6 +38,8 @@ export function ShowcaseDetailClient({
   communityPreviewModal?: boolean;
   backHref?: string;
   backLabel?: string;
+  /** Community moderator with showcase permissions — can delete others' posts. */
+  canModerate?: boolean;
 }) {
   const router = useGuardedRouter();
   const [post, setPost] = useState(initialPost);
@@ -130,6 +133,7 @@ export function ShowcaseDetailClient({
           communityName={showCommunityAttribution ? communityName : undefined}
           communityImage={showCommunityAttribution ? communityImage : undefined}
           communityPreviewModal={communityPreviewModal}
+          canModerate={canModerate}
           onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}

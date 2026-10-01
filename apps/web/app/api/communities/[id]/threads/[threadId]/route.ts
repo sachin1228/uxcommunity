@@ -11,6 +11,12 @@ import {
   normalizeTags,
 } from "@/lib/communities/thread-body";
 import { isPublicContentScope } from "@/lib/content-scope";
+import {
+  loadCommunityPermissionCheck,
+  logCommunityActivity,
+  managerActorRole,
+  type CommunityManagerStatus,
+} from "@/lib/communities/manager-role";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
@@ -201,7 +207,21 @@ export async function DELETE(
   };
 
   if (!existing) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
-  if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
+
+  // Authors delete their own threads; community managers holding the
+  // "moderate threads" permission may delete anyone's. Public-scope content
+  // lives outside any community, so only its author can delete it.
+  const isOwn = existing.user_id === userId;
+  let moderator: CommunityManagerStatus | null = null;
+  if (!isOwn) {
+    const check = publicScope
+      ? { allowed: false, status: null }
+      : await loadCommunityPermissionCheck(db, communityId, userId, "can_moderate_threads");
+    if (!check.allowed) {
+      return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
+    }
+    moderator = check.status;
+  }
 
   const { data: threadRow } = await db
     .from("community_threads")
@@ -211,6 +231,18 @@ export async function DELETE(
 
   const { error } = await db.from("community_threads").delete().eq("id", threadId);
   if (error) { console.error("[DELETE thread]", error); return NextResponse.json({ error: "Failed to delete thread." }, { status: 500 }); }
+
+  // Audit trail for moderated deletions of other members' threads.
+  if (!isOwn && moderator) {
+    await logCommunityActivity(db, {
+      communityId,
+      actorId: userId,
+      actorRole: managerActorRole(moderator),
+      action: "thread_deleted",
+      targetUserId: existing.user_id,
+      details: { thread_id: threadId },
+    });
+  }
 
   const attachments = Array.isArray(threadRow?.attachments) ? threadRow.attachments as Array<{ url?: string }> : [];
   for (const attachment of attachments) {

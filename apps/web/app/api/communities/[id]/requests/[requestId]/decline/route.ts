@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
+import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/decline
- * Decline a pending join request. Owner or admin with "manage members".
+ * Decline a pending join request. Owner or manager with "manage members".
  */
 export async function POST(
   _req: NextRequest,
@@ -19,11 +19,8 @@ export async function POST(
 
   const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
   if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  const canDecideRequests =
-    managerStatus.isOwner ||
-    (managerStatus.role === "admin" && managerStatus.permissions.can_manage_members);
-  if (!canDecideRequests) {
-    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  if (!managerStatus.isOwner && !managerStatus.permissions.can_manage_members) {
+    return NextResponse.json({ error: "You don't have permission to manage members." }, { status: 403 });
   }
 
   const { data: request } = await db
@@ -42,15 +39,11 @@ export async function POST(
     .eq("id", requestId);
 
   // Audit trail
-  const [{ data: actor }, { data: targetUser }] = await Promise.all([
-    db.from("users").select("name").eq("id", userId).maybeSingle(),
-    db.from("users").select("name").eq("id", request.user_id).maybeSingle(),
-  ]);
+  const { data: targetUser } = await db.from("users").select("name").eq("id", request.user_id).maybeSingle();
   await logCommunityActivity(db, {
     communityId,
     actorId: userId,
-    actorRole: managerStatus.isOwner ? "owner" : "admin",
-    actorName: actor?.name ?? null,
+    actorRole: managerActorRole(managerStatus),
     action: "join_request_declined",
     targetUserId: request.user_id,
     details: { member_name: targetUser?.name ?? null },

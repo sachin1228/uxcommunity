@@ -19,6 +19,7 @@ import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas
 import type { MentionCandidate } from "@/lib/communities/mentions";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { initRequestCache } from "@/lib/request-cache";
+import type { CommunityPermission } from "@/lib/communities/permissions";
 import type { SSRCommunitySections } from "@/lib/communities/server";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
@@ -820,13 +821,17 @@ export function CommunityChat({
   // never carries them, so read them from `community` directly.
   const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
   const myPerms = community?.current_user_permissions;
-  // Platform-appointed admins of app-created communities get the same
-  // management UI as a private-group creator, scoped by their grants.
-  const isAdminWith = (permission: "can_edit_settings" | "can_manage_members" | "can_delete_messages") =>
-    myRole === "admin" && Boolean(myPerms?.[permission]);
-  const canOpenSettings = isOwner || isAdminWith("can_edit_settings");
-  const canManageMembers = isOwner || isAdminWith("can_manage_members");
-  const canModerateMessages = isOwner || isAdminWith("can_delete_messages");
+  // The owner, platform-appointed admins and in-app moderators share the same
+  // management UI, each capability scoped by the member's grants.
+  const isManagerWith = (permission: CommunityPermission) =>
+    (myRole === "admin" || myRole === "moderator") && Boolean(myPerms?.[permission]);
+  const canOpenSettings = isOwner || isManagerWith("can_edit_settings");
+  const canManageMembers = isOwner || isManagerWith("can_manage_members");
+  const canModerateMessages = isOwner || isManagerWith("can_delete_messages");
+  const canModerateThreads = isOwner || isManagerWith("can_moderate_threads");
+  const canModerateShowcase = isOwner || isManagerWith("can_moderate_showcase");
+  const canModerateResources = isOwner || isManagerWith("can_moderate_resources");
+  const canModerateEvents = isOwner || isManagerWith("can_moderate_events");
 
   // Stable header callbacks — inline arrows would recreate every render and
   // defeat the memoized ChatHeader's bail-out on keystrokes.
@@ -925,18 +930,23 @@ export function CommunityChat({
           />
         )}
         {renderedTab === "showcase" ? (
-          <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
+          <ShowcaseView
+            communityId={communityId}
+            currentUserId={currentUserId}
+            canModerate={canModerateShowcase}
+          />
         ) : renderedTab === "threads" ? (
           <ThreadsView
             communityId={communityId}
             currentUserId={currentUserId}
+            canModerate={canModerateThreads}
             onThreadCreated={handleThreadCreated}
             onThreadDeleted={handleThreadDeleted}
           />
         ) : renderedTab === "events" ? (
-          <EventsView communityId={communityId} currentUserId={currentUserId} />
+          <EventsView communityId={communityId} currentUserId={currentUserId} canModerate={canModerateEvents} />
         ) : renderedTab === "resources" ? (
-          <ResourcesView communityId={communityId} currentUserId={currentUserId} />
+          <ResourcesView communityId={communityId} currentUserId={currentUserId} canModerate={canModerateResources} />
         ) : renderedTab === "members" ? (
           <MembersView
             communityId={communityId}

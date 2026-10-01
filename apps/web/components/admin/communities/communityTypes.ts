@@ -1,11 +1,18 @@
 // ─── Shared types & constants for the Communities admin section ───────────────
 
+import {
+  ALL_COMMUNITY_PERMISSIONS,
+  MODERATOR_PERMISSION_OPTIONS,
+  type CommunityPermission,
+  type CommunityPermissions,
+} from "@/lib/communities/permissions";
+
 export interface CommunityMember {
   id: string;
   name: string;
   email: string;
   joined_at: string;
-  /** "owner" | "admin" | "member" (defaults to member when absent). */
+  /** "owner" | "admin" | "moderator" | "member" (defaults to member when absent). */
   role?: string;
 }
 
@@ -47,42 +54,16 @@ export interface Community {
 }
 
 // ─── Community admin permissions ────────────────────────────────────────────
+// The catalogue lives in lib/communities/permissions so the platform dashboard
+// and the owner-facing members UI grant from the same list.
 
-export interface CommunityPermissionFlags {
-  can_edit_settings: boolean;
-  can_manage_members: boolean;
-  can_delete_messages: boolean;
-}
+export type CommunityPermissionFlags = CommunityPermissions;
 
-export type CommunityPermissionKey = keyof CommunityPermissionFlags;
+export type CommunityPermissionKey = CommunityPermission;
 
-export const ALL_PERMISSIONS: CommunityPermissionFlags = {
-  can_edit_settings: true,
-  can_manage_members: true,
-  can_delete_messages: true,
-};
+export const ALL_PERMISSIONS = ALL_COMMUNITY_PERMISSIONS;
 
-export const PERMISSION_OPTIONS: Array<{
-  key: CommunityPermissionKey;
-  label: string;
-  description: string;
-}> = [
-  {
-    key: "can_edit_settings",
-    label: "Edit community settings",
-    description: "Rename the community and update its photo, description, rules and tabs (the gear in the app).",
-  },
-  {
-    key: "can_manage_members",
-    label: "Manage members",
-    description: "Remove members and accept / decline join requests.",
-  },
-  {
-    key: "can_delete_messages",
-    label: "Moderate chat messages",
-    description: "Delete any member's messages in the community chat.",
-  },
-];
+export const PERMISSION_OPTIONS = MODERATOR_PERMISSION_OPTIONS;
 
 export interface CommunityAdmin {
   user_id: string;
@@ -98,7 +79,7 @@ export interface CommunityActivityEntry {
   id: string;
   community_id: string;
   actor_id: string | null;
-  actor_role: "owner" | "admin" | "platform";
+  actor_role: "owner" | "admin" | "moderator" | "platform";
   actor_name: string | null;
   action: string;
   target_user_id: string | null;

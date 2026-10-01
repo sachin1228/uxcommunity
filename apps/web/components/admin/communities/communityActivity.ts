@@ -13,6 +13,12 @@ export function describeActivity(entry: CommunityActivityEntry): string {
       return `removed ${target(d.admin_name) ?? "an admin"}'s admin rights`;
     case "admin_permissions_updated":
       return `changed ${target(d.admin_name) ?? "an admin"}'s permissions`;
+    case "moderator_promoted":
+      return `made ${target(d.member_name) ?? "a member"} a moderator`;
+    case "moderator_dismissed":
+      return `removed ${target(d.member_name) ?? "a moderator"}'s moderator role`;
+    case "moderator_permissions_updated":
+      return `changed ${target(d.member_name) ?? "a moderator"}'s moderator permissions`;
     case "member_removed":
       return `removed ${target(d.member_name) ?? "a member"} from the community`;
     case "join_request_accepted":
@@ -31,6 +37,14 @@ export function describeActivity(entry: CommunityActivityEntry): string {
       return "regenerated the invite link";
     case "message_deleted":
       return "deleted a member's chat message";
+    case "thread_deleted":
+      return "deleted a member's thread";
+    case "showcase_deleted":
+      return "deleted a member's showcase post";
+    case "resource_deleted":
+      return "deleted a member's resource";
+    case "event_deleted":
+      return "deleted a member's event";
     default:
       return entry.action.replace(/_/g, " ");
   }

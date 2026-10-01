@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
+import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
 import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
 
@@ -103,13 +104,16 @@ export default async function ResourceDetailPage({ params }: Props) {
 
   if (!membership) redirect(`/dashboard/communities/${communityId}`);
 
-  const [resource, comments, community] = await Promise.all([
+  const [resource, comments, community, managerStatus] = await Promise.all([
     getResource(db, communityId, resourceId, userId),
     getComments(db, resourceId),
     db.from("communities").select("name").eq("id", communityId).maybeSingle(),
+    loadCommunityManagerStatus(db, communityId, userId),
   ]);
 
   if (!resource) redirect(`/dashboard/communities/${communityId}?tab=resources`);
+
+  const canModerate = Boolean(managerStatus?.isOwner || managerStatus?.permissions.can_moderate_resources);
 
   return (
     <ResourceDetailClient
@@ -118,6 +122,7 @@ export default async function ResourceDetailPage({ params }: Props) {
       currentUserId={userId}
       communityId={communityId}
       communityName={community.data?.name ?? "Community"}
+      canModerate={canModerate}
       backHref={`/dashboard/communities/${communityId}?tab=resources`}
       backLabel="Resources"
     />

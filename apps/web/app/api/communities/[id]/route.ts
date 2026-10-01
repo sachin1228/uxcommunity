@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
+import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { MASTER_IMAGE_LOOKUPS } from "@/lib/r2-cleanup";
@@ -36,8 +36,8 @@ export async function GET(
 
 // ── PATCH /api/communities/[id] ─────────────────────────────────────────────
 // Update name, description, privacy, tabs, rules.
-// Allowed for the owner, and for platform-appointed community admins who hold
-// the "edit community settings" permission (privacy is owner-only).
+// Allowed for the owner and for managers (admins or moderators) who hold the
+// "edit community settings" permission (privacy is owner-only).
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -50,10 +50,7 @@ export async function PATCH(
 
   const managerStatus = await loadCommunityManagerStatus(db, id, userId);
   if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  if (!managerStatus.canManage) {
-    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
-  }
-  if (managerStatus.role === "admin" && !managerStatus.permissions.can_edit_settings) {
+  if (!managerStatus.isOwner && !managerStatus.permissions.can_edit_settings) {
     return NextResponse.json(
       { error: "You don't have permission to edit community settings." },
       { status: 403 },
@@ -248,14 +245,13 @@ export async function PATCH(
     } catch { /* ignore */ }
   }
 
-  // Audit trail — snapshot the actor name so the trail survives renames.
+  // Audit trail — logCommunityActivity snapshots the actor name so the trail
+  // survives renames.
   if (changed.length > 0) {
-    const { data: actor } = await db.from("users").select("name").eq("id", userId).maybeSingle();
     await logCommunityActivity(db, {
       communityId: id,
       actorId: userId,
-      actorRole: isOwner ? "owner" : "admin",
-      actorName: actor?.name ?? null,
+      actorRole: managerActorRole(managerStatus),
       action: "community_settings_updated",
       details: { changed },
     });

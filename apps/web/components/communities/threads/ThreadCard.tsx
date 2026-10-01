@@ -31,6 +31,8 @@ interface ThreadCardProps {
   thread: CommunityThread;
   currentUserId: string;
   communityId: string;
+  /** Owner or manager with "moderate threads" — may delete anyone's thread. */
+  canModerate?: boolean;
   onUpdated: (thread: CommunityThread) => void;
   onLikeChanged: (threadId: string, liked: boolean, newCount: number) => void;
   onSaveChanged: (threadId: string, saved: boolean) => void;
@@ -57,6 +59,7 @@ export function ThreadCard({
   thread,
   currentUserId,
   communityId,
+  canModerate = false,
   onUpdated,
   onLikeChanged,
   onSaveChanged,
@@ -451,6 +454,16 @@ export function ThreadCard({
                       {deleting ? "Deleting…" : "Delete"}
                     </button>
                   </>
+                ) : canModerate ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setMenuOpen(false); setConfirmDelete(true); }}
+                    disabled={deleting}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                  >
+                    <Trash2 strokeWidth={2.5} size={11} />
+                    {deleting ? "Deleting…" : "Delete"}
+                  </button>
                 ) : (
                   <button
                     type="button"

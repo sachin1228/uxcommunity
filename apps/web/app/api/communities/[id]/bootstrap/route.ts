@@ -8,6 +8,7 @@ import {
   type ReadResult,
 } from "@/lib/communities/read-models";
 import { loadCommunityContentEvents } from "@/lib/communities/content-events";
+import { NO_COMMUNITY_PERMISSIONS, hasAnyCommunityPermission } from "@/lib/communities/permissions";
 type Params = { params: Promise<{ id: string }> };
 type Section = "community" | "messages" | "content-events" | "rules";
 
@@ -121,12 +122,16 @@ export async function GET(_request: NextRequest, context: Params) {
     current_user_permissions?: Record<string, boolean>;
   } | undefined;
   const role = community?.current_user_role ?? "member";
+  // Merged onto the empty set so a member's payload still carries every
+  // toggle, and `can_manage` means "at least one management action", not
+  // just "is an admin" — moderators hold grants too.
+  const permissions = { ...NO_COMMUNITY_PERMISSIONS, ...(community?.current_user_permissions ?? {}) };
   const body = {
     ...data,
     permissions: {
       role,
-      can_manage: role === "owner" || role === "admin",
-      ...(community?.current_user_permissions ?? {}),
+      can_manage: hasAnyCommunityPermission(permissions),
+      ...permissions,
     },
     unreadCount: 0,
     failures,

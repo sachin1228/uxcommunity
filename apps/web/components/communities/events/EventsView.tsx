@@ -41,9 +41,12 @@ function mergeUniqueEvents(events: CommunityEvent[]) {
 export function EventsView({
   communityId,
   currentUserId,
+  canModerate = false,
 }: {
   communityId: string;
   currentUserId: string;
+  /** Owner or manager with "moderate events" — may delete any event. */
+  canModerate?: boolean;
 }) {
   initRequestCache(currentUserId);
   const router = useGuardedRouter();
@@ -318,6 +321,7 @@ export function EventsView({
                     event={event}
                     currentUserId={currentUserId}
                     communityId={communityId}
+                    canModerate={canModerate}
                     onUpdated={handleUpdated}
                     onDeleted={handleDeleted}
                     onRsvpChanged={handleRsvpChanged}

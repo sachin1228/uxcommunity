@@ -8,7 +8,10 @@ interface EventOptionsMenuProps {
   saved: boolean;
   shared?: boolean;
   reported?: boolean;
-  isOwner: boolean;
+  /** Host — offers Edit (while the event is still ahead). */
+  canEdit: boolean;
+  /** Host or manager with "moderate events" — offers Delete. */
+  canDelete: boolean;
   past?: boolean;
   deleting?: boolean;
   /**
@@ -29,7 +32,8 @@ export function EventOptionsMenu({
   saved,
   shared = false,
   reported = false,
-  isOwner,
+  canEdit,
+  canDelete,
   past = false,
   deleting = false,
   saving = false,
@@ -100,21 +104,19 @@ export function EventOptionsMenu({
               gone by, so there is nothing left to reschedule (the form refuses
               a past start). Delete is not the same decision — it stays for an
               event that has already happened, because taking a finished event
-              down is exactly when a host wants it. */}
-          {isOwner && onDelete && (
-            <>
-              {!past && onEdit && (
-                <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                  <Pencil strokeWidth={2.5} size={11} /> Edit
-                </button>
-              )}
-              <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
-                {deleting ? "Deleting…" : "Delete"}
-              </button>
-            </>
+              down is exactly when a host or moderator wants it. */}
+          {canEdit && !past && onEdit && (
+            <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+              <Pencil strokeWidth={2.5} size={11} /> Edit
+            </button>
           )}
-          {onReport && (
+          {canDelete && onDelete && (
+            <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+              {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          )}
+          {!canEdit && !canDelete && onReport && (
             <button type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
               <Flag strokeWidth={2.5} size={11} /> {reported ? "Reported" : "Report"}
             </button>

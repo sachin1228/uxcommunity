@@ -24,6 +24,8 @@ interface ShowcaseCardProps {
   currentUserId: string;
   isLast?: boolean;
   communityId: string;
+  /** Owner or manager with "moderate showcase" — may delete anyone's post. */
+  canModerate?: boolean;
   communityName?: string;
   communityImage?: string | null;
   onOpen?: () => void;
@@ -54,6 +56,7 @@ export function ShowcaseCard({
   post,
   currentUserId,
   communityId,
+  canModerate = false,
   communityName,
   communityImage,
   onOpen,
@@ -192,7 +195,8 @@ export function ShowcaseCard({
           />
           <ShowcaseOptionsMenu
             saved={saved}
-            canManage={post.user_id === currentUserId}
+            canEdit={post.user_id === currentUserId}
+            canDelete={post.user_id === currentUserId || canModerate}
             reported={reported}
             busy={savePending}
             onToggleSave={toggleSave}

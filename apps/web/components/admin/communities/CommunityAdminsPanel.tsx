@@ -11,11 +11,16 @@ import {
   type CommunityPermissionKey,
 } from "./communityTypes";
 import { fmtDate } from "./communityTypes";
+import { COMMUNITY_PERMISSION_KEYS } from "@/lib/communities/permissions";
 
 const PERM_CHIP: Record<CommunityPermissionKey, string> = {
   can_edit_settings: "Settings",
   can_manage_members: "Members",
-  can_delete_messages: "Moderation",
+  can_delete_messages: "Chat",
+  can_moderate_threads: "Threads",
+  can_moderate_showcase: "Showcase",
+  can_moderate_resources: "Resources",
+  can_moderate_events: "Events",
 };
 
 interface Props {
@@ -120,7 +125,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
               const permKeys = (Object.keys(PERM_CHIP) as CommunityPermissionKey[]).filter(
                 (key) => admin.permissions[key],
               );
-              const limited = permKeys.length < 3;
+              const limited = permKeys.length < COMMUNITY_PERMISSION_KEYS.length;
               return (
                 <div
                   key={admin.user_id}

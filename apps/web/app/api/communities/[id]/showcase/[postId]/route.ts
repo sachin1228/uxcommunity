@@ -3,6 +3,12 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
+import {
+  loadCommunityPermissionCheck,
+  logCommunityActivity,
+  managerActorRole,
+  type CommunityManagerStatus,
+} from "@/lib/communities/manager-role";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 /** Extract attachment URLs from a stored attachments JSON array (for R2 lookups). */
@@ -130,10 +136,36 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
   const { data: existing } = await getPost(db, id, postId);
   if (!existing) return NextResponse.json({ error: "Post not found." }, { status: 404 });
-  if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own showcase posts." }, { status: 403 });
+
+  // Authors delete their own posts; managers holding "moderate showcase" may
+  // delete anyone's.
+  const isOwn = existing.user_id === userId;
+  let moderator: CommunityManagerStatus | null = null;
+  if (!isOwn) {
+    const check = await loadCommunityPermissionCheck(db, id, userId, "can_moderate_showcase");
+    if (!check.allowed) {
+      return NextResponse.json({ error: "You can only delete your own showcase posts." }, { status: 403 });
+    }
+    moderator = check.status;
+  }
+
   const previousRow = existing as Record<string, unknown>;
-  const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
+  let deleteQuery = db.from("community_showcase_posts").delete().eq("id", postId);
+  if (isOwn) deleteQuery = deleteQuery.eq("user_id", userId);
+  const { error } = await deleteQuery;
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
+
+  // Audit trail for moderated deletions of other members' posts.
+  if (!isOwn && moderator) {
+    await logCommunityActivity(db, {
+      communityId: id,
+      actorId: userId,
+      actorRole: managerActorRole(moderator),
+      action: "showcase_deleted",
+      targetUserId: existing.user_id,
+      details: { post_id: postId },
+    });
+  }
 
   const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
   for (const url of attachmentUrls((existing as Record<string, unknown>).attachments)) {
