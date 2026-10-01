@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, MessageSquare } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { CommunityDp } from "../CommunityDp";
 import { DpWithEventDate } from "../DpWithEventDate";
 import { hasEventEnded } from "@/lib/communities/event-date";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -86,11 +86,11 @@ export function EventChatPanel({
         {/* The room belongs to this event and the page knows its date, so the
             DP says which day it is for. */}
         <DpWithEventDate date={eventDate} endsAt={eventEnd} dpSize={32}>
-          <AvatarImg
-            url={chatCommunityImage ?? null}
+          <CommunityDp
+            imageUrl={chatCommunityImage ?? null}
             name={chatCommunityName ?? eventTitle}
             size={32}
-            className="shrink-0 rounded-full object-cover"
+            className="bg-surface-raised"
           />
         </DpWithEventDate>
         <div className="min-w-0 flex-1">

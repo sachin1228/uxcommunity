@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { invalidateOnJoin } from "@/lib/communities/cache";
-import { Lock, Globe2, Users, Check, MessageSquare } from "lucide-react";
+import { Lock, Globe2, Users, Check, ImagePlus, MessageSquare } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
@@ -67,7 +67,6 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
     }
   }
 
-  const avatarLetter = community.name.charAt(0).toUpperCase();
   // Only the seal is drawn here: the privacy pill above the name already
   // carries the earth/lock, so repeating it beside the name would double up.
   const { verified: isVerifiedCommunity } = communityNameBadges(
@@ -84,7 +83,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
             // eslint-disable-next-line @next/next/no-img-element
             <img src={community.image_url} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="font-display text-2xl font-bold text-foreground">{avatarLetter}</span>
+            <ImagePlus size={22} strokeWidth={2.5} />
           )}
         </div>
 
