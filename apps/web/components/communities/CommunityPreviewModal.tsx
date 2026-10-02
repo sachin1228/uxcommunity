@@ -17,6 +17,10 @@ import type { CommunityPreviewData } from "@/lib/communities/preview";
  * /api/communities/[id]/preview, so joining happens right here in the feed
  * without losing the list. Used by the home feed and the profile activity
  * tabs.
+ *
+ * A 404 means the community is gone (deleted or deactivated) rather than
+ * unreachable — cards of soft-deleted communities stay in the feeds, so the
+ * popup shows a "deleted" state instead of a retry that could never work.
  */
 export function CommunityPreviewModal({
   communityId,
@@ -28,20 +32,24 @@ export function CommunityPreviewModal({
   const [preview, setPreview] = useState<CommunityPreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/communities/${communityId}/preview`);
       if (!res.ok) {
-        setFailed(true);
+        setDeleted(res.status === 404);
+        setFailed(res.status !== 404);
         setPreview(null);
         return;
       }
       const data = (await res.json()) as { preview?: CommunityPreviewData };
       setPreview(data.preview ?? null);
       setFailed(false);
+      setDeleted(false);
     } catch {
       setFailed(true);
+      setDeleted(false);
       setPreview(null);
     } finally {
       setLoading(false);
@@ -66,6 +74,20 @@ export function CommunityPreviewModal({
       {loading ? (
         <div className="flex min-h-48 items-center justify-center">
           <Spinner size={22} />
+        </div>
+      ) : deleted ? (
+        <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="font-body text-sm font-medium text-foreground-muted">This community was deleted</p>
+          <p className="max-w-xs font-body text-xs text-foreground-subtle">
+            Posts from it stay in your feed, but there&apos;s no community to open or join anymore.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-1 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised"
+          >
+            Close
+          </button>
         </div>
       ) : preview ? (
         <div className="px-4 pb-4 pt-7">
