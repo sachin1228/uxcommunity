@@ -568,8 +568,11 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                   {/* This member's answers to the host's compulsory join
                       questions — event chats only, collapsed to one line until
                       the manager opens them. Rendered as a sibling row so the
-                      member row itself never reflows when it opens. */}
-                  {isEventChat && manager && (
+                      member row itself never reflows when it opens. The owner
+                      never answers anything to join their own event, so their
+                      row shows no answers section at all — a permanent
+                      "No join answers recorded" under the host read as a bug. */}
+                  {isEventChat && manager && !isOwnerRow && (
                     <li
                       className="-mt-1 px-3 pb-2"
                     >
