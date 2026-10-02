@@ -38,8 +38,9 @@ interface CommunityFeedListProps {
    */
   showPastEvents?: boolean;
   /**
-   * Homepage only: clicking a card's "posted in …" label opens the
-   * community preview popup here instead of navigating to the community.
+   * Home feed and profile activity tabs: clicking a card's "posted in …"
+   * label opens the community preview popup here instead of navigating to
+   * the community.
    */
   onOpenCommunityPreview?: (communityId: string) => void;
 }

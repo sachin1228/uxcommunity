@@ -1,4 +1,4 @@
-import { CommunityIcon } from "./CommunityIcon";
+import { CommunityDp } from "./CommunityDp";
 
 interface CommunityPostLabelProps {
   communityId?: string;
@@ -7,8 +7,9 @@ interface CommunityPostLabelProps {
   className?: string;
   /**
    * When provided, clicking the label calls this instead of navigating to the
-   * community page — the homepage feed opens its non-member preview popup
-   * here. Omitted on every other surface, which keeps the plain link.
+   * community page — the home feed and the profile activity tabs open their
+   * non-member preview popup here. Omitted elsewhere, which keeps the plain
+   * link.
    */
   onOpenPreview?: () => void;
 }
@@ -23,15 +24,7 @@ export function CommunityPostLabel({
   const content = (
     <div className={`flex items-center gap-1.5 overflow-hidden whitespace-nowrap font-body text-[11px] text-foreground-subtle ${className}`}>
       <span className="shrink-0">posted in</span>
-      {communityImage ? (
-        <img
-          src={communityImage}
-          alt={communityName}
-          className="h-4 w-4 shrink-0 rounded-full object-cover"
-        />
-      ) : (
-        <CommunityIcon size={16} iconSize={9} />
-      )}
+      <CommunityDp imageUrl={communityImage ?? null} name={communityName} size={16} iconSize={9} />
       <span className={`truncate ${onOpenPreview ? "transition-colors hover:text-foreground" : "text-foreground-muted"}`}>{communityName}</span>
     </div>
   );
