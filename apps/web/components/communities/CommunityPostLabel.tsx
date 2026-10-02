@@ -7,8 +7,9 @@ interface CommunityPostLabelProps {
   className?: string;
   /**
    * When provided, clicking the label calls this instead of navigating to the
-   * community page — the homepage feed opens its non-member preview popup
-   * here. Omitted on every other surface, which keeps the plain link.
+   * community page — the home feed and the profile activity tabs open their
+   * non-member preview popup here. Omitted elsewhere, which keeps the plain
+   * link.
    */
   onOpenPreview?: () => void;
 }

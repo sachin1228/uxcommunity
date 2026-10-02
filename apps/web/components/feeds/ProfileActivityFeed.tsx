@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { CommunityFeedList } from "./CommunityFeedList";
+import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "./types";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -107,6 +108,8 @@ function ProfileActivityScope({
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= FEED_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
+  /** Non-member community preview popup, opened from a card's "posted in …" label. */
+  const [previewCommunityId, setPreviewCommunityId] = useState<string | null>(null);
 
   const fetchItems = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -229,10 +232,17 @@ function ProfileActivityScope({
 
   return (
     <>
+      {previewCommunityId && (
+        <CommunityPreviewModal
+          communityId={previewCommunityId}
+          onClose={() => setPreviewCommunityId(null)}
+        />
+      )}
       <CommunityFeedList
         items={items}
         currentUserId={currentUserId}
         onChange={updateItems}
+        onOpenCommunityPreview={setPreviewCommunityId}
         emptyState={emptyStateFor(scope)}
         showPastEvents
       />

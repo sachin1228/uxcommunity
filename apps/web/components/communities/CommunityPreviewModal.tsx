@@ -9,13 +9,14 @@ import {
 import type { CommunityPreviewData } from "@/lib/communities/preview";
 
 /**
- * The homepage's "posted in …" popup.
+ * The feed's "posted in …" popup.
  *
  * A non-member who clicks a feed card's community label gets this modal
  * instead of navigating away: the same preview card the community page
  * server-renders (shared CommunityPreviewCard), fetched from
- * /api/communities/[id]/preview, so joining happens right here on the
- * homepage without losing the feed.
+ * /api/communities/[id]/preview, so joining happens right here in the feed
+ * without losing the list. Used by the home feed and the profile activity
+ * tabs.
  */
 export function CommunityPreviewModal({
   communityId,
