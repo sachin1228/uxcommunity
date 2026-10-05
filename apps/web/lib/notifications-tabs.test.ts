@@ -35,6 +35,7 @@ const ALL_TYPES: NotificationType[] = [
   "showcase_deleted",
   "resource_deleted",
   "event_deleted",
+  "report_reviewed",
 ];
 
 test("every generated notification type lands in a tab", () => {
@@ -61,14 +62,16 @@ test("all event types render under the events tab", () => {
   }
 });
 
-// The Other tab renders manager removals of the user's content; a type it is
-// not given stays invisible instead of leaking into another tab.
+// The Other tab renders manager/platform removals of the user's content and
+// the reporter's thank-you; a type it is not given stays invisible instead of
+// leaking into another tab.
 test("content-removal notices render under the Other tab", () => {
   for (const type of [
     "thread_deleted",
     "showcase_deleted",
     "resource_deleted",
     "event_deleted",
+    "report_reviewed",
   ] as NotificationType[]) {
     assert.equal(notificationTabFor(type), "other", type);
   }

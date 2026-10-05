@@ -9,6 +9,7 @@ import { PostAuthorMeta } from "../PostAuthorMeta";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
+import { ReportModal } from "../ReportModal";
 import { FeedVideo } from "@/components/communities/FeedVideo";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
 import { ThreadImageCarousel } from "../threads/ThreadImageCarousel";
@@ -78,9 +79,10 @@ export function ShowcaseCard({
     onSaveChanged,
   });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  // Report is an acknowledgement, not a stored record — the menu item just
-  // flips to "Reported" for a moment, like the thread, resource and event menus.
+  // Flips to the acknowledged "Reported" state once the report modal's
+  // submission lands, like the thread, resource and event menus.
   const [reported, setReported] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const categoryLabel = SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label ?? post.category;
   const media = mediaForPost(post);
@@ -202,7 +204,7 @@ export function ShowcaseCard({
             onToggleSave={toggleSave}
             onEdit={onEdit}
             onDelete={onDelete}
-            onReport={() => setReported(true)}
+            onReport={() => setShowReportModal(true)}
           />
         </div>
 
@@ -269,6 +271,14 @@ export function ShowcaseCard({
           onClose={() => setLightboxIndex(null)}
         />
       )}
+
+      <ReportModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="showcase"
+        contentId={post.id}
+        onReported={() => setReported(true)}
+      />
     </>
   );
 }

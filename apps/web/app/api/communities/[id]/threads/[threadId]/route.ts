@@ -20,6 +20,7 @@ import {
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
+import { removeCommunityContent } from "@/lib/communities/content-removal";
 
 async function enrichThread(
   db: ReturnType<typeof createServiceClient>,
@@ -224,19 +225,19 @@ export async function DELETE(
     moderator = check.status;
   }
 
-  const { data: threadRow } = await db
-    .from("community_threads")
-    .select("id, attachments")
-    .eq("id", threadId)
-    .maybeSingle();
-
-  const { error } = await db.from("community_threads").delete().eq("id", threadId);
-  if (error) { console.error("[DELETE thread]", error); return NextResponse.json({ error: "Failed to delete thread." }, { status: 500 }); }
+  // Delete the row, reclaim its attachments from R2 and announce the change in
+  // every room that rendered it; the shared helper keeps this identical to the
+  // admin dashboard's removal path.
+  const removal = await removeCommunityContent(db, { kind: "thread", id: threadId, scope: communityId });
+  if (!removal.ok) {
+    console.error("[DELETE thread]", removal.error);
+    return NextResponse.json({ error: "Failed to delete thread." }, { status: 500 });
+  }
 
   // Audit trail for moderated deletions of other members' threads, plus a
   // removal notice to the author. The title rides in the notice body so the
   // author sees what was taken down.
-  if (!isOwn && moderator) {
+  if (!isOwn && moderator && removal.removed) {
     const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId,
@@ -258,36 +259,6 @@ export async function DELETE(
       href: communityHref(communityId),
     });
   }
-
-  const attachments = Array.isArray(threadRow?.attachments) ? threadRow.attachments as Array<{ url?: string }> : [];
-  for (const attachment of attachments) {
-    await deleteR2AssetIfUnreferenced(db, attachment?.url, [{
-      table: "community_threads",
-      column: "attachments",
-      getUrls: (value) => Array.isArray(value)
-        ? value.flatMap((item) => item && typeof item === "object" && typeof item.url === "string" ? [item.url] : [])
-        : [],
-    }]);
-  }
-
-  void publishRealtimeBatch([
-    {
-      room: realtimeRooms.threads(communityId),
-      topic: "thread",
-      data: { id: threadId },
-    },
-    {
-      room: realtimeRooms.chat(communityId),
-      topic: "thread-delete",
-      data: { id: threadId },
-    },
-    {
-      // Remove the timeline's permanent "created a thread" card too.
-      room: realtimeRooms.chat(communityId),
-      topic: "content-delete",
-      data: { id: threadId, community_id: communityId, kind: "thread" },
-    },
-  ]);
 
   return new NextResponse(null, { status: 204 });
 }

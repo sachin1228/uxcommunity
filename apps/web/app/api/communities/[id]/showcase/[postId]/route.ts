@@ -10,7 +10,7 @@ import {
   type CommunityManagerStatus,
 } from "@/lib/communities/manager-role";
 import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
-import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { removeCommunityContent } from "@/lib/communities/content-removal";
 
 /** Extract attachment URLs from a stored attachments JSON array (for R2 lookups). */
 function attachmentUrls(value: unknown): string[] {
@@ -150,16 +150,17 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     moderator = check.status;
   }
 
-  const previousRow = existing as Record<string, unknown>;
-  let deleteQuery = db.from("community_showcase_posts").delete().eq("id", postId);
-  if (isOwn) deleteQuery = deleteQuery.eq("user_id", userId);
-  const { error } = await deleteQuery;
-  if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
+  // Delete the row, reclaim its attachments/posters/cover from R2 and announce
+  // the change in the timeline.
+  const removal = await removeCommunityContent(db, { kind: "showcase", id: postId, scope: id });
+  if (!removal.ok) {
+    return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
+  }
 
   // Audit trail for moderated deletions of other members' posts, plus a
   // removal notice to the author. The title rides in the notice body so the
   // author sees what was taken down.
-  if (!isOwn && moderator) {
+  if (!isOwn && moderator && removal.removed) {
     const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId: id,
@@ -181,28 +182,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       href: communityHref(id),
     });
   }
-
-  const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
-  for (const url of attachmentUrls((existing as Record<string, unknown>).attachments)) {
-    await deleteR2AssetIfUnreferenced(db, url, attachmentLookups);
-  }
-  for (const posterUrl of attachmentPosterUrls((existing as Record<string, unknown>).attachments)) {
-    await deleteR2AssetIfUnreferenced(db, posterUrl, [
-      { table: "community_showcase_posts", column: "attachments", getUrls: attachmentPosterUrls },
-    ]);
-  }
-  await deleteR2AssetIfUnreferenced(db, existing.image_url, [
-    { table: "community_showcase_posts", column: "image_url" },
-  ]);
-
-  void publishRealtimeBatch([
-    {
-      // Remove the timeline's permanent "created a showcase" card too.
-      room: realtimeRooms.chat(id),
-      topic: "content-delete",
-      data: { id: postId, community_id: id, kind: "showcase" },
-    },
-  ]);
 
   return new NextResponse(null, { status: 204 });
 }

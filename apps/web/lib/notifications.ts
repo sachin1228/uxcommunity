@@ -9,8 +9,9 @@ import type { Json } from "@/lib/supabase/database.types";
 
 /**
  * The notification types the app still generates: engagement on the user's own
- * content (comments, replies, likes), event RSVPs, and manager removals of the
- * user's content.
+ * content (comments, replies, likes), event RSVPs, manager/platform removals
+ * of the user's content, and the thank-you a reporter gets once their report
+ * has been reviewed.
  *
  * The community broadcasts ("started a new thread", "shared a new resource",
  * "created a new event") and the chat @mention rows are gone — no route
@@ -29,7 +30,8 @@ export type NotificationType =
   | "thread_deleted"
   | "showcase_deleted"
   | "resource_deleted"
-  | "event_deleted";
+  | "event_deleted"
+  | "report_reviewed";
 
 export type NotificationEntityType = "thread" | "showcase" | "resource" | "event";
 
@@ -53,6 +55,51 @@ export function managerRemovalNotice(
   const actor =
     role === "owner" ? "The community owner" : role === "admin" ? "An admin" : "A moderator";
   return `${actor} deleted your ${REMOVED_CONTENT_LABELS[kind]}`;
+}
+
+/** The removal-notice type recorded for each content kind. */
+export const CONTENT_REMOVAL_TYPES = {
+  thread: "thread_deleted",
+  showcase: "showcase_deleted",
+  resource: "resource_deleted",
+  event: "event_deleted",
+} as const;
+
+/** Long content titles are trimmed to fit the notice body. */
+const REMOVAL_TITLE_SNIPPET = 120;
+
+/**
+ * Removal notice for a post taken down after a member report. Unlike the
+ * manager notice, this one quotes the report reason back — the author should
+ * know what rule was broken, not just that something was removed.
+ */
+export function reportedRemovalNotice(
+  kind: keyof typeof REMOVED_CONTENT_LABELS,
+  reason: string,
+  contentTitle?: string | null,
+): { title: string; body: string } {
+  const snippet = contentTitle?.trim().slice(0, REMOVAL_TITLE_SNIPPET);
+  return {
+    title: `Your ${REMOVED_CONTENT_LABELS[kind]} was removed`,
+    body: `Removed for: ${reason}${snippet ? ` — "${snippet}"` : ""}`,
+  };
+}
+
+/**
+ * The thank-you a reporter receives once their report has been reviewed and
+ * the content was removed. `removed` is false only when the content was
+ * already gone by the time an admin looked at the report.
+ */
+export function reportReviewedNotice(
+  kind: keyof typeof REMOVED_CONTENT_LABELS,
+  removed: boolean,
+): { title: string; body: string } {
+  return {
+    title: "Thanks for reporting",
+    body: removed
+      ? `We reviewed your report and removed the ${REMOVED_CONTENT_LABELS[kind]}. Thanks for helping keep the community safe.`
+      : `We reviewed your report. Thanks for helping keep the community safe.`,
+  };
 }
 
 interface NotificationInput {

@@ -11,6 +11,7 @@ import {
   CalendarDays,
   CheckCheck,
   FileText,
+  Flag,
   Heart,
   MessageCircle,
   Trash2,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/use-notifications";
 
 function iconFor(type: NotificationType) {
+  if (type === "report_reviewed") return Flag;
   if (type.endsWith("_deleted")) return Trash2;
   if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;
@@ -187,12 +189,12 @@ export function NotificationsView({ userId }: { userId: string }) {
               hint="RSVPs and comments on your events will appear here."
             />
           ) : (
-            /* The Other tab renders manager removals — see
+            /* The Other tab renders removals and report outcomes — see
                lib/notifications-tabs.ts for where its types get declared. */
             <EmptyNotifications
               icon={Trash2}
               title="No removal notices"
-              hint="When an admin or moderator removes your thread, showcase post, resource or event, it will show up here."
+              hint="Removals of your posts and updates on reports you filed will show up here."
             />
           )
         ) : (

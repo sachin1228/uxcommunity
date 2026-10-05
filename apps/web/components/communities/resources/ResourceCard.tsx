@@ -10,6 +10,7 @@ import { CommentIcon } from "../CommentIcon";
 import type { CommunityResource } from "@/lib/communities/models/resources";
 import { RESOURCE_TYPES } from "@/lib/communities/models/resources";
 import { ResourceFormModal } from "./ResourceFormModal";
+import { ReportModal } from "../ReportModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -124,6 +125,7 @@ export function ResourceCard({
   const [showEditModal, setShowEditModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reported, setReported] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -281,7 +283,7 @@ export function ResourceCard({
               <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
             </button>
           ) : (
-            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
+            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowReportModal(true); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
               <Flag strokeWidth={2.5} size={11} />{reported ? "Reported" : "Report"}
             </button>
           )}
@@ -404,6 +406,13 @@ export function ResourceCard({
         message="This will permanently remove this resource. This cannot be undone."
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
+      />
+      <ReportModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="resource"
+        contentId={resource.id}
+        onReported={() => setReported(true)}
       />
     </>
   );
