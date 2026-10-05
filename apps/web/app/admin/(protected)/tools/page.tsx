@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, SkipForward, AlertCircle, RefreshCw, Trash2, Database } from "lucide-react";
+import { CheckCircle2, SkipForward, AlertCircle, RefreshCw, Trash2, Database, Undo2 } from "lucide-react";
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -108,9 +108,17 @@ export default function ToolsPage() {
             <div className="flex flex-wrap gap-4 mb-4">
               <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={r2Summary.totalObjects} label="total objects" />
               <Stat icon={<SkipForward strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={r2Summary.trackedObjects} label="tracked" />
+              <Stat icon={<Undo2 strokeWidth={2.5} size={13} className="text-accent" />} value={r2Summary.removalProtectedObjects ?? 0} label="undo-protected" />
               <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-red-400" />} value={r2Summary.potentialOrphans} label="potential orphans" />
               <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-amber-400" />} value={r2Summary.brokenReferences} label="broken refs" />
             </div>
+            {r2Summary.removalProtectedObjects > 0 && (
+              <p className="mb-4 font-body text-[11px] leading-5 text-foreground-muted">
+                {r2Summary.removalProtectedObjects} object(s) belong to posts removed as part of report
+                review. They are held out of the orphan list so an undo can restore the post with
+                working images — undoing the removal puts them back under normal reference tracking.
+              </p>
+            )}
             {r2Summary.orphans?.length > 0 && (
               <>
                 <div className="mt-4 flex items-center justify-between gap-3">
