@@ -10,6 +10,7 @@ import {
   type CommunityManagerStatus,
 } from "@/lib/communities/manager-role";
 import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
+import { removeCommunityContent } from "@/lib/communities/content-removal";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const RESOURCE_TYPES = new Set<ResourceType>([
@@ -174,13 +175,17 @@ export async function DELETE(
     moderator = check.status;
   }
 
-  const { error } = await db.from("community_resources").delete().eq("id", resourceId);
-  if (error) { console.error("[DELETE resource]", error); return NextResponse.json({ error: "Failed to delete resource." }, { status: 500 }); }
+  // Delete the row and announce the change in the resources list and timeline.
+  const removal = await removeCommunityContent(db, { kind: "resource", id: resourceId, scope: communityId });
+  if (!removal.ok) {
+    console.error("[DELETE resource]", removal.error);
+    return NextResponse.json({ error: "Failed to delete resource." }, { status: 500 });
+  }
 
   // Audit trail for moderated deletions of other members' resources, plus a
   // removal notice to the author. The title rides in the notice body so the
   // author sees what was taken down.
-  if (!isOwn && moderator) {
+  if (!isOwn && moderator && removal.removed) {
     const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId,
@@ -202,16 +207,6 @@ export async function DELETE(
       href: communityHref(communityId),
     });
   }
-
-  void publishRealtimeBatch([
-    { room: realtimeRooms.resources(communityId), topic: "resource", data: { id: resourceId } },
-    {
-      // Remove the timeline's permanent "created a resource" card too.
-      room: realtimeRooms.chat(communityId),
-      topic: "content-delete",
-      data: { id: resourceId, community_id: communityId, kind: "resource" },
-    },
-  ]);
 
   return new NextResponse(null, { status: 204 });
 }

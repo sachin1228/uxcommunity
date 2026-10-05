@@ -12,6 +12,7 @@ import { RsvpConfirmDialog, type RsvpConfirmMode } from "./RsvpConfirmDialog";
 import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { ReportModal } from "../ReportModal";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import type { EventJoinAnswers } from "@/lib/communities/event-join-questions";
@@ -281,6 +282,7 @@ export function EventCard({
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const descriptionId = useId();
   const descriptionRef = useRef<HTMLParagraphElement | null>(null);
@@ -736,7 +738,7 @@ export function EventCard({
             onShare={() => void handleShare()}
             onEdit={() => setShowEditModal(true)}
             onDelete={() => isDetail ? void handleDelete() : setConfirmDelete(true)}
-            onReport={() => setReported(true)}
+            onReport={() => setShowReportModal(true)}
           />
         </div>
       </div>
@@ -872,6 +874,13 @@ export function EventCard({
         pending={rsvpPending}
         error={rsvpError}
         confirmLabel="Confirm RSVP"
+      />
+      <ReportModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="event"
+        contentId={event.id}
+        onReported={() => setReported(true)}
       />
     </div>
     </>

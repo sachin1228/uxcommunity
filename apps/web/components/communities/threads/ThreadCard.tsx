@@ -16,6 +16,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 import { renderWithLinks } from "./renderWithLinks";
+import { ReportModal } from "../ReportModal";
 import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
 import { ThreadImageCarousel } from "./ThreadImageCarousel";
@@ -97,6 +98,7 @@ export function ThreadCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
   const [pollVoteBusy, setPollVoteBusy] = useState(false);
   const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
@@ -470,8 +472,7 @@ export function ThreadCard({
                     onClick={(e) => {
                       e.preventDefault();
                       setMenuOpen(false);
-                      setReported(true);
-                      setTimeout(() => setReported(false), 3000);
+                      setShowReportModal(true);
                     }}
                     disabled={reported}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
@@ -678,6 +679,14 @@ export function ThreadCard({
         message="This will permanently remove this thread. This cannot be undone."
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
+      />
+
+      <ReportModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="thread"
+        contentId={thread.id}
+        onReported={() => setReported(true)}
       />
 
       {lightboxIndex !== null && (

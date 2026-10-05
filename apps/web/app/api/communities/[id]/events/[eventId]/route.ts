@@ -13,6 +13,7 @@ import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePr
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
 import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
+import { removeCommunityContent, type RemoveContentResult } from "@/lib/communities/content-removal";
 import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -235,38 +236,24 @@ export async function DELETE(
     moderator = check.status;
   }
 
-  const { data: eventRow } = await db
-    .from("community_events")
-    .select("id, cover_image_url")
-    .eq("id", eventId)
-    .maybeSingle();
-
-  // The event's group chat outlives its event: its members keep the room and
-  // the conversation in it and only lose what pointed at the event (see
-  // 20260925140000_event_delete_keeps_group_chat). The link is cleared before
-  // the delete so the room survives even where the old `on delete cascade`
-  // constraint is still in place — nothing points at the row by the time it
-  // goes, so nothing cascades.
-  // `as never` matches the repo-wide untyped supabase-js baseline for writes the
-  // generated client types don't know about (see the push/settings routes).
-  const { data: roomRow, error: unlinkError } = await db
-    .from("communities")
-    .update({ event_id: null } as never)
-    .eq("event_id", eventId)
-    .select("id")
-    .maybeSingle();
-  if (unlinkError) {
-    console.error("[DELETE community events] group chat unlink failed:", unlinkError);
+  // Unlink the event's group chat (which outlives the event — see
+  // 20260925140000_event_delete_keeps_group_chat), delete the row, reclaim its
+  // cover from R2 and announce the change in every room that rendered it.
+  const removal: RemoveContentResult = await removeCommunityContent(db, {
+    kind: "event",
+    id: eventId,
+    scope: communityId,
+  });
+  if (!removal.ok) {
+    console.error("[DELETE community events]", removal.error);
+    return NextResponse.json({ error: "Failed to delete event." }, { status: 500 });
   }
-  const chatCommunityId = (roomRow as { id: string } | null)?.id ?? null;
-
-  const { error } = await db.from("community_events").delete().eq("id", eventId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const chatCommunityId = removal.chatCommunityId;
 
   // Audit trail for moderated deletions of other members' events, plus a
   // removal notice to the host. The title rides in the notice body so the
   // host sees what was taken down.
-  if (!isOwn && moderator) {
+  if (!isOwn && moderator && removal.removed) {
     const actorRole = managerActorRole(moderator);
     await logCommunityActivity(db, {
       communityId,
@@ -288,40 +275,6 @@ export async function DELETE(
       href: communityHref(communityId),
     });
   }
-
-  // communities.image_url is checked as well as community_events: the event's
-  // group chat wears the event's cover as its own DP (see
-  // ensureEventChatCommunity) and it is still standing, so deleting the event
-  // must not take the image off the face of the room.
-  await deleteR2AssetIfUnreferenced(db, eventRow?.cover_image_url, [
-    { table: "community_events", column: "cover_image_url" },
-    { table: "communities", column: "image_url" },
-  ]);
-
-  const announcements = [
-    { room: realtimeRooms.events(communityId), topic: "event", data: { id: eventId } },
-    {
-      // Remove the timeline's permanent "created an event" card too.
-      room: realtimeRooms.chat(communityId),
-      topic: "content-delete",
-      data: { id: eventId, community_id: communityId, kind: "event" },
-    },
-  ];
-  if (chatCommunityId) {
-    // The room's own members: the date badge on its DP and the Event card
-    // beside its chat both read the link that just went away, so the room has
-    // to hear about it too — the delete is usually made from the event's own
-    // page or its community, not from inside the room.
-    announcements.push(
-      { room: realtimeRooms.events(chatCommunityId), topic: "event", data: { id: eventId } },
-      {
-        room: realtimeRooms.chat(chatCommunityId),
-        topic: "content-delete",
-        data: { id: eventId, community_id: chatCommunityId, kind: "event" },
-      },
-    );
-  }
-  void publishRealtimeBatch(announcements);
 
   // The room id rides back so the deleting client can drop its caches for the
   // room (meta, the event card beside its chat) without a reload.
