@@ -36,6 +36,7 @@ const ALL_TYPES: NotificationType[] = [
   "resource_deleted",
   "event_deleted",
   "report_reviewed",
+  "content_restored",
 ];
 
 test("every generated notification type lands in a tab", () => {
@@ -72,6 +73,7 @@ test("content-removal notices render under the Other tab", () => {
     "resource_deleted",
     "event_deleted",
     "report_reviewed",
+    "content_restored",
   ] as NotificationType[]) {
     assert.equal(notificationTabFor(type), "other", type);
   }

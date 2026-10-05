@@ -15,6 +15,7 @@ import {
   Heart,
   MessageCircle,
   Trash2,
+  Undo2,
   Users,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -31,6 +32,7 @@ import {
 
 function iconFor(type: NotificationType) {
   if (type === "report_reviewed") return Flag;
+  if (type === "content_restored") return Undo2;
   if (type.endsWith("_deleted")) return Trash2;
   if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;

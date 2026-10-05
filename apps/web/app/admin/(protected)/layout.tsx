@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { AdminSidebar } from "@/app/admin/(protected)/AdminSidebar";
 import { AdminTopbar } from "@/app/admin/(protected)/AdminTopbar";
+import { UndoToast } from "@/components/ui/UndoToast";
 
 export default async function AdminProtectedLayout({
   children,
@@ -29,6 +30,9 @@ export default async function AdminProtectedLayout({
       <main className="ml-[12rem] mt-11 flex-1 px-6 py-5">
         {children}
       </main>
+
+      {/* Undo offers raised by admin actions (report dismiss/removal). */}
+      <UndoToast />
     </div>
   );
 }

@@ -823,6 +823,77 @@ export type Database = {
           },
         ];
       };
+      content_removals: {
+        Row: {
+          community_id: string | null;
+          content_author_id: string | null;
+          content_id: string;
+          content_title: string | null;
+          content_type: string;
+          id: string;
+          removed_at: string;
+          removed_by: string | null;
+          snapshot: Json;
+          undone_at: string | null;
+          undone_by: string | null;
+        };
+        Insert: {
+          community_id?: string | null;
+          content_author_id?: string | null;
+          content_id: string;
+          content_title?: string | null;
+          content_type: string;
+          id?: string;
+          removed_at?: string;
+          removed_by?: string | null;
+          snapshot: Json;
+          undone_at?: string | null;
+          undone_by?: string | null;
+        };
+        Update: {
+          community_id?: string | null;
+          content_author_id?: string | null;
+          content_id?: string;
+          content_title?: string | null;
+          content_type?: string;
+          id?: string;
+          removed_at?: string;
+          removed_by?: string | null;
+          snapshot?: Json;
+          undone_at?: string | null;
+          undone_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "content_removals_community_id_fkey";
+            columns: ["community_id"];
+            isOneToOne: false;
+            referencedRelation: "communities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "content_removals_content_author_id_fkey";
+            columns: ["content_author_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "content_removals_removed_by_fkey";
+            columns: ["removed_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "content_removals_undone_by_fkey";
+            columns: ["undone_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       content_reports: {
         Row: {
           community_id: string | null;

@@ -55,6 +55,7 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "resource_deleted",
     "event_deleted",
     "report_reviewed",
+    "content_restored",
   ]),
 };
 

@@ -10,8 +10,8 @@ import type { Json } from "@/lib/supabase/database.types";
 /**
  * The notification types the app still generates: engagement on the user's own
  * content (comments, replies, likes), event RSVPs, manager/platform removals
- * of the user's content, and the thank-you a reporter gets once their report
- * has been reviewed.
+ * of the user's content, the thank-you a reporter gets once their report has
+ * been reviewed, and the all-clear when an admin undoes a removal.
  *
  * The community broadcasts ("started a new thread", "shared a new resource",
  * "created a new event") and the chat @mention rows are gone — no route
@@ -31,7 +31,8 @@ export type NotificationType =
   | "showcase_deleted"
   | "resource_deleted"
   | "event_deleted"
-  | "report_reviewed";
+  | "report_reviewed"
+  | "content_restored";
 
 export type NotificationEntityType = "thread" | "showcase" | "resource" | "event";
 
@@ -82,6 +83,21 @@ export function reportedRemovalNotice(
   return {
     title: `Your ${REMOVED_CONTENT_LABELS[kind]} was removed`,
     body: `Removed for: ${reason}${snippet ? ` — "${snippet}"` : ""}`,
+  };
+}
+
+/**
+ * The notice the author gets when an admin undoes a report removal: the post
+ * is back. Mirrors `reportedRemovalNotice` so the pair reads as one story.
+ */
+export function contentRestoredNotice(
+  kind: keyof typeof REMOVED_CONTENT_LABELS,
+  contentTitle?: string | null,
+): { title: string; body: string } {
+  const snippet = contentTitle?.trim().slice(0, REMOVAL_TITLE_SNIPPET);
+  return {
+    title: `Your ${REMOVED_CONTENT_LABELS[kind]} was restored`,
+    body: `We put it back up${snippet ? ` — "${snippet}"` : ""}.`,
   };
 }
 
@@ -211,6 +227,10 @@ export function deferNotification(input: DeferredNotificationInput) {
 
 export function threadHref(communityId: string, threadId: string) {
   return `/dashboard/communities/${communityId}/threads/${threadId}`;
+}
+
+export function showcaseHref(communityId: string, showcaseId: string) {
+  return `/dashboard/communities/${communityId}/showcase/${showcaseId}`;
 }
 
 export function resourceHref(communityId: string, resourceId: string) {
