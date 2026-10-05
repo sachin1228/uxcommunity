@@ -112,10 +112,18 @@ jobs:
           set -o pipefail
           npx opennextjs-cloudflare deploy -- --name "$WORKER" 2>&1 | tee /tmp/deploy.log
           URL=$(grep -oE "https://${WORKER}\.[a-z0-9-]+\.workers\.dev" /tmp/deploy.log | head -1)
+          # A deploy that printed no URL did not actually create the worker;
+          # without this the step still "succeeded" and the later secret puts
+          # failed against a worker that does not exist.
+          if [ -z "$URL" ]; then
+            echo "::error::No preview worker URL in the deploy output — the deploy did not complete."
+            exit 1
+          fi
           echo "worker=$WORKER" >> "$GITHUB_OUTPUT"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Set preview worker secrets
+        if: steps.deploy.outputs.url != ''
         working-directory: apps/web
         run: |
           WORKER="uxcommunity-web-preview-pr${{ github.event.pull_request.number }}"
@@ -168,5 +176,19 @@ jobs:
 
       - name: Delete preview worker
         working-directory: apps/web
+        shell: bash
         run: |
-          npx wrangler delete "uxcommunity-web-preview-pr${{ github.event.pull_request.number }}" --force
+          WORKER="uxcommunity-web-preview-pr${{ github.event.pull_request.number }}"
+          # Idempotent: the closed event shares the PR's concurrency group, so
+          # merging a PR cancels the in-flight deploy and the worker may never
+          # have been created. Treat Cloudflare's "This Worker does not exist"
+          # (code 10090) as success; any other failure still fails the job.
+          if output=$(npx wrangler delete "$WORKER" --force 2>&1); then
+            printf '%s\n' "$output"
+            echo "Deleted $WORKER."
+          elif printf '%s' "$output" | grep -qE 'does not exist|code: 10090'; then
+            echo "::notice::$WORKER does not exist (deploy was cancelled or never ran) — nothing to delete."
+          else
+            printf '%s\n' "$output"
+            exit 1
+          fi
