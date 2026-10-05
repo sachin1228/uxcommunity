@@ -7,9 +7,9 @@
 --      the row plus its discussion (comments, reactions, likes/saves/RSVPs/
 --      poll votes) is snapshotted here. "Undo" re-inserts everything with the
 --      same ids and marks the record undone. The R2 objects are deliberately
---      NOT reclaimed on removal, so media still resolves after a restore; an
---      orphaned object that is never restored is reaped by the R2 orphan audit
---      after its grace period.
+--      NOT reclaimed on removal, so media still resolves after a restore: the
+--      orphan audit treats the media an active snapshot holds as referenced
+--      (see apps/web/lib/r2-removal-refs.ts).
 --
 --   2. `report_groups` — the queue, one row per reported post instead of one
 --      per report (a thread can be reported by many members). PostgREST can

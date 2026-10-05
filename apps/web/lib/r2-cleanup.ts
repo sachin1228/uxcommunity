@@ -10,7 +10,8 @@
  *  1. Deleting an entity removes the R2 objects that belonged to it — but
  *     ONLY if nothing else references them (shared media is protected).
  *  2. The orphan audit (`/api/admin/r2-audit`) tracks exactly the same
- *     reference sources as the runtime cleanup.
+ *     reference sources as the runtime cleanup, plus the media an active
+ *     `content_removals` snapshot is holding for an undo.
  *  3. Deletions are idempotent and retry-safe: an R2 delete is a no-op for
  *     missing keys, and any object that survives a failed cleanup is picked
  *     up by the next orphan scan (after the grace period).
@@ -35,6 +36,7 @@ import {
   getR2KeyFromUrl,
   getReferenceUrls,
 } from "@/lib/r2";
+import { removalSnapshotMediaUrls } from "@/lib/r2-removal-refs";
 
 export type DbClient = ReturnType<typeof createServiceClient>;
 
@@ -124,9 +126,55 @@ function pushLookupUrls(urls: string[], lookup: MediaReferenceLookup, value: unk
 // ── Reference collection (used by the orphan audit) ──────────────────────────
 
 /**
+ * Media still owned by an undoable admin removal.
+ *
+ * A removed post has no live row, but its snapshot in `content_removals` is
+ * exactly what a restore re-inserts — so every object the snapshot references
+ * must count as used until the removal is undone. Without this, the audit sees
+ * a removed post's images as orphans and deletes them past the grace window;
+ * the undo then restores rows whose media is already gone (see
+ * lib/r2-removal-refs for the extraction rules).
+ */
+export async function collectActiveRemovalMediaReferences(db: DbClient): Promise<MediaReference[]> {
+  const { data, error } = await db
+    .from("content_removals")
+    .select("id, content_type, content_id, snapshot")
+    .is("undone_at", null);
+
+  if (error) {
+    console.error("[r2-cleanup] removal reference query failed", error);
+    return [];
+  }
+
+  const references: MediaReference[] = [];
+  for (const removal of data ?? []) {
+    for (const media of removalSnapshotMediaUrls(
+      removal.snapshot,
+      removal.content_type,
+      removal.content_id,
+    )) {
+      const key = getR2KeyFromUrl(media.url);
+      if (!key) continue;
+      references.push({
+        key,
+        table: "content_removals",
+        column: media.column,
+        entityType: media.entityType,
+        entityId: removal.id,
+        url: media.url,
+      });
+    }
+  }
+
+  return references;
+}
+
+/**
  * Scans every media-referencing column in the database and returns one entry
  * per R2 object referenced. Objects referenced from multiple rows appear once
- * per row — callers deduplicate by key when counting.
+ * per row — callers deduplicate by key when counting. Active removal snapshots
+ * are scanned last: their media is retired from the live tables but must stay
+ * alive for the undo.
  */
 export async function collectAllMediaReferences(db: DbClient): Promise<MediaReference[]> {
   const references: MediaReference[] = [];
@@ -155,6 +203,8 @@ export async function collectAllMediaReferences(db: DbClient): Promise<MediaRefe
       }
     }
   }
+
+  references.push(...(await collectActiveRemovalMediaReferences(db)));
 
   return references;
 }

@@ -53,6 +53,12 @@ export async function GET() {
     if (!seen.has(item.key)) seen.set(item.key, item);
   }
 
+  // Objects kept alive only by an undoable removal snapshot — reported so the
+  // audit's "not an orphan" verdict on them is explainable.
+  const removalProtectedObjects = new Set(
+    tracked.filter((entry) => entry.table === "content_removals").map((entry) => entry.key),
+  ).size;
+
   const r2Objects = await listAllObjects();
 
   const keySet = new Set(r2Objects.map((entry) => entry.key));
@@ -83,6 +89,7 @@ export async function GET() {
     totalObjects: r2Objects.length,
     trackedObjects: tracked.length,
     validTrackedObjects: validCount,
+    removalProtectedObjects,
     potentialOrphans: orphanKeys.length,
     brokenReferences: brokenReferences.length,
     graceDays: DEFAULT_GRACE_DAYS,

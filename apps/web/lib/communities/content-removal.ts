@@ -15,9 +15,11 @@ import "server-only";
  * Admin removals are undoable: `snapshot` captures the row and its discussion
  * (comments, reactions, likes/saves/RSVPs/poll votes) into `content_removals`
  * and KEEPS the R2 objects, so `restoreRemovedContent` can put everything back
- * with the same ids. Media that is never restored is reaped by the R2 orphan
- * audit after its grace period (see lib/r2-cleanup). Member/manager deletions
- * take the fast path: no snapshot, immediate media cleanup.
+ * with the same ids. The orphan audit counts the media an active snapshot holds
+ * as referenced (see lib/r2-removal-refs), which is what keeps a restore from
+ * landing on deleted objects — while a removal is active it retains its media.
+ * Member/manager deletions take the fast path: no snapshot, immediate media
+ * cleanup.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
