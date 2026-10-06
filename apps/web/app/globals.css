@@ -406,6 +406,14 @@ body {
     background-size: var(--grid-size) var(--grid-size);
   }
 
+  /* Fades the dot texture out as it runs down the page, so the pattern reads
+     as an opening flourish at the top and never competes with the content
+     below. */
+  .grid-dots-fade {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 80px, transparent 200px);
+    mask-image: linear-gradient(to bottom, #000 0, #000 80px, transparent 200px);
+  }
+
   .grid-cross {
     background-image:
       linear-gradient(var(--grid-line-color) 1px, transparent 1px),

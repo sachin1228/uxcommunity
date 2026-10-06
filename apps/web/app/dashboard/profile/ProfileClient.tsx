@@ -126,10 +126,9 @@ export function ProfileClient({
   return (
     <div className="relative min-h-full">
       {/* Full-bleed dotted backdrop for the page: the texture belongs to the
-          page, not to a card, so the hero and the feed sit directly on it. The
-          dot colour is already low-alpha in the theme tokens, so the layer
-          carries no extra opacity of its own. */}
-      <div className="grid-dots pointer-events-none absolute inset-0" aria-hidden="true" />
+          page, not to a card, so the hero sits directly on it. It is masked to
+          fade out down the page, so the dots open the page and then vanish. */}
+      <div className="grid-dots grid-dots-fade pointer-events-none absolute inset-0" aria-hidden="true" />
 
       {/* The display picture leads the page with open space above it, the way
           the reference pane opens. The title stays in the document outline and
