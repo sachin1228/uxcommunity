@@ -14,9 +14,9 @@ interface Props {
   avatarUrl: string | null;
 }
 
-/** Rows are uniform: label on the left, icon on the right. */
+/** Rows are uniform: icon on the left, then the label. */
 const ROW_CLASS =
-  "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 " +
+  "flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 " +
   "font-body text-sm text-overlay-foreground transition-colors hover:bg-overlay-elevated";
 const ROW_ICON_CLASS = "shrink-0 text-overlay-muted";
 
@@ -76,8 +76,8 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
         <div className="border-b border-overlay-elevated p-1">
           {MENU_LINKS.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={() => setOpen(false)} className={ROW_CLASS}>
-              <span>{label}</span>
               <Icon strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
+              <span>{label}</span>
             </Link>
           ))}
         </div>
@@ -88,8 +88,8 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
             disabled={loggingOut}
             className={`${ROW_CLASS} disabled:opacity-50`}
           >
-            <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
             <LogOut strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
+            <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
           </button>
         </div>
       </DropdownMenu>

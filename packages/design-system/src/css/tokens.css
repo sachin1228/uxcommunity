@@ -207,8 +207,8 @@
   --radius-full: 9999px;
 
   --grid-line-color: rgba(0, 0, 0, 0.06);
-  --grid-dot-color:  rgba(0, 0, 0, 0.12);
-  --grid-size:       28px;
+  --grid-dot-color:  rgba(0, 0, 0, 0.16);
+  --grid-size:       8px;
 }
 
 /* ─── Dark mode ─────────────────────────────────────────────────────── */
@@ -351,6 +351,6 @@
     --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
 
     --grid-line-color: rgba(255, 255, 255, 0.04);
-    --grid-dot-color:  rgba(255, 255, 255, 0.08);
+    --grid-dot-color:  rgba(255, 255, 255, 0.14);
   }
 }

@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getProfileCompanyState } from "@/lib/companies/service";
 import { ContactLinksCard } from "./ContactLinksCard";
-import { WorkCard } from "./WorkCard";
 
 export const metadata = { title: "Settings" };
 
@@ -14,16 +12,13 @@ export default async function SettingsPage() {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const [{ data: user }, { data: profile }, companyState] = await Promise.all([
+  const [{ data: user }, { data: profile }] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
       .from("designer_profiles")
       .select("linkedin_url, portfolio_url")
       .eq("user_id", userId)
       .maybeSingle(),
-    // Work lives in its own model; this read is the profile-company pointer
-    // plus any work-email challenge still waiting on a code.
-    getProfileCompanyState(db, userId),
   ]);
 
   // The untyped Supabase client types these rows as `never`; cast once here.
@@ -49,8 +44,6 @@ export default async function SettingsPage() {
         initialLinkedIn={profileRow.linkedin_url ?? ""}
         initialPortfolio={profileRow.portfolio_url ?? ""}
       />
-
-      <WorkCard company={companyState.company} pending={companyState.pending} />
     </div>
   );
 }

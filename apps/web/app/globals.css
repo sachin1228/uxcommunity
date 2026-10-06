@@ -162,8 +162,8 @@
   --filter-focus:        #0A0A0A;
 
   --grid-line-color: rgba(0, 0, 0, 0.06);
-  --grid-dot-color:  rgba(0, 0, 0, 0.12);
-  --grid-size:       28px;
+  --grid-dot-color:  rgba(0, 0, 0, 0.16);
+  --grid-size:       8px;
 
   /* Modal surfaces — Geist panel ring + drop (light) */
   --modal-ring: rgba(0, 0, 0, 0.05);
@@ -333,7 +333,7 @@
     --filter-focus:        #FFFFFF;
 
     --grid-line-color: rgba(255, 255, 255, 0.04);
-    --grid-dot-color:  rgba(255, 255, 255, 0.08);
+    --grid-dot-color:  rgba(255, 255, 255, 0.14);
 
     /* Modal surfaces — Geist panel ring + drop (dark) */
     --modal-ring: rgba(255, 255, 255, 0.10);
@@ -404,6 +404,14 @@ body {
       transparent 1px
     );
     background-size: var(--grid-size) var(--grid-size);
+  }
+
+  /* Fades the dot texture out as it runs down the page, so the pattern reads
+     as an opening flourish at the top and never competes with the content
+     below. */
+  .grid-dots-fade {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 80px, transparent 200px);
+    mask-image: linear-gradient(to bottom, #000 0, #000 80px, transparent 200px);
   }
 
   .grid-cross {

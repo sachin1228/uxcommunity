@@ -3,9 +3,24 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
+import { getExperienceLevelNameMap } from "@/lib/master-data-cache";
+import { cleanDesignation } from "@/lib/communities/comment-authors";
 import { ProfileClient } from "./ProfileClient";
 
 export const metadata = { title: "Your Profile" };
+
+/**
+ * The seniority half of the role pill. Experience levels are managed in master
+ * data as list headings ("Mid-Level Designers"), so the trailing "Designer(s)"
+ * noun is dropped — the designation beside it supplies the noun and the pill
+ * reads "Mid-Level Product Designer", not "Mid-Level Designer Product Designer".
+ * Labels without that tail are cleaned but kept whole.
+ */
+function seniorityLabel(levelName: string): string {
+  const cleaned = cleanDesignation(levelName);
+  const withoutNoun = cleaned.replace(/\s+designers?$/i, "").trim();
+  return withoutNoun || cleaned;
+}
 
 interface Props {
   searchParams: Promise<{ tab?: string }>;
@@ -26,7 +41,6 @@ export default async function ProfilePage({ searchParams }: Props) {
     { data: profile },
     { data: userInterests },
     { data: allInterests },
-    { data: bannerRow },
     { company: profileCompany, pending: pendingCompany },
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
@@ -42,14 +56,6 @@ export default async function ProfilePage({ searchParams }: Props) {
       .select("interest_id, design_interests(id, name, image_url)")
       .eq("user_id", userId),
     db.from("design_interests").select("id, name, image_url").eq("is_active", true).order("name"),
-    // Banner read on its own: the hero can live without this optional column,
-    // so if it is missing the gradient renders and every other field on this
-    // page still loads.
-    db
-      .from("designer_profiles")
-      .select("banner_url")
-      .eq("user_id", userId)
-      .maybeSingle(),
     // The company line on the profile, plus any work-email challenge still
     // waiting on a code so the picker can reopen straight into it.
     getProfileCompanyState(db, userId),
@@ -68,6 +74,19 @@ export default async function ProfilePage({ searchParams }: Props) {
     jobTitleName = jobTitle?.name ?? jobTitleSlug;
   }
 
+  // The role pill beside the name states seniority and designation together.
+  // The experience level is also a slug, named in the experience-levels master
+  // table (cached for an hour), so it needs the same resolution as the title.
+  const experienceLevelSlug = (profile as any)?.experience_level ?? null;
+  const experienceLevelName = experienceLevelSlug
+    ? (await getExperienceLevelNameMap())[experienceLevelSlug] ?? experienceLevelSlug
+    : null;
+
+  const roleLabel =
+    [experienceLevelName ? seniorityLabel(experienceLevelName) : null, jobTitleName]
+      .filter(Boolean)
+      .join(" ") || null;
+
   const myInterestIds = (userInterests ?? [])
     .map((r: any) => r.design_interests?.id)
     .filter(Boolean) as string[];
@@ -81,11 +100,9 @@ export default async function ProfilePage({ searchParams }: Props) {
       createdAt={user?.created_at ?? ""}
       avatarUrl={(profile as any)?.avatar_url ?? null}
       avatarSource={(profile as any)?.avatar_source ?? null}
-      bannerUrl={(bannerRow as { banner_url?: string | null } | null)?.banner_url ?? null}
       city={(profile as any)?.cities?.name ?? null}
       sector={(profile as any)?.design_sectors?.name ?? null}
-      experienceLevel={(profile as any)?.experience_level ?? null}
-      jobTitle={jobTitleName}
+      roleLabel={roleLabel}
       initialLinkedIn={(profile as any)?.linkedin_url ?? ""}
       initialPortfolio={(profile as any)?.portfolio_url ?? ""}
       initialBio={(profile as any)?.bio ?? ""}

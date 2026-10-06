@@ -2,8 +2,8 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, MapPin, PenLine, Star, Layers, BadgeCheck, Plus } from "lucide-react";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { Building2, Camera, Loader2, PenLine, Plus } from "lucide-react";
+import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
 
@@ -13,173 +13,137 @@ const chipCls =
 interface ProfileCardProps {
   name: string;
   avatarUrl: string | null;
-  /** Cover image for the hero. Falls back to the gradient when null. */
-  bannerUrl: string | null;
   onOpenAvatarPicker: () => void;
-  onOpenBannerPicker: () => void;
   city: string | null;
   sector: string | null;
-  experienceLevel: string | null;
-  jobTitle: string | null;
+  /**
+   * Seniority plus designation, already composed for the pill beside the name
+   * ("Mid-Level Product Designer"), or null when neither is set.
+   */
+  roleLabel: string | null;
   bio: string;
   /** Read-only topic chips; topics are picked during onboarding. */
   interestNames: string[];
   /** The verified company on the profile, or null when none is set. */
   company: ProfileCompanyView | null;
-  /** Opens the company picker — the same flow as the one on Settings. */
-  onAddCompany: () => void;
+  /** Opens the company picker: adding when none is set, changing when one is. */
+  onEditCompany: () => void;
+  /** Takes the verified company off the profile for good. */
+  onRemoveCompany: () => void;
+  /** True while that removal is in flight. */
+  removingCompany: boolean;
+  /** Message from a failed removal, shown under the company card. */
+  companyError: string | null;
 }
 
 /**
- * The profile hero: banner, overlapping avatar, name, role/city line, bio,
- * interest chips and a compact stats block. Contact details and links live on
- * the Settings page (`app/dashboard/settings`).
+ * The profile hero: display picture, name, role line, city/sector line, the
+ * company card, bio and interest chips. It carries no cover image and no card
+ * chrome of its own —
+ * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
+ * the only image and everything here sits directly on the page. Contact details
+ * and links live on the Settings page (`app/dashboard/settings`).
  */
 export function ProfileCard({
   name,
   avatarUrl,
-  bannerUrl,
   onOpenAvatarPicker,
-  onOpenBannerPicker,
   city,
   sector,
-  experienceLevel,
-  jobTitle,
+  roleLabel,
   bio,
   interestNames,
   company,
-  onAddCompany,
+  onEditCompany,
+  onRemoveCompany,
+  removingCompany,
+  companyError,
 }: ProfileCardProps) {
-  // Role line: "Product Designer · Figma · Pune · …" — mirrors the reference
-  // layout. The company sits right after the role, and when there is none the
-  // same slot invites the member to add one instead.
+  // A stored picture that `AvatarImg` refuses to render (a retired generated
+  // avatar) is the same as having none: the hero shows its initials instead of
+  // an empty frame.
+  const hasPicture = Boolean(avatarUrl) && !isGeneratedProfilePicture(avatarUrl);
+
+  // Role line under the name: city and sector, separated by middots. The
+  // designation and seniority sit on the line above and the company has its own
+  // card below the block, so each kind of detail is stated once.
   const roleParts: React.ReactNode[] = [];
 
-  if (jobTitle) {
-    roleParts.push(
-      <span key="role" className="flex items-center gap-1">
-        <BadgeCheck strokeWidth={2.5} size={12} className="text-accent" />
-        {jobTitle}
-      </span>
-    );
-  }
-
-  if (company) {
-    // A deactivated company keeps whatever the member already had, but the
-    // name is no longer a link and the verified mark is gone: the company
-    // behind it is not something to advertise any more.
-    roleParts.push(
-      <Fragment key="company">
-        {company.isActive ? (
-          <Link
-            href={`/dashboard/companies/${company.slug}`}
-            className="flex items-center gap-1 transition-colors hover:text-accent"
-            title={company.domain ? `Verified via ${company.domain}` : "Company"}
-          >
-            <Building2 strokeWidth={2.5} size={12} className="text-accent" />
-            {company.name}
-          </Link>
-        ) : (
-          <span
-            className="flex items-center gap-1 text-foreground-subtle"
-            title="This company is no longer active"
-          >
-            <Building2 strokeWidth={2.5} size={12} />
-            {company.name}
-          </span>
-        )}
-        {company.isActive && company.domainVerified && <VerifiedMark label={false} size="xs" />}
-      </Fragment>
-    );
-  } else {
-    roleParts.push(
-      <button
-        key="add-company"
-        type="button"
-        onClick={onAddCompany}
-        className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-      >
-        <Plus strokeWidth={2.5} size={11} />
-        Add your company
-      </button>
-    );
-  }
-
+  // Both are plain text: the middot separators carry the line without a glyph
+  // in front of each place.
   if (city) {
-    roleParts.push(
-      <span key="city" className="flex items-center gap-1">
-        <MapPin strokeWidth={2.5} size={12} className="text-accent" />
-        {city}
-      </span>
-    );
+    roleParts.push(<span key="city">{city}</span>);
   }
 
   if (sector) {
-    roleParts.push(
-      <span key="sector" className="flex items-center gap-1">
-        <Layers strokeWidth={2.5} size={12} className="text-accent" />
-        {sector}
-      </span>
-    );
-  }
-
-  if (experienceLevel) {
-    roleParts.push(
-      <span key="experience" className="flex items-center gap-1 capitalize">
-        <Star strokeWidth={2.5} size={12} className="text-accent" />
-        {experienceLevel.replace(/_/g, " ")}
-      </span>
-    );
+    roleParts.push(<span key="sector">{sector}</span>);
   }
 
   return (
-    <section
-      aria-label="Profile details"
-      className="overflow-hidden rounded-2xl border border-border bg-surface"
-    >
-      {/* ── Banner — the member's cover image, or the gradient placeholder ── */}
-      <div className="relative h-32 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-orange-400 sm:h-36">
-        {bannerUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={bannerUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        )}
-        <button
-          type="button"
-          onClick={onOpenBannerPicker}
-          className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 font-body text-[11px] font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
-        >
-          <Camera strokeWidth={2.5} size={11} />
-          {bannerUrl ? "Edit banner" : "Add banner"}
-        </button>
-      </div>
+    <section aria-label="Profile details">
+      <div>
+        {/* ── Display picture — the only image in the hero ──
 
-      {/* ── Avatar + name ── */}
-      <div className="relative px-5 pb-5">
-        <div className="-mt-10 flex items-end gap-4">
-          <div className="group relative shrink-0">
-            <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-surface bg-accent/20">
-              <AvatarImg url={avatarUrl} name={name} size={72} className="h-full w-full object-cover" />
+            With a picture the frame is the rounded square of the reference.
+            Without one the hero falls back to the *same* round initials avatar
+            every other surface shows (`AvatarImg`), rather than a flat square
+            placeholder of its own — a member with no display picture should
+            read the same here as in the topbar. */}
+        <div className="group relative h-24 w-24 shrink-0">
+          {hasPicture ? (
+            <div className="h-24 w-24 overflow-hidden rounded-2xl border border-border bg-accent/20 shadow-lg">
+              <AvatarImg
+                url={avatarUrl}
+                name={name}
+                size={96}
+                rounded={false}
+                className="h-full w-full object-cover"
+              />
             </div>
-            {/* The avatar keeps its own upload — the banner is a separate image. */}
-            <button
-              type="button"
-              onClick={onOpenAvatarPicker}
-              aria-label="Change profile picture"
-              title="Change profile picture"
-              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
-            >
-              <Camera strokeWidth={2.5} size={18} />
-            </button>
-          </div>
+          ) : (
+            <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
+          )}
+          <button
+            type="button"
+            onClick={onOpenAvatarPicker}
+            aria-label="Change profile picture"
+            title="Change profile picture"
+            className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none ${
+              hasPicture ? "rounded-2xl" : "rounded-full"
+            }`}
+          >
+            <Camera strokeWidth={2.5} size={20} />
+          </button>
         </div>
 
-        {/* Name */}
-        <div className="mt-3 flex items-center gap-3">
-          <h2 className="truncate font-display text-xl font-semibold text-foreground">{name}</h2>
+        {/* Name and the role line stack on the left; Edit sits at the right
+            edge, level with the last line of that block — the same place the
+            reference header keeps its actions. */}
+        <div className="mt-4 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
+
+            {/* Seniority and designation on their own line under the name,
+                as plain text — no pill, no icon. Truncated so it always stays
+                a single line however long the label runs. */}
+            {roleLabel && (
+              <p className="mt-1.5 truncate font-body text-sm text-foreground-muted">{roleLabel}</p>
+            )}
+
+            {/* City · sector — omitted entirely when neither is set, rather
+                than leaving an empty line behind. */}
+            {roleParts.length > 0 && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
+                {roleParts.map((part, index) => (
+                  <Fragment key={index}>
+                    {index > 0 && <span aria-hidden="true">·</span>}
+                    {part}
+                  </Fragment>
+                ))}
+              </p>
+            )}
+          </div>
+
           <Link
             href="/dashboard/settings"
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
@@ -189,15 +153,71 @@ export function ProfileCard({
           </Link>
         </div>
 
-        {/* Role · company · city · sector · level */}
-        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
-          {roleParts.map((part, index) => (
-            <Fragment key={index}>
-              {index > 0 && <span aria-hidden="true">·</span>}
-              {part}
-            </Fragment>
-          ))}
-        </p>
+        {/* The company has its own card under the identity block, clear of the
+            city and sector line. It is also the only place the company can be
+            managed now that Settings keeps to contact details and links: the
+            card opens the picker to replace it, and Remove sits beside it.
+
+            A deactivated company keeps the name and stays open to replacing,
+            but loses the accent and the verified mark: the company behind it is
+            not something to advertise any more. */}
+        <div className="mt-3">
+          {company ? (
+            <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onEditCompany}
+                title={
+                  company.isActive
+                    ? company.domain
+                      ? `Verified via ${company.domain} — change it`
+                      : "Change company"
+                    : "This company is no longer active — add another"
+                }
+                className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
+                  company.isActive ? "text-foreground" : "text-foreground-subtle"
+                }`}
+              >
+                <Building2
+                  strokeWidth={2.5}
+                  size={14}
+                  className={`shrink-0 ${company.isActive ? "text-accent" : ""}`}
+                />
+                <span className="truncate">{company.name}</span>
+                {company.isActive && company.domainVerified && (
+                  <VerifiedMark label={false} size="xs" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onRemoveCompany}
+                disabled={removingCompany}
+                aria-label={`Remove ${company.name} from your profile`}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+              >
+                {removingCompany && (
+                  <Loader2 strokeWidth={2.5} size={11} className="animate-spin" />
+                )}
+                Remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onEditCompany}
+              className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+            >
+              <Plus strokeWidth={2.5} size={14} />
+              Add your company
+            </button>
+          )}
+
+          {companyError && (
+            <p className="mt-2 font-body text-xs text-foreground-muted" role="alert">
+              {companyError}
+            </p>
+          )}
+        </div>
 
         {/* Bio */}
         {bio && (

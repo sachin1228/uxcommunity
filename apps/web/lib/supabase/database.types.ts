@@ -1041,7 +1041,6 @@ export type Database = {
         Row: {
           avatar_source: string | null;
           avatar_url: string | null;
-          banner_url: string | null;
           bio: string | null;
           city_id: string | null;
           communities_auto_joined: boolean;
@@ -1058,7 +1057,6 @@ export type Database = {
         Insert: {
           avatar_source?: string | null;
           avatar_url?: string | null;
-          banner_url?: string | null;
           bio?: string | null;
           city_id?: string | null;
           communities_auto_joined?: boolean;
@@ -1075,7 +1073,6 @@ export type Database = {
         Update: {
           avatar_source?: string | null;
           avatar_url?: string | null;
-          banner_url?: string | null;
           bio?: string | null;
           city_id?: string | null;
           communities_auto_joined?: boolean;
