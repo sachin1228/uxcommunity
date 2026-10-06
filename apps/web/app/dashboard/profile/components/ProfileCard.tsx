@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, MapPin, PenLine, Layers, BadgeCheck, Plus } from "lucide-react";
+import { Building2, Camera, MapPin, PenLine, Layers, Plus } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -31,8 +31,8 @@ interface ProfileCardProps {
 }
 
 /**
- * The profile hero: display picture, name with the role pill, company/city
- * line, bio and interest chips. It carries no cover image and no card chrome —
+ * The profile hero: display picture, name, role line, company/city line, bio
+ * and interest chips. It carries no cover image and no card chrome —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
  * the only image and everything here sits directly on the page. Contact details
  * and links live on the Settings page (`app/dashboard/settings`).
@@ -146,14 +146,11 @@ export function ProfileCard({
           <div className="min-w-0">
             <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
-            {/* Seniority and designation on their own line under the name. The
-                chip is content-width (`w-fit`) so it stays a pill rather than
-                stretching across the column. */}
+            {/* Seniority and designation on their own line under the name,
+                as plain text — no pill, no icon. Truncated so it always stays
+                a single line however long the label runs. */}
             {roleLabel && (
-              <span className={`${chipCls} mt-2 w-fit`}>
-                <BadgeCheck strokeWidth={2.5} size={11} className="text-accent" />
-                {roleLabel}
-              </span>
+              <p className="mt-1.5 truncate font-body text-sm text-foreground-muted">{roleLabel}</p>
             )}
 
             {/* Company · city · sector */}
