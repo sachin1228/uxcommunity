@@ -131,13 +131,11 @@ export function ProfileClient({
           carries no extra opacity of its own. */}
       <div className="grid-dots pointer-events-none absolute inset-0" aria-hidden="true" />
 
-      <div className="relative mx-auto max-w-3xl px-4 py-8 lg:px-6">
-        <div className="mb-8">
-          <h1 className="font-display text-2xl font-semibold text-foreground">Your Profile</h1>
-          <p className="mt-0.5 font-body text-sm text-foreground-muted">
-            How you appear to others in the community
-          </p>
-        </div>
+      {/* The display picture leads the page with open space above it, the way
+          the reference pane opens. The title stays in the document outline and
+          keeps naming the browser tab (see `page.tsx` metadata). */}
+      <div className="relative mx-auto max-w-3xl px-4 pt-24 pb-12 lg:px-6">
+        <h1 className="sr-only">Your Profile</h1>
 
         <div className="mb-6">
           <ProfileCard
