@@ -8,7 +8,6 @@ import {
   Calendar,
   Check,
   Copy,
-  Globe2,
   Hash,
   ImagePlus,
   Lock,
@@ -20,6 +19,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityNameBadges } from "./CommunityBadges";
 import {
@@ -409,7 +409,7 @@ export function CommunitySettingsView({
             </h3>
             <div className="grid gap-2">
               {([
-                ["public",  Globe2, "Public",  "Anyone can discover and join"],
+                ["public",  EarthGlyph, "Public",  "Anyone can discover and join"],
                 ["private", Lock,   "Private", "Invite-only — you approve members"],
               ] as const).map(([value, Icon, label, copy]) => {
                 const active = isPrivate === (value === "private");

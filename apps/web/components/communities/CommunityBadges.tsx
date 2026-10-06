@@ -1,4 +1,5 @@
-import { Globe2, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
+import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import {
   communityNameBadges,
   type CommunityVisibilityIcon,
@@ -63,7 +64,7 @@ export function CommunityVisibilityIcon({
   className?: string;
 }) {
   const label = kind === "lock" ? "Private community" : "Public community";
-  const Icon = kind === "lock" ? Lock : Globe2;
+  const Icon = kind === "lock" ? Lock : EarthGlyph;
 
   return (
     // The label lives on the wrapper so the answer to "public or private?" is

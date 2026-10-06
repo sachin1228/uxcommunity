@@ -5,7 +5,6 @@ import {
   BookOpen,
   Calendar,
   Check,
-  Globe2,
   Hash,
   ImagePlus,
   Lock,
@@ -14,6 +13,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
@@ -250,7 +250,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
               </div>
               <div className="grid gap-2">
                 {([
-                  ["public", Globe2, "Public", "Anyone can discover and join"],
+                  ["public", EarthGlyph, "Public", "Anyone can discover and join"],
                   ["private", Lock, "Private", "Invite-only and owner managed"],
                 ] as const).map(([value, Icon, label, copy]) => {
                   const active = privacy === value;

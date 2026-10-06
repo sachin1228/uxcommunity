@@ -1,8 +1,12 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef } from "react";
-import { Globe2, Lock, type LucideIcon } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef, type ComponentType } from "react";
+import { Lock } from "lucide-react";
+import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { HOME_FEED_TAB_SCOPES } from "@/lib/feeds/home-feed-options";
+
+/** Small monochrome glyphs, sized like lucide icons. */
+type IconComponent = ComponentType<{ size?: string | number; strokeWidth?: string | number; className?: string }>;
 
 /** Labels for the feed source selector (see lib/feeds/home-feed-options). */
 const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
@@ -10,8 +14,8 @@ const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
   communities: "Your Communities",
 };
 /** Same glyphs the sidebar rows use for a community's visibility. */
-const SCOPE_ICONS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], LucideIcon> = {
-  public: Globe2,
+const SCOPE_ICONS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], IconComponent> = {
+  public: EarthGlyph,
   communities: Lock,
 };
 const SCOPES = HOME_FEED_TAB_SCOPES.map((value) => ({
@@ -39,7 +43,7 @@ const MOTION_EASING = "cubic-bezier(.22, 1, .36, 1)";
 interface Option {
   value: string;
   label: string;
-  icon: LucideIcon;
+  icon: IconComponent;
 }
 
 interface SwitcherProps {

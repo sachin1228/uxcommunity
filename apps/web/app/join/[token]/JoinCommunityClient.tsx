@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { invalidateOnJoin } from "@/lib/communities/cache";
-import { Lock, Globe2, Users, Check, ImagePlus, MessageSquare } from "lucide-react";
+import { Lock, Users, Check, ImagePlus, MessageSquare } from "lucide-react";
+import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { Spinner } from "@/components/ui/Spinner";
 import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
@@ -93,7 +94,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
             {community.is_private ? (
               <><Lock strokeWidth={2.5} size={11} /> Private community</>
             ) : (
-              <><Globe2 strokeWidth={2.5} size={11} /> Public community</>
+              <><EarthGlyph size={11} /> Public community</>
             )}
           </span>
         </div>
