@@ -162,7 +162,7 @@
   --filter-focus:        #0A0A0A;
 
   --grid-line-color: rgba(0, 0, 0, 0.06);
-  --grid-dot-color:  rgba(0, 0, 0, 0.12);
+  --grid-dot-color:  rgba(0, 0, 0, 0.16);
   --grid-size:       28px;
 
   /* Modal surfaces — Geist panel ring + drop (light) */
@@ -333,7 +333,7 @@
     --filter-focus:        #FFFFFF;
 
     --grid-line-color: rgba(255, 255, 255, 0.04);
-    --grid-dot-color:  rgba(255, 255, 255, 0.08);
+    --grid-dot-color:  rgba(255, 255, 255, 0.14);
 
     /* Modal surfaces — Geist panel ring + drop (dark) */
     --modal-ring: rgba(255, 255, 255, 0.10);
