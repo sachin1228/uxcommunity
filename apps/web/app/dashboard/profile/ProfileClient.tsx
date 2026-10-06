@@ -56,6 +56,8 @@ export function ProfileClient({
   // edits it, and a copy in state would keep the first render's value forever,
   // including an empty one, which reads as a nameless hero.
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
+  const [removingCompany, setRemovingCompany] = useState(false);
+  const [companyError, setCompanyError] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState(pendingCompany);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
 
@@ -129,6 +131,27 @@ export function ProfileClient({
     setPictureError(null);
   }
 
+  // The hero owns the company card, so it also owns taking the company away:
+  // the picker covers adding and changing, and nothing else deletes a
+  // membership since Settings stopped carrying the Work section.
+  async function handleRemoveCompany() {
+    setRemovingCompany(true);
+    setCompanyError(null);
+    try {
+      const response = await fetch("/api/companies/membership", { method: "DELETE" });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { message?: string };
+        setCompanyError(data.message ?? "Couldn't remove the company. Please try again.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setCompanyError("Network error. Please try again.");
+    } finally {
+      setRemovingCompany(false);
+    }
+  }
+
   function handleRemoveUpload() {
     if (uploadPreview) URL.revokeObjectURL(uploadPreview);
     setUploadPreview(null);
@@ -159,7 +182,13 @@ export function ProfileClient({
             bio={initialBio}
             interestNames={interestNames}
             company={initialCompany}
-            onAddCompany={() => setShowCompanyPicker(true)}
+            onEditCompany={() => {
+              setCompanyError(null);
+              setShowCompanyPicker(true);
+            }}
+            onRemoveCompany={handleRemoveCompany}
+            removingCompany={removingCompany}
+            companyError={companyError}
           />
         </div>
 

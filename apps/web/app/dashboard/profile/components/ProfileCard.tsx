@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, PenLine, Plus } from "lucide-react";
+import { Building2, Camera, Loader2, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -26,8 +26,14 @@ interface ProfileCardProps {
   interestNames: string[];
   /** The verified company on the profile, or null when none is set. */
   company: ProfileCompanyView | null;
-  /** Opens the company picker — the same flow as the one on Settings. */
-  onAddCompany: () => void;
+  /** Opens the company picker: adding when none is set, changing when one is. */
+  onEditCompany: () => void;
+  /** Takes the verified company off the profile for good. */
+  onRemoveCompany: () => void;
+  /** True while that removal is in flight. */
+  removingCompany: boolean;
+  /** Message from a failed removal, shown under the company card. */
+  companyError: string | null;
 }
 
 /**
@@ -48,7 +54,10 @@ export function ProfileCard({
   bio,
   interestNames,
   company,
-  onAddCompany,
+  onEditCompany,
+  onRemoveCompany,
+  removingCompany,
+  companyError,
 }: ProfileCardProps) {
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
@@ -145,43 +154,68 @@ export function ProfileCard({
         </div>
 
         {/* The company has its own card under the identity block, clear of the
-            city and sector line. A deactivated company keeps the name but loses
-            the link and the verified mark: the company behind it is not
-            something to advertise any more. */}
+            city and sector line. It is also the only place the company can be
+            managed now that Settings keeps to contact details and links: the
+            card opens the picker to replace it, and Remove sits beside it.
+
+            A deactivated company keeps the name and stays open to replacing,
+            but loses the accent and the verified mark: the company behind it is
+            not something to advertise any more. */}
         <div className="mt-3">
           {company ? (
-            <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2.5">
-              {company.isActive ? (
-                <Link
-                  href={`/dashboard/companies/${company.slug}`}
-                  className="flex min-w-0 items-center gap-1.5 font-body text-sm text-foreground transition-colors hover:text-accent"
-                  title={company.domain ? `Verified via ${company.domain}` : "Company"}
-                >
-                  <Building2 strokeWidth={2.5} size={14} className="shrink-0 text-accent" />
-                  <span className="truncate">{company.name}</span>
-                </Link>
-              ) : (
-                <span
-                  className="flex min-w-0 items-center gap-1.5 font-body text-sm text-foreground-subtle"
-                  title="This company is no longer active"
-                >
-                  <Building2 strokeWidth={2.5} size={14} className="shrink-0" />
-                  <span className="truncate">{company.name}</span>
-                </span>
-              )}
-              {company.isActive && company.domainVerified && (
-                <VerifiedMark label={false} size="xs" />
-              )}
+            <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onEditCompany}
+                title={
+                  company.isActive
+                    ? company.domain
+                      ? `Verified via ${company.domain} — change it`
+                      : "Change company"
+                    : "This company is no longer active — add another"
+                }
+                className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
+                  company.isActive ? "text-foreground" : "text-foreground-subtle"
+                }`}
+              >
+                <Building2
+                  strokeWidth={2.5}
+                  size={14}
+                  className={`shrink-0 ${company.isActive ? "text-accent" : ""}`}
+                />
+                <span className="truncate">{company.name}</span>
+                {company.isActive && company.domainVerified && (
+                  <VerifiedMark label={false} size="xs" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onRemoveCompany}
+                disabled={removingCompany}
+                aria-label={`Remove ${company.name} from your profile`}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+              >
+                {removingCompany && (
+                  <Loader2 strokeWidth={2.5} size={11} className="animate-spin" />
+                )}
+                Remove
+              </button>
             </div>
           ) : (
             <button
               type="button"
-              onClick={onAddCompany}
+              onClick={onEditCompany}
               className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
             >
               <Plus strokeWidth={2.5} size={14} />
               Add your company
             </button>
+          )}
+
+          {companyError && (
+            <p className="mt-2 font-body text-xs text-foreground-muted" role="alert">
+              {companyError}
+            </p>
           )}
         </div>
 
