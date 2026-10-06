@@ -144,18 +144,17 @@ export function ProfileCard({
             reference header keeps its actions. */}
         <div className="mt-4 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
+            <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
-              {/* Seniority and designation in one pill, like the role chip the
-                  reference header keeps beside the name. */}
-              {roleLabel && (
-                <span className={`${chipCls} shrink-0`}>
-                  <BadgeCheck strokeWidth={2.5} size={11} className="text-accent" />
-                  {roleLabel}
-                </span>
-              )}
-            </div>
+            {/* Seniority and designation on their own line under the name. The
+                chip is content-width (`w-fit`) so it stays a pill rather than
+                stretching across the column. */}
+            {roleLabel && (
+              <span className={`${chipCls} mt-2 w-fit`}>
+                <BadgeCheck strokeWidth={2.5} size={11} className="text-accent" />
+                {roleLabel}
+              </span>
+            )}
 
             {/* Company · city · sector */}
             <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
