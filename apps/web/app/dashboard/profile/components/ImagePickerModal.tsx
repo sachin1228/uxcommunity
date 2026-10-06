@@ -62,10 +62,10 @@ export function ImagePickerModal({
   const copy = COPY[variant];
   const isBanner = variant === "banner";
 
-  // A banner is a wide strip; the avatar is a circle.
+  // A banner is a wide strip; the avatar previews in the hero's rounded square.
   const previewCls = isBanner
     ? "aspect-[16/5] w-full rounded-lg object-cover ring-2 ring-accent"
-    : "size-20 rounded-full object-cover ring-2 ring-accent";
+    : "size-20 rounded-2xl object-cover ring-2 ring-accent";
 
   return (
     <ModalPortal>
@@ -171,7 +171,7 @@ export function ImagePickerModal({
                     disabled={removing}
                     className="mt-3 w-full text-center font-body text-xs text-foreground-muted transition-colors hover:text-red-400 disabled:opacity-50"
                   >
-                    {removing ? "Removing…" : "Remove banner and use the gradient"}
+                    {removing ? "Removing…" : "Remove banner"}
                   </button>
                 )}
               </>

@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, MapPin, PenLine, Star, Layers, BadgeCheck, Plus } from "lucide-react";
+import { Building2, Camera, MapPin, PenLine, Layers, BadgeCheck, Plus } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -13,14 +13,14 @@ const chipCls =
 interface ProfileCardProps {
   name: string;
   avatarUrl: string | null;
-  /** Cover image for the hero. Falls back to the gradient when null. */
-  bannerUrl: string | null;
   onOpenAvatarPicker: () => void;
-  onOpenBannerPicker: () => void;
   city: string | null;
   sector: string | null;
-  experienceLevel: string | null;
-  jobTitle: string | null;
+  /**
+   * Seniority plus designation, already composed for the pill beside the name
+   * ("Mid-Level Product Designer"), or null when neither is set.
+   */
+  roleLabel: string | null;
   bio: string;
   /** Read-only topic chips; topics are picked during onboarding. */
   interestNames: string[];
@@ -31,38 +31,29 @@ interface ProfileCardProps {
 }
 
 /**
- * The profile hero: banner, overlapping avatar, name, role/city line, bio,
- * interest chips and a compact stats block. Contact details and links live on
- * the Settings page (`app/dashboard/settings`).
+ * The profile hero: display picture, name with the role pill, company/city
+ * line, bio and interest chips. It carries no cover image and no card chrome —
+ * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
+ * the only image and everything here sits directly on the page. Contact details
+ * and links live on the Settings page (`app/dashboard/settings`).
  */
 export function ProfileCard({
   name,
   avatarUrl,
-  bannerUrl,
   onOpenAvatarPicker,
-  onOpenBannerPicker,
   city,
   sector,
-  experienceLevel,
-  jobTitle,
+  roleLabel,
   bio,
   interestNames,
   company,
   onAddCompany,
 }: ProfileCardProps) {
-  // Role line: "Product Designer · Figma · Pune · …" — mirrors the reference
-  // layout. The company sits right after the role, and when there is none the
-  // same slot invites the member to add one instead.
+  // Role line under the name: company, city, sector. The designation and the
+  // seniority live in the pill beside the name instead, so the member's role is
+  // stated in one place. When there is no company the same slot invites the
+  // member to add one.
   const roleParts: React.ReactNode[] = [];
-
-  if (jobTitle) {
-    roleParts.push(
-      <span key="role" className="flex items-center gap-1">
-        <BadgeCheck strokeWidth={2.5} size={12} className="text-accent" />
-        {jobTitle}
-      </span>
-    );
-  }
 
   if (company) {
     // A deactivated company keeps whatever the member already had, but the
@@ -123,63 +114,60 @@ export function ProfileCard({
     );
   }
 
-  if (experienceLevel) {
-    roleParts.push(
-      <span key="experience" className="flex items-center gap-1 capitalize">
-        <Star strokeWidth={2.5} size={12} className="text-accent" />
-        {experienceLevel.replace(/_/g, " ")}
-      </span>
-    );
-  }
-
   return (
-    <section
-      aria-label="Profile details"
-      className="overflow-hidden rounded-2xl border border-border bg-surface"
-    >
-      {/* ── Banner — the member's cover image, or the gradient placeholder ── */}
-      <div className="relative h-32 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-orange-400 sm:h-36">
-        {bannerUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={bannerUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        )}
-        <button
-          type="button"
-          onClick={onOpenBannerPicker}
-          className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 font-body text-[11px] font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
-        >
-          <Camera strokeWidth={2.5} size={11} />
-          {bannerUrl ? "Edit banner" : "Add banner"}
-        </button>
-      </div>
-
-      {/* ── Avatar + name ── */}
-      <div className="relative px-5 pb-5">
-        <div className="-mt-10 flex items-end gap-4">
-          <div className="group relative shrink-0">
-            <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-surface bg-accent/20">
-              <AvatarImg url={avatarUrl} name={name} size={72} className="h-full w-full object-cover" />
-            </div>
-            {/* The avatar keeps its own upload — the banner is a separate image. */}
-            <button
-              type="button"
-              onClick={onOpenAvatarPicker}
-              aria-label="Change profile picture"
-              title="Change profile picture"
-              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
-            >
-              <Camera strokeWidth={2.5} size={18} />
-            </button>
+    <section aria-label="Profile details">
+      <div>
+        {/* ── Display picture — the only image in the hero ── */}
+        <div className="group relative h-24 w-24 shrink-0">
+          <div className="h-24 w-24 overflow-hidden rounded-2xl border border-border bg-accent/20 shadow-lg">
+            <AvatarImg
+              url={avatarUrl}
+              name={name}
+              size={96}
+              rounded={false}
+              className="h-full w-full object-cover"
+            />
           </div>
+          <button
+            type="button"
+            onClick={onOpenAvatarPicker}
+            aria-label="Change profile picture"
+            title="Change profile picture"
+            className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+          >
+            <Camera strokeWidth={2.5} size={20} />
+          </button>
         </div>
 
-        {/* Name */}
-        <div className="mt-3 flex items-center gap-3">
-          <h2 className="truncate font-display text-xl font-semibold text-foreground">{name}</h2>
+        {/* Name and the role line stack on the left; Edit sits at the right
+            edge, level with the last line of that block — the same place the
+            reference header keeps its actions. */}
+        <div className="mt-4 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
+
+              {/* Seniority and designation in one pill, like the role chip the
+                  reference header keeps beside the name. */}
+              {roleLabel && (
+                <span className={`${chipCls} shrink-0`}>
+                  <BadgeCheck strokeWidth={2.5} size={11} className="text-accent" />
+                  {roleLabel}
+                </span>
+              )}
+            </div>
+
+            {/* Company · city · sector */}
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
+              {roleParts.map((part, index) => (
+                <Fragment key={index}>
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  {part}
+                </Fragment>
+              ))}
+            </p>
+          </div>
+
           <Link
             href="/dashboard/settings"
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
@@ -188,16 +176,6 @@ export function ProfileCard({
             Edit Profile
           </Link>
         </div>
-
-        {/* Role · company · city · sector · level */}
-        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
-          {roleParts.map((part, index) => (
-            <Fragment key={index}>
-              {index > 0 && <span aria-hidden="true">·</span>}
-              {part}
-            </Fragment>
-          ))}
-        </p>
 
         {/* Bio */}
         {bio && (
