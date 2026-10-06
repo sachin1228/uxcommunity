@@ -5,33 +5,7 @@ import { Upload, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 
-type Variant = "avatar" | "banner";
-
-const COPY: Record<
-  Variant,
-  { title: string; dialogId: string; idle: string; ready: string; save: string; remove: string }
-> = {
-  avatar: {
-    title: "Change profile picture",
-    dialogId: "profile-picture-title",
-    idle: "Upload a profile picture",
-    ready: "Profile picture ready",
-    save: "Save profile picture",
-    remove: "Remove picture",
-  },
-  banner: {
-    title: "Change banner",
-    dialogId: "profile-banner-title",
-    idle: "Upload a banner image",
-    ready: "Banner ready",
-    save: "Save banner",
-    remove: "Remove banner",
-  },
-};
-
 interface ImagePickerModalProps {
-  /** Which image the dialog edits — the avatar or the hero banner. */
-  variant: Variant;
   uploadPreview: string | null;
   saving: boolean;
   error: string | null;
@@ -39,14 +13,14 @@ interface ImagePickerModalProps {
   onRemoveUpload: () => void;
   onSave: () => void;
   onClose: () => void;
-  /** Banner only — the banner already on the profile, if any. */
-  existingUrl?: string | null;
-  onRemoveExisting?: () => void;
-  removing?: boolean;
 }
 
+/**
+ * The profile picture picker: choose a file, preview it in the hero's rounded
+ * square, then save or discard. The profile has no other image, so there is one
+ * flow here rather than a variant per slot.
+ */
 export function ImagePickerModal({
-  variant,
   uploadPreview,
   saving,
   error,
@@ -54,18 +28,8 @@ export function ImagePickerModal({
   onRemoveUpload,
   onSave,
   onClose,
-  existingUrl = null,
-  onRemoveExisting,
-  removing = false,
 }: ImagePickerModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const copy = COPY[variant];
-  const isBanner = variant === "banner";
-
-  // A banner is a wide strip; the avatar previews in the hero's rounded square.
-  const previewCls = isBanner
-    ? "aspect-[16/5] w-full rounded-lg object-cover ring-2 ring-accent"
-    : "size-20 rounded-2xl object-cover ring-2 ring-accent";
 
   return (
     <ModalPortal>
@@ -78,17 +42,17 @@ export function ImagePickerModal({
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby={copy.dialogId}
+          aria-labelledby="profile-picture-title"
           className="modal-panel w-full max-w-lg overflow-hidden"
         >
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
-            <h2 id={copy.dialogId} className="font-display text-base font-semibold text-foreground">
-              {copy.title}
+            <h2 id="profile-picture-title" className="font-display text-base font-semibold text-foreground">
+              Change profile picture
             </h2>
             <button
               type="button"
               onClick={onClose}
-              aria-label={`Close ${isBanner ? "banner" : "profile picture"} dialog`}
+              aria-label="Close profile picture dialog"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               <X strokeWidth={2.5} size={16} aria-hidden="true" />
@@ -111,70 +75,37 @@ export function ImagePickerModal({
             />
 
             {uploadPreview ? (
-              isBanner ? (
-                <div className="flex flex-col gap-3 py-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={uploadPreview} alt="Banner preview" className={previewCls} />
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-body text-xs text-foreground-muted">
-                      {copy.ready} · JPEG, PNG or WebP · max 5 MB
-                    </p>
-                    <button
-                      type="button"
-                      onClick={onRemoveUpload}
-                      className="shrink-0 font-body text-xs text-foreground-muted transition-colors hover:text-red-400"
-                    >
-                      Choose another
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4 py-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={uploadPreview} alt="Profile picture preview" className={previewCls} />
-                  <div className="flex flex-col gap-1">
-                    <p className="font-body text-sm font-medium text-foreground">{copy.ready}</p>
-                    <p className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP · max 5 MB</p>
-                    <button
-                      type="button"
-                      onClick={onRemoveUpload}
-                      className="w-fit font-body text-xs text-foreground-muted transition-colors hover:text-red-400"
-                    >
-                      {copy.remove}
-                    </button>
-                  </div>
-                </div>
-              )
-            ) : (
-              <>
-                {isBanner && existingUrl && (
-                  <div className="mb-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={existingUrl} alt="Current banner" className={previewCls} />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent/50 hover:text-foreground"
-                >
-                  <Upload strokeWidth={2.5} aria-hidden="true" />
-                  <span className="font-body text-sm font-medium">{copy.idle}</span>
-                  <span className="font-body text-xs text-foreground-subtle">
-                    {isBanner ? "Wide images look best · " : ""}JPEG, PNG or WebP · max 5 MB
-                  </span>
-                </button>
-                {isBanner && existingUrl && onRemoveExisting && (
+              <div className="flex items-center gap-4 py-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={uploadPreview}
+                  alt="Profile picture preview"
+                  className="size-20 rounded-2xl object-cover ring-2 ring-accent"
+                />
+                <div className="flex flex-col gap-1">
+                  <p className="font-body text-sm font-medium text-foreground">Profile picture ready</p>
+                  <p className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP · max 5 MB</p>
                   <button
                     type="button"
-                    onClick={onRemoveExisting}
-                    disabled={removing}
-                    className="mt-3 w-full text-center font-body text-xs text-foreground-muted transition-colors hover:text-red-400 disabled:opacity-50"
+                    onClick={onRemoveUpload}
+                    className="w-fit font-body text-xs text-foreground-muted transition-colors hover:text-red-400"
                   >
-                    {removing ? "Removing…" : "Remove banner"}
+                    Remove picture
                   </button>
-                )}
-              </>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent/50 hover:text-foreground"
+              >
+                <Upload strokeWidth={2.5} aria-hidden="true" />
+                <span className="font-body text-sm font-medium">Upload a profile picture</span>
+                <span className="font-body text-xs text-foreground-subtle">
+                  JPEG, PNG or WebP · max 5 MB
+                </span>
+              </button>
             )}
           </div>
 
@@ -189,7 +120,7 @@ export function ImagePickerModal({
               className="modal-btn modal-btn-primary"
             >
               {saving && <Spinner className="size-3.5" />}
-              {saving ? "Saving…" : copy.save}
+              {saving ? "Saving…" : "Save profile picture"}
             </button>
           </div>
         </div>

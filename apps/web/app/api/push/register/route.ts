@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createServiceClient();
-  // `as never` matches the pattern used for columns the generated client types
-  // do not know about yet (see app/api/profile/banner/route.ts).
+  // `as never` matches the pattern used elsewhere in the app to satisfy the
+  // untyped supabase-js client.
   const { error } = await db
     .from("push_tokens")
     .upsert(

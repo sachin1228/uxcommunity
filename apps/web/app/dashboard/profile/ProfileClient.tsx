@@ -156,7 +156,6 @@ export function ProfileClient({
 
       {showPicturePicker && (
         <ImagePickerModal
-          variant="avatar"
           uploadPreview={uploadPreview}
           saving={pictureSaving}
           error={pictureError}
