@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { Building2, Camera, PenLine, Plus } from "lucide-react";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
 
@@ -50,6 +50,11 @@ export function ProfileCard({
   company,
   onAddCompany,
 }: ProfileCardProps) {
+  // A stored picture that `AvatarImg` refuses to render (a retired generated
+  // avatar) is the same as having none: the hero shows its initials instead of
+  // an empty frame.
+  const hasPicture = Boolean(avatarUrl) && !isGeneratedProfilePicture(avatarUrl);
+
   // Role line under the name: city and sector, separated by middots. The
   // designation and seniority sit on the line above and the company has its own
   // card below the block, so each kind of detail is stated once.
@@ -68,23 +73,35 @@ export function ProfileCard({
   return (
     <section aria-label="Profile details">
       <div>
-        {/* ── Display picture — the only image in the hero ── */}
+        {/* ── Display picture — the only image in the hero ──
+
+            With a picture the frame is the rounded square of the reference.
+            Without one the hero falls back to the *same* round initials avatar
+            every other surface shows (`AvatarImg`), rather than a flat square
+            placeholder of its own — a member with no display picture should
+            read the same here as in the topbar. */}
         <div className="group relative h-24 w-24 shrink-0">
-          <div className="h-24 w-24 overflow-hidden rounded-2xl border border-border bg-accent/20 shadow-lg">
-            <AvatarImg
-              url={avatarUrl}
-              name={name}
-              size={96}
-              rounded={false}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          {hasPicture ? (
+            <div className="h-24 w-24 overflow-hidden rounded-2xl border border-border bg-accent/20 shadow-lg">
+              <AvatarImg
+                url={avatarUrl}
+                name={name}
+                size={96}
+                rounded={false}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : (
+            <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
+          )}
           <button
             type="button"
             onClick={onOpenAvatarPicker}
             aria-label="Change profile picture"
             title="Change profile picture"
-            className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+            className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none ${
+              hasPicture ? "rounded-2xl" : "rounded-full"
+            }`}
           >
             <Camera strokeWidth={2.5} size={20} />
           </button>

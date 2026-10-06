@@ -49,12 +49,24 @@ export function ProfileClient({
   pendingCompany,
 }: Props) {
   const router = useRouter();
-  const [name] = useState(initialName);
   // The server is the source of truth: the client only mirrors what the last
   // read returned, and refreshes the page after a membership changes.
+  //
+  // `initialName` is read straight from that render — nothing on this screen
+  // edits it, and a copy in state would keep the first render's value forever,
+  // including an empty one, which reads as a nameless hero.
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(pendingCompany);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+
+  // A newer server render (a refresh, a navigation) supersedes whatever an
+  // upload left in state. Adjusted during render — an effect would re-render a
+  // second time for props it already has.
+  const [serverAvatarUrl, setServerAvatarUrl] = useState(initialAvatarUrl);
+  if (serverAvatarUrl !== initialAvatarUrl) {
+    setServerAvatarUrl(initialAvatarUrl);
+    setAvatarUrl(initialAvatarUrl);
+  }
   const [showPicturePicker, setShowPicturePicker] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -138,7 +150,7 @@ export function ProfileClient({
 
         <div className="mb-6">
           <ProfileCard
-            name={name}
+            name={initialName}
             avatarUrl={avatarUrl}
             onOpenAvatarPicker={() => setShowPicturePicker(true)}
             city={city}
