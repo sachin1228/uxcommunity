@@ -31,8 +31,9 @@ interface ProfileCardProps {
 }
 
 /**
- * The profile hero: display picture, name, role line, company/city line, bio
- * and interest chips. It carries no cover image and no card chrome —
+ * The profile hero: display picture, name, role line, city/sector line, the
+ * company card, bio and interest chips. It carries no cover image and no card
+ * chrome of its own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
  * the only image and everything here sits directly on the page. Contact details
  * and links live on the Settings page (`app/dashboard/settings`).
@@ -49,55 +50,13 @@ export function ProfileCard({
   company,
   onAddCompany,
 }: ProfileCardProps) {
-  // Role line under the name: company, city, sector, separated by middots. The
-  // designation and seniority sit on the line above, so the member's role is
-  // stated in one place. When there is no company the same slot invites the
-  // member to add one.
+  // Role line under the name: city and sector, separated by middots. The
+  // designation and seniority sit on the line above and the company has its own
+  // card below the block, so each kind of detail is stated once.
   const roleParts: React.ReactNode[] = [];
 
-  if (company) {
-    // A deactivated company keeps whatever the member already had, but the
-    // name is no longer a link and the verified mark is gone: the company
-    // behind it is not something to advertise any more.
-    roleParts.push(
-      <Fragment key="company">
-        {company.isActive ? (
-          <Link
-            href={`/dashboard/companies/${company.slug}`}
-            className="flex items-center gap-1 transition-colors hover:text-accent"
-            title={company.domain ? `Verified via ${company.domain}` : "Company"}
-          >
-            <Building2 strokeWidth={2.5} size={12} className="text-accent" />
-            {company.name}
-          </Link>
-        ) : (
-          <span
-            className="flex items-center gap-1 text-foreground-subtle"
-            title="This company is no longer active"
-          >
-            <Building2 strokeWidth={2.5} size={12} />
-            {company.name}
-          </span>
-        )}
-        {company.isActive && company.domainVerified && <VerifiedMark label={false} size="xs" />}
-      </Fragment>
-    );
-  } else {
-    roleParts.push(
-      <button
-        key="add-company"
-        type="button"
-        onClick={onAddCompany}
-        className="flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-      >
-        <Plus strokeWidth={2.5} size={11} />
-        Add your company
-      </button>
-    );
-  }
-
-  // City and sector are plain text: the middot separators carry the line
-  // without a glyph in front of each place.
+  // Both are plain text: the middot separators carry the line without a glyph
+  // in front of each place.
   if (city) {
     roleParts.push(<span key="city">{city}</span>);
   }
@@ -145,15 +104,18 @@ export function ProfileCard({
               <p className="mt-1.5 truncate font-body text-sm text-foreground-muted">{roleLabel}</p>
             )}
 
-            {/* Company · city · sector */}
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
-              {roleParts.map((part, index) => (
-                <Fragment key={index}>
-                  {index > 0 && <span aria-hidden="true">·</span>}
-                  {part}
-                </Fragment>
-              ))}
-            </p>
+            {/* City · sector — omitted entirely when neither is set, rather
+                than leaving an empty line behind. */}
+            {roleParts.length > 0 && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
+                {roleParts.map((part, index) => (
+                  <Fragment key={index}>
+                    {index > 0 && <span aria-hidden="true">·</span>}
+                    {part}
+                  </Fragment>
+                ))}
+              </p>
+            )}
           </div>
 
           <Link
@@ -163,6 +125,47 @@ export function ProfileCard({
             <PenLine strokeWidth={2.5} size={11} />
             Edit Profile
           </Link>
+        </div>
+
+        {/* The company has its own card under the identity block, clear of the
+            city and sector line. A deactivated company keeps the name but loses
+            the link and the verified mark: the company behind it is not
+            something to advertise any more. */}
+        <div className="mt-3">
+          {company ? (
+            <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2.5">
+              {company.isActive ? (
+                <Link
+                  href={`/dashboard/companies/${company.slug}`}
+                  className="flex min-w-0 items-center gap-1.5 font-body text-sm text-foreground transition-colors hover:text-accent"
+                  title={company.domain ? `Verified via ${company.domain}` : "Company"}
+                >
+                  <Building2 strokeWidth={2.5} size={14} className="shrink-0 text-accent" />
+                  <span className="truncate">{company.name}</span>
+                </Link>
+              ) : (
+                <span
+                  className="flex min-w-0 items-center gap-1.5 font-body text-sm text-foreground-subtle"
+                  title="This company is no longer active"
+                >
+                  <Building2 strokeWidth={2.5} size={14} className="shrink-0" />
+                  <span className="truncate">{company.name}</span>
+                </span>
+              )}
+              {company.isActive && company.domainVerified && (
+                <VerifiedMark label={false} size="xs" />
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onAddCompany}
+              className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+            >
+              <Plus strokeWidth={2.5} size={14} />
+              Add your company
+            </button>
+          )}
         </div>
 
         {/* Bio */}
