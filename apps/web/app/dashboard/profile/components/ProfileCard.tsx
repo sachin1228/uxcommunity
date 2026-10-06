@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, MapPin, PenLine, Layers, Plus } from "lucide-react";
+import { Building2, Camera, PenLine, Plus } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -49,8 +49,8 @@ export function ProfileCard({
   company,
   onAddCompany,
 }: ProfileCardProps) {
-  // Role line under the name: company, city, sector. The designation and the
-  // seniority live in the pill beside the name instead, so the member's role is
+  // Role line under the name: company, city, sector, separated by middots. The
+  // designation and seniority sit on the line above, so the member's role is
   // stated in one place. When there is no company the same slot invites the
   // member to add one.
   const roleParts: React.ReactNode[] = [];
@@ -96,22 +96,14 @@ export function ProfileCard({
     );
   }
 
+  // City and sector are plain text: the middot separators carry the line
+  // without a glyph in front of each place.
   if (city) {
-    roleParts.push(
-      <span key="city" className="flex items-center gap-1">
-        <MapPin strokeWidth={2.5} size={12} className="text-accent" />
-        {city}
-      </span>
-    );
+    roleParts.push(<span key="city">{city}</span>);
   }
 
   if (sector) {
-    roleParts.push(
-      <span key="sector" className="flex items-center gap-1">
-        <Layers strokeWidth={2.5} size={12} className="text-accent" />
-        {sector}
-      </span>
-    );
+    roleParts.push(<span key="sector">{sector}</span>);
   }
 
   return (
