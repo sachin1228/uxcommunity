@@ -15,7 +15,7 @@ export function CreateCommunityCard() {
   return (
     <section
       aria-labelledby="home-create-community-heading"
-      className="overflow-hidden rounded-xl border border-stone-200 shadow-sm"
+      className="overflow-hidden rounded-xl shadow-sm"
       style={{ backgroundColor: paper }}
     >
       <div className="px-4 pt-5 text-center">
