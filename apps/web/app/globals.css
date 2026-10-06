@@ -163,7 +163,7 @@
 
   --grid-line-color: rgba(0, 0, 0, 0.06);
   --grid-dot-color:  rgba(0, 0, 0, 0.16);
-  --grid-size:       28px;
+  --grid-size:       12px;
 
   /* Modal surfaces — Geist panel ring + drop (light) */
   --modal-ring: rgba(0, 0, 0, 0.05);
