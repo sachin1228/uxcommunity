@@ -674,6 +674,20 @@ name)` browse ordering index, trigram indexes on `companies.name`,
 short prefixes over `lower(name)`, and a plain btree on `company_domains.domain`
 for exact lookups (the only index before was the partial one on verified rows).
 
+**The empty query is curated, and only the empty query**
+(`20261007150000_company_directory_design_first.sql`): browsing answers with the
+design tools, studios, agencies and design-led employers a designer is most
+likely to look for, in a hand-picked order (`companies.featured_rank`, list in
+`data/company-directory/mnc-companies.json`), then the rest of the directory in
+name order. Typing is untouched — "fig" finds Figma because of its name, not
+because of the curation. `featured_rank` is deliberately not `directory_rank`,
+which the import derives (below). The browse arm is two bounded arms — featured
+by rank, then everything else by name — rather than one `order by featured_rank
+nulls last, name`, because the single-`ORDER BY` form cannot use the
+`(is_active, name)` index at all: it would sort every active company before the
+`LIMIT` could discard any, which is the 500,000-row cost this shape avoids. Both
+arms still walk an index, and the browse timings below are unchanged by it.
+
 Measured on the real schema, the real function and the real importer, median of
 five, `shared_buffers = 128MB` (`npm run bench:companies-directory`, which prints
 the whole table and the plans):
@@ -977,7 +991,9 @@ the migration.
 6. **Search**: the index set and the `UNION`-shaped `search_companies` with the
    alias arm, the ≤2-character prefix rule, per-arm `limit v_max`, `strpos`
    ordering inside the substring arms, and an `evidence_confidence` column.
-   Re-measured at 1k/10k/100k/500k **against populated tables** (§8).
+   Re-measured at 1k/10k/100k/500k **against populated tables** (§8). The
+   curated design-first browse (`featured_rank`, migration 150000) sits on top of
+   it and changes nothing about typing (§8).
 7. **Import path** (§9): `scripts/import-company-directory.mjs` — CSV → unlogged
    staging → set-based merge, deterministic UUIDv5 ids, idempotent, refusing any
    row that claims to be verified and skipping anything a member proved or

@@ -152,6 +152,14 @@ Employee count, revenue, active status and public-listing status are the inputs
 that would make ranking meaningful; they arrive with the registry layers, and
 until then the rank is labelled provisional in the report.
 
+One rank on `companies` is **not** derived and must not be read as one:
+`featured_rank` (migration
+[20261007150000_company_directory_design_first.sql](../supabase/migrations/20261007150000_company_directory_design_first.sql))
+is the hand-curated position of a design company in the picker's first screen,
+list in `data/company-directory/mnc-companies.json`. It exists as a second column
+precisely so that curation can never be written into — or mistaken for — the
+import's computed ordering.
+
 ## 7. Special cases and where they are tested
 
 Every case below has an assertion in

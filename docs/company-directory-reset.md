@@ -16,6 +16,13 @@ registry identity and provenance the bootstrap list never had.
 > manages them afterwards. Nothing else in this document changes: it is still the
 > audit and the operation for retiring the v1 4,574-row bootstrap seed, and a
 > curated hint is not one of those rows.
+>
+> **Update (2026-10-07), second change:**
+> `supabase/migrations/20261007150000_company_directory_design_first.sql` marks 35
+> of those seeded companies (`companies.featured_rank`) so the picker's first
+> screen — the empty query — opens on design employers instead of the alphabet's
+> top corner. It removes nothing, touches no other search path, and is reversed by
+> `update public.companies set featured_rank = null`.
 
 This document is the audit of how those rows came to exist, what was removed from
 the repository, the one operation that removes them from a database that already

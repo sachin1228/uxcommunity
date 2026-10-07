@@ -24,6 +24,13 @@
  *   data/company-directory/mnc-companies.json — the single source. Editing the
  *   SQL by hand is refused by `--check`, which the node test runs.
  *
+ *   The same file also holds `featured`: the design companies the picker shows
+ *   FIRST, in the order it shows them. That block is applied by a separate,
+ *   hand-written migration (20261007150000_company_directory_design_first.sql)
+ *   because most of that file is a `search_companies` rewrite, and a function
+ *   buried in a template literal is not reviewable. `loadFeatured` validates the
+ *   array here; the node test asserts the migration marks exactly it.
+ *
  *   The admin page (app/admin/(protected)/companies) manages these rows at
  *   runtime through /api/admin/companies; this migration is the one-time list,
  *   and both write the same two tables, so the two stay in sync by construction.
@@ -97,6 +104,44 @@ export function loadMncCompanies(path = DATA_PATH) {
   }
 
   return companies;
+}
+
+/**
+ * Reads the curated design-first block: the companies the picker's initial,
+ * empty-query screen shows, in the order it shows them.
+ *
+ * Throws on a name that is not in `companies`, or on a duplicate, because the
+ * migration that applies this list can only mark a company that exists: a typo
+ * would silently leave a hole at the top of the picker, which is the one thing
+ * the block exists to prevent.
+ */
+export function loadFeatured(path = DATA_PATH) {
+  const source = JSON.parse(readFileSync(path, "utf8"));
+  const featured = source.featured ?? [];
+  if (!Array.isArray(featured) || featured.length === 0) {
+    throw new Error("mnc-companies.json has no `featured` array");
+  }
+
+  const names = new Set(loadMncCompanies(path).map((entry) => entry.name));
+  const seen = new Set();
+  const ordered = [];
+
+  for (const [index, entry] of featured.entries()) {
+    const name = String(entry ?? "").trim();
+    if (!name) {
+      throw new Error(`featured entry ${index + 1} is empty`);
+    }
+    if (seen.has(name)) {
+      throw new Error(`featured lists ${name} twice`);
+    }
+    if (!names.has(name)) {
+      throw new Error(`featured names ${name}, which is not in \`companies\``);
+    }
+    seen.add(name);
+    ordered.push(name);
+  }
+
+  return ordered;
 }
 
 export function seedSql(companies) {
