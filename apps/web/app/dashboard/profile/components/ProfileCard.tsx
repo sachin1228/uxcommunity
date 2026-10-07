@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
-import { Building2, Camera, Loader2, PenLine, Plus } from "lucide-react";
+import { Building2, Camera, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -27,12 +27,6 @@ interface ProfileCardProps {
   company: ProfileCompanyView | null;
   /** Opens the company picker: adding when none is set, changing when one is. */
   onEditCompany: () => void;
-  /** Takes the verified company off the profile for good. */
-  onRemoveCompany: () => void;
-  /** True while that removal is in flight. */
-  removingCompany: boolean;
-  /** Message from a failed removal, shown under the company card. */
-  companyError: string | null;
   /** Opens the Edit Profile modal (identity details + group swap). */
   onOpenEditProfile: () => void;
 }
@@ -56,9 +50,6 @@ export function ProfileCard({
   interestNames,
   company,
   onEditCompany,
-  onRemoveCompany,
-  removingCompany,
-  companyError,
   onOpenEditProfile,
 }: ProfileCardProps) {
   // A stored picture that `AvatarImg` refuses to render (a retired generated
@@ -159,7 +150,10 @@ export function ProfileCard({
         {/* The company has its own card under the identity block, clear of the
             city and sector line. It is also the only place the company can be
             managed now that Settings keeps to contact details and links: the
-            card opens the picker to replace it, and Remove sits beside it.
+            card opens the picker to replace it and Edit sits beside it.
+
+            There is no Remove: a member changes the workplace on their profile
+            rather than dropping it, so the row carries Edit alone.
 
             A deactivated company keeps the name and stays open to replacing,
             but loses the accent and the verified mark: the company behind it is
@@ -193,15 +187,12 @@ export function ProfileCard({
               </button>
               <button
                 type="button"
-                onClick={onRemoveCompany}
-                disabled={removingCompany}
-                aria-label={`Remove ${company.name} from your profile`}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+                onClick={onEditCompany}
+                aria-label={`Edit the company on your profile: ${company.name}`}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
               >
-                {removingCompany && (
-                  <Loader2 strokeWidth={2.5} size={11} className="animate-spin" />
-                )}
-                Remove
+                <PenLine strokeWidth={2.5} size={11} />
+                Edit
               </button>
             </div>
           ) : (
@@ -213,12 +204,6 @@ export function ProfileCard({
               <Plus strokeWidth={2.5} size={14} />
               Add your company
             </button>
-          )}
-
-          {companyError && (
-            <p className="mt-2 font-body text-xs text-foreground-muted" role="alert">
-              {companyError}
-            </p>
           )}
         </div>
 
