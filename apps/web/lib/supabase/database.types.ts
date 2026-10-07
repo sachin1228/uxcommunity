@@ -1686,6 +1686,32 @@ export type Database = {
           },
         ];
       };
+      profile_field_changes: {
+        Row: {
+          changed_at: string;
+          field: string;
+          user_id: string;
+        };
+        Insert: {
+          changed_at?: string;
+          field: string;
+          user_id: string;
+        };
+        Update: {
+          changed_at?: string;
+          field?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_field_changes_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       push_throttle: {
         Row: {
           community_id: string;
@@ -2679,6 +2705,17 @@ export type Database = {
         }[];
       };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
+      update_profile_identity: {
+        Args: {
+          p_user_id: string;
+          p_name?: string;
+          p_city_id?: string;
+          p_sector_id?: string;
+          p_experience_level?: string;
+          p_job_title?: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       application_status: "pending" | "approved" | "rejected";

@@ -5,6 +5,7 @@ import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/perfor
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { getExperienceLevelNameMap } from "@/lib/master-data-cache";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
+import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import { ProfileClient } from "./ProfileClient";
 
 export const metadata = { title: "Your Profile" };
@@ -42,6 +43,7 @@ export default async function ProfilePage({ searchParams }: Props) {
     { data: userInterests },
     { data: allInterests },
     { company: profileCompany, pending: pendingCompany },
+    identity,
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
@@ -59,6 +61,9 @@ export default async function ProfilePage({ searchParams }: Props) {
     // The company line on the profile, plus any work-email challenge still
     // waiting on a code so the picker can reopen straight into it.
     getProfileCompanyState(db, userId),
+    // Everything the Edit Profile modal needs: current values, select
+    // options, current official groups and per-slot cooldown locks.
+    loadProfileIdentity(userId),
   ]);
 
   // Resolve the job title slug to its admin-managed display name (the profile
@@ -110,6 +115,7 @@ export default async function ProfilePage({ searchParams }: Props) {
       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
       initialCompany={profileCompany}
       pendingCompany={pendingCompany}
+      identity={identity}
     />
   );
 }

@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
+import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { ProfileCard } from "./components/ProfileCard";
 import { ImagePickerModal } from "./components/ImagePickerModal";
+import { EditProfileModal } from "./components/EditProfileModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
+import type { ProfileIdentityPayload } from "@/lib/profile/identity";
 import type {
   PendingCompanyVerification,
   ProfileCompanyView,
@@ -32,6 +35,9 @@ interface Props {
   allInterests: { id: string; name: string; image_url?: string | null }[];
   initialCompany: ProfileCompanyView | null;
   pendingCompany: PendingCompanyVerification | null;
+  /** Current identity values, select options, groups and cooldown locks
+   *  for the Edit Profile modal. */
+  identity: ProfileIdentityPayload;
 }
 
 export function ProfileClient({
@@ -47,6 +53,7 @@ export function ProfileClient({
   allInterests,
   initialCompany,
   pendingCompany,
+  identity,
 }: Props) {
   const router = useRouter();
   // The server is the source of truth: the client only mirrors what the last
@@ -70,6 +77,7 @@ export function ProfileClient({
     setAvatarUrl(initialAvatarUrl);
   }
   const [showPicturePicker, setShowPicturePicker] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [pictureSaving, setPictureSaving] = useState(false);
@@ -158,6 +166,14 @@ export function ProfileClient({
     setUploadBlob(null);
   }
 
+  // An identity edit moves the member between official communities, so the
+  // sidebar and explore caches are stale by definition — bust them, then let
+  // the server render re-supply this card with the new name/city/sector.
+  function handleIdentitySaved() {
+    invalidateCommunitiesList();
+    router.refresh();
+  }
+
   return (
     <div className="relative min-h-full">
       {/* Full-bleed dotted backdrop for the page: the texture belongs to the
@@ -189,6 +205,7 @@ export function ProfileClient({
             onRemoveCompany={handleRemoveCompany}
             removingCompany={removingCompany}
             companyError={companyError}
+            onOpenEditProfile={() => setShowEditProfile(true)}
           />
         </div>
 
@@ -204,6 +221,17 @@ export function ProfileClient({
           onRemoveUpload={handleRemoveUpload}
           onSave={handleSavePicture}
           onClose={closePicturePicker}
+        />
+      )}
+
+      {/* Mounted only while open: the draft (fields, step, error) is
+          per-attempt state, so unmounting is what resets it. */}
+      {showEditProfile && (
+        <EditProfileModal
+          open
+          data={identity}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={handleIdentitySaved}
         />
       )}
 

@@ -82,6 +82,21 @@ export const masterDataSchema = z.object({
   image_url: z.string().url().optional().nullable(),
 });
 
+// Edit-profile modal: the identity slots a member can change. Each slot is
+// gated by a three-month cooldown server-side; the client only sends the
+// fields the member actually touched, so every field is optional but the
+// payload must carry at least one.
+export const profileIdentityUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
+    city_id: z.string().uuid("Please select a city"),
+    sector_id: z.string().uuid("Please select a design sector"),
+    experience_level: z.string().min(1, "Please select an experience level"),
+    job_title: z.string().min(1, "Please select a job title"),
+  })
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, { message: "Nothing to update." });
+
 export const updateApplicationSchema = z.object({
   status: z.enum(["pending", "approved", "rejected"]).optional(),
   review_notes: z.string().optional(),
