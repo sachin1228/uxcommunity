@@ -268,7 +268,7 @@ test("a link never doubles the slash when the app origin ends in one", () => {
   );
 });
 
-test("the verification email shows the code and both things it proves", () => {
+test("the verification email shows the code, the company and the domain", () => {
   const verification = RENDERED.find(([name]) => name === "company verification");
   assert.ok(verification);
   for (const fragment of ["482913", "Figma", "figma.com"]) {

@@ -164,7 +164,7 @@ export interface CompanyVerificationEmail {
 /**
  * The one-time code that proves a member controls a work mailbox on a company
  * domain. The domain — not the company name typed in the form — is what the
- * code is issued for, so the email names both: the code approves a domain, and
+ * code is issued for, so the email names both: the code is for a domain, and
  * the member can see exactly which one.
  */
 export function renderCompanyVerificationEmail({
@@ -182,7 +182,7 @@ export function renderCompanyVerificationEmail({
     },
     {
       kind: "paragraph",
-      text: `Proving you control this mailbox verifies the domain **${domain}**. It does not make you an administrator or an official representative of the company.`,
+      text: `The code is for the work email on **${domain}**.`,
     },
     { kind: "code", value: code },
     {

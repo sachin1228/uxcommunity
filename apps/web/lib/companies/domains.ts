@@ -294,6 +294,36 @@ export function companyNameMatchesDomain(
 }
 
 /**
+ * Padding a company name can carry without becoming a different name: the
+ * legal-entity words already dropped for initials, plus the articles people
+ * put in front of a brand.
+ */
+const NAME_NOISE_WORDS = new Set([...LEGAL_ENTITY_WORDS, "the"]);
+
+/**
+ * Do two company names name the same company? `Figma`, `figma`, `Figma, Inc.`
+ * and `The Figma` all do.
+ *
+ * Used by the picker to decide whether the company a member is about to create
+ * is already on screen under a different spelling — creating it anyway is how
+ * the directory grows a second `Zomato` that can never be merged, because a
+ * name is joined and never re-created. Only the words that carry no identity
+ * are dropped: `Figma Labs` is a different name from `Figma`, so it is not
+ * folded together here. A name that reduces to nothing (`Inc`) matches nothing.
+ */
+export function companyNamesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const key = (value: string | null | undefined) =>
+    typeof value === "string"
+      ? words(value)
+          .filter((word) => !NAME_NOISE_WORDS.has(word))
+          .join("")
+      : "";
+
+  const left = key(a);
+  return left.length > 1 && left === key(b);
+}
+
+/**
  * A suggested company name for a domain — `labsmart.co.in` → `Labsmart`. Used
  * to offer the member the name that would match, instead of just refusing.
  */

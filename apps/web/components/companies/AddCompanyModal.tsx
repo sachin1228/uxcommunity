@@ -7,7 +7,9 @@ import { Modal } from "@/components/ui/Modal";
 import {
   checkWorkEmail,
   companyNameMatchesDomain,
+  companyNamesMatch,
   domainFromEmail,
+  normalizeDomain,
   suggestedCompanyName,
 } from "@/lib/companies/domains";
 import { CompanyLogo, VerifiedMark } from "./CompanyBadge";
@@ -115,15 +117,24 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
 
-  // Result
-  const [verified, setVerified] = useState<{ name: string; slug: string; domain: string | null } | null>(
-    null
-  );
+  // Result. `domainVerified` is false when the code proved the mailbox but the
+  // company's claim on the domain was too weak to settle it (verified_via
+  // `mailbox_only`) — the membership is real, the verified mark is not earned.
+  const [verified, setVerified] = useState<{
+    name: string;
+    slug: string;
+    domain: string | null;
+    domainVerified: boolean;
+  } | null>(null);
 
   // Directory search, debounced. The empty query browses the directory.
   useEffect(() => {
     if (!open || step !== "search") return;
     const controller = new AbortController();
+    // Only the run that still owns the spinner may clear it: a superseded run
+    // settles the moment it is aborted, and clearing there would blink the
+    // spinner off while the run that replaced it is still waiting.
+    let current = true;
     const timer = setTimeout(async () => {
       setSearching(true);
       setSearchFailed(false);
@@ -139,11 +150,12 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
         setSearchFailed(true);
         setHits([]);
       } finally {
-        setSearching(false);
+        if (current) setSearching(false);
       }
     }, 250);
 
     return () => {
+      current = false;
       controller.abort();
       clearTimeout(timer);
     };
@@ -168,6 +180,19 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
       ? companyNameMatchesDomain(newName, claimedDomain)
       : null;
   const nameSuggestion = claimedDomain ? suggestedCompanyName(claimedDomain) : "";
+
+  // The create row is an escape hatch for "my company is not listed", and a
+  // company the member can already see above it makes that hatch a duplicate
+  // factory. It closes only for that company: a listed one that answers to the
+  // typed name (however it is punctuated), or that owns the typed domain. A
+  // name the directory does not have at all keeps the row, which is the whole
+  // point of it.
+  const typedDomain = normalizeDomain(trimmedQuery);
+  const alreadyListed = hits.some(
+    (company) =>
+      companyNamesMatch(trimmedQuery, company.name) ||
+      (typedDomain !== null && typedDomain === company.domain)
+  );
 
   const startVerification = useCallback(
     async (payload: {
@@ -255,7 +280,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
       });
       const data = (await res.json().catch(() => ({}))) as {
         /** The verified company, or the company the member should join instead. */
-        company?: CompanyOption;
+        company?: CompanyOption & { verifiedVia?: string };
         error?: string;
         message?: string;
         attemptsLeft?: number | null;
@@ -267,6 +292,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
           name: data.company.name,
           slug: data.company.slug,
           domain: data.company.domain ?? null,
+          domainVerified: data.company.verifiedVia !== "mailbox_only",
         });
         setPending(null);
         setStep("done");
@@ -276,8 +302,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
 
       if (
         data.error === "domain_already_verified" ||
-        data.error === "domain_not_verified" ||
-        data.error === "domain_control_only"
+        data.error === "domain_not_verified"
       ) {
         // The domain moved out from under this challenge: send the member back
         // to search with the reason, rather than letting them retry a code that
@@ -362,12 +387,14 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
               aria-label="Search company"
               className={`${fieldCls} pl-9`}
             />
+            {/* The spin animation owns `transform` — its keyframes set
+                `rotate()` outright — so a `-translate-y-1/2` on the same
+                element is dropped once per cycle and the icon drops with it.
+                The wrapper holds the centring translate; only the svg spins. */}
             {searching && (
-              <Loader2
-                strokeWidth={2.5}
-                size={14}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-foreground-muted"
-              />
+              <span className="pointer-events-none absolute right-3.5 top-1/2 flex -translate-y-1/2 text-foreground-muted">
+                <Loader2 strokeWidth={2.5} size={14} className="animate-spin" />
+              </span>
             )}
           </div>
 
@@ -421,26 +448,28 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={chooseNew}
-            disabled={!trimmedQuery}
-            className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-left transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-foreground-muted">
-              <Building2 strokeWidth={2.5} size={14} />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-body text-sm font-medium text-foreground">
-                {trimmedQuery ? `Create “${trimmedQuery}”` : "Add a company"}
+          {!alreadyListed && (
+            <button
+              type="button"
+              onClick={chooseNew}
+              disabled={!trimmedQuery}
+              className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-left transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-foreground-muted">
+                <Building2 strokeWidth={2.5} size={14} />
               </span>
-              <span className="block font-body text-xs text-foreground-muted">
-                {trimmedQuery
-                  ? "We'll verify it with your work email"
-                  : "Search for your company, or type its name"}
+              <span className="min-w-0">
+                <span className="block truncate font-body text-sm font-medium text-foreground">
+                  {trimmedQuery ? `Create “${trimmedQuery}”` : "Add a company"}
+                </span>
+                <span className="block font-body text-xs text-foreground-muted">
+                  {trimmedQuery
+                    ? "We'll verify it with your work email"
+                    : "Search for your company, or type its name"}
+                </span>
               </span>
-            </span>
-          </button>
+            </button>
+          )}
         </div>
       )}
 
@@ -675,7 +704,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
               {verified.domain && (
                 <p className="mt-0.5 flex items-center gap-2">
                   <span className="font-body text-xs text-foreground-muted">{verified.domain}</span>
-                  <VerifiedMark size="xs" />
+                  {verified.domainVerified && <VerifiedMark size="xs" />}
                 </p>
               )}
             </div>

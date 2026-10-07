@@ -35,6 +35,17 @@
 create extension if not exists pgtap with schema extensions;
 select plan(52);
 
+-- ─── Isolation ──────────────────────────────────────────────
+-- The suite runs against ONE database that ships a real curated company
+-- directory (20261007130000_company_directory_mnc_seed.sql) whose slugs overlap
+-- the retired v1 seed's list (figma, google, …). The retirement plan identifies
+-- v1 rows by slug, so without isolation those curated rows would be counted as
+-- retained, and this file's fixture deletes/re-inserts would clobber them for
+-- the files that run after. Run inside a transaction from an empty directory so
+-- the file describes exactly the v1 rows it creates, and roll back at the end.
+begin;
+delete from public.companies;
+
 -- ─── Fixture ────────────────────────────────────────────────
 
 delete from public.companies
@@ -538,5 +549,7 @@ delete from public.companies
  where slug in ('microsoft', 'apple', 'netflix', 'spotify', 'stripe', 'shopify',
                 'adobe', 'amazon', 'figma', 'retirement-bystander', 'a-member-company');
 delete from public.users where email like '%@seed-retirement.test';
+
+rollback;
 
 select * from finish();

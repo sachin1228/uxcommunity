@@ -38,6 +38,15 @@
 create extension if not exists pgtap with schema extensions;
 select plan(161);
 
+-- ─── Isolation ──────────────────────────────────────────────
+-- The suite runs against ONE database that ships a real curated company
+-- directory (20261007130000_company_directory_mnc_seed.sql). This file asserts
+-- exact claim counts for domains those rows also carry (meta.com), so it runs
+-- inside a transaction from an empty directory and rolls every fixture back,
+-- leaving the curated rows exactly as they were for the files that follow.
+begin;
+delete from public.companies;
+
 -- ─── Fixture ────────────────────────────────────────────────
 
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
@@ -61,7 +70,9 @@ delete from public.users where id in (
   'e0e0e0e0-0000-4000-8000-000000000008',
   'e0e0e0e0-0000-4000-8000-000000000009',
   'e0e0e0e0-0000-4000-8000-000000000010',
-  'e0e0e0e0-0000-4000-8000-000000000011'
+  'e0e0e0e0-0000-4000-8000-000000000011',
+  'e0e0e0e0-0000-4000-8000-000000000012',
+  'e0e0e0e0-0000-4000-8000-000000000013'
 );
 
 insert into public.users (id, name, email, password_hash, application_id) values
@@ -75,7 +86,13 @@ insert into public.users (id, name, email, password_hash, application_id) values
   ('e0e0e0e0-0000-4000-8000-000000000008', 'Reserved Member', 'r1@mediumreserved.test', 'x', null),
   ('e0e0e0e0-0000-4000-8000-000000000009', 'Earlier Member',  'i1@instagram.test',  'x', null),
   ('e0e0e0e0-0000-4000-8000-000000000010', 'Hint Member',     'l1@lowhint.test',   'x', null),
-  ('e0e0e0e0-0000-4000-8000-000000000011', 'Unsure Member',   'u1@unsurehint.test','x', null);
+  ('e0e0e0e0-0000-4000-8000-000000000011', 'Unsure Member',   'u1@unsurehint.test','x', null),
+  -- Two members with no history, for the contested-domain cases below: once a
+  -- correct code adds a member to a company, that company refuses a second
+  -- challenge from them (`already_member`), so each case that has to reach the
+  -- code needs a member who has not verified yet.
+  ('e0e0e0e0-0000-4000-8000-000000000012', 'Contested Member', 'u2@contested-weak.test','x', null),
+  ('e0e0e0e0-0000-4000-8000-000000000013', 'Later Member',    'u3@contested-weak.test','x', null);
 
 -- `experience_level` is plain text since 20260722_drop_experience_level_enum.sql.
 insert into public.designer_profiles (user_id, experience_level)
@@ -1091,14 +1108,19 @@ select is(
 );
 
 
--- ─── 5b. A correct code on a WEAK claim grants no company ───────────────────
+-- ─── 5b. A correct code on a WEAK claim adds the member, not the domain ────
 
--- The failure mode this guards: the directory guesses that lowhint.test belongs
--- to Weakco Ltd. Somebody with a lowhint.test mailbox selects Weakco Ltd and
--- enters the code we really did send them. OTP proves the MAILBOX; it cannot
--- prove that the directory's company-to-domain mapping is right — and if it
--- could, then every wrong seed row would become a verified company by the first
--- person to sign up at that domain.
+-- The two questions, and which one each answer settles:
+--
+--   * where does this member work?  the directory guesses lowhint.test belongs to
+--     Weakco Ltd, somebody with a lowhint.test mailbox selects Weakco Ltd and
+--     enters the code we really did send them. OTP proves the MAILBOX and the
+--     member chose that company, so the workplace is added.
+--   * does this domain belong to
+--     that company?                 that is a question about the DIRECTORY, and
+--     OTP answers nothing about it: if it did, every wrong seed row would become
+--     a verified domain through the first person to sign up at it. The claim
+--     stays unverified and an operator reviews it.
 
 select ok(
   public.company_confidence_meets_threshold('medium')
@@ -1121,14 +1143,14 @@ select is(
 );
 
 select is(
-  (select status from public.confirm_company_verification(
+  (select row(r.status, r.verified_via) from public.confirm_company_verification(
     'e0e0e0e0-0000-4000-8000-000000000010',
     (select id from public.company_email_verifications
       where user_id = 'e0e0e0e0-0000-4000-8000-000000000010' and consumed_at is null),
     'hash-l1'
-  )),
-  'domain_control_only',
-  'the correct code on a low claim is recorded as domain control, not company ownership'
+  ) as r),
+  row('verified'::text, 'mailbox_only'::text),
+  'the correct code on a low claim adds the member, and says the road was the mailbox'
 );
 
 select is(
@@ -1141,16 +1163,16 @@ select is(
 select is(
   (select count(*)::int from public.company_members
     where company_id = 'c1c1c1c1-0000-4000-8000-000000000011'
-      and user_id = 'e0e0e0e0-0000-4000-8000-000000000010'),
-  0,
-  'and no membership: a mailbox is not an employer'
+      and user_id = 'e0e0e0e0-0000-4000-8000-000000000010' and verified),
+  1,
+  'and the membership exists, because the mailbox is the member''s'
 );
 
 select is(
   (select company_id from public.designer_profiles
     where user_id = 'e0e0e0e0-0000-4000-8000-000000000010'),
-  null::uuid,
-  'and the profile was not pointed at the company'
+  'c1c1c1c1-0000-4000-8000-000000000011'::uuid,
+  'and the profile points at the company the member chose'
 );
 
 select is(
@@ -1176,7 +1198,7 @@ select is(
     'hash-l1'
   )),
   'already_used',
-  'the challenge is spent even though nothing was granted, so the mailbox cannot be replayed'
+  'the challenge is spent either way, so the same mailbox cannot be replayed'
 );
 
 
@@ -1193,8 +1215,8 @@ select is(
     )),
     'hash-u1'
   )),
-  'domain_control_only',
-  'an unknown claim cannot be promoted either'
+  'verified',
+  'an unknown claim adds the member the same way: the mailbox is the proof of the mailbox'
 );
 
 select is(
@@ -1205,23 +1227,24 @@ select is(
 );
 
 -- The same domain, claimed weakly by the directory and correctly by the company
--- that really uses it. The member on the weak side gets domain control only; the
--- member on the strong side verifies. This is the "A guessed abc.com, B uses
--- abc.com" case from the architecture review.
+-- that really uses it. The member on the weak side is added to THEIR company, and
+-- the DOMAIN still belongs to the better claim; the member on the strong side is
+-- what proves it. This is the "A guessed abc.com, B uses abc.com" case from the
+-- architecture review, and the two outcomes are different questions.
 select is(
   (select status from public.confirm_company_verification(
-    'e0e0e0e0-0000-4000-8000-000000000011',
+    'e0e0e0e0-0000-4000-8000-000000000012',
     (select verification_id from public.start_company_verification(
-      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000011',
+      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000012',
       p_domain     => 'contested-weak.test',
-      p_work_email => 'u1@contested-weak.test',
+      p_work_email => 'u2@contested-weak.test',
       p_code_hash  => 'hash-u2',
       p_company_id => 'c1c1c1c1-0000-4000-8000-000000000011'
     )),
     'hash-u2'
   )),
-  'domain_control_only',
-  'the weak claimant cannot take a domain another company has better evidence for'
+  'verified',
+  'the weak claimant is added to their own company, and takes no domain authority for it'
 );
 
 select is(
@@ -1272,15 +1295,15 @@ select is(
 -- now-proved domain cannot end up verified on it, whatever the code proves.
 select is(
   (select status from public.confirm_company_verification(
-    'e0e0e0e0-0000-4000-8000-000000000010',
+    'e0e0e0e0-0000-4000-8000-000000000013',
     (select verification_id from public.start_company_verification(
-      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000010',
+      p_user_id    => 'e0e0e0e0-0000-4000-8000-000000000013',
       p_domain     => 'contested-weak.test',
-      p_work_email => 'l1@contested-weak.test',
-      p_code_hash  => 'hash-l2',
+      p_work_email => 'u3@contested-weak.test',
+      p_code_hash  => 'hash-u3',
       p_company_id => 'c1c1c1c1-0000-4000-8000-000000000011'
     )),
-    'hash-l2'
+    'hash-u3'
   )),
   'domain_already_verified',
   'and once the domain is somebody else''s proof, the weak claimant is refused at the code'
@@ -1620,5 +1643,7 @@ select is(
   0,
   'and the refused row left nothing behind'
 );
+
+rollback;
 
 select * from finish();
