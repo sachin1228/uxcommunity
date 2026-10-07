@@ -22,13 +22,11 @@ import {
  * The details edited here are the ones a member picked at signup (name,
  * job title, experience level, city, sector — never the display picture),
  * and the last four also place them in official communities. So the modal
- * tells BOTH stories at once, live, in every step:
+ * tells BOTH stories: the fields first, then what saving them implies.
  *
  *   1. form    — the fields, with locked slots disabled under their cooldown;
- *                a Communities panel shows, DP and name, which groups the
- *                current draft would cause them to leave and join;
- *   2. confirm — the old → new values, the same leave/join rows, and the
- *                three-month cost of the change;
+ *   2. confirm — the old → new values, the groups the change leaves/joins
+ *                (DP and name), and the three-month cost of the change;
  *   3. done    — the server's report of what actually happened.
  *
  * The database is the authority for the cooldown and the swap (one atomic
@@ -424,26 +422,6 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
               />
               {levelLock && <LockNote until={levelLock} />}
             </div>
-          </div>
-
-          {/* Live community preview — the groups this draft would move. */}
-          <div className="mt-6 rounded-xl border border-border bg-surface-raised px-4 py-3.5">
-            <p className="mb-2.5 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-              Communities
-            </p>
-            {moves.length > 0 ? (
-              <>
-                <MoveRows moves={moves} />
-                <p className="mt-2.5 font-body text-[11px] text-foreground-subtle">
-                  {moves.length === 1 ? "This group change happens" : "These group changes happen"} when
-                  you confirm — nothing has changed yet.
-                </p>
-              </>
-            ) : (
-              <p className="font-body text-xs text-foreground-muted">
-                Change a field above to see which communities move with it.
-              </p>
-            )}
           </div>
 
           <div className="mt-6 flex items-center justify-end gap-2">
