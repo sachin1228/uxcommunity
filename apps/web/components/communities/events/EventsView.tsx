@@ -59,7 +59,8 @@ export function EventsView({
   const [createdGroup, setCreatedGroup] = useState<{
     title: string;
     eventDate: string;
-    chatCommunityId: string;
+    endDate: string | null;
+    coverImageUrl: string | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
@@ -198,7 +199,8 @@ export function EventsView({
       setCreatedGroup({
         title: event.title,
         eventDate: event.event_date,
-        chatCommunityId,
+        endDate: event.end_date,
+        coverImageUrl: event.cover_image_url,
       });
     }
   }
@@ -355,7 +357,8 @@ export function EventsView({
         <EventGroupCreatedModal
           eventTitle={createdGroup.title}
           eventDate={createdGroup.eventDate}
-          chatCommunityId={createdGroup.chatCommunityId}
+          eventEnd={createdGroup.endDate ?? createdGroup.eventDate}
+          coverImageUrl={createdGroup.coverImageUrl}
           onClose={() => setCreatedGroup(null)}
         />
       )}

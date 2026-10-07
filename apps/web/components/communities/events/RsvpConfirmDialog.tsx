@@ -1,41 +1,22 @@
 "use client";
 
-import { Check, LogOut, MessageSquare, Pin, PinOff, UserCheck, UserX } from "lucide-react";
+import { Check, UserX } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
+import { EventChatPreviewRow } from "./EventChatPreviewRow";
 
 /**
  * The confirmation in front of both halves of an RSVP.
  *
  * RSVP-ing is not only a number: it is how somebody enters the event's group
- * chat, and that room appears in their sidebar (pinned, until the event date).
- * Taking the RSVP back undoes all of it. Neither direction should happen under
- * a stray tap, so the button opens this dialog and the request is sent only
- * from its confirm button — one tap is the whole decision, the member just
- * gets to see what it means first.
+ * chat, so the dialog's whole point is the room it shows — drawn exactly as the
+ * sidebar will draw it (name, pin, member count). One short line says what the
+ * button does to the RSVP; the row shows what it does to the room. Neither
+ * direction should happen under a stray tap, so the request is sent only from
+ * the confirm button — one tap is the whole decision, the member just gets to
+ * see what it means first.
  */
-
-function fmtEventDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 export type RsvpConfirmMode = "join" | "leave";
-
-function Point({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-3">
-      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-        {icon}
-      </span>
-      <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">{children}</p>
-    </li>
-  );
-}
 
 export function RsvpConfirmDialog({
   mode,
@@ -44,6 +25,9 @@ export function RsvpConfirmDialog({
   onConfirm,
   eventTitle,
   eventDate,
+  eventEnd,
+  coverImageUrl,
+  chatMemberCount = null,
   isOwner = false,
   pending,
   error,
@@ -53,15 +37,20 @@ export function RsvpConfirmDialog({
   onClose: () => void;
   onConfirm: () => void;
   eventTitle: string;
-  /** The event's start — the anchor for "pinned until". */
+  /** The event's start — the room DP's date badge. */
   eventDate: string;
+  /** The event's end (or its start when it has none) — the badge's LIVE window. */
+  eventEnd: string | null;
+  /** The event's cover, which the room wears as its own DP. */
+  coverImageUrl: string | null;
+  /** Members in the room; null hides the line (e.g. no room yet). */
+  chatMemberCount?: number | null;
   /** The host keeps their own group chat, so backing out costs them less. */
   isOwner?: boolean;
   pending: boolean;
   error?: string | null;
 }) {
   const joining = mode === "join";
-  const date = fmtEventDate(eventDate);
 
   return (
     <Modal
@@ -71,67 +60,21 @@ export function RsvpConfirmDialog({
       maxWidth="max-w-md"
     >
       <p className="text-pretty font-body text-sm leading-6 text-foreground-muted">
-        {joining ? (
-          <>
-            RSVP-ing to <span className="font-medium text-foreground">{eventTitle}</span> also joins
-            you to the event&apos;s group chat, where everybody going talks about it.
-          </>
-        ) : (
-          <>
-            You&apos;re going to{" "}
-            <span className="font-medium text-foreground">{eventTitle}</span>. Taking that back is
-            what takes you out of its group chat too — your RSVP is what put you in it.
-          </>
-        )}
+        {joining
+          ? "Your RSVP joins you to this chat — everyone going talks in one place."
+          : isOwner
+            ? "You host this event, so the chat stays yours — everyone going keeps talking in it."
+            : "Withdrawing takes you out of this chat — your RSVP is what put you in it."}
       </p>
 
-      <ul className="mt-5 flex flex-col gap-3">
-        {joining ? (
-          <>
-            <Point icon={<UserCheck strokeWidth={2.5} size={13} />}>
-              You count as going, and the host sees your RSVP.
-            </Point>
-            <Point icon={<MessageSquare strokeWidth={2.5} size={13} />}>
-              You join the event&apos;s group chat and can post there straight away.
-            </Point>
-            <Point icon={<Pin strokeWidth={2.5} size={13} />}>
-              It is pinned to the top of your sidebar until{" "}
-              <span className="font-medium text-foreground">{date}</span>. Leave the RSVP and you
-              leave the room.
-            </Point>
-          </>
-        ) : (
-          <>
-            <Point icon={<UserX strokeWidth={2.5} size={13} />}>
-              You stop counting as going, and the host sees that you are no longer coming.
-            </Point>
-            {isOwner ? (
-              <Point icon={<MessageSquare strokeWidth={2.5} size={13} />}>
-                You host this event, so the group chat stays yours — you keep it, and everybody
-                going keeps talking in it.
-              </Point>
-            ) : (
-              <Point icon={<LogOut strokeWidth={2.5} size={13} />}>
-                You leave the event&apos;s group chat and stop getting its messages and previews.
-              </Point>
-            )}
-            <Point icon={<PinOff strokeWidth={2.5} size={13} />}>
-              {isOwner ? (
-                <>
-                  It stays pinned in your sidebar until{" "}
-                  <span className="font-medium text-foreground">{date}</span>.
-                </>
-              ) : (
-                <>
-                  It drops out of your sidebar — the pin lasts only as long as the RSVP. You can
-                  RSVP again any time before{" "}
-                  <span className="font-medium text-foreground">{date}</span>.
-                </>
-              )}
-            </Point>
-          </>
-        )}
-      </ul>
+      <EventChatPreviewRow
+        className="mt-5"
+        eventTitle={eventTitle}
+        eventDate={eventDate}
+        eventEnd={eventEnd}
+        coverImageUrl={coverImageUrl}
+        memberCount={chatMemberCount}
+      />
 
       {error && (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">

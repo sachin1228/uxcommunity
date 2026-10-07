@@ -97,6 +97,28 @@ async function loadEventCommentCounts(eventIds: string[]): Promise<Map<string, n
 }
 
 /**
+ * How many members each event's group chat has, keyed by event id — the number
+ * the RSVP confirm dialog shows on the room's row. One room per event (the
+ * partial unique index on `communities.event_id`), and an event without a room
+ * simply has no entry. Best-effort: an environment without the event-chat
+ * migration loses the count, never the card.
+ */
+async function loadEventChatMemberCounts(
+  eventIds: string[],
+): Promise<Map<string, number | null>> {
+  const counts = new Map<string, number | null>();
+  const { data, error } = await createServiceClient()
+    .from("communities")
+    .select("event_id, member_count")
+    .in("event_id", eventIds);
+  if (error) return counts;
+  for (const row of (data ?? []) as Array<{ event_id: string | null; member_count: number | null }>) {
+    if (row.event_id) counts.set(row.event_id, row.member_count ?? null);
+  }
+  return counts;
+}
+
+/**
  * Complete an event row into the shape `EventCard` renders. Every event surface
  * goes through here, so no page can hand the card a partially-loaded row again:
  *
@@ -109,7 +131,9 @@ async function loadEventCommentCounts(eventIds: string[]): Promise<Map<string, n
  *   0 comments while the detail page showed the real number;
  * - `rsvps` previews are attached unless the caller passes `withRsvps: false`
  *   because it already loaded the full attendee list (the detail pages reuse
- *   that list for the avatar strip).
+ *   that list for the avatar strip);
+ * - `chat_member_count` comes from the event's group room when one exists (the
+ *   RSVP confirm shows it on the room's row); no room yet leaves it null.
  */
 export async function enrichEventCards(
   rows: Array<Record<string, unknown>>,
@@ -126,14 +150,18 @@ export async function enrichEventCards(
   const needsCommentCount = !carriesField(enriched, "comment_count");
   const needsRsvps = withRsvps && !carriesField(enriched, "rsvps");
 
-  const [commentCounts, previews] = await Promise.all([
+  const [commentCounts, previews, chatMemberCounts] = await Promise.all([
     needsCommentCount && ids.length ? loadEventCommentCounts(ids) : null,
     needsRsvps && ids.length ? loadEventAttendeePreviews(ids) : null,
+    ids.length ? loadEventChatMemberCounts(ids) : null,
   ]);
 
   return enriched.map((row) => ({
     ...row,
     ...(commentCounts ? { comment_count: commentCounts.get(row.id as string) ?? 0 } : {}),
     ...(previews ? { rsvps: previews.get(row.id as string) ?? [] } : {}),
+    ...(chatMemberCounts
+      ? { chat_member_count: chatMemberCounts.get(row.id as string) ?? null }
+      : {}),
   })) as unknown as CommunityEvent[];
 }
