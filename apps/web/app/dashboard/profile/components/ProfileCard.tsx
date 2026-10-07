@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment } from "react";
-import Link from "next/link";
 import { Building2, Camera, Loader2, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
@@ -34,6 +33,8 @@ interface ProfileCardProps {
   removingCompany: boolean;
   /** Message from a failed removal, shown under the company card. */
   companyError: string | null;
+  /** Opens the Edit Profile modal (identity details + group swap). */
+  onOpenEditProfile: () => void;
 }
 
 /**
@@ -58,6 +59,7 @@ export function ProfileCard({
   onRemoveCompany,
   removingCompany,
   companyError,
+  onOpenEditProfile,
 }: ProfileCardProps) {
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
@@ -144,13 +146,14 @@ export function ProfileCard({
             )}
           </div>
 
-          <Link
-            href="/dashboard/settings"
+          <button
+            type="button"
+            onClick={onOpenEditProfile}
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
           >
             <PenLine strokeWidth={2.5} size={11} />
             Edit Profile
-          </Link>
+          </button>
         </div>
 
         {/* The company has its own card under the identity block, clear of the
