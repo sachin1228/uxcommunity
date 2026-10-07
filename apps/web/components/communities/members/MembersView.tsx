@@ -36,12 +36,10 @@ interface PendingRequest {
 
 /** One member's answers to the event's compulsory join questions. */
 interface EventJoinResponse {
-  user_id:         string;
-  company_name:    string;
-  work_experience: string;
-  why_attend:      string;
-  expectations:    string;
-  created_at:      string;
+  user_id:      string;
+  why_attend:   string;
+  expectations: string;
+  created_at:   string;
 }
 
 interface MembersViewProps {

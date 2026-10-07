@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   EVENT_JOIN_QUESTIONS,
+  EVENT_JOIN_ANSWER_LIMITS,
   joinAnswersPayload,
   type EventJoinAnswers,
   type EventJoinQuestionKey,
@@ -14,8 +15,8 @@ import {
 /**
  * The host's compulsory questions, asked before either door into an event's
  * group chat opens — the RSVP's "I'm Going" and the room's own "Join event
- * chat" confirmation. Nothing is sent until all four are answered; the confirm
- * button stays off until then, and says how many are still open.
+ * chat" confirmation. Nothing is sent until every question is answered; the
+ * confirm button stays off until then, and says how many are still open.
  */
 
 type Draft = Partial<Record<EventJoinQuestionKey, string>>;
@@ -108,7 +109,7 @@ export function EventJoinQuestionsModal({
                 placeholder={placeholder}
                 rows={3}
                 required
-                maxLength={2000}
+                maxLength={EVENT_JOIN_ANSWER_LIMITS[key]}
                 disabled={pending}
                 className="field resize-none"
               />
@@ -119,7 +120,7 @@ export function EventJoinQuestionsModal({
                 onChange={(e) => setDraft((prev) => ({ ...prev, [key]: e.target.value }))}
                 placeholder={placeholder}
                 required
-                maxLength={key === "work_experience" ? 100 : 200}
+                maxLength={EVENT_JOIN_ANSWER_LIMITS[key]}
                 disabled={pending}
                 className="field"
               />

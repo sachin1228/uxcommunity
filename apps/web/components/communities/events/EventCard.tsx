@@ -277,7 +277,7 @@ export function EventCard({
   /**
    * The host's compulsory join questions, asked after the RSVP confirm dialog
    * when the member is joining (never when withdrawing). The request fires
-   * only once all four are answered.
+   * only once every question is answered.
    */
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const [shared, setShared] = useState(false);
@@ -858,6 +858,9 @@ export function EventCard({
         }}
         eventTitle={event.title}
         eventDate={event.event_date}
+        eventEnd={event.end_date ?? event.event_date}
+        coverImageUrl={event.cover_image_url}
+        chatMemberCount={event.chat_member_count ?? null}
         isOwner={isOwner}
         pending={rsvpPending}
         error={rsvpError}

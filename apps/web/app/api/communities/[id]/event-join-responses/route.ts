@@ -34,8 +34,6 @@ export async function GET(
   return NextResponse.json({
     responses: [...responses.values()].map((row) => ({
       user_id: row.user_id,
-      company_name: row.company_name,
-      work_experience: row.work_experience,
       why_attend: row.why_attend,
       expectations: row.expectations,
       created_at: row.created_at,

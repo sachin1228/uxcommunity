@@ -1120,33 +1120,27 @@ export type Database = {
       event_chat_join_responses: {
         Row: {
           community_id: string;
-          company_name: string;
           created_at: string;
           expectations: string;
           updated_at: string;
           user_id: string;
           why_attend: string;
-          work_experience: string;
         };
         Insert: {
           community_id: string;
-          company_name: string;
           created_at?: string;
           expectations: string;
           updated_at?: string;
           user_id: string;
           why_attend: string;
-          work_experience: string;
         };
         Update: {
           community_id?: string;
-          company_name?: string;
           created_at?: string;
           expectations?: string;
           updated_at?: string;
           user_id?: string;
           why_attend?: string;
-          work_experience?: string;
         };
         Relationships: [
           {

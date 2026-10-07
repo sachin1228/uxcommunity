@@ -58,8 +58,8 @@ export async function POST(
   // and answered the host's compulsory questions, which are recorded here so
   // the host reads them back in the members tab.
   if (community.type === "event") {
-    // The questions are compulsory: the modal will not send without all four
-    // answered, but the server is the referee — a join without answers is
+    // The questions are compulsory: the modal will not send without all of
+    // them answered, but the server is the referee — a join without answers is
     // refused rather than waved through.
     const answers = joinAnswersPayload(body?.answers ?? {});
     if (!answers) {

@@ -13,8 +13,6 @@ type Db = ReturnType<typeof createServiceClient>;
 /** One member's recorded answers — what the members tab renders per member. */
 export interface EventJoinResponseRow {
   user_id: string;
-  company_name: string;
-  work_experience: string;
   why_attend: string;
   expectations: string;
   created_at: string;
@@ -25,12 +23,6 @@ export function joinAnswersWithinBounds(
   answers: Record<string, unknown>,
 ): boolean {
   return (
-    typeof answers.company_name === "string" &&
-    answers.company_name.length >= 1 &&
-    answers.company_name.length <= EVENT_JOIN_ANSWER_LIMITS.company_name &&
-    typeof answers.work_experience === "string" &&
-    answers.work_experience.length >= 1 &&
-    answers.work_experience.length <= EVENT_JOIN_ANSWER_LIMITS.work_experience &&
     typeof answers.why_attend === "string" &&
     answers.why_attend.length >= 1 &&
     answers.why_attend.length <= EVENT_JOIN_ANSWER_LIMITS.why_attend &&
@@ -53,8 +45,6 @@ export async function storeEventJoinResponse(
   communityId: string,
   userId: string,
   answers: {
-    company_name: string;
-    work_experience: string;
     why_attend: string;
     expectations: string;
   },
@@ -86,9 +76,7 @@ export async function loadEventJoinResponses(
 ): Promise<Map<string, EventJoinResponseRow>> {
   const { data, error } = await db
     .from("event_chat_join_responses")
-    .select(
-      "user_id, company_name, work_experience, why_attend, expectations, created_at",
-    )
+    .select("user_id, why_attend, expectations, created_at")
     .eq("community_id", communityId);
 
   const map = new Map<string, EventJoinResponseRow>();

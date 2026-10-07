@@ -33,6 +33,8 @@ export interface CommunityEvent {
   user_liked: boolean;
   save_count: number;
   user_saved: boolean;
+  /** Members in the event's group room, or null when no room exists yet. */
+  chat_member_count?: number | null;
   rsvps?: EventRsvp[];
   users: { name: string; avatar_url: string | null } | null;
 }
