@@ -155,6 +155,10 @@ type PerformanceRpcMap = {
       company_logo_url: string | null;
       domain: string | null;
       joined_at: string | null;
+      domain_owner_company_id: string | null;
+      /** `own_domain` | `delegation` | `mailbox_only`. */
+      verified_via: string | null;
+      claim_confidence: string | null;
     }>;
   };
   leave_company: { args: { p_user_id: string }; returns: boolean };

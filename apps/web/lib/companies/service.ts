@@ -131,14 +131,30 @@ export type ConfirmStatus =
   | "company_inactive"
   | "domain_not_verified"
   | "domain_already_verified"
-  | "domain_control_only"
   | "not_installed"
   | "unexpected";
+
+/**
+ * How a proved mailbox was accepted.
+ *
+ * `own_domain` and `delegation` mean the company's claim on the domain was
+ * settled by the proof (or by a reviewed delegation); `mailbox_only` means the
+ * code proved the mailbox but the claim was too weak to verify the domain, so
+ * the membership is real and the domain is still an unproved hint.
+ */
+export type VerifiedVia = "own_domain" | "delegation" | "mailbox_only";
 
 export type ConfirmVerificationResult =
   | {
       ok: true;
-      company: CompanyRef & { logoUrl: string | null; domain: string | null; joinedAt: string | null };
+      company: CompanyRef & {
+        logoUrl: string | null;
+        domain: string | null;
+        joinedAt: string | null;
+        /** Whether the proof settled the domain claim itself. */
+        domainVerified: boolean;
+        verifiedVia: VerifiedVia;
+      };
     }
   | { ok: false; status: Exclude<ConfirmStatus, "verified">; attemptsLeft: number | null };
 
@@ -422,6 +438,8 @@ export async function confirmCompanyVerification(
     };
   }
 
+  const verifiedVia = (row.verified_via as VerifiedVia | null) ?? "own_domain";
+
   return {
     ok: true,
     company: {
@@ -431,6 +449,8 @@ export async function confirmCompanyVerification(
       logoUrl: companyLogoUrl(row.company_logo_url, row.domain),
       domain: row.domain,
       joinedAt: row.joined_at,
+      domainVerified: verifiedVia !== "mailbox_only",
+      verifiedVia,
     },
   };
 }

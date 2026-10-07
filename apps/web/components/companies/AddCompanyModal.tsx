@@ -115,10 +115,15 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
 
-  // Result
-  const [verified, setVerified] = useState<{ name: string; slug: string; domain: string | null } | null>(
-    null
-  );
+  // Result. `domainVerified` is false when the code proved the mailbox but the
+  // company's claim on the domain was too weak to settle it (verified_via
+  // `mailbox_only`) — the membership is real, the verified mark is not earned.
+  const [verified, setVerified] = useState<{
+    name: string;
+    slug: string;
+    domain: string | null;
+    domainVerified: boolean;
+  } | null>(null);
 
   // Directory search, debounced. The empty query browses the directory.
   useEffect(() => {
@@ -255,7 +260,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
       });
       const data = (await res.json().catch(() => ({}))) as {
         /** The verified company, or the company the member should join instead. */
-        company?: CompanyOption;
+        company?: CompanyOption & { verifiedVia?: string };
         error?: string;
         message?: string;
         attemptsLeft?: number | null;
@@ -267,6 +272,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
           name: data.company.name,
           slug: data.company.slug,
           domain: data.company.domain ?? null,
+          domainVerified: data.company.verifiedVia !== "mailbox_only",
         });
         setPending(null);
         setStep("done");
@@ -276,8 +282,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
 
       if (
         data.error === "domain_already_verified" ||
-        data.error === "domain_not_verified" ||
-        data.error === "domain_control_only"
+        data.error === "domain_not_verified"
       ) {
         // The domain moved out from under this challenge: send the member back
         // to search with the reason, rather than letting them retry a code that
@@ -675,7 +680,7 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
               {verified.domain && (
                 <p className="mt-0.5 flex items-center gap-2">
                   <span className="font-body text-xs text-foreground-muted">{verified.domain}</span>
-                  <VerifiedMark size="xs" />
+                  {verified.domainVerified && <VerifiedMark size="xs" />}
                 </p>
               )}
             </div>

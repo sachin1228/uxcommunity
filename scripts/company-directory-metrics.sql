@@ -8,7 +8,8 @@
 -- It cannot answer questions about what real members did, because those only
 -- exist in the database:
 --
---   * how many domains are waiting on an operator (`domain_control_only`)
+--   * how many proofs went through the mailbox alone, and what they left queued
+--     for an operator (`mailbox_only`)
 --   * how many domains members have actually proved
 --   * how many reviews happened, and how they went
 --   * how many verification attempts failed
@@ -34,6 +35,11 @@ verified_claims as (
 -- member verified; the same row exists for a claim an older OTP path verified
 -- before the threshold shipped, which is why the join is on evidence and not on
 -- `source` (the claim keeps the source of the layer that made it).
+--
+-- `mailbox_only_events` counts every proved-mailbox observation: a weak claim
+-- now joins the member to the company (`verified_via = 'mailbox_only'`) and
+-- still leaves the claim unverified, so this is "proofs whose domain question is
+-- unsettled", which is exactly the operator's queue.
 member_verified as (
   select distinct e.company_id, e.domain
   from public.domain_evidence as e
@@ -66,7 +72,7 @@ domains as (
 ),
 observations as (
   select
-    count(*) filter (where e.source = 'member_domain_control')::bigint as domain_control_only_events,
+    count(*) filter (where e.source = 'member_domain_control')::bigint as mailbox_only_events,
     count(distinct (e.company_id, e.domain)) filter (where e.source = 'member_domain_control')::bigint
                                                                         as domains_pending_operator,
     count(*) filter (where e.checked and e.source is distinct from 'member_domain_control')::bigint
@@ -128,7 +134,7 @@ select metric, value from (
   union all select 'domains_verified', domains_verified::text from domains
   union all select 'domains_with_multiple_verified_owners', domains_with_multiple_verified_owners::text from domains
   union all select 'domains_verified_by_members', (select count(*)::text from member_verified)
-  union all select 'domain_control_only_events', domain_control_only_events::text from observations
+  union all select 'mailbox_only_events', mailbox_only_events::text from observations
   union all select 'domains_pending_operator_review', domains_pending_operator::text from observations
   union all select 'checked_company_evidence_rows', checked_company_evidence::text from observations
   union all select 'unchecked_lead_rows', unchecked_leads::text from observations

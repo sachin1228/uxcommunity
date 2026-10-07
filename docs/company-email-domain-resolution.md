@@ -14,7 +14,7 @@ just stated here:
 | A claim's evidence | What a correct OTP at that domain does |
 | --- | --- |
 | `high` / `medium` | promotes the claim to **verified** and creates the membership |
-| `low` / `unknown` | **domain control only** (`domain_control_only`): the observation is recorded, nothing is verified, no membership is created |
+| `low` / `unknown` | creates the membership through the mailbox alone (`verified_via = 'mailbox_only'`): the observation is recorded, the claim stays unverified |
 
 An OTP proves the member controls that **mailbox**. It does not prove that the
 directory's company → domain mapping is correct, and every seeded row in the
@@ -23,21 +23,27 @@ whichever seeded row is wrong becomes verified company ownership for the first
 person who signs up at that domain — which is the reverse of the trust model the
 OTP is supposed to enforce.
 
-So the promotion threshold is part of the trust model:
+So the promotion threshold is part of the trust model, and it governs the
+**domain**, not the membership:
 
 ```
-evidence >= medium   → the mailbox proof settles it
-evidence <  medium   → the mailbox proves CONTROL OF THE DOMAIN, and the
-                       mapping is queued for review as domain_evidence
-                       with source = 'member_domain_control'
+evidence >= medium   → the mailbox proof settles the claim: verified + membership
+evidence <  medium   → the mailbox proves CONTROL OF THE DOMAIN and grants the
+                       membership (verified_via = 'mailbox_only'); the claim
+                       stays unverified and the mapping is queued for review as
+                       domain_evidence with source = 'member_domain_control'
 ```
+
+Either way the member joins the company — they answered a code sent to its
+mailbox, which is what "where do you work?" asked for. What a weak claim cannot
+buy is authority over the domain itself.
 
 That evidence type is deliberately **excluded** from the resolver's weighting
 (`company_domain_steward`): it must not raise a claim's strength, because "somebody
 has a mailbox here" is true for both the right company and the wrong one.
 
 **And it is also excluded from the promotion gate.** The state after a
-`domain_control_only` is not a dead end: the observation is the *queue* for an
+mailbox-only proof is not a dead end: the observation is the *queue* for an
 operator review, and a promotion (which lifts the claim's evidence, not its
 `verified` flag) is what lets a later proof settle it. That mechanism is shipped
 — migration `20260929152000`, `company_domain_review_queue` and
@@ -257,8 +263,9 @@ or an assertion in the shipped migration
 | every promotion/rejection is attributable | `company_domain_reviews.reviewer_id` (not null → `users`), `reason` 3–1000 chars, `before`/`after_confidence`; a reviewer-less call raises |
 | no client role can review | `revoke all … from public, anon, authenticated` + `grant execute … to service_role` on the table and both functions |
 | a weak claim cannot reserve a domain, a medium-or-better one can | `start_company_verification` (case H) and `confirm_company_verification` |
+| a correct code always adds the workplace, while a weak claim still cannot be verified by one | `confirm_company_verification` (`20261007170000`): membership + profile pointer, `verified_via = 'mailbox_only'`, `company_domains.verified` untouched |
 | a proof is the only thing that sets `verified` | both RPCs; the import refuses an export that claims it |
 | a domain whose owner changed | `public.reassign_company_domain(...)` |
 
-Assertions: `supabase/tests/company_domain_stewardship.test.sql` (127),
-`supabase/tests/company_verified_domains.test.sql` (111).
+Assertions: `supabase/tests/company_domain_stewardship.test.sql` (161),
+`supabase/tests/company_verified_domains.test.sql` (118).

@@ -48,7 +48,8 @@ insert into public.companies (id, name, slug) values
 
 -- The shapes this queue exists for:
 --   reviewco.test  Revco A's claim is `unknown` and a member has proved a
---                  mailbox there -> domain_control_only, queued for review.
+--                  mailbox there -> membership via the mailbox alone
+--                  (verified_via = 'mailbox_only'), claim queued for review.
 --   rejectme.test  the same shape, used for the rejection path.
 --   owned.test     Revco A's claim is weak AND somebody else has PROVED the
 --                  domain: promotable? no — that is a reassignment.

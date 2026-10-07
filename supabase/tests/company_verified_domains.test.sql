@@ -28,7 +28,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(116);
+select plan(118);
 
 -- ─── Isolation ──────────────────────────────────────────────
 -- The suite runs against ONE database that ships a real curated company
@@ -54,7 +54,8 @@ delete from public.company_email_verifications where user_id in (
   'c0c0c0c0-0000-4000-8000-000000000005',
   'c0c0c0c0-0000-4000-8000-000000000006',
   'c0c0c0c0-0000-4000-8000-000000000007',
-  'c0c0c0c0-0000-4000-8000-000000000008'
+  'c0c0c0c0-0000-4000-8000-000000000008',
+  'c0c0c0c0-0000-4000-8000-000000000009'
 );
 delete from public.designer_profiles where user_id in (
   'c0c0c0c0-0000-4000-8000-000000000001',
@@ -64,7 +65,8 @@ delete from public.designer_profiles where user_id in (
   'c0c0c0c0-0000-4000-8000-000000000005',
   'c0c0c0c0-0000-4000-8000-000000000006',
   'c0c0c0c0-0000-4000-8000-000000000007',
-  'c0c0c0c0-0000-4000-8000-000000000008'
+  'c0c0c0c0-0000-4000-8000-000000000008',
+  'c0c0c0c0-0000-4000-8000-000000000009'
 );
 delete from public.users where id in (
   'c0c0c0c0-0000-4000-8000-000000000001',
@@ -74,7 +76,8 @@ delete from public.users where id in (
   'c0c0c0c0-0000-4000-8000-000000000005',
   'c0c0c0c0-0000-4000-8000-000000000006',
   'c0c0c0c0-0000-4000-8000-000000000007',
-  'c0c0c0c0-0000-4000-8000-000000000008'
+  'c0c0c0c0-0000-4000-8000-000000000008',
+  'c0c0c0c0-0000-4000-8000-000000000009'
 );
 delete from public.companies where slug in ('figma', 'google', 'midlevel', 'stale-co', 'hintco', 'reserved-co');
 
@@ -86,7 +89,10 @@ insert into public.users (id, name, email, password_hash, application_id) values
   ('c0c0c0c0-0000-4000-8000-000000000005', 'Arjun',  'arjun@google.test',      'x', null),
   ('c0c0c0c0-0000-4000-8000-000000000006', 'Dev',    'dev@midlevel.test',      'x', null),
   ('c0c0c0c0-0000-4000-8000-000000000007', 'Asha',   'asha@hintco.test',       'x', null),
-  ('c0c0c0c0-0000-4000-8000-000000000008', 'Vikram', 'vikram@reserved.test',   'x', null);
+  ('c0c0c0c0-0000-4000-8000-000000000008', 'Vikram', 'vikram@reserved.test',   'x', null),
+  -- A second hintco.test member: the promotion path below needs somebody who is
+  -- not already a member of the company the first flow added.
+  ('c0c0c0c0-0000-4000-8000-000000000009', 'Bela',   'bela@hintco.test',       'x', null);
 
 insert into public.designer_profiles (user_id, experience_level)
 select id, 'mid_level' from public.users
@@ -98,7 +104,8 @@ where id in (
   'c0c0c0c0-0000-4000-8000-000000000005',
   'c0c0c0c0-0000-4000-8000-000000000006',
   'c0c0c0c0-0000-4000-8000-000000000007',
-  'c0c0c0c0-0000-4000-8000-000000000008'
+  'c0c0c0c0-0000-4000-8000-000000000008',
+  'c0c0c0c0-0000-4000-8000-000000000009'
 )
 on conflict (user_id) do update set experience_level = excluded.experience_level;
 
@@ -948,11 +955,11 @@ select is(
 );
 
 -- The code comes back. What it proves is the MAILBOX: this member really does
--- read asha@hintco.test. It does not prove that the directory's mapping of
--- hintco.test to Hintco is right — nobody has checked that row — so the answer
--- is domain control and nothing else. Both halves matter: the member is not
--- silently mapped to a company on the strength of a guess, and nothing is lost,
--- because the observation is recorded.
+-- read asha@hintco.test. That is the question the flow asked ("where do you
+-- work?", answered by a code sent to the workplace's domain), so the workplace
+-- is added. It does NOT make the directory's mapping of hintco.test to Hintco
+-- verified: nobody has checked that row, and the two questions are separate —
+-- membership answers the first, evidence answers the second.
 select is(
   (select status from public.confirm_company_verification(
     'c0c0c0c0-0000-4000-8000-000000000007',
@@ -960,14 +967,27 @@ select is(
       where user_id = 'c0c0c0c0-0000-4000-8000-000000000007' and consumed_at is null),
     'hash-asha'
   )),
-  'domain_control_only',
-  'a correct code on an unchecked directory hint grants domain control, not the company'
+  'verified',
+  'a correct code on an unchecked directory hint adds the company'
+);
+
+select is(
+  (select name from public.get_user_company('c0c0c0c0-0000-4000-8000-000000000007')),
+  'Hintco',
+  'and the member''s profile points at it'
+);
+
+select is(
+  (select count(*)::int from public.company_members
+    where user_id = 'c0c0c0c0-0000-4000-8000-000000000007' and verified),
+  1,
+  'the membership is recorded as verified: the mailbox was proved'
 );
 
 select is(
   (select verified from public.company_domains where domain = 'hintco.test'),
   false,
-  'the unchecked hint stays unverified: a mailbox cannot promote a guess to a proof'
+  'the unchecked hint still stays unverified: a mailbox does not promote a guess to a domain proof'
 );
 
 select is(
@@ -977,17 +997,18 @@ select is(
 );
 
 select is(
-  (select name from public.get_user_company('c0c0c0c0-0000-4000-8000-000000000007')),
-  null,
-  'the member is not silently mapped to a company on weak evidence'
+  (select source from public.domain_evidence
+    where domain = 'hintco.test' and evidence_type = 'work_email_otp'),
+  'member_domain_control',
+  'what the code proved is recorded as exactly that, so an operator still sees the claim'
 );
 
 select is(
-  (select count(*)::int from public.company_members as m
+  (select c.slug from public.company_members as m
     join public.companies as c on c.id = m.company_id
-   where c.slug = 'hintco' and m.verified),
-  0,
-  'and no membership was created'
+   where m.user_id = 'c0c0c0c0-0000-4000-8000-000000000007'),
+  'hintco',
+  'and the membership is the directory company the member chose, not a new row'
 );
 
 select is(
@@ -1008,15 +1029,15 @@ where d.domain = 'hintco.test';
 
 select is(
   (select status from public.confirm_company_verification(
-    'c0c0c0c0-0000-4000-8000-000000000007',
+    'c0c0c0c0-0000-4000-8000-000000000009',
     (select verification_id from public.start_company_verification(
-      p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000007',
+      p_user_id    => 'c0c0c0c0-0000-4000-8000-000000000009',
       p_domain     => 'hintco.test',
-      p_work_email => 'asha@hintco.test',
-      p_code_hash  => 'hash-asha-2',
+      p_work_email => 'bela@hintco.test',
+      p_code_hash  => 'hash-bela',
       p_company_id => (select id from public.companies where slug = 'hintco')
     )),
-    'hash-asha-2'
+    'hash-bela'
   )),
   'verified',
   'once a reviewed source backs the claim, the mailbox proof promotes it'
@@ -1041,11 +1062,14 @@ select is(
 );
 
 select is(
-  (select count(*)::int from public.company_members as m
-    join public.companies as c on c.id = m.company_id
-   where c.slug = 'hintco' and m.verified),
-  1,
-  'the member joins the directory company once'
+  (select count(*)::int from (
+     select m.user_id from public.company_members as m
+       join public.companies as c on c.id = m.company_id
+      where c.slug = 'hintco' and m.verified
+      group by m.user_id having count(*) > 1
+   ) as twice),
+  0,
+  'the members who proved a mailbox here are on the company''s roster once each'
 );
 
 -- A hint is not a blanket invitation: Hintco is verified for hintco.test alone,
