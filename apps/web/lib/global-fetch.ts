@@ -32,6 +32,7 @@ import {
   setDedupeFetchImpl,
   type DedupeFetchOptions,
 } from "./dedupe-fetch"
+import { reportNetworkFailure } from "./connectivity"
 
 export const MUTATION_COOLDOWN_MS = 2000
 export const DEDUPE_BYPASS_HEADER = "x-ux-dedupe-bypass"
@@ -116,11 +117,23 @@ export function installGlobalFetchGuard(): () => void {
   setDedupeFetchImpl(original)
 
   const guarded = ((input, init) => {
-    if (!isSameOriginAppApi(input) || shouldBypassGuard(init)) {
-      return original(input, init)
-    }
-    const method = (init?.method ?? "GET").toUpperCase()
-    return dedupeFetch(input, init, dedupeOptionsFor(input, method))
+    const request =
+      !isSameOriginAppApi(input) || shouldBypassGuard(init)
+        ? original(input, init)
+        : dedupeFetch(
+            input,
+            init,
+            dedupeOptionsFor(input, (init?.method ?? "GET").toUpperCase()),
+          )
+    // Watch rejections to flag connectivity loss app-wide. The derived
+    // promise re-throws, so callers see the exact same failure.
+    return request.then(
+      (response) => response,
+      (error: unknown) => {
+        reportNetworkFailure(error)
+        throw error
+      },
+    )
   }) as typeof fetch
   ;(guarded as unknown as { __uxGlobalFetchGuard: boolean }).__uxGlobalFetchGuard = true
 
