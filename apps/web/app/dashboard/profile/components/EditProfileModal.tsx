@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Lock, Minus } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CommunityDp } from "@/components/communities/CommunityDp";
@@ -64,8 +64,8 @@ function formatDate(iso: string | Date): string {
   });
 }
 
-/** A community as a row: DP, name and the verified seal of a default group. */
-function GroupChip({
+/** DP, name and the verified seal — the inside of every group slot. */
+function GroupContent({
   name,
   imageUrl,
   type,
@@ -74,25 +74,35 @@ function GroupChip({
   name: string;
   imageUrl: string | null;
   type: IdentityDimension;
-  /** The group being left reads muted and dashed. */
+  /** The group being left reads muted, struck through (the modal's "old value" language). */
   leaving?: boolean;
 }) {
   return (
-    <span
-      className={`flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-1.5 ${
-        leaving ? "border-dashed border-border bg-transparent" : "border-border bg-surface"
-      }`}
-    >
+    <>
       <CommunityDp imageUrl={imageUrl} name={name} size={24} iconSize={12} />
       <span
         className={`flex min-w-0 items-center gap-1 font-body text-xs ${
-          leaving ? "text-foreground-muted" : "text-foreground"
+          leaving ? "text-foreground-muted" : "font-medium text-foreground"
         }`}
       >
-        <span className="truncate">{name}</span>
+        <span className={`truncate ${leaving ? "line-through" : ""}`} title={name}>
+          {name}
+        </span>
         <CommunityNameBadges type={type} isPrivate={false} size={11} />
       </span>
-    </span>
+    </>
+  );
+}
+
+/** The empty half of a move: no group to leave, or none to join. */
+function EmptyContent({ text }: { text: string }) {
+  return (
+    <>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-accent/25 text-foreground-subtle">
+        <Minus strokeWidth={2.5} size={11} />
+      </span>
+      <span className="font-body text-xs text-foreground-muted">{text}</span>
+    </>
   );
 }
 
@@ -105,34 +115,56 @@ interface Move {
   join: { name: string; image_url: string | null } | null;
 }
 
-/** The leave → join rows shared by the form preview, the confirm step and the result. */
-function MoveRows({ moves }: { moves: Move[] }) {
+/**
+ * The leave → join rows shared by the form preview and the confirm step:
+ * a full-width ledger — the field label, then a "Leaving" row and a
+ * "Joining" row — so long community names never truncate.
+ */
+const otherKeepsGeneral = "No group — “Other” keeps you in General";
+
+function MoveLabel({ label }: { label: string }) {
   return (
-    <ul className="flex flex-col gap-2.5">
-      {moves.map((move) => (
-        <li key={move.dimension} className="flex flex-wrap items-center gap-2">
-          <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-            {move.label}
+    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+      {label}
+    </p>
+  );
+}
+
+function MoveRow({ move }: { move: Move }) {
+  return (
+    <li>
+      <MoveLabel label={move.label} />
+      <div className="mt-1.5 overflow-hidden rounded-xl border border-border">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <span className="w-16 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-subtle">
+            Leaving
           </span>
           {move.leave ? (
-            <GroupChip
-              name={move.leave.name}
-              imageUrl={move.leave.image_url}
-              type={move.dimension}
-              leaving
-            />
+            <GroupContent name={move.leave.name} imageUrl={move.leave.image_url} type={move.dimension} leaving />
           ) : (
-            <span className="font-body text-xs text-foreground-subtle">No group held</span>
+            <EmptyContent text="No group held" />
           )}
-          <ArrowRight strokeWidth={2.5} size={12} className="shrink-0 text-foreground-subtle" />
+        </div>
+        <div className="flex items-center gap-2 border-t border-accent/10 bg-accent/10 px-3 py-2">
+          <span className="w-16 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+            Joining
+          </span>
           {move.join ? (
-            <GroupChip name={move.join.name} imageUrl={move.join.image_url} type={move.dimension} />
+            <GroupContent name={move.join.name} imageUrl={move.join.image_url} type={move.dimension} />
           ) : (
-            <span className="font-body text-xs text-foreground-muted">
-              No group — &ldquo;Other&rdquo; keeps you in General
-            </span>
+            <EmptyContent text={otherKeepsGeneral} />
           )}
-        </li>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function MoveRows({ moves }: { moves: Move[] }) {
+  return (
+    <ul className="flex flex-col gap-3.5">
+      {moves.map((move) => (
+        <MoveRow key={move.dimension} move={move} />
       ))}
     </ul>
   );
