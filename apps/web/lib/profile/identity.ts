@@ -1,11 +1,11 @@
 /**
  * The identity slots behind the Edit Profile modal.
  *
- * Signup picks the four things that also place a member in an official group
- * — name, designation (experience level + job title), city and sector — and
- * `autoJoinCommunities()` turns the last three into communities. The modal
- * lets a member change them again, under a three-month cooldown per slot
- * (`profile_field_changes`), swapping the memberships the change implies.
+ * Signup picks the details that also place a member in an official group —
+ * name, job title, experience level, city and industry sector — and
+ * `autoJoinCommunities()` turns the group-bearing ones into communities. The
+ * modal lets a member change them again, under a three-month cooldown per
+ * slot (`profile_field_changes`), swapping the memberships the change implies.
  *
  * This file is the client-safe half: the types the page, the API and the
  * modal share, plus the two naming rules that must match `auto-join.ts` and
@@ -14,8 +14,8 @@
  * imports, so the unit test can pin the formulas.
  */
 
-/** One cooldown per slot; designation covers experience level AND job title. */
-export type IdentitySlot = "name" | "designation" | "city" | "sector";
+/** One cooldown slot per editable field; each can change once every three months. */
+export type IdentitySlot = "name" | "job_title" | "experience_level" | "city" | "sector";
 
 /** The profile dimensions that place a member in an official group. */
 export type IdentityDimension = "city" | "sector" | "experience_level" | "job_title";
@@ -60,11 +60,6 @@ export interface IdentityUpdateResult {
   changed_fields: IdentitySlot[];
   left_communities: OfficialGroup[];
   joined_communities: OfficialGroup[];
-}
-
-/** The cooldown slot a dimension bills its change to. */
-export function slotForDimension(dimension: IdentityDimension): IdentitySlot {
-  return dimension === "experience_level" || dimension === "job_title" ? "designation" : dimension;
 }
 
 /**

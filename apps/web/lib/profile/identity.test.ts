@@ -4,7 +4,6 @@ import {
   isCatchAllName,
   officialGroupName,
   previewGroup,
-  slotForDimension,
   slotUnlockDate,
 } from "./identity";
 
@@ -49,15 +48,6 @@ test("a real selection previews the named group with the master image", () => {
     previewGroup("job_title", { id: "product_designer", name: "Product Designer", image_url: null }),
     { name: "Product Designer", image_url: null },
   );
-});
-
-// Designation is ONE cooldown slot covering both halves, so editing either
-// the seniority or the title spends the same three months.
-test("experience level and job title share the designation slot", () => {
-  assert.equal(slotForDimension("experience_level"), "designation");
-  assert.equal(slotForDimension("job_title"), "designation");
-  assert.equal(slotForDimension("city"), "city");
-  assert.equal(slotForDimension("sector"), "sector");
 });
 
 // The unlock date mirrors Postgres' `+ interval '3 months'`, which clamps to

@@ -48,9 +48,10 @@ type Step = "form" | "confirm" | "done";
 
 const slotLabel: Record<IdentitySlot, string> = {
   name: "Name",
-  designation: "Designation",
+  job_title: "Job Title",
+  experience_level: "Experience Level",
   city: "City",
-  sector: "Sector",
+  sector: "Industry Sector",
 };
 
 function formatDate(iso: string | Date): string {
@@ -203,8 +204,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   const sectorChanged = sectorId !== "" && sectorId !== (data.current.sector_id ?? "");
   const levelChanged = levelSlug !== "" && levelSlug !== (data.current.experience_level ?? "");
   const titleChanged = titleSlug !== "" && titleSlug !== (data.current.job_title ?? "");
-  const designationChanged = levelChanged || titleChanged;
-  const anyChange = nameChanged || cityChanged || sectorChanged || designationChanged;
+  const anyChange = nameChanged || cityChanged || sectorChanged || levelChanged || titleChanged;
 
   const selectedCity = data.options.cities.find((o) => o.id === cityId) ?? null;
   const selectedSector = data.options.sectors.find((o) => o.id === sectorId) ?? null;
@@ -223,7 +223,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   if (sectorChanged) {
     moves.push({
       dimension: "sector",
-      label: "Sector",
+      label: "Industry Sector",
       leave: data.groups.sector,
       join: selectedSector ? previewGroup("sector", selectedSector) : null,
     });
@@ -231,7 +231,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   if (levelChanged) {
     moves.push({
       dimension: "experience_level",
-      label: "Experience level",
+      label: "Experience Level",
       leave: data.groups.experience_level,
       join: selectedLevel ? previewGroup("experience_level", selectedLevel) : null,
     });
@@ -239,7 +239,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   if (titleChanged) {
     moves.push({
       dimension: "job_title",
-      label: "Job title",
+      label: "Job Title",
       leave: data.groups.job_title,
       join: selectedTitle ? previewGroup("job_title", selectedTitle) : null,
     });
@@ -248,13 +248,15 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   // ── Cooldown locks (dates come pre-filtered to the future) ──
   const lockFor = (slot: IdentitySlot): string | null => data.locks[slot] ?? null;
   const nameLock = lockFor("name");
-  const designationLock = lockFor("designation");
+  const titleLock = lockFor("job_title");
+  const levelLock = lockFor("experience_level");
   const cityLock = lockFor("city");
   const sectorLock = lockFor("sector");
 
   const spentSlots: IdentitySlot[] = [];
   if (nameChanged) spentSlots.push("name");
-  if (designationChanged) spentSlots.push("designation");
+  if (titleChanged) spentSlots.push("job_title");
+  if (levelChanged) spentSlots.push("experience_level");
   if (cityChanged) spentSlots.push("city");
   if (sectorChanged) spentSlots.push("sector");
 
@@ -327,8 +329,9 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
       {step === "form" && (
         <div>
           <p className="-mt-2 mb-5 font-body text-xs text-foreground-muted">
-            Step 1 of 2 — pick your details. Changing city, sector or designation moves you between
-            the official groups they created; you will confirm on the next step.
+            Step 1 of 2 — pick your details. Changing your city, industry sector, job title or
+            experience level moves you between the official groups they created; you will confirm on
+            the next step.
           </p>
 
           {errorLines.length > 0 && (
@@ -365,32 +368,6 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
               ) : null}
             </div>
 
-            <div>
-              <p className={fieldLabelCls}>
-                <span>Designation</span>
-                <span className="normal-case tracking-normal font-normal text-foreground-subtle">
-                  job title &amp; experience level count as one change
-                </span>
-              </p>
-              <div className="flex flex-col gap-2.5">
-                <SearchableSelect
-                  options={data.options.titles.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url }))}
-                  value={titleSlug}
-                  onChange={setTitleSlug}
-                  placeholder="Job title"
-                  disabled={Boolean(designationLock)}
-                />
-                <SearchableSelect
-                  options={data.options.levels.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url }))}
-                  value={levelSlug}
-                  onChange={setLevelSlug}
-                  placeholder="Experience level"
-                  disabled={Boolean(designationLock)}
-                />
-              </div>
-              {designationLock && <LockNote until={designationLock} />}
-            </div>
-
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <p className={fieldLabelCls}>
@@ -407,17 +384,45 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
               </div>
               <div>
                 <p className={fieldLabelCls}>
-                  <span>Sector</span>
+                  <span>Industry Sector</span>
                 </p>
                 <SearchableSelect
                   options={data.options.sectors.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url }))}
                   value={sectorId}
                   onChange={setSectorId}
-                  placeholder="Select sector"
+                  placeholder="Select industry sector"
                   disabled={Boolean(sectorLock)}
                 />
                 {sectorLock && <LockNote until={sectorLock} />}
               </div>
+            </div>
+
+            <div>
+              <p className={fieldLabelCls}>
+                <span>Job Title</span>
+              </p>
+              <SearchableSelect
+                options={data.options.titles.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url }))}
+                value={titleSlug}
+                onChange={setTitleSlug}
+                placeholder="Select job title"
+                disabled={Boolean(titleLock)}
+              />
+              {titleLock && <LockNote until={titleLock} />}
+            </div>
+
+            <div>
+              <p className={fieldLabelCls}>
+                <span>Experience Level</span>
+              </p>
+              <SearchableSelect
+                options={data.options.levels.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url }))}
+                value={levelSlug}
+                onChange={setLevelSlug}
+                placeholder="Select experience level"
+                disabled={Boolean(levelLock)}
+              />
+              {levelLock && <LockNote until={levelLock} />}
             </div>
           </div>
 
@@ -531,7 +536,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
             {sectorChanged && (
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Sector
+                  Industry Sector
                 </span>
                 <span className="font-body text-sm text-foreground-muted line-through">
                   {data.options.sectors.find((o) => o.id === data.current.sector_id)?.name ?? "—"}

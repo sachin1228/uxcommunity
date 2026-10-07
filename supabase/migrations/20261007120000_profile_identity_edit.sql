@@ -4,17 +4,17 @@
 -- WHY
 --   The profile hero's Edit action used to hand the member off to Settings,
 --   which only edits contact links. Members need to change the identity
---   details they picked during signup — name, designation (job title +
---   experience level), city and industry sector — from a modal on the
---   profile page. Those details are also what places a member in their
---   official groups (General + city + sector + experience level + job
---   title, created at signup / auto-join), so changing one must ALSO move
---   the member between exactly those groups.
+--   details they picked during signup — name, job title, experience level,
+--   city and industry sector — from a modal on the profile page. Those
+--   details are also what places a member in their official groups
+--   (General + city + sector + experience level + job title, created at
+--   signup / auto-join), so changing one must ALSO move the member between
+--   exactly those groups.
 --
 -- WHAT
 --   1. profile_field_changes — one row per member per editable slot, holding
 --      the last change timestamp. A slot may change once every three months:
---        name | designation (experience level AND/OR job title) | city | sector
+--        name | job title | experience level | city | sector
 --   2. update_profile_identity() — the only writer of those columns. It locks
 --      the member's rows, enforces the cooldown, updates name/profile
 --      columns, records the change timestamps, leaves the communities tied
@@ -28,10 +28,30 @@
 -- ─── 1. Cooldown records ────────────────────────────────────
 create table if not exists public.profile_field_changes (
   user_id    uuid not null references public.users (id) on delete cascade,
-  field      text not null check (field in ('name', 'designation', 'city', 'sector')),
+  field      text not null,
   changed_at timestamptz not null default now(),
   primary key (user_id, field)
 );
+
+-- The slot set. Re-runnable: an install that applied the earlier version of
+-- this migration (where experience level and job title shared one
+-- "designation" slot) is migrated in place — the shared lock is granted to
+-- both halves, so the split is never LESS strict than before.
+alter table public.profile_field_changes
+  drop constraint if exists profile_field_changes_field_check;
+
+insert into public.profile_field_changes (user_id, field, changed_at)
+select pfc.user_id, slot.field, pfc.changed_at
+  from public.profile_field_changes as pfc,
+       unnest(array['job_title', 'experience_level']) as slot(field)
+ where pfc.field = 'designation'
+on conflict (user_id, field) do update set changed_at = excluded.changed_at;
+
+delete from public.profile_field_changes where field = 'designation';
+
+alter table public.profile_field_changes
+  add constraint profile_field_changes_field_check
+  check (field in ('name', 'job_title', 'experience_level', 'city', 'sector'));
 
 -- No policies on purpose: only the service role reads/writes this table,
 -- and it bypasses RLS. (Every other write in this app goes through the
@@ -45,10 +65,10 @@ alter table public.profile_field_changes enable row level security;
 revoke all on table public.profile_field_changes from anon, authenticated;
 
 comment on table public.profile_field_changes is
-  'Last-change timestamps for the editable identity slots; each slot can change once per three months.';
+  'Last-change timestamps for the editable identity slots (name, job title, experience level, city, sector); each slot can change once per three months.';
 
 -- ─── 2. The atomic edit ─────────────────────────────────────
-create function public.update_profile_identity(
+create or replace function public.update_profile_identity(
   p_user_id uuid,
   p_name text default null,
   p_city_id uuid default null,
@@ -123,15 +143,19 @@ begin
     v_changed := array_append(v_changed, 'sector');
   end if;
 
-  -- Designation is one slot covering both halves (seniority + title), so
-  -- changing either half uses the slot's single change.
+  -- Experience level and job title are separate slots — separate fields in
+  -- signup and in the modal — so each carries its own three-month cooldown.
   v_experience_changed :=
     p_experience_level is not null and p_experience_level is distinct from v_experience_level;
   v_job_title_changed :=
     p_job_title is not null and p_job_title is distinct from v_job_title;
 
-  if v_experience_changed or v_job_title_changed then
-    v_changed := array_append(v_changed, 'designation');
+  if v_experience_changed then
+    v_changed := array_append(v_changed, 'experience_level');
+  end if;
+
+  if v_job_title_changed then
+    v_changed := array_append(v_changed, 'job_title');
   end if;
 
   if array_length(v_changed, 1) is null then

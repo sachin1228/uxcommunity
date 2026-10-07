@@ -2,11 +2,11 @@
 -- Profile identity edit (migration 20261007120000): cooldowns + group swaps
 --
 -- update_profile_identity() is the one writer of the identity slots edited
--- from the profile modal (name / designation / city / sector). These
--- assertions pin the contract the modal and the API rely on:
+-- from the profile modal (name / job title / experience level / city /
+-- sector). These assertions pin the contract the modal and the API rely on:
 --
---   * each slot can change once per three months — independently;
---   * "designation" is ONE slot covering experience level AND job title;
+--   * each slot can change once per three months — independently, including
+--     job title vs experience level (separate fields in signup and the modal);
 --   * a change swaps the member between the official groups of the changed
 --     dimension only (leave old value's group, join new value's group,
 --     upserting it exactly like auto-join does), moving the membership;
@@ -25,7 +25,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(38);
+select plan(40);
 
 -- ─── Seeded master rows ─────────────────────────────────────────────────────
 create temporary table fx as
@@ -246,7 +246,7 @@ select throws_ok(
   'a second city change inside three months is refused'
 );
 
--- ─── 4. Designation is ONE slot: a title change locks seniority too ─────────
+-- ─── 4. A job title change spends only the job title slot ───────────────────
 create temporary table r4 as
 select public.update_profile_identity(
   '0b000000-0000-4000-8000-000000000001',
@@ -254,8 +254,8 @@ select public.update_profile_identity(
 ) as res;
 
 select is(
-  (select res ->> 'changed_fields' from r4)::jsonb, '["designation"]'::jsonb,
-  'a job title edit reports the designation slot'
+  (select res ->> 'changed_fields' from r4)::jsonb, '["job_title"]'::jsonb,
+  'a job title edit reports the job title slot'
 );
 
 select is(
@@ -272,17 +272,13 @@ select is(
 
 select throws_ok(
   $$select public.update_profile_identity(
-      '0b000000-0000-4000-8000-000000000001', p_experience_level => 'senior')$$,
+      '0b000000-0000-4000-8000-000000000001', p_job_title => 'product_designer')$$,
   'P0001',
   'profile_field_cooldown',
-  'an experience-level change hits the same designation cooldown'
+  'a second job title change inside three months is refused'
 );
 
--- ─── 5. When the designation cooldown lapses, both halves are available ─────
-update public.profile_field_changes
-   set changed_at = now() - interval '4 months'
- where user_id = '0b000000-0000-4000-8000-000000000001' and field = 'designation';
-
+-- ─── 5. Experience level is its own slot, untouched by the title change ─────
 create temporary table r5 as
 select public.update_profile_identity(
   '0b000000-0000-4000-8000-000000000001',
@@ -290,8 +286,8 @@ select public.update_profile_identity(
 ) as res;
 
 select is(
-  (select res ->> 'changed_fields' from r5)::jsonb, '["designation"]'::jsonb,
-  'a lapsed designation slot can be used again'
+  (select res ->> 'changed_fields' from r5)::jsonb, '["experience_level"]'::jsonb,
+  'an experience-level edit right after a title change reports its own slot'
 );
 
 select is(
@@ -313,7 +309,22 @@ select ok(
      where cm.user_id = '0b000000-0000-4000-8000-000000000001'
        and c.type = 'job_title' and c.reference_id = (select ux_title_id from fx)
   ),
-  'roles inside one designation change move only the changed dimension'
+  'the job title change from the previous edit is untouched'
+);
+
+select ok(
+  (select count(*) from public.profile_field_changes
+    where user_id = '0b000000-0000-4000-8000-000000000001'
+      and field in ('job_title', 'experience_level')) = 2,
+  'job title and experience level each record their own cooldown row'
+);
+
+select throws_ok(
+  $$select public.update_profile_identity(
+      '0b000000-0000-4000-8000-000000000001', p_experience_level => 'mid_level')$$,
+  'P0001',
+  'profile_field_cooldown',
+  'a second experience-level change inside three months is refused'
 );
 
 -- ─── 6. "Other" joins nothing: the catch-all keeps members in General ───────
