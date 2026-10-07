@@ -61,7 +61,6 @@ export function EventsView({
     eventDate: string;
     endDate: string | null;
     coverImageUrl: string | null;
-    chatCommunityId: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
@@ -202,7 +201,6 @@ export function EventsView({
         eventDate: event.event_date,
         endDate: event.end_date,
         coverImageUrl: event.cover_image_url,
-        chatCommunityId,
       });
     }
   }
@@ -361,7 +359,6 @@ export function EventsView({
           eventDate={createdGroup.eventDate}
           eventEnd={createdGroup.endDate ?? createdGroup.eventDate}
           coverImageUrl={createdGroup.coverImageUrl}
-          chatCommunityId={createdGroup.chatCommunityId}
           onClose={() => setCreatedGroup(null)}
         />
       )}
