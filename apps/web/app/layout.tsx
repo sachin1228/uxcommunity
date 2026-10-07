@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
+import { OfflineScreen } from "@/components/ui/OfflineScreen";
 import "./globals.css";
 
 /**
@@ -85,6 +86,7 @@ export default function RootLayout({
       <body className="bg-background text-foreground antialiased">
         <NavigationGuard />
         <GlobalFetchGuard />
+        <OfflineScreen />
         {children}
       </body>
     </html>
