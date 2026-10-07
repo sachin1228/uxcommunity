@@ -129,6 +129,10 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
   useEffect(() => {
     if (!open || step !== "search") return;
     const controller = new AbortController();
+    // Only the run that still owns the spinner may clear it: a superseded run
+    // settles the moment it is aborted, and clearing there would blink the
+    // spinner off while the run that replaced it is still waiting.
+    let current = true;
     const timer = setTimeout(async () => {
       setSearching(true);
       setSearchFailed(false);
@@ -144,11 +148,12 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
         setSearchFailed(true);
         setHits([]);
       } finally {
-        setSearching(false);
+        if (current) setSearching(false);
       }
     }, 250);
 
     return () => {
+      current = false;
       controller.abort();
       clearTimeout(timer);
     };
@@ -367,12 +372,14 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
               aria-label="Search company"
               className={`${fieldCls} pl-9`}
             />
+            {/* The spin animation owns `transform` — its keyframes set
+                `rotate()` outright — so a `-translate-y-1/2` on the same
+                element is dropped once per cycle and the icon drops with it.
+                The wrapper holds the centring translate; only the svg spins. */}
             {searching && (
-              <Loader2
-                strokeWidth={2.5}
-                size={14}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-foreground-muted"
-              />
+              <span className="pointer-events-none absolute right-3.5 top-1/2 flex -translate-y-1/2 text-foreground-muted">
+                <Loader2 strokeWidth={2.5} size={14} className="animate-spin" />
+              </span>
             )}
           </div>
 
