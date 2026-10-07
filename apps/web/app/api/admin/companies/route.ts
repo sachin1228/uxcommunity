@@ -40,14 +40,16 @@ export async function GET(request: NextRequest) {
 
   const showAll = request.nextUrl.searchParams.get("all") === "true";
   const query = request.nextUrl.searchParams.get("q") ?? "";
-  const limit = Number(request.nextUrl.searchParams.get("limit") ?? 500);
+  // 1,000 is the function's own cap. The page filters client-side, so a lower
+  // default here would hide directory rows from the people who curate them.
+  const limit = Number(request.nextUrl.searchParams.get("limit") ?? 1000);
   const offset = Number(request.nextUrl.searchParams.get("offset") ?? 0);
 
   const db = createServiceClient();
   const { data, error } = await db.rpc("admin_list_companies", {
     p_query: query.trim().slice(0, 80),
     p_all: showAll,
-    p_limit: Number.isFinite(limit) ? limit : 500,
+    p_limit: Number.isFinite(limit) ? limit : 1000,
     p_offset: Number.isFinite(offset) ? offset : 0,
   });
 

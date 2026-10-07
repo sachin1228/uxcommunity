@@ -688,6 +688,15 @@ nulls last, name`, because the single-`ORDER BY` form cannot use the
 `LIMIT` could discard any, which is the 500,000-row cost this shape avoids. Both
 arms still walk an index, and the browse timings below are unchanged by it.
 
+An admin curates the block at runtime from Admin → Companies → **First screen**
+(migration `20261007160000_company_directory_featured_admin.sql`, route
+`/api/admin/companies/featured`): starring a company appends it, the arrows move
+it one position, removing it closes the gap, and deactivating one takes it out —
+so the block stays 1..N with no ties and never contains a company the picker
+would refuse to show (`featured_rank is null or (is_active and featured_rank >=
+1)`, a check constraint, not a convention). The curated JSON remains the day-one
+list; this is the editor for it.
+
 Measured on the real schema, the real function and the real importer, median of
 five, `shared_buffers = 128MB` (`npm run bench:companies-directory`, which prints
 the whole table and the plans):
@@ -992,8 +1001,9 @@ the migration.
    alias arm, the ≤2-character prefix rule, per-arm `limit v_max`, `strpos`
    ordering inside the substring arms, and an `evidence_confidence` column.
    Re-measured at 1k/10k/100k/500k **against populated tables** (§8). The
-   curated design-first browse (`featured_rank`, migration 150000) sits on top of
-   it and changes nothing about typing (§8).
+   curated design-first browse (`featured_rank`, migrations 150000 and 160000)
+   sits on top of it, is editable from Admin → Companies → First screen, and
+   changes nothing about typing (§8).
 7. **Import path** (§9): `scripts/import-company-directory.mjs` — CSV → unlogged
    staging → set-based merge, deterministic UUIDv5 ids, idempotent, refusing any
    row that claims to be verified and skipping anything a member proved or

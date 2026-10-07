@@ -23,6 +23,14 @@ registry identity and provenance the bootstrap list never had.
 > screen — the empty query — opens on design employers instead of the alphabet's
 > top corner. It removes nothing, touches no other search path, and is reversed by
 > `update public.companies set featured_rank = null`.
+>
+> **Update (2026-10-07), third change:**
+> `20261007160000_company_directory_featured_admin.sql` lets an admin edit that
+> block from Admin → Companies → First screen — feature, reorder, remove. It keeps
+> the block at 1..N with no ties and refuses to hold a deactivated company (the
+> `featured_rank is null or (is_active and featured_rank >= 1)` check). Still
+> nothing removed, and still no second source of truth: the picker reads the same
+> column.
 
 This document is the audit of how those rows came to exist, what was removed from
 the repository, the one operation that removes them from a database that already

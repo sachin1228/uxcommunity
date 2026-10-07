@@ -53,7 +53,7 @@
     "test:notification-tabs": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/notifications-tabs.test.ts",
     "test:notification-realtime": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/notifications-realtime.test.ts",
     "test:companies": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/companies/domains.test.ts apps/web/lib/companies/codes.test.ts apps/web/lib/companies/logos.test.ts",
-    "test:companies-db": "bash supabase/tests/run-local.sh supabase/tests/company_verified_domains.test.sql supabase/tests/company_domain_stewardship.test.sql supabase/tests/company_domain_review.test.sql supabase/tests/company_directory_seed_retirement.test.sql supabase/tests/company_directory_mnc_seed.test.sql supabase/tests/company_directory_admin.test.sql supabase/tests/company_directory_design_first.test.sql",
+    "test:companies-db": "bash supabase/tests/run-local.sh supabase/tests/company_verified_domains.test.sql supabase/tests/company_domain_stewardship.test.sql supabase/tests/company_domain_review.test.sql supabase/tests/company_directory_seed_retirement.test.sql supabase/tests/company_directory_mnc_seed.test.sql supabase/tests/company_directory_admin.test.sql supabase/tests/company_directory_design_first.test.sql supabase/tests/company_directory_featured_admin.test.sql",
     "test:companies-v2": "node --test scripts/generate-company-directory-v2.test.mjs scripts/generate-company-directory-reset.test.mjs",
     "test:companies-import": "node --test scripts/import-company-directory.test.mjs",
     "companies:v2": "node scripts/generate-company-directory-v2.mjs",

@@ -2471,6 +2471,19 @@ export type Database = {
           domain: string | null;
         }[];
       };
+      admin_featured_companies: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          "position": number;
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          domain: string | null;
+          domain_verified: boolean;
+          member_count: number;
+        }[];
+      };
       admin_list_companies: {
         Args: {
           p_query?: string;
@@ -2490,7 +2503,16 @@ export type Database = {
           domain_count: number;
           member_count: number;
           total_count: number;
+          featured_rank: number | null;
         }[];
+      };
+      admin_move_company_featured: {
+        Args: { p_id: string; p_direction: number };
+        Returns: number;
+      };
+      admin_set_company_featured: {
+        Args: { p_id: string; p_featured: boolean };
+        Returns: number;
       };
       admin_update_company: {
         Args: {
