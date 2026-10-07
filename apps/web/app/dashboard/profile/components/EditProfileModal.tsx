@@ -531,6 +531,12 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
                 Communities that will change
               </p>
               <MoveRows moves={moves} />
+              <p className="mt-3 border-t border-border pt-2.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
+                Members are only placed in official communities that match their details — this
+                keeps communities relatable and spam-free. So if you change your city from Pune to
+                Bengaluru, for example, you leave Pune Designers and automatically join Bengaluru
+                Designers.
+              </p>
             </div>
           )}
 
