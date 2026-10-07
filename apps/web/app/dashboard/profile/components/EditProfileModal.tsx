@@ -108,6 +108,9 @@ function EmptyContent({ text }: { text: string }) {
 interface Move {
   dimension: IdentityDimension;
   label: string;
+  /** The current value's master name and the draft value's, for the explainer. */
+  fromValue: string;
+  toValue: string;
   /** The group the member holds for the current value, when they hold one. */
   leave: OfficialGroup | null;
   /** The group the draft value implies; null when the draft is catch-all "Other". */
@@ -169,6 +172,25 @@ function MoveRows({ moves }: { moves: Move[] }) {
   );
 }
 
+/**
+ * The live half of the confirm step's explainer: the member's own draft
+ * spelled out (old → new) with the groups it moves them between, so the
+ * copy talks about the change they are making — not a generic example.
+ */
+function moveSentence(move: Move): string {
+  const head = `You're changing your ${move.label.toLowerCase()} from ${move.fromValue} to ${move.toValue}`;
+  if (move.leave && move.join) {
+    return `${head} — you leave ${move.leave.name} and automatically join ${move.join.name}.`;
+  }
+  if (move.leave) {
+    return `${head} — you leave ${move.leave.name}; “Other” keeps you in General.`;
+  }
+  if (move.join) {
+    return `${head} — you automatically join ${move.join.name}.`;
+  }
+  return `${head} — you stay in General.`;
+}
+
 /** "Can change again on …" — the cooldown note under a locked control. */
 function LockNote({ until }: { until: string }) {
   return (
@@ -209,11 +231,24 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   const selectedLevel = data.options.levels.find((o) => o.id === levelSlug) ?? null;
   const selectedTitle = data.options.titles.find((o) => o.id === titleSlug) ?? null;
 
+  const currentCityName = data.options.cities.find((o) => o.id === data.current.city_id)?.name ?? "—";
+  const currentSectorName = data.options.sectors.find((o) => o.id === data.current.sector_id)?.name ?? "—";
+  const currentLevelName =
+    data.options.levels.find((o) => o.id === data.current.experience_level)?.name ??
+    data.current.experience_level ??
+    "—";
+  const currentTitleName =
+    data.options.titles.find((o) => o.id === data.current.job_title)?.name ??
+    data.current.job_title ??
+    "—";
+
   const moves: Move[] = [];
   if (cityChanged) {
     moves.push({
       dimension: "city",
       label: "City",
+      fromValue: currentCityName,
+      toValue: selectedCity?.name ?? "—",
       leave: data.groups.city,
       join: selectedCity ? previewGroup("city", selectedCity) : null,
     });
@@ -222,6 +257,8 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
     moves.push({
       dimension: "sector",
       label: "Industry Sector",
+      fromValue: currentSectorName,
+      toValue: selectedSector?.name ?? "—",
       leave: data.groups.sector,
       join: selectedSector ? previewGroup("sector", selectedSector) : null,
     });
@@ -230,6 +267,8 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
     moves.push({
       dimension: "experience_level",
       label: "Experience Level",
+      fromValue: currentLevelName,
+      toValue: selectedLevel?.name ?? "—",
       leave: data.groups.experience_level,
       join: selectedLevel ? previewGroup("experience_level", selectedLevel) : null,
     });
@@ -238,6 +277,8 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
     moves.push({
       dimension: "job_title",
       label: "Job Title",
+      fromValue: currentTitleName,
+      toValue: selectedTitle?.name ?? "—",
       leave: data.groups.job_title,
       join: selectedTitle ? previewGroup("job_title", selectedTitle) : null,
     });
@@ -479,8 +520,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
                   Job title
                 </span>
                 <span className="font-body text-sm text-foreground-muted line-through">
-                  {data.options.titles.find((o) => o.id === data.current.job_title)?.name ??
-                    data.current.job_title}
+                  {currentTitleName}
                 </span>
                 <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
                 <span className="font-body text-sm font-medium text-foreground">{selectedTitle?.name}</span>
@@ -492,8 +532,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
                   Experience level
                 </span>
                 <span className="font-body text-sm text-foreground-muted line-through">
-                  {data.options.levels.find((o) => o.id === data.current.experience_level)?.name ??
-                    data.current.experience_level}
+                  {currentLevelName}
                 </span>
                 <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
                 <span className="font-body text-sm font-medium text-foreground">{selectedLevel?.name}</span>
@@ -505,7 +544,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
                   City
                 </span>
                 <span className="font-body text-sm text-foreground-muted line-through">
-                  {data.options.cities.find((o) => o.id === data.current.city_id)?.name ?? "—"}
+                  {currentCityName}
                 </span>
                 <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
                 <span className="font-body text-sm font-medium text-foreground">{selectedCity?.name}</span>
@@ -517,7 +556,7 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
                   Industry Sector
                 </span>
                 <span className="font-body text-sm text-foreground-muted line-through">
-                  {data.options.sectors.find((o) => o.id === data.current.sector_id)?.name ?? "—"}
+                  {currentSectorName}
                 </span>
                 <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
                 <span className="font-body text-sm font-medium text-foreground">{selectedSector?.name}</span>
@@ -530,13 +569,11 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
               <p className="mb-2.5 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
                 Communities that will change
               </p>
-              <MoveRows moves={moves} />
-              <p className="mt-3 border-t border-border pt-2.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
+              <p className="mb-3.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
                 Members are only placed in official communities that match their details — this
-                keeps communities relatable and spam-free. So if you change your city from Pune to
-                Bengaluru, for example, you leave Pune Designers and automatically join Bengaluru
-                Designers.
+                keeps communities relatable and spam-free. {moves.map(moveSentence).join(" ")}
               </p>
+              <MoveRows moves={moves} />
             </div>
           )}
 
