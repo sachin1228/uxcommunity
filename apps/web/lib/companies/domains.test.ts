@@ -4,6 +4,7 @@ import {
   FREE_EMAIL_DOMAINS,
   checkWorkEmail,
   companyNameMatchesDomain,
+  companyNamesMatch,
   domainFromEmail,
   isFreeEmailDomain,
   maskEmail,
@@ -125,6 +126,23 @@ test("a company name has to correspond to the domain it proves", () => {
   assert.equal(companyNameMatchesDomain("Microsoft", "acme-labs.com").label, "acme");
   assert.equal(suggestedCompanyName("labsmart.co.in"), "Labsmart");
   assert.equal(suggestedCompanyName("tcs.com"), "Tcs");
+});
+
+test("the same company under a different spelling is the same name", () => {
+  // The picker hides its "Create "…"" row when a listed company already
+  // answers to what was typed, so that punctuation, casing and a legal-entity
+  // suffix cannot produce a second Zomato that no one can merge away.
+  for (const typed of ["zomato", "Zomato", "ZOMATO", " Zomato ", "Zomato,", "Zomato Inc", "Zomato, Inc.", "The Zomato", "Zomato pvt ltd"]) {
+    assert.equal(companyNamesMatch(typed, "Zomato"), true, `${typed} is Zomato`);
+  }
+
+  for (const typed of ["Zomatos", "Zomato Labs", "Zomatoo", "Zomato Technologies", "", "Inc", "Ltd"]) {
+    assert.equal(companyNamesMatch(typed, "Zomato"), false, `${typed} is not Zomato`);
+  }
+
+  // Two different companies sharing only a legal suffix are not the same name.
+  assert.equal(companyNamesMatch("Figma Inc", "Canva Inc"), false);
+  assert.equal(companyNamesMatch("Figma,", "Figma Inc."), true);
 });
 
 test("the work email is only ever shown masked", () => {

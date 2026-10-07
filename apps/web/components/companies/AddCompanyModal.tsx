@@ -7,7 +7,9 @@ import { Modal } from "@/components/ui/Modal";
 import {
   checkWorkEmail,
   companyNameMatchesDomain,
+  companyNamesMatch,
   domainFromEmail,
+  normalizeDomain,
   suggestedCompanyName,
 } from "@/lib/companies/domains";
 import { CompanyLogo, VerifiedMark } from "./CompanyBadge";
@@ -178,6 +180,19 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
       ? companyNameMatchesDomain(newName, claimedDomain)
       : null;
   const nameSuggestion = claimedDomain ? suggestedCompanyName(claimedDomain) : "";
+
+  // The create row is an escape hatch for "my company is not listed", and a
+  // company the member can already see above it makes that hatch a duplicate
+  // factory. It closes only for that company: a listed one that answers to the
+  // typed name (however it is punctuated), or that owns the typed domain. A
+  // name the directory does not have at all keeps the row, which is the whole
+  // point of it.
+  const typedDomain = normalizeDomain(trimmedQuery);
+  const alreadyListed = hits.some(
+    (company) =>
+      companyNamesMatch(trimmedQuery, company.name) ||
+      (typedDomain !== null && typedDomain === company.domain)
+  );
 
   const startVerification = useCallback(
     async (payload: {
@@ -433,26 +448,28 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={chooseNew}
-            disabled={!trimmedQuery}
-            className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-left transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-foreground-muted">
-              <Building2 strokeWidth={2.5} size={14} />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-body text-sm font-medium text-foreground">
-                {trimmedQuery ? `Create “${trimmedQuery}”` : "Add a company"}
+          {!alreadyListed && (
+            <button
+              type="button"
+              onClick={chooseNew}
+              disabled={!trimmedQuery}
+              className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-left transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-foreground-muted">
+                <Building2 strokeWidth={2.5} size={14} />
               </span>
-              <span className="block font-body text-xs text-foreground-muted">
-                {trimmedQuery
-                  ? "We'll verify it with your work email"
-                  : "Search for your company, or type its name"}
+              <span className="min-w-0">
+                <span className="block truncate font-body text-sm font-medium text-foreground">
+                  {trimmedQuery ? `Create “${trimmedQuery}”` : "Add a company"}
+                </span>
+                <span className="block font-body text-xs text-foreground-muted">
+                  {trimmedQuery
+                    ? "We'll verify it with your work email"
+                    : "Search for your company, or type its name"}
+                </span>
               </span>
-            </span>
-          </button>
+            </button>
+          )}
         </div>
       )}
 
