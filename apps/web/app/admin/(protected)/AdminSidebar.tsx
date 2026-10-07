@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag } from "lucide-react";
+import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2 } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -18,6 +18,7 @@ const MASTER_DATA = [
   { href: "/admin/interests",         label: "Interests",         icon: Sparkles  },
   { href: "/admin/experience-levels", label: "Experience",        icon: TrendingUp },
   { href: "/admin/job-titles",        label: "Job Titles",        icon: BadgeCheck },
+  { href: "/admin/companies",         label: "Companies",         icon: Building2  },
 ];
 
 export function AdminSidebar() {

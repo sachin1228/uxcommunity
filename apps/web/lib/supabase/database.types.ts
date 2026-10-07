@@ -2456,6 +2456,61 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_create_company: {
+        Args: {
+          p_name: string;
+          p_domain?: string | null;
+          p_logo_url?: string | null;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          is_active: boolean;
+          domain: string | null;
+        }[];
+      };
+      admin_list_companies: {
+        Args: {
+          p_query?: string;
+          p_all?: boolean;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          is_active: boolean;
+          created_at: string;
+          domain: string | null;
+          domain_verified: boolean;
+          domain_count: number;
+          member_count: number;
+          total_count: number;
+        }[];
+      };
+      admin_update_company: {
+        Args: {
+          p_id: string;
+          p_name?: string | null;
+          p_is_active?: boolean | null;
+          p_logo_url?: string | null;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          is_active: boolean;
+        }[];
+      };
+      admin_delete_company: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
       complete_signup: {
         Args: {
           p_avatar_source: string;

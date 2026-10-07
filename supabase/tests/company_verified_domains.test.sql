@@ -30,6 +30,17 @@
 create extension if not exists pgtap with schema extensions;
 select plan(116);
 
+-- ─── Isolation ──────────────────────────────────────────────
+-- The suite runs against ONE database that ships a real curated company
+-- directory (20261007130000_company_directory_mnc_seed.sql). This file's
+-- fixtures recreate companies by name and assert against the whole table,
+-- which those rows would pollute — and this file's cleanup would delete Figma
+-- and Google for the test files that run after it. Run inside a transaction
+-- from an empty directory so the file stays independent of what else is
+-- installed, and roll back every fixture when it finishes.
+begin;
+delete from public.companies;
+
 -- ─── Fixture ────────────────────────────────────────────────
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
 -- statements. Cleanup first so a failed earlier run cannot leak into this one:
@@ -1260,5 +1271,7 @@ select is(
   0,
   'no consumer mailbox domain was offered as a company domain'
 );
+
+rollback;
 
 select * from finish();

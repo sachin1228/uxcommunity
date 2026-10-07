@@ -7,6 +7,16 @@ production directory. The production directory is a ~500,000-company dataset
 loaded from a generated CSV export by `scripts/import-company-directory.mjs`, with
 registry identity and provenance the bootstrap list never had.
 
+> **Update (2026-10-07): the directory no longer starts empty.** While the
+> 500,000-company import is still unbuilt, the picker would otherwise be an empty
+> box, so `supabase/migrations/20261007130000_company_directory_mnc_seed.sql`
+> seeds a hand-curated list of ~573 multi-national employers (US / Europe / India)
+> as unverified domain hints, and Admin → Companies
+> (`/api/admin/companies`, migration `20261007140000_company_directory_admin.sql`)
+> manages them afterwards. Nothing else in this document changes: it is still the
+> audit and the operation for retiring the v1 4,574-row bootstrap seed, and a
+> curated hint is not one of those rows.
+
 This document is the audit of how those rows came to exist, what was removed from
 the repository, the one operation that removes them from a database that already
 has them, and the evidence that it cannot take anything else with it.

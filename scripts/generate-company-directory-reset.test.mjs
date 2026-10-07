@@ -41,15 +41,30 @@ test("the committed operation is exactly what the generator produces", () => {
   assert.equal(SEED.length, 4574, "the seed layer is 4,574 entries");
 });
 
-test("it is not a migration, so a freshly built database has no seed to reset", () => {
-  // The file lives outside supabase/migrations/, and no migration writes
-  // directory rows: that is what makes `db reset` (and a new production
-  // database) start with an empty company directory, companies 0 and
-  // company_domains 0, rather than 4,574 bootstrap rows.
+test("it is not a migration, and only the curated seed writes directory rows", () => {
+  // The reset file lives outside supabase/migrations/, so `db reset` never
+  // applies it: no migration runs it, and it removes only the RETIRED v1
+  // bootstrap rows, which no current migration writes.
+  //
+  // One migration DOES seed rows — the curated MNC list
+  // (20261007130000_company_directory_mnc_seed.sql) — and it is the single
+  // sanctioned exception: the directory would otherwise be an empty box until
+  // the 500k import exists. This test keeps the guard by naming it: any OTHER
+  // migration that starts writing directory rows has to be a deliberate change.
   assert.ok(!OUT_PATH.includes("supabase/migrations/"), "the reset is not under migrations");
+
+  const seeders = readdirSync(MIGRATIONS)
+    .filter((file) => file.endsWith(".sql"))
+    .filter((file) => readFileSync(join(MIGRATIONS, file), "utf8").includes("insert into _mnc_seed"));
+  assert.deepEqual(
+    seeders,
+    ["20261007130000_company_directory_mnc_seed.sql"],
+    "only the curated MNC seed writes directory rows from a migration"
+  );
 
   const offenders = readdirSync(MIGRATIONS)
     .filter((file) => file.endsWith(".sql"))
+    .filter((file) => file !== "20261007130000_company_directory_mnc_seed.sql")
     .filter((file) => {
       const sql = readFileSync(join(MIGRATIONS, file), "utf8");
       // A top-level (column 0) insert is a seed. The member-facing confirm flow
@@ -57,7 +72,7 @@ test("it is not a migration, so a freshly built database has no seed to reset", 
       // with `created_by` — which is a write a member caused, not a seed.
       return /^insert into public\.(companies|company_domains)/m.test(sql) || /insert into _company_directory/.test(sql);
     });
-  assert.deepEqual(offenders, [], "no migration writes company or domain rows when it is applied");
+  assert.deepEqual(offenders, [], "no other migration writes company or domain rows when it is applied");
 });
 
 test("applying the file removes nothing: the transition takes an explicit call", () => {

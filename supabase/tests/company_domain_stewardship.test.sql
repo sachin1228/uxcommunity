@@ -38,6 +38,15 @@
 create extension if not exists pgtap with schema extensions;
 select plan(161);
 
+-- ─── Isolation ──────────────────────────────────────────────
+-- The suite runs against ONE database that ships a real curated company
+-- directory (20261007130000_company_directory_mnc_seed.sql). This file asserts
+-- exact claim counts for domains those rows also carry (meta.com), so it runs
+-- inside a transaction from an empty directory and rolls every fixture back,
+-- leaving the curated rows exactly as they were for the files that follow.
+begin;
+delete from public.companies;
+
 -- ─── Fixture ────────────────────────────────────────────────
 
 -- Committed rows, because the RPCs are SECURITY DEFINER and are called across
@@ -1620,5 +1629,7 @@ select is(
   0,
   'and the refused row left nothing behind'
 );
+
+rollback;
 
 select * from finish();
