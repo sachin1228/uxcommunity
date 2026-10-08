@@ -186,7 +186,9 @@ export function EventsView({
           event_date: event.event_date,
           end_date: event.end_date,
           is_online: event.is_online,
-          rsvp_count: 0,
+          // The create response counts the host, who is going from the moment
+          // the event exists — the card must not say "Be the first to go".
+          rsvp_count: event.rsvp_count,
         },
       },
     });

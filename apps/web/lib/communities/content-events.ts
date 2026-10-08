@@ -64,7 +64,11 @@ function metaFor(kind: ContentEventKind, row: Record<string, unknown>): ContentE
         event_date: typeof row.event_date === "string" ? row.event_date : null,
         end_date: typeof row.end_date === "string" ? row.end_date : null,
         is_online: row.is_online === true,
-        rsvp_count: 0,
+        // The event row carries no count of its own; a caller that knows the
+        // one it just wrote (the create route writes the host's RSVP with the
+        // event) hands it over, and everyone else gets the bootstrap pass,
+        // which recounts from event_rsvps (see loadCommunityContentEvents).
+        rsvp_count: typeof row.rsvp_count === "number" ? row.rsvp_count : 0,
       };
   }
 }

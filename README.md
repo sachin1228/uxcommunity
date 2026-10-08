@@ -197,6 +197,16 @@ Without database access at all, `--mock-communities 3` answers the sidebar's own
 
 In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `apps/web/wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
 
+### Event host-going regression
+
+```bash
+E2E_SEED_ALLOW_REMOTE=1 npm run test:e2e-event-host-going   # against the project apps/web/.env.local points at
+npm run test:e2e-event-host-going -- --url http://localhost:3000
+npm run test:e2e-event-host-going -- --keep-seed            # leave the event and seed for inspection
+```
+
+A member who creates an event is in its group chat, so they are going to it — but "going" is answered by `event_rsvps`, the table behind the card's "Going ✓" and its count. `apps/web/e2e/event-host-going.test.mjs` is the guard for that: it seeds the same throwaway member and one private community it owns, mints the member's session from `SESSION_SECRET`, creates an event through `POST /api/communities/:id/events`, and asserts the response, the `event_rsvps` row and the community's event list all agree the host is going. It then withdraws the RSVP and takes the undo offer's action — the same POST the toast fires — asserting both directions on all three surfaces, and that withdrawing never evicts the host from their own group chat. It starts its own `next dev` on port 3119 unless `--url` / `E2E_APP_URL` points at a running app, and deletes the event, its group chat and the seed when the run ends. Without the host's row, the host's own card offers them the "I'm Going" button and the count leaves them out — exactly the state this run turns red.
+
 ### Cloudflare deployment targets
 
 Two Workers deploy from this repository, both from `.github/workflows/deploy.yml`, in that order: `uxcommunity-realtime` (config in `apps/realtime/wrangler.toml`), which owns both Durable Object classes (`Room` for communities, `UserDO` for user rooms), and then `uxcommunity-web` (config in `apps/web/wrangler.toml`), the OpenNext bundle that publishes to it.

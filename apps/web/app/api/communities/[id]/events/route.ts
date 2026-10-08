@@ -213,13 +213,32 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // The host is going to the event they just made. They are put in its group
+  // chat below, and the RSVP must say the same thing or the card would invite
+  // them to their own event and the going count would leave them out. Written
+  // with the creation, not left for them to confirm — and a failure here is
+  // logged, never fatal: the event exists, and the button stays as the way to
+  // fix it. This is the event's first RSVP, so its default `created_at` also
+  // puts the host at the head of the attendee strip, which lists oldest first.
+  const { error: creatorRsvpError } = await db
+    .from("event_rsvps")
+    .insert({ event_id: (data as { id: string }).id, user_id: userId });
+  if (creatorRsvpError) {
+    console.error("[POST community events] creator RSVP failed:", creatorRsvpError);
+  }
+
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },
     {
-      // The chat timeline's permanent "<name> created an event" card.
+      // The chat timeline's permanent "<name> created an event" card. The
+      // count is the host's own RSVP written above — without it the card would
+      // announce an event with somebody going as "Be the first to go".
       room: realtimeRooms.chat(communityId),
       topic: "content-insert",
-      data: contentEventPayload(data as Record<string, unknown>, "event"),
+      data: contentEventPayload(
+        { ...(data as Record<string, unknown>), rsvp_count: creatorRsvpError ? 0 : 1 },
+        "event",
+      ),
     },
   ]);
 
