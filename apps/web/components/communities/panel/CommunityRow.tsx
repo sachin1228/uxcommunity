@@ -103,7 +103,7 @@ export const CommunityRow = memo(function CommunityRow({
       <button
         onClick={() => onClick(c.id)}
         onMouseEnter={handleMouseEnter}
-        className={`flex w-full items-start gap-[11px] rounded-lg px-[10px] py-[9px] text-left transition-colors ${
+        className={`flex w-full items-start gap-[11px] rounded-lg px-[14px] py-[9px] text-left transition-colors ${
           active
             ? "bg-surface-raised text-foreground"
             : "hover:bg-surface-raised"

@@ -95,14 +95,14 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto">
       {/* WORKSPACE nav */}
       <div className="px-[8px] pb-[9px] pt-[13px]">
-        <p className="mb-[9px] px-[10px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
+        <p className="mb-[9px] px-[14px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
           Workspace
         </p>
         <ul className="flex flex-col gap-[3px]">
           <li>
             <Link
               href="/dashboard"
-              className={`flex items-center gap-[11px] rounded-lg px-[9px] py-[7px] font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -115,7 +115,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard/communities"
-              className={`flex items-center gap-[11px] rounded-lg px-[9px] py-[7px] font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
                 exploreActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -128,7 +128,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard/library"
-              className={`flex items-center gap-[11px] rounded-lg px-[9px] py-[7px] font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
                 libraryActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -141,7 +141,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard/jobs"
-              className={`flex items-center gap-[11px] rounded-lg px-[9px] py-[7px] font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
                 jobsActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -157,7 +157,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
 
       {/* ALL — community list */}
       <div>
-        <div className="flex items-center justify-between px-[18px] pb-[7px] pt-[9px]">
+        <div className="flex items-center justify-between px-[22px] pb-[7px] pt-[9px]">
           <span className="font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
             Your Community
           </span>
