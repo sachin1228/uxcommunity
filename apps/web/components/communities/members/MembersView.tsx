@@ -481,7 +481,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                   >
                     <ChatAvatar name={member.name} url={member.avatar_url} size={9} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
+                      <div className="flex items-center gap-2">
                         <p className="font-body text-sm font-semibold text-foreground truncate leading-none">
                           {member.name}
                         </p>
@@ -499,11 +499,6 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                           </span>
                         ) : null}
                       </div>
-                      {member.designation && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
-                          {member.designation}
-                        </span>
-                      )}
                     </div>
                     {/* Row menu — managers only; each action checks its own
                         protected rows (see canRemoveRow / canModerateRow). */}
