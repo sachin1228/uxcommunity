@@ -125,23 +125,6 @@ function fmtEventDate(iso: string) {
 }
 
 
-/**
- * True when an accent is so light that white text on it would wash out — the
- * white and near-white picks (Silver, a custom #fff). WCAG relative luminance,
- * gamma-corrected, with 0.8 as the washout line: everything below takes white
- * text, everything above takes dark.
- */
-function accentNeedsDarkText(hex: string): boolean {
-  const m = hex.replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(m)) return false;
-  const channel = (i: number) => {
-    const c = parseInt(m.slice(i, i + 2), 16) / 255;
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  };
-  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-  return luminance > 0.8;
-}
-
 /** Uppercase micro-label used across the event ticket fields (ink on paper). */
 function TicketLabel({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
@@ -447,25 +430,13 @@ export function EventCard({
   ];
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
-  // Per-event accent color: drives the big date, going button, glow, and the
-  // stub's tinted gradient (accent mixed into dark, ~12% at top fading to 0).
   // The host's own reading of the schedule, shown only when it differs from
   // this viewer's clock (and only for events young enough to carry a zone) —
   // see hostScheduleForViewer.
   const hostSchedule = hostScheduleForViewer(event);
 
-  const accent = event.accent_color ?? "#e8e14a";
-  const accentStyle = {
-    ["--accent" as string]: accent,
-    ["--accent-hover" as string]: `${accent}e6`,
-    ["--accent-glow" as string]: `${accent}40`,
-    ["--accent-tint" as string]: `${accent}1f`,
-  } as React.CSSProperties;
-
-  // Ink for text sitting on the solid accent: white on every color that can
-  // carry it, dark on the washed-out light ones (see accentNeedsDarkText).
-  const onAccentText = accentNeedsDarkText(accent) ? "text-stone-950" : "text-white";
-
+  // The ticket is monochrome by design: white ink on the dark card, the same
+  // accent the app itself uses. There is no per-event card colour to pick.
   const rsvpButton = !past ? (
     <button
       type="button"
@@ -473,10 +444,10 @@ export function EventCard({
       disabled={rsvpPending || full}
       className={`inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full px-3 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         event.user_rsvped
-          ? "bg-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/30"
+          ? "bg-white/20 text-white hover:bg-white/30"
           : full
             ? "border border-white/20 text-stone-500"
-            : `bg-[var(--accent)] ${onAccentText} shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]`
+            : "bg-white text-stone-950 shadow-[0_2px_8px_rgba(255,255,255,0.25)] hover:bg-white/90"
       }`}
     >
       {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
@@ -537,7 +508,6 @@ export function EventCard({
       ref={ticketRef}
       className="relative bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)]"
       style={{
-        ...accentStyle,
         clipPath: `url(#${clipId})`,
         WebkitClipPath: `url(#${clipId})`,
       }}
@@ -655,14 +625,14 @@ export function EventCard({
         {/* ── Panel 3: perforated stub with the big date + going button ── */}
         <div
           className="relative shrink-0 bg-[#111111] lg:w-[9.5rem]"
-          style={{ backgroundImage: "linear-gradient(to bottom, var(--accent-tint), transparent 70%)" }}
+          style={{ backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.12), transparent 70%)" }}
         >
 
           <div className="flex h-full flex-col items-center justify-center gap-3.5 px-3 py-5">
             {/* Big date block */}
             <div className="text-center">
               <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-stone-300">{startWeekday}</p>
-              <p className="font-display text-5xl font-bold leading-none text-[var(--accent)]">{startDay}</p>
+              <p className="font-display text-5xl font-bold leading-none text-white">{startDay}</p>
               <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-stone-300">{startMonth} {startYear}</p>
             </div>
 

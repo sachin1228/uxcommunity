@@ -7,14 +7,14 @@ import { enrichCommunityEvents } from "./read-models";
 /**
  * The one column list every event surface selects before handing a row to
  * `EventCard`. Kept here, next to the enrichment, so a query can't quietly drop
- * a field the card renders (`accent_color`, `is_public`, …) — the event page and
- * the feed disagreed on the accent colour for exactly that reason.
+ * a field the card renders (`is_public`, `host_timezone`, …) — the event page
+ * and the feed disagreed on those for exactly that reason.
  *
  * Everything the card needs beyond these columns (author, counts, attendee
  * faces) is filled in by `enrichEventCards`.
  */
 export const EVENT_CARD_COLUMNS =
-  "id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, accent_color, host_timezone, host_utc_offset_minutes, created_at, updated_at";
+  "id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, host_timezone, host_utc_offset_minutes, created_at, updated_at";
 
 /** How many attendee faces the card's avatar stack shows. */
 const ATTENDEE_PREVIEW_LIMIT = 5;

@@ -185,10 +185,6 @@ export async function POST(
     : null;
   const isPublic = body.is_public === true;
 
-  const accentColor = typeof body.accent_color === "string" && /^#[0-9a-fA-F]{6}$/.test(body.accent_color.trim())
-    ? body.accent_color.trim().toLowerCase()
-    : null;
-
   const { data, error } = await db
     .from("community_events")
     .insert({
@@ -203,7 +199,6 @@ export async function POST(
       meet_link: meetLink,
       max_attendees: maxAttendees,
       cover_image_url: rawCoverImageUrl,
-      accent_color: accentColor,
       is_public: isPublic,
       host_timezone: hostTimezone,
       host_utc_offset_minutes: hostOffsetMinutes,
