@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookMarked, Calendar, Eraser, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -53,14 +53,14 @@ type ConfirmAction = "leave" | "delete" | null;
 
 const CONFIRM_COPY: Record<NonNullable<ConfirmAction>, { title: string; body: string; cta: string }> = {
   leave: {
-    title: "Leave community?",
+    title: "Exit community?",
     body: "You'll no longer be able to view or send messages here.",
-    cta: "Leave",
+    cta: "Exit",
   },
   delete: {
-    title: "Delete chat?",
-    body: "This removes the chat from your sidebar. Other members won't be affected, and it'll reappear when a new message arrives.",
-    cta: "Delete chat",
+    title: "Clear chat?",
+    body: "This clears the chat from your sidebar. Other members won't be affected, and it'll reappear when a new message arrives.",
+    cta: "Clear chat",
   },
 };
 
@@ -294,19 +294,21 @@ export const ChatHeader = memo(function ChatHeader({
                         type="button"
                         role="menuitem"
                         onClick={() => requestAction("delete")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
                       >
-                        Delete chat
+                        <Eraser strokeWidth={2.5} size={14} className="shrink-0" />
+                        <span>Clear chat</span>
                       </button>
-                      {/* Most destructive last: leaving removes membership,
-                          deleting only hides the chat from your sidebar. */}
+                      {/* Most destructive last: exiting removes membership,
+                          clearing only hides the chat from your sidebar. */}
                       <button
                         type="button"
                         role="menuitem"
                         onClick={() => requestAction("leave")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
                       >
-                        Leave community
+                        <LogOut strokeWidth={2.5} size={14} className="shrink-0" />
+                        <span>Exit community</span>
                       </button>
                     </div>
                   )}
