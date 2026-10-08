@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime, formatCommenters } from "./chatUtils";
+import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import {
   NotificationHoverActions,
@@ -174,10 +174,8 @@ export function ContentNotificationBubble({
 
   const reactions = event.reactions ?? [];
   // How much discussion the card has on its own detail page — surfaced here so
-  // members can judge it without opening the item first, along with the people
-  // who spoke most recently.
+  // members can judge it without opening the item first.
   const commentCount = Math.max(0, meta?.comment_count ?? 0);
-  const commenterNames = formatCommenters(meta?.comment_users);
 
   return (
     <div
@@ -332,23 +330,13 @@ export function ContentNotificationBubble({
           <div className="flex items-center gap-1.5 mt-0.5">
             {commentCount > 0 && (
               <span
-                className={`flex min-w-0 items-center gap-1 font-body text-[10px] leading-none ${
+                className={`flex items-center gap-1 font-body text-[10px] leading-none ${
                   isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
                 }`}
-                title={
-                  commenterNames
-                    ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"} · ${commenterNames}`
-                    : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
-                }
+                title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
               >
                 <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
                 <span className="shrink-0 tabular-nums">{commentCount}</span>
-                {commenterNames && (
-                  <span className="truncate">
-                    <span className="opacity-60">·&nbsp;</span>
-                    {commenterNames}
-                  </span>
-                )}
               </span>
             )}
             <span
