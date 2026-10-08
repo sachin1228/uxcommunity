@@ -49,8 +49,6 @@ function makeDescription(type, name) {
       return `Designers working in the ${name} industry. Discuss trends, tools, and opportunities.`;
     case "experience_level":
       return `A community for ${name}. Peer support, career advice, and shared learning.`;
-    case "general":
-      return `${name} — an open community for designers everywhere.`;
     case "user":
       return `${name} — a member-led community.`;
     default:

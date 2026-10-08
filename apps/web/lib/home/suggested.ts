@@ -14,8 +14,7 @@ export const SUGGESTION_LIMIT = 4;
  * Community types worth suggesting. Profile-derived communities (city, sector,
  * experience level, job title) are deliberately out: a member can only join the
  * ones their profile already matches, and they are auto-joined at signup, so
- * they are never a discovery. `general` is excluded for the same reason — every
- * member is in it.
+ * they are never a discovery.
  */
 const SUGGESTABLE_TYPES: ReadonlySet<string> = new Set(["interest", "user"]);
 

@@ -72,7 +72,6 @@ test("skips private communities — a Join tap there would only file a request",
 
 test("suggests interest and member-led communities only", () => {
   const suggested = pickSuggestedCommunities([
-    community({ id: "auto-joined-at-signup", type: "general", member_count: 9000 }),
     community({ id: "profile-city", type: "city", member_count: 8000 }),
     community({ id: "always-matches", type: "interest", member_count: 30 }),
     community({ id: "member-led", type: "user", member_count: 20 }),

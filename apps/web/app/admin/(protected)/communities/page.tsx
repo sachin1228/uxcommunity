@@ -19,7 +19,6 @@ type MainTabValue = typeof MAIN_TABS[number]["value"];
 // Type sub-tabs (shown below the origin tabs, always the same row).
 const TYPE_TABS = [
   { label: "All", value: "all" },
-  { label: "General", value: "general" },
   { label: "Industry", value: "sector" },
   { label: "Interest", value: "interest" },
   { label: "Experience", value: "experience_level" },

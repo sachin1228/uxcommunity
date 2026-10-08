@@ -272,8 +272,8 @@ function SignupInner() {
         return;
       }
       // Communities are auto-joined server-side during /api/signup/avatar, so the
-      // sidebar shows the full list (General + city + sector) the first time the
-      // dashboard loads.
+      // sidebar shows the full list (city + sector + interests) the first time
+      // the dashboard loads.
       setWelcome({
         phase: "ready",
         joinedCommunities:

@@ -26,7 +26,7 @@ test("member-created communities are not verified", () => {
 });
 
 test("verification is case sensitive so a hand-crafted name can't spoof it", () => {
-  assert.equal(isSignupCommunity("General"), false);
+  assert.equal(isSignupCommunity("Interest"), false);
 });
 
 test("only an explicit true reads as private", () => {
@@ -42,7 +42,7 @@ test("only an explicit true reads as private", () => {
 // an earth beside the seal would be noise, and those groups are not discovered
 // by browsing.
 test("signup default groups show the seal alone", () => {
-  for (const type of ["general", "city", "sector", "experience_level", "job_title"]) {
+  for (const type of ["city", "sector", "experience_level", "job_title"]) {
     assert.deepEqual(
       communityNameBadges(type, false),
       { verified: true, visibility: null },

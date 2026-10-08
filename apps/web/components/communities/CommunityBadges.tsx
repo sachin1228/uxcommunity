@@ -10,7 +10,7 @@ import {
  * what kind of group they are looking at:
  *
  *   ✓  verified seal — a default group the signup flow created for them
- *                      (General, city, sector, experience level, job title)
+ *                      (city, sector, experience level, job title)
  *   🌐 earth         — an interest community, or a public member-created group
  *   🔒 lock          — a private group
  *

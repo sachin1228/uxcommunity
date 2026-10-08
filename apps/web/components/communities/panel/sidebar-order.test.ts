@@ -40,7 +40,7 @@ function order(communities: Ordered[]): string[] {
 // The exact situation the pin exists for: an event goes out, the room is empty,
 // and the busy communities it has to outrank all have fresh messages.
 const BUSY: Ordered[] = [
-  community("General", "2026-09-24T18:20:00Z"),
+  community("Accessibility", "2026-09-24T18:20:00Z"),
   community("Bangalore Designers", "2026-09-24T17:05:00Z"),
   community("Product Design", "2026-09-24T16:44:00Z"),
 ];
@@ -57,7 +57,7 @@ test("a room that is not pinned sorts back down with the rest", () => {
   // was ever above communities that talk more.
   const expired = community("Designup decade", "2026-09-24T12:00:00Z");
   assert.deepEqual(order([...BUSY, expired]), [
-    "General",
+    "Accessibility",
     "Bangalore Designers",
     "Product Design",
     "Designup decade",
@@ -74,7 +74,7 @@ test("a pin past its deadline is expired, and only then", () => {
   // The client's clock is the caller's, so the answer is exact at the boundary:
   // the deadline instant itself is over, one millisecond before it is not.
   const room = community("Designup decade", null, { id: "a", pinned_until: "2026-09-25T13:30:00Z" });
-  const unpinned = community("General", "2026-09-24T18:20:00Z", { id: "b" });
+  const unpinned = community("Accessibility", "2026-09-24T18:20:00Z", { id: "b" });
   const deadline = Date.parse("2026-09-25T13:30:00Z");
 
   assert.deepEqual(expiredPinIds([room, unpinned], deadline - 1), []);
@@ -101,7 +101,7 @@ test("the event somebody just RSVPed to is at the very top of the pinned group",
   assert.deepEqual(order([conference, ...BUSY, townHall]), [
     "Bangalore meetup",
     "Designup decade",
-    "General",
+    "Accessibility",
     "Bangalore Designers",
     "Product Design",
   ]);

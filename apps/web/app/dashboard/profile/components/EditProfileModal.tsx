@@ -122,7 +122,7 @@ interface Move {
  * a full-width ledger — the field label, then a "Leaving" row and a
  * "Joining" row — so long community names never truncate.
  */
-const otherKeepsGeneral = "No group — “Other” keeps you in General";
+const otherCreatesNoGroup = "No group — “Other” creates no community";
 
 function MoveLabel({ label }: { label: string }) {
   return (
@@ -154,7 +154,7 @@ function MoveRow({ move }: { move: Move }) {
           {move.join ? (
             <GroupContent name={move.join.name} imageUrl={move.join.image_url} type={move.dimension} />
           ) : (
-            <EmptyContent text={otherKeepsGeneral} />
+            <EmptyContent text={otherCreatesNoGroup} />
           )}
         </div>
       </div>
@@ -183,12 +183,12 @@ function moveSentence(move: Move): string {
     return `${head} — you leave ${move.leave.name} and automatically join ${move.join.name}.`;
   }
   if (move.leave) {
-    return `${head} — you leave ${move.leave.name}; “Other” keeps you in General.`;
+    return `${head} — you leave ${move.leave.name}; “Other” creates no community.`;
   }
   if (move.join) {
     return `${head} — you automatically join ${move.join.name}.`;
   }
-  return `${head} — you stay in General.`;
+  return `${head} — no community changes.`;
 }
 
 /** "Can change again on …" — the cooldown note under a locked control. */

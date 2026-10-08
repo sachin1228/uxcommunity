@@ -2,11 +2,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Auto-join a user to every community implied by their profile:
- * General (always) + city + sector + experience level + job title + each design interest.
+ * city + sector + experience level + job title + each design interest.
  *
  * The catch-all "Other" options (cities / sectors / interests named "Other")
- * intentionally do NOT produce a dedicated community — those members already
- * land in the always-joined General community.
+ * intentionally do NOT produce a dedicated community.
  *
  * Runs server-side (service role) at signup completion and again, once per
  * member, as a dashboard repair for accounts created before this logic was
@@ -47,7 +46,7 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
 
   if (profile?.city_id) {
     const city = profile.cities as unknown as { name: string; image_url: string | null } | null;
-    // "Other" cities don't get a community — the member stays in General.
+    // "Other" cities don't get a dedicated community.
     if (city && !isCatchAll(city.name)) {
       specs.push({
         type: "city",
@@ -60,7 +59,7 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
 
   if (profile?.sector_id) {
     const sector = profile.design_sectors as unknown as { name: string; image_url: string | null } | null;
-    // "Other" sectors don't get a community — the member stays in General.
+    // "Other" sectors don't get a dedicated community.
     if (sector && !isCatchAll(sector.name)) {
       specs.push({
         type: "sector",
@@ -119,25 +118,8 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
     }
   }
 
-  // ── 3. Always join the default general community ─────────────
-  const { data: generalCommunity } = await db
-    .from("communities")
-    .select("id")
-    .eq("type", "general")
-    .maybeSingle();
-
-  if (generalCommunity) {
-    const { error } = await db
-      .from("community_members")
-      .upsert(
-        { community_id: generalCommunity.id, user_id: userId },
-        { onConflict: "community_id,user_id", ignoreDuplicates: true }
-      );
-    if (!error) joinedCommunities.push((generalCommunity as { id: string }).id);
-  }
-
   if (specs.length) {
-    // ── 4. Upsert each profile-based community (parallel) ───────
+    // ── 3. Upsert each profile-based community (parallel) ───────
     const upserted = await Promise.all(
       specs.map(async (spec) => {
         const { data: community, error } = await db
@@ -179,7 +161,7 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
     }
   }
 
-  // ── 5. Mark the profile so dashboard repair runs only once ──
+  // ── 4. Mark the profile so dashboard repair runs only once ──
   if (profile) {
     await db
       .from("designer_profiles")
