@@ -65,6 +65,10 @@ function stubFetch(routes) {
 }
 
 const verifyRoute = (route) => ({ match: (url) => url.endsWith("/user/tokens/verify"), ...route });
+const accountVerifyRoute = (route) => ({
+  match: (url) => url.endsWith(`/accounts/${ACCOUNT_ID}/tokens/verify`),
+  ...route,
+});
 const bucketRoute = (route) => ({ match: (url) => url.includes("/r2/buckets/"), ...route });
 
 /** Runs the guard with a stubbed Cloudflare API. */
@@ -173,7 +177,7 @@ test("a healthy credential passes and asks exactly the two endpoints the deploy 
 test("the token never reaches the report, whatever the answer", async () => {
   for (const routes of [
     [verifyRoute({ body: ACTIVE }), bucketRoute({ body: BUCKET_FOUND })],
-    [verifyRoute({ status: 401, body: AUTH_ERROR })],
+    [verifyRoute({ status: 401, body: AUTH_ERROR }), accountVerifyRoute({ status: 401, body: AUTH_ERROR })],
     [verifyRoute({ body: ACTIVE }), bucketRoute({ status: 403, body: AUTH_ERROR })],
   ]) {
     const { text } = await run({ routes });
@@ -182,14 +186,74 @@ test("the token never reaches the report, whatever the answer", async () => {
 });
 
 test("the 2026-10-08 signature — 401 Authentication error — fails and names the secret to rotate", async () => {
-  const { ok, exitCode, text, calls } = await run({ routes: [verifyRoute({ status: 401, body: AUTH_ERROR })] });
+  const { ok, exitCode, text, calls } = await run({
+    routes: [
+      verifyRoute({ status: 401, body: AUTH_ERROR }),
+      accountVerifyRoute({ status: 401, body: AUTH_ERROR }),
+    ],
+  });
   assert.equal(ok, false);
   assert.equal(exitCode, 1);
-  assert.match(text, /Cloudflare rejected CLOUDFLARE_API_TOKEN: Authentication error \(code 10000\)/);
+  assert.match(text, /Cloudflare rejected CLOUDFLARE_API_TOKEN at both verify endpoints: Authentication error \(code 10000\)/);
   assert.match(text, /My Profile → API Tokens/);
-  // Nothing else is asked once the credential itself is rejected: the bucket
+  // Nothing else is asked once both endpoints reject the credential: the bucket
   // check would only repeat the same 401.
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
+});
+
+test("an account-owned token the user endpoint rejects is still verified at the account endpoint", async () => {
+  // Cloudflare's account-owned tokens answer `401 code 1000 Invalid API Token`
+  // on /user/tokens/verify however healthy they are. Every permission a deploy
+  // needs can live on either kind, so rejecting this one would fail a working
+  // credential — and did, on the preview run of 2026-10-08.
+  const invalidToken = {
+    success: false,
+    errors: [{ code: 1000, message: "Invalid API Token" }],
+    messages: [],
+    result: null,
+  };
+  const { ok, exitCode, calls, text } = await run({
+    routes: [
+      verifyRoute({ status: 401, body: invalidToken }),
+      accountVerifyRoute({ body: ACTIVE }),
+      bucketRoute({ body: BUCKET_FOUND }),
+    ],
+  });
+  assert.equal(ok, true);
+  assert.equal(exitCode, 0);
+  assert.match(text, /CLOUDFLARE_API_TOKEN is active \(id abc123\)/);
+  assert.match(text, new RegExp(`R2 bucket "${BUCKET}"`));
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    [
+      "https://api.cloudflare.com/client/v4/user/tokens/verify",
+      `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/tokens/verify`,
+      `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/r2/buckets/${BUCKET}`,
+    ],
+  );
+});
+
+test("an account-owned token's expiry comes from the endpoint that verified it", async () => {
+  const now = Date.parse("2026-10-08T00:00:00Z");
+  const invalidToken = {
+    success: false,
+    errors: [{ code: 1000, message: "Invalid API Token" }],
+    messages: [],
+    result: null,
+  };
+  const { ok, exitCode, text } = await run({
+    now,
+    routes: [
+      verifyRoute({ status: 401, body: invalidToken }),
+      accountVerifyRoute({
+        body: { ...ACTIVE, result: { id: "abc123", status: "active", expires_on: "2026-10-15T00:00:00Z" } },
+      }),
+      bucketRoute({ body: BUCKET_FOUND }),
+    ],
+  });
+  assert.equal(ok, true);
+  assert.equal(exitCode, 0);
+  assert.match(text, /expires in 7 day\(s\), on 2026-10-15T00:00:00Z/);
 });
 
 test("a missing or empty secret fails with the repository secret named", async () => {

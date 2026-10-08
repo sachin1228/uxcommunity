@@ -29,9 +29,13 @@
  *   1. `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are present at all
  *      (the workflows already check non-emptiness; the messages here name the
  *      repository secret to fix);
- *   2. the token is LIVE. `GET /user/tokens/verify` needs no permission of its
- *      own, so a rejection there is the credential itself — an expired TTL, a
- *      revoked token, or an edited one — and never a missing scope;
+ *   2. the token is LIVE. Verify needs no permission of its own, so a rejection
+ *      is the credential itself — an expired TTL, a revoked token, or an edited
+ *      one — and never a missing scope. Both kinds of Cloudflare token are
+ *      accepted: `/user/tokens/verify` answers `401 code 1000 Invalid API Token`
+ *      for account-owned tokens even when they are healthy, so a rejection
+ *      there is re-checked against `/accounts/:id/tokens/verify`, which is the
+ *      endpoint that recognizes them;
  *   3. the token is not about to expire. The same endpoint returns
  *      `expires_on`, so a TTL that is about to run out is a warning on the
  *      deploy that still works instead of a 401 on the one that does not;
@@ -158,7 +162,7 @@ export function readR2CacheBucket(configPath = WRANGLER_CONFIG_PATH) {
 /**
  * Turns a token's `expires_on` into what the guard should report about it.
  *
- * @param expiresOn The ISO timestamp `/user/tokens/verify` returns, if any.
+ * @param expiresOn The ISO timestamp the token verify endpoint returns, if any.
  * @param now Reference time, for tests.
  * @returns `{ kind }` of `none` (no TTL), `ok`, `expiring`, `expired` or
  *   `unknown`, with `daysLeft` and `expiresOn` where they apply.
@@ -174,7 +178,8 @@ export function expiryNotice(expiresOn, now = Date.now()) {
 }
 
 /**
- * Classifies the answer to `GET /user/tokens/verify`.
+ * Classifies the answer to a token verify endpoint — `GET /user/tokens/verify`
+ * for user tokens, `GET /accounts/:id/tokens/verify` for account-owned ones.
  *
  * @param httpStatus Response status; 0 means the request never completed.
  * @param payload Parsed body, when there was one.
@@ -237,9 +242,10 @@ export function apiErrorDetail(payload, httpStatus) {
 const TOKEN_SECRET = "CLOUDFLARE_API_TOKEN";
 /** How the message tells the operator to fix a credential problem. */
 const ROTATE_HINT =
-  "Rotate it in the Cloudflare dashboard (My Profile → API Tokens) and update the repository secret " +
-  "(Settings → Secrets and variables → Actions). An unrenewed TTL, a revoked token and one that was " +
-  "replaced by a value with a stray newline all look exactly like this.";
+  "Rotate it in the Cloudflare dashboard (My Profile → API Tokens, or Manage account → Account API " +
+  "tokens) and update the repository secret (Settings → Secrets and variables → Actions). An " +
+  "unrenewed TTL, a revoked token and one that was replaced by a value with a stray newline all " +
+  "look exactly like this.";
 
 /**
  * Issues one authenticated GET against the Cloudflare API.
@@ -305,12 +311,34 @@ export async function checkCloudflareCredentials({
     return { ok: false, exitCode: 1, lines };
   }
 
-  // 1. Is the credential itself alive? This endpoint needs no permission, so a
-  //    rejection here can only be about the token.
+  // 1. Is the credential itself alive? Verify needs no permission of its own, so
+  //    a rejection can only be about the token — but Cloudflare has two kinds of
+  //    token and two verify endpoints, and `/user/tokens/verify` answers
+  //    `401 code 1000 "Invalid API Token"` for a perfectly healthy account-owned
+  //    token. `/accounts/:id/tokens/verify` is the endpoint that recognizes
+  //    those, so the first rejection is only final when the second agrees. The
+  //    two kinds are interchangeable for both deploys — deploy permissions live
+  //    on either — so the guard accepts whichever the operator created.
   const verify = await cloudflareGet(fetchImpl, `${API_BASE}/user/tokens/verify`, token);
-  const tokenState = classifyTokenVerify(verify.status, verify.payload);
+  let tokenState = classifyTokenVerify(verify.status, verify.payload);
+  let verifyPayload = verify.payload;
   if (tokenState.status === "rejected") {
-    fail(`Cloudflare rejected ${TOKEN_SECRET}: ${tokenState.detail}. ${ROTATE_HINT}`);
+    const accountVerify = await cloudflareGet(
+      fetchImpl,
+      `${API_BASE}/accounts/${accountId}/tokens/verify`,
+      token,
+    );
+    const accountState = classifyTokenVerify(accountVerify.status, accountVerify.payload);
+    if (accountState.status === "active") {
+      tokenState = accountState;
+      verifyPayload = accountVerify.payload;
+    }
+  }
+  if (tokenState.status === "rejected") {
+    fail(
+      `Cloudflare rejected ${TOKEN_SECRET} at both verify endpoints: ${tokenState.detail}. ` +
+        ROTATE_HINT,
+    );
     return { ok: false, exitCode: 1, lines };
   }
   if (tokenState.status === "unverifiable") {
@@ -324,7 +352,7 @@ export async function checkCloudflareCredentials({
 
   // 2. A TTL that is about to run out fails every Cloudflare call in this
   //    workflow the day it lapses, with nothing here to explain it.
-  const expiry = expiryNotice(verify.payload?.result?.expires_on, now);
+  const expiry = expiryNotice(verifyPayload?.result?.expires_on, now);
   if (expiry.kind === "expired") {
     fail(`${TOKEN_SECRET} expired on ${expiry.expiresOn}. ${ROTATE_HINT}`);
   } else if (expiry.kind === "expiring") {
