@@ -93,6 +93,7 @@ export async function fetchCommunityMetaSSR(
       event_date: eventRoom?.eventDate ?? null,
       pinned_until: eventRoom?.pinnedUntil ?? null,
       event_end: eventRoom?.eventEnd ?? null,
+      event_is_public: eventRoom?.eventIsPublic ?? null,
       // Role/permissions are not fetched server-side any more; bootstrap
       // overwrites them client-side moments later.
       current_user_role: null,

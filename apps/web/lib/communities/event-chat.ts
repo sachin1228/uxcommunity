@@ -148,6 +148,8 @@ export interface EventChatSidebarMeta {
   pinnedUntil: string | null;
   /** The deadline whether ahead or past — what the badge's ENDED day reads. */
   eventEnd: string | null;
+  /** The event's "Share publicly" flag — what the room's earth/lock reads. */
+  eventIsPublic: boolean | null;
 }
 
 /**
@@ -184,12 +186,17 @@ export async function loadEventChatSidebarMeta(
 
   const { data: events } = await db
     .from("community_events")
-    .select("id, event_date, end_date")
+    .select("id, event_date, end_date, is_public")
     .in("id", eventIds);
   const byEventId = new Map(
-    ((events ?? []) as Array<{ id: string; event_date: string; end_date: string | null }>).map(
-      (event) => [event.id, event],
-    ),
+    (
+      (events ?? []) as Array<{
+        id: string;
+        event_date: string;
+        end_date: string | null;
+        is_public: boolean | null;
+      }>
+    ).map((event) => [event.id, event]),
   );
 
   const nowMs = now.getTime();
@@ -205,6 +212,7 @@ export async function loadEventChatSidebarMeta(
       eventDate: event.event_date ?? null,
       pinnedUntil: !deadline || Number.isNaN(deadlineMs) || deadlineMs >= nowMs ? deadline : null,
       eventEnd: deadline ?? null,
+      eventIsPublic: event.is_public ?? null,
     });
   }
 
@@ -229,7 +237,14 @@ export async function loadEventRoomMeta(
   now: Date = new Date(),
 ): Promise<EventChatSidebarMeta> {
   const meta = await loadEventChatSidebarMeta(db, [communityId], now);
-  return meta.get(communityId) ?? { eventDate: null, pinnedUntil: null, eventEnd: null };
+  return (
+    meta.get(communityId) ?? {
+      eventDate: null,
+      pinnedUntil: null,
+      eventEnd: null,
+      eventIsPublic: null,
+    }
+  );
 }
 
 /** Whether this member is already in the event's group chat. */

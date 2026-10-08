@@ -76,7 +76,7 @@ export const CommunityRow = memo(function CommunityRow({
   onHover,
 }: CommunityRowProps) {
   const { lastReaction } = c;
-  const badges = communityNameBadges(c.type, c.is_private);
+  const badges = communityNameBadges(c.type, c.is_private, c.event_is_public);
   const preview = c.last_message ? formatPreview(c.last_message) : null;
   // A thread/showcase/resource/event created after the newest message takes
   // over the preview line ("john created a thread") — mirroring the chat

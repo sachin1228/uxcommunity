@@ -37,6 +37,8 @@ interface Community {
   type?: string | null;
   description?: string | null;
   is_private?: boolean;
+  /** An event room's event "Share publicly" flag — decides the earth/lock. */
+  event_is_public?: boolean | null;
   enabled_tabs?: string[];
   /** Absent on rows that predate the flag; reads as on. */
   showcase_enabled?: boolean | null;
@@ -277,7 +279,12 @@ export function CommunitySettingsView({
             </h2>
             <p className="mt-0.5 flex items-center gap-1 font-body text-[11px] text-foreground-muted">
               {community.name}
-              <CommunityNameBadges type={community.type} isPrivate={isPrivate} size={11} />
+              <CommunityNameBadges
+                type={community.type}
+                isPrivate={isPrivate}
+                eventIsPublic={community.event_is_public}
+                size={11}
+              />
             </p>
           </div>
           <div className="flex items-center gap-2">
