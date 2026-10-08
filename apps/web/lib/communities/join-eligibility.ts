@@ -13,7 +13,7 @@ export interface JoinEligibility {
 
 /**
  * Whether this member may join a community outright, mirroring the Explore
- * page's rule (`get_all_communities`): open to interest/user types,
+ * page's rule (`get_all_communities`): open to member-created (user) communities,
  * profile-derived types need a profile match, and private communities go
  * through the owner-approval request flow. CommunityPreview on the community
  * page applies the same rule — keep the two in step.
@@ -29,7 +29,7 @@ export async function loadJoinEligibility(
   userId: string,
 ): Promise<JoinEligibility> {
   const [profileResult, pendingRequestResult] = await Promise.all([
-    community.type === "interest" || community.type === "user"
+    community.type === "user"
       ? Promise.resolve({ data: null })
       : db
           .from("designer_profiles")
@@ -48,7 +48,7 @@ export async function loadJoinEligibility(
   ]);
 
   let canJoin = false;
-  if (community.type === "interest" || community.type === "user") {
+  if (community.type === "user") {
     canJoin = true;
   } else if (profileResult.data) {
     const profile = profileResult.data as unknown as {

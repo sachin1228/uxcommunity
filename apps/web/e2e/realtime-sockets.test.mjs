@@ -152,7 +152,7 @@ function mockCommunityRow(id, index) {
   return {
     id,
     name: `E2E community ${index}`,
-    type: "interest",
+    type: "user",
     image_url: null,
     member_count: 3,
     message_count: 0,

@@ -7,10 +7,9 @@
  *   GET /api/admin/communities
  *   GET /api/admin/cities
  *   GET /api/admin/sectors
- *   GET /api/admin/interests
  *   GET /api/admin/tags
  *
- * Write paths (create city/sector/interest) are exercised once in the
+ * Write paths (create city/sector) are exercised once in the
  * smoke test only to avoid polluting the database during high-VU runs.
  *
  * Requires: authenticated admin session. Call loginAdmin() before running.
@@ -26,7 +25,6 @@ const READ_ENDPOINTS = [
   { name: 'admin/communities',   path: '/api/admin/communities' },
   { name: 'admin/cities',        path: '/api/admin/cities' },
   { name: 'admin/sectors',       path: '/api/admin/sectors' },
-  { name: 'admin/interests',     path: '/api/admin/interests' },
   { name: 'admin/tags',          path: '/api/admin/tags' },
 ];
 
@@ -60,19 +58,6 @@ export function adminWriteSmoke() {
     );
     check(res, {
       'admin/cities-post: status 2xx or 401': (r) =>
-        (r.status >= 200 && r.status < 300) || r.status === 401 || r.status === 403,
-    });
-    sleep(0.2);
-  });
-
-  group('admin — create interest (smoke only)', () => {
-    const res = http.post(
-      `${BASE_URL}/api/admin/interests`,
-      JSON.stringify({ name: `k6 smoke interest ${Date.now()}` }),
-      { headers: JSON_HEADERS, tags: { name: 'admin/interests-post' } },
-    );
-    check(res, {
-      'admin/interests-post: status 2xx or 401': (r) =>
         (r.status >= 200 && r.status < 300) || r.status === 401 || r.status === 403,
     });
     sleep(0.2);

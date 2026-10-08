@@ -6,9 +6,9 @@ A platform for UI/UX, product, and social media designers. Designers sign up dir
 
 | Area | What's built |
 |---|---|
-| **Application / onboarding** | Direct multi-step sign-up (profile → avatar → interests) at `/signup`, with invite links for approved/invited users. Applications still land in the admin dashboard for approve/reject review with email notifications. |
+| **Application / onboarding** | Direct multi-step sign-up (profile → avatar) at `/signup`, with invite links for approved/invited users. Applications still land in the admin dashboard for approve/reject review with email notifications. |
 | **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
-| **Admin panel** | Review and approve/reject applications; manage users (block/unblock/delete); community admins & permissions; CRUD for master data: cities, sectors, experience levels, interests, job titles, communities, Lottie animations; incomplete sign-up recovery; R2 storage health audit; k6 load-test runs. |
+| **Admin panel** | Review and approve/reject applications; manage users (block/unblock/delete); community admins & permissions; CRUD for master data: cities, sectors, experience levels, job titles, communities, Lottie animations; incomplete sign-up recovery; R2 storage health audit; k6 load-test runs. |
 | **Communities / chat** | Real-time community chat (Cloudflare Durable Objects — see `apps/realtime`). Members are auto-joined to communities on sign-up. Admins can delete messages. |
 | **Image & file uploads** | Avatars, community images, chat/thread/showcase/event media uploaded to Cloudflare R2 (S3-compatible). Clients compress before upload (Canvas on web, `expo-image-manipulator` on mobile) and the server validates the bytes (signature sniffing) and stores them as-is. Orphaned objects are reclaimed by a reference-aware cleanup plus an admin R2 audit. |
 | **Rate limiting** | Redis-backed sliding-window limiter (Upstash) plus a global middleware guard. Per-route limits cover login (IP + email), applications, password reset, sign-up, chat sends, and content creation. |

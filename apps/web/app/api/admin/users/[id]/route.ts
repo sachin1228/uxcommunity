@@ -30,12 +30,6 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
 
-  // Fetch interests separately (join table)
-  const { data: interestRows } = await db
-    .from("user_interests")
-    .select("design_interests ( id, name )")
-    .eq("user_id", id);
-
   // Resolve the job title slug to its admin-managed display name. The profile
   // column stores a slug (no PostgREST embed), so look it up explicitly.
   const profileRow = user?.designer_profiles as
@@ -71,13 +65,6 @@ export async function GET(
     application = app ?? null;
   }
 
-  const interests = (interestRows ?? [])
-    .map((r) => {
-      const di = r.design_interests as unknown as { id: string; name: string } | null;
-      return di ? { id: di.id, name: di.name } : null;
-    })
-    .filter(Boolean);
-
   // Community membership stats for the "member of all communities" toggle
   const [{ count: totalCommunities }, { count: userCommunities }] = await Promise.all([
     db.from("communities").select("id", { count: "exact", head: true }),
@@ -100,7 +87,6 @@ export async function GET(
         }
       : user,
     application,
-    interests,
     memberOfAllCommunities,
   });
 }

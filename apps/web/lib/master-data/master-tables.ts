@@ -5,7 +5,6 @@
 export const MASTER_TABLES = [
   "cities",
   "design_sectors",
-  "design_interests",
   "experience_levels",
   "job_titles",
 ] as const;

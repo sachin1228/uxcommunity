@@ -20,7 +20,6 @@ type MainTabValue = typeof MAIN_TABS[number]["value"];
 const TYPE_TABS = [
   { label: "All", value: "all" },
   { label: "Industry", value: "sector" },
-  { label: "Interest", value: "interest" },
   { label: "Experience", value: "experience_level" },
   { label: "Job Title", value: "job_title" },
   { label: "City", value: "city" },

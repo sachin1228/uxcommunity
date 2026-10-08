@@ -45,7 +45,7 @@ delete from public.communities where id = '3b3b3b3b-0000-4000-8000-000000000001'
 delete from public.users where email like '%@admin-member-page-scale.test';
 
 insert into public.communities (id, name, type, is_active)
-values ('3b3b3b3b-0000-4000-8000-000000000001', 'Admin M-2 scale fixture', 'interest', true);
+values ('3b3b3b3b-0000-4000-8000-000000000001', 'Admin M-2 scale fixture', 'city', true);
 
 -- Adds members at positions low..high with unique users and strictly
 -- increasing joined_at, so the fixture has a total join order.

@@ -22,9 +22,8 @@ type Community = CachedExploreCommunity;
 const LOCK_REASON: Record<string, string> = {};
 
 const TABS = [
-  { label: "All",        value: "all"              },
-  { label: "Interest",   value: "interest"          },
-  { label: "Member-led", value: "user"              },
+  { label: "All",        value: "all"  },
+  { label: "Member-led", value: "user" },
 ] as const;
 
 type TabValue = typeof TABS[number]["value"];

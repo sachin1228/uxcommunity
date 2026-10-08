@@ -11,7 +11,7 @@ import {
  *
  *   ✓  verified seal — a default group the signup flow created for them
  *                      (city, sector, experience level, job title)
- *   🌐 earth         — an interest community, or a public member-created group
+ *   🌐 earth         — a public member-created group
  *   🔒 lock          — a private group
  *
  * Which pair a community gets is decided by `communityNameBadges` in

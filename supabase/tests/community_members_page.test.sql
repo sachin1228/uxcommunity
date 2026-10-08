@@ -54,11 +54,11 @@ select user_id,
 from m2_users;
 
 insert into public.communities (id, name, type, is_active)
-select community_id, 'M-2 member fixture', 'interest', true from m2_fixture;
+select community_id, 'M-2 member fixture', 'city', true from m2_fixture;
 insert into public.communities (id, name, type, is_active)
-select big_community_id, 'M-2 member fixture (large)', 'interest', true from m2_fixture;
+select big_community_id, 'M-2 member fixture (large)', 'city', true from m2_fixture;
 insert into public.communities (id, name, type, is_active)
-select empty_community_id, 'M-2 member fixture (empty)', 'interest', true from m2_fixture;
+select empty_community_id, 'M-2 member fixture (empty)', 'city', true from m2_fixture;
 
 insert into public.community_members (community_id, user_id, role, joined_at)
 select f.community_id,

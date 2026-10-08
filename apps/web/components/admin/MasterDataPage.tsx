@@ -98,7 +98,6 @@ export function MasterDataPage({
             ? (data[responseKey] ?? [])
             : (data.cities ??
                data.sectors ??
-               data.interests ??
                data.experience_levels ??
                data.job_titles ??
                [])

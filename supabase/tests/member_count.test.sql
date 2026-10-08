@@ -59,11 +59,11 @@ end $$;
 
 create temporary table mc_fixture as
 select gen_random_uuid() as community_id,
-       gen_random_uuid() as interest_id,
+       gen_random_uuid() as city_id,
        gen_random_uuid() as other_community_id,
-       gen_random_uuid() as other_interest_id,
+       gen_random_uuid() as other_city_id,
        gen_random_uuid() as empty_community_id,
-       gen_random_uuid() as empty_interest_id;
+       gen_random_uuid() as empty_city_id;
 
 create temporary table mc_users as
 select gen_random_uuid() as user_id, series.value as position
@@ -74,28 +74,28 @@ select user_id, 'C-1 counter fixture ' || position,
        format('%s@member-count.test', user_id), 'x'
 from mc_users;
 
--- Explore resolves an interest community through its master-data row and drops
+-- Explore resolves a city community through its master-data row and drops
 -- the community when the reference is missing, so each fixture community gets
--- its own temporary design_interests row (rolled back with everything else).
-insert into public.design_interests (id, name)
-select f.interest_id, format('C-1 fixture interest %s', f.interest_id) from mc_fixture f;
+-- its own temporary cities row (rolled back with everything else).
+insert into public.cities (id, name)
+select f.city_id, format('C-1 fixture city %s', f.city_id) from mc_fixture f;
 
-insert into public.design_interests (id, name)
-select f.other_interest_id, format('C-1 fixture interest %s', f.other_interest_id) from mc_fixture f;
+insert into public.cities (id, name)
+select f.other_city_id, format('C-1 fixture city %s', f.other_city_id) from mc_fixture f;
 
-insert into public.design_interests (id, name)
-select f.empty_interest_id, format('C-1 fixture interest %s', f.empty_interest_id) from mc_fixture f;
-
-insert into public.communities (id, name, type, reference_id, is_active)
-select f.community_id, 'C-1 counter fixture', 'interest', f.interest_id, true from mc_fixture f;
+insert into public.cities (id, name)
+select f.empty_city_id, format('C-1 fixture city %s', f.empty_city_id) from mc_fixture f;
 
 insert into public.communities (id, name, type, reference_id, is_active)
-select f.other_community_id, 'C-1 counter fixture (destination)', 'interest', f.other_interest_id, true from mc_fixture f;
+select f.community_id, 'C-1 counter fixture', 'city', f.city_id, true from mc_fixture f;
+
+insert into public.communities (id, name, type, reference_id, is_active)
+select f.other_community_id, 'C-1 counter fixture (destination)', 'city', f.other_city_id, true from mc_fixture f;
 
 -- Nobody ever joins this one: it is what proves Explore's exclusion is the
 -- counter's job (the old INNER JOIN to a membership aggregate used to be).
 insert into public.communities (id, name, type, reference_id, is_active)
-select f.empty_community_id, 'C-1 counter fixture (empty)', 'interest', f.empty_interest_id, true from mc_fixture f;
+select f.empty_community_id, 'C-1 counter fixture (empty)', 'city', f.empty_city_id, true from mc_fixture f;
 
 create temporary view mc as
 select

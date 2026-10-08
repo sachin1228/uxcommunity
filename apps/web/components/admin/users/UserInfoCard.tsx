@@ -2,7 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
-import type { AdminUser, UserApplication, UserInterest } from "./userTypes";
+import type { AdminUser, UserApplication } from "./userTypes";
 import { EXPERIENCE_LABELS, AVATAR_SOURCE_LABELS } from "./userTypes";
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -17,10 +17,9 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 interface Props {
   user: AdminUser;
   application: UserApplication | null;
-  interests: UserInterest[];
 }
 
-export function UserInfoCard({ user, application, interests }: Props) {
+export function UserInfoCard({ user, application }: Props) {
   const profile = user.designer_profiles;
   const avatarUrl = profile?.avatar_url;
 
@@ -58,25 +57,6 @@ export function UserInfoCard({ user, application, interests }: Props) {
       <InfoRow
         label="Job Title"
         value={profile?.job_title_name ?? profile?.job_title ?? "—"}
-      />
-      <InfoRow
-        label="Interests"
-        value={
-          interests.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {interests.map((i) => (
-                <span
-                  key={i.id}
-                  className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-body text-xs text-accent"
-                >
-                  {i.name}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span className="text-foreground-muted">—</span>
-          )
-        }
       />
       <InfoRow
         label="Experience Level"

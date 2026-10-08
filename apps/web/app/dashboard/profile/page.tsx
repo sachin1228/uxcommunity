@@ -40,8 +40,6 @@ export default async function ProfilePage({ searchParams }: Props) {
   const [
     { data: user },
     { data: profile },
-    { data: userInterests },
-    { data: allInterests },
     { company: profileCompany, pending: pendingCompany },
     identity,
   ] = await Promise.all([
@@ -53,11 +51,6 @@ export default async function ProfilePage({ searchParams }: Props) {
       )
       .eq("user_id", userId)
       .maybeSingle(),
-    db
-      .from("user_interests")
-      .select("interest_id, design_interests(id, name, image_url)")
-      .eq("user_id", userId),
-    db.from("design_interests").select("id, name, image_url").eq("is_active", true).order("name"),
     // The company line on the profile, plus any work-email challenge still
     // waiting on a code so the picker can reopen straight into it.
     getProfileCompanyState(db, userId),
@@ -92,10 +85,6 @@ export default async function ProfilePage({ searchParams }: Props) {
       .filter(Boolean)
       .join(" ") || null;
 
-  const myInterestIds = (userInterests ?? [])
-    .map((r: any) => r.design_interests?.id)
-    .filter(Boolean) as string[];
-
   return (
     <ProfileClient
       userId={userId}
@@ -111,8 +100,6 @@ export default async function ProfilePage({ searchParams }: Props) {
       initialLinkedIn={(profile as any)?.linkedin_url ?? ""}
       initialPortfolio={(profile as any)?.portfolio_url ?? ""}
       initialBio={(profile as any)?.bio ?? ""}
-      initialInterestIds={myInterestIds}
-      allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
       initialCompany={profileCompany}
       pendingCompany={pendingCompany}
       identity={identity}

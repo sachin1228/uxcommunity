@@ -181,7 +181,8 @@ export interface CachedSidebarCommunity {
   id: string;
   name: string;
   /** `event` rows are an event's group chat (see lib/communities/event-chat). */
-  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "user" | "event";
+  type: "city" | "sector" | "experience_level" | "job_title" | "user" | "event";
+
   image_url: string | null;
   reference_name?: string | null;
   is_private?: boolean;
@@ -262,7 +263,8 @@ export interface SidebarLastContent {
 export interface CachedExploreCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "user" | "event";
+  type: "city" | "sector" | "experience_level" | "job_title" | "user" | "event";
+
   image_url: string | null;
   description: string | null;
   is_private?: boolean;

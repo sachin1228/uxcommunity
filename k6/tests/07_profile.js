@@ -4,7 +4,6 @@
  * Endpoints covered:
  *   GET   /api/profile
  *   PATCH /api/profile
- *   POST  /api/profile/interests
  *   GET   /api/lottie-settings
  *   GET   /api/link-preview?url=...
  *
@@ -52,19 +51,6 @@ export function profileTests() {
       'profile/patch: status 200': (r) => r.status === 200,
     });
     sleep(0.2);
-  });
-
-  group('profile — update interests (empty list is valid)', () => {
-    const res = http.post(
-      `${BASE_URL}/api/profile/interests`,
-      JSON.stringify({ interest_ids: [] }),
-      { headers: JSON_HEADERS, tags: { name: 'profile/interests' } },
-    );
-    check(res, {
-      'profile/interests: status 2xx': (r) =>
-        r.status >= 200 && r.status < 300,
-    });
-    sleep(0.1);
   });
 
   group('lottie-settings — get', () => {

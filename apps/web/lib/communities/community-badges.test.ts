@@ -51,19 +51,6 @@ test("signup default groups show the seal alone", () => {
   }
 });
 
-// Interest communities are the public topic groups, so the earth says more
-// about them than the seal would — and only one badge keeps the row calm.
-test("interest communities show the earth instead of the seal", () => {
-  assert.deepEqual(communityNameBadges("interest", false), {
-    verified: false,
-    visibility: "globe",
-  });
-  assert.deepEqual(communityNameBadges("interest", undefined), {
-    verified: false,
-    visibility: "globe",
-  });
-});
-
 test("a member-created community shows earth when public, lock when private", () => {
   assert.deepEqual(communityNameBadges(MEMBER_COMMUNITY_TYPE, false), {
     verified: false,

@@ -133,9 +133,6 @@ export async function POST(request: NextRequest) {
     p_sector_id: profile.sector_id,
     p_experience_level: profile.experience_level,
     p_job_title: profile.job_title,
-    // Interests are no longer collected during signup — members discover and
-    // join interest communities from Explore Communities instead.
-    p_interest_ids: [],
     p_avatar_url: profilePictureUrl as string,
     p_avatar_source: (profilePictureUrl ? "upload" : null) as string,
     // `undefined` takes the parameter's DEFAULT NULL — the same stored value.
@@ -161,7 +158,8 @@ export async function POST(request: NextRequest) {
   // Best-effort: the account is already created, so a tracking failure is silent.
   await markSignupCompleted(identity.email, userId);
 
-  // Join every profile-based community (city + sector + interests) server-side
+  // Join every profile-based community (city, sector, experience level, job
+  // title) server-side
   // so the sidebar shows the full list the first time the dashboard loads.
   // Non-fatal if it fails — the dashboard layout retries exactly once via the
   // designer_profiles.communities_auto_joined flag.

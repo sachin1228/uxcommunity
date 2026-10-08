@@ -34,7 +34,7 @@ These FK rows are `on delete cascade`, so deleting the `users` row removes them:
 - Showcase: posts, comments, `showcase_comment_reactions`
 - Resources: `community_resources`, `resource_saves`, `resource_comments`,
   `resource_comment_reactions`, `resource_bookmarks`
-- Account: `password_resets`, `user_interests`, `notifications` (`user_id`),
+- Account: `password_resets`, `notifications` (`user_id`),
   `community_admin_permissions`
 
 ## Survives on purpose (attribution, audit trail)

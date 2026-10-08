@@ -150,8 +150,8 @@ test("a shared picture is left in the bucket", async () => {
 
   const result = await syncMasterImageToCommunities({
     db,
-    table: "design_interests",
-    masterId: "interest-1",
+    table: "design_sectors",
+    masterId: "sector-1",
     imageUrl: NEW,
     previousImageUrl: OLD,
   });
@@ -214,7 +214,6 @@ test("each master table mirrors the community type that points at it", async () 
   const expected: Record<MasterTable, string> = {
     cities: "city",
     design_sectors: "sector",
-    design_interests: "interest",
     experience_levels: "experience_level",
     job_titles: "job_title",
   };

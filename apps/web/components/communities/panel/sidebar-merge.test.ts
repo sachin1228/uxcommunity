@@ -14,7 +14,7 @@ function community(
   return {
     id,
     name,
-    type: "interest",
+    type: "user",
     image_url: null,
     member_count: 2,
     message_count: 0,

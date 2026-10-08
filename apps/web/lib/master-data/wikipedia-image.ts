@@ -1,6 +1,6 @@
 /**
- * Wikipedia photo lookup for master-data rows (cities, sectors, interests,
- * experience levels). Used by the Admin "Fetch images" bulk action.
+ * Wikipedia photo lookup for master-data rows (cities, sectors,
+ * experience levels, job titles). Used by the Admin "Fetch images" bulk action.
  *
  * Images come from Wikipedia/Wikimedia Commons — free license and stable
  * CDN URLs. The lookup prefers each page's lead photo at a decent size and
