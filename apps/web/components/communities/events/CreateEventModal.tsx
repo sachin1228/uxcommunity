@@ -1,11 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
+import { Check, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
-import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "@/lib/communities/models/events";
 import { compressImage, compressedFile } from "@/lib/image-client";
 import {
@@ -19,6 +18,7 @@ import {
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { HostTimeZoneField } from "./HostTimeZoneField";
+import { PickerInput } from "./PickerInput";
 import { useNowTick } from "@/lib/use-now-tick";
 
 interface CreateEventModalProps {
@@ -72,7 +72,6 @@ export function CreateEventModal({
   const [meetLink, setMeetLink] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
   const [isPublic, setIsPublic] = useState(initialIsPublic);
-  const [accentColor, setAccentColor] = useState(DEFAULT_EVENT_ACCENT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,7 +151,6 @@ export function CreateEventModal({
           meet_link: meetLink.trim() || null,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
-          accent_color: accentColor,
           is_public: isPublic,
           // The host's own side of the schedule, so the card can show the time
           // they actually set beside each viewer's reading of it. The offset is
@@ -278,7 +276,7 @@ export function CreateEventModal({
                   it. */}
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                  <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                  Date <span className="text-accent">*</span>
                   <span
                     className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
                     title={`The times you enter are read in ${zoneLabel}`}
@@ -286,7 +284,7 @@ export function CreateEventModal({
                     {zoneLabel}
                   </span>
                 </span>
-                <input
+                <PickerInput
                   type="date"
                   value={eventDate}
                   min={minDate}
@@ -302,7 +300,6 @@ export function CreateEventModal({
                       setEventTime("");
                     }
                   }}
-                  className="field w-full"
                 />
               </label>
 
@@ -311,9 +308,9 @@ export function CreateEventModal({
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
+                    Start time <span className="text-accent">*</span>
                   </span>
-                  <input
+                  <PickerInput
                     type="time"
                     value={eventTime}
                     min={eventDate === minDate ? minStartTime : undefined}
@@ -323,19 +320,17 @@ export function CreateEventModal({
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className="field w-full"
                   />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                     End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
-                  <input
+                  <PickerInput
                     type="time"
                     value={endTime}
                     min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full"
                   />
                 </label>
               </div>
@@ -415,14 +410,6 @@ export function CreateEventModal({
               className="field w-full"
             />
           </label>
-
-          {/* Accent color */}
-          <div>
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Card color <span className="font-normal text-foreground-subtle">(the main color of this event's ticket)</span>
-            </span>
-            <AccentColorPicker value={accentColor} onChange={setAccentColor} />
-          </div>
 
           {/* Make public toggle */}
           <ToggleRow

@@ -132,11 +132,6 @@ export async function PATCH(
       ? body.cover_image_url.trim()
       : null;
   }
-  if ("accent_color" in body) {
-    patch.accent_color = typeof body.accent_color === "string" && /^#[0-9a-fA-F]{6}$/.test(body.accent_color.trim())
-      ? body.accent_color.trim().toLowerCase()
-      : null;
-  }
   if (typeof body.is_public === "boolean") patch.is_public = body.is_public;
 
   if (!Object.keys(patch).length) return NextResponse.json({ error: "Nothing to update." }, { status: 422 });

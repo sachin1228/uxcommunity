@@ -13,7 +13,6 @@ export interface CommunityEvent {
   meet_link: string | null;
   max_attendees: number | null;
   cover_image_url: string | null;
-  accent_color?: string | null;
   is_public?: boolean;
   /**
    * The zone the host set the event in, and their offset at that instant in
