@@ -166,42 +166,32 @@ export async function loadRsvpCounts(
 
 // ─── Per-kind visual identity (shared by the timeline cards) ────────────────
 
+/**
+ * The one icon-tile treatment every content card wears, whatever its kind —
+ * the design system's accent ink, black in light mode and white in dark.
+ * Shared here rather than per-kind so the four kinds cannot drift into four
+ * different tile colors: the tile is a surface, and surfaces stay neutral
+ * while the eyebrow beside it carries the kind's hue.
+ */
+export const CONTENT_TILE = {
+  /** Tile background — the accent ink. */
+  bg: "var(--color-accent)",
+  /** Icon color on the tile. */
+  fg: "var(--color-accent-foreground)",
+} as const;
+
 export interface KindTheme {
   /** Eyebrow label — "THREAD", "RESOURCE", … */
   label: string;
-  /** Icon-tile background (light/dark-aware Geist scale stop). */
-  tileBg: string;
-  /** Icon color on the tile. */
-  tileFg: string;
   /** Eyebrow text color. */
   accent: string;
 }
 
 export const KIND_THEME: Record<ContentEventKind, KindTheme> = {
-  thread: {
-    label: "Thread",
-    tileBg: "var(--ds-green-200)",
-    tileFg: "var(--ds-green-800)",
-    accent: "var(--ds-green-800)",
-  },
-  showcase: {
-    label: "Showcase",
-    tileBg: "var(--ds-purple-200)",
-    tileFg: "var(--ds-purple-700)",
-    accent: "var(--ds-purple-700)",
-  },
-  resource: {
-    label: "Resource",
-    tileBg: "var(--ds-purple-200)",
-    tileFg: "var(--ds-purple-700)",
-    accent: "var(--ds-purple-700)",
-  },
-  event: {
-    label: "Event",
-    tileBg: "var(--ds-amber-200)",
-    tileFg: "var(--ds-amber-800)",
-    accent: "var(--ds-amber-800)",
-  },
+  thread:   { label: "Thread",   accent: "var(--ds-green-800)" },
+  showcase: { label: "Showcase", accent: "var(--ds-purple-700)" },
+  resource: { label: "Resource", accent: "var(--ds-purple-700)" },
+  event:    { label: "Event",    accent: "var(--ds-amber-800)" },
 };
 
 /** First line of a text field, truncated for the subtitle. */

@@ -21,6 +21,7 @@ import { userColorVar } from "@/lib/communities/user-color";
 import type { CachedThreadEvent } from "@/lib/communities/cache";
 import { THREAD_CATEGORIES } from "@/lib/communities/models/threads";
 import {
+  CONTENT_TILE,
   KIND_THEME,
   firstLine,
 } from "@/lib/communities/content-notifications";
@@ -153,8 +154,8 @@ export function ThreadNotificationBubble({
                   : "bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:border-white/[0.08] dark:hover:bg-white/[0.08]"
               }`}
             >
-              {/* Thumbnail — image, video poster, or tinted category tile.
-                  Stretches to the card's full height (min 64px). */}
+              {/* Thumbnail — image, video poster, or the shared solid-ink
+                  category tile. Stretches to the card's full height (min 64px). */}
               <div className="relative w-[64px] min-h-[64px] shrink-0 overflow-hidden">
                 {imgUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -184,16 +185,12 @@ export function ThreadNotificationBubble({
                 ) : (
                   <div
                     className="flex h-full w-full items-center justify-center"
-                    style={{
-                      backgroundColor: isMe ? "rgba(255,255,255,0.10)" : theme.tileBg,
-                    }}
+                    style={{ backgroundColor: CONTENT_TILE.bg }}
                   >
                     <CatIcon
                       size={24}
                       strokeWidth={2.5}
-                      style={{
-                        color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
-                      }}
+                      style={{ color: CONTENT_TILE.fg }}
                     />
                   </div>
                 )}

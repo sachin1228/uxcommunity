@@ -31,6 +31,7 @@ import { userColorVar } from "@/lib/communities/user-color";
 import { RESOURCE_TYPES } from "@/lib/communities/models/resources";
 import type { CachedContentEvent, ContentEventKind } from "@/lib/communities/cache";
 import {
+  CONTENT_TILE,
   KIND_THEME,
   firstLine,
   fmtEventSchedule,
@@ -237,8 +238,9 @@ export function ContentNotificationBubble({
                 : "bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:border-white/[0.08] dark:hover:bg-white/[0.08]"
             }`}
           >
-            {/* Thumbnail — image, video poster, or tinted icon tile. Stretches
-                to the card's full height (min 64px) instead of a fixed square. */}
+            {/* Thumbnail — image, video poster, or the shared solid-ink icon
+                tile. Stretches to the card's full height (min 64px) instead of
+                a fixed square. */}
             <div className="relative w-[64px] min-h-[64px] shrink-0 overflow-hidden">
               {imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -268,16 +270,12 @@ export function ContentNotificationBubble({
               ) : (
                 <div
                   className="flex h-full w-full items-center justify-center"
-                  style={{
-                    backgroundColor: isMe ? "rgba(255,255,255,0.10)" : theme.tileBg,
-                  }}
+                  style={{ backgroundColor: CONTENT_TILE.bg }}
                 >
                   <TileIcon
                     size={24}
                     strokeWidth={2.5}
-                    style={{
-                      color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
-                    }}
+                    style={{ color: CONTENT_TILE.fg }}
                   />
                 </div>
               )}
