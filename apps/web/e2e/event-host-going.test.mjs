@@ -24,9 +24,12 @@
  *      mints the seeded member's session from SESSION_SECRET. The seeded row's
  *      password is a secret the seeder throws away, so there is no account to
  *      configure;
- *   3. POSTs the create-event route, then reads the event back through the
- *      community's event list and straight from the database, and asserts all
- *      three agree that the host is going;
+ *   3. POSTs the create-event route and asserts the response, the database and
+ *      the community's event list all agree the host is going — then withdraws
+ *      the RSVP (the card's own toggle) and takes the undo offer's action (the
+ *      same POST), asserting both directions on the same three surfaces. The
+ *      withdraw leg also pins the host-only rule that the room keeps them: the
+ *      group chat is the host's, so withdrawing never evicts them from it;
  *   4. deletes the event and its room, and clears the seed.
  *
  * RUN (from the repo root)
@@ -148,6 +151,22 @@ async function waitForApp(base, proc, read) {
   throw new Error("dev server did not start");
 }
 
+/** The event as the community's list route (the feed read model) reports it. */
+async function fetchListedEvent(base, communityId, eventId, cookie) {
+  const response = await fetch(`${base}/api/communities/${communityId}/events`, { headers: { cookie } });
+  const body = await response.json().catch(() => ({}));
+  return (body.events ?? []).find((row) => row.id === eventId) ?? null;
+}
+
+/** The RSVP route's toggle, the exact request the card's button fires. */
+async function postRsvp(base, communityId, eventId, cookie) {
+  const response = await fetch(`${base}/api/communities/${communityId}/events/${eventId}/rsvp`, {
+    method: "POST",
+    headers: { cookie },
+  });
+  return { ok: response.ok, status: response.status, body: await response.json().catch(() => ({})) };
+}
+
 async function main() {
   const target = resolveSeedTarget({ envText: readEnvFile(WEB_ENV_FILE) });
   const refusal = remoteSeedRefusal(target);
@@ -226,36 +245,93 @@ async function main() {
     roomId = body.chat_community_id ?? null;
     check("the event got its own group chat", Boolean(roomId), `chat_community_id=${roomId}`);
 
+    // The four reads the legs below are written in terms of, bound once here.
+    const listedEvent = () => fetchListedEvent(base, communityId, eventId, cookie);
+    const toggleRsvp = () => postRsvp(base, communityId, eventId, cookie);
+    const rsvpRow = async () => {
+      const { data } = await db
+        .from("event_rsvps")
+        .select("user_id")
+        .eq("event_id", eventId)
+        .eq("user_id", SEED_USER_ID)
+        .maybeSingle();
+      return data ?? null;
+    };
+    const roomSeat = async () => {
+      const { data } = await db
+        .from("community_members")
+        .select("community_id")
+        .eq("community_id", roomId)
+        .eq("user_id", SEED_USER_ID)
+        .maybeSingle();
+      return data ?? null;
+    };
+
     // The two fields the card renders the button and the count from. This is
     // the regression: without the host's RSVP they read false / 0.
     check("create response says the host is going", event.user_rsvped === true, `user_rsvped=${event.user_rsvped}`);
     check("create response counts the host", event.rsvp_count === 1, `rsvp_count=${event.rsvp_count}`);
 
     // ── 2. Ground truth: the row the counts are computed from ──
-    const { data: rsvpRow } = await db
-      .from("event_rsvps")
-      .select("event_id, user_id")
-      .eq("event_id", eventId)
-      .eq("user_id", SEED_USER_ID)
-      .maybeSingle();
-    check("event_rsvps holds the host's row", Boolean(rsvpRow));
+    check("event_rsvps holds the host's row", Boolean(await rsvpRow()));
 
     // ── 3. The community's event list — the list-page RPC every feed reads ──
-    const list = await fetch(`${base}/api/communities/${communityId}/events`, { headers: { cookie } });
-    const listBody = await list.json().catch(() => ({}));
-    const listed = (listBody.events ?? []).find((row) => row.id === eventId);
+    const listed = await listedEvent();
     check("list route returns the event", Boolean(listed));
     check("list says the host is going", listed?.user_rsvped === true, `user_rsvped=${listed?.user_rsvped}`);
     check("list's going count includes the host", listed?.rsvp_count === 1, `rsvp_count=${listed?.rsvp_count}`);
 
     // ── 4. The premise of the fix: the host is in the room the event made ──
-    const { data: roomMember } = await db
-      .from("community_members")
-      .select("community_id")
-      .eq("community_id", roomId)
-      .eq("user_id", SEED_USER_ID)
-      .maybeSingle();
-    check("host is a member of the event's group chat", Boolean(roomMember));
+    check("host is a member of the event's group chat", Boolean(await roomSeat()));
+
+    // ── 5. Withdrawing (the card's "Going ✓" tap, confirmed): the host leaves
+    // the going list — and keeps their seat in their own room, because the
+    // group chat is the host's to manage (leaveEventChat never removes the
+    // owner). Both halves are asserted: a route that stopped removing the RSVP
+    // would leave a ghost attendee, and one that started evicting the owner
+    // would take the room's only manager out of it.
+    const withdrawn = await toggleRsvp();
+    check(
+      "withdraw route answers rsvped:false",
+      withdrawn.ok && withdrawn.body.rsvped === false,
+      `status ${withdrawn.status} — ${JSON.stringify(withdrawn.body)}`,
+    );
+    check("withdraw reports the host's going count as 0", withdrawn.body.rsvp_count === 0, `rsvp_count=${withdrawn.body.rsvp_count}`);
+    check(
+      "withdraw names the room the sidebar drops",
+      withdrawn.body.chat_community_id === roomId,
+      `chat_community_id=${withdrawn.body.chat_community_id}`,
+    );
+    check("the host's RSVP row is gone", !(await rsvpRow()));
+    check("the host keeps their seat in their own room", Boolean(await roomSeat()));
+
+    const listedAfterWithdraw = await listedEvent();
+    check(
+      "list says the host is not going",
+      listedAfterWithdraw?.user_rsvped === false,
+      `user_rsvped=${listedAfterWithdraw?.user_rsvped}`,
+    );
+    check(
+      "list's going count drops to 0",
+      listedAfterWithdraw?.rsvp_count === 0,
+      `rsvp_count=${listedAfterWithdraw?.rsvp_count}`,
+    );
+
+    // ── 6. Taking the undo offer. The toast's action is the same POST again
+    // (EventCard.restoreRsvp), which is what re-registers the host — and the
+    // path the original revert bug lived on, so it is checked end to end.
+    const restored = await toggleRsvp();
+    check(
+      "undo (RSVP again) answers rsvped:true",
+      restored.ok && restored.body.rsvped === true,
+      `status ${restored.status} — ${JSON.stringify(restored.body)}`,
+    );
+    check("undo counts the host again", restored.body.rsvp_count === 1, `rsvp_count=${restored.body.rsvp_count}`);
+    check("the host's RSVP row is back", Boolean(await rsvpRow()));
+
+    const listedAfterUndo = await listedEvent();
+    check("list says the host is going again", listedAfterUndo?.user_rsvped === true, `user_rsvped=${listedAfterUndo?.user_rsvped}`);
+    check("list's going count is back to 1", listedAfterUndo?.rsvp_count === 1, `rsvp_count=${listedAfterUndo?.rsvp_count}`);
   } finally {
     if (keepSeed) {
       console.log(`  --keep-seed: leaving event ${eventId}, room ${roomId} and the seed in place`);
