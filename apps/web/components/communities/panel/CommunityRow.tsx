@@ -151,18 +151,13 @@ export const CommunityRow = memo(function CommunityRow({
           </div>
 
           {/* Meta: the member count. Every badge lives on this line — the
-              verified seal, then a dot, then the public/private icon
-              ("2 members · 🌐", "3 members ✓ · 🔒") — so the name stays
-              clean and the badges read as properties of the group. */}
+              verified seal, then the public/private icon ("2 members 🌐",
+              "3 members ✓ 🔒") — so the name stays clean and the badges
+              read as properties of the group. */}
           <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-foreground-muted">
             <span>{fmtCount(c.member_count)} members</span>
             {badges.verified && <SignupCommunityBadge size={12} />}
-            {badges.visibility && (
-              <>
-                <span>·</span>
-                <CommunityVisibilityIcon kind={badges.visibility} />
-              </>
-            )}
+            {badges.visibility && <CommunityVisibilityIcon kind={badges.visibility} />}
           </div>
 
           {/* Preview line */}
