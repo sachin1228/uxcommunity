@@ -11,8 +11,8 @@ import {
  *
  *   ✓  verified seal — a default group the signup flow created for them
  *                      (city, sector, experience level, job title)
- *   🌐 earth         — an open group: a public member-created community, or
- *                      an event's chat whose event is shared publicly
+ *   🌐 earth         — an open group: a public member-created community or
+ *                      event room
  *   🔒 lock          — a closed group: any signup default group (joined only
  *                      through the signup match), or a private community
  *
@@ -87,26 +87,20 @@ export function CommunityVisibilityIcon({
  * "Name ✓ 🔒". Pass the community's `type` and `is_private` straight through —
  * one component so every surface draws the same pair from the same rules, and
  * renders nothing when the rules say a name carries no badge at all.
- *
- * An event's group chat also passes its event's "Share publicly" flag
- * (`eventIsPublic`), which decides the earth vs the lock for that room.
  */
 export function CommunityNameBadges({
   type,
   isPrivate,
-  eventIsPublic,
   size = 12,
   className = "",
 }: {
   type?: string | null;
   isPrivate?: boolean | null;
-  /** An event room's event "Share publicly" flag — decides earth vs lock. */
-  eventIsPublic?: boolean | null;
   /** Icon size in px; the seal is drawn one px larger than the visibility icon. */
   size?: number;
   className?: string;
 }) {
-  const { verified, visibility } = communityNameBadges(type, isPrivate, eventIsPublic);
+  const { verified, visibility } = communityNameBadges(type, isPrivate);
   if (!verified && !visibility) return null;
 
   return (

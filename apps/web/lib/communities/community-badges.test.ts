@@ -72,18 +72,14 @@ test("a default group shows the seal and the lock, private or not", () => {
   });
 });
 
-// An event room is only as open as its event: the badge follows the event's
-// "Share publicly" setting, and a flag that cannot be read keeps it closed.
-test("an event room follows its event's Share publicly setting", () => {
-  assert.deepEqual(communityNameBadges(EVENT_CHAT_COMMUNITY_TYPE, false, true), {
+// An event room's badge reads the room's own public/private setting, the same
+// way a member-created community's does.
+test("an event room follows its room's public/private setting", () => {
+  assert.deepEqual(communityNameBadges(EVENT_CHAT_COMMUNITY_TYPE, false), {
     verified: false,
     visibility: "globe",
   });
-  assert.deepEqual(communityNameBadges(EVENT_CHAT_COMMUNITY_TYPE, false, false), {
-    verified: false,
-    visibility: "lock",
-  });
-  assert.deepEqual(communityNameBadges(EVENT_CHAT_COMMUNITY_TYPE, false), {
+  assert.deepEqual(communityNameBadges(EVENT_CHAT_COMMUNITY_TYPE, true), {
     verified: false,
     visibility: "lock",
   });

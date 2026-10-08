@@ -146,8 +146,6 @@ export interface CachedMeta {
     pinned_until?: string | null;
     /** That deadline whether ahead or past — the badge's ENDED day reads it. */
     event_end?: string | null;
-    /** The event's "Share publicly" flag — the room badge's earth/lock reads it. */
-    event_is_public?: boolean | null;
     /** "owner" | "admin" | "moderator" | "member" — the current user's role in this community. */
     current_user_role?: string | null;
     /** Effective permission grants (owners: everything; admins and moderators: configured toggles). */
@@ -221,12 +219,6 @@ export interface CachedSidebarCommunity {
    * every other kind of community.
    */
   event_end?: string | null;
-  /**
-   * An event group chat's event "Share publicly" flag — whether the room is
-   * open beyond an invite; the row's earth/lock badge mirrors it. Absent on
-   * every other kind of community.
-   */
-  event_is_public?: boolean | null;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;

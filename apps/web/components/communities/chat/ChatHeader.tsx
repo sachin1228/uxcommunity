@@ -29,8 +29,6 @@ interface Community {
   pinned_until?: string | null;
   /** That deadline whether ahead or past — what makes the badge say ENDED. */
   event_end?: string | null;
-  /** The event's "Share publicly" flag — the room name's earth/lock reads it. */
-  event_is_public?: boolean | null;
 }
 
 interface ChatHeaderProps {
@@ -248,7 +246,6 @@ export const ChatHeader = memo(function ChatHeader({
                       <CommunityNameBadges
                         type={community.type}
                         isPrivate={community.is_private}
-                        eventIsPublic={community.event_is_public}
                         size={13}
                       />
                     </span>

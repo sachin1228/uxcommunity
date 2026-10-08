@@ -67,10 +67,8 @@ export function communityVisibility(
  *   the seal plus the lock: a member joins these only through the signup
  *   match, never by browsing, so they read as closed whatever `is_private`
  *   says.
- * - An event's group chat — earth or lock, following the event's own
- *   "Share publicly" setting (`eventIsPublic`); a flag that cannot be read
- *   keeps the room closed.
- * - Member-created — earth when public, lock when private.
+ * - Member-created communities and event rooms — earth when public, lock
+ *   when private, following the community's own setting.
  * - Anything else — nothing, or the lock when private.
  *
  * Unknown types fall through to "nothing but the lock when private" rather than
@@ -79,22 +77,14 @@ export function communityVisibility(
 export function communityNameBadges(
   type: string | null | undefined,
   isPrivate: boolean | null | undefined,
-  eventIsPublic?: boolean | null,
 ): CommunityNameBadgeSpec {
   if (isSignupCommunity(type)) {
     return { verified: true, visibility: "lock" };
   }
 
-  if (type === EVENT_CHAT_COMMUNITY_TYPE) {
-    return {
-      verified: false,
-      visibility: eventIsPublic === true ? "globe" : "lock",
-    };
-  }
-
   const isPublicGroup = communityVisibility(isPrivate) === "public";
 
-  if (type === MEMBER_COMMUNITY_TYPE) {
+  if (type === MEMBER_COMMUNITY_TYPE || type === EVENT_CHAT_COMMUNITY_TYPE) {
     return { verified: false, visibility: isPublicGroup ? "globe" : "lock" };
   }
 
