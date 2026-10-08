@@ -125,6 +125,8 @@ export const CommunityRow = memo(function CommunityRow({
             <span className="min-w-0 truncate font-body text-[14px] font-medium text-foreground">
               {c.name}
             </span>
+            {/* The verified seal rides with the name it certifies. */}
+            {badges.verified && <SignupCommunityBadge size={12} />}
             {/* An event's chat stays pinned to the top of the list until its
                 event date (see sidebar-order); the mark says why it's up
                 there instead of leaving it a mystery. The DP carries that
@@ -150,14 +152,11 @@ export const CommunityRow = memo(function CommunityRow({
             )}
           </div>
 
-          {/* Meta: the member count. Every badge lives on this line — the
-              public/private icon, then the verified seal ("2 members 🌐",
-              "3 members 🔒 ✓") — so the name stays clean and the badges
-              read as properties of the group. */}
+          {/* Meta: the member count, with the group's visibility mark after it
+              ("2 members 🌐", "3 members 🔒"). */}
           <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-foreground-muted">
             <span>{fmtCount(c.member_count)} members</span>
             {badges.visibility && <CommunityVisibilityIcon kind={badges.visibility} />}
-            {badges.verified && <SignupCommunityBadge size={12} />}
           </div>
 
           {/* Preview line */}
