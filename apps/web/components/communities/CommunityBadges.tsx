@@ -11,8 +11,10 @@ import {
  *
  *   ✓  verified seal — a default group the signup flow created for them
  *                      (city, sector, experience level, job title)
- *   🌐 earth         — a public member-created group
- *   🔒 lock          — a private group
+ *   🌐 earth         — an open group: a public member-created community or
+ *                      event room
+ *   🔒 lock          — a closed group: any signup default group (joined only
+ *                      through the signup match), or a private community
  *
  * Which pair a community gets is decided by `communityNameBadges` in
  * `lib/communities/community-badges.ts`; this file only draws it.
@@ -53,7 +55,7 @@ export function SignupCommunityBadge({
   );
 }
 
-/** Earth for a public/discoverable community, lock for a private one. */
+/** Earth for an open community, lock for a closed one. */
 export function CommunityVisibilityIcon({
   kind,
   size = 12,

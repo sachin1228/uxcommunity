@@ -1,3 +1,5 @@
+import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
+
 /**
  * Classification helpers behind the community name badges.
  *
@@ -62,10 +64,12 @@ export function communityVisibility(
  * The badge pair for one community name:
  *
  * - Platform default group (city, sector, experience level, job title) —
- *   the seal alone. The earth would only repeat what the seal already
- *   implies, and these groups are not something a member goes looking for.
- * - Member-created — earth when public, lock when private.
- * - Private anything — the lock, next to the seal for a private default group.
+ *   the seal plus the lock: a member joins these only through the signup
+ *   match, never by browsing, so they read as closed whatever `is_private`
+ *   says.
+ * - Member-created communities and event rooms — earth when public, lock
+ *   when private, following the community's own setting.
+ * - Anything else — nothing, or the lock when private.
  *
  * Unknown types fall through to "nothing but the lock when private" rather than
  * guessing a badge for a community kind the platform does not know yet.
@@ -74,16 +78,15 @@ export function communityNameBadges(
   type: string | null | undefined,
   isPrivate: boolean | null | undefined,
 ): CommunityNameBadgeSpec {
-  const signupCreated = isSignupCommunity(type);
-  const isPrivateGroup = communityVisibility(isPrivate) === "private";
-
-  if (isPrivateGroup) {
-    return { verified: signupCreated, visibility: "lock" };
+  if (isSignupCommunity(type)) {
+    return { verified: true, visibility: "lock" };
   }
 
-  if (type === MEMBER_COMMUNITY_TYPE) {
-    return { verified: false, visibility: "globe" };
+  const isPublicGroup = communityVisibility(isPrivate) === "public";
+
+  if (type === MEMBER_COMMUNITY_TYPE || type === EVENT_CHAT_COMMUNITY_TYPE) {
+    return { verified: false, visibility: isPublicGroup ? "globe" : "lock" };
   }
 
-  return { verified: signupCreated, visibility: null };
+  return { verified: false, visibility: isPublicGroup ? null : "lock" };
 }
