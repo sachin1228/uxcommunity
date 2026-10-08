@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, ChevronDown, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookMarked, Calendar, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -53,9 +53,9 @@ type ConfirmAction = "leave" | "delete" | null;
 
 const CONFIRM_COPY: Record<NonNullable<ConfirmAction>, { title: string; body: string; cta: string }> = {
   leave: {
-    title: "Leave community?",
+    title: "Exit community?",
     body: "You'll no longer be able to view or send messages here.",
-    cta: "Leave",
+    cta: "Exit",
   },
   delete: {
     title: "Delete chat?",
@@ -138,7 +138,7 @@ export const ChatHeader = memo(function ChatHeader({
   communityId,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
-  const [openMenu, setOpenMenu] = useState<"joined" | "more" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"more" | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -280,29 +280,6 @@ export const ChatHeader = memo(function ChatHeader({
                 <div className="relative">
                   <button
                     type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={openMenu === "joined"}
-                    onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
-                    className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
-                  >
-                    Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
-                  </button>
-                  {openMenu === "joined" && (
-                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => requestAction("leave")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
-                      >
-                        Leave community
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="relative">
-                  <button
-                    type="button"
                     aria-label="Community options"
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "more"}
@@ -317,9 +294,21 @@ export const ChatHeader = memo(function ChatHeader({
                         type="button"
                         role="menuitem"
                         onClick={() => requestAction("delete")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
                       >
-                        Delete chat
+                        <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
+                        <span>Delete chat</span>
+                      </button>
+                      {/* Most destructive last: exiting removes membership,
+                          deleting only hides the chat from your sidebar. */}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => requestAction("leave")}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                      >
+                        <LogOut strokeWidth={2.5} size={14} className="shrink-0" />
+                        <span>Exit community</span>
                       </button>
                     </div>
                   )}

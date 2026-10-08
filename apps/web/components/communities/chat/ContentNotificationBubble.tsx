@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime, formatCommenters } from "./chatUtils";
+import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import {
   NotificationHoverActions,
@@ -31,6 +31,7 @@ import { userColorVar } from "@/lib/communities/user-color";
 import { RESOURCE_TYPES } from "@/lib/communities/models/resources";
 import type { CachedContentEvent, ContentEventKind } from "@/lib/communities/cache";
 import {
+  CONTENT_TILE,
   KIND_THEME,
   firstLine,
   fmtEventSchedule,
@@ -173,10 +174,8 @@ export function ContentNotificationBubble({
 
   const reactions = event.reactions ?? [];
   // How much discussion the card has on its own detail page — surfaced here so
-  // members can judge it without opening the item first, along with the people
-  // who spoke most recently.
+  // members can judge it without opening the item first.
   const commentCount = Math.max(0, meta?.comment_count ?? 0);
-  const commenterNames = formatCommenters(meta?.comment_users);
 
   return (
     <div
@@ -237,8 +236,9 @@ export function ContentNotificationBubble({
                 : "bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:border-white/[0.08] dark:hover:bg-white/[0.08]"
             }`}
           >
-            {/* Thumbnail — image, video poster, or tinted icon tile. Stretches
-                to the card's full height (min 64px) instead of a fixed square. */}
+            {/* Thumbnail — image, video poster, or the shared solid-ink icon
+                tile. Stretches to the card's full height (min 64px) instead of
+                a fixed square. */}
             <div className="relative w-[64px] min-h-[64px] shrink-0 overflow-hidden">
               {imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -268,16 +268,12 @@ export function ContentNotificationBubble({
               ) : (
                 <div
                   className="flex h-full w-full items-center justify-center"
-                  style={{
-                    backgroundColor: isMe ? "rgba(255,255,255,0.10)" : theme.tileBg,
-                  }}
+                  style={{ backgroundColor: CONTENT_TILE.bg }}
                 >
                   <TileIcon
                     size={24}
                     strokeWidth={2.5}
-                    style={{
-                      color: isMe ? "rgba(255,255,255,0.85)" : theme.tileFg,
-                    }}
+                    style={{ color: CONTENT_TILE.fg }}
                   />
                 </div>
               )}
@@ -334,23 +330,13 @@ export function ContentNotificationBubble({
           <div className="flex items-center gap-1.5 mt-0.5">
             {commentCount > 0 && (
               <span
-                className={`flex min-w-0 items-center gap-1 font-body text-[10px] leading-none ${
+                className={`flex items-center gap-1 font-body text-[10px] leading-none ${
                   isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
                 }`}
-                title={
-                  commenterNames
-                    ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"} · ${commenterNames}`
-                    : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
-                }
+                title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
               >
                 <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
                 <span className="shrink-0 tabular-nums">{commentCount}</span>
-                {commenterNames && (
-                  <span className="truncate">
-                    <span className="opacity-60">·&nbsp;</span>
-                    {commenterNames}
-                  </span>
-                )}
               </span>
             )}
             <span

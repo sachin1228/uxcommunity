@@ -500,9 +500,9 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         ) : null}
                       </div>
                       {member.designation && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
+                        <p className="font-body text-xs text-foreground-muted truncate">
                           {member.designation}
-                        </span>
+                        </p>
                       )}
                     </div>
                     {/* Row menu — managers only; each action checks its own

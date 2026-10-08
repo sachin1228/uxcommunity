@@ -28,9 +28,6 @@ export interface ContentEventMeta {
   /** Comments left on the item's own detail page, so the card can show how
    * much discussion it has. Enriched server-side per page load. */
   comment_count?: number | null;
-  /** Display names of the most recent commenters, newest first, so the card can
-   * show who is talking next to the count. Capped at COMMENTERS_SHOWN. */
-  comment_users?: string[] | null;
 }
 
 /**
@@ -45,34 +42,20 @@ export const CONTENT_COMMENT_SOURCES: Record<ContentEventKind, { table: string; 
   event:    { table: "event_comments",    column: "event_id" },
 };
 
-/** How many commenter names a card shows beside its comment count. */
-export const COMMENTERS_SHOWN = 3;
-
-export interface ContentCommentSummary {
-  /** Total comments on the item, replies included. */
-  count: number;
-  /** Most recent distinct commenters, newest first (≤ COMMENTERS_SHOWN). */
-  commenters: string[];
-}
-
 /**
- * Who has been talking on a page of content cards, and how much.
+ * How much discussion a page of content cards has.
  *
  * The four kinds keep their comments in their own table with their own FK
- * column, so this is one query per kind (per page, not per card) plus a single
- * name lookup — the row also carries `user_id`/`created_at`, which is what lets
- * a card name its newest commenters instead of only counting them.
+ * column, so this is one query per kind (per page, not per card).
  *
- * A content item can be commented on before this page loads, so the summary is
+ * A content item can be commented on before this page loads, so the count is
  * recomputed on every page load rather than trusted from the persisted event.
  */
-export async function loadCommentSummaries(
+export async function loadCommentCounts(
   db: { from: (table: string) => unknown },
   items: Array<{ id: string; kind: ContentEventKind }>,
-): Promise<Map<string, ContentCommentSummary>> {
+): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
-  /** itemId → (userId → that user's newest comment time on the item). */
-  const authors = new Map<string, Map<string, string>>();
 
   const byKind: Record<ContentEventKind, { table: string; column: string; ids: string[] }> = {
     thread:   { ...CONTENT_COMMENT_SOURCES.thread,   ids: [] },
@@ -92,54 +75,17 @@ export async function loadCommentSummaries(
           }>;
         };
       })
-        .select(`${column}, user_id, created_at`)
+        .select(column)
         .in(column, ids)) as { data: Array<Record<string, string | null>> | null };
       for (const row of data ?? []) {
         const id = row[column];
         if (!id) continue;
         counts.set(id, (counts.get(id) ?? 0) + 1);
-        const author = row.user_id;
-        if (!author) continue;
-        const perItem = authors.get(id) ?? new Map<string, string>();
-        authors.set(id, perItem);
-        const at = row.created_at ?? "";
-        if (!perItem.has(author) || at > perItem.get(author)!) perItem.set(author, at);
       }
     }),
   );
 
-  // One lookup for every commenter on the page; rows with a deleted author are
-  // simply left unnamed rather than dropped from the count.
-  const authorIds = [...new Set([...authors.values()].flatMap((perItem) => [...perItem.keys()]))];
-  const names = new Map<string, string>();
-  if (authorIds.length) {
-    const { data: users } = (await (db.from("users") as {
-      select: (cols: string) => {
-        in: (col: string, values: string[]) => Promise<{
-          data: Array<{ id: string; name: string | null }> | null;
-        }>;
-      };
-    })
-      .select("id, name")
-      .in("id", authorIds)) as { data: Array<{ id: string; name: string | null }> | null };
-    for (const user of users ?? []) {
-      if (user?.id && user.name) names.set(user.id, user.name);
-    }
-  }
-
-  const summaries = new Map<string, ContentCommentSummary>();
-  for (const [id, count] of counts) {
-    const perItem = authors.get(id);
-    const commenters = perItem
-      ? [...perItem.entries()]
-          .sort((a, b) => b[1].localeCompare(a[1]))
-          .slice(0, COMMENTERS_SHOWN)
-          .map(([userId]) => names.get(userId))
-          .filter((name): name is string => Boolean(name))
-      : [];
-    summaries.set(id, { count, commenters });
-  }
-  return summaries;
+  return counts;
 }
 
 /**
@@ -166,42 +112,38 @@ export async function loadRsvpCounts(
 
 // ─── Per-kind visual identity (shared by the timeline cards) ────────────────
 
+/**
+ * The one icon-tile treatment every content card wears, whatever its kind —
+ * the design system's solid ink, black in light mode and white in dark.
+ * Shared here rather than per-kind so the four kinds cannot drift into four
+ * different tile colors: the tile is a surface, and surfaces stay neutral
+ * while the eyebrow beside it carries the kind's hue.
+ *
+ * Deliberately the foreground/background pair, not the accent pair: an
+ * own-message (blue) bubble re-points `--color-accent-foreground` to white for
+ * its text, which would leave the icon white-on-white on the dark theme's
+ * white tile. These two tokens are never re-pointed anywhere, so the icon
+ * stays visible in every bubble on both themes.
+ */
+export const CONTENT_TILE = {
+  /** Tile background — the solid ink. */
+  bg: "var(--color-foreground)",
+  /** Icon color on the tile — the paper under the ink. */
+  fg: "var(--color-background)",
+} as const;
+
 export interface KindTheme {
   /** Eyebrow label — "THREAD", "RESOURCE", … */
   label: string;
-  /** Icon-tile background (light/dark-aware Geist scale stop). */
-  tileBg: string;
-  /** Icon color on the tile. */
-  tileFg: string;
   /** Eyebrow text color. */
   accent: string;
 }
 
 export const KIND_THEME: Record<ContentEventKind, KindTheme> = {
-  thread: {
-    label: "Thread",
-    tileBg: "var(--ds-green-200)",
-    tileFg: "var(--ds-green-800)",
-    accent: "var(--ds-green-800)",
-  },
-  showcase: {
-    label: "Showcase",
-    tileBg: "var(--ds-purple-200)",
-    tileFg: "var(--ds-purple-700)",
-    accent: "var(--ds-purple-700)",
-  },
-  resource: {
-    label: "Resource",
-    tileBg: "var(--ds-purple-200)",
-    tileFg: "var(--ds-purple-700)",
-    accent: "var(--ds-purple-700)",
-  },
-  event: {
-    label: "Event",
-    tileBg: "var(--ds-amber-200)",
-    tileFg: "var(--ds-amber-800)",
-    accent: "var(--ds-amber-800)",
-  },
+  thread:   { label: "Thread",   accent: "var(--ds-green-800)" },
+  showcase: { label: "Showcase", accent: "var(--ds-purple-700)" },
+  resource: { label: "Resource", accent: "var(--ds-purple-700)" },
+  event:    { label: "Event",    accent: "var(--ds-amber-800)" },
 };
 
 /** First line of a text field, truncated for the subtitle. */
