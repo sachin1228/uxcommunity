@@ -151,12 +151,11 @@ export const CommunityRow = memo(function CommunityRow({
             )}
           </div>
 
-          {/* Meta: verified seal + member count + city. The seal reads as a
-              property of the group's membership ("verified, N members"), which
-              is why it sits on this line rather than beside the name. */}
+          {/* Meta: member count + city. The verified seal trails the count
+              ("3 members ✓") instead of sitting beside the name. */}
           <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-foreground-muted">
-            {badges.verified && <SignupCommunityBadge size={12} />}
             <span>{fmtCount(c.member_count)} members</span>
+            {badges.verified && <SignupCommunityBadge size={12} />}
             {c.type === "city" && c.reference_name && (
               <span>· {c.reference_name}</span>
             )}
