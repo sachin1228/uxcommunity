@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, Eraser, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookMarked, Calendar, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -58,9 +58,9 @@ const CONFIRM_COPY: Record<NonNullable<ConfirmAction>, { title: string; body: st
     cta: "Exit",
   },
   delete: {
-    title: "Clear chat?",
-    body: "This clears the chat from your sidebar. Other members won't be affected, and it'll reappear when a new message arrives.",
-    cta: "Clear chat",
+    title: "Delete chat?",
+    body: "This removes the chat from your sidebar. Other members won't be affected, and it'll reappear when a new message arrives.",
+    cta: "Delete chat",
   },
 };
 
@@ -296,11 +296,11 @@ export const ChatHeader = memo(function ChatHeader({
                         onClick={() => requestAction("delete")}
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
                       >
-                        <Eraser strokeWidth={2.5} size={14} className="shrink-0" />
-                        <span>Clear chat</span>
+                        <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
+                        <span>Delete chat</span>
                       </button>
                       {/* Most destructive last: exiting removes membership,
-                          clearing only hides the chat from your sidebar. */}
+                          deleting only hides the chat from your sidebar. */}
                       <button
                         type="button"
                         role="menuitem"
