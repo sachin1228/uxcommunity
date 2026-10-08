@@ -114,16 +114,22 @@ export async function loadRsvpCounts(
 
 /**
  * The one icon-tile treatment every content card wears, whatever its kind —
- * the design system's accent ink, black in light mode and white in dark.
+ * the design system's solid ink, black in light mode and white in dark.
  * Shared here rather than per-kind so the four kinds cannot drift into four
  * different tile colors: the tile is a surface, and surfaces stay neutral
  * while the eyebrow beside it carries the kind's hue.
+ *
+ * Deliberately the foreground/background pair, not the accent pair: an
+ * own-message (blue) bubble re-points `--color-accent-foreground` to white for
+ * its text, which would leave the icon white-on-white on the dark theme's
+ * white tile. These two tokens are never re-pointed anywhere, so the icon
+ * stays visible in every bubble on both themes.
  */
 export const CONTENT_TILE = {
-  /** Tile background — the accent ink. */
-  bg: "var(--color-accent)",
-  /** Icon color on the tile. */
-  fg: "var(--color-accent-foreground)",
+  /** Tile background — the solid ink. */
+  bg: "var(--color-foreground)",
+  /** Icon color on the tile — the paper under the ink. */
+  fg: "var(--color-background)",
 } as const;
 
 export interface KindTheme {
