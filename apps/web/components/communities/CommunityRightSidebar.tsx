@@ -67,8 +67,6 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
       return `A space for ${name} designers to connect and share.`;
     case "job_title":
       return `Connect with fellow ${name}s and share your work.`;
-    case "general":
-      return "The default community for every UX Community designer.";
     case "user":
       return "A member-created community on UX Community.";
     default:

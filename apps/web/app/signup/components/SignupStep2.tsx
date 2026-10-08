@@ -59,7 +59,7 @@ export function SignupStep2({
             City <span className="text-red-400">*</span>
           </span>
           {/* "Other" is a real row in the cities master data — selecting it must not
-              create a dedicated community; those members belong to General. */}
+              create a dedicated community. */}
           <SearchableSelect
             options={cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url }))}
             value={state.city_id}

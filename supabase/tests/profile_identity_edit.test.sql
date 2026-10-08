@@ -10,8 +10,7 @@
 --   * a change swaps the member between the official groups of the changed
 --     dimension only (leave old value's group, join new value's group,
 --     upserting it exactly like auto-join does), moving the membership;
---   * the General community and the other dimensions' memberships are never
---     touched;
+--   * the other dimensions' memberships are never touched;
 --   * catch-all "Other" values produce no community (leave only);
 --   * a missing old membership is not an error (nothing to leave);
 --   * inactive master values are refused whole (nothing applied);
@@ -25,7 +24,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(41);
 
 -- ─── Seeded master rows ─────────────────────────────────────────────────────
 create temporary table fx as
@@ -41,8 +40,8 @@ select
   (select id            from public.job_titles where slug = 'ux_designer')          as ux_title_id;
 
 -- ─── Fixtures ───────────────────────────────────────────────────────────────
--- Three members: "one" (full auto-join memberships), "two" (general + city),
--- "three" (general only — as if they had left the city group before).
+-- Three members: "one" (full auto-join memberships), "two" (city only),
+-- "three" (no groups — as if they had left the city group before).
 
 insert into public.users (id, name, email, password_hash) values
   ('0b000000-0000-4000-8000-000000000001', 'Member One',   'one@example.test',   'x'),
@@ -57,19 +56,13 @@ select u.id, fx.pune_id, fx.sector_a_id, 'mid_level', 'product_designer'
                ('0b000000-0000-4000-8000-000000000003'::uuid)) as u(id);
 
 -- The official groups as auto-join would have created them at signup.
--- (General is seeded as a singleton by migration 20260726500000 and job
--- title groups by 20260913120000 — the fixtures join the seeded rows.)
+-- (Job title groups are seeded by 20260913120000 — the fixtures join the
+-- seeded rows.)
 insert into public.communities (id, name, type, reference_id) values
   ('0a000000-0000-4000-8000-000000000002', 'Pune Designers',      'city',
    (select pune_id from fx)),
   ('0a000000-0000-4000-8000-000000000003', 'Mid-Level Designers', 'experience_level',
    (select mid_level_id from fx));
-
-insert into public.community_members (community_id, user_id)
-select (select id from public.communities where type = 'general'), u.id
-  from (values ('0b000000-0000-4000-8000-000000000001'::uuid),
-               ('0b000000-0000-4000-8000-000000000002'::uuid),
-               ('0b000000-0000-4000-8000-000000000003'::uuid)) as u(id);
 
 insert into public.community_members (community_id, user_id) values
   ('0a000000-0000-4000-8000-000000000002', '0b000000-0000-4000-8000-000000000001'),
@@ -220,12 +213,17 @@ select ok(
 );
 
 select ok(
-  exists (
-    select 1 from public.community_members
-     where user_id = '0b000000-0000-4000-8000-000000000001'
-       and community_id = (select id from public.communities where type = 'general')
+  not exists (
+    select 1 from public.communities where type = 'general'
   ),
-  'General is never touched'
+  'the retired General community does not exist'
+);
+
+select throws_ok(
+  $$insert into public.communities (name, type) values ('General', 'general')$$,
+  '23514',
+  'new row for relation "communities" violates check constraint "communities_type_check"',
+  'the general type is rejected by the schema'
 );
 
 select ok(
@@ -327,7 +325,7 @@ select throws_ok(
   'a second experience-level change inside three months is refused'
 );
 
--- ─── 6. "Other" joins nothing: the catch-all keeps members in General ───────
+-- ─── 6. "Other" joins nothing: the catch-all creates no community ──────────
 create temporary table r6 as
 select public.update_profile_identity(
   '0b000000-0000-4000-8000-000000000002',

@@ -61,7 +61,7 @@ export async function GET() {
     lottie_data:   null,
     reference_id:  c.reference_id,
     // Set when a member created the community (type "user"); null for the
-    // communities the uxcommunity app creates itself (general/city/sector/...).
+    // communities the uxcommunity app creates itself (city/sector/...).
     owner_id:      c.owner_id ?? null,
     // Derived from the community type rather than `owner_id is null`: an
     // ownerless member-led community is a bug, not a platform community, and

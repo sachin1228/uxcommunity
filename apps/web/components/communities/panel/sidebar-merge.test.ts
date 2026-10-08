@@ -38,7 +38,7 @@ const STALE_SERVER_LIST: Community[] = [
   community("illustration", "Illustration", "2026-09-14T14:05:00Z"),
   community("senior", "Senior designers", "2026-09-14T14:05:30Z"),
   community("industrial", "Industrial Design", "2026-09-14T14:05:10Z"),
-  community("general", "General", "2026-09-14T14:04:00Z"),
+  community("product", "Product Design", "2026-09-14T14:04:00Z"),
   community("accessibility", "Accessibility", "2026-09-14T13:05:00Z", {
     message_count: 1, // server still counts the unread 2:08 message
   }),
@@ -51,7 +51,7 @@ const LOCAL_REALTIME_LIST: Community[] = [
   community("illustration", "Illustration", "2026-09-14T14:05:00Z"),
   community("senior", "Senior designers", "2026-09-14T14:05:30Z"),
   community("industrial", "Industrial Design", "2026-09-14T14:05:10Z"),
-  community("general", "General", "2026-09-14T14:04:00Z"),
+  community("product", "Product Design", "2026-09-14T14:04:00Z"),
 ];
 
 test("stale server replay does not demote realtime-newer activity", () => {

@@ -161,8 +161,8 @@ export async function POST(request: NextRequest) {
   // Best-effort: the account is already created, so a tracking failure is silent.
   await markSignupCompleted(identity.email, userId);
 
-  // Join every profile-based community (General + city + sector) server-side so
-  // the sidebar shows the full list the first time the dashboard loads.
+  // Join every profile-based community (city + sector + interests) server-side
+  // so the sidebar shows the full list the first time the dashboard loads.
   // Non-fatal if it fails — the dashboard layout retries exactly once via the
   // designer_profiles.communities_auto_joined flag.
   let joinedCommunities = 0;

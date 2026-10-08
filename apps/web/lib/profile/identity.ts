@@ -83,7 +83,7 @@ export function slotUnlockDate(changedAt: string | Date): Date {
 
 /**
  * "Other" is the catch-all option in every master table, and it stays
- * community-free on purpose: those members are already in General. The
+ * community-free on purpose: a catch-all pick produces no group. The
  * comparison trims and lowercases so a stray " Other " cannot slip past —
  * same rule as `auto-join.ts` and the RPC.
  */
@@ -105,8 +105,8 @@ export function officialGroupName(dimension: IdentityDimension, masterName: stri
 
 /**
  * The group a not-yet-saved selection will produce, for the live preview.
- * Catch-all "Other" selections produce no group (the member stays in General),
- * which the modal renders as "no group" rather than an empty row.
+ * Catch-all "Other" selections produce no group, which the modal renders as
+ * "no group" rather than an empty row.
  */
 export function previewGroup(
   dimension: IdentityDimension,

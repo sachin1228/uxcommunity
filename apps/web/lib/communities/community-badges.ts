@@ -8,13 +8,11 @@
 
 /**
  * Community types the signup flow creates automatically (`autoJoinCommunities`):
- * the always-joined General community plus one community per profile dimension.
- * These are the communities a member never created, so they are the ones
- * eligible for the verified seal (interest communities excepted — see
- * `communityNameBadges`).
+ * one community per profile dimension. These are the communities a member
+ * never created, so they are the ones eligible for the verified seal
+ * (interest communities excepted — see `communityNameBadges`).
  */
 export const SIGNUP_COMMUNITY_TYPES = [
-  "general",
   "city",
   "sector",
   "interest",
@@ -35,7 +33,7 @@ export type SignupCommunityType = (typeof SIGNUP_COMMUNITY_TYPES)[number];
 
 /**
  * True for every community the platform creates on the member's behalf —
- * General, city, sector, interest, experience-level and job-title communities.
+ * city, sector, interest, experience-level and job-title communities.
  *
  * Member-created communities (`type: "user"`) and unknown types do not qualify:
  * the badge must mean "the platform stands behind this", so the allow-list is
@@ -71,8 +69,8 @@ export function communityVisibility(
 /**
  * The badge pair for one community name:
  *
- * - Platform default group (General, city, sector, experience level, job
- *   title) — the seal alone. The earth would only repeat what the seal already
+ * - Platform default group (city, sector, experience level, job title) —
+ *   the seal alone. The earth would only repeat what the seal already
  *   implies, and these groups are not something a member goes looking for.
  * - Interest community — the earth, because these are the public topic groups
  *   members browse. The seal is dropped so the earth reads as the group's own

@@ -102,7 +102,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         {/* Name + description */}
         <h1 className="flex items-center justify-center gap-1.5 font-display text-xl font-semibold text-foreground">
           {community.name}
-          {/* Default groups (city, sector, experience level, job title, General)
+          {/* Default groups (city, sector, experience level, job title)
               carry the verified seal here too, so an invite link reads the same
               as the sidebar the member lands in. */}
           {isVerifiedCommunity && <SignupCommunityBadge size={16} />}
