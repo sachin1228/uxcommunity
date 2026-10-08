@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, ChevronDown, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { Activity, BookMarked, Calendar, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -138,7 +138,7 @@ export const ChatHeader = memo(function ChatHeader({
   communityId,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
-  const [openMenu, setOpenMenu] = useState<"joined" | "more" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"more" | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -277,29 +277,11 @@ export const ChatHeader = memo(function ChatHeader({
                     <Settings strokeWidth={2.5} size={15} />
                   </button>
                 )}
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={openMenu === "joined"}
-                    onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
-                    className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
-                  >
-                    Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
-                  </button>
-                  {openMenu === "joined" && (
-                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => requestAction("leave")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
-                      >
-                        Leave community
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {/* Membership status — a static chip; leaving lives in the
+                    three-dot menu beside it. */}
+                <span className="h-8 flex items-center rounded-lg border border-border px-3 font-body text-xs text-foreground">
+                  Joined
+                </span>
                 <div className="relative">
                   <button
                     type="button"
@@ -320,6 +302,16 @@ export const ChatHeader = memo(function ChatHeader({
                         className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
                       >
                         Delete chat
+                      </button>
+                      {/* Most destructive last: leaving removes membership,
+                          deleting only hides the chat from your sidebar. */}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => requestAction("leave")}
+                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                      >
+                        Leave community
                       </button>
                     </div>
                   )}
