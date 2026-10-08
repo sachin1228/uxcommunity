@@ -464,6 +464,19 @@ select:focus-visible {
     cursor: not-allowed;
   }
 
+  /* Date/time fields draw their own icon and open their picker from a click
+     anywhere in the box (see PickerInput), so the browser's tiny edge
+     indicator is hidden and the whole field — including the editable date
+     segments, which otherwise keep their text cursor — reads as clickable. */
+  .picker-input::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+
+  .picker-input:not(:disabled),
+  .picker-input:not(:disabled)::-webkit-datetime-edit {
+    cursor: pointer;
+  }
+
   input:where(.field) {
     height: 32px;
     padding: 0 12px;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
+import { Check, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/communities/event-time";
 import { wallTimeInputsInZone } from "@/lib/communities/timezone";
 import { HostTimeZoneField } from "./HostTimeZoneField";
+import { PickerInput } from "./PickerInput";
 import { useNowTick } from "@/lib/use-now-tick";
 
 interface EditEventModalProps {
@@ -300,7 +301,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   picked, beneath the date. */}
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                  <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
+                  Date <span className="text-accent">*</span>
                   <span
                     className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
                     title={`The times you enter are read in ${zoneLabel}`}
@@ -308,7 +309,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                     {zoneLabel}
                   </span>
                 </span>
-                <input
+                <PickerInput
                   type="date"
                   value={eventDate}
                   min={minDate}
@@ -327,7 +328,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       setEventTime("");
                     }
                   }}
-                  className="field w-full"
                 />
               </label>
 
@@ -335,9 +335,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
+                    Start time <span className="text-accent">*</span>
                   </span>
-                  <input
+                  <PickerInput
                     type="time"
                     value={eventTime}
                     min={eventDate === minDate ? minStartTime : undefined}
@@ -349,19 +349,17 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className="field w-full"
                   />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                     End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
-                  <input
+                  <PickerInput
                     type="time"
                     value={endTime}
                     min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full"
                   />
                 </label>
               </div>
