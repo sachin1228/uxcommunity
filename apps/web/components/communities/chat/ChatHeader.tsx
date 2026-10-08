@@ -277,11 +277,6 @@ export const ChatHeader = memo(function ChatHeader({
                     <Settings strokeWidth={2.5} size={15} />
                   </button>
                 )}
-                {/* Membership status — a static chip; leaving lives in the
-                    three-dot menu beside it. */}
-                <span className="h-8 flex items-center rounded-lg border border-border px-3 font-body text-xs text-foreground">
-                  Joined
-                </span>
                 <div className="relative">
                   <button
                     type="button"
