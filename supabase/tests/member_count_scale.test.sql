@@ -36,13 +36,13 @@ select plan(21);
 
 delete from public.communities where id = 'c1c1c1c1-0000-4000-8000-000000000001';
 delete from public.users where email like '%@member-count.test';
-delete from public.design_interests where id = 'c1c1c1c1-0000-4000-8000-000000000002';
+delete from public.cities where id = 'c1c1c1c1-0000-4000-8000-000000000002';
 
-insert into public.design_interests (id, name)
-values ('c1c1c1c1-0000-4000-8000-000000000002', 'C-1 scale fixture interest');
+insert into public.cities (id, name)
+values ('c1c1c1c1-0000-4000-8000-000000000002', 'C-1 scale fixture city');
 
 insert into public.communities (id, name, type, reference_id, is_active)
-values ('c1c1c1c1-0000-4000-8000-000000000001', 'C-1 scale fixture', 'interest',
+values ('c1c1c1c1-0000-4000-8000-000000000001', 'C-1 scale fixture', 'city',
         'c1c1c1c1-0000-4000-8000-000000000002', true);
 
 insert into public.users (id, name, email, password_hash)
@@ -345,7 +345,7 @@ select ok(
 
 delete from public.communities where id = 'c1c1c1c1-0000-4000-8000-000000000001';
 delete from public.users where email like '%@member-count.test';
-delete from public.design_interests where id = 'c1c1c1c1-0000-4000-8000-000000000002';
+delete from public.cities where id = 'c1c1c1c1-0000-4000-8000-000000000002';
 
 select is(
   (

@@ -4,7 +4,6 @@
  * Endpoints covered:
  *   GET /api/data/cities            → { cities: [] }
  *   GET /api/data/sectors           → { sectors: [] }
- *   GET /api/data/interests         → { interests: [] }
  *   GET /api/data/experience-levels → { experience_levels: [] }
  *   GET /api/giphy?type=trending&limit=10
  */
@@ -17,7 +16,6 @@ import { BASE_URL } from '../config.js';
 const ENDPOINTS = [
   { name: 'cities',             path: '/api/data/cities',             key: 'cities' },
   { name: 'sectors',            path: '/api/data/sectors',            key: 'sectors' },
-  { name: 'interests',          path: '/api/data/interests',          key: 'interests' },
   { name: 'experience-levels',  path: '/api/data/experience-levels',  key: 'experience_levels' },
 ];
 

@@ -79,7 +79,6 @@ export const MASTER_IMAGE_LOOKUPS: MediaReferenceLookup[] = [
   { table: "communities", column: "image_url" },
   { table: "cities", column: "image_url" },
   { table: "design_sectors", column: "image_url" },
-  { table: "design_interests", column: "image_url" },
   { table: "experience_levels", column: "image_url" },
   { table: "job_titles", column: "image_url" },
 ];
@@ -88,7 +87,6 @@ export const MASTER_LOTTIE_LOOKUPS: MediaReferenceLookup[] = [
   { table: "communities", column: "lottie_url" },
   { table: "cities", column: "lottie_url" },
   { table: "design_sectors", column: "lottie_url" },
-  { table: "design_interests", column: "lottie_url" },
   { table: "experience_levels", column: "lottie_url" },
   { table: "job_titles", column: "lottie_url" },
 ];
@@ -102,8 +100,6 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   { table: "cities", column: "lottie_url" },
   { table: "design_sectors", column: "image_url" },
   { table: "design_sectors", column: "lottie_url" },
-  { table: "design_interests", column: "image_url" },
-  { table: "design_interests", column: "lottie_url" },
   { table: "experience_levels", column: "image_url" },
   { table: "experience_levels", column: "lottie_url" },
   { table: "job_titles", column: "image_url" },
@@ -130,8 +126,6 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "cities.lottie_url": "city",
   "design_sectors.image_url": "sector",
   "design_sectors.lottie_url": "sector",
-  "design_interests.image_url": "interest",
-  "design_interests.lottie_url": "interest",
   "experience_levels.image_url": "experience_level",
   "experience_levels.lottie_url": "experience_level",
   "job_titles.image_url": "job_title",

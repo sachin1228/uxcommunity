@@ -47,7 +47,6 @@ interface CommunityRule {
 const TYPE_LABELS: Record<string, string> = {
   city: "City",
   sector: "Industry",
-  interest: "Interest",
   experience_level: "Experience",
   job_title: "Job Title",
 };
@@ -61,8 +60,6 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
       return `Connect with designers based in ${name}.`;
     case "sector":
       return `A community for designers in the ${name} industry.`;
-    case "interest":
-      return `Designers who share a passion for ${name}.`;
     case "experience_level":
       return `A space for ${name} designers to connect and share.`;
     case "job_title":

@@ -7,7 +7,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { UserInfoCard } from "@/components/admin/users/UserInfoCard";
-import type { AdminUser, UserApplication, UserInterest } from "@/components/admin/users/userTypes";
+import type { AdminUser, UserApplication } from "@/components/admin/users/userTypes";
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +15,6 @@ export default function UserDetailPage() {
 
   const [user, setUser] = useState<AdminUser | null>(null);
   const [application, setApplication] = useState<UserApplication | null>(null);
-  const [interests, setInterests] = useState<UserInterest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -33,7 +32,6 @@ export default function UserDetailPage() {
         const data = await res.json();
         setUser(data.user);
         setApplication(data.application ?? null);
-        setInterests(data.interests ?? []);
         setMemberOfAll(data.memberOfAllCommunities ?? false);
       } catch {
         setError("Failed to load user.");
@@ -221,7 +219,7 @@ export default function UserDetailPage() {
       </div>
 
       {/* Details card */}
-      <UserInfoCard user={user} application={application} interests={interests} />
+      <UserInfoCard user={user} application={application} />
 
       {/* Delete confirm modal */}
       {confirmDelete && (

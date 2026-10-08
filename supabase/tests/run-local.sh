@@ -168,10 +168,10 @@ insert into public.users (id, name, email, password_hash) values
 on conflict (id) do nothing;
 
 insert into public.communities (id, name, type, is_active) values
-  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Fixture A', 'interest', true),
-  ('bbbbbbbb-0000-0000-0000-00000000000b', 'Fixture B', 'interest', true),
-  ('cccccccc-0000-0000-0000-00000000000c', 'Fixture C', 'interest', true),
-  ('dddddddd-0000-0000-0000-00000000000d', 'Fixture D', 'interest', true)
+  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Fixture A', 'city', true),
+  ('bbbbbbbb-0000-0000-0000-00000000000b', 'Fixture B', 'city', true),
+  ('cccccccc-0000-0000-0000-00000000000c', 'Fixture C', 'city', true),
+  ('dddddddd-0000-0000-0000-00000000000d', 'Fixture D', 'city', true)
 on conflict (id) do nothing;
 
 -- Oldest membership becomes the sidebar fixture's community A / viewer pair.

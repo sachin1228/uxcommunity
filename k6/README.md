@@ -24,7 +24,7 @@ k6/
 │   ├── 04_communities.js   # communities, messages, reactions
 │   ├── 05_threads.js       # threads, likes, comments
 │   ├── 06_events.js        # events, rsvp, event comments
-│   ├── 07_profile.js       # profile get/patch, interests, link-preview
+│   ├── 07_profile.js       # profile get/patch, link-preview
 │   ├── 08_admin.js         # admin panel read + light write smoke
 │   └── 09_chat_messages.js # deep chat coverage: pagination, replies, reactions, delete, read
 ├── scenarios/              # k6 entry points
@@ -356,16 +356,16 @@ The stress scenario relaxes the error-rate threshold to 15 % — the goal there 
 
 | Group | Endpoints |
 |---|---|
-| Public data | `/api/data/cities`, `/api/data/sectors`, `/api/data/interests`, `/api/data/experience-levels`, `/api/giphy` |
+| Public data | `/api/data/cities`, `/api/data/sectors`, `/api/data/experience-levels`, `/api/data/job-titles`, `/api/giphy` |
 | Auth | `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/reset-request` |
 | Applications | `POST /api/applications` |
 | Home feed | `/api/home/feed` (used by the RSVP regression script) |
 | Communities | `/api/communities`, `/api/communities/all`, `/api/communities/:id`, `/api/communities/:id/messages`, `/api/communities/:id/messages/:msgId/reactions`, `/api/communities/:id/read` |
 | Threads | `/api/communities/:id/threads`, `/api/communities/:id/threads/:threadId`, `/api/communities/:id/threads/:threadId/like`, `/api/communities/:id/threads/:threadId/comments`, `/api/communities/:id/threads/:threadId/comments/:commentId` |
 | Events | `/api/communities/:id/events`, `/api/communities/:id/events/:eventId`, `/api/communities/:id/events/:eventId/rsvp`, `/api/communities/:id/events/:eventId/rsvp/list`, `/api/communities/:id/events/:eventId/comments` |
-| Profile | `/api/profile`, `/api/profile/avatar`, `/api/profile/interests`, `/api/lottie-settings`, `/api/link-preview` |
-| Admin (read) | `/api/admin/applications`, `/api/admin/users`, `/api/admin/communities`, `/api/admin/cities`, `/api/admin/sectors`, `/api/admin/interests`, `/api/admin/tags` |
-| Admin (write, smoke only) | `POST /api/admin/cities`, `POST /api/admin/interests`, `POST /api/admin/upload` |
+| Profile | `/api/profile`, `/api/profile/avatar`, `/api/lottie-settings`, `/api/link-preview` |
+| Admin (read) | `/api/admin/applications`, `/api/admin/users`, `/api/admin/communities`, `/api/admin/cities`, `/api/admin/sectors`, `/api/admin/job-titles`, `/api/admin/tags` |
+| Admin (write, smoke only) | `POST /api/admin/cities`, `POST /api/admin/upload` |
 | Chat (deep, `09_chat_messages.js`) | `GET /api/communities/:id/messages` (list + pagination), `POST` (text, reply, rate-limit burst), `GET /api/communities/:id/messages/:msgId` (single), `POST /api/communities/:id/messages/:msgId/reactions` (add, toggle, switch), `DELETE /api/communities/:id/messages/:msgId` (soft-delete), `PATCH /api/communities/:id/read` |
 
 Not covered: thread/event/resource/showcase **uploads**, push registration, and the

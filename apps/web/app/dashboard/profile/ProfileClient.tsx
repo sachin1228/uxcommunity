@@ -31,8 +31,6 @@ interface Props {
   initialLinkedIn: string;
   initialPortfolio: string;
   initialBio: string;
-  initialInterestIds: string[];
-  allInterests: { id: string; name: string; image_url?: string | null }[];
   initialCompany: ProfileCompanyView | null;
   pendingCompany: PendingCompanyVerification | null;
   /** Current identity values, select options, groups and cooldown locks
@@ -49,8 +47,6 @@ export function ProfileClient({
   sector,
   roleLabel,
   initialBio,
-  initialInterestIds,
-  allInterests,
   initialCompany,
   pendingCompany,
   identity,
@@ -80,10 +76,6 @@ export function ProfileClient({
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [pictureSaving, setPictureSaving] = useState(false);
   const [pictureError, setPictureError] = useState<string | null>(null);
-
-  const interestNames = allInterests
-    .filter((i) => initialInterestIds.includes(i.id))
-    .map((i) => i.name);
 
   useEffect(() => {
     return () => {
@@ -173,7 +165,6 @@ export function ProfileClient({
             sector={sector}
             roleLabel={roleLabel}
             bio={initialBio}
-            interestNames={interestNames}
             company={initialCompany}
             onEditCompany={() => setShowCompanyPicker(true)}
             onOpenEditProfile={() => setShowEditProfile(true)}

@@ -12,11 +12,6 @@ export interface UserProfile {
   design_sectors: { name: string } | null;
 }
 
-export interface UserInterest {
-  id: string;
-  name: string;
-}
-
 export interface AdminUser {
   id: string;
   name: string;

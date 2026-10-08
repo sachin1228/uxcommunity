@@ -16,7 +16,6 @@ import { findWikipediaImage } from "@/lib/master-data/wikipedia-image";
 const TABLES = {
   cities: { table: "cities" },
   design_sectors: { table: "design_sectors" },
-  design_interests: { table: "design_interests" },
   experience_levels: { table: "experience_levels" },
   job_titles: { table: "job_titles" },
 } as const satisfies Record<MasterTable, { table: string }>;

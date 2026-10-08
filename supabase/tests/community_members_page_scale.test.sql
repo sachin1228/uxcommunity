@@ -35,7 +35,7 @@ delete from public.communities where id = '2a2a2a2a-0000-4000-8000-000000000001'
 delete from public.users where email like '%@member-page-scale.test';
 
 insert into public.communities (id, name, type, is_active)
-values ('2a2a2a2a-0000-4000-8000-000000000001', 'M-2 scale fixture', 'interest', true);
+values ('2a2a2a2a-0000-4000-8000-000000000001', 'M-2 scale fixture', 'city', true);
 
 insert into public.users (id, name, email, password_hash)
 values ('2a2a2a2a-0000-4000-8000-000000000011', 'M-2 scale owner',

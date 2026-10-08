@@ -971,39 +971,6 @@ export type Database = {
           },
         ];
       };
-      design_interests: {
-        Row: {
-          created_at: string;
-          id: string;
-          image_url: string | null;
-          is_active: boolean;
-          lottie_format: string | null;
-          lottie_url: string | null;
-          name: string;
-          updated_at: string;
-        };
-        Insert: {
-          created_at?: string;
-          id?: string;
-          image_url?: string | null;
-          is_active?: boolean;
-          lottie_format?: string | null;
-          lottie_url?: string | null;
-          name: string;
-          updated_at?: string;
-        };
-        Update: {
-          created_at?: string;
-          id?: string;
-          image_url?: string | null;
-          is_active?: boolean;
-          lottie_format?: string | null;
-          lottie_url?: string | null;
-          name?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
       design_sectors: {
         Row: {
           created_at: string;
@@ -2371,39 +2338,6 @@ export type Database = {
           },
         ];
       };
-      user_interests: {
-        Row: {
-          created_at: string;
-          interest_id: string;
-          user_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          interest_id: string;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          interest_id?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "user_interests_interest_id_fkey";
-            columns: ["interest_id"];
-            isOneToOne: false;
-            referencedRelation: "design_interests";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "user_interests_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       users: {
         Row: {
           application_id: string | null;
@@ -2534,7 +2468,6 @@ export type Database = {
           p_city_id: string;
           p_email: string;
           p_experience_level: string;
-          p_interest_ids: string[];
           p_invitation_token?: string;
           p_job_title: string;
           p_name: string;

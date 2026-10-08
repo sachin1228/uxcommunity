@@ -270,8 +270,8 @@ Total: 1 HTTP, 1 DB query
 
 ## N. Profile Loading
 ```
-1. GET /api/profile → 3 DB SELECT (users, designer_profiles, user_interests + design_interests join)
-Total: 1 HTTP, 3 DB queries
+1. GET /api/profile → 2 DB SELECT (users, designer_profiles)
+Total: 1 HTTP, 2 DB queries
 ```
 
 ## O. Logout

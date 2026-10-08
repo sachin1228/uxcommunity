@@ -12,7 +12,6 @@ const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg
 const MASTER_TABLE: Record<string, { table: string; idCol: string }> = {
   city:             { table: "cities",            idCol: "id" },
   sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
   experience_level: { table: "experience_levels", idCol: "id" },
   job_title:        { table: "job_titles",        idCol: "id" },
 };
@@ -24,8 +23,6 @@ const DP_REFERENCE_LOOKUPS = [
   { table: "cities", column: "lottie_url" },
   { table: "design_sectors", column: "image_url" },
   { table: "design_sectors", column: "lottie_url" },
-  { table: "design_interests", column: "image_url" },
-  { table: "design_interests", column: "lottie_url" },
   { table: "experience_levels", column: "image_url" },
   { table: "experience_levels", column: "lottie_url" },
   { table: "job_titles", column: "image_url" },
@@ -224,7 +221,6 @@ export async function DELETE(
       { table: "communities", column: "lottie_url" },
       { table: "cities", column: "lottie_url" },
       { table: "design_sectors", column: "lottie_url" },
-      { table: "design_interests", column: "lottie_url" },
       { table: "experience_levels", column: "lottie_url" },
       { table: "job_titles", column: "lottie_url" },
     ]);

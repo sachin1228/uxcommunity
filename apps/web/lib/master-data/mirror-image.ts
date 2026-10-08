@@ -38,7 +38,6 @@ import type { MasterTable } from "./master-tables";
 export const COMMUNITY_TYPE_BY_MASTER_TABLE = {
   cities: "city",
   design_sectors: "sector",
-  design_interests: "interest",
   experience_levels: "experience_level",
   job_titles: "job_title",
 } as const satisfies Record<MasterTable, string>;

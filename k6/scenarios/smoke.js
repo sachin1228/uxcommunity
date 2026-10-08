@@ -70,7 +70,7 @@ export default function () {
   chatMessageTests(); // deep chat: pagination, replies, reactions, rate-limit, read
   threadTests();      // threads, likes, comments
   eventTests();       // events, rsvp, event comments
-  profileTests();     // profile get/patch, interests, lottie-settings
+  profileTests();     // profile get/patch, lottie-settings
 
   logout();
 
@@ -78,7 +78,7 @@ export default function () {
   loginAdmin(ADMIN_EMAIL, ADMIN_PASSWORD);
 
   adminReadTests();  // all admin GET endpoints
-  adminWriteSmoke(); // create city + interest (smoke only — not in load/stress)
+  adminWriteSmoke(); // create city (smoke only — not in load/stress)
 
   logout();
 

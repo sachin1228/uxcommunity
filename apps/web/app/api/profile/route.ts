@@ -14,12 +14,7 @@ export async function GET() {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const [
-    { data: user },
-    { data: profile },
-    { data: userInterests },
-    { data: allInterests },
-  ] = await Promise.all([
+  const [{ data: user }, { data: profile }] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
       .from("designer_profiles")
@@ -28,16 +23,9 @@ export async function GET() {
       )
       .eq("user_id", userId)
       .maybeSingle(),
-    db.from("user_interests").select("interest_id, design_interests(id, name, image_url)").eq("user_id", userId),
-    db.from("design_interests").select("id, name, image_url").eq("is_active", true).order("name"),
   ]);
 
-  return NextResponse.json({
-    user,
-    profile,
-    userInterests: (userInterests ?? []).map((r: any) => r.design_interests).filter(Boolean),
-    allInterests: allInterests ?? [],
-  });
+  return NextResponse.json({ user, profile });
 }
 
 export async function PATCH(request: NextRequest) {

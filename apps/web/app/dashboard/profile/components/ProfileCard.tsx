@@ -6,9 +6,6 @@ import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg"
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
 
-const chipCls =
-  "flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground";
-
 interface ProfileCardProps {
   name: string;
   avatarUrl: string | null;
@@ -21,8 +18,6 @@ interface ProfileCardProps {
    */
   roleLabel: string | null;
   bio: string;
-  /** Read-only topic chips; topics are picked during onboarding. */
-  interestNames: string[];
   /** The verified company on the profile, or null when none is set. */
   company: ProfileCompanyView | null;
   /** Opens the company picker: adding when none is set, changing when one is. */
@@ -33,8 +28,8 @@ interface ProfileCardProps {
 
 /**
  * The profile hero: display picture, name, role line, city/sector line, the
- * company card, bio and interest chips. It carries no cover image and no card
- * chrome of its own —
+ * company card and bio. It carries no cover image and no card chrome of its
+ * own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
  * the only image and everything here sits directly on the page. Contact details
  * and links live on the Settings page (`app/dashboard/settings`).
@@ -47,7 +42,6 @@ export function ProfileCard({
   sector,
   roleLabel,
   bio,
-  interestNames,
   company,
   onEditCompany,
   onOpenEditProfile,
@@ -212,16 +206,6 @@ export function ProfileCard({
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
-        {/* Interest chips */}
-        {interestNames.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {interestNames.map((n) => (
-              <span key={n} className={chipCls}>
-                {n}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </section>
   );

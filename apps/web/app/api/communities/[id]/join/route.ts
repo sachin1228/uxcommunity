@@ -12,7 +12,7 @@ import { storeEventJoinResponse } from "@/lib/communities/event-join-responses";
  * POST /api/communities/[id]/join
  *
  * Access rules:
- *  - interest / user            → anyone can join (unless private)
+ *  - user                       → anyone can join (unless private)
  *  - sector                     → user's sector_id must match community reference_id
  *  - city                       → user's city_id must match community reference_id
  *  - experience_level           → user's experience_level slug must resolve to matching reference_id
@@ -110,8 +110,8 @@ export async function POST(
     return NextResponse.json({ success: true });
   }
 
-  // 2. Interest / user communities are open to all
-  const FREE_TYPES = new Set(["interest", "user"]);
+  // 2. Member-led communities are open to all
+  const FREE_TYPES = new Set(["user"]);
 
   if (!FREE_TYPES.has(community.type)) {
     const { data: profile } = await db

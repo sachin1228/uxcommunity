@@ -29,7 +29,7 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 | Dashboard (`/admin`) | Applications review — all / pending / approved / rejected tabs, detail modal, approve & reject |
 | Users | View all members, block/unblock, open a profile, delete accounts |
 | Communities | Create/edit communities, community admins & permissions |
-| Master data | Cities, sectors, experience levels, interests, job titles, Lottie animations |
+| Master data | Cities, sectors, experience levels, job titles, Lottie animations |
 | Signup attempts | Incomplete sign-ups; send a resume link |
 | Tools | R2 storage health (orphan scan/delete) and related maintenance |
 | Load test | Admin-triggered k6 smoke/load runs |
@@ -43,12 +43,12 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 | `/api/auth/*` | login, logout, me, reset-request, reset-confirm |
 | `/api/applications` | Application submission endpoint (rate-limited: 5/hr per IP) |
 | `/api/signup/*` | Multi-step onboarding: validate, direct, profile, avatar, picture, complete, resume |
-| `/api/profile/*` | Update profile, interests, avatar |
+| `/api/profile/*` | Update profile, avatar |
 | `/api/communities/*` | Communities, membership, invites, chat messages + reactions + upload, read receipts, threads, events, resources, showcase, comments, rules, content reactions |
 | `/api/home/*` | Home feed pages |
 | `/api/notifications` | List, mark read, clear |
 | `/api/push/*` | Expo push registration, settings, test push |
-| `/api/data/*` | Public reference data (cities, sectors, experience levels, interests) |
+| `/api/data/*` | Public reference data (cities, sectors, experience levels, job titles) |
 | `/api/admin/*` | Admin CRUD, uploads, `r2-audit`, `load-test`, signup attempts |
 | `/api/giphy`, `/api/link-preview`, `/api/lottie-settings`, `/api/image-download`, `/api/healthz` | Supporting endpoints |
 

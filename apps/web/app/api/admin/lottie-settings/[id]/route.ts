@@ -34,7 +34,6 @@ export async function DELETE(
         { table: "communities", column: "lottie_url" },
         { table: "cities", column: "lottie_url" },
         { table: "design_sectors", column: "lottie_url" },
-        { table: "design_interests", column: "lottie_url" },
         { table: "experience_levels", column: "lottie_url" },
         { table: "job_titles", column: "lottie_url" },
       ]);

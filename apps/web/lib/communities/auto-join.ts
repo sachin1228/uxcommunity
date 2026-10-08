@@ -2,9 +2,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Auto-join a user to every community implied by their profile:
- * city + sector + experience level + job title + each design interest.
+ * city + sector + experience level + job title.
  *
- * The catch-all "Other" options (cities / sectors / interests named "Other")
+ * The catch-all "Other" options (cities / sectors named "Other")
  * intentionally do NOT produce a dedicated community.
  *
  * Runs server-side (service role) at signup completion and again, once per
@@ -27,14 +27,8 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
     .eq("user_id", userId)
     .maybeSingle();
 
-  // ── 2. Load interests ────────────────────────────────────────
-  const { data: interests } = await db
-    .from("user_interests")
-    .select("interest_id, design_interests(name, image_url)")
-    .eq("user_id", userId);
-
   type CommunitySpec = {
-    type: "city" | "sector" | "interest" | "experience_level" | "job_title";
+    type: "city" | "sector" | "experience_level" | "job_title";
     reference_id: string;
     name: string;
     image_url: string | null;
@@ -102,18 +96,6 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
         reference_id: (jobTitle as { id: string }).id,
         name: (jobTitle as { name: string }).name,
         image_url: (jobTitle as { image_url: string | null }).image_url ?? null,
-      });
-    }
-  }
-
-  for (const row of interests ?? []) {
-    const interest = row.design_interests as unknown as { name: string; image_url: string | null } | null;
-    if (row.interest_id && interest?.name && !isCatchAll(interest.name)) {
-      specs.push({
-        type: "interest",
-        reference_id: row.interest_id,
-        name: interest.name,
-        image_url: interest.image_url ?? null,
       });
     }
   }

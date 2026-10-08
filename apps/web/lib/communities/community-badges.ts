@@ -9,13 +9,11 @@
 /**
  * Community types the signup flow creates automatically (`autoJoinCommunities`):
  * one community per profile dimension. These are the communities a member
- * never created, so they are the ones eligible for the verified seal
- * (interest communities excepted — see `communityNameBadges`).
+ * never created, so they are the ones eligible for the verified seal.
  */
 export const SIGNUP_COMMUNITY_TYPES = [
   "city",
   "sector",
-  "interest",
   "experience_level",
   "job_title",
 ] as const;
@@ -23,17 +21,11 @@ export const SIGNUP_COMMUNITY_TYPES = [
 /** Communities a member created themselves from Create Community. */
 export const MEMBER_COMMUNITY_TYPE = "user";
 
-/**
- * The one signup-created type that does NOT use the seal: interest communities
- * are topic groups a member browses and joins, so they carry the earth instead.
- */
-export const INTEREST_COMMUNITY_TYPE = "interest";
-
 export type SignupCommunityType = (typeof SIGNUP_COMMUNITY_TYPES)[number];
 
 /**
  * True for every community the platform creates on the member's behalf —
- * city, sector, interest, experience-level and job-title communities.
+ * city, sector, experience-level and job-title communities.
  *
  * Member-created communities (`type: "user"`) and unknown types do not qualify:
  * the badge must mean "the platform stands behind this", so the allow-list is
@@ -72,9 +64,6 @@ export function communityVisibility(
  * - Platform default group (city, sector, experience level, job title) —
  *   the seal alone. The earth would only repeat what the seal already
  *   implies, and these groups are not something a member goes looking for.
- * - Interest community — the earth, because these are the public topic groups
- *   members browse. The seal is dropped so the earth reads as the group's own
- *   mark rather than a second, competing badge.
  * - Member-created — earth when public, lock when private.
  * - Private anything — the lock, next to the seal for a private default group.
  *
@@ -87,10 +76,6 @@ export function communityNameBadges(
 ): CommunityNameBadgeSpec {
   const signupCreated = isSignupCommunity(type);
   const isPrivateGroup = communityVisibility(isPrivate) === "private";
-
-  if (type === INTEREST_COMMUNITY_TYPE) {
-    return { verified: false, visibility: isPrivateGroup ? "lock" : "globe" };
-  }
 
   if (isPrivateGroup) {
     return { verified: signupCreated, visibility: "lock" };

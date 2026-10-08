@@ -272,7 +272,8 @@ function SignupInner() {
         return;
       }
       // Communities are auto-joined server-side during /api/signup/avatar, so the
-      // sidebar shows the full list (city + sector + interests) the first time
+      // sidebar shows the full list (city, sector, experience level, job title)
+      // the first time
       // the dashboard loads.
       setWelcome({
         phase: "ready",

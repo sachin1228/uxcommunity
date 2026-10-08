@@ -16,7 +16,7 @@ export const SUGGESTION_LIMIT = 4;
  * ones their profile already matches, and they are auto-joined at signup, so
  * they are never a discovery.
  */
-const SUGGESTABLE_TYPES: ReadonlySet<string> = new Set(["interest", "user"]);
+const SUGGESTABLE_TYPES: ReadonlySet<string> = new Set(["user"]);
 
 export interface SuggestedCommunitySource {
   id: string;
