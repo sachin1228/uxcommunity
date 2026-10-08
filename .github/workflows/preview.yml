@@ -41,6 +41,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Same guard the production deploy runs, and for the same reason: a
+      # rejected CLOUDFLARE_API_TOKEN used to be discovered AFTER the OpenNext
+      # build, reported as "Failed to provision remote R2 bucket ... ", which
+      # names neither the token nor the step that has to change. See
+      # scripts/verify-cloudflare-credentials.mjs.
+      - name: Verify Cloudflare credentials
+        run: node scripts/verify-cloudflare-credentials.mjs
+
       - name: Write env files
         working-directory: apps/web
         run: |

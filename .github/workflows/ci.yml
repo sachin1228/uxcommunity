@@ -116,6 +116,14 @@ jobs:
       - name: Audit Vercel drift
         run: node scripts/audit-vercel.mjs
 
+      # Blocking, and no install step for the same reason as the audits above.
+      # The credential guard decides whether both deploy workflows proceed, and
+      # its failure branches — a rejected or expired token, an R2 bucket the
+      # token cannot read — are exercised here, where a mistake in the guard
+      # cannot block a release.
+      - name: Unit-test the Cloudflare credential guard
+        run: node --test scripts/verify-cloudflare-credentials.test.mjs
+
   lint:
     name: ESLint (advisory)
     runs-on: ubuntu-latest

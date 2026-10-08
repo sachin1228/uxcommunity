@@ -59,6 +59,31 @@ jobs:
           API_URL: ${{ secrets.API_URL }}
           API_SECRET: ${{ secrets.API_SECRET }}
 
+      # A wrong guard here would block a HEALTHY deploy, so its helpers are
+      # pinned down before it is allowed to gate one — same rule as the
+      # realtime smoke harness below.
+      - name: Unit-test the Cloudflare credential guard
+        run: node --test scripts/verify-cloudflare-credentials.test.mjs
+
+      # Fail in seconds, naming the secret that is wrong, instead of after a
+      # full OpenNext build on a symptom from the deepest layer of the stack.
+      # On 2026-10-08 the credential stopped being accepted and surfaced here:
+      #
+      #   Error: Failed to provision remote R2 bucket "uxcommunity-web-next-cache"
+      #   for binding "NEXT_INC_CACHE_R2_BUCKET": Failed to check whether bucket
+      #   exists: 401 ... Authentication error
+      #
+      # — the web deploy's R2 check using the same dead token the realtime
+      # deploy above had already failed with, on the same run whose sibling job
+      # could not even delete a preview worker. The message reads like OpenNext
+      # or R2; the cause was the credential. This step asks the credential to
+      # prove itself (`/user/tokens/verify` — a rejection there can only be the
+      # token), warns when its TTL is inside two weeks, and makes the same
+      # bucket read OpenNext makes, so a token that is live but was never given
+      # "Workers R2 Storage" also fails here, with the permission named.
+      - name: Verify Cloudflare credentials
+        run: node scripts/verify-cloudflare-credentials.mjs
+
       # ── Realtime worker (the web app publishes to it) ─────────────────────
       - name: Deploy realtime worker
         working-directory: apps/realtime

@@ -222,6 +222,19 @@ npm run smoke:realtime -- --url http://localhost:8787   # secrets from apps/real
 npm run test:smoke-realtime                             # the harness's own helpers
 ```
 
+### Deploy credentials
+
+Both workflows authenticate to Cloudflare with two repository secrets (`Settings → Secrets and variables → Actions`): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token is the account-scoped kind created in the Cloudflare dashboard (My Profile → API Tokens → Create Token). The **Edit Cloudflare Workers** template covers the two Worker deploys; the web deploy additionally needs **Workers R2 Storage: Edit**, because `opennextjs-cloudflare deploy` reads — and, when it is missing, creates — the incremental-cache bucket before it publishes.
+
+Give the token **no expiry**, or rotate it before its TTL lapses. An expired token does not degrade gracefully: on 2026-10-08 the credential stopped being accepted between 19:33 UTC and 09:02 UTC, and every Cloudflare call in CI answered `401 {"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}`. What surfaced first was the web deploy failing with `Failed to provision remote R2 bucket "uxcommunity-web-next-cache" ... Authentication error` — a message that reads like an OpenNext or R2 problem and is neither: the realtime deploy one step before it had failed on the same token, and the preview cleanup job could not even `wrangler delete` a worker. Nothing in either workflow had asked the credential to prove it still worked.
+
+Both workflows now do, before they build: `node scripts/verify-cloudflare-credentials.mjs` (the **Verify Cloudflare credentials** step) checks that the token is live, that its expiry is not inside two weeks, and that the bucket `NEXT_INC_CACHE_R2_BUCKET` binds in `apps/web/wrangler.toml` is readable with it — the same read OpenNext makes before publishing. It fails in seconds, naming the secret to rotate or the permission to add. Run it by hand, and test its helpers, with:
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npm run verify:cloudflare
+npm run test:verify-cloudflare    # the guard's own helpers
+```
+
 ## Building the Android APK locally (no Expo cloud)
 
 The mobile app lives in `expo-app-standalone 3/` (Expo / React Native, managed workflow). To produce an installable APK on your own machine you need:
