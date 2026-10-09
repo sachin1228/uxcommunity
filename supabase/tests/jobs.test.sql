@@ -1,7 +1,8 @@
 -- ============================================================
 -- Jobs — verified-company postings with profile-gated applications
 --
--- Migration under test: 20261009120000_jobs.sql
+-- Migrations under test: 20261009120000_jobs.sql and
+-- 20261009170000_job_lifecycle.sql
 --
 -- The two rules that make a posting trustworthy are:
 --
@@ -22,13 +23,19 @@
 --      their own posting, URLs are shape-checked;
 --   4. the reads return the viewer's flags (can_apply, applied,
 --      is_mine) computed by the same rule the write enforces, and
---      the applicants board is the poster's alone.
+--      the applicants board is the poster's alone;
+--   5. the lifecycle: only the poster may edit, close or delete; a
+--      posting's four targeting criteria freeze the moment an
+--      application exists (while the rest of it stays editable);
+--      a closed posting leaves the browse feed but stays readable
+--      by its owner, refuses applications, and reopens cleanly;
+--      deleting takes the applications with it.
 --
 -- Runs inside a transaction: every fixture is rolled back, and the
 -- file does not depend on what other suites left behind.
 -- ============================================================
 
-select plan(59);
+select plan(96);
 
 begin;
 
@@ -47,7 +54,8 @@ delete from public.designer_profiles where user_id in (
   'd7d7d7d7-0000-4000-8000-000000000003',
   'd7d7d7d7-0000-4000-8000-000000000004',
   'd7d7d7d7-0000-4000-8000-000000000005',
-  'd7d7d7d7-0000-4000-8000-000000000006'
+  'd7d7d7d7-0000-4000-8000-000000000006',
+  'd7d7d7d7-0000-4000-8000-000000000007'
 );
 delete from public.users where id in (
   'd7d7d7d7-0000-4000-8000-000000000001',
@@ -55,7 +63,8 @@ delete from public.users where id in (
   'd7d7d7d7-0000-4000-8000-000000000003',
   'd7d7d7d7-0000-4000-8000-000000000004',
   'd7d7d7d7-0000-4000-8000-000000000005',
-  'd7d7d7d7-0000-4000-8000-000000000006'
+  'd7d7d7d7-0000-4000-8000-000000000006',
+  'd7d7d7d7-0000-4000-8000-000000000007'
 );
 delete from public.cities where id in (
   'e7e7e7e7-0000-4000-8000-000000000001',
@@ -73,7 +82,11 @@ insert into public.users (id, name, email, password_hash, application_id) values
   ('d7d7d7d7-0000-4000-8000-000000000003', 'FarCity',  'farcity@jobs.test',  'x', null),
   ('d7d7d7d7-0000-4000-8000-000000000004', 'OtherRole','otherrole@jobs.test','x', null),
   ('d7d7d7d7-0000-4000-8000-000000000005', 'Partial',  'partial@jobs.test',  'x', null),
-  ('d7d7d7d7-0000-4000-8000-000000000006', 'Outsider', 'outsider@jobs.test', 'x', null);
+  ('d7d7d7d7-0000-4000-8000-000000000006', 'Outsider', 'outsider@jobs.test', 'x', null),
+  -- Matches the lifecycle section's posting and never applies until the
+  -- reopen test, so "Apply is available" and "Apply is closed" are both
+  -- assertions about the posting rather than about a stray application.
+  ('d7d7d7d7-0000-4000-8000-000000000007', 'Opener',   'opener@jobs.test',   'x', null);
 
 insert into public.cities (id, name, is_active) values
   ('e7e7e7e7-0000-4000-8000-000000000001', 'Jobsville', true),
@@ -97,7 +110,10 @@ values
   ('d7d7d7d7-0000-4000-8000-000000000005', null, null,
    'product_designer', 'mid_level'),
   ('d7d7d7d7-0000-4000-8000-000000000006', 'e7e7e7e7-0000-4000-8000-000000000001',
-   'f7f7f7f7-0000-4000-8000-000000000001', 'product_designer', 'mid_level');
+   'f7f7f7f7-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
+  -- Matches the referral posting's ux_designer / mid_level criteria.
+  ('d7d7d7d7-0000-4000-8000-000000000007', 'e7e7e7e7-0000-4000-8000-000000000001',
+   'f7f7f7f7-0000-4000-8000-000000000001', 'ux_designer', 'mid_level');
 
 -- The company: verified domain + a verified membership for the
 -- poster only. Outsider joins later as UNVERIFIED to show the
@@ -687,6 +703,457 @@ select is(
   (select count(*) from public.job_posts where title = 'Senior Product Designer'),
   1::bigint,
   'the posting survives an applicant leaving'
+);
+
+-- ─── 8. The owner's edit ─────────────────────────────────────
+-- The lifecycle migration (20261009170000_job_lifecycle.sql): one write for
+-- editing, one for closing/reopening, one for deleting, and the rule that
+-- makes the first of those safe — the four targeting criteria freeze once an
+-- application exists, because they are what `apply_to_job` compares against a
+-- member's profile.
+
+select has_function('public', 'update_job_post', 'update_job_post(...) exists');
+select has_function('public', 'set_job_post_status', 'set_job_post_status(...) exists');
+select has_function('public', 'delete_job_post', 'delete_job_post(...) exists');
+
+select is(
+  (select count(*) from information_schema.columns
+   where table_schema = 'public' and table_name = 'job_posts'
+     and column_name = 'status' and is_nullable = 'NO'),
+  1::bigint,
+  'job_posts carries a non-null lifecycle status'
+);
+
+select is(
+  (select count(*) from public.job_posts where updated_at is null),
+  2::bigint,
+  'a posting carries no edit stamp until it is edited'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
+          ->> 'status'
+   from public.job_posts as jp where jp.title = 'Design Ops Lead'),
+  'open',
+  'the payload carries the lifecycle status'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
+          ->> 'criteria_locked'
+   from public.job_posts as jp where jp.title = 'Design Ops Lead'),
+  'false',
+  'the payload reports the criteria as free while nobody has applied'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
+          ->> 'criteria_locked'
+   from public.job_posts as jp where jp.title = 'Senior Product Designer'),
+  'true',
+  'the payload locks the criteria as soon as an applicant exists'
+);
+
+-- The referral posting has no applicants, so its criteria are still free.
+select is(
+  (select edited_at is not null from public.update_job_post(
+     p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+     p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+     p_title            => 'Design Ops Lead',
+     p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000002',
+     p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+     p_job_title        => 'ux_designer',
+     p_experience_level => 'mid_level',
+     p_work_mode        => 'remote',
+     p_employment_type  => 'contract',
+     p_salary           => 'Not disclosed',
+     p_description      => 'Run the design system.'
+  )),
+  true,
+  'the owner can edit a posting nobody has applied to, stamp and all'
+);
+
+select is(
+  (select city_id from public.job_posts where title = 'Design Ops Lead'),
+  'e7e7e7e7-0000-4000-8000-000000000002'::uuid,
+  'the targeting criteria may move while nobody has applied'
+);
+
+-- Back to the original city, so everything after this reads the fixture it
+-- expects.
+select count(*) from public.update_job_post(
+  p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+  p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+  p_title            => 'Design Ops Lead',
+  p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+  p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+  p_job_title        => 'ux_designer',
+  p_experience_level => 'mid_level',
+  p_work_mode        => 'remote',
+  p_employment_type  => 'contract',
+  p_salary           => 'Not disclosed',
+  p_description      => 'Run the design system.'
+);
+
+-- Pin the stamp to a value a save could never produce, then save the identical
+-- posting: the stamp must come back untouched, because the member re-opened
+-- the form and pressed save without changing a field.
+update public.job_posts set updated_at = timestamptz '2026-01-01 00:00:00+00'
+  where title = 'Design Ops Lead';
+
+select is(
+  (select edited_at from public.update_job_post(
+     p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+     p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+     p_title            => 'Design Ops Lead',
+     p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+     p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+     p_job_title        => 'ux_designer',
+     p_experience_level => 'mid_level',
+     p_work_mode        => 'remote',
+     p_employment_type  => 'contract',
+     p_salary           => 'Not disclosed',
+     p_description      => 'Run the design system.'
+  )),
+  timestamptz '2026-01-01 00:00:00+00',
+  'a save that changes nothing leaves the edit stamp alone'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000003',
+      p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+      p_title            => 'Hijacked',
+      p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+      p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+      p_job_title        => 'ux_designer',
+      p_experience_level => 'mid_level',
+      p_work_mode        => 'remote',
+      p_employment_type  => 'contract',
+      p_salary           => null,
+      p_description      => 'Not mine to edit.'
+    )
+  $$),
+  'not_your_job',
+  'only the poster can edit their posting'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+      p_job_id           => '00000000-0000-4000-8000-000000000000',
+      p_title            => 'Ghost',
+      p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+      p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+      p_job_title        => 'ux_designer',
+      p_experience_level => 'mid_level',
+      p_work_mode        => 'remote',
+      p_employment_type  => 'contract',
+      p_salary           => null,
+      p_description      => 'Ghost.'
+    )
+  $$),
+  'job_not_found',
+  'editing a missing posting is refused'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+      p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+      p_title            => 'Design Ops Lead',
+      p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+      p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+      p_job_title        => 'ux_designer',
+      p_experience_level => 'mid_level',
+      p_work_mode        => 'remote',
+      p_employment_type  => 'contract',
+      p_salary           => null,
+      p_description      => '   '
+    )
+  $$),
+  'missing_description',
+  'an edit cannot store a blank description'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+      p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+      p_title            => 'Design Ops Lead',
+      p_city_id          => '00000000-0000-4000-8000-000000000000',
+      p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+      p_job_title        => 'ux_designer',
+      p_experience_level => 'mid_level',
+      p_work_mode        => 'remote',
+      p_employment_type  => 'contract',
+      p_salary           => null,
+      p_description      => 'Run the design system.'
+    )
+  $$),
+  'invalid_city',
+  'an edit cannot store a city outside the master data'
+);
+
+-- The list fields are not on the edit form. A NULL list means "leave the
+-- stored one alone", so an edit must never blank what it never showed.
+update public.job_posts set responsibilities = array['Keep the system honest']
+  where title = 'Design Ops Lead';
+
+select count(*) from public.update_job_post(
+  p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+  p_job_id           => (select id from public.job_posts where title = 'Design Ops Lead'),
+  p_title            => 'Design Ops Lead',
+  p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+  p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+  p_job_title        => 'ux_designer',
+  p_experience_level => 'mid_level',
+  p_work_mode        => 'remote',
+  p_employment_type  => 'contract',
+  p_salary           => 'Not disclosed',
+  p_description      => 'Run the design system.'
+);
+
+select is(
+  (select responsibilities from public.job_posts where title = 'Design Ops Lead'),
+  array['Keep the system honest'],
+  'an edit that omits the list fields leaves them alone'
+);
+
+-- ─── 9. Locked criteria once an application exists ──────────
+
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+      p_job_id           => (select id from public.job_posts where title = 'Senior Product Designer'),
+      p_title            => 'Senior Product Designer',
+      p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000002',
+      p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+      p_job_title        => 'product_designer',
+      p_experience_level => 'mid_level',
+      p_work_mode        => 'hybrid',
+      p_employment_type  => 'full_time',
+      p_salary           => null,
+      p_description      => 'Design payments flows.'
+    )
+  $$),
+  'criteria_locked',
+  'the city cannot move once an application exists'
+);
+
+-- Checked before the master data, so the reason stays the lock rather than a
+-- shape error about a slug the posting never asked for.
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+      p_job_id           => (select id from public.job_posts where title = 'Senior Product Designer'),
+      p_title            => 'Senior Product Designer',
+      p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+      p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+      p_job_title        => 'product_designer',
+      p_experience_level => 'lead_principal',
+      p_work_mode        => 'hybrid',
+      p_employment_type  => 'full_time',
+      p_salary           => null,
+      p_description      => 'Design payments flows.'
+    )
+  $$),
+  'criteria_locked',
+  'the experience level cannot move once an application exists'
+);
+
+select is(
+  (select edited_at is not null from public.update_job_post(
+     p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+     p_job_id           => (select id from public.job_posts where title = 'Senior Product Designer'),
+     p_title            => 'Senior Product Designer',
+     p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+     p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+     p_job_title        => 'product_designer',
+     p_experience_level => 'mid_level',
+     p_work_mode        => 'hybrid',
+     p_employment_type  => 'contract',
+     p_salary           => '₹30–40L / year',
+     p_description      => 'Edited: own the payments flow end to end.'
+  )),
+  true,
+  'the rest of the posting stays editable once an application exists'
+);
+
+select is(
+  (select description from public.job_posts where title = 'Senior Product Designer'),
+  'Edited: own the payments flow end to end.',
+  'the edit is stored'
+);
+
+select is(
+  (select city_id::text || '|' || job_title
+   from public.job_posts where title = 'Senior Product Designer'),
+  'e7e7e7e7-0000-4000-8000-000000000001|product_designer',
+  'the locked criteria did not move with the edit'
+);
+
+select is(
+  (select count(*) from public.job_applications
+   where job_id = (select id from public.job_posts where title = 'Senior Product Designer')),
+  1::bigint,
+  'an edit leaves the applications in place'
+);
+
+-- ─── 10. Closing and reopening ──────────────────────────────
+-- Closing is the graceful end: it keeps the row, its URL and its history
+-- while it stops taking applications, and it is reversible — so the browse
+-- feed drops it for everyone else while its owner keeps seeing it.
+
+select is(
+  public.failure_message($$
+    select * from public.set_job_post_status(
+      'd7d7d7d7-0000-4000-8000-000000000003',
+      (select id from public.job_posts where title = 'Design Ops Lead'),
+      'closed'
+    )
+  $$),
+  'not_your_job',
+  'only the poster can close their posting'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.set_job_post_status(
+      'd7d7d7d7-0000-4000-8000-000000000001',
+      (select id from public.job_posts where title = 'Design Ops Lead'),
+      'archived'
+    )
+  $$),
+  'invalid_status',
+  'only open / closed are valid statuses'
+);
+
+-- The baseline the close flips: this member matches the posting, is not its
+-- poster, and has not applied.
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000007')
+          ->> 'can_apply'
+   from public.job_posts as jp where jp.title = 'Design Ops Lead'),
+  'true',
+  'a matched member may apply to the open posting'
+);
+
+select is(
+  (select job_status from public.set_job_post_status(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_posts where title = 'Design Ops Lead'),
+     'closed'
+  )),
+  'closed',
+  'the poster closes the posting'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.apply_to_job(
+      (select id from public.job_posts where title = 'Design Ops Lead'),
+      'd7d7d7d7-0000-4000-8000-000000000007',
+      'Opener', 'https://portfolio.opener.test',
+      'https://www.linkedin.com/in/opener', null
+    )
+  $$),
+  'job_closed',
+  'a closed posting takes no applications'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000007')
+          ->> 'can_apply'
+   from public.job_posts as jp where jp.title = 'Design Ops Lead'),
+  'false',
+  'the Apply flag closes with the posting'
+);
+
+select is(
+  (select count(*) from public.get_job_feed('d7d7d7d7-0000-4000-8000-000000000003')),
+  1::bigint,
+  'a closed posting leaves the browse feed'
+);
+
+select is(
+  (select count(*) from public.get_job_feed('d7d7d7d7-0000-4000-8000-000000000001')),
+  2::bigint,
+  'a closed posting stays in its owner''s feed, so it can be reopened'
+);
+
+select is(
+  (select job_status from public.set_job_post_status(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_posts where title = 'Design Ops Lead'),
+     'open'
+  )),
+  'open',
+  'the poster reopens it'
+);
+
+select is(
+  (select count(*) from public.apply_to_job(
+     (select id from public.job_posts where title = 'Design Ops Lead'),
+     'd7d7d7d7-0000-4000-8000-000000000007',
+     'Opener', 'https://portfolio.opener.test',
+     'https://www.linkedin.com/in/opener', null
+  )),
+  1::bigint,
+  'reopening really reopens — the same member may now apply'
+);
+
+-- ─── 11. Deleting ───────────────────────────────────────────
+-- The irreversible one, and the only one that takes applications with it.
+
+select is(
+  public.failure_message($$
+    select * from public.delete_job_post(
+      'd7d7d7d7-0000-4000-8000-000000000003',
+      (select id from public.job_posts where title = 'Design Ops Lead')
+    )
+  $$),
+  'not_your_job',
+  'only the poster can delete their posting'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.delete_job_post(
+      'd7d7d7d7-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000000'
+    )
+  $$),
+  'job_not_found',
+  'deleting a missing posting is refused'
+);
+
+select is(
+  (select count(*) from public.delete_job_post(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_posts where title = 'Design Ops Lead')
+  )),
+  1::bigint,
+  'the poster deletes their posting'
+);
+
+select is(
+  (select count(*) from public.job_posts where title = 'Design Ops Lead'),
+  0::bigint,
+  'the posting is gone'
+);
+
+select is(
+  (select count(*) from public.job_applications
+   where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000007'),
+  0::bigint,
+  'deleting a posting takes its applications with it'
 );
 
 select finish();

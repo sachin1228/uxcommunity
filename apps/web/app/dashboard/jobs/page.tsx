@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { JobsBrowser } from "@/components/jobs/JobsBrowser";
-import { timeAgoLabel } from "@/lib/jobs/format";
+import { editedLabel, timeAgoLabel } from "@/lib/jobs/format";
 import { getJobFeed, loadJobMasterData, loadJobViewer } from "@/lib/jobs/service";
 
 export const metadata = { title: "Jobs — uxcommunity" };
@@ -36,6 +36,7 @@ export default async function JobsPage({
       jobs={jobs.map((job) => ({
         ...job,
         posted_label: timeAgoLabel(job.created_at),
+        updated_label: editedLabel(job.created_at, job.updated_at),
         my_application: job.my_application
           ? { ...job.my_application, applied_label: timeAgoLabel(job.my_application.created_at) }
           : null,

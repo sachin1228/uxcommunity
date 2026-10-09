@@ -4,7 +4,7 @@ import { ExternalLink, FileText, Globe, Inbox, UserRound, Users } from "lucide-r
 import { BackLink } from "@/components/ui/BackLink";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
-import { KindBadge } from "./JobBadges";
+import { ClosedBadge, KindBadge } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import type { JobApplicant, JobPost } from "@/lib/jobs/types";
 import { workModeLabel } from "@/lib/jobs/types";
@@ -49,7 +49,8 @@ export function ApplicantsBoard({
                 {experienceYearsLabel(job.experience_level_label)}
               </span>
             </div>
-            <div className="shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
+              {job.status === "closed" && <ClosedBadge />}
               <KindBadge kind={job.kind} />
             </div>
           </div>
@@ -67,7 +68,10 @@ export function ApplicantsBoard({
           </p>
 
           <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <span className="font-body text-xs text-foreground-subtle">{job.posted_label}</span>
+            <span className="font-body text-xs text-foreground-subtle">
+              {job.posted_label}
+              {job.updated_label ? ` · ${job.updated_label}` : ""}
+            </span>
             <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
               <Users strokeWidth={2.5} size={11} />
               {applicants.length} applicant{applicants.length === 1 ? "" : "s"}

@@ -49,3 +49,18 @@ export const jobPostSchema = z.object({
 
 export type JobPostInput = z.infer<typeof jobPostSchema>;
 export type JobApplicationInput = z.infer<typeof jobApplicationSchema>;
+
+/**
+ * An edit carries the same role fields as a post — minus `kind` and
+ * `company_id`. Those two are the verified proof a posting was made under;
+ * changing either one is a different posting, not an edit, so the route never
+ * accepts them and `update_job_post` never reads them.
+ */
+export const jobPostUpdateSchema = jobPostSchema.omit({ kind: true, company_id: true });
+
+export type JobPostUpdateInput = z.infer<typeof jobPostUpdateSchema>;
+
+/** Close / reopen. Anything else is refused before the database is called. */
+export const jobStatusSchema = z.object({
+  status: z.enum(["open", "closed"]),
+});

@@ -11,6 +11,18 @@ export type JobKind = "hiring" | "referral";
 export type WorkMode = "remote" | "hybrid" | "onsite";
 export type EmploymentType = "full_time" | "part_time" | "contract" | "internship";
 
+/**
+ * The posting's lifecycle. `open` takes applications; `closed` is the
+ * graceful end — it keeps its URL, its applicants and its history, and only
+ * its owner can still read it in the feed (to reopen it).
+ */
+export type JobStatus = "open" | "closed";
+
+export const JOB_STATUSES: JobStatus[] = ["open", "closed"];
+
+export const isJobStatus = (value: string): value is JobStatus =>
+  (JOB_STATUSES as string[]).includes(value);
+
 export const JOB_KINDS: { value: JobKind; label: string }[] = [
   { value: "hiring", label: "Hiring" },
   { value: "referral", label: "Referral" },
@@ -92,9 +104,18 @@ export interface JobPost {
   experience_level: string;
   experience_level_label: string;
   created_at: string;
+  status: JobStatus;
+  /** Set by the first edit that changed something; null when never edited. */
+  updated_at: string | null;
   company: JobCompany;
   poster: JobPoster;
   applicant_count: number;
+  /**
+   * The four targeting dimensions are frozen once an application exists.
+   * Computed by the same predicate `update_job_post` enforces, so the edit
+   * form disables the fields instead of re-deriving the rule.
+   */
+  criteria_locked: boolean;
   applied: boolean;
   is_mine: boolean;
   /** Authority for the Apply lock — computed by the same rule the write enforces. */
@@ -102,6 +123,8 @@ export interface JobPost {
   my_application: JobApplicationSummary | null;
   /** Server-rendered relative label (`timeAgoLabel`), so SSR and hydration match. */
   posted_label: string;
+  /** "Updated 3d ago", or null when the posting was never edited. */
+  updated_label: string | null;
 }
 
 export interface JobApplicant {

@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import { Building2, Plus } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
+import { EMPTY_JOB_FORM, JobFormFields, jobFieldLabel, jobFormPayload } from "./JobFormFields";
 import type { JobMasterData } from "@/lib/jobs/service";
-import type { EmploymentType, JobKind, JobViewer, WorkMode } from "@/lib/jobs/types";
-import { EMPLOYMENT_TYPES, WORK_MODES } from "@/lib/jobs/types";
-
-const labelCls = "font-body text-xs font-medium text-foreground";
+import type { JobKind, JobViewer } from "@/lib/jobs/types";
+import type { JobFormValues } from "./JobFormFields";
 
 interface PostJobModalProps {
   open: boolean;
@@ -31,30 +29,32 @@ interface PostJobModalProps {
  * posts under the company already verified on their profile. The form never
  * decides trust: the database's create_job_post re-checks the membership and
  * the master data before a row lands.
+ *
+ * The role fields themselves come from JobFormFields, which the edit modal
+ * renders too — the two forms stay identical by construction.
  */
 export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJobModalProps) {
   const router = useRouter();
 
   const [kind, setKind] = useState<JobKind>("hiring");
   const [showCompanyModal, setShowCompanyModal] = useState(false);
-
-  const [title, setTitle] = useState("");
-  const [cityId, setCityId] = useState("");
-  const [sectorId, setSectorId] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [experienceLevel, setExperienceLevel] = useState("");
-  const [workMode, setWorkMode] = useState<WorkMode>("hybrid");
-  const [employmentType, setEmploymentType] = useState<EmploymentType>("full_time");
-  const [salary, setSalary] = useState("");
-  const [description, setDescription] = useState("");
-  const [website, setWebsite] = useState("");
-
+  const [values, setValues] = useState<JobFormValues>(EMPTY_JOB_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // The company verified on the profile is the one a posting can use; a
   // verification done in-flow lands in viewer.company after router.refresh().
   const company = viewer.company;
+
+  const patch = (next: Partial<JobFormValues>) => setValues((current) => ({ ...current, ...next }));
+
+  function close() {
+    // A reopened form starts clean: a half-filled draft for a posting that
+    // was never made is noise, not an offer to resume.
+    setValues(EMPTY_JOB_FORM);
+    setError(null);
+    onClose();
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -64,15 +64,15 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
       setError("Verify your company with a work email before posting.");
       return;
     }
-    if (title.trim().length < 2) {
+    if (values.title.trim().length < 2) {
       setError("Add a role title.");
       return;
     }
-    if (!cityId || !sectorId || !jobTitle || !experienceLevel) {
+    if (!values.cityId || !values.sectorId || !values.jobTitle || !values.experienceLevel) {
       setError("Choose the city, sector, job title and experience level — they decide who can apply.");
       return;
     }
-    if (!description.trim()) {
+    if (!values.description.trim()) {
       setError("Add a role description.");
       return;
     }
@@ -87,16 +87,7 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
         body: JSON.stringify({
           kind,
           company_id: company.id,
-          title: title.trim(),
-          city_id: cityId,
-          sector_id: sectorId,
-          job_title: jobTitle,
-          experience_level: experienceLevel,
-          work_mode: workMode,
-          employment_type: employmentType,
-          salary: salary.trim(),
-          description: description.trim(),
-          website: website.trim(),
+          ...jobFormPayload(values),
         }),
       });
 
@@ -119,7 +110,7 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="Post a job" maxWidth="max-w-2xl">
+      <Modal open={open} onClose={close} title="Post a job" maxWidth="max-w-2xl">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {error && (
             <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
@@ -129,7 +120,7 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
 
           {/* Post type */}
           <div className="flex flex-col gap-1.5">
-            <span className={labelCls}>Post type</span>
+            <span className={jobFieldLabel}>Post type</span>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <TypeCard
                 active={kind === "hiring"}
@@ -148,7 +139,7 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
 
           {/* Company */}
           <div className="flex flex-col gap-1.5">
-            <span className={labelCls}>Company</span>
+            <span className={jobFieldLabel}>Company</span>
             {company ? (
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3">
                 <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={32} />
@@ -181,133 +172,12 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
             )}
           </div>
 
-          {/* Role */}
-          <div className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              Role title <span className="text-red-400">*</span>
-            </span>
-            <input
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="e.g. Senior Product Designer — Payments"
-              maxLength={140}
-              className="field"
-            />
-          </div>
-
-          {/* Criteria — the four dimensions that gate applying */}
-          <div className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              Who can apply <span className="text-red-400">*</span>
-            </span>
-            <p className="-mt-1 font-body text-[11px] text-foreground-subtle">
-              Only members whose profile matches all four dimensions can apply.
-            </p>
-            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <SearchableSelect
-                options={master.cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.imageUrl }))}
-                value={cityId}
-                onChange={setCityId}
-                placeholder="City"
-              />
-              <SearchableSelect
-                options={master.sectors.map((s) => ({ value: s.id, label: s.name, imageUrl: s.imageUrl }))}
-                value={sectorId}
-                onChange={setSectorId}
-                placeholder="Industry sector"
-              />
-              <SearchableSelect
-                options={master.jobTitles.map((j) => ({ value: j.slug, label: j.label, imageUrl: j.imageUrl }))}
-                value={jobTitle}
-                onChange={setJobTitle}
-                placeholder="Job title"
-              />
-              <SearchableSelect
-                options={master.experienceLevels.map((l) => ({ value: l.slug, label: l.label, imageUrl: l.imageUrl }))}
-                value={experienceLevel}
-                onChange={setExperienceLevel}
-                placeholder="Experience level"
-              />
-            </div>
-          </div>
-
-          {/* Arrangement */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5">
-              <span className={labelCls}>Work mode</span>
-              <select
-                value={workMode}
-                onChange={(event) => setWorkMode(event.target.value as WorkMode)}
-                className="field"
-              >
-                {WORK_MODES.map((mode) => (
-                  <option key={mode.value} value={mode.value}>
-                    {mode.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className={labelCls}>Employment type</span>
-              <select
-                value={employmentType}
-                onChange={(event) => setEmploymentType(event.target.value as EmploymentType)}
-                className="field"
-              >
-                {EMPLOYMENT_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              Salary <span className="text-foreground-subtle">(optional)</span>
-            </span>
-            <input
-              type="text"
-              value={salary}
-              onChange={(event) => setSalary(event.target.value)}
-              placeholder="e.g. ₹18–24L / year — leave empty for “Not disclosed”"
-              maxLength={80}
-              className="field"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              About the role <span className="text-red-400">*</span>
-            </span>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              placeholder="What the team does, why this role exists, how you work…"
-              className="field resize-none"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              Website <span className="text-foreground-subtle">(optional)</span>
-            </span>
-            <input
-              type="url"
-              value={website}
-              onChange={(event) => setWebsite(event.target.value)}
-              placeholder="https://…"
-              className="field"
-            />
-          </label>
+          <JobFormFields values={values} onChange={patch} master={master} />
 
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               disabled={submitting}
               className="modal-btn modal-btn-secondary"
             >

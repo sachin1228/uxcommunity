@@ -22,6 +22,25 @@ export function timeAgoLabel(iso: string, now: Date = new Date()): string {
 }
 
 /**
+ * The stamp to show when a posting was edited after it was published, or null
+ * when it was never edited. The database only moves `updated_at` on a save
+ * that actually changed a field and never sets it at creation, so "no edit"
+ * stays distinguishable from "edited at the moment it was posted" — and a
+ * posting can never advertise an edit that did not happen. An edit that lands
+ * in the same instant as the creation is treated as no edit.
+ */
+export function editedLabel(createdAt: string, updatedAt: string | null): string | null {
+  if (!updatedAt) return null;
+
+  const created = Date.parse(createdAt);
+  const updated = Date.parse(updatedAt);
+  if (!Number.isFinite(created) || !Number.isFinite(updated)) return null;
+  if (updated <= created) return null;
+
+  return `Updated ${timeAgoLabel(updatedAt)}`;
+}
+
+/**
  * The years range inside an experience label ("Mid-level Designers (3-5 years)"
  * → "(3-5 years)") for surfaces that show it beside the role title. Falls back
  * to the full label when it carries no parenthetical, so an admin-edited label

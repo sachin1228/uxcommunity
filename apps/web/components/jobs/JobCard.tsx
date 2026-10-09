@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Users } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
-import { KindBadge, LockedNote } from "./JobBadges";
+import { ClosedBadge, KindBadge, LockedNote } from "./JobBadges";
 import type { JobPost } from "@/lib/jobs/types";
 import { workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
@@ -19,6 +19,10 @@ interface JobCardProps {
  * — the pane beside the list renders the card's own payload, so a click is a
  * client-side switch, not a route change. The four targeting criteria live on
  * the detail pane — the card keeps the scan cheap.
+ *
+ * A closed posting is marked here rather than hidden: it stays in "My posts"
+ * for its owner (the feed returns it to nobody else), where the badge is what
+ * explains why it no longer appears to anyone browsing.
  */
 export function JobCard({ job, selected = false, onSelect }: JobCardProps) {
   return (
@@ -50,6 +54,7 @@ export function JobCard({ job, selected = false, onSelect }: JobCardProps) {
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            {job.status === "closed" && <ClosedBadge />}
             <KindBadge kind={job.kind} />
             {job.is_mine && (
               <span className="rounded-full border border-accent/40 px-2 py-0.5 font-body text-[10px] font-semibold text-accent">
@@ -72,7 +77,10 @@ export function JobCard({ job, selected = false, onSelect }: JobCardProps) {
         </p>
 
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <span className="font-body text-xs text-foreground-subtle">{job.posted_label}</span>
+          <span className="font-body text-xs text-foreground-subtle">
+            {job.posted_label}
+            {job.updated_label ? ` · ${job.updated_label}` : ""}
+          </span>
 
           {job.is_mine ? (
             <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { experienceYearsLabel, timeAgoLabel } from "./format";
+import { editedLabel, experienceYearsLabel, timeAgoLabel } from "./format";
 
 test("the years tail is lifted out of an experience label", () => {
   assert.equal(experienceYearsLabel("Mid-level Designers (3-5 years)"), "(3-5 years)");
@@ -10,6 +10,21 @@ test("the years tail is lifted out of an experience label", () => {
 test("a label without a parenthetical stays whole", () => {
   assert.equal(experienceYearsLabel("Students"), "Students");
   assert.equal(experienceYearsLabel("Lead / Principal"), "Lead / Principal");
+});
+
+test("an edit stamp appears only after a real edit", () => {
+  const created = "2026-10-09T12:00:00Z";
+
+  // Never edited: the database leaves updated_at null, and a posting must not
+  // claim a change that did not happen.
+  assert.equal(editedLabel(created, null), null);
+  // An edit cannot precede or coincide with the creation.
+  assert.equal(editedLabel(created, created), null);
+  assert.equal(editedLabel(created, "2026-10-09T11:00:00Z"), null);
+  assert.equal(editedLabel(created, "not-a-date"), null);
+
+  assert.notEqual(editedLabel(created, "2026-10-09T13:00:00Z"), null);
+  assert.match(editedLabel(created, "2026-10-09T13:00:00Z") ?? "", /^Updated /);
 });
 
 test("time labels step from minutes to hours to days to a date", () => {

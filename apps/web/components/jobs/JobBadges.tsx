@@ -29,6 +29,20 @@ export function KindBadge({ kind }: { kind: JobKind }) {
   );
 }
 
+/**
+ * A posting that has stopped taking applications. Shown beside the kind on the
+ * card, and where Apply would otherwise be, so a filled role reads as finished
+ * rather than broken — the posting keeps its URL and its applicants.
+ */
+export function ClosedBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-surface-raised px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+      <Lock strokeWidth={2.5} size={10} aria-hidden="true" />
+      Closed
+    </span>
+  );
+}
+
 /** The eligibility lock, shown wherever Apply is refused by a profile mismatch. */
 export function LockedNote({ children }: { children: React.ReactNode }) {
   return (

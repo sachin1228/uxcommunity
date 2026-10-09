@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, CheckCircle2, ExternalLink, Globe, Users } from "lucide-react";
+import { Briefcase, CheckCircle2, ExternalLink, Globe, Lock, Users } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
-import { KindBadge, LockedNote, MetaChip } from "./JobBadges";
+import { ClosedBadge, KindBadge, LockedNote, MetaChip } from "./JobBadges";
+import { JobOwnerActions } from "./JobOwnerActions";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { experienceYearsLabel } from "@/lib/jobs/format";
+import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types";
 
@@ -20,8 +22,20 @@ import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types"
  *
  * Rendered both inside the board's detail pane and, standalone, on the
  * posting's own page — the host surface owns layout, so this is content only.
+ *
+ * `master` is only needed for the owner's controls (their edit form picks from
+ * the criteria master data) and is optional for that reason: the board's pane
+ * only ever shows other members' roles, so it renders without it.
  */
-export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) {
+export function JobDetail({
+  job,
+  viewer,
+  master,
+}: {
+  job: JobPost;
+  viewer: JobViewer;
+  master?: JobMasterData;
+}) {
   const guard = useGuardedRouter();
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
@@ -42,7 +56,8 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
                   {experienceYearsLabel(job.experience_level_label)}
                 </span>
               </h1>
-              <div className="shrink-0 pt-1">
+              <div className="flex shrink-0 items-center gap-2 pt-1">
+                {job.status === "closed" && <ClosedBadge />}
                 <KindBadge kind={job.kind} />
               </div>
             </div>
@@ -62,6 +77,13 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
                 </>
               )}
             </p>
+            {/* The edit stamp rides beside the post time so a reader can tell
+                a posting was revised — `updated_label` is null when it never
+                was, so this never claims a change that did not happen. */}
+            <p className="mt-1.5 font-body text-xs text-foreground-subtle">
+              Posted {job.posted_label}
+              {job.updated_label ? ` · ${job.updated_label}` : ""}
+            </p>
           </div>
         </div>
 
@@ -78,7 +100,29 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
                 <Users strokeWidth={2.5} size={14} />
                 View {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
               </button>
+              {master && (
+                <div className="ml-auto">
+                  <JobOwnerActions job={job} master={master} />
+                </div>
+              )}
             </>
+          ) : job.status === "closed" ? (
+            // Closed replaces the Apply action entirely: there is nothing to
+            // apply to, and a locked-eligibility note would blame the wrong
+            // thing. An existing application is still named, because it still
+            // exists — closing is not a withdrawal.
+            <div className="flex flex-col gap-1.5">
+              <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
+                <Lock strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                This posting is closed
+              </span>
+              <p className="font-body text-xs text-foreground-subtle">
+                It is no longer accepting applications.
+                {job.applied
+                  ? ` Your application was submitted${job.my_application?.applied_label ? ` ${job.my_application.applied_label}` : ""}.`
+                  : ""}
+              </p>
+            </div>
           ) : job.applied ? (
             <div className="flex flex-col gap-1.5">
               <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
