@@ -109,32 +109,28 @@ export function JobsBrowser({
         </button>
       </div>
 
-      {/* Tabs — full width; the strip's underline spans the list column only */}
+      {/* Tabs — full-width strip; the active tab's border rides on the full-width underline */}
       <div
-        className={`mt-5 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] ${
-          paneOpen ? "hidden lg:grid" : ""
-        }`}
+        className={`mt-5 ${paneOpen ? "hidden lg:flex" : "flex"} items-center gap-1 border-b border-border`}
       >
-        <div className="flex items-center gap-1 border-b border-border">
-          {tabs.map((item) => {
-            const active = tab === item.value;
-            return (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setTab(item.value)}
-                className={`relative -mb-px border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
-                  active
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                {item.label}
-                <span className="ml-1.5 text-xs text-foreground-subtle">{item.count}</span>
-              </button>
-            );
-          })}
-        </div>
+        {tabs.map((item) => {
+          const active = tab === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setTab(item.value)}
+              className={`relative -mb-px border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
+                active
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-foreground-muted hover:text-foreground"
+              }`}
+            >
+              {item.label}
+              <span className="ml-1.5 text-xs text-foreground-subtle">{item.count}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div
