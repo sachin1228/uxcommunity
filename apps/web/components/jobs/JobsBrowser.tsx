@@ -51,8 +51,8 @@ export function JobsBrowser({
 
   // A click deep in a long posting can leave the page scrolled past the top
   // of the pane that just swapped contents — bring the new job back into
-  // view. Gated on the selection actually CHANGING: a `didMount` flag is not
-  // enough because StrictMode replays mount effects, and the replay scrolled
+  // view. Gated on the selection actually CHANGING: gating on mount alone is
+  // not enough because StrictMode replays mount effects, and the replay scrolled
   // the pane's top edge flush with the scrollport — hiding the heading and
   // tabs the moment the page opened.
   useEffect(() => {
