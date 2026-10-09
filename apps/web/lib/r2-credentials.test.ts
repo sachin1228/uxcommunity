@@ -13,18 +13,22 @@ import {
  * the way the AWS SDK surfaced it in the Worker logs: a bare 401 with no
  * request id and no detail beyond `Unauthorized`.
  */
+// `Object.assign` rather than `error.$metadata = …`: an `Error` has no such
+// property, and the SDK adds it at runtime, so the shape has to be built in one
+// expression for the type checker to agree with what the SDK actually throws.
+function sdkError(name: string, status: number) {
+  return Object.assign(new Error(`${name}: ${name}`), {
+    name,
+    $metadata: { httpStatusCode: status, attempts: 1 },
+  });
+}
+
 function unauthorizedError() {
-  const error = new Error("Unauthorized");
-  error.name = "Unauthorized";
-  error.$metadata = { httpStatusCode: 401, attempts: 1 };
-  return error;
+  return sdkError("Unauthorized", 401);
 }
 
 function s3Error(name: string, status: number) {
-  const error = new Error(`${name}: ${name}`);
-  error.name = name;
-  error.$metadata = { httpStatusCode: status, attempts: 1 };
-  return error;
+  return sdkError(name, status);
 }
 
 test("classifyR2Failure treats every rejected-credential shape as a credential problem", () => {
