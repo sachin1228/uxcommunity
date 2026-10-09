@@ -177,6 +177,55 @@ type PerformanceRpcMap = {
       members: Json;
     }>;
   };
+  // ─── Jobs (verified-company postings) ───
+  // All job rules live in these functions (see
+  // supabase/migrations/20261009120000_jobs.sql); the API routes only supply
+  // the session user id, so a request can never post without a verified
+  // company or apply without a profile match.
+  create_job_post: {
+    args: {
+      p_poster_id: string;
+      p_kind: string;
+      p_company_id: string;
+      p_title: string;
+      p_city_id: string;
+      p_sector_id: string;
+      p_job_title: string;
+      p_experience_level: string;
+      p_work_mode: string;
+      p_employment_type: string;
+      p_salary: string | null;
+      p_description: string;
+      p_responsibilities: string[];
+      p_requirements: string[];
+      p_skills: string[];
+      p_website: string | null;
+    };
+    returns: Array<{ job_id: string; created_at: string }>;
+  };
+  apply_to_job: {
+    args: {
+      p_job_id: string;
+      p_applicant_id: string;
+      p_name: string;
+      p_portfolio_url: string;
+      p_linkedin_url: string;
+      p_resume_url: string | null;
+    };
+    returns: Array<{ application_id: string; created_at: string }>;
+  };
+  get_job_feed: {
+    args: { p_viewer_id: string; p_limit: number };
+    returns: Array<{ item: Json }>;
+  };
+  get_job_detail: {
+    args: { p_job_id: string; p_viewer_id: string };
+    returns: Array<{ item: Json }>;
+  };
+  get_job_applicants: {
+    args: { p_poster_id: string; p_job_id: string };
+    returns: Array<{ item: Json }>;
+  };
 };
 
 /** Card scopes the profile activity tabs can request. */

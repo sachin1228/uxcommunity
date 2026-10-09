@@ -114,6 +114,9 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   SHOWCASE_ATTACHMENT_LOOKUP,
   SHOWCASE_POSTER_LOOKUP,
   THREAD_ATTACHMENT_LOOKUP,
+  // Resumes attached to job applications. Must be tracked here or the
+  // orphan audit treats every live resume as an orphan and deletes it.
+  { table: "job_applications", column: "resume_url" },
   { table: "lottie_settings", column: "lottie_url" },
 ];
 
@@ -136,5 +139,6 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "community_showcase_posts.image_url": "showcase",
   "community_showcase_posts.attachments": "showcase",
   "community_threads.attachments": "thread",
+  "job_applications.resume_url": "resume",
   "lottie_settings.lottie_url": "lottie_setting",
 };
