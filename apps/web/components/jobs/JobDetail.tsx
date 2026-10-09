@@ -148,103 +148,97 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        {/* Main */}
-        <div className="flex flex-col gap-6">
-          <Section title="About the role">
-            <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
-              {job.description}
-            </p>
-          </Section>
-
-          {job.responsibilities.length > 0 && (
-            <Section title="What you'll do">
-              <ul className="flex flex-col gap-2">
-                {job.responsibilities.map((item) => (
-                  <li
-                    key={item}
-                    className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
-                  >
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {job.requirements.length > 0 && (
-            <Section title="What we're looking for">
-              <ul className="flex flex-col gap-2">
-                {job.requirements.map((item) => (
-                  <li
-                    key={item}
-                    className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
-                  >
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {job.skills.length > 0 && (
-            <Section title="Skills">
-              <div className="flex flex-wrap gap-1.5">
-                {job.skills.map((skill) => (
-                  <MetaChip key={skill}>{skill}</MetaChip>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          <Section title={`About ${job.company.name}`}>
-            <a
-              href={`/dashboard/companies/${job.company.slug}`}
-              className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
-            >
-              <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={16} />
-              View {job.company.name} on uxcommunity
-            </a>
-            {job.website && (
-              <a
-                href={job.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 flex items-center gap-1.5 font-body text-xs font-medium text-accent hover:underline"
-              >
-                <Globe strokeWidth={2.5} size={12} />
-                {job.website.replace(/^https?:\/\//, "")}
-              </a>
-            )}
-          </Section>
+      <div className="mt-6 flex flex-col gap-6">
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="font-display text-sm font-semibold text-foreground">
+            {job.kind === "referral" ? "Referred by" : "Posted by"}
+          </h2>
+          <a
+            href={`/dashboard/profile/${job.poster.id}`}
+            className="mt-3 flex items-center gap-2.5"
+          >
+            <AvatarImg url={job.poster.avatar_url} name={job.poster.name} size={36} />
+            <span className="min-w-0">
+              <span className="block truncate font-body text-sm font-medium text-foreground">
+                {job.is_mine ? "You" : job.poster.name}
+              </span>
+              <span className="block truncate font-body text-[11px] text-foreground-muted">
+                {[job.poster.job_title_label, job.poster.experience_level_label]
+                  .filter(Boolean)
+                  .join(" · ") || "Member"}
+              </span>
+            </span>
+          </a>
         </div>
 
-        {/* Sidebar */}
-        <aside className="flex flex-col gap-4">
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="font-display text-sm font-semibold text-foreground">
-              {job.kind === "referral" ? "Referred by" : "Posted by"}
-            </h2>
+        <Section title="About the role">
+          <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
+            {job.description}
+          </p>
+        </Section>
+
+        {job.responsibilities.length > 0 && (
+          <Section title="What you'll do">
+            <ul className="flex flex-col gap-2">
+              {job.responsibilities.map((item) => (
+                <li
+                  key={item}
+                  className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
+                >
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {job.requirements.length > 0 && (
+          <Section title="What we're looking for">
+            <ul className="flex flex-col gap-2">
+              {job.requirements.map((item) => (
+                <li
+                  key={item}
+                  className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
+                >
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {job.skills.length > 0 && (
+          <Section title="Skills">
+            <div className="flex flex-wrap gap-1.5">
+              {job.skills.map((skill) => (
+                <MetaChip key={skill}>{skill}</MetaChip>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section title={`About ${job.company.name}`}>
+          <a
+            href={`/dashboard/companies/${job.company.slug}`}
+            className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
+          >
+            <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={16} />
+            View {job.company.name} on uxcommunity
+          </a>
+          {job.website && (
             <a
-              href={`/dashboard/profile/${job.poster.id}`}
-              className="mt-3 flex items-center gap-2.5"
+              href={job.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center gap-1.5 font-body text-xs font-medium text-accent hover:underline"
             >
-              <AvatarImg url={job.poster.avatar_url} name={job.poster.name} size={36} />
-              <span className="min-w-0">
-                <span className="block truncate font-body text-sm font-medium text-foreground">
-                  {job.is_mine ? "You" : job.poster.name}
-                </span>
-                <span className="block truncate font-body text-[11px] text-foreground-muted">
-                  {[job.poster.job_title_label, job.poster.experience_level_label]
-                    .filter(Boolean)
-                    .join(" · ") || "Member"}
-                </span>
-              </span>
+              <Globe strokeWidth={2.5} size={12} />
+              {job.website.replace(/^https?:\/\//, "")}
             </a>
-          </div>
-        </aside>
+          )}
+        </Section>
       </div>
 
       {!job.is_mine && !job.applied && job.can_apply && (
