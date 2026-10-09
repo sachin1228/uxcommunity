@@ -5,6 +5,7 @@ import {
   loadCommunityManagerStatus,
   loadCommunityPermissions,
   logCommunityActivity,
+  managerActorRole,
 } from "@/lib/communities/manager-role";
 import {
   MODERATOR_DEFAULT_PERMISSIONS,
@@ -77,8 +78,9 @@ export async function GET(
  * DELETE /api/communities/[id]/members/[userId]
  *
  * Owner (or a community admin / moderator holding the "manage members"
- * permission) removes a member from the community. Only the owner may remove
- * another moderator or admin; everyone else is limited to regular members.
+ * permission) removes a member from the community. The owner — and the
+ * platform-appointed admin of an app-created community — may also remove a
+ * moderator; platform-appointed admins themselves are managed by the platform.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -120,9 +122,15 @@ export async function DELETE(
   if (targetRole === "owner") {
     return NextResponse.json({ error: "Owners cannot be removed." }, { status: 400 });
   }
-  if (!isOwner && (targetRole === "admin" || targetRole === "moderator")) {
+  if (targetRole === "admin" && !isOwner) {
     return NextResponse.json(
-      { error: "Only the owner can remove a moderator or an admin." },
+      { error: "Platform admins are managed by the platform." },
+      { status: 400 },
+    );
+  }
+  if (targetRole === "moderator" && !managerStatus.canManageModerators) {
+    return NextResponse.json(
+      { error: "Only the community owner or an admin can remove a moderator." },
       { status: 403 },
     );
   }
@@ -145,7 +153,7 @@ export async function DELETE(
   await logCommunityActivity(db, {
     communityId,
     actorId: callerId,
-    actorRole: isOwner ? "owner" : managerStatus.role === "moderator" ? "moderator" : "admin",
+    actorRole: managerActorRole(managerStatus),
     action: "member_removed",
     targetUserId,
     details: { member_name: targetUser?.name ?? null },
@@ -157,7 +165,9 @@ export async function DELETE(
 /**
  * PATCH /api/communities/[id]/members/[userId]
  *
- * Owner-only moderator management:
+ * Moderator management by the community's manager tier — the owner, or the
+ * platform-appointed admin of an app-created community (which never has an
+ * owner):
  *  - { role: "moderator", permissions? } promotes a member (or re-applies an
  *    existing moderator's grants). Omitted permissions default to the
  *    moderator set — content moderation on, administration off.
@@ -177,9 +187,9 @@ export async function PATCH(
 
   const managerStatus = await loadCommunityManagerStatus(db, communityId, callerId);
   if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  if (!managerStatus.isOwner) {
+  if (!managerStatus.canManageModerators) {
     return NextResponse.json(
-      { error: "Only the community owner can manage moderators." },
+      { error: "Only the community owner or an admin can manage moderators." },
       { status: 403 },
     );
   }
@@ -240,7 +250,7 @@ export async function PATCH(
     await logCommunityActivity(db, {
       communityId,
       actorId: callerId,
-      actorRole: "owner",
+      actorRole: managerActorRole(managerStatus),
       action: "moderator_dismissed",
       targetUserId,
       details: { member_name: targetUser?.name ?? null },
@@ -297,7 +307,7 @@ export async function PATCH(
   await logCommunityActivity(db, {
     communityId,
     actorId: callerId,
-    actorRole: "owner",
+    actorRole: managerActorRole(managerStatus),
     action: wasModerator ? "moderator_permissions_updated" : "moderator_promoted",
     targetUserId,
     details: { member_name: targetUser?.name ?? null, permissions },

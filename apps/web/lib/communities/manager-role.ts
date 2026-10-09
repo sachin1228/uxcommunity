@@ -17,8 +17,12 @@ type Db = ReturnType<typeof createServiceClient>;
  *  - owners (creator of a member-created community) always hold every capability;
  *  - platform-appointed admins of app-created communities hold whichever
  *    toggles the platform enabled in `community_admin_permissions`;
- *  - moderators, appointed by the owner in-app, hold whichever toggles the
- *    owner picked in the same table.
+ *  - moderators, appointed by the manager tier in-app, hold whichever toggles
+ *    the appointer picked in the same table.
+ *
+ * The owner and the app-created community's admin form the manager tier:
+ * they appoint, edit and dismiss moderators (an app-created community never
+ * has an owner, so its platform-appointed admin stands in for one).
  */
 export type CommunityRole = "owner" | "admin" | "moderator" | "member";
 
@@ -29,6 +33,13 @@ export interface CommunityManagerStatus {
   permissions: CommunityPermissions;
   /** True for the community's owner (creator). */
   isOwner: boolean;
+  /**
+   * True when the caller may appoint, edit and dismiss moderators: the owner,
+   * or the platform-appointed admin of an app-created community (which never
+   * has an owner). Admins only exist in app-created communities — the platform
+   * is the only writer of `role = 'admin'`.
+   */
+  canManageModerators: boolean;
   /** True when the caller may take at least one management action. */
   canManage: boolean;
 }
@@ -117,6 +128,7 @@ export async function loadCommunityManagerStatus(
       role: null,
       permissions: NO_COMMUNITY_PERMISSIONS,
       isOwner: false,
+      canManageModerators: false,
       canManage: false,
     };
   }
@@ -128,6 +140,7 @@ export async function loadCommunityManagerStatus(
     role,
     permissions,
     isOwner: role === "owner",
+    canManageModerators: role === "owner" || role === "admin",
     canManage: role === "owner" || hasAnyCommunityPermission(permissions),
   };
 }

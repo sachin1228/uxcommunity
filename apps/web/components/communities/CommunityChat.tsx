@@ -824,21 +824,27 @@ export function CommunityChat({
   );
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
-  // "members" is always available and "activity" is owner-only — neither is an
-  // owner-toggleable area, so both skip the feature-flag fallback; every other
-  // tab has to be enabled for this community or it falls back to Chat.
+  // Role and grants only exist on the loaded read model; the sidebar fallback
+  // never carries them, so read them from `community` directly.
+  const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
+  const myPerms = community?.current_user_permissions;
+  // The manager tier that appoints moderators and audits manager activity: the
+  // owner of a member-created community, or the platform-appointed admin of an
+  // app-created community (which never has an owner; `admin` rows only exist
+  // there).
+  const canManageModerators = isOwner || myRole === "admin";
+  // "members" is always available and "activity" is manager-tier-only —
+  // neither is an owner-toggleable area, so both skip the feature-flag
+  // fallback; every other tab has to be enabled for this community or it
+  // falls back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
     activeTab !== "members" &&
     activeTab !== "activity" &&
     !isFeatureVisible(activeTab as CommunityFeature, displayCommunity)
       ? "chat"
-      : activeTab === "activity" && !isOwner
+      : activeTab === "activity" && !canManageModerators
         ? "chat"
         : activeTab;
-  // Role and grants only exist on the loaded read model; the sidebar fallback
-  // never carries them, so read them from `community` directly.
-  const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
-  const myPerms = community?.current_user_permissions;
   // The owner, platform-appointed admins and in-app moderators share the same
   // management UI, each capability scoped by the member's grants.
   const isManagerWith = (permission: CommunityPermission) =>
@@ -891,7 +897,7 @@ export function CommunityChat({
           currentUserId={currentUserId}
           onSettingsClick={canOpenSettings ? handleSettingsClick : undefined}
           canOpenSettings={canOpenSettings}
-          showActivityTab={isOwner}
+          showActivityTab={canManageModerators}
           communityId={communityId}
         />
 
@@ -977,6 +983,7 @@ export function CommunityChat({
             currentUserId={currentUserId}
             isOwner={isOwner}
             canManageMembers={canManageMembers}
+            canManageModerators={canManageModerators}
             isPrivate={displayCommunity?.is_private ?? false}
             isEventChat={displayCommunity?.type === "event"}
           />

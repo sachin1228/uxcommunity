@@ -10,12 +10,14 @@ const PAGE_SIZE = 30;
  * GET /api/communities/[id]/activity?before=<ISO>
  *
  * One page of the community's management audit trail (most recent first) for
- * the owner's in-chat Activity tab: which admin/moderator did what. Keyset
- * pagination on created_at — `before` returns only rows older than the given
- * timestamp — so pages never shift under concurrent inserts and the
+ * the manager tier's in-chat Activity tab: which admin/moderator did what.
+ * Keyset pagination on created_at — `before` returns only rows older than the
+ * given timestamp — so pages never shift under concurrent inserts and the
  * (community_id, created_at desc) index carries the query. Actor names are
  * snapshotted at write time; actors' avatars and the acted-on member's name
- * are resolved per page. Owner-only: this is the owner's oversight view.
+ * are resolved per page. Manager-tier only: the owner's oversight view in a
+ * member-created community, or the platform-appointed admin's in an app-created
+ * one (which never has an owner).
  */
 export async function GET(
   req: NextRequest,
@@ -32,8 +34,8 @@ export async function GET(
   if (!managerStatus) {
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
-  if (!managerStatus.isOwner) {
-    return NextResponse.json({ error: "Only the community owner can view activity." }, { status: 403 });
+  if (!managerStatus.canManageModerators) {
+    return NextResponse.json({ error: "Only the community owner or an admin can view activity." }, { status: 403 });
   }
 
   // Values that do not parse as a date are ignored rather than failing the query.

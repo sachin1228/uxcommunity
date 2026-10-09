@@ -39,7 +39,7 @@ export async function GET(
   const db = createServiceClient();
 
   // Auth guard — caller must be a member. The loaded status also tells us
-  // whether they are the owner (the only role that sees moderator grants).
+  // whether they manage moderators (the only role that sees moderator grants).
   const managerStatus = await loadCommunityManagerStatus(db, communityId, callerId);
   if (!managerStatus || !managerStatus.role) {
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
@@ -81,10 +81,11 @@ export async function GET(
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.user_id, p]));
 
-  // Moderator grants ride along with the page for the owner only — they are
-  // what the "Edit moderator permissions" dialog prefills from.
+  // Moderator grants ride along with the page for the manager tier only
+  // (owner, or an app-created community's admin) — they are what the
+  // "Edit moderator permissions" dialog prefills from.
   const permissionsByUser = new Map<string, CommunityPermissions>();
-  if (managerStatus.isOwner) {
+  if (managerStatus.canManageModerators) {
     const moderatorIds = rows
       .filter((m) => (m.role ?? "member") === "moderator")
       .map((m) => m.user_id);
@@ -120,7 +121,7 @@ export async function GET(
       name:        m.name,
       avatar_url:  p?.avatar_url ?? null,
       designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-      ...(role === "moderator" && managerStatus.isOwner
+      ...(role === "moderator" && managerStatus.canManageModerators
         ? { permissions: permissionsByUser.get(m.user_id) ?? NO_COMMUNITY_PERMISSIONS }
         : {}),
     };
