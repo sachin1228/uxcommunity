@@ -20,3 +20,14 @@ export function timeAgoLabel(iso: string, now: Date = new Date()): string {
 
   return then.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
+
+/**
+ * The years range inside an experience label ("Mid-level Designers (3-5 years)"
+ * → "(3-5 years)") for surfaces that show it beside the role title. Falls back
+ * to the full label when it carries no parenthetical, so an admin-edited label
+ * still shows something true.
+ */
+export function experienceYearsLabel(label: string): string {
+  const match = label.match(/\(([^)]+)\)\s*$/);
+  return match ? `(${match[1]})` : label;
+}
