@@ -119,7 +119,12 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
-            <AvatarImg url={viewer.avatarUrl} name={viewer.name} size={40} />
+            <AvatarImg
+              url={viewer.avatarUrl}
+              name={viewer.name}
+              size={40}
+              className="rounded-full object-cover"
+            />
             <div className="min-w-0">
               <p className="truncate font-body text-sm font-semibold text-foreground">
                 {job.title}
