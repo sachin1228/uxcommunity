@@ -153,7 +153,7 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
         {/* Main */}
         <div className="flex flex-col gap-6">
           <Section title="About the role">
-            <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground-muted">
+            <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
               {job.description}
             </p>
           </Section>
