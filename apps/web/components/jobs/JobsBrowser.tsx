@@ -103,8 +103,31 @@ export function JobsBrowser({
         </button>
       </div>
 
+      {/* Tabs — full width; the divider trails the tabs instead of cutting the page */}
+      <div className={`mt-5 ${paneOpen ? "hidden lg:flex" : "flex"} items-center gap-1`}>
+        {tabs.map((item) => {
+          const active = tab === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setTab(item.value)}
+              className={`border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
+                active
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-foreground-muted hover:text-foreground"
+              }`}
+            >
+              {item.label}
+              <span className="ml-1.5 text-xs text-foreground-subtle">{item.count}</span>
+            </button>
+          );
+        })}
+        <div aria-hidden="true" className="h-px flex-1 self-end bg-border" />
+      </div>
+
       <div
-        className={`mt-5 grid grid-cols-1 gap-5${
+        className={`mt-4 grid grid-cols-1 gap-5${
           jobs.length > 0 ? " lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start" : ""
         }`}
       >
@@ -112,32 +135,9 @@ export function JobsBrowser({
         <div
           className={`${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`}
         >
-          {/* Tabs */}
-          <div className="flex items-center gap-1">
-            {tabs.map((item) => {
-              const active = tab === item.value;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setTab(item.value)}
-                  className={`border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
-                    active
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-foreground-muted hover:text-foreground"
-                  }`}
-                >
-                  {item.label}
-                  <span className="ml-1.5 text-xs text-foreground-subtle">{item.count}</span>
-                </button>
-              );
-            })}
-            <div aria-hidden="true" className="h-px flex-1 self-end bg-border" />
-          </div>
-
           {/* Search (All jobs only) */}
           {tab === "all" && otherJobs.length > 0 && (
-            <div className="relative mt-4">
+            <div className="relative mb-4">
               <Search
                 strokeWidth={2.5}
                 size={14}
@@ -154,7 +154,7 @@ export function JobsBrowser({
           )}
 
           {/* Lists */}
-          <div className="mt-4 flex flex-col gap-2.5">
+          <div className="flex flex-col gap-2.5">
             {visibleJobs.map((job) => (
               <JobCard
                 key={job.id}
