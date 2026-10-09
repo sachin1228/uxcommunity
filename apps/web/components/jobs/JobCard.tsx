@@ -45,7 +45,7 @@ export function JobCard({ job }: JobCardProps) {
               {job.title}
             </h3>
             <span className="shrink-0 font-body text-xs text-foreground-muted">
-              · {experienceYearsLabel(job.experience_level_label)}
+              {experienceYearsLabel(job.experience_level_label)}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
