@@ -97,6 +97,22 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
         run: node scripts/verify-r2-credentials.mjs
 
+      # Third guard, same reason: the preview worker is built with the production
+      # secrets above. A dead Supabase service-role key fails every preview's API
+      # routes, and a dead Resend key makes the preview's reset/invite flow lie —
+      # both look like the PR's own bug from the outside, so name the secret here
+      # instead. The project URL is the [vars] value the worker actually gets.
+      - name: Verify service credentials
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+        run: |
+          export NEXT_PUBLIC_SUPABASE_URL="$(awk -F'"' '/^NEXT_PUBLIC_SUPABASE_URL/{print $2}' apps/web/wrangler.toml)"
+          node scripts/verify-service-credentials.mjs
+
       - name: Verify client build-time env vars
         working-directory: apps/web
         shell: bash

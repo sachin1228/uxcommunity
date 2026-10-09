@@ -70,6 +70,9 @@ jobs:
       - name: Unit-test the R2 media credential guard
         run: node --test scripts/verify-r2-credentials.test.mjs
 
+      - name: Unit-test the service credential guard
+        run: node --test scripts/verify-service-credentials.test.mjs
+
       # Fail in seconds, naming the secret that is wrong, instead of after a
       # full OpenNext build on a symptom from the deepest layer of the stack.
       # On 2026-10-08 the credential stopped being accepted and surfaced here:
@@ -230,6 +233,31 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
         run: node scripts/verify-r2-credentials.mjs
+
+      # ── The other secrets the deploy is about to push ───────────────────
+      # The R2 outage on 2026-10-09 was one credential dying unnoticed. The
+      # audit that followed found the same blind spot on every other secret
+      # this workflow writes into .dev.vars: the deploy uploads them whether or
+      # not they are still accepted, and each failure hides in a different
+      # place — Supabase 401s every API route, Resend makes password resets
+      # vanish silently, Upstash turns every rate limit OFF (the limiter fails
+      # open by design), GIPHY breaks GIF search. Each one now proves itself
+      # with a single read-only request before the build. Passed from the
+      # repository secrets, not read back out of .dev.vars, so it proves the
+      # values this deploy is about to push.
+      - name: Verify service credentials
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+        run: |
+          # The project URL is not a secret: it is the [vars] value that reaches
+          # the Worker, so the probe has to use THAT one (same read as the
+          # realtime smoke step above) rather than a copy that could drift.
+          export NEXT_PUBLIC_SUPABASE_URL="$(awk -F'"' '/^NEXT_PUBLIC_SUPABASE_URL/{print $2}' apps/web/wrangler.toml)"
+          node scripts/verify-service-credentials.mjs
 
       # Fail the build if any NEXT_PUBLIC_* var the client needs is missing
       # from the build env — a missing var silently disables realtime (no

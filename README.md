@@ -8,7 +8,7 @@ A platform for UI/UX, product, and social media designers. Designers sign up dir
 |---|---|
 | **Application / onboarding** | Direct multi-step sign-up (profile → avatar) at `/signup`, with invite links for approved/invited users. Applications still land in the admin dashboard for approve/reject review with email notifications. |
 | **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
-| **Admin panel** | Review and approve/reject applications; manage users (block/unblock/delete); community admins & permissions; CRUD for master data: cities, sectors, experience levels, job titles, communities, Lottie animations; incomplete sign-up recovery; R2 storage health audit; k6 load-test runs. |
+| **Admin panel** | Review and approve/reject applications; manage users (block/unblock/delete); community admins & permissions; CRUD for master data: cities, sectors, experience levels, job titles, communities, Lottie animations; incomplete sign-up recovery; R2 storage health audit; System Health dashboard for every external service, with automatic email alerts when one goes down; k6 load-test runs. |
 | **Communities / chat** | Real-time community chat (Cloudflare Durable Objects — see `apps/realtime`). Members are auto-joined to communities on sign-up. Admins can delete messages. |
 | **Image & file uploads** | Avatars, community images, chat/thread/showcase/event media uploaded to Cloudflare R2 (S3-compatible). Clients compress before upload (Canvas on web, `expo-image-manipulator` on mobile) and the server validates the bytes (signature sniffing) and stores them as-is. Orphaned objects are reclaimed by a reference-aware cleanup plus an admin R2 audit. |
 | **Rate limiting** | Redis-backed sliding-window limiter (Upstash) plus a global middleware guard. Per-route limits cover login (IP + email), applications, password reset, sign-up, chat sends, and content creation. |
@@ -351,6 +351,61 @@ To repair it:
    run that same check before the build, so a dead credential fails the deploy
    in seconds instead of shipping an app whose every upload 500s.
 
+### Verifying the other service credentials
+
+The R2 outage was one credential dying unnoticed. The audit that followed found
+the same blind spot on every other secret a deploy pushes: the deploy uploads
+them whether or not they are still accepted, and each failure hides somewhere
+different. `npm run verify:services` asks each one to prove itself with a single
+read-only request before a build is spent on it:
+
+```
+  ok    Supabase (service-role key): authenticated (sb_s…-k- from apps/web/.dev.vars).
+  ok    Resend (transactional email): authenticated (re_b…7Ay from apps/web/.dev.vars).
+  ok    Upstash Redis (rate limiting): authenticated (gQAA…xYw from apps/web/.dev.vars).
+  ok    GIPHY (GIF search): authenticated (A0JB…FGW from apps/web/.dev.vars).
+```
+
+What a dead credential means, and whether it blocks a deploy:
+
+| Service | Probe | If it is dead |
+|---|---|---|
+| Supabase service role | one-row REST read on `users` | **fails the deploy** — every API route and Server Component 401s |
+| Resend | `GET /domains` (never sends mail) | **fails the deploy** — password resets and invitations stop arriving, silently |
+| Upstash Redis | `GET /ping` with the token | warns — the limiter fails open, so every rate limit is simply off |
+| GIPHY | one-result trending lookup | warns — GIF search only |
+| R2 media | see `npm run verify:r2` above | **fails the deploy** — every upload 500s |
+
+Resend answers a dead key with HTTP 400 (`API key is invalid`), not 401, so the
+guard reads the body rather than trusting the status code. A 5xx or a network
+error only warns for all of them: that is the provider being unhappy, and it must
+not become a new way for a healthy deploy to go red. Both deploy workflows run
+this check.
+
+### Dependency health and alerts
+
+`/admin/health` answers "is every external service up?" with a check per
+dependency — R2, Supabase, the realtime Worker, Upstash, Resend and GIPHY — each
+with status, latency, a plain-language detail and the value to fix. Every probe
+is inert, so the page can be re-checked freely: R2 lists a `healthcheck/` prefix
+and writes nothing, Supabase counts rows without transferring them, and the
+realtime probe publishes an **empty** event list (the Worker checks the secret,
+refuses the payload, and delivers nothing). `/api/admin/health` serves the same
+report to a monitor and answers 503 while something is unhealthy.
+
+Nobody has to open the page to find out. The realtime Worker runs a scheduled
+monitor (a Durable Object alarm, state in `apps/realtime/src/alert-monitor.ts`)
+that asks `/api/internal/dependency-health` every few minutes and emails the
+addresses in `ADMIN_EMAIL` through Resend:
+
+- when a monitored dependency goes **down** (edge-triggered, so one alert per outage),
+- at most one reminder per hour while it stays down,
+- and one "recovered" notice when it answers again.
+
+Only services a user would notice are alertable (R2, Supabase, realtime, Resend).
+A dead GIPHY key or an Upstash blip still shows on the page — it just never wakes
+anyone up, which is the point.
+
 ## CI/CD
 
 | Workflow | Trigger | What it does |
@@ -359,13 +414,14 @@ To repair it:
 | `.github/workflows/preview.yml` | PR opened/updated | Builds a per-PR Cloudflare worker (`uxcommunity-web-preview-pr<N>`) and comments the URL; realtime is disabled in previews |
 | `.github/workflows/deploy.yml` | Push to `main` | Deploys the web worker (OpenNext) and the realtime worker to Cloudflare |
 
-Both deploy workflows run two credential guards before they build: the Cloudflare API token the deploy itself needs (`scripts/verify-cloudflare-credentials.mjs`), and the R2 media credential every upload route uses (`scripts/verify-r2-credentials.mjs`). Each one names the repository secret to fix instead of letting a dead key surface later as an auth error from a deeper layer of the stack.
+Both deploy workflows run three credential guards before they build: the Cloudflare API token the deploy itself needs (`scripts/verify-cloudflare-credentials.mjs`), the R2 media credential every upload route uses (`scripts/verify-r2-credentials.mjs`), and every other service secret the deploy pushes (`scripts/verify-service-credentials.mjs`). Each one names the repository secret to fix instead of letting a dead key surface later as an auth error from a deeper layer of the stack.
 
 ## Known limitations
 
 - **Admin auth is a single env-var credential** (`ADMIN_EMAIL` + `ADMIN_PASSWORD`). There is no multi-admin system, no admin user records in the database, and no per-admin audit log.
 - **Rate limiter fails open.** If Upstash Redis is unreachable, the rate limiter allows requests through and logs an error. This keeps the app available during Redis outages but means rate limits won't be enforced in that window.
 - **The `main` branch deploys on merge.** Both workers ship from `deploy.yml`; the PR preview worker is the only pre-merge environment.
+- **Health alerts are email-only, and the monitor lives in the realtime Worker.** Alerts go to `ADMIN_EMAIL` through Resend (no Slack, PagerDuty or SMS), and the schedule that runs them is the realtime Worker's cron — if that worker is down altogether, checks stop with it. The admin page still answers whenever the web app does.
 
 ## Rebrand notes
 
