@@ -45,17 +45,18 @@ export function JobsBrowser({
   // Below lg the panes take turns; from lg up both are always visible.
   const [paneOpen, setPaneOpen] = useState(Boolean(seeded));
   const paneRef = useRef<HTMLDivElement>(null);
-  const didMount = useRef(false);
+  const scrolledId = useRef(selectedId);
 
   // A click deep in a long posting can leave the page scrolled past the top
-  // of the pane that just swapped contents — bring the new job back into view
-  // without unsettling a page that is already at the top.
+  // of the pane that just swapped contents — bring the new job back into
+  // view. Gated on the selection actually CHANGING: a `didMount` flag is not
+  // enough because StrictMode replays mount effects, and the replay scrolled
+  // the pane's top edge flush with the scrollport — hiding the heading and
+  // tabs the moment the page opened.
   useEffect(() => {
-    if (!didMount.current) {
-      didMount.current = true;
-      return;
-    }
-    paneRef.current?.scrollIntoView({ block: "nearest" });
+    if (scrolledId.current === selectedId) return;
+    scrolledId.current = selectedId;
+    paneRef.current?.scrollIntoView({ block: "start" });
   }, [selectedId]);
 
   const myPosts = jobs.filter((job) => job.is_mine);
