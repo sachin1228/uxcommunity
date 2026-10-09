@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useRef, useEffect, useCallback, memo } from "react";
+import Link from "next/link";
 import { Clock, CheckCheck, X, RefreshCw, Ban } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime, isEmojiOnly, splitEmojiClusters } from "./chatUtils";
@@ -13,6 +14,7 @@ import type { CachedMessage, MessageDeletedByRole, MessageReaction, ReplyPreview
 import { ModalPortal } from "@/components/ui/Modal";
 import { userColorVar } from "@/lib/communities/user-color";
 import { KIND_THEME } from "@/lib/communities/content-notifications";
+import { profileHref } from "@/lib/profile/links";
 
 
 interface MessageBubbleProps {
@@ -303,14 +305,33 @@ function DeleteConfirmDialog({
   );
 }
 
-/** Colored sender-name row rendered inside bubbles, WhatsApp-style. */
-function SenderName({ name, userId, className = "" }: { name: string; userId: string | null; className?: string }) {
+/** Colored sender-name row rendered inside bubbles, WhatsApp-style. Opens the
+ *  sender's profile when `href` is given (everyone but the viewer / tombstones
+ *  without a sender id render as plain text). */
+function SenderName({
+  name,
+  userId,
+  href,
+  className = "",
+}: {
+  name: string;
+  userId: string | null;
+  href?: string | null;
+  className?: string;
+}) {
+  const text = href ? (
+    <Link href={href} className="hover:underline">
+      {name}
+    </Link>
+  ) : (
+    name
+  );
   return (
     <p
       className={`font-body text-xs font-semibold leading-4 break-words ${className}`}
       style={{ color: userColorVar(userId) }}
     >
-      {name}
+      {text}
     </p>
   );
 }
@@ -369,7 +390,11 @@ function DeletedBubble({
         />
       )}
       {!isMe && showHeader && senderName && (
-        <SenderName name={senderName} userId={senderId ?? null} />
+        <SenderName
+          name={senderName}
+          userId={senderId ?? null}
+          href={senderId ? profileHref(senderId) : null}
+        />
       )}
       <div className="flex items-center gap-1.5">
         <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
@@ -532,7 +557,17 @@ export const MessageBubble = memo(function MessageBubble({
         {!isMe && (
           <div className="w-7 shrink-0">
             {showHeader && sender && (
-              <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
+              msg.user_id ? (
+                <Link
+                  href={profileHref(msg.user_id)}
+                  title={sender.name}
+                  className="block w-fit rounded-full transition-opacity hover:opacity-85"
+                >
+                  <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
+                </Link>
+              ) : (
+                <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
+              )
             )}
           </div>
         )}
@@ -650,6 +685,7 @@ export const MessageBubble = memo(function MessageBubble({
                     <SenderName
                       name={sender.name}
                       userId={msg.user_id}
+                      href={msg.user_id ? profileHref(msg.user_id) : null}
                       className={imageUrl ? "mb-1 pl-1" : ""}
                     />
                   )}

@@ -3,25 +3,11 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
-import { getExperienceLevelNameMap } from "@/lib/master-data-cache";
-import { cleanDesignation } from "@/lib/communities/comment-authors";
+import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
 import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import { ProfileClient } from "./ProfileClient";
 
 export const metadata = { title: "Your Profile" };
-
-/**
- * The seniority half of the role pill. Experience levels are managed in master
- * data as list headings ("Mid-Level Designers"), so the trailing "Designer(s)"
- * noun is dropped — the designation beside it supplies the noun and the pill
- * reads "Mid-Level Product Designer", not "Mid-Level Designer Product Designer".
- * Labels without that tail are cleaned but kept whole.
- */
-function seniorityLabel(levelName: string): string {
-  const cleaned = cleanDesignation(levelName);
-  const withoutNoun = cleaned.replace(/\s+designers?$/i, "").trim();
-  return withoutNoun || cleaned;
-}
 
 interface Props {
   searchParams: Promise<{ tab?: string }>;
@@ -59,31 +45,13 @@ export default async function ProfilePage({ searchParams }: Props) {
     loadProfileIdentity(userId),
   ]);
 
-  // Resolve the job title slug to its admin-managed display name (the profile
-  // column stores a slug, which has no PostgREST embed).
-  let jobTitleName: string | null = null;
-  const jobTitleSlug = (profile as any)?.job_title ?? null;
-  if (jobTitleSlug) {
-    const { data: jobTitle } = await db
-      .from("job_titles")
-      .select("name")
-      .eq("slug", jobTitleSlug)
-      .maybeSingle();
-    jobTitleName = jobTitle?.name ?? jobTitleSlug;
-  }
-
-  // The role pill beside the name states seniority and designation together.
-  // The experience level is also a slug, named in the experience-levels master
-  // table (cached for an hour), so it needs the same resolution as the title.
-  const experienceLevelSlug = (profile as any)?.experience_level ?? null;
-  const experienceLevelName = experienceLevelSlug
-    ? (await getExperienceLevelNameMap())[experienceLevelSlug] ?? experienceLevelSlug
-    : null;
-
-  const roleLabel =
-    [experienceLevelName ? seniorityLabel(experienceLevelName) : null, jobTitleName]
-      .filter(Boolean)
-      .join(" ") || null;
+  // The role pill beside the name states seniority and designation together;
+  // both are slugs, resolved by the shared helper (see `role-label.ts`).
+  const roleLabel = await resolveProfileRoleLabel(
+    db,
+    (profile as any)?.job_title ?? null,
+    (profile as any)?.experience_level ?? null,
+  );
 
   return (
     <ProfileClient

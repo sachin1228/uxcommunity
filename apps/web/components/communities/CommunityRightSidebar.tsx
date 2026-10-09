@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Calendar, MapPin } from "lucide-react";
 import {
@@ -30,6 +31,7 @@ import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { profileHref } from "@/lib/profile/links";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { EventRoomGoneSection, EventRoomSection } from "./events/EventRoomSection";
 
@@ -307,14 +309,19 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
                     key={member.user_id}
                     className={`relative rounded-full ring-2 ring-background ${index > 0 ? "-ml-2.5" : ""}`}
                     style={{ zIndex: visibleMembers.length - index }}
-                    title={member.users?.name ?? "Member"}
                   >
-                    <AvatarImg
-                      url={member.users?.avatar_url}
-                      name={member.users?.name ?? "Member"}
-                      size={36}
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
+                    <Link
+                      href={profileHref(member.user_id)}
+                      title={member.users?.name ?? "Member"}
+                      className="block rounded-full transition-opacity hover:opacity-85"
+                    >
+                      <AvatarImg
+                        url={member.users?.avatar_url}
+                        name={member.users?.name ?? "Member"}
+                        size={36}
+                        className="h-9 w-9 rounded-full object-cover"
+                      />
+                    </Link>
                   </li>
                 ))}
                 {overflow > 0 && (

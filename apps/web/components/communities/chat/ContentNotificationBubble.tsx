@@ -28,6 +28,7 @@ import {
   NotificationReactionPills,
 } from "./NotificationHoverActions";
 import { userColorVar } from "@/lib/communities/user-color";
+import { profileHref } from "@/lib/profile/links";
 import { RESOURCE_TYPES } from "@/lib/communities/models/resources";
 import type { CachedContentEvent, ContentEventKind } from "@/lib/communities/cache";
 import {
@@ -188,7 +189,13 @@ export function ContentNotificationBubble({
       {!isMe && (
         <div className="w-7 shrink-0 mt-0.5">
           {sender && (
-            <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
+            <Link
+              href={profileHref(event.user_id)}
+              title={senderName}
+              className="block w-fit rounded-full transition-opacity hover:opacity-85"
+            >
+              <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
+            </Link>
           )}
         </div>
       )}
@@ -217,12 +224,17 @@ export function ContentNotificationBubble({
               isMe ? "text-accent-foreground" : "text-foreground-muted"
             }`}
           >
-            <span
-              className="font-semibold"
-              style={!isMe ? { color: userColorVar(event.user_id) } : undefined}
-            >
-              {name}
-            </span>
+            {isMe ? (
+              <span className="font-semibold">{name}</span>
+            ) : (
+              <Link
+                href={profileHref(event.user_id)}
+                className="font-semibold hover:underline"
+                style={{ color: userColorVar(event.user_id) }}
+              >
+                {name}
+              </Link>
+            )}
             {` created ${withArticle(theme.label.toLowerCase())}`}
           </p>
 
