@@ -27,10 +27,11 @@
  * SAFETY
  *   The parser recognises seven block tags and five inline tags by name and
  *   escapes every byte of text it emits itself; unrecognised markup can only
- *   ever become text or disappear. There is no innerHTML, no
- *   `dangerouslySetInnerHTML` and no regex tag-stripping to bypass, and the
- *   same code runs on the server, so a caller that never touches the editor
- *   (the API is one) is sanitised identically.
+ *   ever become text or disappear. Nothing here hands html to the DOM as
+ *   markup — there is no innerHTML path, no dangerouslySetInnerHTML and no
+ *   regex tag-stripping to bypass — and the same code runs on the server, so a
+ *   caller that never touches the editor (the API is one) is sanitised
+ *   identically.
  *
  * Pure and dependency-free on purpose: the browser runs it on every keystroke
  * and paste, the server runs it before every write, and `node --test` covers
