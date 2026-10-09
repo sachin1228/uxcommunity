@@ -3,38 +3,39 @@
 import { CheckCircle2, Users } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { KindBadge, LockedNote } from "./JobBadges";
-import { useGuardedRouter } from "@/lib/navigation-guard";
 import type { JobPost } from "@/lib/jobs/types";
 import { workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 
 interface JobCardProps {
   job: JobPost;
+  selected?: boolean;
+  onSelect: () => void;
 }
 
 /**
  * The LinkedIn shape: the title leads, one line carries company · city (work
- * mode) · salary, and the time sits under it. The four targeting criteria
- * live on the detail page — the card keeps the scan cheap.
+ * mode) · salary, and the time sits under it. Selecting is local to the board
+ * — the pane beside the list renders the card's own payload, so a click is a
+ * client-side switch, not a route change. The four targeting criteria live on
+ * the detail pane — the card keeps the scan cheap.
  */
-export function JobCard({ job }: JobCardProps) {
-  const guard = useGuardedRouter();
-  const detailHref = `/dashboard/jobs/${job.id}`;
-
-  const open = () => guard.push(detailHref);
-
+export function JobCard({ job, selected = false, onSelect }: JobCardProps) {
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={open}
+      aria-current={selected ? "true" : undefined}
+      onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          open();
+          onSelect();
         }
       }}
-      className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface p-3.5 transition-colors hover:border-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+      className={`group flex cursor-pointer items-start gap-3 rounded-xl border bg-surface p-3.5 transition-colors hover:border-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent ${
+        selected ? "border-accent/60" : "border-border"
+      }`}
     >
       <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} />
 

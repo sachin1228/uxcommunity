@@ -3,24 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Briefcase, CheckCircle2, ExternalLink, Globe, Users } from "lucide-react";
-import { BackLink } from "@/components/ui/BackLink";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
 import { KindBadge, LockedNote, MetaChip } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
-import {
-  criteriaMismatches,
-  listPhrase,
-  workModeLabel,
-} from "@/lib/jobs/types";
+import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types";
 
 /**
  * A posting as the viewer sees it. The Apply action follows `can_apply` — the
  * flag the database computed with the same rule its write enforces — and a
  * locked posting names the profile dimensions that do not match, so the rule
  * never has to be guessed.
+ *
+ * Rendered inside the board's detail pane: the pane owns layout and the
+ * below-lg back control, so this component is content only.
  */
 export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) {
   const guard = useGuardedRouter();
@@ -30,15 +28,9 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
   const mismatches = criteriaMismatches(job, viewer);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 lg:px-6">
-      <BackLink
-        href="/dashboard/jobs"
-        label="Jobs"
-        className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
-      />
-
+    <div className="flex flex-col gap-6">
       {/* Header card */}
-      <div className="mt-4 rounded-2xl border border-border bg-surface p-5">
+      <div className="rounded-2xl border border-border bg-surface p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={56} />
           <div className="min-w-0 flex-1">
@@ -148,98 +140,97 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
         </div>
       </div>
 
-      <div className="mt-6 flex flex-col gap-6">
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <h2 className="font-display text-sm font-semibold text-foreground">
-            {job.kind === "referral" ? "Referred by" : "Posted by"}
-          </h2>
-          <a
-            href={`/dashboard/profile/${job.poster.id}`}
-            className="mt-3 flex items-center gap-2.5"
-          >
-            <AvatarImg url={job.poster.avatar_url} name={job.poster.name} size={36} />
-            <span className="min-w-0">
-              <span className="block truncate font-body text-sm font-medium text-foreground">
-                {job.is_mine ? "You" : job.poster.name}
-              </span>
-              <span className="block truncate font-body text-[11px] text-foreground-muted">
-                {[job.poster.job_title_label, job.poster.experience_level_label]
-                  .filter(Boolean)
-                  .join(" · ") || "Member"}
-              </span>
+      {/* Poster */}
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <h2 className="font-display text-sm font-semibold text-foreground">
+          {job.kind === "referral" ? "Referred by" : "Posted by"}
+        </h2>
+        <a
+          href={`/dashboard/profile/${job.poster.id}`}
+          className="mt-3 flex items-center gap-2.5"
+        >
+          <AvatarImg url={job.poster.avatar_url} name={job.poster.name} size={36} />
+          <span className="min-w-0">
+            <span className="block truncate font-body text-sm font-medium text-foreground">
+              {job.is_mine ? "You" : job.poster.name}
             </span>
-          </a>
-        </div>
-
-        <Section title="About the role">
-          <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
-            {job.description}
-          </p>
-        </Section>
-
-        {job.responsibilities.length > 0 && (
-          <Section title="What you'll do">
-            <ul className="flex flex-col gap-2">
-              {job.responsibilities.map((item) => (
-                <li
-                  key={item}
-                  className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
-                >
-                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {job.requirements.length > 0 && (
-          <Section title="What we're looking for">
-            <ul className="flex flex-col gap-2">
-              {job.requirements.map((item) => (
-                <li
-                  key={item}
-                  className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
-                >
-                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {job.skills.length > 0 && (
-          <Section title="Skills">
-            <div className="flex flex-wrap gap-1.5">
-              {job.skills.map((skill) => (
-                <MetaChip key={skill}>{skill}</MetaChip>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        <Section title={`About ${job.company.name}`}>
-          <a
-            href={`/dashboard/companies/${job.company.slug}`}
-            className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
-          >
-            <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={16} />
-            View {job.company.name} on uxcommunity
-          </a>
-          {job.website && (
-            <a
-              href={job.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-center gap-1.5 font-body text-xs font-medium text-accent hover:underline"
-            >
-              <Globe strokeWidth={2.5} size={12} />
-              {job.website.replace(/^https?:\/\//, "")}
-            </a>
-          )}
-        </Section>
+            <span className="block truncate font-body text-[11px] text-foreground-muted">
+              {[job.poster.job_title_label, job.poster.experience_level_label]
+                .filter(Boolean)
+                .join(" · ") || "Member"}
+            </span>
+          </span>
+        </a>
       </div>
+
+      <Section title="About the role">
+        <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
+          {job.description}
+        </p>
+      </Section>
+
+      {job.responsibilities.length > 0 && (
+        <Section title="What you'll do">
+          <ul className="flex flex-col gap-2">
+            {job.responsibilities.map((item) => (
+              <li
+                key={item}
+                className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
+              >
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {job.requirements.length > 0 && (
+        <Section title="What we're looking for">
+          <ul className="flex flex-col gap-2">
+            {job.requirements.map((item) => (
+              <li
+                key={item}
+                className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
+              >
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {job.skills.length > 0 && (
+        <Section title="Skills">
+          <div className="flex flex-wrap gap-1.5">
+            {job.skills.map((skill) => (
+              <MetaChip key={skill}>{skill}</MetaChip>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section title={`About ${job.company.name}`}>
+        <a
+          href={`/dashboard/companies/${job.company.slug}`}
+          className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
+        >
+          <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={16} />
+          View {job.company.name} on uxcommunity
+        </a>
+        {job.website && (
+          <a
+            href={job.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center gap-1.5 font-body text-xs font-medium text-accent hover:underline"
+          >
+            <Globe strokeWidth={2.5} size={12} />
+            {job.website.replace(/^https?:\/\//, "")}
+          </a>
+        )}
+      </Section>
 
       {!job.is_mine && !job.applied && job.can_apply && (
         <ApplyModal

@@ -7,7 +7,11 @@ import { getJobFeed, loadJobMasterData, loadJobViewer } from "@/lib/jobs/service
 
 export const metadata = { title: "Jobs — uxcommunity" };
 
-export default async function JobsPage() {
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await getSession();
   if (!session || session.role !== "user") {
     redirect("/login");
@@ -19,7 +23,8 @@ export default async function JobsPage() {
     redirect("/login");
   }
 
-  const [jobs, master] = await Promise.all([
+  const [query, jobs, master] = await Promise.all([
+    searchParams,
     getJobFeed(db, viewer.id),
     loadJobMasterData(db),
   ]);
@@ -28,7 +33,14 @@ export default async function JobsPage() {
     <JobsBrowser
       viewer={viewer}
       master={master}
-      jobs={jobs.map((job) => ({ ...job, posted_label: timeAgoLabel(job.created_at) }))}
+      jobs={jobs.map((job) => ({
+        ...job,
+        posted_label: timeAgoLabel(job.created_at),
+        my_application: job.my_application
+          ? { ...job.my_application, applied_label: timeAgoLabel(job.my_application.created_at) }
+          : null,
+      }))}
+      initialJobId={typeof query.job === "string" ? query.job : null}
     />
   );
 }
