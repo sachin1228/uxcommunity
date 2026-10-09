@@ -103,27 +103,33 @@ export function JobsBrowser({
         </button>
       </div>
 
-      {/* Tabs — full width; the divider trails the tabs instead of cutting the page */}
-      <div className={`mt-5 ${paneOpen ? "hidden lg:flex" : "flex"} items-center gap-1`}>
-        {tabs.map((item) => {
-          const active = tab === item.value;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setTab(item.value)}
-              className={`border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
-                active
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-foreground-muted hover:text-foreground"
-              }`}
-            >
-              {item.label}
-              <span className="ml-1.5 text-xs text-foreground-subtle">{item.count}</span>
-            </button>
-          );
-        })}
-        <div aria-hidden="true" className="h-px flex-1 self-end bg-border" />
+      {/* Tabs — full width; the divider trails the tabs and ends at the list column */}
+      <div
+        className={`mt-5 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] ${
+          paneOpen ? "hidden lg:grid" : ""
+        }`}
+      >
+        <div className="flex items-center gap-1">
+          {tabs.map((item) => {
+            const active = tab === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setTab(item.value)}
+                className={`border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
+                  active
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {item.label}
+                <span className="ml-1.5 text-xs text-foreground-subtle">{item.count}</span>
+              </button>
+            );
+          })}
+          <div aria-hidden="true" className="h-px flex-1 self-end bg-border" />
+        </div>
       </div>
 
       <div
