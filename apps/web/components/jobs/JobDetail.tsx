@@ -8,6 +8,7 @@ import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
 import { KindBadge, LockedNote, MetaChip } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
+import { experienceYearsLabel } from "@/lib/jobs/format";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types";
 
@@ -34,11 +35,16 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={56} />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-display text-xl font-semibold leading-tight text-foreground">
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="min-w-0 font-display text-xl font-semibold leading-tight text-foreground">
                 {job.title}
+                <span className="ml-2 font-body text-sm font-normal text-foreground-muted">
+                  {experienceYearsLabel(job.experience_level_label)}
+                </span>
               </h1>
-              <KindBadge kind={job.kind} />
+              <div className="shrink-0 pt-1">
+                <KindBadge kind={job.kind} />
+              </div>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-body text-sm text-foreground-muted">
               <span className="inline-flex items-center gap-1.5">
