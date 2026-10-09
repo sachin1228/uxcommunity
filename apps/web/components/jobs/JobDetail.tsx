@@ -147,7 +147,7 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
         </h2>
         <a
           href={`/dashboard/profile/${job.poster.id}`}
-          className="mt-3 flex items-center gap-2.5"
+          className="group mt-3 flex items-center gap-2.5"
         >
           <AvatarImg
             url={job.poster.avatar_url}
@@ -156,7 +156,7 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
             className="rounded-full object-cover"
           />
           <span className="min-w-0">
-            <span className="block truncate font-body text-sm font-medium text-foreground">
+            <span className="block truncate font-body text-sm font-medium text-foreground group-hover:underline">
               {job.is_mine ? "You" : job.poster.name}
             </span>
             <span className="block truncate font-body text-[11px] text-foreground-muted">
