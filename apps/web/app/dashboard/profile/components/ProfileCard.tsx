@@ -2,9 +2,9 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { Building2, Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
+import { Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
-import { VerifiedMark } from "@/components/companies/CompanyBadge";
+import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
 
 interface ProfileCardProps {
@@ -199,10 +199,11 @@ export function ProfileCard({
                     company.isActive ? "text-foreground" : "text-foreground-subtle"
                   }`}
                 >
-                  <Building2
-                    strokeWidth={2.5}
-                    size={14}
-                    className={`shrink-0 ${company.isActive ? "text-accent" : ""}`}
+                  <CompanyLogo
+                    name={company.name}
+                    logoUrl={company.logoUrl}
+                    size={18}
+                    shape="circle"
                   />
                   <span className="truncate">{company.name}</span>
                   {company.isActive && company.domainVerified && (
@@ -231,10 +232,11 @@ export function ProfileCard({
                   company.isActive ? "text-foreground" : "text-foreground-subtle"
                 }`}
               >
-                <Building2
-                  strokeWidth={2.5}
-                  size={14}
-                  className={`shrink-0 ${company.isActive ? "text-accent" : ""}`}
+                <CompanyLogo
+                  name={company.name}
+                  logoUrl={company.logoUrl}
+                  size={18}
+                  shape="circle"
                 />
                 <span className="truncate">{company.name}</span>
                 {company.isActive && company.domainVerified && (

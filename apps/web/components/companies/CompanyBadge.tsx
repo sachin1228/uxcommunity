@@ -18,17 +18,21 @@ export function CompanyLogo({
   name,
   logoUrl,
   size = 32,
+  shape = "square",
   className = "",
 }: {
   name: string;
   logoUrl?: string | null;
   size?: number;
+  /** Compose the mark as a small closed circle (chips, cards) or a tile. */
+  shape?: "square" | "circle";
   className?: string;
 }) {
   // Remembered per URL rather than as a boolean, so a logo that changes (a
   // company gets a real one) is retried without an effect resetting state.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const style = { width: size, height: size };
+  const radius = shape === "circle" ? "rounded-full" : "rounded-md";
 
   if (logoUrl && logoUrl !== failedUrl) {
     return (
@@ -38,7 +42,7 @@ export function CompanyLogo({
         alt=""
         style={style}
         onError={() => setFailedUrl(logoUrl)}
-        className={`shrink-0 rounded-md border border-border bg-surface object-cover ${className}`}
+        className={`shrink-0 ${radius} border border-border bg-surface object-cover ${className}`}
       />
     );
   }
@@ -47,7 +51,7 @@ export function CompanyLogo({
     <span
       aria-hidden="true"
       style={style}
-      className={`flex shrink-0 items-center justify-center rounded-md border border-border bg-surface-raised font-body text-xs font-semibold uppercase text-foreground-muted select-none ${className}`}
+      className={`flex shrink-0 items-center justify-center ${radius} border border-border bg-surface-raised font-body text-xs font-semibold uppercase text-foreground-muted select-none ${className}`}
     >
       {name.trim()[0] ?? "?"}
     </span>

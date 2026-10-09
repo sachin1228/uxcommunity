@@ -1,6 +1,7 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
+import { companyLogoUrl } from "@/lib/companies/logos";
 import type { JobApplicant, JobPost, JobViewer } from "./types";
 
 /**
@@ -92,7 +93,15 @@ function asJsonObject(value: Json): { [key: string]: unknown } | null {
 
 /** Trust the SQL payload contract (same convention as the feed functions). */
 function asJobPost(value: Json): JobPost | null {
-  return asJsonObject(value) as unknown as JobPost | null;
+  const job = asJsonObject(value) as unknown as JobPost | null;
+  if (!job || !job.company) return job;
+  // The SQL carries the stored logo + the company's domain; resolving here
+  // gives the jobs surfaces the same picture the profile shows (the stored
+  // image, else the domain's icon — never a name-derived placeholder).
+  return {
+    ...job,
+    company: { ...job.company, logo_url: companyLogoUrl(job.company.logo_url, job.company.domain) },
+  };
 }
 
 function asJobApplicant(value: Json): JobApplicant | null {
