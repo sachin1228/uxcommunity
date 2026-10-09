@@ -90,7 +90,7 @@ export function JobsBrowser({
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 pt-6 lg:px-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -134,7 +134,7 @@ export function JobsBrowser({
       </div>
 
       <div
-        className={`mt-4 grid grid-cols-1 gap-5${
+        className={`grid grid-cols-1 gap-5${
           tab === "all" && jobs.length > 0
             ? " lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start"
             : ""
@@ -142,7 +142,7 @@ export function JobsBrowser({
       >
         {/* Rail — the browse list */}
         <div
-          className={`${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`}
+          className={`${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col pt-4 pb-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`}
         >
           {/* Search (All jobs only) */}
           {tab === "all" && otherJobs.length > 0 && (
@@ -224,7 +224,7 @@ export function JobsBrowser({
         {tab === "all" && jobs.length > 0 && (
           <div
             ref={paneRef}
-            className={`${paneOpen ? "flex" : "hidden"} min-w-0 flex-col lg:flex lg:border-l lg:border-border lg:pl-5`}
+            className={`${paneOpen ? "flex" : "hidden"} min-w-0 flex-col pt-4 pb-6 lg:flex lg:border-l lg:border-border lg:pl-5`}
           >
             <button
               type="button"
