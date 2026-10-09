@@ -149,7 +149,12 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
           href={`/dashboard/profile/${job.poster.id}`}
           className="mt-3 flex items-center gap-2.5"
         >
-          <AvatarImg url={job.poster.avatar_url} name={job.poster.name} size={36} />
+          <AvatarImg
+            url={job.poster.avatar_url}
+            name={job.poster.name}
+            size={36}
+            className="rounded-full object-cover"
+          />
           <span className="min-w-0">
             <span className="block truncate font-body text-sm font-medium text-foreground">
               {job.is_mine ? "You" : job.poster.name}
