@@ -1,22 +1,26 @@
 "use client";
 
-import { Briefcase, CheckCircle2, Users } from "lucide-react";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { CheckCircle2, Users } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
-import { KindBadge, LockedNote, MetaChip } from "./JobBadges";
+import { KindBadge, LockedNote } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import type { JobPost } from "@/lib/jobs/types";
-import { employmentTypeLabel, workModeLabel } from "@/lib/jobs/types";
+import { workModeLabel } from "@/lib/jobs/types";
 
 interface JobCardProps {
   job: JobPost;
 }
 
+/**
+ * The LinkedIn shape: the title leads, one line carries company · city (work
+ * mode) · salary, and the time sits under it. The four targeting criteria
+ * live on the detail page — the card keeps the scan cheap.
+ */
 export function JobCard({ job }: JobCardProps) {
-  const router = useGuardedRouter();
+  const guard = useGuardedRouter();
   const detailHref = `/dashboard/jobs/${job.id}`;
 
-  const open = () => router.push(detailHref);
+  const open = () => guard.push(detailHref);
 
   return (
     <div
@@ -31,18 +35,13 @@ export function JobCard({ job }: JobCardProps) {
       }}
       className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface p-3.5 transition-colors hover:border-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
     >
-      <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} shape="circle" />
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={48} shape="circle" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="truncate font-display text-sm font-semibold text-foreground">
-              {job.title}
-            </h3>
-            <p className="mt-0.5 truncate font-body text-xs text-foreground-muted">
-              {job.company.name}
-            </p>
-          </div>
+          <h3 className="truncate font-display text-[15px] font-semibold leading-snug text-accent">
+            {job.title}
+          </h3>
           <div className="flex shrink-0 items-center gap-1.5">
             <KindBadge kind={job.kind} />
             {job.is_mine && (
@@ -53,36 +52,20 @@ export function JobCard({ job }: JobCardProps) {
           </div>
         </div>
 
-        {/* The four criteria are the targeting, so the card leads with them. */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <MetaChip>{job.city_name}</MetaChip>
-          <MetaChip>{job.sector_name}</MetaChip>
-          <MetaChip>{job.job_title_label}</MetaChip>
-          <MetaChip>{job.experience_level_label}</MetaChip>
-        </div>
+        <p className="mt-0.5 truncate font-body text-[13px] text-foreground-muted">
+          {job.company.name}
+          <span className="mx-1.5 text-foreground-subtle">•</span>
+          {job.city_name} ({workModeLabel(job.work_mode)})
+          {job.salary && (
+            <>
+              <span className="mx-1.5 text-foreground-subtle">•</span>
+              {job.salary}
+            </>
+          )}
+        </p>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <MetaChip>{workModeLabel(job.work_mode)}</MetaChip>
-          <MetaChip>{employmentTypeLabel(job.employment_type)}</MetaChip>
-          {job.salary && <MetaChip>{job.salary}</MetaChip>}
-        </div>
-
-        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 font-body text-[11px] text-foreground-subtle">
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <AvatarImg
-                url={job.poster.avatar_url}
-                name={job.poster.name}
-                size={20}
-                className="rounded-full object-cover"
-              />
-              <span className="truncate font-medium text-foreground-muted">
-                {job.is_mine ? "Posted by you" : `Posted by ${job.poster.name}`}
-              </span>
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>{job.posted_label}</span>
-          </div>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="font-body text-xs text-foreground-subtle">{job.posted_label}</span>
 
           {job.is_mine ? (
             <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
@@ -95,10 +78,7 @@ export function JobCard({ job }: JobCardProps) {
               Applied
             </span>
           ) : job.can_apply ? (
-            <span className="inline-flex items-center gap-1.5 font-body text-[11px] font-medium text-accent">
-              <Briefcase strokeWidth={2.5} size={11} />
-              You match this role
-            </span>
+            <span className="font-body text-[11px] font-medium text-accent">You match this role</span>
           ) : (
             <LockedNote>Locked for your profile</LockedNote>
           )}

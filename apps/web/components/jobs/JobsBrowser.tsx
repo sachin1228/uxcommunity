@@ -102,7 +102,7 @@ export function JobsBrowser({
             type="text"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search roles, companies or skills…"
+            placeholder="Search roles or companies…"
             className="field w-full pl-8"
           />
         </div>
