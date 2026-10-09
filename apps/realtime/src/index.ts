@@ -7,6 +7,7 @@ import { isRetryableStatus, retryWithBackoff } from "./retry";
 import { logEvent } from "./log";
 export { UserDO } from "./user";
 export { Room } from "./room";
+export { AlertMonitor } from "./alert-monitor";
 export { resolveRoomTarget, USER_ROOM_PREFIXES } from "./room-routing";
 
 const SESSION_COOKIE = "uxcommunity_session";
@@ -75,6 +76,20 @@ function parseCookies(header: string | null): Map<string, string> {
 }
 
 export default {
+  /**
+   * Cron entry point for the dependency monitor (see src/alert-monitor.ts).
+   *
+   * The tick is deliberately thin: hand it to the Durable Object, which owns the
+   * state that decides whether this run is news or a repeat. The same fetch
+   * handler is reachable at /__scheduled under `wrangler dev --test-scheduled`.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await env.ALERT_MONITOR.get(env.ALERT_MONITOR.idFromName(ALERT_MONITOR_NAME)).fetch(
+      "https://alert-monitor/run",
+      { method: "POST" },
+    );
+  },
+
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
@@ -86,6 +101,9 @@ export default {
     }
     if (url.pathname === "/stats") {
       return handleStats(request, env, url);
+    }
+    if (url.pathname === "/health-monitor") {
+      return handleHealthMonitorState(request, env);
     }
     return new Response("Not found", { status: 404 });
   },
@@ -148,6 +166,26 @@ async function handleStats(request: Request, env: Env, url: URL): Promise<Respon
         "x-realtime-stats": env.REALTIME_PUBLISH_SECRET,
       },
     }),
+  );
+}
+
+/** The single monitor instance — one state machine for the whole app. */
+const ALERT_MONITOR_NAME = "dependency-monitor";
+
+/**
+ * Read-only view of what the dependency monitor last saw, behind the same
+ * publish secret as `/stats`.
+ *
+ * It exists so the monitor can be inspected without reading Durable Object
+ * storage by hand — the deploy smoke test and a human debugging an alert both
+ * need "what does it think right now", and neither should be able to change it.
+ */
+async function handleHealthMonitorState(request: Request, env: Env): Promise<Response> {
+  if (request.headers.get("x-realtime-publish-secret") !== env.REALTIME_PUBLISH_SECRET) {
+    return new Response("Forbidden", { status: 403 });
+  }
+  return env.ALERT_MONITOR.get(env.ALERT_MONITOR.idFromName(ALERT_MONITOR_NAME)).fetch(
+    "https://alert-monitor/state",
   );
 }
 
