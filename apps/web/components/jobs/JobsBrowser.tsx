@@ -152,12 +152,15 @@ export function JobsBrowser({
                 size={14}
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted"
               />
+              {/* Real border, not the `field` ring: the rail is a scroll
+                  container and clips the ring's outside-shadow at its edge,
+                  which read as a cut border and corners. */}
               <input
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search roles or companies…"
-                className="field w-full pl-8"
+                className="h-9 w-full rounded-lg border border-border bg-surface pl-9 pr-3 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle hover:border-foreground-subtle focus:border-foreground-muted"
               />
             </div>
           )}
