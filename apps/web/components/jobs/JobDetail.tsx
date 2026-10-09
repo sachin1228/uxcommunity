@@ -12,7 +12,6 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 import {
   criteriaMismatches,
-  employmentTypeLabel,
   listPhrase,
   workModeLabel,
 } from "@/lib/jobs/types";
@@ -225,24 +224,6 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
         {/* Sidebar */}
         <aside className="flex flex-col gap-4">
           <div className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="font-display text-sm font-semibold text-foreground">Job overview</h2>
-            <dl className="mt-3 flex flex-col gap-2.5">
-              <Fact label="City" value={job.city_name} />
-              <Fact label="Sector" value={job.sector_name} />
-              <Fact label="Job title" value={job.job_title_label} />
-              <Fact label="Experience" value={job.experience_level_label} />
-              <Fact label="Employment" value={employmentTypeLabel(job.employment_type)} />
-              <Fact label="Work mode" value={workModeLabel(job.work_mode)} />
-              <Fact label="Salary" value={job.salary ?? "Not disclosed"} />
-              <Fact label="Posted" value={job.posted_label} />
-              <Fact
-                label="Applicants"
-                value={`${job.applicant_count} ${job.applicant_count === 1 ? "person" : "people"}`}
-              />
-            </dl>
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface p-4">
             <h2 className="font-display text-sm font-semibold text-foreground">
               {job.kind === "referral" ? "Referred by" : "Posted by"}
             </h2>
@@ -285,14 +266,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="mb-2.5 font-display text-base font-semibold text-foreground">{title}</h2>
       {children}
     </section>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="font-body text-xs text-foreground-subtle">{label}</dt>
-      <dd className="text-right font-body text-xs font-medium text-foreground">{value}</dd>
-    </div>
   );
 }
