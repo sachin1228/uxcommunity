@@ -12,8 +12,9 @@ type Tab = "all" | "posts";
 
 /**
  * The jobs board. Every posting is visible to every member — the profile
- * match is what unlocks Apply, not what hides the job — so the list carries
- * the lock state per card and the four criteria chips that explain it.
+ * match is what unlocks Apply, not what hides the job — but the member's OWN
+ * posts stay out of the browse list: they live under "My posts", so the board
+ * only shows roles they could actually apply to.
  */
 export function JobsBrowser({
   viewer,
@@ -30,11 +31,12 @@ export function JobsBrowser({
   const [postOpen, setPostOpen] = useState(false);
 
   const myPosts = jobs.filter((job) => job.is_mine);
+  const otherJobs = jobs.filter((job) => !job.is_mine);
 
   const query = search.trim().toLowerCase();
   const visibleJobs =
     tab === "all"
-      ? jobs.filter(
+      ? otherJobs.filter(
           (job) =>
             !query ||
             job.title.toLowerCase().includes(query) ||
@@ -44,7 +46,7 @@ export function JobsBrowser({
       : myPosts;
 
   const tabs: { value: Tab; label: string; count: number }[] = [
-    { value: "all", label: "All jobs", count: jobs.length },
+    { value: "all", label: "All jobs", count: otherJobs.length },
     { value: "posts", label: "My posts", count: myPosts.length },
   ];
 
@@ -91,7 +93,7 @@ export function JobsBrowser({
       </div>
 
       {/* Search (All jobs only) */}
-      {tab === "all" && jobs.length > 0 && (
+      {tab === "all" && otherJobs.length > 0 && (
         <div className="relative mt-4">
           <Search
             strokeWidth={2.5}
@@ -116,15 +118,16 @@ export function JobsBrowser({
 
         {visibleJobs.length === 0 &&
           (tab === "all" ? (
-            <EmptyState
-              title={jobs.length === 0 ? "No jobs yet" : "No jobs match"}
-              body={
-                jobs.length === 0
-                  ? "Be the first to post a role — you'll verify your company with a work email."
-                  : "Try a different search term."
-              }
-              action={
-                jobs.length === 0 ? (
+            query ? (
+              <EmptyState
+                title="No jobs match"
+                body="Try a different search term."
+              />
+            ) : jobs.length === 0 ? (
+              <EmptyState
+                title="No jobs yet"
+                body="Be the first to post a role — you'll verify your company with a work email."
+                action={
                   <button
                     type="button"
                     onClick={() => setPostOpen(true)}
@@ -133,9 +136,14 @@ export function JobsBrowser({
                     <Plus strokeWidth={2.5} size={14} />
                     Post a job
                   </button>
-                ) : undefined
-              }
-            />
+                }
+              />
+            ) : (
+              <EmptyState
+                title="No jobs from other members yet"
+                body="Your own posts live under My posts — roles posted by other members will show up here."
+              />
+            )
           ) : (
             <EmptyState
               title="You haven't posted a job yet"
