@@ -41,9 +41,11 @@ export function JobsBrowser({
   const [tab, setTab] = useState<Tab>(seeded?.is_mine ? "posts" : "all");
   const [search, setSearch] = useState("");
   const [postOpen, setPostOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(seeded?.id ?? jobs[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    seeded?.id ?? jobs.find((job) => !job.is_mine)?.id ?? null
+  );
   // Below lg the panes take turns; from lg up both are always visible.
-  const [paneOpen, setPaneOpen] = useState(Boolean(seeded));
+  const [paneOpen, setPaneOpen] = useState(Boolean(seeded && !seeded.is_mine));
   const paneRef = useRef<HTMLDivElement>(null);
   const scrolledId = useRef(selectedId);
 
@@ -61,7 +63,16 @@ export function JobsBrowser({
 
   const myPosts = jobs.filter((job) => job.is_mine);
   const otherJobs = jobs.filter((job) => !job.is_mine);
-  const selectedJob = jobs.find((job) => job.id === selectedId) ?? null;
+
+  // The pane only ever browses other members' roles: on All jobs the shown
+  // posting derives from that list (first one when nothing is picked), so a
+  // stale selection — the viewer's own post carried in by a back link — can
+  // never surface in the pane, and an empty list shows no job at all.
+  const selectedJob =
+    tab === "all"
+      ? (otherJobs.find((job) => job.id === selectedId) ?? otherJobs[0] ?? null)
+      : null;
+  const highlightedId = tab === "all" ? (selectedJob?.id ?? null) : selectedId;
 
   const query = search.trim().toLowerCase();
   const visibleJobs =
@@ -143,7 +154,7 @@ export function JobsBrowser({
 
       <div
         className={`grid grid-cols-1 gap-5${
-          tab === "all" && jobs.length > 0
+          tab === "all" && otherJobs.length > 0
             ? " lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start"
             : ""
         }`}
@@ -183,7 +194,7 @@ export function JobsBrowser({
               <JobCard
                 key={job.id}
                 job={job}
-                selected={job.id === selectedId}
+                selected={job.id === highlightedId}
                 onSelect={() => selectJob(job.id)}
               />
             ))}
@@ -232,8 +243,8 @@ export function JobsBrowser({
           </div>
         </div>
 
-        {/* Pane — the selected posting (All jobs only) */}
-        {tab === "all" && jobs.length > 0 && (
+        {/* Pane — the selected posting, other members' roles only */}
+        {tab === "all" && otherJobs.length > 0 && (
           <div
             ref={paneRef}
             className={`${paneOpen ? "flex" : "hidden"} min-w-0 flex-col pt-4 pb-6 lg:flex lg:border-l lg:border-border lg:pl-5`}
@@ -247,14 +258,7 @@ export function JobsBrowser({
               Jobs
             </button>
 
-            {selectedJob ? (
-              <JobDetail job={selectedJob} viewer={viewer} />
-            ) : (
-              <EmptyState
-                title="Select a job"
-                body="Pick a posting from the list to see its details."
-              />
-            )}
+            {selectedJob && <JobDetail job={selectedJob} viewer={viewer} />}
           </div>
         )}
       </div>
