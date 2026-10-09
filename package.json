@@ -22,6 +22,8 @@
     "test:smoke-realtime": "node --test scripts/smoke-realtime.test.mjs",
     "verify:cloudflare": "node scripts/verify-cloudflare-credentials.mjs",
     "test:verify-cloudflare": "node --test scripts/verify-cloudflare-credentials.test.mjs",
+    "verify:r2": "node scripts/verify-r2-credentials.mjs",
+    "test:verify-r2": "node --test scripts/verify-r2-credentials.test.mjs",
     "test:e2e-realtime": "node apps/web/e2e/realtime-sockets.test.mjs",
     "test:e2e-event-host-going": "node apps/web/e2e/event-host-going.test.mjs",
     "test:e2e-seed-member": "node --test apps/web/e2e/seed-member.test.mjs",

@@ -65,6 +65,11 @@ jobs:
       - name: Unit-test the Cloudflare credential guard
         run: node --test scripts/verify-cloudflare-credentials.test.mjs
 
+      # The other credential that decides whether a deploy is worth making:
+      # same rule as above, its failure branches are pinned down first.
+      - name: Unit-test the R2 media credential guard
+        run: node --test scripts/verify-r2-credentials.test.mjs
+
       # Fail in seconds, naming the secret that is wrong, instead of after a
       # full OpenNext build on a symptom from the deepest layer of the stack.
       # On 2026-10-08 the credential stopped being accepted and surfaced here:
@@ -204,6 +209,27 @@ jobs:
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           INVITATION_EXPIRY_DAYS=${{ secrets.INVITATION_EXPIRY_DAYS || '7' }}
           EOF
+
+      # ── The media credential every upload route uses ────────────────────
+      # Threads, showcase, events, avatars and chat attachments all write
+      # through one S3-compatible client in apps/web/lib/r2.ts, built from
+      # R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY — the values written into
+      # .dev.vars above and uploaded as Worker secrets below. Nothing used to
+      # ask that credential to prove it still worked: on 2026-10-09 a rejected
+      # key surfaced hours later as a 500 on the first user upload, and the
+      # only trace was `Unauthorized: Unauthorized` inside the AWS SDK stack.
+      # This PUTs a probe object, reads it back and deletes it, so a revoked,
+      # rolled or wrong-account key fails here in seconds naming the secret.
+      # Passed from the repository secrets rather than read back out of
+      # .dev.vars, so it proves the value the deploy is about to push.
+      - name: Verify R2 media credentials
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+        run: node scripts/verify-r2-credentials.mjs
 
       # Fail the build if any NEXT_PUBLIC_* var the client needs is missing
       # from the build env — a missing var silently disables realtime (no

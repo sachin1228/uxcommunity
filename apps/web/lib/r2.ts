@@ -29,6 +29,95 @@ import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFrom
 // admin orphan audit, and the tests use the identical parsing logic.
 export { attachmentPosterUrls, attachmentUrls } from "@uxcommunity/shared";
 
+/**
+ * The message an operator needs when R2 rejects the media credential.
+ *
+ * Every upload route in the app funnels through this module, so a rejected
+ * `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` pair takes out threads, showcase,
+ * events, avatars and chat attachments at once, each as a generic 500. The
+ * repair is never in this file, so the error says where it is.
+ */
+export const R2_CREDENTIAL_HINT =
+  "Cloudflare R2 rejected the media credential. Rotate R2_ACCESS_KEY_ID / " +
+  "R2_SECRET_ACCESS_KEY (R2 → API → Manage API Tokens in the Cloudflare dashboard, with " +
+  "\"Object Read & Write\" on the media bucket), update the repository secret and every local env " +
+  "file, then redeploy. `npm run verify:r2` proves the new value before a deploy is spent on it.";
+
+/**
+ * A rejected R2 credential, raised instead of the SDK's bare
+ * `Unauthorized: Unauthorized` so the log line that reaches an operator names
+ * the fix. Message-only: no credential value is ever attached.
+ */
+export class R2CredentialError extends Error {
+  /** HTTP status R2 answered with (401 or 403), when the SDK reported one. */
+  readonly status: number | null;
+  /** SDK error name, e.g. `Unauthorized` or `AccessDenied`. */
+  readonly code: string;
+
+  constructor(code: string, status: number | null, cause?: unknown) {
+    super(`${R2_CREDENTIAL_HINT} (${code}${status ? ` HTTP ${status}` : ""})`);
+    this.name = "R2CredentialError";
+    this.status = status;
+    this.code = code;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
+ * Decides whether a failed R2 command was a rejected credential.
+ *
+ * R2 answers a revoked key, a rolled secret and a key from another account
+ * identically — a bare `401 Unauthorized` — and it reports nothing that tells
+ * them apart, so anything 401/403-shaped has to be treated as "the credential
+ * needs fixing". A read-only token that authenticates fine and is then refused
+ * per object is the 403 (`AccessDenied`) case.
+ *
+ * The same classification is duplicated in scripts/verify-r2-credentials.mjs,
+ * which runs before the deploy without a TypeScript toolchain.
+ */
+export function classifyR2Failure(error: unknown): { credential: boolean; code: string; status: number | null } {
+  const metadata = (error as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata;
+  const status = typeof metadata?.httpStatusCode === "number" ? metadata.httpStatusCode : null;
+  const code = String(
+    (error as { name?: string; Code?: string } | null)?.Code ??
+      (error as { name?: string } | null)?.name ??
+      "",
+  );
+
+  const credentialCode =
+    /Unauthorized|AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch|ExpiredToken|InvalidToken/i.test(code);
+  return {
+    credential: credentialCode || status === 401 || status === 403,
+    code: code || "UnknownError",
+    status,
+  };
+}
+
+/**
+ * Runs one S3 command through a single place, so every call in this module
+ * turns a rejected credential into {@link R2CredentialError} instead of
+ * whatever shape the SDK threw. Non-auth failures are rethrown untouched —
+ * callers already depend on them (a 404 from `HeadObjectCommand` means "the
+ * object is not there", not "the upload failed").
+ *
+ * Takes a thunk rather than a command so each call keeps the output type the
+ * SDK infers for its own command, with no cast at the call site.
+ *
+ * @param run Sends the command, e.g. `() => client.send(new PutObjectCommand({ ... }))`.
+ * @returns Whatever the command resolves to.
+ */
+export async function sendR2Command<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    const failure = classifyR2Failure(error);
+    if (failure.credential) {
+      throw new R2CredentialError(failure.code, failure.status, error);
+    }
+    throw error;
+  }
+}
+
 function getClient(): S3Client {
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
@@ -187,25 +276,34 @@ export async function uploadToR2(
   contentType: string
 ): Promise<string> {
   const client = getClient();
-  await client.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-      CacheControl: "public, max-age=31536000, immutable",
-    })
+  await sendR2Command(() =>
+    client.send(
+      new PutObjectCommand({
+        Bucket: getBucket(),
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        CacheControl: "public, max-age=31536000, immutable",
+      })
+    )
   );
   return r2PublicUrl(key);
 }
 
-/** Returns true when an R2 object exists (used to verify canonical videos). */
+/**
+ * Returns true when an R2 object exists (used to verify canonical videos).
+ *
+ * A rejected credential is not "the object is missing": it is thrown, so a dead
+ * key cannot report an uploaded file as absent and send the caller down a
+ * re-upload path that would fail exactly the same way.
+ */
 export async function r2ObjectExists(key: string): Promise<boolean> {
   const client = getClient();
   try {
-    await client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key }));
+    await sendR2Command(() => client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key })));
     return true;
-  } catch {
+  } catch (error) {
+    if (error instanceof R2CredentialError) throw error;
     return false;
   }
 }
@@ -218,23 +316,23 @@ export async function r2ObjectExists(key: string): Promise<boolean> {
  */
 export async function copyR2Object(sourceKey: string, destinationKey: string): Promise<void> {
   const client = getClient();
-  await client.send(
-    new CopyObjectCommand({
+  await sendR2Command(() =>
+    client.send(new CopyObjectCommand({
       Bucket: getBucket(),
       CopySource: `${getBucket()}/${sourceKey}`,
       Key: destinationKey,
       ContentType: "video/mp4",
       CacheControl: "public, max-age=31536000, immutable",
       MetadataDirective: "REPLACE",
-    })
+    }))
   );
 }
 
 /** Download an R2 object by key and return it as a Buffer. */
 export async function downloadFromR2(key: string): Promise<Buffer> {
   const client = getClient();
-  const resp = await client.send(
-    new GetObjectCommand({ Bucket: getBucket(), Key: key })
+  const resp = await sendR2Command(() =>
+    client.send(new GetObjectCommand({ Bucket: getBucket(), Key: key }))
   );
   if (!resp.Body) throw new Error(`[r2] Empty body downloading key: ${key}`);
   return Buffer.from(await resp.Body.transformToByteArray());
@@ -256,14 +354,14 @@ export async function listR2ObjectKeys(
   startAfter?: string,
 ): Promise<{ keys: string[]; objects: R2ListedObject[]; nextContinuationToken?: string; isTruncated: boolean }> {
   const client = getClient();
-  const response = await client.send(
-    new ListObjectsV2Command({
+  const response = await sendR2Command(() =>
+    client.send(new ListObjectsV2Command({
       Bucket: getBucket(),
       Prefix: prefix,
       ContinuationToken: continuationToken,
       StartAfter: startAfter,
       MaxKeys: 1000,
-    }),
+    })),
   );
 
   const objects: R2ListedObject[] = (response.Contents ?? [])
@@ -285,8 +383,8 @@ export async function listR2ObjectKeys(
 /** Delete an R2 object by key (best-effort — does not throw on 404). */
 export async function deleteFromR2(key: string): Promise<void> {
   const client = getClient();
-  await client.send(
-    new DeleteObjectCommand({ Bucket: getBucket(), Key: key })
+  await sendR2Command(() =>
+    client.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }))
   );
 }
 

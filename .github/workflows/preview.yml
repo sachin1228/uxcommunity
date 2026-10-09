@@ -83,6 +83,20 @@ jobs:
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           EOF
 
+      # Same guard the production deploy runs, and for the same reason: a PR
+      # whose preview cannot upload images answers every upload route with a 500
+      # that looks like the PR's own bug. Preview uploads hit the production
+      # media bucket with the production credential (there is no separate
+      # preview bucket), so a dead key has to be named here, before the build.
+      - name: Verify R2 media credentials
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+        run: node scripts/verify-r2-credentials.mjs
+
       - name: Verify client build-time env vars
         working-directory: apps/web
         shell: bash

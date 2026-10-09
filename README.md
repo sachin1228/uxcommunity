@@ -298,7 +298,7 @@ Copy the APK to the device (Drive, chat, USB) and open it there, allowing "insta
 | `NEXT_PUBLIC_APP_URL` | Public origin of the app, e.g. `http://localhost:3000` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — server-only, never expose to the client |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Cloudflare R2 credentials, bucket name, and public delivery domain |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Cloudflare R2 credentials, bucket name, and public delivery domain. Both deploy workflows prove these can write before they build — see [Rotating the R2 media credentials](#rotating-the-r2-media-credentials) |
 | `GIPHY_API_KEY` | GIPHY API key for GIF/sticker search |
 | `SESSION_SECRET` | Secret used to sign JWT session tokens (`openssl rand -base64 32`) |
 | `ADMIN_EMAIL` | Email address for the single built-in admin account |
@@ -317,6 +317,40 @@ Copy the APK to the device (Drive, chat, USB) and open it there, allowing "insta
 
 Push delivery tuning is optional, with defaults in code: `PUSH_BATCH_SIZE`, `PUSH_MAX_CONCURRENCY`, `PUSH_RATE_LIMIT`, `PUSH_MAX_RETRIES`, `PUSH_RETRY_BASE_MS`, `PUSH_RETRY_MAX_MS`, `PUSH_REQUEST_TIMEOUT_MS`, `PUSH_MAX_DELIVERIES`, `PUSH_TIME_BUDGET_MS`, `PUSH_RECEIPT_CHECK`, `PUSH_RECEIPT_GRACE_MS`. `apps/web/lib/push/expo.ts` and `apps/web/lib/push/chat.ts` document what each one bounds.
 
+### Rotating the R2 media credentials
+
+Every upload in the app — community threads, showcase posts, event images,
+profile avatars, chat attachments, lottie — writes to Cloudflare R2 through one
+S3-compatible client in `apps/web/lib/r2.ts`, built from `R2_ACCESS_KEY_ID` and
+`R2_SECRET_ACCESS_KEY`. One rejected credential therefore takes out every media
+feature at once, each as the same generic "Upload failed. Please try again."
+500, which is what happened on 2026-10-09.
+
+Two things name that failure now. At runtime the route logs an
+`R2CredentialError` whose message says which value to rotate. Locally,
+`npm run verify:r2` reproduces it in seconds without touching the app:
+
+```
+  ok   R2 media vars are present (access key fb30…d8f, bucket "drafthub", key id from apps/web/.dev.vars)
+  FAIL Cloudflare R2 rejected the media credential (HTTP 401: Unauthorized) while writing a probe object …
+```
+
+To repair it:
+
+1. Cloudflare dashboard → R2 → API → Manage API Tokens → Create API Token, with
+   **Object Read & Write** on the media bucket. A read-only token authenticates
+   fine and then fails on the first upload.
+2. Update the repository secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`
+   (GitHub → Settings → Secrets and variables → Actions). A deploy writes
+   `.dev.vars` from those secrets, so a value changed only in the Cloudflare
+   dashboard never reaches the Worker.
+3. Update the same values in every local env file — `apps/web/.dev.vars`,
+   `apps/web/.env.local` and `apps/web/.env` — or local uploads keep failing
+   while production works.
+4. Run `npm run verify:r2` until it passes, then deploy. Both deploy workflows
+   run that same check before the build, so a dead credential fails the deploy
+   in seconds instead of shipping an app whose every upload 500s.
+
 ## CI/CD
 
 | Workflow | Trigger | What it does |
@@ -324,6 +358,8 @@ Push delivery tuning is optional, with defaults in code: `PUSH_BATCH_SIZE`, `PUS
 | `.github/workflows/ci.yml` | PR + push to `main` | Blocking TypeScript check and the full web unit suite; ESLint advisory |
 | `.github/workflows/preview.yml` | PR opened/updated | Builds a per-PR Cloudflare worker (`uxcommunity-web-preview-pr<N>`) and comments the URL; realtime is disabled in previews |
 | `.github/workflows/deploy.yml` | Push to `main` | Deploys the web worker (OpenNext) and the realtime worker to Cloudflare |
+
+Both deploy workflows run two credential guards before they build: the Cloudflare API token the deploy itself needs (`scripts/verify-cloudflare-credentials.mjs`), and the R2 media credential every upload route uses (`scripts/verify-r2-credentials.mjs`). Each one names the repository secret to fix instead of letting a dead key surface later as an auth error from a deeper layer of the stack.
 
 ## Known limitations
 
