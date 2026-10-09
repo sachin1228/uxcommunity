@@ -49,19 +49,22 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
               </h1>
               <KindBadge kind={job.kind} />
             </div>
-            <p className="mt-1 flex flex-wrap items-center gap-1.5 font-body text-sm text-foreground-muted">
-              {job.company.name}
-              {job.company.domain_verified && <VerifiedMark label={false} size="xs" />}
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-body text-sm text-foreground-muted">
+              <span className="inline-flex items-center gap-1.5">
+                {job.company.name}
+                {job.company.domain_verified && <VerifiedMark label={false} size="xs" />}
+              </span>
+              <span aria-hidden="true" className="text-foreground-subtle">•</span>
+              <span>
+                {job.city_name} ({workModeLabel(job.work_mode)})
+              </span>
+              {job.salary && (
+                <>
+                  <span aria-hidden="true" className="text-foreground-subtle">•</span>
+                  <span>{job.salary}</span>
+                </>
+              )}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <MetaChip>{job.city_name}</MetaChip>
-              <MetaChip>{job.sector_name}</MetaChip>
-              <MetaChip>{job.job_title_label}</MetaChip>
-              <MetaChip>{job.experience_level_label}</MetaChip>
-              <MetaChip>{workModeLabel(job.work_mode)}</MetaChip>
-              <MetaChip>{employmentTypeLabel(job.employment_type)}</MetaChip>
-              {job.salary && <MetaChip>{job.salary}</MetaChip>}
-            </div>
           </div>
         </div>
 
