@@ -124,6 +124,13 @@ jobs:
       - name: Unit-test the Cloudflare credential guard
         run: node --test scripts/verify-cloudflare-credentials.test.mjs
 
+      # Same rule, same job, same reason: the R2 media credential guard decides
+      # whether the deploy proceeds, so a mistake in it must be caught where it
+      # cannot block a release. It reads no files and imports no packages, so it
+      # runs here without an install step like the two audits above.
+      - name: Unit-test the R2 media credential guard
+        run: node --test scripts/verify-r2-credentials.test.mjs
+
   lint:
     name: ESLint (advisory)
     runs-on: ubuntu-latest

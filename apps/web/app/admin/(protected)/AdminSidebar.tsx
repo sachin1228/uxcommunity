@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2 } from "lucide-react";
+import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2, HeartPulse } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -129,6 +129,20 @@ export function AdminSidebar() {
       >
         <Wrench strokeWidth={2.5} size={16} className={active("/admin/tools") ? "text-accent" : ""} />
         Tools
+      </Link>
+
+      {/* System Health — reachability of R2, Supabase and the realtime worker. */}
+      <Link
+        href="/admin/health"
+        onClick={() => setPendingHref("/admin/health")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/health")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <HeartPulse strokeWidth={2.5} size={16} className={active("/admin/health") ? "text-accent" : ""} />
+        System Health
       </Link>
 
       {/* Load Test */}

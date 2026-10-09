@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { appLink } from "./layout";
-import type { RenderedEmail } from "./document";
+import { renderEmail, type EmailBlock, type RenderedEmail } from "./document";
 import {
   renderCompanyVerificationEmail,
   renderInvitationEmail,
@@ -111,6 +111,30 @@ export async function sendResumeSignupEmail(
 
 export async function sendRejectionEmail(to: string, name: string): Promise<void> {
   await send(to, renderRejectionEmail({ name, appUrl: getAppUrl() }));
+}
+
+/**
+ * An operator alert (see lib/health/alert.ts) — the one email in the app that
+ * is not written for a member.
+ *
+ * The body is passed in as blocks rather than hard-coded here because what
+ * broke is known only to the caller that ran the checks; this function owns the
+ * house rendering, the From address and the send.
+ */
+export async function sendAdminAlertEmail(
+  to: string,
+  alert: { subject: string; preheader: string; heading: string; blocks: EmailBlock[] }
+): Promise<void> {
+  await send(
+    to,
+    renderEmail({
+      appUrl: getAppUrl(),
+      subject: alert.subject,
+      preheader: alert.preheader,
+      heading: alert.heading,
+      blocks: alert.blocks,
+    })
+  );
 }
 
 export async function sendCompanyVerificationEmail(

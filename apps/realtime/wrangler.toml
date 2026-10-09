@@ -13,6 +13,7 @@ workers_dev = true
 bindings = [
   { name = "COMMUNITY_DO", class_name = "Room" },
   { name = "USER_DO", class_name = "UserDO" },
+  { name = "ALERT_MONITOR", class_name = "AlertMonitor" },
 ]
 
 [[migrations]]
@@ -26,6 +27,23 @@ new_sqlite_classes = ["UserDO"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = []
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["AlertMonitor"]
+
+# Dependency monitor: every five minutes this Worker asks the web app whether
+# R2, Supabase, realtime, Upstash, Resend and GIPHY are reachable, and the web
+# app emails the admins when one of the services worth waking someone for goes
+# down (see src/alert-monitor.ts and apps/web/lib/health/alert.ts).
+#
+# Cron Triggers are per-Worker and free, which is why the monitor lives here:
+# the realtime Worker already runs this app's Durable Objects and already holds
+# API_URL / API_SECRET, so this adds no deployment, no secret and no resource
+# to provision. It also cannot alert about the web app itself being down — the
+# email is sent BY the web app — so that case is logged instead.
+[triggers]
+crons = ["*/5 * * * *"]
 
 # Invocation logs. These used to live in a duplicate config at the repository
 # root, which existed only so the Cloudflare Git integration could build from
