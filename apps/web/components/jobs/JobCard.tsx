@@ -3,6 +3,8 @@
 import { CheckCircle2, Users } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { ClosedBadge, KindBadge, LockedNote } from "./JobBadges";
+import { JobOwnerActions } from "./JobOwnerActions";
+import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost } from "@/lib/jobs/types";
 import { workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
@@ -11,6 +13,16 @@ interface JobCardProps {
   job: JobPost;
   selected?: boolean;
   onSelect: () => void;
+  /**
+   * Only needed by the owner's menu (its edit form picks from the criteria
+   * master data). A caller without it still renders the card, minus the menu.
+   */
+  master?: JobMasterData;
+  /**
+   * Whether this card's actions should be shown at all. The browse list shows
+   * other members' roles, so their cards never carry any.
+   */
+  showOwnerActions?: boolean;
 }
 
 /**
@@ -23,8 +35,19 @@ interface JobCardProps {
  * A closed posting is marked here rather than hidden: it stays in "My posts"
  * for its owner (the feed returns it to nobody else), where the badge is what
  * explains why it no longer appears to anyone browsing.
+ *
+ * On the owner's own list the card also carries the posting's controls, so a
+ * role can be closed or deleted from the scan. That cluster is its own click
+ * and key target — it contains its events, because the card around it is one
+ * big button and selecting a posting must not fire when the menu is used.
  */
-export function JobCard({ job, selected = false, onSelect }: JobCardProps) {
+export function JobCard({
+  job,
+  selected = false,
+  onSelect,
+  master,
+  showOwnerActions = false,
+}: JobCardProps) {
   return (
     <div
       role="button"
@@ -82,7 +105,22 @@ export function JobCard({ job, selected = false, onSelect }: JobCardProps) {
             {job.updated_label ? ` · ${job.updated_label}` : ""}
           </span>
 
-          {job.is_mine ? (
+          {showOwnerActions && job.is_mine ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
+                <Users strokeWidth={2.5} size={11} />
+                {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
+              </span>
+              {/* The same controls the posting's own page carries, so a role can
+                  be closed or removed without opening it. */}
+              <JobOwnerActions
+                job={job}
+                master={master}
+                variant="compact"
+                redirectOnDelete={false}
+              />
+            </span>
+          ) : job.is_mine ? (
             <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
               <Users strokeWidth={2.5} size={11} />
               {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}

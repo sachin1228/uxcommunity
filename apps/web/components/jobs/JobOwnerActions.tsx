@@ -16,11 +16,17 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
  * The posting owner's controls: Edit, Close/Reopen, Delete.
  *
  * They are asymmetric on purpose, because their consequences are. Edit is the
- * everyday action and sits in the open. Close is reversible — it keeps the
- * URL, the applicants and the history while it stops new applications — so it
- * is confirmed by a plain menu pick and offered back as an undo. Delete is the
- * only irreversible one, so it is the only one behind a dialog that names what
- * disappears.
+ * everyday action and sits in the open on the posting's own page. Close is
+ * reversible — it keeps the URL, the applicants and the history while it stops
+ * new applications — so it is confirmed by a plain menu pick and offered back
+ * as an undo. Delete is the only irreversible one, so it is the only one behind
+ * a dialog that names what disappears.
+ *
+ * Two surfaces render this: the posting's own page (`variant="full"`, an
+ * inline Edit button plus the menu) and each row of the owner's list
+ * (`variant="compact"`, the menu alone — a scanned list wants one small target,
+ * not two). `master` is only needed to open the edit form, so a surface without
+ * it still gets Close/Reopen/Delete.
  *
  * Everything here is a convenience over the database's own rule:
  * `update_job_post`, `set_job_post_status` and `delete_job_post` each re-check
@@ -30,12 +36,14 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
 export function JobOwnerActions({
   job,
   master,
-  onDeleted,
+  variant = "full",
+  /** False when deleting should leave the member where they are (the list). */
+  redirectOnDelete = true,
 }: {
   job: JobPost;
-  master: JobMasterData;
-  /** Where to go once the posting is gone; defaults to the jobs board. */
-  onDeleted?: () => void;
+  master?: JobMasterData;
+  variant?: "full" | "compact";
+  redirectOnDelete?: boolean;
 }) {
   const router = useRouter();
   const guard = useGuardedRouter();
@@ -105,8 +113,8 @@ export function JobOwnerActions({
 
   /**
    * Deliberately not thrown: ConfirmDialog resolves its confirm and closes, so
-   * a refusal lands in the toolbar beside the trigger rather than leaving the
-   * dialog up as if the member had not answered.
+   * a refusal lands beside the trigger rather than leaving the dialog up as if
+   * the member had not answered.
    */
   async function deleteJob() {
     setError(null);
@@ -118,24 +126,36 @@ export function JobOwnerActions({
       return;
     }
 
-    // The posting is gone — refresh the board it returns to, so the deleted
-    // row cannot be served from a cached render.
-    if (onDeleted) onDeleted();
-    else guard.push("/dashboard/jobs");
+    // Refresh the board either way: the deleted row must not be served from a
+    // cached render, whether the member stays on the list or lands back on it.
+    if (redirectOnDelete) guard.push("/dashboard/jobs");
     router.refresh();
   }
 
+  /**
+   * The whole control cluster is a click target of its own inside a job card,
+   * which is itself a button — so pointer AND key events stop here. React
+   * portals (the menu, the dialogs) bubble through the React tree rather than
+   * the DOM, so without this a menu pick would also select the card, and Enter
+   * on a focused menu item would navigate to the posting.
+   */
+  function contain(event: React.SyntheticEvent) {
+    event.stopPropagation();
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setEditOpen(true)}
-        disabled={pending}
-        className="modal-btn modal-btn-secondary !h-8 text-[12px]"
-      >
-        <Pencil strokeWidth={2.5} size={13} />
-        Edit
-      </button>
+    <div className="flex items-center gap-2" onClick={contain} onKeyDown={contain}>
+      {variant === "full" && (
+        <button
+          type="button"
+          onClick={() => setEditOpen(true)}
+          disabled={!master || pending}
+          className="modal-btn modal-btn-secondary !h-8 text-[12px]"
+        >
+          <Pencil strokeWidth={2.5} size={13} />
+          Edit
+        </button>
+      )}
 
       <button
         type="button"
@@ -145,7 +165,11 @@ export function JobOwnerActions({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         disabled={pending}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+        className={`flex shrink-0 items-center justify-center text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground ${
+          variant === "full"
+            ? "h-8 w-8 rounded-lg border border-border"
+            : "h-7 w-7 rounded-md border border-transparent"
+        }`}
       >
         {pending ? <Spinner size={14} /> : <MoreHorizontal strokeWidth={2.5} size={16} />}
       </button>
@@ -163,18 +187,20 @@ export function JobOwnerActions({
         align="right"
         className="min-w-44 p-1"
       >
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            setMenuOpen(false);
-            setEditOpen(true);
-          }}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
-        >
-          <Pencil strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
-          <span>Edit job</span>
-        </button>
+        {master && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false);
+              setEditOpen(true);
+            }}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
+          >
+            <Pencil strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+            <span>Edit job</span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -209,7 +235,7 @@ export function JobOwnerActions({
         </button>
       </DropdownMenu>
 
-      {editOpen && (
+      {editOpen && master && (
         <EditJobModal
           key={job.id}
           open

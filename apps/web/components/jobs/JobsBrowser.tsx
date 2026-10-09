@@ -194,6 +194,10 @@ export function JobsBrowser({
               <JobCard
                 key={job.id}
                 job={job}
+                master={master}
+                // The browse list holds other members' roles, so only "My
+                // posts" ever carries the owner's controls.
+                showOwnerActions={tab === "posts"}
                 selected={job.id === highlightedId}
                 onSelect={() => selectJob(job.id)}
               />
