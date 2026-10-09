@@ -39,9 +39,14 @@ export function JobCard({ job }: JobCardProps) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="truncate font-display text-[15px] font-semibold leading-snug text-accent">
-            {job.title}
-          </h3>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3 className="truncate font-display text-[15px] font-semibold leading-snug text-accent">
+              {job.title}
+            </h3>
+            <span className="shrink-0 font-body text-xs text-foreground-muted">
+              · {job.experience_level_label}
+            </span>
+          </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <KindBadge kind={job.kind} />
             {job.is_mine && (
