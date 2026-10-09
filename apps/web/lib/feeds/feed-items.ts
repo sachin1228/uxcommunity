@@ -1,10 +1,10 @@
 import type { Json } from "@/lib/supabase/performance-rpcs";
 
 /**
- * The card payload every feed RPC returns (`get_home_feed_page` and
- * `get_profile_feed_page`). Both surfaces render the same client components, so
- * the guard, the defaults and the page size live here — a change to the feed
- * contract can never apply to only one of them.
+ * The card payload every feed RPC returns (`get_home_feed_page`,
+ * `get_profile_feed_page` and `get_member_feed_page`). They all render the
+ * same client components, so the guard, the defaults and the page size live
+ * here — a change to the feed contract can never apply to only one of them.
  */
 export const FEED_PAGE_SIZE = 30;
 

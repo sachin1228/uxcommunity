@@ -78,8 +78,42 @@ const EMPTY_STATE: Record<ProfileActivityTab, { title: string; body: string }> =
   },
 };
 
-function emptyStateFor(tab: ProfileActivityTab) {
-  const copy = EMPTY_STATE[tab];
+/**
+ * Third-person copies for a member's profile — the same states minus Saved (a
+ * member's saves are private). The bodies say "you can see" because the server
+ * lists only cards the viewer is entitled to.
+ */
+const MEMBER_EMPTY_STATE: Record<Exclude<ProfileActivityTab, "saved">, { title: string; body: (name: string) => string }> = {
+  all: {
+    title: "Nothing here yet",
+    body: (name) => `Posts ${name} shares with you — publicly, or in communities you both belong to — will appear here.`,
+  },
+  thread: {
+    title: "No threads yet",
+    body: (name) => `Threads ${name} starts in communities you can see will appear here.`,
+  },
+  showcase: {
+    title: "No showcase posts yet",
+    body: (name) => `Work ${name} shares in communities you can see will appear here.`,
+  },
+  resource: {
+    title: "No resources yet",
+    body: (name) => `Resources ${name} shares in communities you can see will appear here.`,
+  },
+  event: {
+    title: "No events yet",
+    body: (name) => `Events ${name} hosts in communities you can see will appear here.`,
+  },
+};
+
+function emptyCopy(tab: ProfileActivityTab, subjectName?: string | null): { title: string; body: string } {
+  if (!subjectName || tab === "saved") return EMPTY_STATE[tab];
+  const member = MEMBER_EMPTY_STATE[tab];
+  return { title: member.title, body: member.body(subjectName) };
+}
+
+function emptyStateFor(tab: ProfileActivityTab, subjectName?: string | null) {
+  const copy = emptyCopy(tab, subjectName);
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <p className="font-body text-sm font-medium text-foreground-muted">{copy.title}</p>
@@ -91,17 +125,22 @@ function emptyStateFor(tab: ProfileActivityTab) {
 /**
  * One tab's page of cards. Mounted only while its tab is active (like the
  * community tab views), so each scope fetches, paginates and caches on its own
- * endpoint and switching tabs is instant once a scope has been opened.
+ * endpoint and switching tabs is instant once a scope has been opened. For a
+ * member's profile the endpoint also carries the member's id.
  */
 function ProfileActivityScope({
   scope,
   currentUserId,
+  subject,
 }: {
   scope: ProfileActivityTab;
   currentUserId: string;
+  subject: { id: string; name: string } | null;
 }) {
   initRequestCache(currentUserId);
-  const requestUrl = `/api/profile/feed?scope=${scope}`;
+  const requestUrl = subject
+    ? `/api/profile/feed?scope=${scope}&user=${encodeURIComponent(subject.id)}`
+    : `/api/profile/feed?scope=${scope}`;
   const cached = getCachedRequest<{ items?: FeedItem[] }>(requestUrl, currentUserId);
   const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
   const [loading, setLoading] = useState(() => !cached);
@@ -123,11 +162,15 @@ function ProfileActivityScope({
       setHasMore((data.items?.length ?? 0) >= FEED_PAGE_SIZE);
       setError(null);
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : "Failed to load your posts.");
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : subject ? `Failed to load ${subject.name}'s posts.` : "Failed to load your posts.",
+      );
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, requestUrl]);
+  }, [currentUserId, requestUrl, subject]);
 
   useEffect(() => {
     const initialFetch = window.setTimeout(() => void fetchItems(true), 0);
@@ -158,18 +201,26 @@ function ProfileActivityScope({
   // immediately; everything else that changes *which* cards belong (a new post,
   // a delete, saving a post this tab has never listed) pulls the page again
   // instead of patching.
+  //
+  // A member's feed lists the posts they authored, so unsaving one of their
+  // posts must not drop it here — the save-drop belongs to the owner's Saved
+  // tab alone — and edits/deletes merge straight in.
   const onContentChanges = useCallback((changes: ContentChange[]) => {
-    const unsavedIds = new Set(
-      changes.filter((change) => change.patch?.user_saved === false).map((change) => change.id),
-    );
+    if (subject) {
+      updateItems((current) => applyContentChanges(current, changes, feedItemKind));
+    } else {
+      const unsavedIds = new Set(
+        changes.filter((change) => change.patch?.user_saved === false).map((change) => change.id),
+      );
 
-    updateItems((current) => {
-      const merged = applyContentChanges(current, changes, feedItemKind);
-      const inScope = (item: FeedItem) =>
-        scope !== "saved" || Boolean(item.user_saved);
-      if (!unsavedIds.size) return merged.filter(inScope);
-      return merged.filter((item) => inScope(item) && (item.user_id === currentUserId || !unsavedIds.has(item.id)));
-    });
+      updateItems((current) => {
+        const merged = applyContentChanges(current, changes, feedItemKind);
+        const inScope = (item: FeedItem) =>
+          scope !== "saved" || Boolean(item.user_saved);
+        if (!unsavedIds.size) return merged.filter(inScope);
+        return merged.filter((item) => inScope(item) && (item.user_id === currentUserId || !unsavedIds.has(item.id)));
+      });
+    }
 
     const needsRefetch = changes.some((change) => {
       const isMineOrEveryKind = change.kind === scope || scope === "all" || scope === "saved";
@@ -179,7 +230,7 @@ function ProfileActivityScope({
       invalidateRequest(requestUrl, currentUserId);
       void fetchItems(true, true);
     }
-  }, [currentUserId, fetchItems, requestUrl, scope, updateItems]);
+  }, [currentUserId, fetchItems, requestUrl, scope, subject, updateItems]);
 
   useContentChanges(null, onContentChanges);
 
@@ -217,7 +268,9 @@ function ProfileActivityScope({
   if (error) {
     return (
       <div role="alert" className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-        <p className="font-body text-sm font-medium text-red-400">Couldn&apos;t load your posts</p>
+        <p className="font-body text-sm font-medium text-red-400">
+          {subject ? `Couldn't load ${subject.name}'s posts` : "Couldn't load your posts"}
+        </p>
         <p className="max-w-sm font-body text-xs text-foreground-subtle">{error}</p>
         <button
           type="button"
@@ -243,7 +296,7 @@ function ProfileActivityScope({
         currentUserId={currentUserId}
         onChange={updateItems}
         onOpenCommunityPreview={setPreviewCommunityId}
-        emptyState={emptyStateFor(scope)}
+        emptyState={emptyStateFor(scope, subject?.name)}
         showPastEvents
       />
 
@@ -269,17 +322,27 @@ function ProfileActivityScope({
  * rendered by the same components and persisted through the same API routes as
  * the homepage feed and the community tabs, so an edit here immediately shows
  * there (and vice versa) and always lands in the database.
+ *
+ * Pass `subject` to list another member's posts instead: same cards, same tabs
+ * minus Saved, with the server listing only what the viewer may see.
  */
 export function ProfileActivityFeed({
   currentUserId,
   initialTab = "all",
   basePath = "/dashboard/profile",
+  subject = null,
 }: {
   currentUserId: string;
   initialTab?: ProfileActivityTab;
   basePath?: string;
+  subject?: { id: string; name: string } | null;
 }) {
-  const [activeTab, setActiveTab] = useState<ProfileActivityTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<ProfileActivityTab>(
+    subject && initialTab === "saved" ? "all" : initialTab,
+  );
+  const tabs = subject
+    ? PROFILE_ACTIVITY_TABS.filter((tab) => tab.value !== "saved")
+    : PROFILE_ACTIVITY_TABS;
 
   const handleTabChange = useCallback((tab: ProfileActivityTab) => {
     setActiveTab(tab);
@@ -300,6 +363,7 @@ export function ProfileActivityFeed({
       const match = /[?&]tab=([a-z]+)/.exec(window.location.search);
       const tab = match?.[1] ?? "all";
       if (!isProfileFeedScope(tab)) return;
+      if (subject && tab === "saved") return;
       setActiveTab(tab);
       if (event.state?.profileTab !== tab) {
         window.history.replaceState({ profileTab: tab }, "");
@@ -307,16 +371,16 @@ export function ProfileActivityFeed({
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [subject]);
 
   return (
-    <section aria-label="Your activity" className="mt-2">
+    <section aria-label={subject ? `${subject.name}'s activity` : "Your activity"} className="mt-2">
       <nav
         role="tablist"
-        aria-label="Your posts"
+        aria-label={subject ? `${subject.name}'s posts` : "Your posts"}
         className="flex items-center gap-1 overflow-x-auto border-b border-border md:gap-3"
       >
-        {PROFILE_ACTIVITY_TABS.map(({ value, label, icon: Icon }) => (
+        {tabs.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
             type="button"
@@ -338,7 +402,7 @@ export function ProfileActivityFeed({
       </nav>
 
       <div className="pt-4">
-        <ProfileActivityScope key={activeTab} scope={activeTab} currentUserId={currentUserId} />
+        <ProfileActivityScope key={activeTab} scope={activeTab} currentUserId={currentUserId} subject={subject} />
       </div>
     </section>
   );

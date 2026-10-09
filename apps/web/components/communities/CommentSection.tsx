@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   ArrowUpDown,
   ChevronDown,
@@ -17,6 +18,7 @@ import { ALLOWED_COMMENT_REACTIONS } from "@/lib/communities/comment-reactions";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { formatRelativeDate, formatFullDate } from "./threads/threadShared";
 import { sortCommentTree } from "@/lib/communities/comment-tree";
+import { profileHref } from "@/lib/profile/links";
 
 /**
  * Shared comment section used by every community content type (threads,
@@ -277,7 +279,13 @@ function CommentRow<C extends CommunityComment>({
         <div className="flex shrink-0 flex-col items-center">
           {/* One avatar size for the whole thread, replies included — a reply is
               the same person as a top-level comment, so it is not scaled down. */}
-          <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="lg" />
+          <Link
+            href={profileHref(comment.user_id)}
+            title={name}
+            className="rounded-full transition-opacity hover:opacity-85"
+          >
+            <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="lg" />
+          </Link>
           {showConnector && (
             <span aria-hidden="true" className="relative mt-1 w-4 flex-1">
               {/* Border colour is expressed as alpha stops rather than the
@@ -300,7 +308,12 @@ function CommentRow<C extends CommunityComment>({
           <header className="flex min-w-0 items-center gap-2 leading-5">
             {/* Same name treatment as the members list (text-sm / semibold),
                 so an author reads the same in a comment as in the roster. */}
-            <span className="truncate font-body text-sm font-semibold text-foreground">{name}</span>
+            <Link
+              href={profileHref(comment.user_id)}
+              className="truncate font-body text-sm font-semibold text-foreground hover:underline"
+            >
+              {name}
+            </Link>
             <span aria-hidden="true" className="text-foreground-subtle">•</span>
             <time
               dateTime={comment.created_at}

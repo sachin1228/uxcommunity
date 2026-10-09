@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import TruncateMarkup from "react-truncate-markup";
 import { flattenPreviewText } from "@/lib/communities/preview-text";
 import { Calendar, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
@@ -12,6 +13,7 @@ import { RsvpConfirmDialog, type RsvpConfirmMode } from "./RsvpConfirmDialog";
 import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { profileHref } from "@/lib/profile/links";
 import { ReportModal } from "../ReportModal";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -172,20 +174,34 @@ function AvatarStack({
     <div className="flex flex-wrap items-center gap-2.5">
       {visible.length > 0 && (
         <div className="flex items-center" aria-label={`${safeCount} attendees`}>
-          {visible.map((rsvp, index) => (
-            <div
-              key={rsvp.user_id ?? `idx-${index}`}
-              style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-              className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111]"
-            >
+          {visible.map((rsvp, index) => {
+            const frameClass =
+              "relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111]";
+            const frameStyle = { marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index };
+            const avatar = (
               <AvatarImg
                 url={rsvp.users?.avatar_url ?? null}
                 name={rsvp.users?.name ?? "Member"}
                 size={28}
                 className="size-full rounded-full object-cover"
               />
-            </div>
-          ))}
+            );
+            return rsvp.user_id ? (
+              <Link
+                key={rsvp.user_id}
+                href={profileHref(rsvp.user_id)}
+                title={rsvp.users?.name ?? "Member"}
+                style={frameStyle}
+                className={`${frameClass} transition-opacity hover:opacity-85`}
+              >
+                {avatar}
+              </Link>
+            ) : (
+              <div key={`idx-${index}`} style={frameStyle} className={frameClass}>
+                {avatar}
+              </div>
+            );
+          })}
         </div>
       )}
       <span className="font-display text-xs text-stone-400">
@@ -701,13 +717,31 @@ export function EventCard({
     </div>
   );
 
+  // The list card opens the event page; clicks on nested controls — the
+  // host's profile links, the RSVP stack, the options menu — must not also
+  // open it. Same guard as the thread and showcase cards.
+  function handleCardClick(event: React.MouseEvent<HTMLElement>) {
+    if (!onOpen || isDetail) return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    onOpen();
+  }
+
+  function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (!onOpen || isDetail || event.key !== "Enter") return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    event.preventDefault();
+    onOpen();
+  }
+
   return (
     <>
     <article
       tabIndex={onOpen && !isDetail ? 0 : undefined}
       role={onOpen && !isDetail ? "link" : undefined}
-      onClick={onOpen && !isDetail ? onOpen : undefined}
-      onKeyDown={onOpen && !isDetail ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
       // One shell for both surfaces: the event page renders the same card the
       // feed does, so the two can't look like different components.
       className={`${communityFeedLayout.card} ${isDetail ? "group" : ""} ${
@@ -720,6 +754,7 @@ export function EventCard({
         <PostAuthorMeta
           name={event.users?.name}
           avatarUrl={event.users?.avatar_url}
+          userId={event.users ? event.user_id : null}
           createdAt={event.created_at}
           dateInline
           secondaryLabel={event.is_online ? "Event · Online" : event.location ? `Event · ${event.location}` : "Event"}
