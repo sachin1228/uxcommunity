@@ -113,7 +113,7 @@ export function JobsBrowser({
           className={`${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`}
         >
           {/* Tabs */}
-          <div className="flex items-center gap-1 border-b border-border">
+          <div className="flex items-center gap-1">
             {tabs.map((item) => {
               const active = tab === item.value;
               return (
@@ -121,7 +121,7 @@ export function JobsBrowser({
                   key={item.value}
                   type="button"
                   onClick={() => setTab(item.value)}
-                  className={`relative -mb-px border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
+                  className={`border-b-2 px-3 py-2 font-body text-sm font-medium transition-colors ${
                     active
                       ? "border-foreground text-foreground"
                       : "border-transparent text-foreground-muted hover:text-foreground"
@@ -132,6 +132,7 @@ export function JobsBrowser({
                 </button>
               );
             })}
+            <div aria-hidden="true" className="h-px flex-1 self-end bg-border" />
           </div>
 
           {/* Search (All jobs only) */}
