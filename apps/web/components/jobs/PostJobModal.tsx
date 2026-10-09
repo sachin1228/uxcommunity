@@ -47,9 +47,6 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
   const [employmentType, setEmploymentType] = useState<EmploymentType>("full_time");
   const [salary, setSalary] = useState("");
   const [description, setDescription] = useState("");
-  const [responsibilities, setResponsibilities] = useState("");
-  const [requirements, setRequirements] = useState("");
-  const [skills, setSkills] = useState("");
   const [website, setWebsite] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -58,12 +55,6 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
   // The company verified on the profile is the one a posting can use; a
   // verification done in-flow lands in viewer.company after router.refresh().
   const company = viewer.company;
-
-  const lines = (value: string) =>
-    value
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -105,12 +96,6 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
           employment_type: employmentType,
           salary: salary.trim(),
           description: description.trim(),
-          responsibilities: lines(responsibilities),
-          requirements: lines(requirements),
-          skills: skills
-            .split(/[\n,]/)
-            .map((item) => item.trim())
-            .filter(Boolean),
           website: website.trim(),
         }),
       });
@@ -303,45 +288,6 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
               rows={4}
               placeholder="What the team does, why this role exists, how you work…"
               className="field resize-none"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              What they’ll do <span className="text-foreground-subtle">(one per line)</span>
-            </span>
-            <textarea
-              value={responsibilities}
-              onChange={(event) => setResponsibilities(event.target.value)}
-              rows={3}
-              placeholder={"Own the end-to-end payment flow\nPair with engineers on design specs"}
-              className="field resize-none"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              What you’re looking for <span className="text-foreground-subtle">(one per line)</span>
-            </span>
-            <textarea
-              value={requirements}
-              onChange={(event) => setRequirements(event.target.value)}
-              rows={3}
-              placeholder={"4+ years designing consumer products\nStrong systems thinking"}
-              className="field resize-none"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className={labelCls}>
-              Skills <span className="text-foreground-subtle">(comma separated)</span>
-            </span>
-            <input
-              type="text"
-              value={skills}
-              onChange={(event) => setSkills(event.target.value)}
-              placeholder="Figma, Prototyping, Design systems"
-              className="field"
             />
           </label>
 
