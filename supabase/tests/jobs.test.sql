@@ -38,79 +38,79 @@ begin;
 -- the company are fixture-local.
 delete from public.job_applications;
 delete from public.job_posts;
-delete from public.company_members where company_id = 'a1a1a1a1-0000-4000-8000-000000000001';
-delete from public.company_domains where company_id = 'a1a1a1a1-0000-4000-8000-000000000001';
-delete from public.companies where id = 'a1a1a1a1-0000-4000-8000-000000000001';
+delete from public.company_members where company_id = 'a7a7a7a7-0000-4000-8000-000000000001';
+delete from public.company_domains where company_id = 'a7a7a7a7-0000-4000-8000-000000000001';
+delete from public.companies where id = 'a7a7a7a7-0000-4000-8000-000000000001';
 delete from public.designer_profiles where user_id in (
-  'd0d0d0d0-0000-4000-8000-000000000001',
-  'd0d0d0d0-0000-4000-8000-000000000002',
-  'd0d0d0d0-0000-4000-8000-000000000003',
-  'd0d0d0d0-0000-4000-8000-000000000004',
-  'd0d0d0d0-0000-4000-8000-000000000005',
-  'd0d0d0d0-0000-4000-8000-000000000006'
+  'd7d7d7d7-0000-4000-8000-000000000001',
+  'd7d7d7d7-0000-4000-8000-000000000002',
+  'd7d7d7d7-0000-4000-8000-000000000003',
+  'd7d7d7d7-0000-4000-8000-000000000004',
+  'd7d7d7d7-0000-4000-8000-000000000005',
+  'd7d7d7d7-0000-4000-8000-000000000006'
 );
 delete from public.users where id in (
-  'd0d0d0d0-0000-4000-8000-000000000001',
-  'd0d0d0d0-0000-4000-8000-000000000002',
-  'd0d0d0d0-0000-4000-8000-000000000003',
-  'd0d0d0d0-0000-4000-8000-000000000004',
-  'd0d0d0d0-0000-4000-8000-000000000005',
-  'd0d0d0d0-0000-4000-8000-000000000006'
+  'd7d7d7d7-0000-4000-8000-000000000001',
+  'd7d7d7d7-0000-4000-8000-000000000002',
+  'd7d7d7d7-0000-4000-8000-000000000003',
+  'd7d7d7d7-0000-4000-8000-000000000004',
+  'd7d7d7d7-0000-4000-8000-000000000005',
+  'd7d7d7d7-0000-4000-8000-000000000006'
 );
 delete from public.cities where id in (
-  'e0e0e0e0-0000-4000-8000-000000000001',
-  'e0e0e0e0-0000-4000-8000-000000000002'
+  'e7e7e7e7-0000-4000-8000-000000000001',
+  'e7e7e7e7-0000-4000-8000-000000000002'
 );
 delete from public.design_sectors where id in (
-  'f0f0f0f0-0000-4000-8000-000000000001'
+  'f7f7f7f7-0000-4000-8000-000000000001'
 );
 
 -- Members: the poster, a fully matched applicant, and three
 -- near-misses (wrong city, wrong job title, partial profile).
 insert into public.users (id, name, email, password_hash, application_id) values
-  ('d0d0d0d0-0000-4000-8000-000000000001', 'Poster',   'poster@jobs.test',   'x', null),
-  ('d0d0d0d0-0000-4000-8000-000000000002', 'Matched',  'matched@jobs.test',  'x', null),
-  ('d0d0d0d0-0000-4000-8000-000000000003', 'FarCity',  'farcity@jobs.test',  'x', null),
-  ('d0d0d0d0-0000-4000-8000-000000000004', 'OtherRole','otherrole@jobs.test','x', null),
-  ('d0d0d0d0-0000-4000-8000-000000000005', 'Partial',  'partial@jobs.test',  'x', null),
-  ('d0d0d0d0-0000-4000-8000-000000000006', 'Outsider', 'outsider@jobs.test', 'x', null);
+  ('d7d7d7d7-0000-4000-8000-000000000001', 'Poster',   'poster@jobs.test',   'x', null),
+  ('d7d7d7d7-0000-4000-8000-000000000002', 'Matched',  'matched@jobs.test',  'x', null),
+  ('d7d7d7d7-0000-4000-8000-000000000003', 'FarCity',  'farcity@jobs.test',  'x', null),
+  ('d7d7d7d7-0000-4000-8000-000000000004', 'OtherRole','otherrole@jobs.test','x', null),
+  ('d7d7d7d7-0000-4000-8000-000000000005', 'Partial',  'partial@jobs.test',  'x', null),
+  ('d7d7d7d7-0000-4000-8000-000000000006', 'Outsider', 'outsider@jobs.test', 'x', null);
 
 insert into public.cities (id, name, is_active) values
-  ('e0e0e0e0-0000-4000-8000-000000000001', 'Jobsville', true),
-  ('e0e0e0e0-0000-4000-8000-000000000002', 'Farville',  true);
+  ('e7e7e7e7-0000-4000-8000-000000000001', 'Jobsville', true),
+  ('e7e7e7e7-0000-4000-8000-000000000002', 'Farville',  true);
 
 insert into public.design_sectors (id, name, is_active) values
-  ('f0f0f0f0-0000-4000-8000-000000000001', 'Product Design', true);
+  ('f7f7f7f7-0000-4000-8000-000000000001', 'Product Design', true);
 
 insert into public.designer_profiles
   (user_id, city_id, sector_id, job_title, experience_level)
 values
-  ('d0d0d0d0-0000-4000-8000-000000000001', 'e0e0e0e0-0000-4000-8000-000000000001',
-   'f0f0f0f0-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
-  ('d0d0d0d0-0000-4000-8000-000000000002', 'e0e0e0e0-0000-4000-8000-000000000001',
-   'f0f0f0f0-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
-  ('d0d0d0d0-0000-4000-8000-000000000003', 'e0e0e0e0-0000-4000-8000-000000000002',
-   'f0f0f0f0-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
-  ('d0d0d0d0-0000-4000-8000-000000000004', 'e0e0e0e0-0000-4000-8000-000000000001',
-   'f0f0f0f0-0000-4000-8000-000000000001', 'ux_designer', 'mid_level'),
+  ('d7d7d7d7-0000-4000-8000-000000000001', 'e7e7e7e7-0000-4000-8000-000000000001',
+   'f7f7f7f7-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
+  ('d7d7d7d7-0000-4000-8000-000000000002', 'e7e7e7e7-0000-4000-8000-000000000001',
+   'f7f7f7f7-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
+  ('d7d7d7d7-0000-4000-8000-000000000003', 'e7e7e7e7-0000-4000-8000-000000000002',
+   'f7f7f7f7-0000-4000-8000-000000000001', 'product_designer', 'mid_level'),
+  ('d7d7d7d7-0000-4000-8000-000000000004', 'e7e7e7e7-0000-4000-8000-000000000001',
+   'f7f7f7f7-0000-4000-8000-000000000001', 'ux_designer', 'mid_level'),
   -- Partial profile: no city, no sector — must never count as matched.
-  ('d0d0d0d0-0000-4000-8000-000000000005', null, null,
+  ('d7d7d7d7-0000-4000-8000-000000000005', null, null,
    'product_designer', 'mid_level'),
-  ('d0d0d0d0-0000-4000-8000-000000000006', 'e0e0e0e0-0000-4000-8000-000000000001',
-   'f0f0f0f0-0000-4000-8000-000000000001', 'product_designer', 'mid_level');
+  ('d7d7d7d7-0000-4000-8000-000000000006', 'e7e7e7e7-0000-4000-8000-000000000001',
+   'f7f7f7f7-0000-4000-8000-000000000001', 'product_designer', 'mid_level');
 
 -- The company: verified domain + a verified membership for the
 -- poster only. Outsider joins later as UNVERIFIED to show the
 -- proof, not the row, is what counts.
 insert into public.companies (id, name, slug, is_active) values
-  ('a1a1a1a1-0000-4000-8000-000000000001', 'Jobsco', 'jobsco', true);
+  ('a7a7a7a7-0000-4000-8000-000000000001', 'Jobsco', 'jobsco', true);
 
 insert into public.company_domains (company_id, domain, verified, verified_at) values
-  ('a1a1a1a1-0000-4000-8000-000000000001', 'jobsco.test', true, now());
+  ('a7a7a7a7-0000-4000-8000-000000000001', 'jobsco.test', true, now());
 
 insert into public.company_members (company_id, user_id, verified) values
-  ('a1a1a1a1-0000-4000-8000-000000000001', 'd0d0d0d0-0000-4000-8000-000000000001', true),
-  ('a1a1a1a1-0000-4000-8000-000000000001', 'd0d0d0d0-0000-4000-8000-000000000006', false);
+  ('a7a7a7a7-0000-4000-8000-000000000001', 'd7d7d7d7-0000-4000-8000-000000000001', true),
+  ('a7a7a7a7-0000-4000-8000-000000000001', 'd7d7d7d7-0000-4000-8000-000000000006', false);
 
 -- A local helper: the stand-in throws_ok only compares SQLSTATE, but
 -- the failure codes ARE the contract here, so read the message.
@@ -152,9 +152,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000006', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000006', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'mid_level', 'hybrid', 'full_time',
       null, 'Design payments flows.', '{}', '{}', '{}', null
     )$$),
@@ -165,9 +165,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'referring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'referring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'mid_level', 'hybrid', 'full_time',
       null, 'Design payments flows.', '{}', '{}', '{}', null
     )$$),
@@ -178,9 +178,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'mid_level', 'sometimes', 'full_time',
       null, 'Design payments flows.', '{}', '{}', '{}', null
     )$$),
@@ -191,9 +191,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      '00000000-0000-4000-8000-000000000000', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      '00000000-0000-4000-8000-000000000000', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'mid_level', 'hybrid', 'full_time',
       null, 'Design payments flows.', '{}', '{}', '{}', null
     )$$),
@@ -204,9 +204,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'wizard', 'mid_level', 'hybrid', 'full_time',
       null, 'Design payments flows.', '{}', '{}', '{}', null
     )$$),
@@ -217,9 +217,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'ceo', 'hybrid', 'full_time',
       null, 'Design payments flows.', '{}', '{}', '{}', null
     )$$),
@@ -230,9 +230,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'mid_level', 'hybrid', 'full_time',
       null, '   ', '{}', '{}', '{}', null
     )$$),
@@ -243,9 +243,9 @@ select is(
 select is(
   public.failure_message($$
     select * from public.create_job_post(
-      'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-      'a1a1a1a1-0000-4000-8000-000000000001', 'Senior Product Designer',
-      'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Senior Product Designer',
+      'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
       'product_designer', 'mid_level', 'hybrid', 'full_time',
       'Great pay', 'Design payments flows.', '{}', '{}', '{}', 'jobsco.test'
     )$$),
@@ -257,9 +257,9 @@ select is(
 
 select is(
   (select count(*) from public.create_job_post(
-    'd0d0d0d0-0000-4000-8000-000000000001', 'hiring',
-    'a1a1a1a1-0000-4000-8000-000000000001', '  Senior Product Designer  ',
-    'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+    'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+    'a7a7a7a7-0000-4000-8000-000000000001', '  Senior Product Designer  ',
+    'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
     'product_designer', 'mid_level', 'hybrid', 'full_time',
     '  ', 'Design payments flows.',
     array['Own the payments flow', '  ', 'Pair with design systems'],
@@ -306,7 +306,7 @@ select is(
 select is(
   (select count(*) from public.apply_to_job(
     (select id from public.job_posts where title = 'Senior Product Designer'),
-    'd0d0d0d0-0000-4000-8000-000000000002',
+    'd7d7d7d7-0000-4000-8000-000000000002',
     '  Matched Applicant  ',
     'https://portfolio.matched.test',
     'https://www.linkedin.com/in/matched',
@@ -318,7 +318,7 @@ select is(
 
 select is(
   (select name from public.job_applications
-   where applicant_id = 'd0d0d0d0-0000-4000-8000-000000000002'),
+   where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000002'),
   'Matched Applicant',
   'the application name is stored trimmed'
 );
@@ -326,13 +326,13 @@ select is(
 -- Same-timestamp tie-break: pin the first application a touch earlier
 -- so the board's newest-first assertion below is deterministic.
 update public.job_applications set created_at = now() - interval '1 hour'
-  where applicant_id = 'd0d0d0d0-0000-4000-8000-000000000002';
+  where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000002';
 
 select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000003',
+      'd7d7d7d7-0000-4000-8000-000000000003',
       'Far City', 'https://portfolio.far.test',
       'https://www.linkedin.com/in/far', null
     )$$),
@@ -344,7 +344,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000004',
+      'd7d7d7d7-0000-4000-8000-000000000004',
       'Other Role', 'https://portfolio.role.test',
       'https://www.linkedin.com/in/role', null
     )$$),
@@ -356,7 +356,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000005',
+      'd7d7d7d7-0000-4000-8000-000000000005',
       'Partial Profile', 'https://portfolio.partial.test',
       'https://www.linkedin.com/in/partial', null
     )$$),
@@ -368,7 +368,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000001',
+      'd7d7d7d7-0000-4000-8000-000000000001',
       'Poster Self', 'https://portfolio.poster.test',
       'https://www.linkedin.com/in/poster', null
     )$$),
@@ -380,7 +380,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000002',
+      'd7d7d7d7-0000-4000-8000-000000000002',
       'Matched Again', 'https://portfolio.matched.test',
       'https://www.linkedin.com/in/matched', null
     )$$),
@@ -392,7 +392,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000006',
+      'd7d7d7d7-0000-4000-8000-000000000006',
       'Bad Portfolio', 'portfolio.no-scheme.test',
       'https://www.linkedin.com/in/outsider', null
     )$$),
@@ -404,7 +404,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000006',
+      'd7d7d7d7-0000-4000-8000-000000000006',
       'Bad LinkedIn', 'https://portfolio.outsider.test',
       'https://example.com/in/outsider', null
     )$$),
@@ -416,7 +416,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       (select id from public.job_posts where title = 'Senior Product Designer'),
-      'd0d0d0d0-0000-4000-8000-000000000006',
+      'd7d7d7d7-0000-4000-8000-000000000006',
       'Bad Resume', 'https://portfolio.outsider.test',
       'https://www.linkedin.com/in/outsider', 'not-a-url'
     )$$),
@@ -428,7 +428,7 @@ select is(
   public.failure_message($$
     select * from public.apply_to_job(
       '00000000-0000-4000-8000-000000000000',
-      'd0d0d0d0-0000-4000-8000-000000000006',
+      'd7d7d7d7-0000-4000-8000-000000000006',
       'Ghost Job', 'https://portfolio.outsider.test',
       'https://www.linkedin.com/in/outsider', null
     )$$),
@@ -440,14 +440,14 @@ select is(
 -- the gate for applying (they were never in the company): the
 -- profile is. Give them a matching profile and they may apply.
 update public.designer_profiles
-  set city_id = 'e0e0e0e0-0000-4000-8000-000000000001',
-      sector_id = 'f0f0f0f0-0000-4000-8000-000000000001'
-  where user_id = 'd0d0d0d0-0000-4000-8000-000000000006';
+  set city_id = 'e7e7e7e7-0000-4000-8000-000000000001',
+      sector_id = 'f7f7f7f7-0000-4000-8000-000000000001'
+  where user_id = 'd7d7d7d7-0000-4000-8000-000000000006';
 
 select is(
   (select count(*) from public.apply_to_job(
     (select id from public.job_posts where title = 'Senior Product Designer'),
-    'd0d0d0d0-0000-4000-8000-000000000006',
+    'd7d7d7d7-0000-4000-8000-000000000006',
     'Outsider Now Matched', 'https://portfolio.outsider.test',
     'https://www.linkedin.com/in/outsider',
     'https://cdn.example.test/resumes/outsider.pdf'
@@ -458,7 +458,7 @@ select is(
 
 select is(
   (select resume_url from public.job_applications
-   where applicant_id = 'd0d0d0d0-0000-4000-8000-000000000006'),
+   where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000006'),
   'https://cdn.example.test/resumes/outsider.pdf',
   'the resume URL is stored'
 );
@@ -466,7 +466,7 @@ select is(
 -- ─── 5. Reads: the viewer flags match the write rule ────────
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000001')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000001')
           ->> 'can_apply'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'false',
@@ -474,7 +474,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000001')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000001')
           ->> 'is_mine'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'true',
@@ -482,7 +482,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000002')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000002')
           ->> 'applied'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'true',
@@ -490,7 +490,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000002')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000002')
           ->> 'can_apply'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'false',
@@ -498,7 +498,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           ->> 'can_apply'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'false',
@@ -506,7 +506,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           ->> 'city_name'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'Jobsville',
@@ -514,7 +514,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           ->> 'job_title_label'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'Product Designer',
@@ -522,7 +522,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           ->> 'experience_level_label'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'Mid-Level Designers',
@@ -530,7 +530,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           #>> '{company,name}'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'Jobsco',
@@ -538,7 +538,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           #>> '{company,domain_verified}'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'true',
@@ -546,7 +546,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           ->> 'applicant_count'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   '2',
@@ -554,7 +554,7 @@ select is(
 );
 
 select is(
-  (select public.job_post_payload(jp.id, 'd0d0d0d0-0000-4000-8000-000000000003')
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
           #>> '{poster,name}'
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'Poster',
@@ -567,9 +567,9 @@ select is(
 -- one slightly ahead — a database cannot order two identical
 -- timestamps meaningfully, and the test must not depend on gen_random_uuid luck.
 select count(*) from public.create_job_post(
-  'd0d0d0d0-0000-4000-8000-000000000001', 'referral',
-  'a1a1a1a1-0000-4000-8000-000000000001', 'Design Ops Lead',
-  'e0e0e0e0-0000-4000-8000-000000000001', 'f0f0f0f0-0000-4000-8000-000000000001',
+  'd7d7d7d7-0000-4000-8000-000000000001', 'referral',
+  'a7a7a7a7-0000-4000-8000-000000000001', 'Design Ops Lead',
+  'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
   'ux_designer', 'mid_level', 'remote', 'contract',
   'Not disclosed', 'Run the design system.',
   '{}', '{}', '{}', null
@@ -579,14 +579,14 @@ update public.job_posts set created_at = now() + interval '1 hour'
   where title = 'Design Ops Lead';
 
 select is(
-  (select count(*) from public.get_job_feed('d0d0d0d0-0000-4000-8000-000000000003')),
+  (select count(*) from public.get_job_feed('d7d7d7d7-0000-4000-8000-000000000003')),
   2::bigint,
   'the feed lists every posting for any viewer'
 );
 
 select is(
   (select item ->> 'title' from public.get_job_feed(
-     'd0d0d0d0-0000-4000-8000-000000000003')
+     'd7d7d7d7-0000-4000-8000-000000000003')
    order by item ->> 'created_at' desc limit 1),
   'Design Ops Lead',
   'the feed is newest-first'
@@ -595,7 +595,7 @@ select is(
 select is(
   (select item ->> 'applicant_count' from public.get_job_detail(
      (select id from public.job_posts where title = 'Senior Product Designer'),
-     'd0d0d0d0-0000-4000-8000-000000000002'
+     'd7d7d7d7-0000-4000-8000-000000000002'
    )),
   '2',
   'get_job_detail renders the posting with its flags'
@@ -604,7 +604,7 @@ select is(
 select is(
   (select item #>> '{my_application,linkedin_url}' from public.get_job_detail(
      (select id from public.job_posts where title = 'Senior Product Designer'),
-     'd0d0d0d0-0000-4000-8000-000000000002'
+     'd7d7d7d7-0000-4000-8000-000000000002'
    )),
   'https://www.linkedin.com/in/matched',
   'get_job_detail carries the viewer''s own application'
@@ -613,7 +613,7 @@ select is(
 select is(
   (select count(*) from public.get_job_detail(
      '00000000-0000-4000-8000-000000000000',
-     'd0d0d0d0-0000-4000-8000-000000000002'
+     'd7d7d7d7-0000-4000-8000-000000000002'
    )),
   0::bigint,
   'get_job_detail returns nothing for a missing job'
@@ -623,7 +623,7 @@ select is(
 
 select is(
   (select count(*) from public.get_job_applicants(
-     'd0d0d0d0-0000-4000-8000-000000000001',
+     'd7d7d7d7-0000-4000-8000-000000000001',
      (select id from public.job_posts where title = 'Senior Product Designer')
    )),
   2::bigint,
@@ -633,7 +633,7 @@ select is(
 select is(
   public.failure_message($$
     select * from public.get_job_applicants(
-      'd0d0d0d0-0000-4000-8000-000000000002',
+      'd7d7d7d7-0000-4000-8000-000000000002',
       (select id from public.job_posts where title = 'Senior Product Designer')
     )$$),
   'not_your_job',
@@ -642,7 +642,7 @@ select is(
 
 select is(
   (select item #>> '{name}' from public.get_job_applicants(
-     'd0d0d0d0-0000-4000-8000-000000000001',
+     'd7d7d7d7-0000-4000-8000-000000000001',
      (select id from public.job_posts where title = 'Senior Product Designer')
    ) order by item ->> 'created_at' desc, item ->> 'id' desc limit 1),
   'Outsider Now Matched',
@@ -651,7 +651,7 @@ select is(
 
 select is(
   (select item #>> '{portfolio_url}' from public.get_job_applicants(
-     'd0d0d0d0-0000-4000-8000-000000000001',
+     'd7d7d7d7-0000-4000-8000-000000000001',
      (select id from public.job_posts where title = 'Senior Product Designer')
    ) order by item ->> 'created_at' desc, item ->> 'id' desc limit 1),
   'https://portfolio.outsider.test',
@@ -660,7 +660,7 @@ select is(
 
 -- ─── 7. Round trip: a deleted account frees the posting ─────
 
-delete from public.users where id = 'd0d0d0d0-0000-4000-8000-000000000002';
+delete from public.users where id = 'd7d7d7d7-0000-4000-8000-000000000002';
 
 select is(
   (select count(*) from public.job_applications
