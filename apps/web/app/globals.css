@@ -201,8 +201,8 @@
 
     /* Field inputs — Geist-style ring fields (dark theme) */
     --color-field:            #151517;
-    --color-field-ring:       rgba(255, 255, 255, 0.14);
-    --color-field-ring-hover: rgba(255, 255, 255, 0.24);
+    --color-field-ring:       rgba(255, 255, 255, 0.22);
+    --color-field-ring-hover: rgba(255, 255, 255, 0.32);
     --color-field-ring-focus: rgba(255, 255, 255, 0.60);
     --color-field-halo:       rgba(255, 255, 255, 0.22);
 

@@ -1,19 +1,46 @@
-import { Briefcase } from "lucide-react";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/session";
+import { createServiceClient } from "@/lib/supabase/service";
+import { JobsBrowser } from "@/components/jobs/JobsBrowser";
+import { timeAgoLabel } from "@/lib/jobs/format";
+import { getJobFeed, loadJobMasterData, loadJobViewer } from "@/lib/jobs/service";
 
 export const metadata = { title: "Jobs — uxcommunity" };
 
-export default function JobsPage() {
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const session = await getSession();
+  if (!session || session.role !== "user") {
+    redirect("/login");
+  }
+
+  const db = createServiceClient();
+  const viewer = await loadJobViewer(db, session.userId!);
+  if (!viewer) {
+    redirect("/login");
+  }
+
+  const [query, jobs, master] = await Promise.all([
+    searchParams,
+    getJobFeed(db, viewer.id),
+    loadJobMasterData(db),
+  ]);
+
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-      <Briefcase strokeWidth={2.5} size={48} className="text-foreground-muted opacity-40" />
-      <div>
-        <h1 className="font-body text-xl font-semibold text-foreground">
-          Jobs
-        </h1>
-        <p className="mt-1 font-body text-sm text-foreground-muted">
-          Coming soon
-        </p>
-      </div>
-    </div>
+    <JobsBrowser
+      viewer={viewer}
+      master={master}
+      jobs={jobs.map((job) => ({
+        ...job,
+        posted_label: timeAgoLabel(job.created_at),
+        my_application: job.my_application
+          ? { ...job.my_application, applied_label: timeAgoLabel(job.my_application.created_at) }
+          : null,
+      }))}
+      initialJobId={typeof query.job === "string" ? query.job : null}
+    />
   );
 }

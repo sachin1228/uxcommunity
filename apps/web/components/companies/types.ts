@@ -33,6 +33,11 @@ export interface ProfileCompanyView {
   slug: string;
   logoUrl: string | null;
   isActive: boolean;
+  /**
+   * The company's display domain: verified when someone proved one, else the
+   * domain the directory knows it by. `domainVerified` says which — "Verified
+   * via" copy must gate on it, not on the domain being present.
+   */
   domain: string | null;
   domainVerified: boolean;
   membershipVerified: boolean;
