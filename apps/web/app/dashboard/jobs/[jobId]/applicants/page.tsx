@@ -29,13 +29,13 @@ export default async function JobApplicantsPage({
     notFound();
   }
   if (!job.is_mine) {
-    redirect("/dashboard/jobs");
+    redirect(`/dashboard/jobs/${jobId}`);
   }
 
   const result = await getJobApplicants(db, viewer.id, jobId);
   if (!result.ok) {
     if (result.code === "not_your_job") {
-      redirect("/dashboard/jobs");
+      redirect(`/dashboard/jobs/${jobId}`);
     }
     // The list failed to load (e.g. the migration is not installed); render
     // the board empty rather than a broken page — the error is logged.

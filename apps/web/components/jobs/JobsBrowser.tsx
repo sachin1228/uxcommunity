@@ -12,12 +12,13 @@ import type { JobPost, JobViewer } from "@/lib/jobs/types";
 type Tab = "all" | "posts";
 
 /**
- * The jobs board, LinkedIn-style: the rail lists postings, the pane shows the
- * selected one. Selecting is local state, not a route change — `get_job_feed`
- * already returns the full detail payload for every row, so the pane renders
- * the card's own data. Below lg the two swap places instead of sitting side by
- * side; `?job=` only seeds the selection, so "back to this job" links reopen
- * it on arrival.
+ * The jobs board, LinkedIn-style: on "All jobs" the rail lists postings and
+ * the pane shows the selected one — selecting is local state, not a route
+ * change, because `get_job_feed` already returns the full detail payload for
+ * every row. "My posts" is a plain list: each post opens its own view page
+ * (`/dashboard/jobs/<id>`), not the master-detail pane. Below lg the panes
+ * take turns instead of sitting side by side; `?job=` only seeds the
+ * selection, so "back to this job" links reopen it on arrival.
  *
  * Every posting is visible to every member — the profile match is what
  * unlocks Apply, not what hides the job — but the member's OWN posts stay out
@@ -79,6 +80,11 @@ export function JobsBrowser({
   ];
 
   const selectJob = (jobId: string) => {
+    if (tab === "posts") {
+      // My posts have their own view page; the pane is for browsing.
+      router.push(`/dashboard/jobs/${jobId}`);
+      return;
+    }
     setSelectedId(jobId);
     setPaneOpen(true);
   };
@@ -133,7 +139,9 @@ export function JobsBrowser({
 
       <div
         className={`mt-4 grid grid-cols-1 gap-5${
-          jobs.length > 0 ? " lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start" : ""
+          tab === "all" && jobs.length > 0
+            ? " lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start"
+            : ""
         }`}
       >
         {/* Rail — the browse list */}
@@ -213,8 +221,8 @@ export function JobsBrowser({
           </div>
         </div>
 
-        {/* Pane — the selected posting */}
-        {jobs.length > 0 && (
+        {/* Pane — the selected posting (All jobs only) */}
+        {tab === "all" && jobs.length > 0 && (
           <div
             ref={paneRef}
             className={`${paneOpen ? "flex" : "hidden"} min-w-0 flex-col lg:flex`}
@@ -249,9 +257,7 @@ export function JobsBrowser({
           onCreated={(jobId) => {
             setPostOpen(false);
             setTab("posts");
-            setSelectedId(jobId);
-            setPaneOpen(true);
-            router.refresh();
+            router.push(`/dashboard/jobs/${jobId}`);
           }}
         />
       )}

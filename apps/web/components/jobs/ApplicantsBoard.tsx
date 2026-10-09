@@ -26,7 +26,7 @@ export function ApplicantsBoard({
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-6">
       <BackLink
-        href={`/dashboard/jobs?job=${job.id}`}
+        href={`/dashboard/jobs/${job.id}`}
         label={job.title}
         className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
       />

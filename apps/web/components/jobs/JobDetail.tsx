@@ -17,8 +17,8 @@ import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types"
  * locked posting names the profile dimensions that do not match, so the rule
  * never has to be guessed.
  *
- * Rendered inside the board's detail pane: the pane owns layout and the
- * below-lg back control, so this component is content only.
+ * Rendered both inside the board's detail pane and, standalone, on the
+ * posting's own page — the host surface owns layout, so this is content only.
  */
 export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) {
   const guard = useGuardedRouter();
