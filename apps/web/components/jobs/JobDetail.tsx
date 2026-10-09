@@ -41,7 +41,7 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
       {/* Header card */}
       <div className="mt-4 rounded-2xl border border-border bg-surface p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={56} shape="circle" />
+          <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={56} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-xl font-semibold leading-tight text-foreground">
@@ -202,7 +202,7 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
               href={`/dashboard/companies/${job.company.slug}`}
               className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
             >
-              <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={16} shape="circle" />
+              <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={16} />
               View {job.company.name} on uxcommunity
             </a>
             {job.website && (

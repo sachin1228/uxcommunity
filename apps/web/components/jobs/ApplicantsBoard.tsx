@@ -32,7 +32,7 @@ export function ApplicantsBoard({
       />
 
       <div className="mt-4 flex items-start gap-3 rounded-2xl border border-border bg-surface p-5">
-        <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} shape="circle" />
+        <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} />
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-lg font-semibold leading-tight text-foreground">
             {applicants.length} applicant{applicants.length === 1 ? "" : "s"}

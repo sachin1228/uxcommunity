@@ -190,7 +190,7 @@ export function ProfileCard({
                   onClick={onEditCompany}
                   title={
                     company.isActive
-                      ? company.domain
+                      ? company.domainVerified && company.domain
                         ? `Verified via ${company.domain} — change it`
                         : "Change company"
                       : "This company is no longer active — add another"
@@ -203,7 +203,6 @@ export function ProfileCard({
                     name={company.name}
                     logoUrl={company.logoUrl}
                     size={18}
-                    shape="circle"
                   />
                   <span className="truncate">{company.name}</span>
                   {company.isActive && company.domainVerified && (
@@ -226,7 +225,9 @@ export function ProfileCard({
               <Link
                 href={`/dashboard/companies/${company.slug}`}
                 title={
-                  company.isActive && company.domain ? `Verified via ${company.domain}` : undefined
+                  company.isActive && company.domainVerified && company.domain
+                    ? `Verified via ${company.domain}`
+                    : undefined
                 }
                 className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
                   company.isActive ? "text-foreground" : "text-foreground-subtle"
@@ -236,7 +237,6 @@ export function ProfileCard({
                   name={company.name}
                   logoUrl={company.logoUrl}
                   size={18}
-                  shape="circle"
                 />
                 <span className="truncate">{company.name}</span>
                 {company.isActive && company.domainVerified && (

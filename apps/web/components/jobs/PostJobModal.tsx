@@ -151,7 +151,7 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
             <span className={labelCls}>Company</span>
             {company ? (
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3">
-                <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={32} shape="circle" />
+                <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={32} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-body text-sm font-semibold text-foreground">
                     {company.name}

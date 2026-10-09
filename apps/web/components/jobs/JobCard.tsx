@@ -35,7 +35,7 @@ export function JobCard({ job }: JobCardProps) {
       }}
       className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface p-3.5 transition-colors hover:border-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
     >
-      <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={48} shape="circle" />
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
