@@ -200,6 +200,8 @@ type PerformanceRpcMap = {
       p_requirements: string[];
       p_skills: string[];
       p_website: string | null;
+      /** The closing date's instant, or null for no deadline. */
+      p_closes_at: string | null;
     };
     returns: Array<{ job_id: string; created_at: string }>;
   };
@@ -248,6 +250,8 @@ type PerformanceRpcMap = {
       p_requirements: string[] | null;
       p_skills: string[] | null;
       p_website: string | null;
+      /** NULL clears the deadline. */
+      p_closes_at: string | null;
     };
     returns: Array<{ job_id: string; edited_at: string | null }>;
   };

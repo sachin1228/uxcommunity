@@ -28,6 +28,10 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
  * not two). `master` is only needed to open the edit form, so a surface without
  * it still gets Close/Reopen/Delete.
  *
+ * A posting whose closing date has passed is offered "Change deadline" in place
+ * of "Edit job": the date is the lever that brings it back, and reopening it is
+ * the same form.
+ *
  * Everything here is a convenience over the database's own rule:
  * `update_job_post`, `set_job_post_status` and `delete_job_post` each re-check
  * that the posting is the session member's, so hiding these controls from
@@ -198,7 +202,9 @@ export function JobOwnerActions({
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
           >
             <Pencil strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
-            <span>Edit job</span>
+            {/* An expired posting comes back by moving its date, so the one item
+                that fixes it says so. */}
+            <span>{job.deadline_expired ? "Change deadline" : "Edit job"}</span>
           </button>
         )}
 

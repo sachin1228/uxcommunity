@@ -107,6 +107,12 @@ export interface JobPost {
   status: JobStatus;
   /** Set by the first edit that changed something; null when never edited. */
   updated_at: string | null;
+  /**
+   * The last instant it accepts applications; null when the owner set no
+   * deadline. Independent of `status`: both can stop applications, and the UI
+   * names them apart (Expired versus Closed).
+   */
+  closes_at: string | null;
   company: JobCompany;
   poster: JobPoster;
   applicant_count: number;
@@ -125,6 +131,15 @@ export interface JobPost {
   posted_label: string;
   /** "Updated 3d ago", or null when the posting was never edited. */
   updated_label: string | null;
+  /** "Closes 24 Oct" / "Expired 24 Oct", or null — server-rendered. */
+  deadline_label: string | null;
+  /**
+   * True when the deadline has passed and the owner has not closed it.
+   * Server-rendered from the same instant the label used, so the SSR output
+   * and the hydrated client never disagree about which side of the deadline
+   * the posting is on.
+   */
+  deadline_expired: boolean;
 }
 
 export interface JobApplicant {

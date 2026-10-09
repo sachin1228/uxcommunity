@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Users } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
-import { ClosedBadge, KindBadge, LockedNote } from "./JobBadges";
+import { JobStateBadge, KindBadge, LockedNote } from "./JobBadges";
 import { JobOwnerActions } from "./JobOwnerActions";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost } from "@/lib/jobs/types";
@@ -77,7 +77,7 @@ export function JobCard({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {job.status === "closed" && <ClosedBadge />}
+            <JobStateBadge job={job} />
             <KindBadge kind={job.kind} />
             {job.is_mine && (
               <span className="rounded-full border border-accent/40 px-2 py-0.5 font-body text-[10px] font-semibold text-accent">
@@ -103,6 +103,14 @@ export function JobCard({
           <span className="font-body text-xs text-foreground-subtle">
             {job.posted_label}
             {job.updated_label ? ` · ${job.updated_label}` : ""}
+            {job.deadline_label ? (
+              <>
+                {" · "}
+                <span className={job.deadline_expired ? "text-amber-500" : undefined}>
+                  {job.deadline_label}
+                </span>
+              </>
+            ) : null}
           </span>
 
           {showOwnerActions && job.is_mine ? (

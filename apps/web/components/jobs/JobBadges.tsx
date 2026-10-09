@@ -1,5 +1,5 @@
-import { Lock } from "lucide-react";
-import type { JobKind } from "@/lib/jobs/types";
+import { Clock, Lock } from "lucide-react";
+import type { JobKind, JobPost } from "@/lib/jobs/types";
 import { jobKindLabel } from "@/lib/jobs/types";
 
 /** Neutral outlined chip for job facts (work mode, employment type, salary…). */
@@ -29,11 +29,7 @@ export function KindBadge({ kind }: { kind: JobKind }) {
   );
 }
 
-/**
- * A posting that has stopped taking applications. Shown beside the kind on the
- * card, and where Apply would otherwise be, so a filled role reads as finished
- * rather than broken — the posting keeps its URL and its applicants.
- */
+/** A posting its owner ended. Shown where Apply would otherwise be. */
 export function ClosedBadge() {
   return (
     <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-surface-raised px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
@@ -41,6 +37,35 @@ export function ClosedBadge() {
       Closed
     </span>
   );
+}
+
+/**
+ * A posting whose closing date has passed. Deliberately a different word from
+ * Closed: the owner did not end this one, the calendar did — and the owner can
+ * still bring it back by moving the date.
+ */
+export function ExpiredBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+      <Clock strokeWidth={2.5} size={10} aria-hidden="true" />
+      Expired
+    </span>
+  );
+}
+
+/**
+ * The one lifecycle badge a posting earns, so the card, the detail page and the
+ * applicants board cannot disagree. Closed wins over Expired: when the owner
+ * ended a posting early, their decision is what stopped it, not the calendar.
+ */
+export function JobStateBadge({
+  job,
+}: {
+  job: Pick<JobPost, "status" | "deadline_expired">;
+}) {
+  if (job.status === "closed") return <ClosedBadge />;
+  if (job.deadline_expired) return <ExpiredBadge />;
+  return null;
 }
 
 /** The eligibility lock, shown wherever Apply is refused by a profile mismatch. */

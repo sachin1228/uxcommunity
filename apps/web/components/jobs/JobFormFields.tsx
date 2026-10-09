@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { closingDateFromInstant } from "@/lib/jobs/format";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { EmploymentType, JobPost, WorkMode } from "@/lib/jobs/types";
 import { EMPLOYMENT_TYPES, WORK_MODES } from "@/lib/jobs/types";
@@ -28,6 +29,8 @@ export interface JobFormValues {
   salary: string;
   description: string;
   website: string;
+  /** A plain date, "" for no deadline — exactly what a date input holds. */
+  closesAt: string;
 }
 
 export const EMPTY_JOB_FORM: JobFormValues = {
@@ -41,6 +44,7 @@ export const EMPTY_JOB_FORM: JobFormValues = {
   salary: "",
   description: "",
   website: "",
+  closesAt: "",
 };
 
 /** A stored posting, as the edit form opens on it. */
@@ -56,6 +60,7 @@ export function jobFormValuesFrom(job: JobPost): JobFormValues {
     salary: job.salary ?? "",
     description: job.description,
     website: job.website ?? "",
+    closesAt: job.closes_at ? closingDateFromInstant(job.closes_at) : "",
   };
 }
 
@@ -205,6 +210,22 @@ export function JobFormFields({
           className="field"
         />
       </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className={jobFieldLabel}>
+          Closing date <span className="text-foreground-subtle">(optional)</span>
+        </span>
+        <input
+          type="date"
+          value={values.closesAt}
+          onChange={(event) => onChange({ closesAt: event.target.value })}
+          className="field"
+        />
+        <span className="font-body text-[11px] text-foreground-subtle">
+          Applications stop at the end of this day. Leave it empty to keep the role open until you
+          close it, or set a new date to reopen an expired one.
+        </span>
+      </label>
     </>
   );
 }
@@ -222,5 +243,6 @@ export function jobFormPayload(values: JobFormValues) {
     salary: values.salary.trim(),
     description: values.description.trim(),
     website: values.website.trim(),
+    closes_at: values.closesAt.trim(),
   };
 }

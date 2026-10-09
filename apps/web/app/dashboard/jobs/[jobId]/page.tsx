@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { BackLink } from "@/components/ui/BackLink";
 import { JobDetail } from "@/components/jobs/JobDetail";
-import { editedLabel, timeAgoLabel } from "@/lib/jobs/format";
+import { deadlineFields, editedLabel, timeAgoLabel } from "@/lib/jobs/format";
 import { getJobDetail, loadJobMasterData, loadJobViewer } from "@/lib/jobs/service";
 
 export const metadata = { title: "Job — uxcommunity" };
@@ -55,6 +55,7 @@ export default async function JobDetailPage({
             ...job,
             posted_label: timeAgoLabel(job.created_at),
             updated_label: editedLabel(job.created_at, job.updated_at),
+            ...deadlineFields(job),
             my_application: job.my_application
               ? { ...job.my_application, applied_label: timeAgoLabel(job.my_application.created_at) }
               : null,

@@ -86,6 +86,10 @@ export async function POST(
     requirements: data.requirements ?? null,
     skills: data.skills ?? null,
     website: data.website ? data.website : null,
+    // Already the instant, converted by the schema's transform. The field is
+    // required on the way in, so a save always states the deadline rather than
+    // falling through to the database default (which would clear it).
+    closesAt: data.closes_at,
   });
 
   if (!result.ok) {

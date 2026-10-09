@@ -1,8 +1,8 @@
 -- ============================================================
 -- Jobs — verified-company postings with profile-gated applications
 --
--- Migrations under test: 20261009120000_jobs.sql and
--- 20261009170000_job_lifecycle.sql
+-- Migrations under test: 20261009120000_jobs.sql,
+-- 20261009170000_job_lifecycle.sql and 20261009180000_job_expiry.sql
 --
 -- The two rules that make a posting trustworthy are:
 --
@@ -29,13 +29,18 @@
 --      application exists (while the rest of it stays editable);
 --      a closed posting leaves the browse feed but stays readable
 --      by its owner, refuses applications, and reopens cleanly;
---      deleting takes the applications with it.
+--      deleting takes the applications with it;
+--   6. the closing date: one expression (job_post_is_open) decides
+--      whether a posting takes applications, an expired posting
+--      leaves the browse feed while keeping its owner's view,
+--      applying to one is refused as expired rather than closed, and
+--      reopening clears a deadline that has already passed.
 --
 -- Runs inside a transaction: every fixture is rolled back, and the
 -- file does not depend on what other suites left behind.
 -- ============================================================
 
-select plan(96);
+select plan(115);
 
 begin;
 
@@ -1154,6 +1159,206 @@ select is(
    where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000007'),
   0::bigint,
   'deleting a posting takes its applications with it'
+);
+
+-- ─── 12. The closing date ───────────────────────────────────
+-- 20261009180000_job_expiry.sql. There is no scheduler here, so "auto-close"
+-- is derived: one expression, job_post_is_open, decides whether a posting
+-- takes applications, and the payload still reports the owner's own status so
+-- Expired can be told apart from Closed.
+
+select has_function('public', 'job_post_is_open', 'job_post_is_open(...) exists');
+
+select is(
+  public.job_post_is_open('open', null::timestamptz),
+  true,
+  'a posting with no deadline is open'
+);
+
+select is(
+  public.job_post_is_open('open', now() + interval '1 day'),
+  true,
+  'a deadline still ahead keeps it open'
+);
+
+select is(
+  public.job_post_is_open('open', now() - interval '1 day'),
+  false,
+  'a deadline that has passed closes it'
+);
+
+select is(
+  public.job_post_is_open('closed', now() + interval '1 day'),
+  false,
+  'the owner''s lever wins over a deadline still ahead'
+);
+
+-- A fresh posting for the deadline cases, matching the Opener''s profile.
+select count(*) from public.create_job_post(
+  'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+  'a7a7a7a7-0000-4000-8000-000000000001', 'Expiring Role',
+  'e7e7e7e7-0000-4000-8000-000000000001', 'f7f7f7f7-0000-4000-8000-000000000001',
+  'ux_designer', 'mid_level', 'remote', 'full_time',
+  null, 'A role with a closing date.',
+  '{}', '{}', '{}', null, now() + interval '2 days'
+);
+
+select is(
+  (select closes_at is not null from public.job_posts where title = 'Expiring Role'),
+  true,
+  'a posting can be created with a closing date'
+);
+
+select is(
+  (select closes_at from public.job_posts where title = 'Senior Product Designer'),
+  null::timestamptz,
+  'a posting created before the deadline existed has none'
+);
+
+select is(
+  (select (public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000007')
+           ->> 'closes_at')::timestamptz
+   from public.job_posts as jp where jp.title = 'Expiring Role'),
+  (select closes_at from public.job_posts where title = 'Expiring Role'),
+  'the payload carries the deadline'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000007')
+          ->> 'can_apply'
+   from public.job_posts as jp where jp.title = 'Expiring Role'),
+  'true',
+  'a matched member may apply while the deadline is ahead'
+);
+
+-- Time passes: the deadline is now behind us.
+update public.job_posts set closes_at = now() - interval '1 hour'
+  where title = 'Expiring Role';
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000007')
+          ->> 'status'
+   from public.job_posts as jp where jp.title = 'Expiring Role'),
+  'open',
+  'an expired posting is still open as far as its owner''s status goes'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000007')
+          ->> 'can_apply'
+   from public.job_posts as jp where jp.title = 'Expiring Role'),
+  'false',
+  'the Apply flag closes with the deadline'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.apply_to_job(
+      (select id from public.job_posts where title = 'Expiring Role'),
+      'd7d7d7d7-0000-4000-8000-000000000007',
+      'Opener', 'https://portfolio.opener.test',
+      'https://www.linkedin.com/in/opener', null
+    )
+  $$),
+  'job_expired',
+  'applying to an expired posting is refused as expired, not as closed'
+);
+
+select is(
+  (select count(*) from public.get_job_feed('d7d7d7d7-0000-4000-8000-000000000003')),
+  1::bigint,
+  'an expired posting leaves the browse feed'
+);
+
+select is(
+  (select count(*) from public.get_job_feed('d7d7d7d7-0000-4000-8000-000000000001')),
+  2::bigint,
+  'an expired posting stays in its owner''s feed, so the date can be moved'
+);
+
+-- The owner closes it (with the deadline already behind us), then reopens it:
+-- reopening cannot mean "open with a deadline in the past", so the deadline is
+-- cleared rather than left to expire the posting again immediately.
+select count(*) from public.set_job_post_status(
+  'd7d7d7d7-0000-4000-8000-000000000001',
+  (select id from public.job_posts where title = 'Expiring Role'),
+  'closed'
+);
+
+select count(*) from public.set_job_post_status(
+  'd7d7d7d7-0000-4000-8000-000000000001',
+  (select id from public.job_posts where title = 'Expiring Role'),
+  'open'
+);
+
+select is(
+  (select closes_at from public.job_posts where title = 'Expiring Role'),
+  null::timestamptz,
+  'reopening clears a deadline that has already passed'
+);
+
+select is(
+  (select count(*) from public.apply_to_job(
+     (select id from public.job_posts where title = 'Expiring Role'),
+     'd7d7d7d7-0000-4000-8000-000000000007',
+     'Opener', 'https://portfolio.opener.test',
+     'https://www.linkedin.com/in/opener', null
+  )),
+  1::bigint,
+  'the reopened posting takes applications again'
+);
+
+-- The deadline is not part of the criteria freeze: it moves even though the
+-- posting now has an applicant.
+select count(*) from public.update_job_post(
+  p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+  p_job_id           => (select id from public.job_posts where title = 'Expiring Role'),
+  p_title            => 'Expiring Role',
+  p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+  p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+  p_job_title        => 'ux_designer',
+  p_experience_level => 'mid_level',
+  p_work_mode        => 'remote',
+  p_employment_type  => 'full_time',
+  p_salary           => null,
+  p_description      => 'A role with a closing date.',
+  p_closes_at        => timestamptz '2026-12-31 23:59:59.999+00'
+);
+
+select is(
+  (select closes_at from public.job_posts where title = 'Expiring Role'),
+  timestamptz '2026-12-31 23:59:59.999+00',
+  'an edit can move the deadline even once an application exists'
+);
+
+-- And clear it, which is how a poster says "no deadline".
+select count(*) from public.update_job_post(
+  p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+  p_job_id           => (select id from public.job_posts where title = 'Expiring Role'),
+  p_title            => 'Expiring Role',
+  p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+  p_sector_id        => 'f7f7f7f7-0000-4000-8000-000000000001',
+  p_job_title        => 'ux_designer',
+  p_experience_level => 'mid_level',
+  p_work_mode        => 'remote',
+  p_employment_type  => 'full_time',
+  p_salary           => null,
+  p_description      => 'A role with a closing date.',
+  p_closes_at        => null
+);
+
+select is(
+  (select closes_at from public.job_posts where title = 'Expiring Role'),
+  null::timestamptz,
+  'an edit can clear the deadline'
+);
+
+select is(
+  (select count(*) from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname in ('create_job_post', 'update_job_post')),
+  2::bigint,
+  'the pre-deadline overloads are gone — one of each write remains'
 );
 
 select finish();

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { closingInstantFromDate } from "./format";
 
 /** Resumes are attached as files; only the URL-shaped fields are validated here. */
 export const jobApplicationSchema = z.object({
@@ -45,6 +46,23 @@ export const jobPostSchema = z.object({
       (v) => !v || /^https?:\/\/\S+$/i.test(v),
       "Website must start with http(s)://"
     ),
+  /**
+   * The closing date as a plain date, exactly as the date input holds it. It is
+   * REQUIRED to be present (blank meaning no deadline) so a caller always
+   * states its intent: the database parameter is trailing and defaulted, and an
+   * omission there would silently clear a deadline a poster had set.
+   *
+   * Converted here, in the one place both writes pass through, so no route
+   * re-implements the date-to-instant rule.
+   */
+  closes_at: z
+    .string()
+    .trim()
+    .refine(
+      (v) => v === "" || closingInstantFromDate(v) !== null,
+      "Enter a valid closing date"
+    )
+    .transform((v) => (v === "" ? null : closingInstantFromDate(v))),
 });
 
 export type JobPostInput = z.infer<typeof jobPostSchema>;
@@ -54,7 +72,9 @@ export type JobApplicationInput = z.infer<typeof jobApplicationSchema>;
  * An edit carries the same role fields as a post — minus `kind` and
  * `company_id`. Those two are the verified proof a posting was made under;
  * changing either one is a different posting, not an edit, so the route never
- * accepts them and `update_job_post` never reads them.
+ * accepts them and `update_job_post` never reads them. The closing date rides
+ * along and is freely movable: it changes until when applications are taken,
+ * never who is eligible.
  */
 export const jobPostUpdateSchema = jobPostSchema.omit({ kind: true, company_id: true });
 

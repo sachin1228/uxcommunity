@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ApplicantsBoard } from "@/components/jobs/ApplicantsBoard";
-import { editedLabel, timeAgoLabel } from "@/lib/jobs/format";
+import { deadlineFields, editedLabel, timeAgoLabel } from "@/lib/jobs/format";
 import { getJobApplicants, getJobDetail, loadJobViewer } from "@/lib/jobs/service";
 
 export const metadata = { title: "Applicants — uxcommunity" };
@@ -45,6 +45,7 @@ export default async function JobApplicantsPage({
           ...job,
           posted_label: timeAgoLabel(job.created_at),
           updated_label: editedLabel(job.created_at, job.updated_at),
+          ...deadlineFields(job),
         }}
         applicants={[]}
       />
@@ -57,6 +58,7 @@ export default async function JobApplicantsPage({
         ...job,
         posted_label: timeAgoLabel(job.created_at),
         updated_label: editedLabel(job.created_at, job.updated_at),
+        ...deadlineFields(job),
       }}
       applicants={result.applicants.map((applicant) => ({
         ...applicant,

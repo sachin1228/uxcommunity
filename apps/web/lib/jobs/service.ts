@@ -46,15 +46,16 @@ export type CreateJobResult =
   | { ok: false; code: CreateJobFailureCode };
 
 /**
- * Failure codes `apply_to_job` can report. `job_closed` is the lifecycle's
- * contribution: a posting that is no longer open takes no applications, and
- * the database says so rather than the client hiding a button.
+ * Failure codes `apply_to_job` can report. `job_closed` and `job_expired` are
+ * the lifecycle's contribution — the owner ended the posting, or its deadline
+ * passed — and the database says which rather than the client hiding a button.
  */
 export const APPLY_FAILURE_CODES = [
   "job_not_found",
   "unknown_user",
   "own_job",
   "job_closed",
+  "job_expired",
   "invalid_name",
   "invalid_portfolio_url",
   "invalid_linkedin_url",
@@ -249,6 +250,8 @@ export interface CreateJobParams {
   requirements: string[];
   skills: string[];
   website: string | null;
+  /** The closing date's instant, or null for no deadline. */
+  closesAt: string | null;
 }
 
 export async function createJobPost(
@@ -272,6 +275,7 @@ export async function createJobPost(
     p_requirements: params.requirements,
     p_skills: params.skills,
     p_website: params.website,
+    p_closes_at: params.closesAt,
   });
 
   if (error) {
@@ -346,14 +350,18 @@ export interface UpdateJobParams {
   requirements: string[] | null;
   skills: string[] | null;
   website: string | null;
+  /** The closing date's instant; null clears the deadline. */
+  closesAt: string | null;
 }
 
 /**
  * Save an edit. Only the poster's own posting can be written, and the four
  * targeting dimensions are frozen once an application exists — both rules
  * live in `update_job_post`, so the caller gets the database's answer rather
- * than a client-side guess. `editedAt` is the stamp the write set; it stays
- * put when the save changed nothing.
+ * than a client-side guess. The closing date is NOT part of that freeze: it
+ * moves freely, because it changes until when applications are taken, not who
+ * is eligible. `editedAt` is the stamp the write set; it stays put when the
+ * save changed nothing.
  */
 export async function updateJobPost(
   db: SupabaseClient,
@@ -375,6 +383,7 @@ export async function updateJobPost(
     p_requirements: params.requirements,
     p_skills: params.skills,
     p_website: params.website,
+    p_closes_at: params.closesAt,
   });
 
   if (error) {
