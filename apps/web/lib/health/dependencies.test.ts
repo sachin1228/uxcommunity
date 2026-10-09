@@ -4,8 +4,11 @@ import assert from "node:assert/strict";
 import {
   checkDatabase,
   checkDependencies,
+  checkGiphy,
   checkR2Media,
   checkRealtimeWorker,
+  checkResend,
+  checkUpstash,
   HEALTHCHECK_PREFIX,
 } from "./dependencies";
 
@@ -176,26 +179,98 @@ test("an unreachable worker and an unconfigured environment are both down", asyn
   assert.match(unconfigured.hint ?? "", /REALTIME_URL/);
 });
 
-test("the report is healthy only when every dependency is ok", async () => {
+test("Upstash reports a rejected token, and says rate limiting is off when unset", async () => {
+  const rejected = await checkUpstash({
+    url: "https://up.example.in",
+    token: "t",
+    fetchImpl: stubFetch(401).fetchImpl,
+  });
+  assert.equal(rejected.status, "down");
+  assert.match(rejected.hint ?? "", /UPSTASH_REDIS_REST_TOKEN/);
+  assert.match(rejected.detail, /401/);
+
+  const answered = await checkUpstash({
+    url: "https://up.example.in/",
+    token: "t",
+    fetchImpl: (async () => new Response("{\"result\":\"PONG\"}", { status: 200 })) as unknown as typeof fetch,
+  });
+  assert.equal(answered.status, "ok");
+  assert.match(answered.detail, /PONG/);
+
+  const unset = await checkUpstash({ url: "", token: "" });
+  assert.equal(unset.status, "down");
+  assert.match(unset.detail, /rate limiting is off/);
+});
+
+test("Resend is critical: a rejected key silently kills password resets", async () => {
+  const { fetchImpl, calls } = stubFetch(401);
+  const rejected = await checkResend({ apiKey: "key", fetchImpl });
+
+  assert.equal(calls[0].url, "https://api.resend.com/domains");
+  assert.equal(rejected.status, "down");
+  assert.equal(rejected.severity, "critical");
+  assert.equal(rejected.alerts, true);
+  assert.match(rejected.hint ?? "", /Password resets and invitations fail silently/);
+
+  const ok = await checkResend({ apiKey: "key", fetchImpl: stubFetch(200).fetchImpl });
+  assert.equal(ok.status, "ok");
+
+  const unset = await checkResend({ apiKey: "" });
+  assert.equal(unset.status, "down");
+});
+
+test("GIPHY is supporting only: its key can fail without paging anyone", async () => {
+  const rejected = await checkGiphy({ apiKey: "key", fetchImpl: stubFetch(403).fetchImpl });
+  assert.equal(rejected.status, "down");
+  assert.equal(rejected.severity, "supporting");
+  assert.equal(rejected.alerts, false);
+
+  const ok = await checkGiphy({ apiKey: "key", fetchImpl: stubFetch(200).fetchImpl });
+  assert.equal(ok.status, "ok");
+});
+
+/** Every probe stubbed healthy, so the report can be exercised offline. */
+const allHealthy = () => ({
+  r2: async () => ({ objects: [] }),
+  database: async () => {},
+  realtime: { url: "https://rt.example.in", secret: "s", fetchImpl: stubFetch(400).fetchImpl },
+  upstash: { url: "https://up.example.in", token: "t", fetchImpl: stubFetch(200).fetchImpl },
+  resend: { apiKey: "k", fetchImpl: stubFetch(200).fetchImpl },
+  giphy: { apiKey: "g", fetchImpl: stubFetch(200).fetchImpl },
+});
+
+test("the report separates what must page an admin from what must not", async () => {
   await withPublicBase(async () => {
-    const healthy = await checkDependencies({
-      r2: async () => ({ objects: [] }),
-      database: async () => {},
-      realtime: { url: "https://rt.example.in", secret: "s", fetchImpl: stubFetch(400).fetchImpl },
-    });
+    const healthy = await checkDependencies(allHealthy());
     assert.equal(healthy.healthy, true);
-    assert.deepEqual(healthy.checks.map((entry) => entry.id), ["r2", "supabase", "realtime"]);
+    assert.equal(healthy.allOk, true);
+    assert.deepEqual(healthy.alerts, []);
+    assert.deepEqual(
+      healthy.checks.map((entry) => entry.id),
+      ["r2", "supabase", "realtime", "upstash", "resend", "giphy"],
+    );
     assert.ok(Date.parse(healthy.checkedAt) > 0);
 
-    const degraded = await checkDependencies({
+    // A broken critical service is unhealthy AND alertable. One bad dependency
+    // must not hide the state of the others.
+    const critical = await checkDependencies({
+      ...allHealthy(),
       r2: async () => {
         throw r2Unauthorized();
       },
-      database: async () => {},
-      realtime: { url: "https://rt.example.in", secret: "s", fetchImpl: stubFetch(400).fetchImpl },
     });
-    assert.equal(degraded.healthy, false);
-    // One bad dependency must not hide the state of the others.
-    assert.equal(degraded.checks.filter((entry) => entry.status === "ok").length, 2);
+    assert.equal(critical.healthy, false);
+    assert.deepEqual(critical.alerts.map((entry) => entry.id), ["r2"]);
+    assert.equal(critical.checks.filter((entry) => entry.status === "ok").length, 5);
+
+    // A broken supporting service is visible but stays silent: the app still
+    // serves, and an admin should not be woken for GIF search.
+    const supporting = await checkDependencies({
+      ...allHealthy(),
+      giphy: { apiKey: "g", fetchImpl: stubFetch(500).fetchImpl },
+    });
+    assert.equal(supporting.healthy, true, "GIPHY is not on the critical path");
+    assert.equal(supporting.allOk, false);
+    assert.deepEqual(supporting.alerts, []);
   });
 });
