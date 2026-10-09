@@ -20,7 +20,7 @@ interface CommunityMember {
   designation: string | null;
   joined_at:   string;
   role:        string;
-  /** Effective grants — sent for moderator rows when the caller is the owner. */
+  /** Effective grants — sent for moderator rows when the caller manages moderators. */
   permissions?: CommunityPermissions | null;
 }
 
@@ -48,6 +48,12 @@ interface MembersViewProps {
   isOwner?:    boolean;
   /** Owner or manager granted "manage members" — may remove members & decide requests. */
   canManageMembers?: boolean;
+  /**
+   * The manager tier that appoints, edits and dismisses moderators: the owner,
+   * or the platform-appointed admin of an app-created community (which never
+   * has an owner).
+   */
+  canManageModerators?: boolean;
   isPrivate?:  boolean;
   /** Event group chats record each member's answers to the host's join questions. */
   isEventChat?: boolean;
@@ -68,10 +74,11 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, isPrivate = false, isEventChat = false }: MembersViewProps) {
-  // Owners can do everything; moderators/admins act within their granted
-  // permissions. Only the owner appoints or edits moderators.
-  const manager = isOwner || canManageMembers;
+export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, canManageModerators = false, isPrivate = false, isEventChat = false }: MembersViewProps) {
+  // Owner, platform-appointed admins and in-app moderators share the same
+  // management UI, each capability scoped by the member's grants. Only the
+  // manager tier (owner / app-created community's admin) appoints moderators.
+  const manager = isOwner || canManageMembers || canManageModerators;
   const requestUrl = `/api/communities/${communityId}/members?page=0`;
   const hydrated = getCachedRequest<{ members?: CommunityMember[]; has_more?: boolean }>(requestUrl, currentUserId);
   const cachedMembers = membersCache.get(communityId);
@@ -101,7 +108,8 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
   const menuRef = useRef<HTMLUListElement>(null);
 
-  // Moderator permissions modal (owner only): the member + mode it is open for.
+  // Moderator permissions modal (manager tier only): the member + mode it is
+  // open for.
   const [moderatorModalFor, setModeratorModalFor] = useState<CommunityMember | null>(null);
   const [moderatorModalMode, setModeratorModalMode] = useState<"promote" | "edit">("promote");
   const [moderatorSaving, setModeratorSaving] = useState(false);
@@ -460,17 +468,22 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                 const isOwnerRow     = member.role === "owner";
                 const isAdminRow     = member.role === "admin";
                 const isModeratorRow = member.role === "moderator";
-                // Managers can remove regular members; only the owner may
-                // remove another moderator or an admin. Never yourself or the
-                // owner.
+                // Managers with member-removal rights ("manage members", or
+                // the owner) can remove regular members. The owner may also
+                // remove moderators and admins; an app-created community's
+                // admin may remove moderators (platform-managed admins stay
+                // off limits). Never yourself or the owner.
                 const canRemoveRow =
+                  (isOwner || canManageMembers) &&
                   member.user_id !== currentUserId &&
                   !isOwnerRow &&
-                  !((isAdminRow || isModeratorRow) && !isOwner);
-                // Only the owner appoints moderators, edits their permissions
-                // and dismisses them. Platform-managed admins are off limits.
+                  !(isAdminRow && !isOwner) &&
+                  !(isModeratorRow && !canManageModerators);
+                // Only the manager tier appoints moderators, edits their
+                // permissions and dismisses them. Platform-managed admins are
+                // off limits.
                 const canModerateRow =
-                  isOwner &&
+                  canManageModerators &&
                   member.user_id !== currentUserId &&
                   !isOwnerRow &&
                   !isAdminRow;

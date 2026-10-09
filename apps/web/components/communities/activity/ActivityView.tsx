@@ -31,8 +31,10 @@ const entryActorId = (entry: CommunityActivityEntry) =>
   entry.actor_id ?? `u-${entry.actor_name ?? ""}`;
 
 /**
- * The owner's management audit trail — who did what, most recent first.
- * Mounted as the owner-only Activity tab (see ChatHeader's showActivityTab).
+ * The manager tier's management audit trail — who did what, most recent first.
+ * Mounted as the manager-tier Activity tab (see ChatHeader's showActivityTab):
+ * the owner of a member-created community, or an app-created community's
+ * platform-appointed admin.
  */
 export function ActivityView({
   communityId,

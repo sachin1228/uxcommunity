@@ -40,7 +40,7 @@ interface ChatHeaderProps {
   onSettingsClick?: () => void;
   /** Owner or admin with "edit community settings" permission. */
   canOpenSettings?: boolean;
-  /** Owner-only: shows the Activity (management audit) tab after Members. */
+  /** Manager tier only: shows the Activity (management audit) tab after Members. */
   showActivityTab?: boolean;
   /** Used to resolve the community Lottie while meta is still loading. */
   communityId?: string;
@@ -195,8 +195,8 @@ export const ChatHeader = memo(function ChatHeader({
   }
 
   // Members is not an owner-toggleable area, so it stays visible regardless of
-  // enabled_tabs; Activity is the owner's audit view and follows the caller's
-  // role; every other tab follows the community's own flags.
+  // enabled_tabs; Activity is the manager tier's audit view and follows the
+  // caller's role; every other tab follows the community's own flags.
   const visibleTabs = community
     ? DEFAULT_TABS.filter(
         (tab) =>
