@@ -12,21 +12,19 @@ export function MetaChip({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The posting's intent. Both kinds carry the same verified-company proof;
- * the badge only says whether this is the company's official opening
- * ("Hiring") or a member referring ("Referral").
+ * The posting's intent, as plain hashtag text: gold for a hiring post,
+ * indigo for a referral. Both kinds carry the same verified-company proof;
+ * the label only says whether this is the company's official opening or a
+ * member referring.
  */
 export function KindBadge({ kind }: { kind: JobKind }) {
-  const hiring = kind === "hiring";
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-semibold ${
-        hiring
-          ? "border-accent/40 text-accent"
-          : "border-border text-foreground-muted"
+      className={`shrink-0 font-body text-[11px] font-medium ${
+        kind === "hiring" ? "text-amber-500" : "text-indigo-400"
       }`}
     >
-      {jobKindLabel(kind)}
+      #{jobKindLabel(kind)}
     </span>
   );
 }
