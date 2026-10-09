@@ -224,7 +224,7 @@ export function JobsBrowser({
         {tab === "all" && jobs.length > 0 && (
           <div
             ref={paneRef}
-            className={`${paneOpen ? "flex" : "hidden"} min-w-0 flex-col lg:flex`}
+            className={`${paneOpen ? "flex" : "hidden"} min-w-0 flex-col lg:flex lg:border-l lg:border-border lg:pl-5`}
           >
             <button
               type="button"
