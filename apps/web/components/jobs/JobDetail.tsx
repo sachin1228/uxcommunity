@@ -161,16 +161,11 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
             </span>
             <span className="block truncate font-body text-[11px] text-foreground-muted">
               {[
-                [
-                  job.poster.job_title_label,
-                  job.poster.company_name ? `@ ${job.poster.company_name}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" "),
-                job.poster.experience_level_label,
+                job.poster.job_title_label,
+                job.poster.company_name ? `@ ${job.poster.company_name}` : null,
               ]
                 .filter(Boolean)
-                .join(" · ") || "Member"}
+                .join(" ") || "Member"}
             </span>
           </span>
         </a>
