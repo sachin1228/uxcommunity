@@ -55,6 +55,8 @@ export interface JobPoster {
   job_title_label: string | null;
   experience_level: string | null;
   experience_level_label: string | null;
+  /** The company on the poster's profile; null when they display none. */
+  company_name: string | null;
 }
 
 export interface JobApplicationSummary {

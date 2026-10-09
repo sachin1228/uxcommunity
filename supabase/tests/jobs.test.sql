@@ -28,7 +28,7 @@
 -- file does not depend on what other suites left behind.
 -- ============================================================
 
-select plan(58);
+select plan(59);
 
 begin;
 
@@ -479,6 +479,20 @@ select is(
    from public.job_posts as jp where jp.title = 'Senior Product Designer'),
   'true',
   'the poster sees the posting as theirs'
+);
+
+-- The "Posted by" card shows where the poster works: the payload carries
+-- the company from their profile.
+update public.designer_profiles
+set company_id = 'a7a7a7a7-0000-4000-8000-000000000001'
+where user_id = 'd7d7d7d7-0000-4000-8000-000000000001';
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000002')
+          -> 'poster' ->> 'company_name'
+   from public.job_posts as jp where jp.title = 'Senior Product Designer'),
+  'Jobsco',
+  'the payload carries the poster''s profile company'
 );
 
 select is(
