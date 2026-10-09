@@ -148,9 +148,13 @@ export function JobsBrowser({
             : ""
         }`}
       >
-        {/* Rail — the browse list */}
+        {/* Rail — the browse list; on My posts a centered column instead */}
         <div
-          className={`${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col pt-4 pb-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`}
+          className={
+            tab === "posts"
+              ? "mx-auto flex w-full max-w-3xl flex-col px-4 py-6 lg:px-6"
+              : `${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col pt-4 pb-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`
+          }
         >
           {/* Search (All jobs only) */}
           {tab === "all" && otherJobs.length > 0 && (
