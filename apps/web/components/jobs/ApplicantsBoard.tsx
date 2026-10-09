@@ -1,12 +1,14 @@
 "use client";
 
-import { ExternalLink, FileText, Globe, Inbox, UserRound } from "lucide-react";
+import { ExternalLink, FileText, Globe, Inbox, UserRound, Users } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
-import { MetaChip } from "./JobBadges";
+import { KindBadge } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import type { JobApplicant, JobPost } from "@/lib/jobs/types";
+import { workModeLabel } from "@/lib/jobs/types";
+import { experienceYearsLabel } from "@/lib/jobs/format";
 
 /**
  * The poster's applicant list. Every row is an application exactly as it was
@@ -31,21 +33,45 @@ export function ApplicantsBoard({
         className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
       />
 
-      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-border bg-surface p-5">
+      {/* The posting card mirrors the JobCard shape — title + years, kind on
+          the right, company line, posted time and count — so the same job
+          reads identically on the board and on its applicants page. */}
+      <div className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-surface p-3.5">
         <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} />
+
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-lg font-semibold leading-tight text-foreground">
-            {applicants.length} applicant{applicants.length === 1 ? "" : "s"}
-          </h1>
-          <p className="mt-0.5 truncate font-body text-sm text-foreground-muted">
-            {job.title}
-            <span className="mx-1.5 text-foreground-subtle">·</span>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <h1 className="truncate font-display text-[15px] font-semibold leading-snug text-accent">
+                {job.title}
+              </h1>
+              <span className="shrink-0 font-body text-xs text-foreground-muted">
+                {experienceYearsLabel(job.experience_level_label)}
+              </span>
+            </div>
+            <div className="shrink-0">
+              <KindBadge kind={job.kind} />
+            </div>
+          </div>
+
+          <p className="mt-0.5 truncate font-body text-[13px] text-foreground-muted">
             {job.company.name}
+            <span className="mx-1.5 text-foreground-subtle">•</span>
+            {job.city_name} ({workModeLabel(job.work_mode)})
+            {job.salary && (
+              <>
+                <span className="mx-1.5 text-foreground-subtle">•</span>
+                {job.salary}
+              </>
+            )}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <MetaChip>{job.city_name}</MetaChip>
-            <MetaChip>{job.job_title_label}</MetaChip>
-            <MetaChip>{job.experience_level_label}</MetaChip>
+
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span className="font-body text-xs text-foreground-subtle">{job.posted_label}</span>
+            <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
+              <Users strokeWidth={2.5} size={11} />
+              {applicants.length} applicant{applicants.length === 1 ? "" : "s"}
+            </span>
           </div>
         </div>
       </div>
