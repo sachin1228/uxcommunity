@@ -2,20 +2,20 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getProfileCompanyState } from "@/lib/companies/service";
+import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
+import { isProfileId } from "@/lib/profile/links";
 import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
+import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import { ProfileCard } from "../components/ProfileCard";
-
-// Route ids come from URLs, so a non-uuid would reach Postgres as an invalid
-// uuid literal before `maybeSingle()` could answer — validate first.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Props {
   params: Promise<{ userId: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
   const { userId } = await params;
-  if (!UUID_RE.test(userId)) return { title: "Profile" };
+  if (!isProfileId(userId)) return { title: "Profile" };
   const { data } = await createServiceClient()
     .from("users")
     .select("name")
@@ -27,16 +27,21 @@ export async function generateMetadata({ params }: Props) {
 /**
  * A member's profile as other members see it: the same hero the owner sees on
  * `/dashboard/profile`, rendered read-only (no picture picker, no Edit
- * Profile, no company picker). Your own id redirects to the editable page,
- * so a self-click from anywhere lands where editing lives.
+ * Profile, no company picker), followed by the activity tabs listing the posts
+ * they share that the viewer may see. Your own id redirects to the editable
+ * page, so a self-click from anywhere lands where editing lives.
  */
-export default async function MemberProfilePage({ params }: Props) {
+export default async function MemberProfilePage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session || session.role !== "user") redirect("/login");
 
   const { userId } = await params;
-  if (!UUID_RE.test(userId)) notFound();
+  if (!isProfileId(userId)) notFound();
   if (userId === session.userId) redirect("/dashboard/profile");
+
+  const { tab } = await searchParams;
+  // Saved is the owner-only tab; a member's list is the viewer's feed by author.
+  const initialTab: ProfileFeedScope = tab && isProfileFeedScope(tab) && tab !== "saved" ? tab : "all";
 
   const db = createServiceClient();
   const [{ data: user }, { data: profile }, companyState] = await Promise.all([
@@ -83,6 +88,13 @@ export default async function MemberProfilePage({ params }: Props) {
             portfolio={(profile as any)?.portfolio_url ?? ""}
           />
         </div>
+
+        <ProfileActivityFeed
+          currentUserId={session.userId!}
+          initialTab={initialTab}
+          basePath={`/dashboard/profile/${userId}`}
+          subject={{ id: userId, name }}
+        />
       </div>
     </div>
   );
