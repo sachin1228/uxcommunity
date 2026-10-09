@@ -97,14 +97,15 @@ export function ProfileCard({
       <div>
         {/* ── Display picture — the only image in the hero ──
 
-            With a picture the frame is the rounded square of the reference.
-            Without one the hero falls back to the *same* round initials avatar
-            every other surface shows (`AvatarImg`), rather than a flat square
-            placeholder of its own — a member with no display picture should
-            read the same here as in the topbar. */}
+            The frame is a circle, the same shape the picture has everywhere
+            else in the app. Without a picture the hero falls back to the
+            *same* round initials avatar every other surface shows
+            (`AvatarImg`), rather than a flat placeholder of its own — a member
+            with no display picture should read the same here as in the
+            topbar. */}
         <div className="group relative h-24 w-24 shrink-0">
           {hasPicture ? (
-            <div className="h-24 w-24 overflow-hidden rounded-2xl border border-border bg-accent/20 shadow-lg">
+            <div className="h-24 w-24 overflow-hidden rounded-full border border-border bg-accent/20 shadow-lg">
               <AvatarImg
                 url={avatarUrl}
                 name={name}
@@ -122,9 +123,7 @@ export function ProfileCard({
               onClick={onOpenAvatarPicker}
               aria-label="Change profile picture"
               title="Change profile picture"
-              className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none ${
-                hasPicture ? "rounded-2xl" : "rounded-full"
-              }`}
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
             >
               <Camera strokeWidth={2.5} size={20} />
             </button>
