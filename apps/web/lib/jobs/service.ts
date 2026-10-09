@@ -2,7 +2,7 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { companyLogoUrl } from "@/lib/companies/logos";
-import type { JobApplicant, JobPost, JobViewer } from "./types";
+import type { JobApplicant, JobPost, JobStatus, JobViewer } from "./types";
 
 /**
  * Server-side access to the Jobs model.
@@ -45,11 +45,17 @@ export type CreateJobResult =
   | { ok: true; jobId: string }
   | { ok: false; code: CreateJobFailureCode };
 
-/** Failure codes `apply_to_job` can report. */
+/**
+ * Failure codes `apply_to_job` can report. `job_closed` and `job_expired` are
+ * the lifecycle's contribution — the owner ended the posting, or its deadline
+ * passed — and the database says which rather than the client hiding a button.
+ */
 export const APPLY_FAILURE_CODES = [
   "job_not_found",
   "unknown_user",
   "own_job",
+  "job_closed",
+  "job_expired",
   "invalid_name",
   "invalid_portfolio_url",
   "invalid_linkedin_url",
@@ -61,6 +67,61 @@ export const APPLY_FAILURE_CODES = [
 export type ApplyFailureCode = (typeof APPLY_FAILURE_CODES)[number] | "not_installed" | "unexpected";
 
 export type ApplyResult = { ok: true; applicationId: string } | { ok: false; code: ApplyFailureCode };
+
+/**
+ * Failure codes `update_job_post` can report. The content codes are the same
+ * shape checks `create_job_post` applies — an edit can never store something
+ * the create path would have refused — plus the owner and lifecycle gates.
+ */
+export const UPDATE_JOB_FAILURE_CODES = [
+  "job_not_found",
+  "not_your_job",
+  "criteria_locked",
+  "invalid_title",
+  "missing_description",
+  "invalid_work_mode",
+  "invalid_employment_type",
+  "invalid_city",
+  "invalid_sector",
+  "invalid_job_title",
+  "invalid_experience_level",
+  "invalid_website",
+] as const;
+
+export type UpdateJobFailureCode =
+  | (typeof UPDATE_JOB_FAILURE_CODES)[number]
+  | "not_installed"
+  | "unexpected";
+
+export type UpdateJobResult =
+  | { ok: true; jobId: string; editedAt: string | null }
+  | { ok: false; code: UpdateJobFailureCode };
+
+/** Failure codes `set_job_post_status` can report. */
+export const SET_JOB_STATUS_FAILURE_CODES = [
+  "job_not_found",
+  "not_your_job",
+  "invalid_status",
+] as const;
+
+export type SetJobStatusFailureCode =
+  | (typeof SET_JOB_STATUS_FAILURE_CODES)[number]
+  | "not_installed"
+  | "unexpected";
+
+export type SetJobStatusResult =
+  | { ok: true; jobId: string; status: JobStatus }
+  | { ok: false; code: SetJobStatusFailureCode };
+
+/** Failure codes `delete_job_post` can report. */
+export const DELETE_JOB_FAILURE_CODES = ["job_not_found", "not_your_job"] as const;
+
+export type DeleteJobFailureCode =
+  | (typeof DELETE_JOB_FAILURE_CODES)[number]
+  | "not_installed"
+  | "unexpected";
+
+export type DeleteJobResult = { ok: true; jobId: string } | { ok: false; code: DeleteJobFailureCode };
 
 export type ApplicantsResult =
   | { ok: true; applicants: JobApplicant[] }
@@ -189,6 +250,8 @@ export interface CreateJobParams {
   requirements: string[];
   skills: string[];
   website: string | null;
+  /** The closing date's instant, or null for no deadline. */
+  closesAt: string | null;
 }
 
 export async function createJobPost(
@@ -212,6 +275,7 @@ export async function createJobPost(
     p_requirements: params.requirements,
     p_skills: params.skills,
     p_website: params.website,
+    p_closes_at: params.closesAt,
   });
 
   if (error) {
@@ -267,6 +331,143 @@ export async function applyToJob(db: SupabaseClient, params: ApplyParams): Promi
   }
 
   return { ok: true, applicationId: row.application_id };
+}
+
+export interface UpdateJobParams {
+  actorId: string;
+  jobId: string;
+  title: string;
+  cityId: string;
+  sectorId: string;
+  jobTitle: string;
+  experienceLevel: string;
+  workMode: string;
+  employmentType: string;
+  salary: string | null;
+  description: string;
+  /** NULL leaves the stored list alone — see `update_job_post`. */
+  responsibilities: string[] | null;
+  requirements: string[] | null;
+  skills: string[] | null;
+  website: string | null;
+  /** The closing date's instant; null clears the deadline. */
+  closesAt: string | null;
+}
+
+/**
+ * Save an edit. Only the poster's own posting can be written, and the four
+ * targeting dimensions are frozen once an application exists — both rules
+ * live in `update_job_post`, so the caller gets the database's answer rather
+ * than a client-side guess. The closing date is NOT part of that freeze: it
+ * moves freely, because it changes until when applications are taken, not who
+ * is eligible. `editedAt` is the stamp the write set; it stays put when the
+ * save changed nothing.
+ */
+export async function updateJobPost(
+  db: SupabaseClient,
+  params: UpdateJobParams
+): Promise<UpdateJobResult> {
+  const { data, error } = await callPerformanceRpc(db, "update_job_post", {
+    p_actor_id: params.actorId,
+    p_job_id: params.jobId,
+    p_title: params.title,
+    p_city_id: params.cityId,
+    p_sector_id: params.sectorId,
+    p_job_title: params.jobTitle,
+    p_experience_level: params.experienceLevel,
+    p_work_mode: params.workMode,
+    p_employment_type: params.employmentType,
+    p_salary: params.salary,
+    p_description: params.description,
+    p_responsibilities: params.responsibilities,
+    p_requirements: params.requirements,
+    p_skills: params.skills,
+    p_website: params.website,
+    p_closes_at: params.closesAt,
+  });
+
+  if (error) {
+    const code = readRaised(error);
+    const known = (UPDATE_JOB_FAILURE_CODES as readonly string[]).includes(code);
+    if (!known && code !== "not_installed") {
+      console.error("[jobs] update failed:", error);
+    }
+    return { ok: false, code: known ? (code as UpdateJobFailureCode) : code === "not_installed" ? "not_installed" : "unexpected" };
+  }
+
+  const row = (data ?? [])[0];
+  if (!row) {
+    console.error("[jobs] update returned no row");
+    return { ok: false, code: "unexpected" };
+  }
+
+  return { ok: true, jobId: row.job_id, editedAt: row.edited_at ?? null };
+}
+
+/**
+ * Close or reopen a posting. Closing is the reversible end of a role's life:
+ * the row, its URL, its applicant list and its history all stay.
+ */
+export async function setJobPostStatus(
+  db: SupabaseClient,
+  params: { actorId: string; jobId: string; status: JobStatus }
+): Promise<SetJobStatusResult> {
+  const { data, error } = await callPerformanceRpc(db, "set_job_post_status", {
+    p_actor_id: params.actorId,
+    p_job_id: params.jobId,
+    p_status: params.status,
+  });
+
+  if (error) {
+    const code = readRaised(error);
+    const known = (SET_JOB_STATUS_FAILURE_CODES as readonly string[]).includes(code);
+    if (!known && code !== "not_installed") {
+      console.error("[jobs] status change failed:", error);
+    }
+    return { ok: false, code: known ? (code as SetJobStatusFailureCode) : code === "not_installed" ? "not_installed" : "unexpected" };
+  }
+
+  const row = (data ?? [])[0];
+  if (!row) {
+    console.error("[jobs] status change returned no row");
+    return { ok: false, code: "unexpected" };
+  }
+
+  // The database returns the stored status, so the route never echoes the
+  // value the request asked for.
+  return { ok: true, jobId: row.job_id, status: row.job_status as JobStatus };
+}
+
+/**
+ * Permanently delete a posting. The applications cascade with the row, so this
+ * is the irreversible action — closing is the reversible one. Resume objects
+ * stay in R2 for the orphan audit to reclaim.
+ */
+export async function deleteJobPost(
+  db: SupabaseClient,
+  params: { actorId: string; jobId: string }
+): Promise<DeleteJobResult> {
+  const { data, error } = await callPerformanceRpc(db, "delete_job_post", {
+    p_actor_id: params.actorId,
+    p_job_id: params.jobId,
+  });
+
+  if (error) {
+    const code = readRaised(error);
+    const known = (DELETE_JOB_FAILURE_CODES as readonly string[]).includes(code);
+    if (!known && code !== "not_installed") {
+      console.error("[jobs] delete failed:", error);
+    }
+    return { ok: false, code: known ? (code as DeleteJobFailureCode) : code === "not_installed" ? "not_installed" : "unexpected" };
+  }
+
+  const row = (data ?? [])[0];
+  if (!row) {
+    console.error("[jobs] delete returned no row");
+    return { ok: false, code: "unexpected" };
+  }
+
+  return { ok: true, jobId: row.job_id };
 }
 
 /**

@@ -3,8 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { BackLink } from "@/components/ui/BackLink";
 import { JobDetail } from "@/components/jobs/JobDetail";
-import { timeAgoLabel } from "@/lib/jobs/format";
-import { getJobDetail, loadJobViewer } from "@/lib/jobs/service";
+import { deadlineFields, editedLabel, timeAgoLabel } from "@/lib/jobs/format";
+import { getJobDetail, loadJobMasterData, loadJobViewer } from "@/lib/jobs/service";
 
 export const metadata = { title: "Job — uxcommunity" };
 
@@ -34,6 +34,11 @@ export default async function JobDetailPage({
     notFound();
   }
 
+  // The criteria master data is only needed by the owner's edit form, so it is
+  // read only when this viewer is the poster — everyone else sees the posting
+  // and no controls.
+  const master = job.is_mine ? await loadJobMasterData(db) : undefined;
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-6">
       <BackLink
@@ -45,9 +50,12 @@ export default async function JobDetailPage({
       <div className="mt-4">
         <JobDetail
           viewer={viewer}
+          master={master}
           job={{
             ...job,
             posted_label: timeAgoLabel(job.created_at),
+            updated_label: editedLabel(job.created_at, job.updated_at),
+            ...deadlineFields(job),
             my_application: job.my_application
               ? { ...job.my_application, applied_label: timeAgoLabel(job.my_application.created_at) }
               : null,

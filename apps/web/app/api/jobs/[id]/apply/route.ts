@@ -10,6 +10,8 @@ const STATUS_FOR_FAILURE: Record<ApplyFailureCode, number> = {
   job_not_found: 404,
   unknown_user: 401,
   own_job: 409,
+  job_closed: 409,
+  job_expired: 409,
   invalid_name: 422,
   invalid_portfolio_url: 422,
   invalid_linkedin_url: 422,
@@ -23,6 +25,8 @@ const STATUS_FOR_FAILURE: Record<ApplyFailureCode, number> = {
 const MESSAGE_FOR_FAILURE: Partial<Record<ApplyFailureCode, string>> = {
   job_not_found: "This job no longer exists.",
   own_job: "You posted this job.",
+  job_closed: "This posting is closed — it is no longer accepting applications.",
+  job_expired: "This posting’s closing date has passed — it is no longer accepting applications.",
   not_eligible:
     "This job is only open to members whose city, sector, job title and experience level match the posting.",
   already_applied: "You have already applied to this job.",

@@ -72,6 +72,8 @@ export async function POST(request: NextRequest) {
     requirements: data.requirements ?? [],
     skills: data.skills ?? [],
     website: data.website ? data.website : null,
+    // Already the instant, converted by the schema's transform.
+    closesAt: data.closes_at,
   });
 
   if (!result.ok) {

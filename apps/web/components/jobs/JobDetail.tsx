@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, CheckCircle2, ExternalLink, Globe, Users } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, ExternalLink, Globe, Lock, Users } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { RichText } from "@/components/ui/RichText";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
-import { KindBadge, LockedNote, MetaChip } from "./JobBadges";
+import { JobStateBadge, KindBadge, LockedNote, MetaChip } from "./JobBadges";
+import { JobOwnerActions } from "./JobOwnerActions";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { experienceYearsLabel } from "@/lib/jobs/format";
+import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types";
 
@@ -20,8 +23,24 @@ import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types"
  *
  * Rendered both inside the board's detail pane and, standalone, on the
  * posting's own page — the host surface owns layout, so this is content only.
+ *
+ * `master` is only needed for the owner's controls (their edit form picks from
+ * the criteria master data) and is optional for that reason: the board's pane
+ * only ever shows other members' roles, so it renders without it.
+ *
+ * A posting that is not taking applications — the owner closed it, or its
+ * closing date passed — says so in place of the Apply action rather than
+ * presenting a button that can only fail.
  */
-export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) {
+export function JobDetail({
+  job,
+  viewer,
+  master,
+}: {
+  job: JobPost;
+  viewer: JobViewer;
+  master?: JobMasterData;
+}) {
   const guard = useGuardedRouter();
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
@@ -42,7 +61,8 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
                   {experienceYearsLabel(job.experience_level_label)}
                 </span>
               </h1>
-              <div className="shrink-0 pt-1">
+              <div className="flex shrink-0 items-center gap-2 pt-1">
+                <JobStateBadge job={job} />
                 <KindBadge kind={job.kind} />
               </div>
             </div>
@@ -62,6 +82,21 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
                 </>
               )}
             </p>
+            {/* The edit stamp rides beside the post time so a reader can tell
+                a posting was revised — `updated_label` is null when it never
+                was, so this never claims a change that did not happen. */}
+            <p className="mt-1.5 font-body text-xs text-foreground-subtle">
+              Posted {job.posted_label}
+              {job.updated_label ? ` · ${job.updated_label}` : ""}
+              {job.deadline_label ? (
+                <>
+                  {" · "}
+                  <span className={job.deadline_expired ? "text-amber-500" : undefined}>
+                    {job.deadline_label}
+                  </span>
+                </>
+              ) : null}
+            </p>
           </div>
         </div>
 
@@ -78,7 +113,35 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
                 <Users strokeWidth={2.5} size={14} />
                 View {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
               </button>
+              {master && (
+                <div className="ml-auto">
+                  <JobOwnerActions job={job} master={master} />
+                </div>
+              )}
             </>
+          ) : job.status === "closed" || job.deadline_expired ? (
+            // Not taking applications replaces the Apply action entirely:
+            // there is nothing to apply to, and a locked-eligibility note would
+            // blame the wrong thing. An existing application is still named,
+            // because it still exists — neither closing nor a passed deadline
+            // is a withdrawal. "Closed" and "expired" stay separate words: one
+            // is the owner's decision, the other is the calendar's.
+            <div className="flex flex-col gap-1.5">
+              <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
+                {job.status === "closed" ? (
+                  <Lock strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                ) : (
+                  <Clock strokeWidth={2.5} size={14} className="shrink-0 text-amber-500" />
+                )}
+                {job.status === "closed" ? "This posting is closed" : "This posting has expired"}
+              </span>
+              <p className="font-body text-xs text-foreground-subtle">
+                {job.status === "closed"
+                  ? "It is no longer accepting applications."
+                  : "Its closing date has passed, so it is no longer accepting applications."}
+                {appliedSentence(job)}
+              </p>
+            </div>
           ) : job.applied ? (
             <div className="flex flex-col gap-1.5">
               <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
@@ -178,9 +241,7 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
       </div>
 
       <Section title="About the role">
-        <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
-          {job.description}
-        </p>
+        <RichText html={job.description} />
       </Section>
 
       {job.responsibilities.length > 0 && (
@@ -257,6 +318,13 @@ export function JobDetail({ job, viewer }: { job: JobPost; viewer: JobViewer }) 
       )}
     </div>
   );
+}
+
+/** One line telling an applicant their application still stands. */
+function appliedSentence(job: JobPost): string {
+  if (!job.applied) return "";
+  const when = job.my_application?.applied_label;
+  return ` Your application was submitted${when ? ` ${when}` : ""}.`;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

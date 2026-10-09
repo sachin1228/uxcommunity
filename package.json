@@ -54,6 +54,7 @@
     "test:sidebar-content": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/panel/sidebar-content.test.ts",
     "test:sidebar-order": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/panel/sidebar-order.test.ts",
     "test:undo-toast": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/undo-toast.test.ts",
+    "test:jobs": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/jobs/format.test.ts apps/web/lib/jobs/rich-text.test.ts",
     "test:going-list": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/events/going-list.test.ts",
     "test:chat-scroll": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/chatUtils.test.ts",
     "test:mention-jumps": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/mention-jumps.test.ts",

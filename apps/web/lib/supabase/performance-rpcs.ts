@@ -200,6 +200,8 @@ type PerformanceRpcMap = {
       p_requirements: string[];
       p_skills: string[];
       p_website: string | null;
+      /** The closing date's instant, or null for no deadline. */
+      p_closes_at: string | null;
     };
     returns: Array<{ job_id: string; created_at: string }>;
   };
@@ -225,6 +227,41 @@ type PerformanceRpcMap = {
   get_job_applicants: {
     args: { p_poster_id: string; p_job_id: string };
     returns: Array<{ item: Json }>;
+  };
+  // The owner-side writes (see 20261009170000_job_lifecycle.sql). Like the
+  // rest, the actor id is the session user and the function re-checks that
+  // the posting is theirs, so a request can never edit or delete another
+  // member's posting.
+  update_job_post: {
+    args: {
+      p_actor_id: string;
+      p_job_id: string;
+      p_title: string;
+      p_city_id: string;
+      p_sector_id: string;
+      p_job_title: string;
+      p_experience_level: string;
+      p_work_mode: string;
+      p_employment_type: string;
+      p_salary: string | null;
+      p_description: string;
+      /** NULL means "leave the stored list alone" (update_job_post only). */
+      p_responsibilities: string[] | null;
+      p_requirements: string[] | null;
+      p_skills: string[] | null;
+      p_website: string | null;
+      /** NULL clears the deadline. */
+      p_closes_at: string | null;
+    };
+    returns: Array<{ job_id: string; edited_at: string | null }>;
+  };
+  set_job_post_status: {
+    args: { p_actor_id: string; p_job_id: string; p_status: string };
+    returns: Array<{ job_id: string; job_status: string }>;
+  };
+  delete_job_post: {
+    args: { p_actor_id: string; p_job_id: string };
+    returns: Array<{ job_id: string }>;
   };
 };
 
