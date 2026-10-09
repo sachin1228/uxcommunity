@@ -292,13 +292,31 @@ export function ResourceCard({
     </div>
   );
 
+  // The card root opens the detail view; clicks on nested controls — the
+  // author's profile links, the options menu, the external preview — must not
+  // also open it. Same guard as the thread and showcase cards.
+  function handleCardClick(event: React.MouseEvent<HTMLElement>) {
+    if (!onOpen) return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    onOpen();
+  }
+
+  function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (!onOpen || event.key !== "Enter") return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    event.preventDefault();
+    onOpen();
+  }
+
   return (
     <>
       <article
         tabIndex={onOpen ? 0 : undefined}
         role={onOpen ? "link" : undefined}
-        onClick={onOpen ? onOpen : undefined}
-        onKeyDown={onOpen ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
+        onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
         // Same shell rule as the thread card: a list card is clickable, the
         // detail card (which now holds the discussion) is not and takes the
         // roomier detail padding.
@@ -310,6 +328,7 @@ export function ResourceCard({
           <PostAuthorMeta
             name={resource.users?.name}
             avatarUrl={resource.users?.avatar_url}
+            userId={resource.users ? resource.user_id : null}
             createdAt={resource.created_at}
             dateInline
             secondaryLabel={`Resources · ${typeInfo?.label ?? "Post"}`}

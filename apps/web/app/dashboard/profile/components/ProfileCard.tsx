@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment } from "react";
-import { Building2, Camera, PenLine, Plus } from "lucide-react";
+import Link from "next/link";
+import { Building2, Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -9,7 +10,8 @@ import type { ProfileCompanyView } from "@/components/companies/types";
 interface ProfileCardProps {
   name: string;
   avatarUrl: string | null;
-  onOpenAvatarPicker: () => void;
+  /** Omitted on read-only surfaces (other members' profiles) — hides the picker overlay. */
+  onOpenAvatarPicker?: () => void;
   city: string | null;
   sector: string | null;
   /**
@@ -20,19 +22,39 @@ interface ProfileCardProps {
   bio: string;
   /** The verified company on the profile, or null when none is set. */
   company: ProfileCompanyView | null;
-  /** Opens the company picker: adding when none is set, changing when one is. */
-  onEditCompany: () => void;
-  /** Opens the Edit Profile modal (identity details + group swap). */
-  onOpenEditProfile: () => void;
+  /** Opens the company picker: adding when none is set, changing when one is. Omitted on read-only surfaces, where the company links to its page instead. */
+  onEditCompany?: () => void;
+  /** Opens the Edit Profile modal (identity details + group swap). Omitted on read-only surfaces. */
+  onOpenEditProfile?: () => void;
+  /** The member's links — rendered as chips on other members' profiles when set. */
+  linkedin?: string;
+  portfolio?: string;
+}
+
+/**
+ * Normalizes a stored link into something safe to put in `href`, or null when
+ * it cannot be one. Values are user-typed, so only http(s) survives — the
+ * `https://` prefix is added when the member left the scheme off.
+ */
+function externalUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * The profile hero: display picture, name, role line, city/sector line, the
- * company card and bio. It carries no cover image and no card chrome of its
- * own —
+ * company card, bio and (on read-only surfaces) the member's links. It carries
+ * no cover image and no card chrome of its own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
- * the only image and everything here sits directly on the page. Contact details
- * and links live on the Settings page (`app/dashboard/settings`).
+ * the only image and everything here sits directly on the page. The owner's
+ * contact details live on the Settings page (`app/dashboard/settings`).
  */
 export function ProfileCard({
   name,
@@ -45,7 +67,11 @@ export function ProfileCard({
   company,
   onEditCompany,
   onOpenEditProfile,
+  linkedin = "",
+  portfolio = "",
 }: ProfileCardProps) {
+  const linkedinUrl = externalUrl(linkedin);
+  const portfolioUrl = externalUrl(portfolio);
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
   // an empty frame.
@@ -90,17 +116,19 @@ export function ProfileCard({
           ) : (
             <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
           )}
-          <button
-            type="button"
-            onClick={onOpenAvatarPicker}
-            aria-label="Change profile picture"
-            title="Change profile picture"
-            className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none ${
-              hasPicture ? "rounded-2xl" : "rounded-full"
-            }`}
-          >
-            <Camera strokeWidth={2.5} size={20} />
-          </button>
+          {onOpenAvatarPicker && (
+            <button
+              type="button"
+              onClick={onOpenAvatarPicker}
+              aria-label="Change profile picture"
+              title="Change profile picture"
+              className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none ${
+                hasPicture ? "rounded-2xl" : "rounded-full"
+              }`}
+            >
+              <Camera strokeWidth={2.5} size={20} />
+            </button>
+          )}
         </div>
 
         {/* Name and the role line stack on the left; Edit sits at the right
@@ -131,14 +159,16 @@ export function ProfileCard({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenEditProfile}
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-          >
-            <PenLine strokeWidth={2.5} size={11} />
-            Edit Profile
-          </button>
+          {onOpenEditProfile && (
+            <button
+              type="button"
+              onClick={onOpenEditProfile}
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+            >
+              <PenLine strokeWidth={2.5} size={11} />
+              Edit Profile
+            </button>
+          )}
         </div>
 
         {/* The company has its own card under the identity block, clear of the
@@ -154,18 +184,51 @@ export function ProfileCard({
             not something to advertise any more. */}
         <div className="mt-3">
           {company ? (
-            <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onEditCompany}
+            onEditCompany ? (
+              <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onEditCompany}
+                  title={
+                    company.isActive
+                      ? company.domain
+                        ? `Verified via ${company.domain} — change it`
+                        : "Change company"
+                      : "This company is no longer active — add another"
+                  }
+                  className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
+                    company.isActive ? "text-foreground" : "text-foreground-subtle"
+                  }`}
+                >
+                  <Building2
+                    strokeWidth={2.5}
+                    size={14}
+                    className={`shrink-0 ${company.isActive ? "text-accent" : ""}`}
+                  />
+                  <span className="truncate">{company.name}</span>
+                  {company.isActive && company.domainVerified && (
+                    <VerifiedMark label={false} size="xs" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onEditCompany}
+                  aria-label={`Edit the company on your profile: ${company.name}`}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                >
+                  <PenLine strokeWidth={2.5} size={11} />
+                  Edit
+                </button>
+              </div>
+            ) : (
+              // Read-only surfaces show the same chip, but it leads to the
+              // company's page instead of the picker.
+              <Link
+                href={`/dashboard/companies/${company.slug}`}
                 title={
-                  company.isActive
-                    ? company.domain
-                      ? `Verified via ${company.domain} — change it`
-                      : "Change company"
-                    : "This company is no longer active — add another"
+                  company.isActive && company.domain ? `Verified via ${company.domain}` : undefined
                 }
-                className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
+                className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
                   company.isActive ? "text-foreground" : "text-foreground-subtle"
                 }`}
               >
@@ -178,18 +241,9 @@ export function ProfileCard({
                 {company.isActive && company.domainVerified && (
                   <VerifiedMark label={false} size="xs" />
                 )}
-              </button>
-              <button
-                type="button"
-                onClick={onEditCompany}
-                aria-label={`Edit the company on your profile: ${company.name}`}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-              >
-                <PenLine strokeWidth={2.5} size={11} />
-                Edit
-              </button>
-            </div>
-          ) : (
+              </Link>
+            )
+          ) : onEditCompany ? (
             <button
               type="button"
               onClick={onEditCompany}
@@ -198,12 +252,41 @@ export function ProfileCard({
               <Plus strokeWidth={2.5} size={14} />
               Add your company
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Bio */}
         {bio && (
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
+        )}
+
+        {/* Links — only on other members' profiles, where they are the point
+            of the page. A member edits their own links from Edit Profile. */}
+        {(linkedinUrl || portfolioUrl) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {linkedinUrl && (
+              <a
+                href={linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <Linkedin strokeWidth={2.5} size={12} />
+                LinkedIn
+              </a>
+            )}
+            {portfolioUrl && (
+              <a
+                href={portfolioUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <Globe strokeWidth={2.5} size={12} />
+                Portfolio
+              </a>
+            )}
+          </div>
         )}
 
       </div>

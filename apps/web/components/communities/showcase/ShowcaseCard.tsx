@@ -191,6 +191,7 @@ export function ShowcaseCard({
           <PostAuthorMeta
             name={post.author.name}
             avatarUrl={post.author.avatar_url}
+            userId={post.user_id}
             createdAt={post.created_at}
             dateInline
             secondaryLabel={`Showcase · ${categoryLabel}`}

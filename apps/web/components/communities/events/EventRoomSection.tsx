@@ -17,6 +17,7 @@ import {
   hostScheduleForViewer,
 } from "@/lib/communities/event-display";
 import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
+import { profileHref } from "@/lib/profile/links";
 import { goingPreview, toGoingEntries } from "./going-list";
 
 const REQUEST_STALE_MS = 60_000;
@@ -301,19 +302,25 @@ export function EventRoomSection({
           <ul className="mt-3 flex flex-col gap-2.5">
             {visible.map((entry) => (
               <li key={entry.user_id} className="flex items-center gap-2.5">
-                <AvatarImg
-                  url={entry.avatar_url}
-                  name={entry.name}
-                  size={28}
-                  className="h-7 w-7 shrink-0 rounded-full object-cover"
-                />
-                <span
-                  className={`min-w-0 truncate font-body text-sm ${
-                    entry.is_self ? "font-medium text-foreground" : "text-foreground-muted"
-                  }`}
+                <Link
+                  href={profileHref(entry.user_id)}
+                  title={entry.name}
+                  className="flex min-w-0 items-center gap-2.5"
                 >
-                  {entry.label}
-                </span>
+                  <AvatarImg
+                    url={entry.avatar_url}
+                    name={entry.name}
+                    size={28}
+                    className="h-7 w-7 shrink-0 rounded-full object-cover"
+                  />
+                  <span
+                    className={`min-w-0 truncate font-body text-sm hover:underline ${
+                      entry.is_self ? "font-medium text-foreground" : "text-foreground-muted"
+                    }`}
+                  >
+                    {entry.label}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

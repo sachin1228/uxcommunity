@@ -400,6 +400,7 @@ export function ThreadCard({
           <PostAuthorMeta
             name={authorName}
             avatarUrl={thread.users?.avatar_url}
+            userId={thread.users ? thread.user_id : null}
             createdAt={thread.created_at}
             dateLabel={dateLabel}
             dateInline

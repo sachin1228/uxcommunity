@@ -1,10 +1,12 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { Check, ClipboardList, MoreHorizontal, Search, Users, X } from "lucide-react";
 import { EVENT_JOIN_QUESTIONS } from "@/lib/communities/event-join-questions";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { Spinner } from "@/components/ui/Spinner";
+import { profileHref } from "@/lib/profile/links";
 import { ModeratorPermissionsModal } from "./ModeratorPermissionsModal";
 import { fetchJsonCached, getCachedRequest, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -398,18 +400,23 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
               <ul className="space-y-1">
                 {requests.map((req) => (
                   <li key={req.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 bg-surface-raised/50">
-                    <ChatAvatar name={req.name} url={req.avatar_url} size={9} />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-body text-sm font-semibold text-foreground truncate leading-none">{req.name}</p>
-                      <p className="font-body text-xs text-foreground-muted mt-0.5">
-                        Requested to join {timeAgo(req.requested_at)}
-                      </p>
-                      {req.request_message && (
-                        <blockquote className="mt-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs leading-relaxed text-foreground-muted">
-                          “{req.request_message}”
-                        </blockquote>
-                      )}
-                    </div>
+                    <Link
+                      href={profileHref(req.user_id)}
+                      className="flex min-w-0 flex-1 items-start gap-3"
+                    >
+                      <ChatAvatar name={req.name} url={req.avatar_url} size={9} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-sm font-semibold text-foreground truncate leading-none hover:underline">{req.name}</p>
+                        <p className="font-body text-xs text-foreground-muted mt-0.5">
+                          Requested to join {timeAgo(req.requested_at)}
+                        </p>
+                        {req.request_message && (
+                          <blockquote className="mt-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs leading-relaxed text-foreground-muted">
+                            “{req.request_message}”
+                          </blockquote>
+                        )}
+                      </div>
+                    </Link>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
@@ -479,32 +486,37 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                   <li
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-raised transition-colors"
                   >
-                    <ChatAvatar name={member.name} url={member.avatar_url} size={9} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="font-body text-sm font-semibold text-foreground truncate leading-none">
-                          {member.name}
-                        </p>
-                        {isOwnerRow ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
-                            Owner
-                          </span>
-                        ) : isAdminRow ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
-                            Admin
-                          </span>
-                        ) : isModeratorRow ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
-                            Moderator
-                          </span>
-                        ) : null}
+                    <Link
+                      href={profileHref(member.user_id)}
+                      className="flex min-w-0 flex-1 items-center gap-3"
+                    >
+                      <ChatAvatar name={member.name} url={member.avatar_url} size={9} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="font-body text-sm font-semibold text-foreground truncate leading-none hover:underline">
+                            {member.name}
+                          </p>
+                          {isOwnerRow ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
+                              Owner
+                            </span>
+                          ) : isAdminRow ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
+                              Admin
+                            </span>
+                          ) : isModeratorRow ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
+                              Moderator
+                            </span>
+                          ) : null}
+                        </div>
+                        {member.designation && (
+                          <p className="font-body text-xs text-foreground-muted truncate">
+                            {member.designation}
+                          </p>
+                        )}
                       </div>
-                      {member.designation && (
-                        <p className="font-body text-xs text-foreground-muted truncate">
-                          {member.designation}
-                        </p>
-                      )}
-                    </div>
+                    </Link>
                     {/* Row menu — managers only; each action checks its own
                         protected rows (see canRemoveRow / canModerateRow). */}
                     {manager && (canRemoveRow || canModerateRow) && (

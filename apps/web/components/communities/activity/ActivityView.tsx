@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { filterChip } from "@/components/communities/filter-chip";
+import { profileHref } from "@/lib/profile/links";
 import {
   actorLabel,
   describeActivity,
@@ -193,22 +195,49 @@ export function ActivityView({
                       {!isLast && (
                         <span aria-hidden="true" className="absolute left-[26px] top-10 bottom-0 w-px -translate-x-1/2 bg-border" />
                       )}
-                      <span
-                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
-                      >
-                        {isPlatform ? (
-                          "UX"
-                        ) : (
+                      {entry.actor_id && !isPlatform ? (
+                        <Link
+                          href={profileHref(entry.actor_id)}
+                          title={entry.actor_name ?? "Member"}
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold transition-opacity hover:opacity-85 ${ROLE_CHIP[entry.actor_role]}`}
+                        >
                           <ChatAvatar
                             name={entry.actor_name ?? "?"}
                             url={entry.actor_avatar_url ?? null}
                             size={6}
                           />
-                        )}
-                      </span>
+                        </Link>
+                      ) : (
+                        <span
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border p-0.5 font-body text-[8px] font-bold ${ROLE_CHIP[entry.actor_role]}`}
+                        >
+                          {isPlatform ? (
+                            "UX"
+                          ) : (
+                            <ChatAvatar
+                              name={entry.actor_name ?? "?"}
+                              url={entry.actor_avatar_url ?? null}
+                              size={6}
+                            />
+                          )}
+                        </span>
+                      )}
                       <div className="min-w-0 flex-1">
                         <p className="font-body text-sm text-foreground leading-relaxed">
-                          <span className="font-semibold">{isSelf ? "You" : actorLabel(entry)}</span>{" "}
+                          <span className="font-semibold">
+                            {isSelf ? (
+                              "You"
+                            ) : entry.actor_id ? (
+                              <Link
+                                href={profileHref(entry.actor_id)}
+                                className="hover:underline"
+                              >
+                                {actorLabel(entry)}
+                              </Link>
+                            ) : (
+                              actorLabel(entry)
+                            )}
+                          </span>{" "}
                           {describeActivity(entry)}
                         </p>
                         {excerpt && (
