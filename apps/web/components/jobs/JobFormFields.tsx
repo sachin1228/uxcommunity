@@ -1,7 +1,10 @@
 "use client";
 
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SelectField } from "@/components/ui/SelectField";
 import { closingDateFromInstant } from "@/lib/jobs/format";
+import { trimRichText } from "@/lib/jobs/rich-text";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { EmploymentType, JobPost, WorkMode } from "@/lib/jobs/types";
 import { EMPLOYMENT_TYPES, WORK_MODES } from "@/lib/jobs/types";
@@ -82,6 +85,36 @@ export function JobFormFields({
 }) {
   return (
     <>
+      <JobIdentityFields values={values} onChange={onChange} master={master} />
+      <JobCriteriaFields
+        values={values}
+        onChange={onChange}
+        master={master}
+        criteriaLocked={criteriaLocked}
+      />
+      <JobTermFields values={values} onChange={onChange} />
+    </>
+  );
+}
+
+/** What every group below takes from its host. */
+interface JobFieldProps {
+  values: JobFormValues;
+  onChange: (patch: Partial<JobFormValues>) => void;
+  master: JobMasterData;
+}
+
+/**
+ * The role itself: what it is called, what it says, and how it is worked.
+ *
+ * The three groups this form is built from are separate exports so a host can
+ * give each its own card — the post page does — while the edit modal draws them
+ * as one run of fields. The fields themselves are shared either way, which is
+ * what keeps the two surfaces from drifting apart.
+ */
+export function JobIdentityFields({ values, onChange, master }: JobFieldProps) {
+  return (
+    <>
       {/* Role */}
       <div className="flex flex-col gap-1.5">
         <span className={jobFieldLabel}>
@@ -97,6 +130,56 @@ export function JobFormFields({
         />
       </div>
 
+      {/* The description is the one field that is not a form control: it is
+          rich, so it holds its own formatting and takes no label association.
+          It sits directly under the title — a poster names the role, then says
+          what it is, before the criteria that decide who may apply. */}
+      <div className="flex flex-col gap-1.5">
+        <span className={jobFieldLabel}>
+          About the role <span className="text-red-400">*</span>
+        </span>
+        <RichTextEditor
+          id="job-description"
+          ariaLabel="About the role"
+          value={values.description}
+          onChange={(description) => onChange({ description })}
+          placeholder="What the team does, why this role exists, how you work…"
+        />
+      </div>
+
+      {/* Arrangement — how the role is worked, right beside the description
+          that says what it is. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className={jobFieldLabel}>Work mode</span>
+          <SelectField
+            value={values.workMode}
+            onChange={(workMode) => onChange({ workMode })}
+            options={WORK_MODES}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className={jobFieldLabel}>Employment type</span>
+          <SelectField
+            value={values.employmentType}
+            onChange={(employmentType) => onChange({ employmentType })}
+            options={EMPLOYMENT_TYPES}
+          />
+        </label>
+      </div>
+    </>
+  );
+}
+
+/** The four dimensions the eligibility rule compares. */
+export function JobCriteriaFields({
+  values,
+  onChange,
+  master,
+  criteriaLocked = false,
+}: JobFieldProps & { criteriaLocked?: boolean }) {
+  return (
+    <>
       {/* Criteria — the four dimensions that gate applying */}
       <div className="flex flex-col gap-1.5">
         <span className={jobFieldLabel}>
@@ -138,39 +221,20 @@ export function JobFormFields({
           />
         </div>
       </div>
+    </>
+  );
+}
 
-      {/* Arrangement */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className={jobFieldLabel}>Work mode</span>
-          <select
-            value={values.workMode}
-            onChange={(event) => onChange({ workMode: event.target.value as WorkMode })}
-            className="field"
-          >
-            {WORK_MODES.map((mode) => (
-              <option key={mode.value} value={mode.value}>
-                {mode.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className={jobFieldLabel}>Employment type</span>
-          <select
-            value={values.employmentType}
-            onChange={(event) => onChange({ employmentType: event.target.value as EmploymentType })}
-            className="field"
-          >
-            {EMPLOYMENT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
+/** How the offer is paid, where to read more, and when it stops. */
+export function JobTermFields({
+  values,
+  onChange,
+}: {
+  values: JobFormValues;
+  onChange: (patch: Partial<JobFormValues>) => void;
+}) {
+  return (
+    <>
       <label className="flex flex-col gap-1.5">
         <span className={jobFieldLabel}>
           Salary <span className="text-foreground-subtle">(optional)</span>
@@ -182,19 +246,6 @@ export function JobFormFields({
           placeholder="e.g. ₹18–24L / year — leave empty for “Not disclosed”"
           maxLength={80}
           className="field"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className={jobFieldLabel}>
-          About the role <span className="text-red-400">*</span>
-        </span>
-        <textarea
-          value={values.description}
-          onChange={(event) => onChange({ description: event.target.value })}
-          rows={4}
-          placeholder="What the team does, why this role exists, how you work…"
-          className="field resize-none"
         />
       </label>
 
@@ -241,7 +292,9 @@ export function jobFormPayload(values: JobFormValues) {
     work_mode: values.workMode,
     employment_type: values.employmentType,
     salary: values.salary.trim(),
-    description: values.description.trim(),
+    // The canonical subset, trimmed of the blank edges an editor leaves behind.
+    // The route sanitises again on the server; this only saves it the work.
+    description: trimRichText(values.description),
     website: values.website.trim(),
     closes_at: values.closesAt.trim(),
   };

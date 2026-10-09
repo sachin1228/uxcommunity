@@ -1,39 +1,48 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Plus } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
-import { EMPTY_JOB_FORM, JobFormFields, jobFieldLabel, jobFormPayload } from "./JobFormFields";
+import {
+  EMPTY_JOB_FORM,
+  JobCriteriaFields,
+  JobIdentityFields,
+  jobFieldLabel,
+  JobTermFields,
+  jobFormPayload,
+} from "./JobFormFields";
 import type { JobMasterData } from "@/lib/jobs/service";
+import { richTextIsEmpty } from "@/lib/jobs/rich-text";
 import type { JobKind, JobViewer } from "@/lib/jobs/types";
 import type { JobFormValues } from "./JobFormFields";
 
-interface PostJobModalProps {
-  open: boolean;
-  onClose: () => void;
-  viewer: JobViewer;
-  master: JobMasterData;
-  onCreated: (jobId: string) => void;
-}
-
 /**
- * Post a job, in one modal.
+ * Posting a job, on its own page.
+ *
+ * The form outgrew its dialog: a rich description, two post types, the company
+ * proof and seven role fields made a panel that scrolled inside a scroll. On a
+ * page it gets the full height, the posting it creates is a URL that survives a
+ * reload, and the member can move to another tab to fetch text without losing a
+ * half-written role.
  *
  * Both post types need the same proof — a company verified with a work email
- * (the membership row the profile badge reads). "Hiring" lets the poster
- * verify a company right here via the shared AddCompanyModal; "Referral"
- * posts under the company already verified on their profile. The form never
- * decides trust: the database's create_job_post re-checks the membership and
- * the master data before a row lands.
+ * (the membership row the profile badge reads). "Hiring" lets the poster verify
+ * a company in place via the shared AddCompanyModal; "Referral" posts under the
+ * company already verified on their profile. The form never decides trust: the
+ * database's create_job_post re-checks the membership and the master data
+ * before a row lands.
  *
  * The role fields themselves come from JobFormFields, which the edit modal
- * renders too — the two forms stay identical by construction.
+ * renders too — the two forms stay identical by construction. The fields are
+ * drawn here as three cards, one per kind of question: what the role is, who
+ * may apply for it, and the terms it comes with. A long form is easier to
+ * finish when it reads as three short ones.
  */
-export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJobModalProps) {
+export function PostJobForm({ viewer, master }: { viewer: JobViewer; master: JobMasterData }) {
   const router = useRouter();
 
   const [kind, setKind] = useState<JobKind>("hiring");
@@ -47,14 +56,6 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
   const company = viewer.company;
 
   const patch = (next: Partial<JobFormValues>) => setValues((current) => ({ ...current, ...next }));
-
-  function close() {
-    // A reopened form starts clean: a half-filled draft for a posting that
-    // was never made is noise, not an offer to resume.
-    setValues(EMPTY_JOB_FORM);
-    setError(null);
-    onClose();
-  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -72,7 +73,9 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
       setError("Choose the city, sector, job title and experience level — they decide who can apply.");
       return;
     }
-    if (!values.description.trim()) {
+    // A description of `<p><br></p>` is not empty by `trim` and says nothing,
+    // so the field is asked the same question the database will ask.
+    if (richTextIsEmpty(values.description)) {
       setError("Add a role description.");
       return;
     }
@@ -101,7 +104,9 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
         return;
       }
 
-      onCreated(body.job_id);
+      // The posting's own page is the receipt: it shows the role as members
+      // will see it, with the owner's controls on it.
+      router.push(`/dashboard/jobs/${body.job_id}`);
     } catch {
       setError("The job could not be posted. Check your connection and try again.");
       setSubmitting(false);
@@ -110,14 +115,15 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
 
   return (
     <>
-      <Modal open={open} onClose={close} title="Post a job" maxWidth="max-w-2xl">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {error && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-              {error}
-            </p>
-          )}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        {error && (
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
+            {error}
+          </p>
+        )}
 
+        {/* Card one — the role: what it is, and who is posting it. */}
+        <section className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-5">
           {/* Post type */}
           <div className="flex flex-col gap-1.5">
             <span className={jobFieldLabel}>Post type</span>
@@ -172,24 +178,31 @@ export function PostJobModal({ open, onClose, viewer, master, onCreated }: PostJ
             )}
           </div>
 
-          <JobFormFields values={values} onChange={patch} master={master} />
+          <JobIdentityFields values={values} onChange={patch} master={master} />
+        </section>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={close}
-              disabled={submitting}
-              className="modal-btn modal-btn-secondary"
-            >
-              Cancel
-            </button>
-            <button type="submit" disabled={submitting} className="modal-btn modal-btn-primary">
-              {submitting ? <Spinner className="h-3.5 w-3.5 text-white" /> : <Plus strokeWidth={2.5} size={14} />}
-              {submitting ? "Posting…" : "Publish job"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        {/* Card two — the four dimensions that decide who can apply. */}
+        <section className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-5">
+          <JobCriteriaFields values={values} onChange={patch} master={master} />
+        </section>
+
+        {/* Card three — the terms the role comes with. */}
+        <section className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-5">
+          <JobTermFields values={values} onChange={patch} />
+        </section>
+
+        <div className="flex justify-end gap-2 border-t border-border pt-4">
+          {/* A link, not a button that resets state: leaving the page is a
+              navigation, and it stays one for a middle-click or a back press. */}
+          <Link href="/dashboard/jobs" className="modal-btn modal-btn-secondary">
+            Cancel
+          </Link>
+          <button type="submit" disabled={submitting} className="modal-btn modal-btn-primary">
+            {submitting ? <Spinner className="h-3.5 w-3.5 text-white" /> : <Plus strokeWidth={2.5} size={14} />}
+            {submitting ? "Posting…" : "Publish job"}
+          </button>
+        </div>
+      </form>
 
       <AddCompanyModal
         open={showCompanyModal}

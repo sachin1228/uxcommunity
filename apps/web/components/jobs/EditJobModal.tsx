@@ -12,6 +12,7 @@ import {
   jobFormValuesFrom,
   type JobFormValues,
 } from "./JobFormFields";
+import { richTextIsEmpty } from "@/lib/jobs/rich-text";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost } from "@/lib/jobs/types";
 
@@ -55,7 +56,9 @@ export function EditJobModal({ open, onClose, job, master, onSaved }: EditJobMod
       setError("Choose the city, sector, job title and experience level — they decide who can apply.");
       return;
     }
-    if (!values.description.trim()) {
+    // A description of `<p><br></p>` is not empty by `trim` and says nothing,
+    // so the field is asked the same question the database will ask.
+    if (richTextIsEmpty(values.description)) {
       setError("Add a role description.");
       return;
     }

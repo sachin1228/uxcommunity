@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { closingInstantFromDate } from "./format";
+import {
+  RICH_TEXT_MAX_CHARS,
+  RICH_TEXT_MAX_HTML_CHARS,
+  richTextIsEmpty,
+  richTextToPlainText,
+  trimRichText,
+} from "./rich-text";
 
 /** Resumes are attached as files; only the URL-shaped fields are validated here. */
 export const jobApplicationSchema = z.object({
@@ -32,7 +39,32 @@ export const jobPostSchema = z.object({
   work_mode: z.enum(["remote", "hybrid", "onsite"]),
   employment_type: z.enum(["full_time", "part_time", "contract", "internship"]),
   salary: z.string().trim().max(80).optional().or(z.literal("")),
-  description: z.string().trim().min(1, "Add a role description").max(8000),
+  /**
+   * The description arrives as the rich field's html — or as plain text, from a
+   * caller that never touched the editor. Both go through the same sanitiser
+   * here, on the server, so the column only ever holds the subset the reader
+   * knows how to draw and nobody can skip the editor to store markup of their
+   * own choosing.
+   *
+   * Two limits, because there are two things to bound. The poster's is about
+   * the words: 8000 characters, however they format them. The store's is about
+   * the tags that carry those words, and is the constraint the migration sets
+   * on the column. The raw bound is checked first, so a huge body is refused
+   * before anything tries to parse it.
+   */
+  description: z
+    .string()
+    .max(RICH_TEXT_MAX_HTML_CHARS * 2, "That description is too long")
+    .transform((value) => trimRichText(value))
+    .refine((value) => !richTextIsEmpty(value), "Add a role description")
+    .refine(
+      (value) => richTextToPlainText(value).trim().length <= RICH_TEXT_MAX_CHARS,
+      `Keep the description to ${RICH_TEXT_MAX_CHARS} characters`
+    )
+    .refine(
+      (value) => value.length <= RICH_TEXT_MAX_HTML_CHARS,
+      "That description carries more formatting than we can store — simplify it and try again"
+    ),
   responsibilities: listField,
   requirements: listField,
   skills: listField,

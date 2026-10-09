@@ -480,6 +480,35 @@ select:focus-visible {
     height: 32px;
     padding: 0 26px 0 12px;
   }
+
+  /* The rich description field. A contentEditable takes the same skin as the
+     inputs it sits among, but none of their element-scoped padding reaches a
+     div — and the prose the browser writes into it needs the list markers and
+     paragraph rhythm that preflight removes. */
+  [contenteditable]:where(.field) {
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  [contenteditable]:where(.field) > * + * {
+    margin-top: 0.5rem;
+  }
+
+  [contenteditable]:where(.field) ul,
+  [contenteditable]:where(.field) ol {
+    padding-left: 1.25rem;
+    list-style-position: outside;
+  }
+
+  [contenteditable]:where(.field) ul {
+    list-style-type: disc;
+  }
+
+  [contenteditable]:where(.field) ol {
+    list-style-type: decimal;
+  }
 }
 
 /* ─── Modal surfaces + action buttons (Geist style, app theme) ────────

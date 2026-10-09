@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Briefcase, CheckCircle2, Clock, ExternalLink, Globe, Lock, Users } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { RichText } from "@/components/ui/RichText";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
 import { JobStateBadge, KindBadge, LockedNote, MetaChip } from "./JobBadges";
@@ -240,9 +241,7 @@ export function JobDetail({
       </div>
 
       <Section title="About the role">
-        <p className="whitespace-pre-line font-body text-sm leading-relaxed text-foreground">
-          {job.description}
-        </p>
+        <RichText html={job.description} />
       </Section>
 
       {job.responsibilities.length > 0 && (

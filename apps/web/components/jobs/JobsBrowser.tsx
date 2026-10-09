@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Briefcase, Plus, Search } from "lucide-react";
 import { JobCard } from "./JobCard";
 import { JobDetail } from "./JobDetail";
-import { PostJobModal } from "./PostJobModal";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
@@ -40,7 +39,6 @@ export function JobsBrowser({
   const seeded = (initialJobId && jobs.find((job) => job.id === initialJobId)) || null;
   const [tab, setTab] = useState<Tab>(seeded?.is_mine ? "posts" : "all");
   const [search, setSearch] = useState("");
-  const [postOpen, setPostOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
     seeded?.id ?? jobs.find((job) => !job.is_mine)?.id ?? null
   );
@@ -113,7 +111,7 @@ export function JobsBrowser({
         </div>
         <button
           type="button"
-          onClick={() => setPostOpen(true)}
+          onClick={() => router.push("/dashboard/jobs/new")}
           className="modal-btn modal-btn-primary shrink-0"
         >
           <Plus strokeWidth={2.5} size={14} />
@@ -214,7 +212,7 @@ export function JobsBrowser({
                     action={
                       <button
                         type="button"
-                        onClick={() => setPostOpen(true)}
+                        onClick={() => router.push("/dashboard/jobs/new")}
                         className="modal-btn modal-btn-primary mt-3"
                       >
                         <Plus strokeWidth={2.5} size={14} />
@@ -235,7 +233,7 @@ export function JobsBrowser({
                   action={
                     <button
                       type="button"
-                      onClick={() => setPostOpen(true)}
+                      onClick={() => router.push("/dashboard/jobs/new")}
                       className="modal-btn modal-btn-primary mt-3"
                     >
                       <Plus strokeWidth={2.5} size={14} />
@@ -267,19 +265,6 @@ export function JobsBrowser({
         )}
       </div>
 
-      {postOpen && (
-        <PostJobModal
-          open
-          onClose={() => setPostOpen(false)}
-          viewer={viewer}
-          master={master}
-          onCreated={(jobId) => {
-            setPostOpen(false);
-            setTab("posts");
-            router.push(`/dashboard/jobs/${jobId}`);
-          }}
-        />
-      )}
     </div>
   );
 }
