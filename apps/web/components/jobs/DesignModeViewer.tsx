@@ -33,9 +33,9 @@ type DesignSection = "home" | "portfolio" | "linkedin" | "resume" | "profile";
 /**
  * The poster's "design mode" for one posting's applications: a full-screen
  * takeover that renders each application the way its applicant would present
- * it — a light-mode portfolio page with the applicant's own details in the
- * left sidebar, an icon rail for switching sections, and the content on the
- * right. Deliberately light regardless of the app's theme (the `.design-light`
+ * it — a light-mode portfolio page with the applicant's own details and
+ * filled links in the left sidebar, and the section's content on the right.
+ * Deliberately light regardless of the app's theme (the `.design-light`
  * scope re-declares the light tokens): this is a preview of the applicant's
  * page, not app chrome.
  *
@@ -112,7 +112,8 @@ export function DesignModeViewer({
     guard.push(`/dashboard/profile/${applicant.applicant_id}`);
   }
 
-  const railItems: { key: DesignSection; label: string; icon: ReactNode }[] = [
+  // One entry per section — Home plus everything the applicant filled in.
+  const sectionItems: { key: DesignSection; label: string; icon: ReactNode }[] = [
     { key: "home", label: "Home", icon: <Home strokeWidth={2.25} size={18} /> },
     { key: "portfolio", label: "Portfolio", icon: <Globe strokeWidth={2.25} size={18} /> },
     { key: "linkedin", label: "LinkedIn", icon: <Linkedin strokeWidth={2.25} size={18} /> },
@@ -183,9 +184,10 @@ export function DesignModeViewer({
 
         <div className="flex min-h-0 flex-1">
           {/* Sidebar — the applicant's own details, the poster's decisions,
-              and the applicant's filled links at the foot: the same options
-              the applicant card carries, labeled and one click from the
-              poster's eye. */}
+              and every section at the foot: Home plus the options the
+              applicant filled in, labeled and one click from the poster's
+              eye. Below lg this column is hidden; the sections ride in a
+              horizontal strip over the page instead. */}
           <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
             <div className="flex flex-col items-center text-center">
               <AvatarImg
@@ -222,7 +224,13 @@ export function DesignModeViewer({
               />
             </div>
 
-            <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
+            <nav aria-label="Application sections" className="mt-auto flex flex-col gap-1 pt-8">
+              <SideLink
+                active={section === "home"}
+                icon={<Home strokeWidth={2.5} size={15} />}
+                label="Home"
+                onClick={() => setSection("home")}
+              />
               <SideLink
                 active={section === "portfolio"}
                 icon={<Globe strokeWidth={2.5} size={15} />}
@@ -252,41 +260,41 @@ export function DesignModeViewer({
             </nav>
           </aside>
 
-          {/* Icon rail — one icon per section; the active one expands into a
-              labeled pill that floats over the page edge. */}
-          <nav
-            aria-label="Application sections"
-            className="flex w-[72px] shrink-0 flex-col items-start justify-center gap-2 border-r border-border bg-surface pl-3.5"
-          >
-            {railItems.map((item) => {
-              const active = section === item.key;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  title={item.label}
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => setSection(item.key)}
-                  className={
-                    active
-                      ? "z-10 flex h-11 w-max cursor-pointer items-center rounded-full bg-accent px-3.5 text-accent-foreground shadow-[0_6px_20px_rgba(0,0,0,0.14)]"
-                      : "flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-foreground-subtle transition-colors hover:bg-accent-soft hover:text-foreground"
-                  }
-                >
-                  {item.icon}
-                  {active && (
-                    <span className="ml-2 whitespace-nowrap font-body text-xs font-semibold">
-                      {item.label}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
           {/* The page itself. */}
-          <div className="relative min-w-0 flex-1">
-            <div ref={scrollRef} className="h-full overflow-y-auto bg-background">
+          <div className="relative flex min-w-0 flex-1 flex-col">
+            {/* Below lg the sidebar is hidden, so the sections ride here as
+                a horizontal strip; the active one keeps its label. */}
+            <nav
+              aria-label="Application sections"
+              className="flex shrink-0 items-center justify-center gap-1 overflow-x-auto border-b border-border bg-surface px-3 py-2 lg:hidden"
+            >
+              {sectionItems.map((item) => {
+                const active = section === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    title={item.label}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setSection(item.key)}
+                    className={
+                      active
+                        ? "flex h-9 w-max shrink-0 cursor-pointer items-center rounded-full bg-accent px-3 text-accent-foreground shadow-[0_6px_20px_rgba(0,0,0,0.14)]"
+                        : "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-subtle transition-colors hover:bg-accent-soft hover:text-foreground"
+                    }
+                  >
+                    {item.icon}
+                    {active && (
+                      <span className="ml-2 whitespace-nowrap font-body text-xs font-semibold">
+                        {item.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-background">
               <div className="mx-auto w-full max-w-3xl px-6 pb-32 pt-12 sm:px-10">
                 {section === "home" ? (
                   <HomeSection applicant={applicant} job={job} onSection={setSection} />
