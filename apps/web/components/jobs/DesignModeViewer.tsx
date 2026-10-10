@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
+  ArrowUpRight,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -32,8 +33,9 @@ type DesignSection = "portfolio" | "linkedin" | "resume";
  * present it: the applicant's own details and filled links in the left
  * sidebar, and the chosen link loaded in place on the right — an iframe with
  * nothing between the poster and the page itself (resume PDFs render in our
- * own viewer instead, whose tools float on the right edge). Rendered in the
- * app's dark palette (the `.design-dark` scope re-declares the dark tokens)
+ * own viewer instead, whose tools float on the right edge; LinkedIn refuses
+ * framing, so its pane states that and links out). Rendered in the app's
+ * dark palette (the `.design-dark` scope re-declares the dark tokens)
  * regardless of the OS theme: this is the applicant's page, not app chrome.
  *
  * The URL pins the applicant being reviewed — a decision refreshes the data
@@ -281,6 +283,8 @@ export function DesignModeViewer({
           <div className="min-h-0 flex-1 bg-background">
             {isPdf ? (
               <ResumePdf key={sectionUrl} url={sectionUrl} />
+            ) : section === "linkedin" ? (
+              <LinkedInRefusal url={sectionUrl} />
             ) : (
               <iframe
                 src={sectionUrl}
@@ -427,6 +431,37 @@ function DecisionButtons({
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * LinkedIn refuses to be framed (X-Frame-Options: DENY, browser-enforced),
+ * so its pane does not bother with an iframe — it states the refusal and
+ * offers the profile in a new tab, the only way LinkedIn lets itself be read.
+ */
+function LinkedInRefusal({ url }: { url: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft text-foreground-muted">
+        <Linkedin strokeWidth={2} size={22} />
+      </span>
+      <p className="mt-1 font-body text-sm font-medium text-foreground">
+        LinkedIn can’t open in this pane
+      </p>
+      <p className="max-w-xs font-body text-xs leading-relaxed text-foreground-subtle">
+        LinkedIn blocks its pages from being embedded in other sites — open the
+        profile in a new tab instead.
+      </p>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-accent px-4 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+      >
+        Open on LinkedIn
+        <ArrowUpRight strokeWidth={2.5} size={15} />
+      </a>
+    </div>
   );
 }
 
