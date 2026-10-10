@@ -8,7 +8,50 @@ import { JobDetail } from "./JobDetail";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
-type Tab = "hiring" | "referral" | "applied" | "posts";
+/** The two browse tabs. They carry an unseen-roles badge instead of a total. */
+type BrowseKind = "hiring" | "referral";
+type Tab = BrowseKind | "applied" | "posts";
+
+/**
+ * "N new" — matched roles posted since the member last opened that browse
+ * tab. There is no read tracking in the database, so the cut-off lives in the
+ * browser, keyed per account, and is carried as the newest posting instant
+ * that has been seen — a value taken from the data itself, never the browser
+ * clock, so the two sides cannot disagree. A kind with none stored counts
+ * everything as new, so a first visit shows what is waiting for the profile.
+ */
+const seenStorageKey = (viewerId: string) => `uxcommunity:jobs-seen:${viewerId}`;
+
+function readTabSeen(viewerId: string): Partial<Record<BrowseKind, number>> {
+  try {
+    const raw = window.localStorage.getItem(seenStorageKey(viewerId));
+    return raw ? (JSON.parse(raw) as Partial<Record<BrowseKind, number>>) : {};
+  } catch {
+    // Unreadable storage reads as "never visited": everything counts as new.
+    return {};
+  }
+}
+
+function markTabSeen(viewerId: string, kind: BrowseKind, newestPosted: number): void {
+  // An empty list marks nothing — the old cut-off stays, so roles arriving
+  // after an empty visit still count as new.
+  if (!(newestPosted > 0)) return;
+  try {
+    const seen = readTabSeen(viewerId);
+    // Only ever forward: two tabs racing, or a StrictMode replay, must not
+    // move the cut-off backwards.
+    if ((seen[kind] ?? 0) >= newestPosted) return;
+    seen[kind] = newestPosted;
+    window.localStorage.setItem(seenStorageKey(viewerId), JSON.stringify(seen));
+  } catch {
+    // Storage unavailable (private mode): the badge simply reappears next visit.
+  }
+}
+
+/** The newest posting instant in a list, or 0 for an empty one. */
+function newestInstant(list: JobPost[]): number {
+  return list.reduce((max, job) => Math.max(max, Date.parse(job.created_at)), 0);
+}
 
 /**
  * The jobs board, LinkedIn-style: the browse tabs split the open roles by
@@ -87,6 +130,31 @@ export function JobsBrowser({
   const referralJobs = referralPosts.filter((job) => job.can_apply);
   const appliedJobs = jobs.filter((job) => !job.is_mine && job.applied);
 
+  // The browse tabs' "N new", counted once on arrival from the stored
+  // cut-off. The ref gate matters twice: it keeps the count from depending on
+  // derived-array identities, and StrictMode's mount replay would otherwise
+  // recompute AFTER the first run marked the tab seen — blanking the badge
+  // the moment the page opened.
+  const [tabNewCounts, setTabNewCounts] = useState<Record<BrowseKind, number> | null>(null);
+  const countedRef = useRef(false);
+  useEffect(() => {
+    if (countedRef.current) return;
+    countedRef.current = true;
+
+    const seen = readTabSeen(viewer.id);
+    setTabNewCounts({
+      hiring: hiringJobs.filter((job) => Date.parse(job.created_at) > (seen.hiring ?? 0)).length,
+      referral: referralJobs.filter((job) => Date.parse(job.created_at) > (seen.referral ?? 0))
+        .length,
+    });
+
+    // The tab the board opens on is being looked at right now — remember
+    // what was seen, so the next visit only counts roles posted after this.
+    if (tab === "hiring" || tab === "referral") {
+      markTabSeen(viewer.id, tab, newestInstant(tab === "hiring" ? hiringJobs : referralJobs));
+    }
+  }, [hiringJobs, referralJobs, tab, viewer.id]);
+
   // The active tab's browse list, or null on the non-browse tabs. The pane
   // derives its posting from that list (first one when nothing is picked), so
   // a stale selection — a role from another tab, or the viewer's own post
@@ -115,12 +183,22 @@ export function JobsBrowser({
         ? appliedJobs
         : myPosts;
 
-  const tabs: { value: Tab; label: string; count: number }[] = [
-    { value: "hiring", label: "Hiring", count: hiringJobs.length },
-    { value: "referral", label: "Referral", count: referralJobs.length },
-    { value: "applied", label: "Applied", count: appliedJobs.length },
-    { value: "posts", label: "My posts", count: myPosts.length },
+  const newBadge = (count: number | undefined) => (count && count > 0 ? `${count} new` : null);
+  const tabs: { value: Tab; label: string; chip: string | null; unseen: boolean }[] = [
+    { value: "hiring", label: "Hiring", chip: newBadge(tabNewCounts?.hiring), unseen: true },
+    { value: "referral", label: "Referral", chip: newBadge(tabNewCounts?.referral), unseen: true },
+    { value: "applied", label: "Applied", chip: String(appliedJobs.length), unseen: false },
+    { value: "posts", label: "My posts", chip: String(myPosts.length), unseen: false },
   ];
+
+  const openTab = (next: Tab) => {
+    setTab(next);
+    if (next === "hiring" || next === "referral") {
+      // Opening the tab is seeing it: the badge clears and the cut-off moves.
+      setTabNewCounts((counts) => (counts ? { ...counts, [next]: 0 } : counts));
+      markTabSeen(viewer.id, next, newestInstant(next === "hiring" ? hiringJobs : referralJobs));
+    }
+  };
 
   const selectJob = (jobId: string) => {
     if (tab === "posts") {
@@ -152,8 +230,9 @@ export function JobsBrowser({
         </button>
       </div>
 
-      {/* Tabs — the admin strip's style (count chip, accent underline); the
-          active tab's border rides on the full-width underline. */}
+      {/* Tabs — the admin strip's style (accent underline, count chip); the
+          browse tabs carry an "N new" badge instead of a total — matched
+          roles posted since the member last opened them. */}
       <div
         className={`mt-5 ${paneOpen ? "hidden lg:flex" : "flex"} items-center gap-0.5 border-b border-border`}
       >
@@ -163,7 +242,7 @@ export function JobsBrowser({
             <button
               key={item.value}
               type="button"
-              onClick={() => setTab(item.value)}
+              onClick={() => openTab(item.value)}
               className={`-mb-px border-b-2 px-3.5 py-2 font-body text-xs font-medium transition-colors ${
                 active
                   ? "border-accent text-accent"
@@ -171,13 +250,17 @@ export function JobsBrowser({
               }`}
             >
               {item.label}
-              <span
-                className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
-                  active ? "bg-accent/15 text-accent" : "bg-surface-raised text-foreground-muted"
-                }`}
-              >
-                {item.count}
-              </span>
+              {item.chip !== null && (
+                <span
+                  className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                    item.unseen || active
+                      ? "bg-accent/15 text-accent"
+                      : "bg-surface-raised text-foreground-muted"
+                  }`}
+                >
+                  {item.chip}
+                </span>
+              )}
             </button>
           );
         })}
