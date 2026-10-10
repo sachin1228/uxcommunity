@@ -160,6 +160,10 @@ export function CreateEventModal({
       if (!endIso) { setError("End time is not a valid time of day."); return; }
       if (endIso <= startIso) { setError("End time must be after the start time."); return; }
     }
+    // Required, and the picker has no empty option to fall back on — this is
+    // only reachable while the default from the profile is still loading, or
+    // when the viewer has no city on their profile yet.
+    if (!cityId) { setError("City is required."); return; }
 
     setSaving(true);
     setError(null);
@@ -431,14 +435,14 @@ export function CreateEventModal({
           {/* City — the listing bucket on the workspace Events page */}
           <label className="block">
             <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <MapPinned strokeWidth={2.5} size={11} /> City <span className="font-normal text-foreground-subtle">(optional — defaults to your city)</span>
+              <MapPinned strokeWidth={2.5} size={11} /> City <span className="text-accent">*</span> <span className="font-normal text-foreground-subtle">(defaults to your city)</span>
             </span>
             <select
               value={cityId ?? ""}
               onChange={(e) => setCityId(e.target.value || null)}
               className="field w-full"
             >
-              <option value="">Select a city…</option>
+              <option value="" disabled>Select a city…</option>
               {cities.map((city) => (
                 <option key={city.id} value={city.id}>{city.name}</option>
               ))}

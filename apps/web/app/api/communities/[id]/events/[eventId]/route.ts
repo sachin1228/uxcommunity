@@ -140,9 +140,14 @@ export async function PATCH(
       : null;
   }
   if (typeof body.is_public === "boolean") patch.is_public = body.is_public;
+  // There is no null city — clearing it would drop the event off every Events
+  // page, so an edit either names a valid city or leaves the field alone.
   if ("city_id" in body) {
     const cityId = typeof body.city_id === "string" && body.city_id.trim() ? body.city_id.trim() : null;
-    if (cityId && !UUID_PATTERN.test(cityId)) {
+    if (!cityId) {
+      return NextResponse.json({ error: "City is required." }, { status: 422 });
+    }
+    if (!UUID_PATTERN.test(cityId)) {
       return NextResponse.json({ error: "Invalid city." }, { status: 422 });
     }
     patch.city_id = cityId;

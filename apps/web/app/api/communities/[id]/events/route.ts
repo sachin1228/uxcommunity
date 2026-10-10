@@ -187,11 +187,14 @@ export async function POST(
     : null;
   const isPublic = body.is_public === true;
 
-  // The city the event is listed under on the city Events page. The form
-  // defaults it to the host's own city; a malformed id is refused rather than
-  // silently dropped so the form can say why.
+  // The city the event is listed under on the city Events page. Required: an
+  // event with no city appears on no Events page, so the form offers no empty
+  // option and this is the backstop for anything that skips the form.
   const cityId = typeof body.city_id === "string" && body.city_id.trim() ? body.city_id.trim() : null;
-  if (cityId && !UUID_PATTERN.test(cityId)) {
+  if (!cityId) {
+    return NextResponse.json({ error: "City is required." }, { status: 422 });
+  }
+  if (!UUID_PATTERN.test(cityId)) {
     return NextResponse.json({ error: "Invalid city." }, { status: 422 });
   }
 
