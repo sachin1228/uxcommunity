@@ -46,9 +46,10 @@ const TRIAGE_TABS: { value: TriageTab; label: string }[] = [
  * view by anything but the decision itself.
  *
  * Between the posting and the list sits the design-mode card: it opens the
- * application as a page of its own (`DesignModeViewer`), starting at the
- * first applicant in the tab the poster is looking at — an empty tab falls
- * back to the whole list.
+ * application as a page of its own (`DesignModeViewer`) in a fresh tab —
+ * outside the dashboard shell, so the page is the whole page — starting at
+ * the first applicant in the tab the poster is looking at (an empty tab
+ * falls back to the whole list).
  *
  * Reads and writes are gated to the poster by the database, not by this
  * component.
@@ -68,11 +69,9 @@ export function ApplicantsBoard({
     value === "all" ? applicants.length : applicants.filter((a) => a.status === value).length;
   const visible = tab === "all" ? applicants : applicants.filter((a) => a.status === tab);
 
-  /** Open the design view on the first applicant the poster is looking at. */
-  function openDesignMode() {
-    const first = (visible.length > 0 ? visible : applicants)[0];
-    guard.push(`/dashboard/jobs/${job.id}/applicants/${first.id}`);
-  }
+  // Opened with `target="_blank"` so the poster keeps the board behind the
+  // design view; the page itself lives outside /dashboard (see its route).
+  const designHref = `/applications/${job.id}/${(visible.length > 0 ? visible : applicants)[0].id}`;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-6">
@@ -137,14 +136,15 @@ export function ApplicantsBoard({
         </div>
       </div>
 
-      {/* Design mode — the applications as a light-mode portfolio page. The
-          card sits between the posting and the list; the whole card is the
-          affordance, with the button shape marking where it goes. */}
+      {/* Design mode — the application as a full page of its own, opened in
+          a fresh tab. The whole card is the affordance, with the button
+          shape marking where it goes. */}
       {applicants.length > 0 && (
-        <button
-          type="button"
-          onClick={openDesignMode}
-          className="mt-4 flex w-full cursor-pointer items-center gap-3.5 rounded-xl border border-border bg-surface p-3.5 text-left transition-colors hover:border-accent/20 hover:bg-surface-raised"
+        <a
+          href={designHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex w-full items-center gap-3.5 rounded-xl border border-border bg-surface p-3.5 text-left transition-colors hover:border-accent/20 hover:bg-surface-raised"
         >
           <span
             aria-hidden="true"
@@ -168,7 +168,7 @@ export function ApplicantsBoard({
             Open
             <ArrowRight strokeWidth={2.5} size={14} />
           </span>
-        </button>
+        </a>
       )}
 
       {/* Triage tabs — the board's own tab style (count chip, accent

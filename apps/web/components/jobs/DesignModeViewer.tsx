@@ -26,12 +26,13 @@ type DesignSection = "portfolio" | "linkedin" | "resume";
 
 /**
  * The poster's "design mode" for one posting's applications — a page of its
- * own (`/dashboard/jobs/[jobId]/applicants/[applicationId]`) that renders the
- * application the way its applicant would present it: a light-mode portfolio
- * page with the applicant's own details and filled links in the left sidebar,
- * and the section's content on the right. Deliberately light regardless of
- * the app's theme (the `.design-light` scope re-declares the light tokens):
- * this is a preview of the applicant's page, not app chrome.
+ * own (`/applications/[jobId]/[applicationId]`, opened in a fresh tab by the
+ * board's card) that renders the application the way its applicant would
+ * present it: a light-mode portfolio page with the applicant's own details
+ * and filled links in the left sidebar, and the section's content on the
+ * right. Deliberately light regardless of the app's theme (the
+ * `.design-light` scope re-declares the light tokens): this is a preview of
+ * the applicant's page, not app chrome.
  *
  * The URL pins the applicant being reviewed — a decision refreshes the data
  * without changing what the poster is looking at — and previous/next move
@@ -81,7 +82,7 @@ export function DesignModeViewer({
       if (!applicants[next].resume_url) {
         setSection((current) => (current === "resume" ? "portfolio" : current));
       }
-      guard.push(`/dashboard/jobs/${jobId}/applicants/${applicants[next].id}`);
+      guard.push(`/applications/${jobId}/${applicants[next].id}`);
     },
     [applicants, guard, jobId]
   );
@@ -128,7 +129,7 @@ export function DesignModeViewer({
   const decisionError = error?.id === applicant.id ? error.message : null;
 
   return (
-    <div className="design-light flex h-full min-h-0 flex-col bg-background font-body text-foreground">
+    <div className="design-light flex h-dvh min-h-0 flex-col bg-background font-body text-foreground">
       <div className="flex min-h-0 flex-1">
         {/* Sidebar — the applicant's own details, the poster's decisions,
             and the applicant's filled links at the foot. Below lg this

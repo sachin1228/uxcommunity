@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DesignModeViewer } from "@/components/jobs/DesignModeViewer";
+import { UndoToast } from "@/components/ui/UndoToast";
 import { timeAgoLabel } from "@/lib/jobs/format";
 import {
   getJobApplicants,
@@ -14,10 +15,14 @@ export const metadata = { title: "Application — uxcommunity" };
 
 /**
  * One applicant's application, as the design view renders it — the page the
- * board's design-mode card opens. The applicant is pinned by the URL (the
- * last segment is the application id), which is what previous/next walk.
- * The payload the viewer needs (profile facts the SQL does not carry) is
- * resolved here, the same way the applicants board would.
+ * board's design-mode card opens in its own tab. It deliberately lives
+ * OUTSIDE /dashboard: the route there would inherit the app shell (topbar,
+ * sidebar), and the design view is a full page of its own, not a panel of
+ * the dashboard. Auth is checked here directly for the same reason.
+ *
+ * The applicant is pinned by the URL (the last segment is the application
+ * id), which is what previous/next walk, and the payload the viewer needs
+ * (profile facts the SQL does not carry) is resolved here.
  */
 export default async function ApplicantDesignPage({
   params,
@@ -66,6 +71,11 @@ export default async function ApplicantDesignPage({
   }
 
   return (
-    <DesignModeViewer jobId={jobId} applicants={applicants} currentId={applicationId} />
+    <>
+      <DesignModeViewer jobId={jobId} applicants={applicants} currentId={applicationId} />
+      {/* The app's undo toast normally lives in the dashboard shell; this
+          page stands outside it, and its decisions still raise the offer. */}
+      <UndoToast />
+    </>
   );
 }
