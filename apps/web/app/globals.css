@@ -356,6 +356,51 @@ body {
   color: var(--color-foreground);
 }
 
+/* ─── Forced-light scope — the design-mode takeover ──────────────────── */
+/* The jobs design view renders the LIGHT theme regardless of the OS
+   preference: it is a preview of the application as a page of its own, not
+   app chrome. Re-declaring the light values on the scope's subtree wins
+   over the media-query overrides on :root, so token-driven utilities
+   inside read light while the rest of the app keeps following the scheme.
+   The scrollbar overrides mirror the same idea — the global thumbs are
+   white-ish, which would be invisible on this scope's light pages. */
+.design-light {
+  color-scheme: light;
+
+  --color-background:        #FAFAFA;
+  --color-background-subtle: #F5F5F5;
+
+  --color-surface:           #FFFFFF;
+  --color-surface-raised:    #F5F5F5;
+
+  --color-foreground:        #0A0A0A;
+  --color-foreground-muted:  #525252;
+  --color-foreground-subtle: #737373;
+
+  --color-accent:            #0A0A0A;
+  --color-accent-rgb:        10 10 10;
+  --color-accent-hover:      #333333;
+  --color-accent-soft:       #EBEBEB;
+  --color-accent-foreground: #FFFFFF;
+
+  --color-border:            #EAEAEA;
+  --color-border-subtle:     #F5F5F5;
+
+  /* The dark scheme's shadows are heavy blacks meant for dark surfaces;
+     the scope's pages need the light scheme's whisper-soft set. */
+  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-card: 0 0 0 1px var(--color-border), 0 2px 4px rgb(0 0 0 / 0.04);
+}
+
+.design-light * {
+  scrollbar-color: rgba(0 0 0 / 0.18) transparent;
+}
+
+.design-light *::-webkit-scrollbar-thumb { background: rgba(0 0 0 / 0.18); }
+.design-light *::-webkit-scrollbar-thumb:hover { background: rgba(0 0 0 / 0.28); }
+
 /* ─── Home-feed filter switcher ──────────────────────────────────────── */
 /* Fluid segmented control (Newest / Trending / Following). Colors come
    from the reference palette above and flip with the OS color scheme. */
