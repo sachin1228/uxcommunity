@@ -40,7 +40,7 @@
 -- file does not depend on what other suites left behind.
 -- ============================================================
 
-select plan(115);
+select plan(123);
 
 begin;
 
@@ -691,6 +691,91 @@ select is(
    ) order by item ->> 'created_at' desc, item ->> 'id' desc limit 1),
   'https://portfolio.outsider.test',
   'the applicants board carries portfolio, LinkedIn and resume'
+);
+
+-- ─── 6b. Triaging applicants (new / shortlisted / rejected) ─
+-- The triage migration (20261010120000_job_application_triage.sql): one
+-- column, one poster-only write. A decision is a standing, not a log —
+-- it moves in any direction and carries no timestamp of its own.
+
+select has_function(
+  'public', 'set_job_application_status',
+  'set_job_application_status(actor, application, status) exists'
+);
+
+select is(
+  (select application_status from public.set_job_application_status(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_applications
+      where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000006'),
+     'shortlisted'
+   )),
+  'shortlisted',
+  'the poster shortlists an applicant'
+);
+
+select is(
+  (select item ->> 'status' from public.get_job_applicants(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_posts where title = 'Senior Product Designer')
+   ) where item ->> 'name' = 'Outsider Now Matched'),
+  'shortlisted',
+  'the applicants board carries the decision it stored'
+);
+
+select is(
+  (select item ->> 'status' from public.get_job_applicants(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_posts where title = 'Senior Product Designer')
+   ) where item ->> 'name' = 'Matched Applicant'),
+  'new',
+  'an untouched application reads as new'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.set_job_application_status(
+      'd7d7d7d7-0000-4000-8000-000000000003',
+      (select id from public.job_applications
+       where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000006'),
+      'rejected'
+    )$$),
+  'not_your_job',
+  'only the posting''s owner may triage its applicants'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.set_job_application_status(
+      'd7d7d7d7-0000-4000-8000-000000000001',
+      (select id from public.job_applications
+       where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000006'),
+      'hired'
+    )$$),
+  'invalid_status',
+  'a status outside the three is refused'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.set_job_application_status(
+      'd7d7d7d7-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000000',
+      'rejected'
+    )$$),
+  'application_not_found',
+  'triaging a missing application is refused'
+);
+
+select is(
+  (select application_status from public.set_job_application_status(
+     'd7d7d7d7-0000-4000-8000-000000000001',
+     (select id from public.job_applications
+      where applicant_id = 'd7d7d7d7-0000-4000-8000-000000000006'),
+     'new'
+   )),
+  'new',
+  'a decision moves back to new'
 );
 
 -- ─── 7. Round trip: a deleted account frees the posting ─────

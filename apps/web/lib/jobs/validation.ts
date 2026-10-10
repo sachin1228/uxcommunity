@@ -116,3 +116,8 @@ export type JobPostUpdateInput = z.infer<typeof jobPostUpdateSchema>;
 export const jobStatusSchema = z.object({
   status: z.enum(["open", "closed"]),
 });
+
+/** Triage. Anything outside the three is refused before the database is called. */
+export const applicationStatusSchema = z.object({
+  status: z.enum(["new", "shortlisted", "rejected"]),
+});

@@ -1,20 +1,42 @@
 "use client";
 
-import { ExternalLink, FileText, Globe, Inbox, UserRound, Users } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Check, ExternalLink, FileText, Globe, Inbox, UserRound, Users, X } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { Spinner } from "@/components/ui/Spinner";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { JobStateBadge, KindBadge } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import type { JobApplicant, JobPost } from "@/lib/jobs/types";
-import { workModeLabel } from "@/lib/jobs/types";
+import { showUndoToast } from "@/lib/undo-toast";
+import type { ApplicationStatus, JobApplicant, JobPost } from "@/lib/jobs/types";
+import { applicationStatusLabel, workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 
+type TriageTab = "all" | ApplicationStatus;
+
+const TRIAGE_TABS: { value: TriageTab; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "new", label: "New" },
+  { value: "shortlisted", label: "Shortlisted" },
+  { value: "rejected", label: "Rejected" },
+];
+
 /**
- * The poster's applicant list. Every row is an application exactly as it was
- * submitted — name, portfolio, LinkedIn, optional resume — plus a link to the
- * applicant's profile. Reads are gated to the poster by the database, not by
- * this component.
+ * The poster's applicant list, as a triage board. Every row is an application
+ * exactly as it was submitted — name, portfolio, LinkedIn, optional resume —
+ * plus a link to the applicant's profile, and the decision cluster that moves
+ * them between New, Shortlisted and Rejected.
+ *
+ * Every decision is the same write in every direction, so nothing here asks
+ * for a confirmation: a rejection is a standing decision, not a deletion, and
+ * each change offers its own undo in the toast. The tabs count that same
+ * standing — they are not routes, and switching one never moves a card out of
+ * view by anything but the decision itself.
+ *
+ * Reads and writes are gated to the poster by the database, not by this
+ * component.
  */
 export function ApplicantsBoard({
   job,
@@ -23,7 +45,51 @@ export function ApplicantsBoard({
   job: JobPost;
   applicants: JobApplicant[];
 }) {
-  const router = useGuardedRouter();
+  const router = useRouter();
+  const guard = useGuardedRouter();
+  const [tab, setTab] = useState<TriageTab>("all");
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<{ id: string; message: string } | null>(null);
+
+  const countFor = (value: TriageTab): number =>
+    value === "all" ? applicants.length : applicants.filter((a) => a.status === value).length;
+  const visible = tab === "all" ? applicants : applicants.filter((a) => a.status === tab);
+
+  /**
+   * Move one applicant, then offer the way back. The undo runs the opposite
+   * write — `applicant.status` is the standing this click is leaving, so a
+   * poster who triaged the wrong row is one click from where they were.
+   */
+  async function setStatus(applicant: JobApplicant, status: ApplicationStatus) {
+    setError(null);
+    setPendingId(applicant.id);
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/applications/${applicant.id}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(body?.message ?? "The applicant could not be updated.");
+      }
+
+      showUndoToast({
+        message: `“${applicant.name}” moved to ${applicationStatusLabel(status)}.`,
+        actionLabel: "Undo",
+        onAction: () => setStatus(applicant, applicant.status),
+      });
+      router.refresh();
+    } catch (cause) {
+      setError({
+        id: applicant.id,
+        message: cause instanceof Error ? cause.message : "The applicant could not be updated.",
+      });
+    } finally {
+      setPendingId(null);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-6">
@@ -88,19 +154,63 @@ export function ApplicantsBoard({
         </div>
       </div>
 
+      {/* Triage tabs — the board's own tab style (count chip, accent
+          underline); a decision moves a card between tabs, never out of the
+          list. */}
+      {applicants.length > 0 && (
+        <div className="mt-4 flex items-center gap-0.5 border-b border-border">
+          {TRIAGE_TABS.map((item) => {
+            const active = tab === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setTab(item.value)}
+                className={`-mb-px border-b-2 px-3.5 py-2 font-body text-xs font-medium transition-colors ${
+                  active
+                    ? "border-accent text-accent"
+                    : "border-transparent text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {item.label}
+                <span
+                  className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                    active ? "bg-accent/15 text-accent" : "bg-surface-raised text-foreground-muted"
+                  }`}
+                >
+                  {countFor(item.value)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="mt-4 flex flex-col gap-2.5">
-        {applicants.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 py-14 text-center">
-            <Inbox strokeWidth={2.5} size={28} className="text-foreground-muted opacity-40" />
-            <p className="mt-3 font-display text-sm font-semibold text-foreground">
-              No applications yet
-            </p>
-            <p className="mt-1 max-w-xs font-body text-xs text-foreground-muted">
-              Members whose profile matches this role can apply — they’ll show up here.
-            </p>
-          </div>
+        {visible.length === 0 ? (
+          tab === "all" ? (
+            <EmptyList
+              title="No applications yet"
+              body="Members whose profile matches this role can apply — they’ll show up here."
+            />
+          ) : tab === "new" ? (
+            <EmptyList
+              title="No new applicants"
+              body="You’ve reviewed everyone — shortlisted and rejected applicants live in their tabs."
+            />
+          ) : tab === "shortlisted" ? (
+            <EmptyList
+              title="No shortlisted applicants yet"
+              body="Shortlist the ones you want to follow up with."
+            />
+          ) : (
+            <EmptyList
+              title="No rejected applicants"
+              body="Applicants you pass on will collect here."
+            />
+          )
         ) : (
-          applicants.map((applicant) => (
+          visible.map((applicant) => (
             <div
               key={applicant.id}
               className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3.5"
@@ -115,7 +225,7 @@ export function ApplicantsBoard({
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
-                    onClick={() => router.push(`/dashboard/profile/${applicant.applicant_id}`)}
+                    onClick={() => guard.push(`/dashboard/profile/${applicant.applicant_id}`)}
                     className="block max-w-full truncate text-left font-body text-sm font-semibold text-foreground hover:text-accent"
                   >
                     {applicant.name}
@@ -158,17 +268,122 @@ export function ApplicantsBoard({
                 )}
                 <button
                   type="button"
-                  onClick={() => router.push(`/dashboard/profile/${applicant.applicant_id}`)}
-                  className="ml-auto inline-flex items-center gap-1.5 font-medium text-foreground-muted transition-colors hover:text-foreground"
+                  onClick={() => guard.push(`/dashboard/profile/${applicant.applicant_id}`)}
+                  className="inline-flex items-center gap-1.5 font-medium text-foreground-muted transition-colors hover:text-foreground"
                 >
                   <UserRound strokeWidth={2.5} size={12} />
                   Profile
                 </button>
+
+                <span className="ml-auto flex items-center gap-2">
+                  {pendingId === applicant.id ? (
+                    <Spinner size={14} />
+                  ) : (
+                    <TriageCluster
+                      status={applicant.status}
+                      onChange={(status) => void setStatus(applicant, status)}
+                    />
+                  )}
+                </span>
+
+                {error?.id === applicant.id && (
+                  <span role="status" className="font-body text-xs text-red-400">
+                    {error.message}
+                  </span>
+                )}
               </div>
             </div>
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The decision cluster: the standing, as a segmented pair. The active
+ * decision is filled and clicking it moves the applicant back to New (the
+ * title says so); the other decision stays one click away for a change of
+ * mind. A new applicant gets the two decisions as plain actions.
+ */
+function TriageCluster({
+  status,
+  onChange,
+}: {
+  status: ApplicationStatus;
+  onChange: (status: ApplicationStatus) => void;
+}) {
+  if (status !== "new") {
+    const other: ApplicationStatus = status === "shortlisted" ? "rejected" : "shortlisted";
+    const decidedClass =
+      status === "shortlisted"
+        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"
+        : "border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/25";
+    const otherClass =
+      other === "shortlisted"
+        ? "border-emerald-500/30 text-emerald-500/80 hover:bg-emerald-500/10 hover:text-emerald-500"
+        : "border-red-500/30 text-red-400/80 hover:bg-red-500/10 hover:text-red-400";
+
+    return (
+      <>
+        <button
+          type="button"
+          aria-pressed="true"
+          title="Move back to New"
+          onClick={() => onChange("new")}
+          className={`inline-flex h-7 items-center gap-1 rounded-md border px-2.5 font-body text-[11px] font-medium transition-colors ${decidedClass}`}
+        >
+          {status === "shortlisted" ? (
+            <Check strokeWidth={2.5} size={12} />
+          ) : (
+            <X strokeWidth={2.5} size={12} />
+          )}
+          {applicationStatusLabel(status)}
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(other)}
+          className={`inline-flex h-7 items-center gap-1 rounded-md border bg-transparent px-2.5 font-body text-[11px] font-medium transition-colors ${otherClass}`}
+        >
+          {other === "shortlisted" ? (
+            <Check strokeWidth={2.5} size={12} />
+          ) : (
+            <X strokeWidth={2.5} size={12} />
+          )}
+          {applicationStatusLabel(other)}
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange("shortlisted")}
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-500/40 px-2.5 font-body text-[11px] font-medium text-emerald-500 transition-colors hover:bg-emerald-500/10"
+      >
+        <Check strokeWidth={2.5} size={12} />
+        Shortlist
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("rejected")}
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-red-500/40 px-2.5 font-body text-[11px] font-medium text-red-400 transition-colors hover:bg-red-500/10"
+      >
+        <X strokeWidth={2.5} size={12} />
+        Reject
+      </button>
+    </>
+  );
+}
+
+function EmptyList({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 py-14 text-center">
+      <Inbox strokeWidth={2.5} size={28} className="text-foreground-muted opacity-40" />
+      <p className="mt-3 font-display text-sm font-semibold text-foreground">{title}</p>
+      <p className="mt-1 max-w-xs font-body text-xs text-foreground-muted">{body}</p>
     </div>
   );
 }

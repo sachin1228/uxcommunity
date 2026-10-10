@@ -2,7 +2,7 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { companyLogoUrl } from "@/lib/companies/logos";
-import type { JobApplicant, JobPost, JobStatus, JobViewer } from "./types";
+import type { JobApplicant, JobPost, JobStatus, ApplicationStatus, JobViewer } from "./types";
 
 /**
  * Server-side access to the Jobs model.
@@ -127,6 +127,22 @@ export type ApplicantsResult =
   | { ok: true; applicants: JobApplicant[] }
   | { ok: false; code: "not_your_job" | "not_installed" | "unexpected" };
 
+/** Failure codes `set_job_application_status` can report. */
+export const SET_APPLICATION_STATUS_FAILURE_CODES = [
+  "application_not_found",
+  "not_your_job",
+  "invalid_status",
+] as const;
+
+export type SetApplicationStatusFailureCode =
+  | (typeof SET_APPLICATION_STATUS_FAILURE_CODES)[number]
+  | "not_installed"
+  | "unexpected";
+
+export type SetApplicationStatusResult =
+  | { ok: true; applicationId: string; status: ApplicationStatus }
+  | { ok: false; code: SetApplicationStatusFailureCode };
+
 /**
  * PostgREST reports a raised exception as its message. The job functions use
  * stable messages (`not_eligible`, `company_not_verified`, …) so the route can
@@ -166,7 +182,11 @@ function asJobPost(value: Json): JobPost | null {
 }
 
 function asJobApplicant(value: Json): JobApplicant | null {
-  return asJsonObject(value) as unknown as JobApplicant | null;
+  const applicant = asJsonObject(value) as unknown as JobApplicant | null;
+  // Until the triage migration is applied the payload carries no `status`;
+  // an application without one has never been decided, so it reads as new.
+  if (applicant && !applicant.status) applicant.status = "new";
+  return applicant;
 }
 
 /** Newest-first page of postings, each with the viewer's flags. */
@@ -231,6 +251,45 @@ export async function getJobApplicants(
     .filter((applicant): applicant is JobApplicant => Boolean(applicant));
 
   return { ok: true, applicants };
+}
+
+/**
+ * The poster's triage of one application: shortlist, reject, or move back to
+ * new. A standing decision, freely reversible — the database re-checks the
+ * poster through the application's own job on every write.
+ */
+export async function setJobApplicationStatus(
+  db: SupabaseClient,
+  params: { actorId: string; applicationId: string; status: ApplicationStatus }
+): Promise<SetApplicationStatusResult> {
+  const { data, error } = await callPerformanceRpc(db, "set_job_application_status", {
+    p_actor_id: params.actorId,
+    p_application_id: params.applicationId,
+    p_status: params.status,
+  });
+
+  if (error) {
+    const code = readRaised(error);
+    const known = (SET_APPLICATION_STATUS_FAILURE_CODES as readonly string[]).includes(code);
+    if (!known && code !== "not_installed") {
+      console.error("[jobs] application status change failed:", error);
+    }
+    return { ok: false, code: known ? (code as SetApplicationStatusFailureCode) : code === "not_installed" ? "not_installed" : "unexpected" };
+  }
+
+  const row = (data ?? [])[0];
+  if (!row) {
+    console.error("[jobs] application status change returned no row");
+    return { ok: false, code: "unexpected" };
+  }
+
+  // The database returns the stored status, so the route never echoes the
+  // value the request asked for.
+  return {
+    ok: true,
+    applicationId: row.application_id,
+    status: row.application_status as ApplicationStatus,
+  };
 }
 
 export interface CreateJobParams {

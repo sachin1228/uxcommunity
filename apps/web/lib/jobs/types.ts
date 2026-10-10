@@ -23,6 +23,16 @@ export const JOB_STATUSES: JobStatus[] = ["open", "closed"];
 export const isJobStatus = (value: string): value is JobStatus =>
   (JOB_STATUSES as string[]).includes(value);
 
+/**
+ * The poster's triage of one application. `new` is the untouched state every
+ * application starts in; the other two are the poster's standing decisions —
+ * freely movable, because moving back to `new` is the same write as any other.
+ */
+export type ApplicationStatus = "new" | "shortlisted" | "rejected";
+
+export const applicationStatusLabel = (value: ApplicationStatus): string =>
+  value === "shortlisted" ? "Shortlisted" : value === "rejected" ? "Rejected" : "New";
+
 export const JOB_KINDS: { value: JobKind; label: string }[] = [
   { value: "hiring", label: "Hiring" },
   { value: "referral", label: "Referral" },
@@ -151,6 +161,8 @@ export interface JobApplicant {
   resume_url: string | null;
   created_at: string;
   avatar_url: string | null;
+  /** The poster's triage standing; `new` until they decide. */
+  status: ApplicationStatus;
   /** Server-rendered relative label (`timeAgoLabel`). */
   applied_label: string;
 }
