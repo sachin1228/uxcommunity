@@ -170,17 +170,14 @@ export interface JobApplicant {
 /**
  * One applicant as the design view renders them: the application exactly as
  * it was submitted, plus the profile facts that give the sidebar its shape.
- * The SQL payload stops at the application itself; the role label, city, bio
- * and join date are resolved by the applicants page (`loadJobApplicantDetails`)
- * and degrade to null when the profile rows are missing or unset.
+ * The SQL payload stops at the application itself; the role label and the
+ * city are resolved by the applicants page (`loadJobApplicantDetails`) and
+ * degrade to null when the profile rows are missing or unset.
  */
 export interface JobApplicantDetail extends JobApplicant {
   /** Seniority and designation composed ("Senior Product Designer"), or null when the profile sets neither. */
   role_label: string | null;
   city_name: string | null;
-  bio: string | null;
-  /** "Member since Mar 2024", or null when there is no member row to date. */
-  member_since: string | null;
 }
 
 /**

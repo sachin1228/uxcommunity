@@ -24,22 +24,6 @@ export function timeAgoLabel(iso: string, now: Date = new Date()): string {
 }
 
 /**
- * "Member since Mar 2024" — the month a member joined, in the same UTC
- * convention the rest of this module prints dates in. Null when there is no
- * instant to date (the member row is missing or malformed).
- */
-export function memberSinceLabel(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return null;
-  return `Member since ${new Date(at).toLocaleDateString("en-US", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  })}`;
-}
-
-/**
  * The stamp to show when a posting was edited after it was published, or null
  * when it was never edited. The database only moves `updated_at` on a save
  * that actually changed a field and never sets it at creation, so "no edit"

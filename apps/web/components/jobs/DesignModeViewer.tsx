@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
-  ArrowRight,
   ArrowUpRight,
   Check,
   ChevronLeft,
@@ -12,13 +11,11 @@ import {
   Globe,
   Linkedin,
   MapPin,
-  UserRound,
   X,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { ModalPortal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
-import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useApplicantDecision } from "@/lib/jobs/use-applicant-decision";
 import {
   applicationStatusLabel,
@@ -27,7 +24,7 @@ import {
   type JobPost,
 } from "@/lib/jobs/types";
 
-type DesignSection = "home" | "portfolio" | "linkedin" | "resume" | "profile";
+type DesignSection = "portfolio" | "linkedin" | "resume";
 
 /**
  * The poster's "design mode" for one posting's applications: a full-screen
@@ -41,8 +38,8 @@ type DesignSection = "home" | "portfolio" | "linkedin" | "resume" | "profile";
  * The viewer browses the list it was opened with (a snapshot, so a decision
  * never yanks the current applicant out from under the poster) and carries
  * the same decisions as the board, with the same undo. Every rendered fact is
- * filled-in data — the sections show the links the applicant submitted and
- * the profile facts behind them, nothing invented.
+ * filled-in data — the links the applicant submitted, nothing invented; a
+ * PDF resume renders as the document itself, inline.
  */
 export function DesignModeViewer({
   job,
@@ -53,10 +50,9 @@ export function DesignModeViewer({
   applicants: JobApplicantDetail[];
   onClose: () => void;
 }) {
-  const guard = useGuardedRouter();
   const { decide, pendingId, error } = useApplicantDecision(job.id);
   const [index, setIndex] = useState(0);
-  const [section, setSection] = useState<DesignSection>("home");
+  const [section, setSection] = useState<DesignSection>("portfolio");
   // Decisions made here land in this map the moment the database
   // acknowledges them, so the sidebar reads the new standing immediately
   // while `router.refresh()` catches the board up behind the takeover.
@@ -65,16 +61,22 @@ export function DesignModeViewer({
 
   const applicant = applicants[index];
   const status = settled[applicant.id] ?? applicant.status;
+  const resumeUrl = applicant.resume_url;
+  const pdfResumeUrl = resumeUrl && isPdfUrl(resumeUrl) ? resumeUrl : null;
+  // A PDF resume renders as the document itself, filling the pane; the
+  // other accepted formats (DOC/DOCX/RTF) have no in-browser viewer and
+  // keep the link card.
+  const resumeEmbedded = section === "resume" && Boolean(pdfResumeUrl);
 
   const goTo = useCallback(
     (next: number) => {
       if (next < 0 || next >= applicants.length) return;
       setIndex(next);
       // Resume only exists where a resume was attached; stepping onto an
-      // applicant without one falls back to the first section rather than
+      // applicant without one falls back to the first link rather than
       // showing an empty page.
       if (!applicants[next].resume_url) {
-        setSection((current) => (current === "resume" ? "home" : current));
+        setSection((current) => (current === "resume" ? "portfolio" : current));
       }
     },
     [applicants]
@@ -104,11 +106,6 @@ export function DesignModeViewer({
     void decide(applicant, next, (acknowledged) =>
       setSettled((current) => ({ ...current, [applicant.id]: acknowledged }))
     );
-  }
-
-  function openProfile() {
-    onClose();
-    guard.push(`/dashboard/profile/${applicant.applicant_id}`);
   }
 
   // One entry per link the applicant filled in — no more, no less. The
@@ -167,42 +164,36 @@ export function DesignModeViewer({
         </header>
 
         <div className="flex min-h-0 flex-1">
-          {/* Sidebar — the applicant's own details (clicking the identity
-              walks back to Home, the portfolio pattern), the poster's
-              decisions, and the applicant's filled links at the foot.
-              Below lg this column is hidden; the links ride in a horizontal
-              strip over the page instead. */}
+          {/* Sidebar — the applicant's own details, the poster's decisions,
+              and the applicant's filled links at the foot. Below lg this
+              column is hidden; the links ride in a horizontal strip over the
+              page instead. */}
           <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
-            <button
-              type="button"
-              onClick={() => setSection("home")}
-              title="Home"
-              className="flex w-full cursor-pointer flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-surface-raised"
-            >
+            <div className="flex flex-col items-center px-2 py-2 text-center">
               <AvatarImg
                 url={applicant.avatar_url}
                 name={applicant.name}
                 size={112}
                 className="rounded-full object-cover"
               />
-              <span className="mt-4 block font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
+              <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
                 {applicant.name}
-              </span>
+              </h2>
               {applicant.role_label && (
-                <span className="mt-1.5 block font-body text-sm text-foreground-muted">
+                <p className="mt-1.5 font-body text-sm text-foreground-muted">
                   {applicant.role_label}
-                </span>
+                </p>
               )}
               {applicant.city_name && (
-                <span className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
+                <p className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
                   <MapPin strokeWidth={2.5} size={12} />
                   {applicant.city_name}
-                </span>
+                </p>
               )}
-              <span className="mt-1 block font-body text-xs text-foreground-subtle">
+              <p className="mt-1 font-body text-xs text-foreground-subtle">
                 Applied {applicant.applied_label}
-              </span>
-            </button>
+              </p>
+            </div>
 
             <div className="mt-5 grid grid-cols-2 gap-2">
               <DecisionButtons
@@ -260,11 +251,20 @@ export function DesignModeViewer({
               })}
             </nav>
 
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-background">
-              <div className="mx-auto w-full max-w-3xl px-6 pb-32 pt-12 sm:px-10">
-                {section === "home" ? (
-                  <HomeSection applicant={applicant} job={job} onSection={setSection} />
-                ) : section === "portfolio" ? (
+            <div
+              ref={scrollRef}
+              className={`min-h-0 flex-1 bg-background ${
+                resumeEmbedded ? "overflow-hidden" : "overflow-y-auto"
+              }`}
+            >
+              <div
+                className={
+                  resumeEmbedded
+                    ? "mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-24 pt-10 sm:px-10"
+                    : "mx-auto w-full max-w-3xl px-6 pb-32 pt-12 sm:px-10"
+                }
+              >
+                {section === "portfolio" ? (
                   <LinkSection
                     title="Portfolio"
                     description={`The work ${firstName(applicant.name)} shared with this application.`}
@@ -284,23 +284,21 @@ export function DesignModeViewer({
                     url={applicant.linkedin_url}
                     openLabel="Open LinkedIn"
                   />
-                ) : section === "resume" && applicant.resume_url ? (
-                  <LinkSection
-                    title="Resume"
-                    description={`The document ${firstName(applicant.name)} attached to this application.`}
-                    icon={<FileText strokeWidth={2.25} size={20} />}
-                    iconClass="bg-accent-soft text-foreground"
-                    name="Resume"
-                    url={applicant.resume_url}
-                    openLabel="Open resume"
-                  />
-                ) : (
-                  <ProfileSection
-                    applicant={applicant}
-                    job={job}
-                    onOpenProfile={openProfile}
-                  />
-                )}
+                ) : resumeUrl ? (
+                  pdfResumeUrl ? (
+                    <ResumeEmbed applicant={applicant} url={pdfResumeUrl} />
+                  ) : (
+                    <LinkSection
+                      title="Resume"
+                      description={`The document ${firstName(applicant.name)} attached to this application.`}
+                      icon={<FileText strokeWidth={2.25} size={20} />}
+                      iconClass="bg-accent-soft text-foreground"
+                      name="Resume"
+                      url={resumeUrl}
+                      openLabel="Open resume"
+                    />
+                  )
+                ) : null}
               </div>
             </div>
 
@@ -336,118 +334,6 @@ export function DesignModeViewer({
         </div>
       </div>
     </ModalPortal>
-  );
-}
-
-/**
- * The home page of the applicant's page: the greeting, the headline the
- * profile supplies (bio, else the composed role and city, else the posting),
- * and a tile per filled-in item that opens its section.
- */
-function HomeSection({
-  applicant,
-  job,
-  onSection,
-}: {
-  applicant: JobApplicantDetail;
-  job: JobPost;
-  onSection: (section: DesignSection) => void;
-}) {
-  const headline =
-    applicant.bio ??
-    (applicant.role_label
-      ? `${applicant.role_label}${applicant.city_name ? ` based in ${applicant.city_name}` : ""}`
-      : `Applied for ${job.title}.`);
-
-  const tiles: {
-    key: DesignSection;
-    label: string;
-    value: string;
-    icon: ReactNode;
-    iconClass: string;
-  }[] = [
-    {
-      key: "portfolio",
-      label: "Portfolio",
-      value: displayUrl(applicant.portfolio_url),
-      icon: <Globe strokeWidth={2.25} size={19} />,
-      iconClass: "bg-accent-soft text-foreground",
-    },
-    {
-      key: "linkedin",
-      label: "LinkedIn",
-      value: displayUrl(applicant.linkedin_url),
-      icon: <Linkedin strokeWidth={2.25} size={19} />,
-      iconClass: "bg-[#0A66C2]/10 text-[#0A66C2]",
-    },
-    ...(applicant.resume_url
-      ? [
-          {
-            key: "resume" as const,
-            label: "Resume",
-            value: "Attached to the application",
-            icon: <FileText strokeWidth={2.25} size={19} />,
-            iconClass: "bg-accent-soft text-foreground",
-          },
-        ]
-      : []),
-    {
-      key: "profile",
-      label: "Profile",
-      value:
-        [applicant.role_label, applicant.city_name].filter(Boolean).join(" · ") ||
-        "Member on uxcommunity",
-      icon: <UserRound strokeWidth={2.25} size={19} />,
-      iconClass: "bg-accent-soft text-foreground",
-    },
-  ];
-
-  return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-      <h1 className="font-display text-4xl font-semibold tracking-[-0.02em] text-foreground sm:text-5xl">
-        Hi, I&apos;m{" "}
-        <span className="bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 bg-clip-text text-transparent">
-          {firstName(applicant.name)}
-        </span>
-      </h1>
-      <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-foreground-muted">
-        {headline}
-      </p>
-
-      <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-        {tiles.map((tile) => (
-          <button
-            key={tile.key}
-            type="button"
-            onClick={() => onSection(tile.key)}
-            className="group flex cursor-pointer items-center gap-3.5 rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-accent/20 hover:bg-surface-raised"
-          >
-            <span
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${tile.iconClass}`}
-            >
-              {tile.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-body text-sm font-semibold text-foreground">
-                {tile.label}
-              </span>
-              <span className="mt-0.5 block truncate font-body text-xs text-foreground-muted">
-                {tile.value}
-              </span>
-            </span>
-            <ArrowRight
-              strokeWidth={2.5}
-              size={16}
-              className="shrink-0 text-foreground-subtle transition-colors group-hover:text-foreground"
-            />
-          </button>
-        ))}
-      </div>
-
-      <p className="mt-8 font-body text-xs text-foreground-subtle">
-        Applied for {job.title} at {job.company.name} · {applicant.applied_label}
-      </p>
-    </div>
   );
 }
 
@@ -497,70 +383,41 @@ function LinkSection({
   );
 }
 
-/** The member profile behind the application — who the poster would be hiring. */
-function ProfileSection({
-  applicant,
-  job,
-  onOpenProfile,
-}: {
-  applicant: JobApplicantDetail;
-  job: JobPost;
-  onOpenProfile: () => void;
-}) {
-  const meta = [applicant.city_name, applicant.member_since].filter(Boolean).join(" · ");
-
+/**
+ * The resume as the document itself: the PDF renders in an iframe that
+ * fills the pane (the wrapper switches off scrolling for exactly this
+ * section), so a poster can read it without leaving the review. The
+ * new-tab door stays beside the title for readers who want the browser's
+ * own PDF chrome.
+ */
+function ResumeEmbed({ applicant, url }: { applicant: JobApplicantDetail; url: string }) {
   return (
-    <section className="mx-auto max-w-xl">
-      <h2 className="font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
-        Profile
-      </h2>
-      <p className="mt-1.5 font-body text-sm text-foreground-muted">
-        The member profile behind this application.
-      </p>
-
-      <div className="mt-6 rounded-2xl border border-border bg-surface p-6">
-        <div className="flex items-center gap-4">
-          <AvatarImg
-            url={applicant.avatar_url}
-            name={applicant.name}
-            size={64}
-            className="rounded-full object-cover"
-          />
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-semibold text-foreground">
-              {applicant.name}
-            </p>
-            {applicant.role_label && (
-              <p className="mt-0.5 truncate font-body text-sm text-foreground-muted">
-                {applicant.role_label}
-              </p>
-            )}
-            {meta && <p className="mt-1 truncate font-body text-xs text-foreground-subtle">{meta}</p>}
-          </div>
+    <section className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div>
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
+            Resume
+          </h2>
+          <p className="mt-1.5 font-body text-sm text-foreground-muted">
+            The document {firstName(applicant.name)} attached to this application.
+          </p>
         </div>
-
-        <dl className="mt-5 grid grid-cols-1 gap-3 border-t border-border pt-5 sm:grid-cols-2">
-          <div className="flex flex-col gap-0.5">
-            <dt className="font-body text-xs font-medium text-foreground-subtle">Applied for</dt>
-            <dd className="font-body text-sm text-foreground">
-              {job.title} · {job.company.name}
-            </dd>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <dt className="font-body text-xs font-medium text-foreground-subtle">Applied</dt>
-            <dd className="font-body text-sm text-foreground">{applicant.applied_label}</dd>
-          </div>
-        </dl>
-
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          className="mt-5 inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-accent px-4 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs font-medium text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground"
         >
-          Open profile
-          <ArrowRight strokeWidth={2.5} size={15} />
-        </button>
+          Open in new tab
+          <ArrowUpRight strokeWidth={2.5} size={13} />
+        </a>
       </div>
+
+      <iframe
+        src={url}
+        title={`${applicant.name}'s resume`}
+        className="mt-4 min-h-0 w-full flex-1 rounded-xl border border-border bg-surface"
+      />
     </section>
   );
 }
@@ -698,7 +555,7 @@ function SideLink({
   );
 }
 
-/** The first word of a member's name, as the greeting uses it. */
+/** The first word of a member's name, as the section descriptions use it. */
 function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }
@@ -706,4 +563,9 @@ function firstName(name: string): string {
 /** A URL as a reader scans it — scheme and trailing slash stripped. */
 function displayUrl(url: string): string {
   return url.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/+$/, "");
+}
+
+/** True when a URL names a PDF; only PDFs have an in-browser viewer. */
+function isPdfUrl(url: string): boolean {
+  return /\.pdf(?:[?#]|$)/i.test(url);
 }
