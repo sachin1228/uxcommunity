@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteFromR2, uploadToR2 } from "@/lib/r2";
 import { jobApplicationSchema } from "@/lib/jobs/validation";
-import { detectResumeMime, RESUME_MAX_BYTES, resumeExtension } from "@/lib/jobs/resume-file";
+import { detectResumeMime, RESUME_MAX_BYTES, resumeExtension, type ResumeMime } from "@/lib/jobs/resume-file";
 import { applyToJob, type ApplyFailureCode } from "@/lib/jobs/service";
 
 const STATUS_FOR_FAILURE: Record<ApplyFailureCode, number> = {
@@ -70,21 +70,38 @@ export async function POST(
     );
   }
 
-  // The resume is optional; when present it goes to R2 before the apply
-  // call, and is reclaimed whenever the application does not land. A saved
-  // resume (Settings → Job profile) travels as `saved_resume_id` instead: its
-  // file already lives in R2, nothing is uploaded here, and there is nothing
-  // to reclaim on failure.
+  // The resume is required — the modal enforces it and the boundary re-checks
+  // it, so an application can never be recorded without one. A fresh upload
+  // goes to R2 before the apply call and is reclaimed whenever the application
+  // does not land; a saved resume (Settings → Job profile) travels as
+  // `saved_resume_id` instead: its file already lives in R2, nothing is
+  // uploaded here, and there is nothing to reclaim on failure.
+  const resume = formData.get("resume");
+  const uploadedFile = resume instanceof Blob && resume.size > 0 ? resume : null;
+  const savedResumeIdEntry = formData.get("saved_resume_id");
+  const savedResumeId =
+    typeof savedResumeIdEntry === "string" && savedResumeIdEntry ? savedResumeIdEntry : null;
+
+  if (!uploadedFile && !savedResumeId) {
+    return NextResponse.json(
+      { error: "resume_required", message: "Attach a resume to apply." },
+      { status: 422 }
+    );
+  }
+
   const db = createServiceClient();
   let resumeUrl: string | null = null;
   let resumeKey: string | null = null;
-  const resume = formData.get("resume");
-  if (resume && resume instanceof Blob && resume.size > 0) {
-    if (resume.size > RESUME_MAX_BYTES) {
+  // Set only on the fresh-upload path — the first-upload adoption below needs
+  // the original file's name, detected mime and size.
+  let uploadedResume: { name: string; mime: ResumeMime; size: number } | null = null;
+
+  if (uploadedFile) {
+    if (uploadedFile.size > RESUME_MAX_BYTES) {
       return NextResponse.json({ error: "Resume exceeds the 5 MB limit." }, { status: 413 });
     }
 
-    const buffer = Buffer.from(await resume.arrayBuffer());
+    const buffer = Buffer.from(await uploadedFile.arrayBuffer());
     const mime = detectResumeMime(buffer);
     if (!mime) {
       return NextResponse.json(
@@ -100,34 +117,37 @@ export async function POST(
       console.error("[jobs/apply] resume upload error:", error);
       return NextResponse.json({ error: "Resume upload failed. Please try again." }, { status: 500 });
     }
-  } else {
-    const savedResumeId = formData.get("saved_resume_id");
-    if (typeof savedResumeId === "string" && savedResumeId) {
-      if (!UUID_RE.test(savedResumeId)) {
-        return NextResponse.json(
-          { error: "invalid_resume_url", message: "That saved resume is no longer available. Pick another." },
-          { status: 422 }
-        );
-      }
 
-      // Scoped to the applicant: someone else's resume id resolves to
-      // nothing and fails the same way a deleted one does.
-      const { data: savedResume } = await db
-        .from("member_resumes")
-        .select("url")
-        .eq("id", savedResumeId)
-        .eq("user_id", session.userId!)
-        .maybeSingle();
-
-      if (!savedResume) {
-        return NextResponse.json(
-          { error: "invalid_resume_url", message: "That saved resume is no longer available. Pick another." },
-          { status: 422 }
-        );
-      }
-
-      resumeUrl = savedResume.url;
+    uploadedResume = {
+      name: uploadedFile instanceof File ? uploadedFile.name.trim() : "",
+      mime,
+      size: uploadedFile.size,
+    };
+  } else if (savedResumeId) {
+    if (!UUID_RE.test(savedResumeId)) {
+      return NextResponse.json(
+        { error: "invalid_resume_url", message: "That saved resume is no longer available. Pick another." },
+        { status: 422 }
+      );
     }
+
+    // Scoped to the applicant: someone else's resume id resolves to
+    // nothing and fails the same way a deleted one does.
+    const { data: savedResume } = await db
+      .from("member_resumes")
+      .select("url")
+      .eq("id", savedResumeId)
+      .eq("user_id", session.userId!)
+      .maybeSingle();
+
+    if (!savedResume) {
+      return NextResponse.json(
+        { error: "invalid_resume_url", message: "That saved resume is no longer available. Pick another." },
+        { status: 422 }
+      );
+    }
+
+    resumeUrl = savedResume.url;
   }
 
   const { id } = await params;
@@ -156,6 +176,38 @@ export async function POST(
       },
       { status: STATUS_FOR_FAILURE[result.code] }
     );
+  }
+
+  // First-upload adoption: when a member with no saved resumes attaches a
+  // one-off file, that file becomes their first saved resume, so the next
+  // Apply offers it and Settings → Job profile lists it. Members who already
+  // have a saved list manage it themselves — their one-off uploads stay
+  // one-off. Non-fatal by design: the application already landed, so a
+  // failure here is only logged.
+  if (uploadedResume && resumeUrl) {
+    try {
+      const { count, error: countError } = await db
+        .from("member_resumes")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", session.userId!);
+
+      if (countError) throw countError;
+
+      if ((count ?? 0) === 0) {
+        const { error: insertError } = await db.from("member_resumes").insert({
+          user_id: session.userId!,
+          file_name: uploadedResume.name || `resume.${resumeExtension(uploadedResume.mime)}`,
+          mime_type: uploadedResume.mime,
+          size_bytes: uploadedResume.size,
+          url: resumeUrl,
+          is_default: true,
+        });
+
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error("[jobs/apply] resume adopt error:", error);
+    }
   }
 
   return NextResponse.json({ application_id: result.applicationId });

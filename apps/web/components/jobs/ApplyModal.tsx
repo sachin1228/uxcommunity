@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileText, Upload, X } from "lucide-react";
+import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
-import { AvatarImg } from "@/components/ui/AvatarImg";
 import { resumeMeta, type SavedResume } from "@/lib/settings/resumes";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
@@ -21,17 +21,19 @@ interface ApplyModalProps {
 
 /**
  * The application is exactly three fields — name, portfolio, LinkedIn — plus
- * an optional resume. The name and links prefill from the member's profile
+ * a required resume. The name and links prefill from the member's profile
  * but stay editable: the application is what the poster reads, not the
  * profile. Eligibility is not checked here; the database re-checks the
  * applicant's profile row when the form is submitted.
  *
- * The resume comes from one of two places. A member with saved resumes
+ * The resume comes from one of two sources. A member with saved resumes
  * (Settings → Job profile) picks one from a radio list — the default is
- * preselected — or chooses "Upload a new file" (the original attach row) or
- * "No resume". A member without saved resumes, or when the saved-resume list
- * cannot be loaded, sees today's upload-only control: the modal must never
- * break applying, so a failed GET falls back silently.
+ * preselected — or chooses "Upload a new file" (the original attach row). A
+ * member without saved resumes, or when the saved-resume list cannot be
+ * loaded, sees the upload-only control; the first upload by a member with no
+ * saved resumes is adopted into their job profile server-side, so the next
+ * time the modal opens it is offered there. The modal must never break
+ * applying, so a failed GET falls back silently.
  */
 export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModalProps) {
   const [name, setName] = useState(viewer.name);
@@ -43,10 +45,13 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
   const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Saved resumes + the chosen option ("saved:<id>" | "upload" | "none").
+  // Saved resumes + the chosen option ("saved:<id>" | "upload").
   // `savedResumes` stays null until a successful load with ≥1 row — null is
-  // exactly the fallback signal the Resume block renders from.
+  // exactly the fallback signal the Resume block renders from. `resumesLoaded`
+  // records a successful load even of an empty list, which is what gates the
+  // first-upload hint below.
   const [savedResumes, setSavedResumes] = useState<SavedResume[] | null>(null);
+  const [resumesLoaded, setResumesLoaded] = useState(false);
   const [resumeChoice, setResumeChoice] = useState("");
   const resumesRequestedRef = useRef(false);
 
@@ -59,7 +64,9 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
         if (!response.ok) return;
         const body = (await response.json().catch(() => null)) as { resumes?: SavedResume[] } | null;
         const list = body?.resumes;
-        if (!Array.isArray(list) || list.length === 0) return;
+        if (!Array.isArray(list)) return;
+        setResumesLoaded(true);
+        if (list.length === 0) return;
         setSavedResumes(list);
         const preset = list.find((entry) => entry.isDefault) ?? list[0];
         setResumeChoice(`saved:${preset.id}`);
@@ -100,6 +107,18 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
       setError("Enter your LinkedIn profile link (linkedin.com/…)");
       return;
     }
+    if (savedResumes) {
+      // The list always preselects a saved resume, so the only incomplete
+      // choice is the upload option with nothing attached yet.
+      if (resumeChoice === "upload" && !resume) {
+        setError("Attach a resume to apply.");
+        return;
+      }
+    } else if (!resume) {
+      // No usable saved list (empty or not loaded): the upload is the resume.
+      setError("Attach a resume to apply.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -115,7 +134,7 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
         const chosen =
           savedResumes.find((entry) => `saved:${entry.id}` === resumeChoice) ?? null;
         if (chosen) form.set("saved_resume_id", chosen.id);
-        else if (resumeChoice === "upload" && resume) form.set("resume", resume);
+        else if (resume) form.set("resume", resume);
       } else if (resume) {
         form.set("resume", resume);
       }
@@ -136,6 +155,12 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
       }
 
       setSubmitted(true);
+      // The next open starts fresh: re-arm the fetch guard and drop the loaded
+      // list, so the reload shows any resume the server just adopted (a first
+      // upload with none saved) and the hint state stays truthful.
+      resumesRequestedRef.current = false;
+      setSavedResumes(null);
+      setResumesLoaded(false);
       onApplied();
     } catch {
       setError("Your application could not be sent. Check your connection and try again.");
@@ -167,12 +192,7 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
-            <AvatarImg
-              url={viewer.avatarUrl}
-              name={viewer.name}
-              size={40}
-              className="rounded-full object-cover"
-            />
+            <CompanyLogo name={job.company.name} logoUrl={job.company.logo_url} size={40} />
             <div className="min-w-0">
               <p className="truncate font-body text-sm font-semibold text-foreground">
                 {job.title}
@@ -226,7 +246,7 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
 
           <div className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
-              Resume <span className="text-foreground-subtle">(optional — PDF, DOC, DOCX, RTF)</span>
+              Resume <span className="text-red-400">*</span> <span className="text-foreground-subtle">(PDF, DOC, DOCX, RTF — up to 5 MB)</span>
             </span>
             <input
               ref={fileInputRef}
@@ -258,16 +278,16 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
                   ) : (
                     <AttachResumeButton onClick={() => fileInputRef.current?.click()} />
                   ))}
-                <ResumeOption
-                  checked={resumeChoice === "none"}
-                  onSelect={() => setResumeChoice("none")}
-                  label="No resume"
-                />
               </div>
             ) : resume ? (
               <PickedResumeRow file={resume} onRemove={clearPickedResume} />
             ) : (
               <AttachResumeButton onClick={() => fileInputRef.current?.click()} />
+            )}
+            {resumesLoaded && !savedResumes && (
+              <p className="font-body text-xs text-foreground-subtle">
+                Saved to your job profile for next time.
+              </p>
             )}
           </div>
 
@@ -297,7 +317,7 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
   );
 }
 
-/** One choice in the resume radio group (a saved resume, upload, or none). */
+/** One choice in the resume radio group (a saved resume, or a one-off upload). */
 function ResumeOption({
   checked,
   onSelect,
