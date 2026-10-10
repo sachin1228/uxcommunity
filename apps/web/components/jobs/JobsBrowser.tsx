@@ -55,8 +55,8 @@ function newestInstant(list: JobPost[]): number {
 
 /**
  * The jobs board, LinkedIn-style: the browse tabs split the open roles by
- * kind — "Hiring" and "Referral", the same two intents the cards' #Hiring /
- * #Referral tags name — and "Applied" joins them; on those three the rail
+ * kind — "#Hiring" and "#Referral", the same two intents the cards' hashtag
+ * tags name — and "Applied" joins them; on those three the rail
  * lists postings and the pane shows the selected one — selecting is local
  * state, not a route change, because `get_job_feed` already returns the full
  * detail payload for every row. "My posts" is a plain list: each post opens
@@ -185,8 +185,8 @@ export function JobsBrowser({
 
   const newBadge = (count: number | undefined) => (count && count > 0 ? `${count} new` : null);
   const tabs: { value: Tab; label: string; chip: string | null; unseen: boolean }[] = [
-    { value: "hiring", label: "Hiring", chip: newBadge(tabNewCounts?.hiring), unseen: true },
-    { value: "referral", label: "Referral", chip: newBadge(tabNewCounts?.referral), unseen: true },
+    { value: "hiring", label: "#Hiring", chip: newBadge(tabNewCounts?.hiring), unseen: true },
+    { value: "referral", label: "#Referral", chip: newBadge(tabNewCounts?.referral), unseen: true },
     { value: "applied", label: "Applied", chip: String(appliedJobs.length), unseen: false },
     { value: "posts", label: "My posts", chip: String(myPosts.length), unseen: false },
   ];
