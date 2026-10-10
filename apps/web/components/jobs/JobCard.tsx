@@ -36,10 +36,11 @@ interface JobCardProps {
  * for its owner (the feed returns it to nobody else), where the badge is what
  * explains why it no longer appears to anyone browsing.
  *
- * On the owner's own list the card also carries the posting's controls, so a
- * role can be closed or deleted from the scan. That cluster is its own click
- * and key target — it contains its events, because the card around it is one
- * big button and selecting a posting must not fire when the menu is used.
+ * On the owner's own list the card also carries the posting's menu at the
+ * title row's right edge, so a role can be closed or deleted from the scan.
+ * That button is its own click and key target — it contains its events,
+ * because the card around it is one big button and selecting a posting must
+ * not fire when the menu is used.
  */
 export function JobCard({
   job,
@@ -79,10 +80,10 @@ export function JobCard({
           <div className="flex shrink-0 items-center gap-1.5">
             <JobStateBadge job={job} />
             <KindBadge kind={job.kind} />
-            {job.is_mine && (
-              <span className="rounded-full border border-accent/40 px-2 py-0.5 font-body text-[10px] font-semibold text-accent">
-                Your post
-              </span>
+            {/* The same menu the posting's own page carries, so a role can
+                be closed or removed without opening it. */}
+            {showOwnerActions && job.is_mine && (
+              <JobOwnerActions job={job} master={master} redirectOnDelete={false} />
             )}
           </div>
         </div>
@@ -113,22 +114,7 @@ export function JobCard({
             ) : null}
           </span>
 
-          {showOwnerActions && job.is_mine ? (
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
-                <Users strokeWidth={2.5} size={11} />
-                {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
-              </span>
-              {/* The same controls the posting's own page carries, so a role can
-                  be closed or removed without opening it. */}
-              <JobOwnerActions
-                job={job}
-                master={master}
-                variant="compact"
-                redirectOnDelete={false}
-              />
-            </span>
-          ) : job.is_mine ? (
+          {job.is_mine ? (
             <span className="inline-flex items-center gap-1 font-body text-[11px] font-medium text-foreground-muted">
               <Users strokeWidth={2.5} size={11} />
               {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}

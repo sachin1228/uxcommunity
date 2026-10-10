@@ -22,11 +22,13 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
  * as an undo. Delete is the only irreversible one, so it is the only one behind
  * a dialog that names what disappears.
  *
- * Two surfaces render this: the posting's own page (`variant="full"`, an
- * inline Edit button plus the menu) and each row of the owner's list
- * (`variant="compact"`, the menu alone — a scanned list wants one small target,
- * not two). `master` is only needed to open the edit form, so a surface without
- * it still gets Close/Reopen/Delete.
+ * One small menu, two placements: the owner's list hangs it off each row's
+ * title row, and the posting's own page places it beside the kind tag in the
+ * header. On that page the Edit button lives in the page's own actions row, so
+ * the host takes the edit form over through `onEditRequested`; without that
+ * prop the form opens from the menu item here (the list's way in). `master` is
+ * only needed to open the edit form, so a surface without it still gets
+ * Close/Reopen/Delete.
  *
  * A posting whose closing date has passed is offered "Change deadline" in place
  * of "Edit job": the date is the lever that brings it back, and reopening it is
@@ -40,13 +42,18 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
 export function JobOwnerActions({
   job,
   master,
-  variant = "full",
+  /**
+   * Set by a surface that hosts the edit form itself (its Edit button sits
+   * elsewhere on the page); the menu item hands over instead of opening the
+   * form here.
+   */
+  onEditRequested,
   /** False when deleting should leave the member where they are (the list). */
   redirectOnDelete = true,
 }: {
   job: JobPost;
   master?: JobMasterData;
-  variant?: "full" | "compact";
+  onEditRequested?: () => void;
   redirectOnDelete?: boolean;
 }) {
   const router = useRouter();
@@ -149,18 +156,6 @@ export function JobOwnerActions({
 
   return (
     <div className="flex items-center gap-2" onClick={contain} onKeyDown={contain}>
-      {variant === "full" && (
-        <button
-          type="button"
-          onClick={() => setEditOpen(true)}
-          disabled={!master || pending}
-          className="modal-btn modal-btn-secondary !h-8 text-[12px]"
-        >
-          <Pencil strokeWidth={2.5} size={13} />
-          Edit
-        </button>
-      )}
-
       <button
         type="button"
         ref={triggerRef}
@@ -169,11 +164,7 @@ export function JobOwnerActions({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         disabled={pending}
-        className={`flex shrink-0 items-center justify-center text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground ${
-          variant === "full"
-            ? "h-8 w-8 rounded-lg border border-border"
-            : "h-7 w-7 rounded-md border border-transparent"
-        }`}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
       >
         {pending ? <Spinner size={14} /> : <MoreHorizontal strokeWidth={2.5} size={16} />}
       </button>
@@ -197,7 +188,8 @@ export function JobOwnerActions({
             role="menuitem"
             onClick={() => {
               setMenuOpen(false);
-              setEditOpen(true);
+              if (onEditRequested) onEditRequested();
+              else setEditOpen(true);
             }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
           >
