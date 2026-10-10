@@ -21,9 +21,20 @@ import { EMPLOYMENT_TYPES, WORK_MODES } from "@/lib/jobs/types";
 
 export const jobFieldLabel = "font-body text-xs font-medium text-foreground";
 
+/**
+ * The wildcard choice in the two criteria pickers that accept one: "All
+ * cities" / "All sectors" stores NULL — the dimension then matches every
+ * member. Job title and experience level have no wildcard; they are always
+ * exact matches.
+ */
+export const ALL_CITIES = "all";
+export const ALL_SECTORS = "all";
+
 export interface JobFormValues {
   title: string;
+  /** A city id, ALL_CITIES for All cities, or "" while unchosen. */
   cityId: string;
+  /** A sector id, ALL_SECTORS for All sectors, or "" while unchosen. */
   sectorId: string;
   jobTitle: string;
   experienceLevel: string;
@@ -54,8 +65,9 @@ export const EMPTY_JOB_FORM: JobFormValues = {
 export function jobFormValuesFrom(job: JobPost): JobFormValues {
   return {
     title: job.title,
-    cityId: job.city_id,
-    sectorId: job.sector_id,
+    // NULL is the All wildcard; the picker shows it as a chosen option.
+    cityId: job.city_id ?? ALL_CITIES,
+    sectorId: job.sector_id ?? ALL_SECTORS,
     jobTitle: job.job_title,
     experienceLevel: job.experience_level,
     workMode: job.work_mode,
@@ -171,7 +183,11 @@ export function JobIdentityFields({ values, onChange, master }: JobFieldProps) {
   );
 }
 
-/** The four dimensions the eligibility rule compares. */
+/**
+ * The four criteria the eligibility rule compares. City and sector accept
+ * an All wildcard — the posting then matches every member on that
+ * dimension; job title and experience level have no wildcard.
+ */
 export function JobCriteriaFields({
   values,
   onChange,
@@ -187,19 +203,25 @@ export function JobCriteriaFields({
         </span>
         <p className="-mt-1 font-body text-[11px] text-foreground-subtle">
           {criteriaLocked
-            ? "Locked — members have applied, and these four dimensions decide who could. Reopen them by posting a new role."
-            : "Only members whose profile matches all four dimensions can apply."}
+            ? "Locked — members have applied, and these criteria decide who could. Reopen them by posting a new role."
+            : "Members must match the job title and experience level; the city and sector match too unless they are set to All."}
         </p>
         <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SearchableSelect
-            options={master.cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.imageUrl }))}
+            options={[
+              { value: ALL_CITIES, label: "All cities" },
+              ...master.cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.imageUrl })),
+            ]}
             value={values.cityId}
             onChange={(cityId) => onChange({ cityId })}
             placeholder="City"
             disabled={criteriaLocked}
           />
           <SearchableSelect
-            options={master.sectors.map((s) => ({ value: s.id, label: s.name, imageUrl: s.imageUrl }))}
+            options={[
+              { value: ALL_SECTORS, label: "All sectors" },
+              ...master.sectors.map((s) => ({ value: s.id, label: s.name, imageUrl: s.imageUrl })),
+            ]}
             value={values.sectorId}
             onChange={(sectorId) => onChange({ sectorId })}
             placeholder="Industry sector"
@@ -285,8 +307,9 @@ export function JobTermFields({
 export function jobFormPayload(values: JobFormValues) {
   return {
     title: values.title.trim(),
-    city_id: values.cityId,
-    sector_id: values.sectorId,
+    // The All choice travels as NULL — the database's wildcard.
+    city_id: values.cityId === ALL_CITIES ? null : values.cityId,
+    sector_id: values.sectorId === ALL_SECTORS ? null : values.sectorId,
     job_title: values.jobTitle,
     experience_level: values.experienceLevel,
     work_mode: values.workMode,

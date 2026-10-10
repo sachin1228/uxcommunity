@@ -105,9 +105,13 @@ export interface JobPost {
   website: string | null;
   work_mode: WorkMode;
   employment_type: EmploymentType;
-  city_id: string;
+  /** NULL = All cities — the dimension matches every member. */
+  city_id: string | null;
+  /** Display-resolved by the payload: the city name, or "All cities". */
   city_name: string;
-  sector_id: string;
+  /** NULL = All sectors — the dimension matches every member. */
+  sector_id: string | null;
+  /** Display-resolved by the payload: the sector name, or "All sectors". */
   sector_name: string;
   job_title: string;
   job_title_label: string;
@@ -204,8 +208,9 @@ export interface JobViewer {
 /** Human-readable names of the criteria the viewer's profile does not match. */
 export function criteriaMismatches(job: JobPost, viewer: JobViewer): string[] {
   const mismatches: string[] = [];
-  if (viewer.cityId !== job.city_id) mismatches.push("city");
-  if (viewer.sectorId !== job.sector_id) mismatches.push("sector");
+  // An All dimension (NULL) is open to everyone and can never mismatch.
+  if (job.city_id !== null && viewer.cityId !== job.city_id) mismatches.push("city");
+  if (job.sector_id !== null && viewer.sectorId !== job.sector_id) mismatches.push("sector");
   if (viewer.jobTitle !== job.job_title) mismatches.push("job title");
   if (viewer.experienceLevel !== job.experience_level) mismatches.push("experience level");
   return mismatches;

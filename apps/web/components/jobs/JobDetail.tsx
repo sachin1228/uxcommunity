@@ -52,6 +52,14 @@ export function JobDetail({
   const [applicationOpen, setApplicationOpen] = useState(false);
 
   const mismatches = criteriaMismatches(job, viewer);
+  // Which dimensions actually gate this posting: an All city or sector is
+  // open to everyone, so it is not named here.
+  const gateDimensions = [
+    job.city_id ? "city" : null,
+    job.sector_id ? "sector" : null,
+    "job title",
+    "experience level",
+  ].filter((dimension): dimension is string => Boolean(dimension));
 
   return (
     <div className="flex flex-col gap-6">
@@ -161,8 +169,7 @@ export function JobDetail({
               <div className="flex flex-col gap-1">
                 <LockedNote>Apply is locked for your profile</LockedNote>
                 <p className="font-body text-xs text-foreground-subtle">
-                  Only members whose city, sector, job title and experience level match the
-                  posting can apply.
+                  Only members whose {listPhrase(gateDimensions)} match the posting can apply.
                   {mismatches.length > 0 ? ` Your profile differs in ${listPhrase(mismatches)}.` : ""}
                 </p>
               </div>

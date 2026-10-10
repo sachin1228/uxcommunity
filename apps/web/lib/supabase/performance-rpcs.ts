@@ -188,8 +188,10 @@ type PerformanceRpcMap = {
       p_kind: string;
       p_company_id: string;
       p_title: string;
-      p_city_id: string;
-      p_sector_id: string;
+      /** NULL = All cities — the wildcard dimension. */
+      p_city_id: string | null;
+      /** NULL = All sectors — the wildcard dimension. */
+      p_sector_id: string | null;
       p_job_title: string;
       p_experience_level: string;
       p_work_mode: string;
@@ -237,8 +239,10 @@ type PerformanceRpcMap = {
       p_actor_id: string;
       p_job_id: string;
       p_title: string;
-      p_city_id: string;
-      p_sector_id: string;
+      /** NULL = All cities — the wildcard dimension. */
+      p_city_id: string | null;
+      /** NULL = All sectors — the wildcard dimension. */
+      p_sector_id: string | null;
       p_job_title: string;
       p_experience_level: string;
       p_work_mode: string;
