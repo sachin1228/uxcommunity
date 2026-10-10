@@ -72,6 +72,11 @@ export function DesignModeViewer({
       : section === "linkedin"
         ? applicant.linkedin_url
         : (applicant.resume_url ?? applicant.portfolio_url);
+  // The browser's own PDF viewer takes its opening zoom from the URL
+  // fragment, so resume PDFs open at 50%.
+  const frameUrl = /\.pdf($|[?#])/i.test(sectionUrl)
+    ? `${sectionUrl}#zoom=50`
+    : sectionUrl;
 
   const goTo = useCallback(
     (next: number) => {
@@ -274,7 +279,7 @@ export function DesignModeViewer({
               the poster and the link they are reading. */}
           <div className="min-h-0 flex-1 bg-surface">
             <iframe
-              src={sectionUrl}
+              src={frameUrl}
               title={`${applicant.name} — ${section}`}
               className="h-full w-full border-0"
             />
