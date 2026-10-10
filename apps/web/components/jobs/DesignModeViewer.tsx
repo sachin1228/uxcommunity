@@ -32,9 +32,9 @@ type DesignSection = "portfolio" | "linkedin" | "resume";
  * present it: the applicant's own details and filled links in the left
  * sidebar, and the chosen link loaded in place on the right — an iframe with
  * nothing between the poster and the page itself (resume PDFs render in our
- * own viewer instead, whose tools float on the right edge). Forced light
- * regardless of the app's theme (the `.design-light` scope re-declares the
- * light tokens): this is the applicant's page, not app chrome.
+ * own viewer instead, whose tools float on the right edge). Rendered in the
+ * app's dark palette (the `.design-dark` scope re-declares the dark tokens)
+ * regardless of the OS theme: this is the applicant's page, not app chrome.
  *
  * The URL pins the applicant being reviewed — a decision refreshes the data
  * without changing what the poster is looking at — and previous/next move
@@ -130,7 +130,7 @@ export function DesignModeViewer({
   const decisionError = error?.id === applicant.id ? error.message : null;
 
   return (
-    <div className="design-light flex h-dvh min-h-0 flex-col bg-background font-body text-foreground">
+    <div className="design-dark flex h-dvh min-h-0 flex-col bg-background font-body text-foreground">
       <div className="flex min-h-0 flex-1">
         {/* Sidebar — the way out, the applicant's own details, the poster's
             decisions, the pager, and the applicant's filled links at the
@@ -326,7 +326,7 @@ export function DesignModeViewer({
 
 /**
  * The decision pair — the same standing the board's cluster shows, in the
- * viewer's light styling: the standing is filled, clicking it moves the
+ * viewer's dark styling: the standing is filled, clicking it moves the
  * applicant back to New (the title says so), and the other decision stays
  * one click away for a change of mind.
  */
@@ -349,7 +349,7 @@ function DecisionButtons({
         <button
           type="button"
           onClick={() => onChange("shortlisted")}
-          className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 font-body text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+          className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-500/40 bg-transparent px-3 font-body text-xs font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/10"
         >
           <Check strokeWidth={2.5} size={13} />
           Shortlist
@@ -357,7 +357,7 @@ function DecisionButtons({
         <button
           type="button"
           onClick={() => onChange("rejected")}
-          className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-red-200 bg-transparent px-3 font-body text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
+          className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-red-500/40 bg-transparent px-3 font-body text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/10"
         >
           <X strokeWidth={2.5} size={13} />
           Reject
@@ -368,12 +368,12 @@ function DecisionButtons({
     const other: ApplicationStatus = status === "shortlisted" ? "rejected" : "shortlisted";
     const activeClass =
       status === "shortlisted"
-        ? "border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-        : "border border-red-600 bg-red-600 text-white hover:bg-red-700";
+        ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25"
+        : "border border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/25";
     const otherClass =
       other === "shortlisted"
-        ? "border border-emerald-300 bg-transparent text-emerald-700 hover:bg-emerald-50"
-        : "border border-red-200 bg-transparent text-red-600 hover:bg-red-50";
+        ? "border border-emerald-500/30 text-emerald-500/80 hover:bg-emerald-500/10 hover:text-emerald-500"
+        : "border border-red-500/30 text-red-400/80 hover:bg-red-500/10 hover:text-red-400";
 
     buttons = (
       <>
@@ -421,7 +421,7 @@ function DecisionButtons({
       {error && (
         <p
           role="status"
-          className="col-span-2 basis-full text-center font-body text-[11px] leading-snug text-red-600"
+          className="col-span-2 basis-full text-center font-body text-[11px] leading-snug text-red-400"
         >
           {error}
         </p>
@@ -447,7 +447,7 @@ function SideLink({
       onClick={onClick}
       className={`flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 font-body text-sm transition-colors ${
         active
-          ? "bg-surface font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+          ? "bg-accent-soft font-medium text-foreground"
           : "text-foreground-muted hover:bg-accent-soft hover:text-foreground"
       }`}
     >
