@@ -137,7 +137,7 @@ export function DesignModeViewer({
             foot. Every control lives on this column, so the right side is
             nothing but the applicant's own page. Below lg this column is
             hidden; the controls ride over the page as a strip instead. */}
-        <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
+        <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-background-subtle px-6 py-8 lg:flex">
           <button
             type="button"
             onClick={leave}
@@ -278,7 +278,7 @@ export function DesignModeViewer({
 
           {/* The applicant's own page, loaded in place — nothing between
               the poster and the link they are reading. */}
-          <div className="min-h-0 flex-1 bg-surface">
+          <div className="min-h-0 flex-1 bg-background">
             {isPdf ? (
               <ResumePdf key={sectionUrl} url={sectionUrl} />
             ) : (
@@ -447,7 +447,7 @@ function SideLink({
       onClick={onClick}
       className={`flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 font-body text-sm transition-colors ${
         active
-          ? "bg-accent-soft font-medium text-foreground"
+          ? "bg-surface font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
           : "text-foreground-muted hover:bg-accent-soft hover:text-foreground"
       }`}
     >

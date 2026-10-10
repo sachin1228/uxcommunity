@@ -12,7 +12,7 @@ const ZOOM_LEVELS = [25, 33, 50, 67, 75, 100, 125, 150, 175, 200, 250, 300, 400]
  * The resume pane's PDF viewer — ours rather than the browser's, so the
  * tools (zoom, fit width, open in new tab) float on the right edge instead
  * of sitting in the browser's toolbar across the top. Pages render to
- * canvas; it opens at 50%, where a resume reads well (100% = 96 dpi, the
+ * canvas; it opens at 67%, where a resume reads well (100% = 96 dpi, the
  * browser's own convention).
  */
 export function ResumePdf({ url }: { url: string }) {
@@ -22,7 +22,7 @@ export function ResumePdf({ url }: { url: string }) {
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState(0);
-  const [zoom, setZoom] = useState(50);
+  const [zoom, setZoom] = useState(67);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -72,10 +72,8 @@ export function ResumePdf({ url }: { url: string }) {
           canvas.height = Math.floor(viewport.height * ratio);
           canvas.style.width = `${Math.floor(viewport.width)}px`;
           canvas.style.height = `${Math.floor(viewport.height)}px`;
-          const context = canvas.getContext("2d");
-          if (!context) return;
           task = page.render({
-            canvasContext: context,
+            canvas,
             viewport,
             transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
           });
