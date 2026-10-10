@@ -328,6 +328,7 @@ export type Database = {
       community_events: {
         Row: {
           accent_color: string | null;
+          city_id: string | null;
           community_id: string;
           cover_image_url: string | null;
           created_at: string;
@@ -348,6 +349,7 @@ export type Database = {
         };
         Insert: {
           accent_color?: string | null;
+          city_id?: string | null;
           community_id: string;
           cover_image_url?: string | null;
           created_at?: string;
@@ -368,6 +370,7 @@ export type Database = {
         };
         Update: {
           accent_color?: string | null;
+          city_id?: string | null;
           community_id?: string;
           cover_image_url?: string | null;
           created_at?: string;
@@ -387,6 +390,13 @@ export type Database = {
           user_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "community_events_city_id_fkey";
+            columns: ["city_id"];
+            isOneToOne: false;
+            referencedRelation: "cities";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "community_events_community_id_fkey";
             columns: ["community_id"];

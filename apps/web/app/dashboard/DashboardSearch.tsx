@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   Briefcase,
+  CalendarDays,
   Compass,
   Home,
   Library,
@@ -39,6 +40,7 @@ const ICONS: Record<string, typeof Search> = {
   "/dashboard/communities": Compass,
   "/dashboard/library": Library,
   "/dashboard/jobs": Briefcase,
+  "/dashboard/events": CalendarDays,
   "/dashboard/notifications": Bell,
   "/dashboard/profile": UserCircle,
   "/dashboard/settings": Settings,

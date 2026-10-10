@@ -18,6 +18,8 @@ import {
 
 const EVENT_PAGE_SIZE = 25;
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -185,6 +187,17 @@ export async function POST(
     : null;
   const isPublic = body.is_public === true;
 
+  // The city the event is listed under on the city Events page. Required: an
+  // event with no city appears on no Events page, so the form offers no empty
+  // option and this is the backstop for anything that skips the form.
+  const cityId = typeof body.city_id === "string" && body.city_id.trim() ? body.city_id.trim() : null;
+  if (!cityId) {
+    return NextResponse.json({ error: "City is required." }, { status: 422 });
+  }
+  if (!UUID_PATTERN.test(cityId)) {
+    return NextResponse.json({ error: "Invalid city." }, { status: 422 });
+  }
+
   const accentColor = typeof body.accent_color === "string" && /^#[0-9a-fA-F]{6}$/.test(body.accent_color.trim())
     ? body.accent_color.trim().toLowerCase()
     : null;
@@ -193,6 +206,7 @@ export async function POST(
     .from("community_events")
     .insert({
       community_id: communityId,
+      city_id: cityId,
       user_id: userId,
       title,
       description,
