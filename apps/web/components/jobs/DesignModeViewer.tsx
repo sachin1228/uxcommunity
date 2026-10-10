@@ -183,8 +183,9 @@ export function DesignModeViewer({
 
         <div className="flex min-h-0 flex-1">
           {/* Sidebar — the applicant's own details, the poster's decisions,
-              and the two quick links the reference portfolio keeps at the
-              foot of the sidebar. */}
+              and the applicant's filled links at the foot: the same options
+              the applicant card carries, labeled and one click from the
+              poster's eye. */}
           <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
             <div className="flex flex-col items-center text-center">
               <AvatarImg
@@ -223,16 +224,30 @@ export function DesignModeViewer({
 
             <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
               <SideLink
-                active={section === "profile"}
-                icon={<UserRound strokeWidth={2.5} size={15} />}
-                label="Profile"
-                onClick={() => setSection("profile")}
-              />
-              <SideLink
                 active={section === "portfolio"}
                 icon={<Globe strokeWidth={2.5} size={15} />}
                 label="Portfolio"
                 onClick={() => setSection("portfolio")}
+              />
+              <SideLink
+                active={section === "linkedin"}
+                icon={<Linkedin strokeWidth={2.5} size={15} />}
+                label="LinkedIn"
+                onClick={() => setSection("linkedin")}
+              />
+              {applicant.resume_url && (
+                <SideLink
+                  active={section === "resume"}
+                  icon={<FileText strokeWidth={2.5} size={15} />}
+                  label="Resume"
+                  onClick={() => setSection("resume")}
+                />
+              )}
+              <SideLink
+                active={section === "profile"}
+                icon={<UserRound strokeWidth={2.5} size={15} />}
+                label="Profile"
+                onClick={() => setSection("profile")}
               />
             </nav>
           </aside>
