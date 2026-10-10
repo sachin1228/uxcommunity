@@ -15,6 +15,8 @@ export interface CommunityEvent {
   cover_image_url: string | null;
   accent_color?: string | null;
   is_public?: boolean;
+  /** The city the city Events page lists this under; null on older events. */
+  city_id?: string | null;
   /**
    * The zone the host set the event in, and their offset at that instant in
    * minutes east of UTC. Both null on events created before this was recorded

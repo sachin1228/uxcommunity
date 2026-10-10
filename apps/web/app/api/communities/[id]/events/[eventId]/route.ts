@@ -17,6 +17,8 @@ import { removeCommunityContent, type RemoveContentResult } from "@/lib/communit
 import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
 import type { Database } from "@/lib/supabase/database.types";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; eventId: string }> },
@@ -138,6 +140,13 @@ export async function PATCH(
       : null;
   }
   if (typeof body.is_public === "boolean") patch.is_public = body.is_public;
+  if ("city_id" in body) {
+    const cityId = typeof body.city_id === "string" && body.city_id.trim() ? body.city_id.trim() : null;
+    if (cityId && !UUID_PATTERN.test(cityId)) {
+      return NextResponse.json({ error: "Invalid city." }, { status: 422 });
+    }
+    patch.city_id = cityId;
+  }
 
   if (!Object.keys(patch).length) return NextResponse.json({ error: "Nothing to update." }, { status: 422 });
 

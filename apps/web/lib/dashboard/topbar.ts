@@ -55,6 +55,13 @@ export const PAGE_DESTINATIONS: SearchDestination[] = [
     keywords: ["hiring", "roles", "careers", "work"],
   },
   {
+    id: "page:events",
+    label: "Events",
+    href: "/dashboard/events",
+    group: "page",
+    keywords: ["calendar", "meetups", "workshops", "city"],
+  },
+  {
     id: "page:notifications",
     label: "Notifications",
     href: "/dashboard/notifications",

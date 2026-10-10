@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, MapPinned, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -73,8 +73,34 @@ export function CreateEventModal({
   const [maxAttendees, setMaxAttendees] = useState("");
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [accentColor, setAccentColor] = useState(DEFAULT_EVENT_ACCENT);
+  // The city picker's options, loaded when the modal opens. The default is the
+  // viewer's own city from their profile — the Events page lists public events
+  // under their city, so "my city" is the right prefill.
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [citiesRes, profileRes] = await Promise.all([
+          fetch("/api/data/cities"),
+          fetch("/api/profile"),
+        ]);
+        const citiesData = (await citiesRes.json()) as { cities?: { id: string; name: string }[] };
+        const profileData = (await profileRes.json()) as { profile?: { cities?: { id: string } | null } | null };
+        if (cancelled) return;
+        setCities(citiesData.cities ?? []);
+        const defaultCityId = profileData.profile?.cities?.id ?? null;
+        if (defaultCityId) setCityId((current) => current ?? defaultCityId);
+      } catch {
+        // The picker stays empty; the event can still be created without a city.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -150,6 +176,7 @@ export function CreateEventModal({
           is_online: isOnline,
           location: location.trim() || null,
           meet_link: meetLink.trim() || null,
+          city_id: cityId,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
           accent_color: accentColor,
@@ -400,6 +427,23 @@ export function CreateEventModal({
               />
             </label>
           )}
+
+          {/* City — the listing bucket on the workspace Events page */}
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+              <MapPinned strokeWidth={2.5} size={11} /> City <span className="font-normal text-foreground-subtle">(optional — defaults to your city)</span>
+            </span>
+            <select
+              value={cityId ?? ""}
+              onChange={(e) => setCityId(e.target.value || null)}
+              className="field w-full"
+            >
+              <option value="">Select a city…</option>
+              {cities.map((city) => (
+                <option key={city.id} value={city.id}>{city.name}</option>
+              ))}
+            </select>
+          </label>
 
           {/* Max attendees */}
           <label className="block">
