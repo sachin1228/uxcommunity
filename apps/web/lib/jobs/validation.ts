@@ -32,8 +32,10 @@ export const jobPostSchema = z.object({
   kind: z.enum(["hiring", "referral"]),
   company_id: z.string().uuid("Select a verified company"),
   title: z.string().trim().min(2, "Add a role title").max(140),
-  city_id: z.string().uuid("Select a city"),
-  sector_id: z.string().uuid("Select a sector"),
+  /** NULL = All cities — the wildcard the "All cities" choice sends. */
+  city_id: z.string().uuid("Select a city").nullable(),
+  /** NULL = All sectors — the wildcard the "All sectors" choice sends. */
+  sector_id: z.string().uuid("Select a sector").nullable(),
   job_title: z.string().min(1, "Select a job title"),
   experience_level: z.string().min(1, "Select an experience level"),
   work_mode: z.enum(["remote", "hybrid", "onsite"]),

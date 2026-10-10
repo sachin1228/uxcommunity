@@ -8,22 +8,69 @@ import { JobDetail } from "./JobDetail";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
-type Tab = "all" | "applied" | "posts";
+/** The two browse tabs. They carry an unseen-roles badge instead of a total. */
+type BrowseKind = "hiring" | "referral";
+type Tab = BrowseKind | "applied" | "posts";
 
 /**
- * The jobs board, LinkedIn-style: on "For you" and "Applied" the
- * rail lists postings and the pane shows the selected one — selecting is
- * local state, not a route change, because `get_job_feed` already returns the
- * full detail payload for every row. "My posts" is a plain list: each post
- * opens its own view page (`/dashboard/jobs/<id>`), not the master-detail
- * pane. Below lg the panes take turns instead of sitting side by side;
- * `?job=` only seeds the selection, so "back to this job" links reopen it on
- * arrival.
+ * "N new" — matched roles posted since the member last opened that browse
+ * tab. There is no read tracking in the database, so the cut-off lives in the
+ * browser, keyed per account, and is carried as the newest posting instant
+ * that has been seen — a value taken from the data itself, never the browser
+ * clock, so the two sides cannot disagree. A kind with none stored counts
+ * everything as new, so a first visit shows what is waiting for the profile.
+ */
+const seenStorageKey = (viewerId: string) => `uxcommunity:jobs-seen:${viewerId}`;
+
+function readTabSeen(viewerId: string): Partial<Record<BrowseKind, number>> {
+  try {
+    const raw = window.localStorage.getItem(seenStorageKey(viewerId));
+    return raw ? (JSON.parse(raw) as Partial<Record<BrowseKind, number>>) : {};
+  } catch {
+    // Unreadable storage reads as "never visited": everything counts as new.
+    return {};
+  }
+}
+
+function markTabSeen(viewerId: string, kind: BrowseKind, newestPosted: number): void {
+  // An empty list marks nothing — the old cut-off stays, so roles arriving
+  // after an empty visit still count as new.
+  if (!(newestPosted > 0)) return;
+  try {
+    const seen = readTabSeen(viewerId);
+    // Only ever forward: two tabs racing, or a StrictMode replay, must not
+    // move the cut-off backwards.
+    if ((seen[kind] ?? 0) >= newestPosted) return;
+    seen[kind] = newestPosted;
+    window.localStorage.setItem(seenStorageKey(viewerId), JSON.stringify(seen));
+  } catch {
+    // Storage unavailable (private mode): the badge simply reappears next visit.
+  }
+}
+
+/** The newest posting instant in a list, or 0 for an empty one. */
+function newestInstant(list: JobPost[]): number {
+  return list.reduce((max, job) => Math.max(max, Date.parse(job.created_at)), 0);
+}
+
+/**
+ * The jobs board, LinkedIn-style: the browse tabs split the open roles by
+ * kind — "#Hiring" and "#Referral", the same two intents the cards' hashtag
+ * tags name — and "Applied" joins them; on those three the rail
+ * lists postings and the pane shows the selected one — selecting is local
+ * state, not a route change, because `get_job_feed` already returns the full
+ * detail payload for every row. "My posts" is a plain list: each post opens
+ * its own view page (`/dashboard/jobs/<id>`), not the master-detail pane.
+ * Below lg the panes take turns instead of sitting side by side; `?job=` only
+ * seeds the selection (and the tab its kind implies), so "back to this job"
+ * links reopen it on arrival.
  *
- * Every posting is visible to every member — the profile match is what
- * unlocks Apply, not what hides the job — but the browse list only shows
- * roles the member could still apply to: their own posts live under "My
- * posts", and roles they applied to move to "Applied".
+ * The feed returns every posting to every member, but the browse tabs only
+ * show roles the member could still apply to: their own posts live under "My
+ * posts", roles they applied to move to "Applied", and roles their profile
+ * misses on a gating criterion stay out entirely — `can_apply` is the same
+ * predicate the write enforces, so no card in these lists is ever "Locked
+ * for your profile".
  */
 export function JobsBrowser({
   viewer,
@@ -39,7 +86,13 @@ export function JobsBrowser({
   const router = useRouter();
   const seeded = (initialJobId && jobs.find((job) => job.id === initialJobId)) || null;
   const [tab, setTab] = useState<Tab>(
-    seeded?.is_mine ? "posts" : seeded?.applied ? "applied" : "all"
+    seeded?.is_mine
+      ? "posts"
+      : seeded?.applied
+        ? "applied"
+        : seeded?.kind === "referral"
+          ? "referral"
+          : "hiring"
   );
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -63,18 +116,54 @@ export function JobsBrowser({
   }, [selectedId]);
 
   const myPosts = jobs.filter((job) => job.is_mine);
-  // Applied roles leave the browse list: their state (submitted, portfolio
-  // links) lives under "Applied" instead of among the roles still
-  // open to apply to.
-  const browseJobs = jobs.filter((job) => !job.is_mine && !job.applied);
+  // Other members' open roles, split by kind before the profile match
+  // narrows them: applied roles leave the browse lists (their state lives
+  // under "Applied"), and the lists themselves keep only the postings this
+  // member could apply to — `can_apply` is the same predicate the write
+  // enforces, so a "Locked for your profile" card never shows in them. The
+  // pre-match lists stay for the empty state's explanation.
+  const hiringPosts = jobs.filter((job) => !job.is_mine && !job.applied && job.kind === "hiring");
+  const referralPosts = jobs.filter(
+    (job) => !job.is_mine && !job.applied && job.kind === "referral"
+  );
+  const hiringJobs = hiringPosts.filter((job) => job.can_apply);
+  const referralJobs = referralPosts.filter((job) => job.can_apply);
   const appliedJobs = jobs.filter((job) => !job.is_mine && job.applied);
 
-  // The two browse tabs share the pane; "My posts" is a plain list. The shown
-  // posting derives from the active tab's own list (first one when nothing is
-  // picked), so a stale selection — a role from another tab, or the viewer's
-  // own post carried in by a back link — can never surface in the pane, and
-  // an empty list shows no job at all.
-  const paneJobs = tab === "all" ? browseJobs : tab === "applied" ? appliedJobs : null;
+  // The browse tabs' "N new", counted once on arrival from the stored
+  // cut-off. The ref gate matters twice: it keeps the count from depending on
+  // derived-array identities, and StrictMode's mount replay would otherwise
+  // recompute AFTER the first run marked the tab seen — blanking the badge
+  // the moment the page opened.
+  const [tabNewCounts, setTabNewCounts] = useState<Record<BrowseKind, number> | null>(null);
+  const countedRef = useRef(false);
+  useEffect(() => {
+    if (countedRef.current) return;
+    countedRef.current = true;
+
+    const seen = readTabSeen(viewer.id);
+    setTabNewCounts({
+      hiring: hiringJobs.filter((job) => Date.parse(job.created_at) > (seen.hiring ?? 0)).length,
+      referral: referralJobs.filter((job) => Date.parse(job.created_at) > (seen.referral ?? 0))
+        .length,
+    });
+
+    // The tab the board opens on is being looked at right now — remember
+    // what was seen, so the next visit only counts roles posted after this.
+    if (tab === "hiring" || tab === "referral") {
+      markTabSeen(viewer.id, tab, newestInstant(tab === "hiring" ? hiringJobs : referralJobs));
+    }
+  }, [hiringJobs, referralJobs, tab, viewer.id]);
+
+  // The active tab's browse list, or null on the non-browse tabs. The pane
+  // derives its posting from that list (first one when nothing is picked), so
+  // a stale selection — a role from another tab, or the viewer's own post
+  // carried in by a back link — can never surface in the pane, and an empty
+  // list shows no job at all. "My posts" shows no pane at all: it is a plain
+  // list.
+  const browseList =
+    tab === "hiring" ? hiringJobs : tab === "referral" ? referralJobs : null;
+  const paneJobs = browseList ?? (tab === "applied" ? appliedJobs : null);
   const selectedJob = paneJobs
     ? (paneJobs.find((job) => job.id === selectedId) ?? paneJobs[0] ?? null)
     : null;
@@ -82,8 +171,8 @@ export function JobsBrowser({
 
   const query = search.trim().toLowerCase();
   const visibleJobs =
-    tab === "all"
-      ? browseJobs.filter(
+    browseList !== null
+      ? browseList.filter(
           (job) =>
             !query ||
             job.title.toLowerCase().includes(query) ||
@@ -94,11 +183,22 @@ export function JobsBrowser({
         ? appliedJobs
         : myPosts;
 
-  const tabs: { value: Tab; label: string; count: number }[] = [
-    { value: "all", label: "For you", count: browseJobs.length },
-    { value: "applied", label: "Applied", count: appliedJobs.length },
-    { value: "posts", label: "My posts", count: myPosts.length },
+  const newBadge = (count: number | undefined) => (count && count > 0 ? `${count} new` : null);
+  const tabs: { value: Tab; label: string; chip: string | null; unseen: boolean }[] = [
+    { value: "hiring", label: "# Hiring", chip: newBadge(tabNewCounts?.hiring), unseen: true },
+    { value: "referral", label: "# Referral", chip: newBadge(tabNewCounts?.referral), unseen: true },
+    { value: "applied", label: "Applied", chip: String(appliedJobs.length), unseen: false },
+    { value: "posts", label: "My posts", chip: String(myPosts.length), unseen: false },
   ];
+
+  const openTab = (next: Tab) => {
+    setTab(next);
+    if (next === "hiring" || next === "referral") {
+      // Opening the tab is seeing it: the badge clears and the cut-off moves.
+      setTabNewCounts((counts) => (counts ? { ...counts, [next]: 0 } : counts));
+      markTabSeen(viewer.id, next, newestInstant(next === "hiring" ? hiringJobs : referralJobs));
+    }
+  };
 
   const selectJob = (jobId: string) => {
     if (tab === "posts") {
@@ -130,8 +230,9 @@ export function JobsBrowser({
         </button>
       </div>
 
-      {/* Tabs — the admin strip's style (count chip, accent underline); the
-          active tab's border rides on the full-width underline. */}
+      {/* Tabs — the admin strip's style (accent underline, count chip); the
+          browse tabs carry an "N new" badge instead of a total — matched
+          roles posted since the member last opened them. */}
       <div
         className={`mt-5 ${paneOpen ? "hidden lg:flex" : "flex"} items-center gap-0.5 border-b border-border`}
       >
@@ -141,7 +242,7 @@ export function JobsBrowser({
             <button
               key={item.value}
               type="button"
-              onClick={() => setTab(item.value)}
+              onClick={() => openTab(item.value)}
               className={`-mb-px border-b-2 px-3.5 py-2 font-body text-xs font-medium transition-colors ${
                 active
                   ? "border-accent text-accent"
@@ -149,13 +250,17 @@ export function JobsBrowser({
               }`}
             >
               {item.label}
-              <span
-                className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
-                  active ? "bg-accent/15 text-accent" : "bg-surface-raised text-foreground-muted"
-                }`}
-              >
-                {item.count}
-              </span>
+              {item.chip !== null && (
+                <span
+                  className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                    item.unseen || active
+                      ? "bg-accent/15 text-accent"
+                      : "bg-surface-raised text-foreground-muted"
+                  }`}
+                >
+                  {item.chip}
+                </span>
+              )}
             </button>
           );
         })}
@@ -176,8 +281,8 @@ export function JobsBrowser({
               : `${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col pt-4 pb-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`
           }
         >
-          {/* Search (For you only) */}
-          {tab === "all" && browseJobs.length > 0 && (
+          {/* Search (browse tabs only) */}
+          {browseList !== null && browseList.length > 0 && (
             <div className="relative mb-4">
               <Search
                 strokeWidth={2.5}
@@ -213,8 +318,8 @@ export function JobsBrowser({
             ))}
 
             {visibleJobs.length === 0 &&
-              (tab === "all" ? (
-                query ? (
+              (browseList !== null ? (
+                query && browseList.length > 0 ? (
                   <EmptyState title="No jobs match" body="Try a different search term." />
                 ) : jobs.length === 0 ? (
                   <EmptyState
@@ -231,10 +336,24 @@ export function JobsBrowser({
                       </button>
                     }
                   />
+                ) : (tab === "hiring" ? hiringPosts : referralPosts).length > 0 ? (
+                  <EmptyState
+                    title={
+                      tab === "hiring"
+                        ? "No hiring roles match your profile yet"
+                        : "No referral roles match your profile yet"
+                    }
+                    body="A role lands here when your profile matches it — job title and experience level always, and city and sector unless the poster set them to All. Keep your profile current, and check back as new roles arrive."
+                  />
+                ) : tab === "hiring" ? (
+                  <EmptyState
+                    title="No hiring posts from other members yet"
+                    body="Your own posts live under My posts, and roles you apply to move to Applied — hiring posts from other members will show up here."
+                  />
                 ) : (
                   <EmptyState
-                    title="No jobs from other members yet"
-                    body="Your own posts live under My posts, and roles you apply to move to Applied — roles posted by other members will show up here."
+                    title="No referral posts from other members yet"
+                    body="Your own posts live under My posts, and roles you apply to move to Applied — referral posts from other members will show up here."
                   />
                 )
               ) : tab === "applied" ? (

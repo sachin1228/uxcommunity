@@ -4,7 +4,7 @@
 
 import type { NotificationType } from "./use-notifications";
 
-export type NotificationTab = "activity" | "events" | "other";
+export type NotificationTab = "activity" | "events" | "jobs" | "other";
 
 /** Tab order and labels — the view supplies the icons. */
 export const NOTIFICATION_TABS: ReadonlyArray<{
@@ -13,6 +13,7 @@ export const NOTIFICATION_TABS: ReadonlyArray<{
 }> = [
   { key: "activity", label: "Likes and comments" },
   { key: "events", label: "Events" },
+  { key: "jobs", label: "Jobs" },
   { key: "other", label: "Other" },
 ];
 
@@ -30,6 +31,9 @@ const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
  *   comment/reply anywhere in the thread under what they posted.
  * - `events` — everything about the user's events: RSVPs plus the
  *   comments/replies posted on them.
+ * - `jobs` — the roles posted that match the member's profile: the poster
+ *   decides who it targets, the match is the same predicate Apply enforces,
+ *   and the row links to the role (lib/jobs/notifications.ts).
  * - `other` — removals and report outcomes: a community owner/admin/moderator
  *   or the platform removed the user's content (the routes that log
  *   thread_deleted & co. also send the author a notification), plus the
@@ -49,6 +53,7 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "resource_reply",
   ]),
   events: EVENT_TYPES,
+  jobs: new Set(["job_match"]),
   other: new Set([
     "thread_deleted",
     "showcase_deleted",
@@ -63,6 +68,7 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
 export function notificationTabFor(type: NotificationType): NotificationTab | null {
   if (TAB_TYPES.activity.has(type)) return "activity";
   if (TAB_TYPES.events.has(type)) return "events";
+  if (TAB_TYPES.jobs.has(type)) return "jobs";
   if (TAB_TYPES.other.has(type)) return "other";
   return null;
 }
@@ -80,24 +86,29 @@ export function splitNotificationsByTab<
 >(items: readonly T[]): {
   activity: T[];
   events: T[];
+  jobs: T[];
   other: T[];
   unreadByTab: Record<NotificationTab, number>;
 } {
   const activity: T[] = [];
   const events: T[] = [];
+  const jobs: T[] = [];
   const other: T[] = [];
   const unreadByTab: Record<NotificationTab, number> = {
     activity: 0,
     events: 0,
+    jobs: 0,
     other: 0,
   };
 
   for (const item of items) {
     const tab = notificationTabFor(item.type);
     if (!tab) continue;
-    (tab === "activity" ? activity : tab === "events" ? events : other).push(item);
+    (tab === "activity" ? activity : tab === "events" ? events : tab === "jobs" ? jobs : other).push(
+      item
+    );
     if (!item.read_at) unreadByTab[tab] += 1;
   }
 
-  return { activity, events, other, unreadByTab };
+  return { activity, events, jobs, other, unreadByTab };
 }

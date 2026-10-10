@@ -2,14 +2,16 @@
 -- Jobs — verified-company postings with profile-gated applications
 --
 -- Migrations under test: 20261009120000_jobs.sql,
--- 20261009170000_job_lifecycle.sql and 20261009180000_job_expiry.sql
+-- 20261009170000_job_lifecycle.sql, 20261009180000_job_expiry.sql,
+-- 20261010130000_job_wildcard_criteria.sql
 --
 -- The two rules that make a posting trustworthy are:
 --
 --   1. the poster has PROVED the company with a work email (the
 --      company_members row the profile badge reads), and
---   2. the APPLICANT's own profile matches all four dimensions of
---      the posting (city, sector, job title, experience level).
+--   2. the APPLICANT's own profile matches the posting: job title
+--      and experience level exactly, and city and sector too
+--      unless the posting set them to All (NULL).
 --
 -- This file proves both at the database layer, where the writes
 -- re-check them — the API routes only pass the session user id:
@@ -40,7 +42,7 @@
 -- file does not depend on what other suites left behind.
 -- ============================================================
 
-select plan(123);
+select plan(137);
 
 begin;
 
@@ -1444,6 +1446,193 @@ select is(
    where n.nspname = 'public' and p.proname in ('create_job_post', 'update_job_post')),
   2::bigint,
   'the pre-deadline overloads are gone — one of each write remains'
+);
+
+-- ─── 13. All cities / All sectors ───────────────────────────
+-- 20261010130000_job_wildcard_criteria.sql: city and sector may be NULL —
+-- the All wildcard — while job title and experience level stay mandatory
+-- exact matches. The same one rule gates, widened on two dimensions.
+
+select is(
+  (select count(*) from information_schema.columns
+   where table_schema = 'public' and table_name = 'job_posts'
+     and column_name in ('city_id', 'sector_id') and is_nullable = 'YES'),
+  2::bigint,
+  'city and sector tolerate NULL (the All wildcard)'
+);
+
+select is(
+  (select count(*) from public.create_job_post(
+    'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+    'a7a7a7a7-0000-4000-8000-000000000001', 'Everywhere Role',
+    null, null,
+    'product_designer', 'mid_level', 'remote', 'full_time',
+    null, 'Open to designers anywhere.',
+    '{}', '{}', '{}', null
+  )),
+  1::bigint,
+  'a posting can open to every city and every sector'
+);
+
+select is(
+  (select (city_id is null and sector_id is null)
+   from public.job_posts where title = 'Everywhere Role'),
+  true,
+  'All is stored as NULL, not a sentinel row'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.create_job_post(
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Bad Wildcard City',
+      '00000000-0000-4000-8000-000000000000', null,
+      'product_designer', 'mid_level', 'remote', 'full_time',
+      null, 'Open to designers anywhere.', '{}', '{}', '{}', null
+    )$$),
+  'invalid_city',
+  'a non-null city still has to be live master data'
+);
+
+select is(
+  public.failure_message($$
+    select * from public.create_job_post(
+      'd7d7d7d7-0000-4000-8000-000000000001', 'hiring',
+      'a7a7a7a7-0000-4000-8000-000000000001', 'Bad Wildcard Sector',
+      null, '00000000-0000-4000-8000-000000000000',
+      'product_designer', 'mid_level', 'remote', 'full_time',
+      null, 'Open to designers anywhere.', '{}', '{}', '{}', null
+    )$$),
+  'invalid_sector',
+  'a non-null sector still has to be live master data'
+);
+
+select is(
+  (select p ->> 'city_name' || ' / ' || (p ->> 'sector_name')
+   from (
+     select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003') as p
+     from public.job_posts as jp where jp.title = 'Everywhere Role'
+   ) as named),
+  'All cities / All sectors',
+  'the payload resolves the wildcard labels'
+);
+
+-- The owner may still narrow an All posting while nobody has applied.
+select count(*) from public.update_job_post(
+  p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+  p_job_id           => (select id from public.job_posts where title = 'Everywhere Role'),
+  p_title            => 'Everywhere Role',
+  p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+  p_sector_id        => null,
+  p_job_title        => 'product_designer',
+  p_experience_level => 'mid_level',
+  p_work_mode        => 'remote',
+  p_employment_type  => 'full_time',
+  p_salary           => null,
+  p_description      => 'Open to designers anywhere.'
+);
+
+select is(
+  (select city_id from public.job_posts where title = 'Everywhere Role'),
+  'e7e7e7e7-0000-4000-8000-000000000001'::uuid,
+  'All may become one city while nobody has applied'
+);
+
+select count(*) from public.update_job_post(
+  p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+  p_job_id           => (select id from public.job_posts where title = 'Everywhere Role'),
+  p_title            => 'Everywhere Role',
+  p_city_id          => null,
+  p_sector_id        => null,
+  p_job_title        => 'product_designer',
+  p_experience_level => 'mid_level',
+  p_work_mode        => 'remote',
+  p_employment_type  => 'full_time',
+  p_salary           => null,
+  p_description      => 'Open to designers anywhere.'
+);
+
+select is(
+  (select city_id from public.job_posts where title = 'Everywhere Role'),
+  null::uuid,
+  'and the owner can set it back to All'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000003')
+          ->> 'can_apply'
+   from public.job_posts as jp where jp.title = 'Everywhere Role'),
+  'true',
+  'an any-city member matches an All-cities posting'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000004')
+          ->> 'can_apply'
+   from public.job_posts as jp where jp.title = 'Everywhere Role'),
+  'false',
+  'the job title still gates — All never widens it'
+);
+
+select is(
+  (select count(*) from public.apply_to_job(
+     (select id from public.job_posts where title = 'Everywhere Role'),
+     'd7d7d7d7-0000-4000-8000-000000000003',
+     'Far City', 'https://portfolio.far.test',
+     'https://www.linkedin.com/in/far', null
+  )),
+  1::bigint,
+  'the any-city member applies'
+);
+
+select is(
+  (select count(*) from public.apply_to_job(
+     (select id from public.job_posts where title = 'Everywhere Role'),
+     'd7d7d7d7-0000-4000-8000-000000000005',
+     'Partial Profile', 'https://portfolio.partial.test',
+     'https://www.linkedin.com/in/partial', null
+  )),
+  1::bigint,
+  'a profile without a city or sector still matches an All posting'
+);
+
+-- The experience level stays an exact match even when city and sector are All.
+update public.designer_profiles set experience_level = 'lead_principal'
+  where user_id = 'd7d7d7d7-0000-4000-8000-000000000005';
+
+select is(
+  public.failure_message($$
+    select * from public.apply_to_job(
+      (select id from public.job_posts where title = 'Everywhere Role'),
+      'd7d7d7d7-0000-4000-8000-000000000005',
+      'Partial Again', 'https://portfolio.partial.test',
+      'https://www.linkedin.com/in/partial', null
+    )$$),
+  'not_eligible',
+  'the experience level still gates an All posting'
+);
+
+update public.designer_profiles set experience_level = 'mid_level'
+  where user_id = 'd7d7d7d7-0000-4000-8000-000000000005';
+
+select is(
+  public.failure_message($$
+    select * from public.update_job_post(
+      p_actor_id         => 'd7d7d7d7-0000-4000-8000-000000000001',
+      p_job_id           => (select id from public.job_posts where title = 'Everywhere Role'),
+      p_title            => 'Everywhere Role',
+      p_city_id          => 'e7e7e7e7-0000-4000-8000-000000000001',
+      p_sector_id        => null,
+      p_job_title        => 'product_designer',
+      p_experience_level => 'mid_level',
+      p_work_mode        => 'remote',
+      p_employment_type  => 'full_time',
+      p_salary           => null,
+      p_description      => 'Open to designers anywhere.'
+    )
+  $$),
+  'criteria_locked',
+  'All is inside the freeze — it cannot become one city once anyone applied'
 );
 
 select finish();

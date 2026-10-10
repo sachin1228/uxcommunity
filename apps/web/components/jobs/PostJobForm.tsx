@@ -191,7 +191,7 @@ export function PostJobForm({ viewer, master }: { viewer: JobViewer; master: Job
           <JobTermFields values={values} onChange={patch} />
         </section>
 
-        <div className="flex justify-end gap-2 border-t border-border pt-4">
+        <div className="flex justify-end gap-2 pt-4">
           {/* A link, not a button that resets state: leaving the page is a
               navigation, and it stays one for a middle-click or a back press. */}
           <Link href="/dashboard/jobs" className="modal-btn modal-btn-secondary">

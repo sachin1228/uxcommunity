@@ -366,8 +366,10 @@ export interface CreateJobParams {
   kind: string;
   companyId: string;
   title: string;
-  cityId: string;
-  sectorId: string;
+  /** NULL = All cities — the wildcard dimension. */
+  cityId: string | null;
+  /** NULL = All sectors — the wildcard dimension. */
+  sectorId: string | null;
   jobTitle: string;
   experienceLevel: string;
   workMode: string;
@@ -465,8 +467,10 @@ export interface UpdateJobParams {
   actorId: string;
   jobId: string;
   title: string;
-  cityId: string;
-  sectorId: string;
+  /** NULL = All cities — the wildcard dimension. */
+  cityId: string | null;
+  /** NULL = All sectors — the wildcard dimension. */
+  sectorId: string | null;
   jobTitle: string;
   experienceLevel: string;
   workMode: string;

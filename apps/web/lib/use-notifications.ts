@@ -34,7 +34,8 @@ export type NotificationType =
   | "resource_deleted"
   | "event_deleted"
   | "report_reviewed"
-  | "content_restored";
+  | "content_restored"
+  | "job_match";
 
 export interface NotificationItem {
   id: string;

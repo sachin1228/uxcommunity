@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { jobPostSchema } from "@/lib/jobs/validation";
+import { deferJobMatchNotifications } from "@/lib/jobs/notifications";
 import { createJobPost, type CreateJobFailureCode } from "@/lib/jobs/service";
 
 const STATUS_FOR_FAILURE: Record<CreateJobFailureCode, number> = {
@@ -85,6 +86,10 @@ export async function POST(request: NextRequest) {
       { status: STATUS_FOR_FAILURE[result.code] }
     );
   }
+
+  // Everyone the role matches hears about it — deferred past this response,
+  // best effort: the posting stands even if the fan-out misses.
+  deferJobMatchNotifications(result.jobId, session.userId!);
 
   return NextResponse.json({ job_id: result.jobId });
 }

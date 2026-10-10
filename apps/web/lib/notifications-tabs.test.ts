@@ -37,6 +37,7 @@ const ALL_TYPES: NotificationType[] = [
   "event_deleted",
   "report_reviewed",
   "content_restored",
+  "job_match",
 ];
 
 test("every generated notification type lands in a tab", () => {
@@ -61,6 +62,19 @@ test("all event types render under the events tab", () => {
   for (const type of ["event_comment", "event_reply", "event_rsvp"] as NotificationType[]) {
     assert.equal(notificationTabFor(type), "events", type);
   }
+});
+
+test("job matches render under the Jobs tab", () => {
+  assert.equal(notificationTabFor("job_match"), "jobs");
+
+  const page = splitNotificationsByTab([
+    item("n1", "job_match", "2026-10-10T11:00:00Z"),
+    item("n2", "thread_like", "2026-09-15T09:00:00Z"),
+    item("n3", "job_match", "2026-10-10T08:00:00Z", "2026-10-10T08:30:00Z"),
+  ]);
+
+  assert.deepEqual(page.jobs.map((n) => n.id), ["n1", "n3"]);
+  assert.equal(page.unreadByTab.jobs, 1);
 });
 
 // The Other tab renders manager/platform removals of the user's content and
@@ -104,13 +118,14 @@ test("splitting keeps order and counts only the unread items it shows", () => {
   assert.deepEqual(activity.map((n) => n.id), ["n1", "n4"]);
   assert.deepEqual(events.map((n) => n.id), ["n2", "n3"]);
   assert.deepEqual(other, []);
-  assert.deepEqual(unreadByTab, { activity: 1, events: 2, other: 0 });
+  assert.deepEqual(unreadByTab, { activity: 1, events: 2, jobs: 0, other: 0 });
 });
 
-test("an empty page yields three empty tabs", () => {
-  const { activity, events, other, unreadByTab } = splitNotificationsByTab([]);
+test("an empty page yields four empty tabs", () => {
+  const { activity, events, jobs, other, unreadByTab } = splitNotificationsByTab([]);
   assert.deepEqual(activity, []);
   assert.deepEqual(events, []);
+  assert.deepEqual(jobs, []);
   assert.deepEqual(other, []);
-  assert.deepEqual(unreadByTab, { activity: 0, events: 0, other: 0 });
+  assert.deepEqual(unreadByTab, { activity: 0, events: 0, jobs: 0, other: 0 });
 });
