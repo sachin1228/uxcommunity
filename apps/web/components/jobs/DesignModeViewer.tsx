@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
+import { ResumePdf } from "./ResumePdf";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useApplicantDecision } from "@/lib/jobs/use-applicant-decision";
 import {
@@ -30,15 +31,16 @@ type DesignSection = "portfolio" | "linkedin" | "resume";
  * board's card) that renders the application the way its applicant would
  * present it: the applicant's own details and filled links in the left
  * sidebar, and the chosen link loaded in place on the right — an iframe with
- * nothing between the poster and the page itself. Forced light regardless of
- * the app's theme (the `.design-light` scope re-declares the light tokens):
- * this is the applicant's page, not app chrome.
+ * nothing between the poster and the page itself (resume PDFs render in our
+ * own viewer instead, whose tools float on the right edge). Forced light
+ * regardless of the app's theme (the `.design-light` scope re-declares the
+ * light tokens): this is the applicant's page, not app chrome.
  *
  * The URL pins the applicant being reviewed — a decision refreshes the data
  * without changing what the poster is looking at — and previous/next move
  * through the posting's applicants by navigation, so the browser's own back
  * button walks the same path. Every loaded page is the link the applicant
- * submitted, nothing invented; the resume loads the same way.
+ * submitted, nothing invented; the resume renders that same link.
  */
 export function DesignModeViewer({
   jobId,
@@ -72,11 +74,10 @@ export function DesignModeViewer({
       : section === "linkedin"
         ? applicant.linkedin_url
         : (applicant.resume_url ?? applicant.portfolio_url);
-  // The browser's own PDF viewer takes its opening zoom from the URL
-  // fragment, so resume PDFs open at 50%.
-  const frameUrl = /\.pdf($|[?#])/i.test(sectionUrl)
-    ? `${sectionUrl}#zoom=50`
-    : sectionUrl;
+  // PDFs render in our own viewer — the tool rail on the right edge, opening
+  // at 50% — instead of the browser's viewer and its top toolbar; every other
+  // link stays a bare iframe.
+  const isPdf = /\.pdf($|[?#])/i.test(sectionUrl);
 
   const goTo = useCallback(
     (next: number) => {
@@ -278,11 +279,15 @@ export function DesignModeViewer({
           {/* The applicant's own page, loaded in place — nothing between
               the poster and the link they are reading. */}
           <div className="min-h-0 flex-1 bg-surface">
-            <iframe
-              src={frameUrl}
-              title={`${applicant.name} — ${section}`}
-              className="h-full w-full border-0"
-            />
+            {isPdf ? (
+              <ResumePdf key={sectionUrl} url={sectionUrl} />
+            ) : (
+              <iframe
+                src={sectionUrl}
+                title={`${applicant.name} — ${section}`}
+                className="h-full w-full border-0"
+              />
+            )}
           </div>
 
           {/* Below lg the sidebar is hidden, so the pager floats here; on
