@@ -1466,6 +1466,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      member_resumes: {
+        Row: {
+          created_at: string;
+          file_name: string;
+          id: string;
+          is_default: boolean;
+          mime_type: string;
+          size_bytes: number;
+          url: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          file_name: string;
+          id?: string;
+          is_default?: boolean;
+          mime_type: string;
+          size_bytes: number;
+          url: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          file_name?: string;
+          id?: string;
+          is_default?: boolean;
+          mime_type?: string;
+          size_bytes?: number;
+          url?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_resumes_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       message_reactions: {
         Row: {
           community_id: string;
@@ -1513,6 +1554,9 @@ export type Database = {
           chat_push_enabled: boolean;
           chat_sound: string;
           created_at: string;
+          email_community_activity: boolean;
+          email_job_updates: boolean;
+          email_product_news: boolean;
           quiet_hours_enabled: boolean;
           quiet_hours_end: string;
           quiet_hours_start: string;
@@ -1524,6 +1568,9 @@ export type Database = {
           chat_push_enabled?: boolean;
           chat_sound?: string;
           created_at?: string;
+          email_community_activity?: boolean;
+          email_job_updates?: boolean;
+          email_product_news?: boolean;
           quiet_hours_enabled?: boolean;
           quiet_hours_end?: string;
           quiet_hours_start?: string;
@@ -1535,6 +1582,9 @@ export type Database = {
           chat_push_enabled?: boolean;
           chat_sound?: string;
           created_at?: string;
+          email_community_activity?: boolean;
+          email_job_updates?: boolean;
+          email_product_news?: boolean;
           quiet_hours_enabled?: boolean;
           quiet_hours_end?: string;
           quiet_hours_start?: string;

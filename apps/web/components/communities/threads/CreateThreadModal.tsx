@@ -21,9 +21,9 @@ import {
   ComposerMedia,
   ComposerTabs,
   PollComposer,
-  ToggleRow,
   type ThreadComposerTab,
 } from "./ThreadComposerControls";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useThreadFileUpload } from "./useThreadFileUpload";
 
 /** Default, untouched poll draft shown the first time the user opens Poll. */

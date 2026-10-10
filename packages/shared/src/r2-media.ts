@@ -117,6 +117,10 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   // Resumes attached to job applications. Must be tracked here or the
   // orphan audit treats every live resume as an orphan and deletes it.
   { table: "job_applications", column: "resume_url" },
+  // Resumes a member saved on Settings and reuses while applying. Same
+  // reason: untracked, the orphan audit would delete live saved files
+  // after the grace period.
+  { table: "member_resumes", column: "url" },
   { table: "lottie_settings", column: "lottie_url" },
 ];
 
@@ -140,5 +144,6 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "community_showcase_posts.attachments": "showcase",
   "community_threads.attachments": "thread",
   "job_applications.resume_url": "resume",
+  "member_resumes.url": "resume",
   "lottie_settings.lottie_url": "lottie_setting",
 };

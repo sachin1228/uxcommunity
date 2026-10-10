@@ -8,7 +8,12 @@
  * trivially wrong and never trusted.
  */
 
-export const RESUME_MAX_BYTES = 5 * 1024 * 1024;
+import { RESUME_MAX_BYTES } from "@/lib/settings/resumes";
+
+// Defined in `lib/settings/resumes` (client-safe) so the Settings UI enforces
+// the identical number without pulling this Buffer-parsing module into the
+// browser bundle; re-exported here to keep the existing server API intact.
+export { RESUME_MAX_BYTES };
 
 export type ResumeMime =
   | "application/pdf"

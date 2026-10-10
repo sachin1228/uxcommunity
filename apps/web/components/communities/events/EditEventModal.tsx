@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, MapPinned, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
-import { ToggleRow } from "../threads/ThreadComposerControls";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "@/lib/communities/models/events";
 import { compressImage, compressedFile } from "@/lib/image-client";
