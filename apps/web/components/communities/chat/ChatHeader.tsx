@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
+import { Activity, BookMarked, Calendar, Images, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -46,8 +46,8 @@ interface ChatHeaderProps {
   communityId?: string;
 }
 
-export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "activity";
-const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members", "activity"];
+export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "media" | "members" | "activity";
+const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "media", "members", "activity"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -194,13 +194,15 @@ export const ChatHeader = memo(function ChatHeader({
     setConfirmAction(action);
   }
 
-  // Members is not an owner-toggleable area, so it stays visible regardless of
-  // enabled_tabs; Activity is the manager tier's audit view and follows the
-  // caller's role; every other tab follows the community's own flags.
+  // Members and Media are not owner-toggleable areas, so they stay visible
+  // regardless of enabled_tabs; Activity is the manager tier's audit view and
+  // follows the caller's role; every other tab follows the community's own
+  // flags.
   const visibleTabs = community
     ? DEFAULT_TABS.filter(
         (tab) =>
           tab === "members" ||
+          tab === "media" ||
           (tab === "activity"
             ? showActivityTab
             : isFeatureVisible(tab as CommunityFeature, community)),
@@ -322,6 +324,7 @@ export const ChatHeader = memo(function ChatHeader({
                 ["showcase",  "Showcase",  Sparkles],
                 ["resources", "Resources", BookMarked],
                 ["events",    "Events",    Calendar],
+                ["media",     "Media",     Images],
                 ["members",   "Members",   Users],
                 ["activity",  "Activity",  Activity],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (

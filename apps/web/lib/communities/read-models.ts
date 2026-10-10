@@ -360,6 +360,73 @@ export async function loadCommunityRules(
   return { ok: true, data: { rules: data ?? [] } };
 }
 
+/** Tiles are smaller than list cards, so the media grid pages wider. */
+const MEDIA_PAGE_SIZE = 60;
+
+/**
+ * The community Media tab's feed: thread images, showcase images/videos and
+ * event covers, newest first (chat images are not a source — see the
+ * migration). The cursor is the composite tuple
+ * `createdAt|source|sourceId|ordinal` of the page's last item.
+ */
+export async function loadCommunityMediaPage(
+  communityId: string,
+  userId: string,
+  cursor: string | null = null,
+): Promise<ReadResult<{ media: unknown[]; nextCursor: string | null }>> {
+  let cursorCreatedAt: string | null = null;
+  let cursorSource: string | null = null;
+  let cursorSourceId: string | null = null;
+  let cursorOrdinal: number | null = null;
+  if (cursor) {
+    const [createdAt, source, sourceId, ordinal] = cursor.split("|");
+    const parsedOrdinal = Number.parseInt(ordinal ?? "", 10);
+    if (
+      !createdAt ||
+      (source !== "thread" && source !== "showcase" && source !== "event") ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sourceId ?? "") ||
+      !Number.isInteger(parsedOrdinal)
+    ) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+    cursorCreatedAt = normalizeUtcCursor(createdAt);
+    if (!cursorCreatedAt) return { ok: false, status: 400, error: "Invalid cursor." };
+    cursorSource = source;
+    cursorSourceId = sourceId;
+    cursorOrdinal = parsedOrdinal;
+  }
+
+  const { data, error } = await callPerformanceRpc(
+    createServiceClient(),
+    "get_community_media_page",
+    {
+      p_community_id: communityId,
+      p_user_id: userId,
+      p_cursor_created_at: cursorCreatedAt,
+      p_cursor_source: cursorSource,
+      p_cursor_source_id: cursorSourceId,
+      p_cursor_ordinal: cursorOrdinal,
+      p_limit: MEDIA_PAGE_SIZE + 1,
+    },
+  );
+  if (error?.code === "42501") return { ok: false, status: 403, error: "Not a member of this community." };
+  if (error) return { ok: false, status: 500, error: "Failed to fetch media." };
+
+  const rows = ((data ?? []) as Array<{ item: Record<string, unknown> }>).map(({ item }) => item);
+  const media = rows.slice(0, MEDIA_PAGE_SIZE);
+  const last = media.at(-1);
+  return {
+    ok: true,
+    data: {
+      media,
+      nextCursor:
+        rows.length > MEDIA_PAGE_SIZE && last
+          ? `${toUtcCursor(last.created_at as string)}|${last.source as string}|${last.source_id as string}|${last.ordinal as number}`
+          : null,
+    },
+  };
+}
+
 export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,

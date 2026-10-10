@@ -79,6 +79,10 @@ type PerformanceRpcMap = {
   get_home_feed_page: { args: { p_user_id: string; p_before: string | null; p_limit: number; p_scope: HomeFeedScope }; returns: Array<{ item: Json }> };
   get_profile_feed_page: { args: { p_user_id: string; p_scope: ProfileFeedScope; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_member_feed_page: { args: { p_viewer_id: string; p_author_id: string; p_scope: MemberFeedScope; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
+  get_community_media_page: {
+    args: { p_community_id: string; p_user_id: string; p_cursor_created_at: string | null; p_cursor_source: string | null; p_cursor_source_id: string | null; p_cursor_ordinal: number | null; p_limit: number };
+    returns: Array<{ item: Json }>;
+  };
   // ─── Companies (verified work domains) ───
   // All company rules live in these functions (see
   // supabase/migrations/20260929120000_company_verified_domains.sql); the API

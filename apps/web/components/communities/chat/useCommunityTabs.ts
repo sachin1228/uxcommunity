@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ChatTab } from "./ChatHeader";
 
-const VALID_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members", "activity"];
+const VALID_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "media", "members", "activity"];
 
 /**
  * The community page's active tab, mirrored into the URL (`?tab=`).

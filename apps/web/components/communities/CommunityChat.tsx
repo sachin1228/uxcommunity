@@ -67,6 +67,10 @@ const EventsView = dynamic(() => import("./events/EventsView").then((m) => m.Eve
   ssr: false,
   loading: TabLoading,
 });
+const MediaView = dynamic(() => import("./media/MediaView").then((m) => m.MediaView), {
+  ssr: false,
+  loading: TabLoading,
+});
 const ResourcesView = dynamic(() => import("./resources/ResourcesView").then((m) => m.ResourcesView), {
   ssr: false,
   loading: TabLoading,
@@ -833,12 +837,13 @@ export function CommunityChat({
   // app-created community (which never has an owner; `admin` rows only exist
   // there).
   const canManageModerators = isOwner || myRole === "admin";
-  // "members" is always available and "activity" is manager-tier-only —
-  // neither is an owner-toggleable area, so both skip the feature-flag
-  // fallback; every other tab has to be enabled for this community or it
-  // falls back to Chat.
+  // "members" and "media" are always available and "activity" is
+  // manager-tier-only — none is an owner-toggleable area, so all three skip
+  // the feature-flag fallback; every other tab has to be enabled for this
+  // community or it falls back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
     activeTab !== "members" &&
+    activeTab !== "media" &&
     activeTab !== "activity" &&
     !isFeatureVisible(activeTab as CommunityFeature, displayCommunity)
       ? "chat"
@@ -975,6 +980,8 @@ export function CommunityChat({
           />
         ) : renderedTab === "events" ? (
           <EventsView communityId={communityId} currentUserId={currentUserId} canModerate={canModerateEvents} />
+        ) : renderedTab === "media" ? (
+          <MediaView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "resources" ? (
           <ResourcesView communityId={communityId} currentUserId={currentUserId} canModerate={canModerateResources} />
         ) : renderedTab === "members" ? (
