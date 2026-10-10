@@ -11,7 +11,8 @@ import type { Json } from "@/lib/supabase/database.types";
  * The notification types the app still generates: engagement on the user's own
  * content (comments, replies, likes), event RSVPs, manager/platform removals
  * of the user's content, the thank-you a reporter gets once their report has
- * been reviewed, and the all-clear when an admin undoes a removal.
+ * been reviewed, the all-clear when an admin undoes a removal, and the roles
+ * posted that match a member's profile (see lib/jobs/notifications.ts).
  *
  * The community broadcasts ("started a new thread", "shared a new resource",
  * "created a new event") and the chat @mention rows are gone — no route
@@ -32,9 +33,10 @@ export type NotificationType =
   | "resource_deleted"
   | "event_deleted"
   | "report_reviewed"
-  | "content_restored";
+  | "content_restored"
+  | "job_match";
 
-export type NotificationEntityType = "thread" | "showcase" | "resource" | "event";
+export type NotificationEntityType = "thread" | "showcase" | "resource" | "event" | "job";
 
 /** The content kinds a removal notice can be about, and how it names them. */
 const REMOVED_CONTENT_LABELS = {

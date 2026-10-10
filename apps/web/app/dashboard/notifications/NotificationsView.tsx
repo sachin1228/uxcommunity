@@ -7,7 +7,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  ArrowRight,
   Bell,
+  Briefcase,
   CalendarDays,
   CheckCheck,
   FileText,
@@ -33,6 +35,7 @@ import {
 function iconFor(type: NotificationType) {
   if (type === "report_reviewed") return Flag;
   if (type === "content_restored") return Undo2;
+  if (type === "job_match") return Briefcase;
   if (type.endsWith("_deleted")) return Trash2;
   if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;
@@ -45,6 +48,7 @@ function iconFor(type: NotificationType) {
 const TAB_ICONS: Record<NotificationTab, typeof Bell> = {
   activity: MessageCircle,
   events: CalendarDays,
+  jobs: Briefcase,
   other: Bell,
 };
 
@@ -88,13 +92,13 @@ export function NotificationsView({ userId }: { userId: string }) {
 
   // Unread counts are derived from the loaded page — the server total
   // (`unreadCount`) is not split by type.
-  const { activity, events, other, unreadByTab } = useMemo(
+  const { activity, events, jobs, other, unreadByTab } = useMemo(
     () => splitNotificationsByTab(notifications),
     [notifications],
   );
 
   const visible =
-    tab === "activity" ? activity : tab === "events" ? events : other;
+    tab === "activity" ? activity : tab === "events" ? events : tab === "jobs" ? jobs : other;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
@@ -175,7 +179,7 @@ export function NotificationsView({ userId }: { userId: string }) {
           <EmptyNotifications
             icon={Bell}
             title="No notifications yet"
-            hint="Likes, comments and event RSVPs on your posts will appear here."
+            hint="Likes, comments, event RSVPs and job matches will appear here."
           />
         ) : visible.length === 0 ? (
           tab === "activity" ? (
@@ -189,6 +193,12 @@ export function NotificationsView({ userId }: { userId: string }) {
               icon={CalendarDays}
               title="No event activity yet"
               hint="RSVPs and comments on your events will appear here."
+            />
+          ) : tab === "jobs" ? (
+            <EmptyNotifications
+              icon={Briefcase}
+              title="No job matches yet"
+              hint="Roles posted that match your profile will appear here with a link to view them."
             />
           ) : (
             /* The Other tab renders removals and report outcomes — see
@@ -234,6 +244,12 @@ export function NotificationsView({ userId }: { userId: string }) {
                       {item.body && (
                         <span className="mt-0.5 line-clamp-2 font-body text-xs leading-5 text-foreground-muted">
                           {item.body}
+                        </span>
+                      )}
+                      {item.type === "job_match" && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 font-body text-xs font-medium text-accent">
+                          View job
+                          <ArrowRight size={12} strokeWidth={2.5} aria-hidden="true" />
                         </span>
                       )}
                     </span>

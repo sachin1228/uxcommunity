@@ -37,7 +37,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(29);
 
 -- ─── Fixture ────────────────────────────────────────────────
 -- Recipients and actors the calls name, and the entity ids that stand in for
@@ -348,7 +348,36 @@ select ok(
   'the post-read notification is a distinct row, not the read one'
 );
 
--- ─── 7. Cleanup ─────────────────────────────────────────────
+-- ─── 7. The job-match type ──────────────────────────────────
+-- 20261010140000_job_match_notifications.sql: two constraint rebuilds let the
+-- jobs feature tell matching members a role was posted. The unread identity
+-- holds for the new entity kind too — one row per member per job.
+create temporary table m4_job_first as
+select * from public.create_notification(
+  p_user_id      => '4d4d4d4d-0000-4000-8000-000000000001',
+  p_actor_id     => '4d4d4d4d-0000-4000-8000-000000000002',
+  p_community_id => null,
+  p_type         => 'job_match',
+  p_entity_type  => 'job',
+  p_entity_id    => '4d4d4d4d-0000-4000-8000-000000000301',
+  p_title        => 'A new role matches your profile',
+  p_body         => 'Senior Product Designer at Jobsco — All cities (Hybrid)',
+  p_href         => '/dashboard/jobs/4d4d4d4d-0000-4000-8000-000000000301'
+);
+
+select is((select inserted from m4_job_first), true,
+  'a job-match notification inserts with type ''job_match'' and entity ''job''');
+
+select throws_ok(
+  $$ insert into public.notifications (user_id, type, entity_type, entity_id, title, href)
+     values ('4d4d4d4d-0000-4000-8000-000000000001', 'job_posted', 'job',
+             '4d4d4d4d-0000-4000-8000-000000000302', 'Off-list type', '/') $$,
+  '23514',
+  null,
+  'a type outside the constraint is still refused'
+);
+
+-- ─── 8. Cleanup ─────────────────────────────────────────────
 delete from public.notifications
 where user_id in (
   '4d4d4d4d-0000-4000-8000-000000000001',
