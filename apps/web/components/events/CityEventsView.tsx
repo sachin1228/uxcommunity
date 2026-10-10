@@ -11,13 +11,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { publishContentChange } from "@/lib/communities/content-sync";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useNowTick } from "@/lib/use-now-tick";
-import {
-  EVENT_DATE_OPTIONS,
-  EVENT_TYPE_OPTIONS,
-  filterQuery,
-  type EventDateFilter,
-  type EventTypeFilter,
-} from "./event-filters";
+import { filterQuery, type EventDateFilter, type EventTypeFilter } from "./event-filters";
+import { EventFiltersMenu } from "./EventFiltersMenu";
 
 /**
  * How often the Upcoming/Past split re-reads the clock. An event finishing
@@ -206,49 +201,35 @@ export function CityEventsView({
         </div>
 
         {showFilters && (
-          <div className={`${communityFeedLayout.pageHeaderFilters} flex flex-wrap items-center gap-2 pb-1`}>
-            {[
-              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock, count: upcoming.length },
-              { value: "past" as const, label: "Past", icon: CalendarCheck2, count: past.length },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setFilter(item.value)}
-                  aria-pressed={filter === item.value}
-                  className={filterChip(filter === item.value)}
-                >
-                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
-                  {item.label} ({item.count})
-                </button>
-              );
-            })}
-            <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
-            {EVENT_TYPE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => void applyFilters(option.value, dateFilter)}
-                aria-pressed={typeFilter === option.value}
-                className={filterChip(typeFilter === option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-            <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
-            {EVENT_DATE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => void applyFilters(typeFilter, option.value)}
-                aria-pressed={dateFilter === option.value}
-                className={filterChip(dateFilter === option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className={`${communityFeedLayout.pageHeaderFilters} flex items-start justify-between gap-2 pb-1`}>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock, count: upcoming.length },
+                { value: "past" as const, label: "Past", icon: CalendarCheck2, count: past.length },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setFilter(item.value)}
+                    aria-pressed={filter === item.value}
+                    className={filterChip(filter === item.value)}
+                  >
+                    <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                    {item.label} ({item.count})
+                  </button>
+                );
+              })}
+            </div>
+            {/* Type and date live behind one trigger so the row stays
+                chips + button; the trigger tints while a filter is set. */}
+            <EventFiltersMenu
+              type={typeFilter}
+              date={dateFilter}
+              active={filtersActive}
+              onSelect={(nextType, nextDate) => void applyFilters(nextType, nextDate)}
+            />
           </div>
         )}
 
