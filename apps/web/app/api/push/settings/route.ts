@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@/lib/push/chat";
 import { loadUnreadMessageTotals } from "@/lib/push/unread-totals";
+import { clockHHMM } from "@/lib/settings/preferences";
 
 /**
  * GET /api/push/settings
@@ -12,18 +13,14 @@ import { loadUnreadMessageTotals } from "@/lib/push/unread-totals";
  * saved any), which communities they have muted, and the total unread count so
  * the app icon badge can be corrected whenever the app is opened.
  *
+ * The Settings page's email toggles ride on the same row and the same
+ * `preferences` object — additive keys, so the mobile app is unaffected.
+ *
  * PATCH /api/push/settings
  *
  * Partial update. Only the keys present are touched, so the screen can save a
  * single switch without echoing back state it did not change.
  */
-
-/** `time` columns come back as "22:00:00"; the client edits "22:00". */
-function toClock(value: unknown, fallback: string): string {
-  if (typeof value !== "string") return fallback;
-  const match = /^(\d{2}):(\d{2})/.exec(value);
-  return match ? `${match[1]}:${match[2]}` : fallback;
-}
 
 /** A bad IANA name throws, which is the only check worth making. */
 function isValidTimeZone(value: string): boolean {
@@ -56,7 +53,7 @@ export async function GET() {
     db
       .from("notification_preferences")
       .select(
-        "chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
+        "chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, email_job_updates, email_community_activity, email_product_news",
       )
       .eq("user_id", userId)
       .maybeSingle(),
@@ -81,17 +78,22 @@ export async function GET() {
       quietHoursEnabled:
         (row?.quiet_hours_enabled as boolean | undefined) ??
         DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_enabled,
-      quietHoursStart: toClock(
+      quietHoursStart: clockHHMM(
         row?.quiet_hours_start,
         DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_start,
       ),
-      quietHoursEnd: toClock(
+      quietHoursEnd: clockHHMM(
         row?.quiet_hours_end,
         DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_end,
       ),
       quietHoursTimezone: isValidTimeZone(String(row?.quiet_hours_timezone ?? ""))
         ? String(row?.quiet_hours_timezone)
         : DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_timezone,
+      // Email preferences default true/true/false both in the database and
+      // here, so someone who has never saved a row reads back the same.
+      emailJobUpdates: (row?.email_job_updates as boolean | undefined) ?? true,
+      emailCommunityActivity: (row?.email_community_activity as boolean | undefined) ?? true,
+      emailProductNews: (row?.email_product_news as boolean | undefined) ?? false,
     },
     mutedCommunityIds: ((mutedResult.data ?? []) as { community_id: string }[]).map(
       (membership) => membership.community_id,
@@ -164,6 +166,19 @@ export async function PATCH(req: NextRequest) {
       );
     }
     update.quiet_hours_timezone = value;
+  }
+
+  for (const [key, column] of [
+    ["emailJobUpdates", "email_job_updates"],
+    ["emailCommunityActivity", "email_community_activity"],
+    ["emailProductNews", "email_product_news"],
+  ] as const) {
+    if (!(key in body)) continue;
+    const value = body[key];
+    if (typeof value !== "boolean") {
+      return NextResponse.json({ error: `${key} must be a boolean.` }, { status: 422 });
+    }
+    update[column] = value;
   }
 
   // `update` is seeded with user_id + updated_at, so anything above that is a

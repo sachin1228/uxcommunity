@@ -33,6 +33,8 @@ const MESSAGE_FOR_FAILURE: Partial<Record<ApplyFailureCode, string>> = {
   not_installed: "Jobs are not available right now.",
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -69,7 +71,11 @@ export async function POST(
   }
 
   // The resume is optional; when present it goes to R2 before the apply
-  // call, and is reclaimed whenever the application does not land.
+  // call, and is reclaimed whenever the application does not land. A saved
+  // resume (Settings → Job profile) travels as `saved_resume_id` instead: its
+  // file already lives in R2, nothing is uploaded here, and there is nothing
+  // to reclaim on failure.
+  const db = createServiceClient();
   let resumeUrl: string | null = null;
   let resumeKey: string | null = null;
   const resume = formData.get("resume");
@@ -94,10 +100,37 @@ export async function POST(
       console.error("[jobs/apply] resume upload error:", error);
       return NextResponse.json({ error: "Resume upload failed. Please try again." }, { status: 500 });
     }
+  } else {
+    const savedResumeId = formData.get("saved_resume_id");
+    if (typeof savedResumeId === "string" && savedResumeId) {
+      if (!UUID_RE.test(savedResumeId)) {
+        return NextResponse.json(
+          { error: "invalid_resume_url", message: "That saved resume is no longer available. Pick another." },
+          { status: 422 }
+        );
+      }
+
+      // Scoped to the applicant: someone else's resume id resolves to
+      // nothing and fails the same way a deleted one does.
+      const { data: savedResume } = await db
+        .from("member_resumes")
+        .select("url")
+        .eq("id", savedResumeId)
+        .eq("user_id", session.userId!)
+        .maybeSingle();
+
+      if (!savedResume) {
+        return NextResponse.json(
+          { error: "invalid_resume_url", message: "That saved resume is no longer available. Pick another." },
+          { status: 422 }
+        );
+      }
+
+      resumeUrl = savedResume.url;
+    }
   }
 
   const { id } = await params;
-  const db = createServiceClient();
   const result = await applyToJob(db, {
     jobId: id,
     applicantId: session.userId!,

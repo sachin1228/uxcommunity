@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileText, Upload, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { resumeMeta, type SavedResume } from "@/lib/settings/resumes";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
@@ -20,10 +21,17 @@ interface ApplyModalProps {
 
 /**
  * The application is exactly three fields — name, portfolio, LinkedIn — plus
- * an optional resume attachment. The name and links prefill from the
- * member's profile but stay editable: the application is what the poster
- * reads, not the profile. Eligibility is not checked here; the database
- * re-checks the applicant's profile row when the form is submitted.
+ * an optional resume. The name and links prefill from the member's profile
+ * but stay editable: the application is what the poster reads, not the
+ * profile. Eligibility is not checked here; the database re-checks the
+ * applicant's profile row when the form is submitted.
+ *
+ * The resume comes from one of two places. A member with saved resumes
+ * (Settings → Job profile) picks one from a radio list — the default is
+ * preselected — or chooses "Upload a new file" (the original attach row) or
+ * "No resume". A member without saved resumes, or when the saved-resume list
+ * cannot be loaded, sees today's upload-only control: the modal must never
+ * break applying, so a failed GET falls back silently.
  */
 export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModalProps) {
   const [name, setName] = useState(viewer.name);
@@ -35,6 +43,32 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
   const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Saved resumes + the chosen option ("saved:<id>" | "upload" | "none").
+  // `savedResumes` stays null until a successful load with ≥1 row — null is
+  // exactly the fallback signal the Resume block renders from.
+  const [savedResumes, setSavedResumes] = useState<SavedResume[] | null>(null);
+  const [resumeChoice, setResumeChoice] = useState("");
+  const resumesRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (!open || resumesRequestedRef.current) return;
+    resumesRequestedRef.current = true;
+    void (async () => {
+      try {
+        const response = await fetch("/api/settings/resumes");
+        if (!response.ok) return;
+        const body = (await response.json().catch(() => null)) as { resumes?: SavedResume[] } | null;
+        const list = body?.resumes;
+        if (!Array.isArray(list) || list.length === 0) return;
+        setSavedResumes(list);
+        const preset = list.find((entry) => entry.isDefault) ?? list[0];
+        setResumeChoice(`saved:${preset.id}`);
+      } catch {
+        // Silent fallback to the upload-only control below.
+      }
+    })();
+  }, [open]);
+
   function pickResume(file: File | null) {
     if (!file) return;
     if (file.size > MAX_RESUME_BYTES) {
@@ -43,6 +77,11 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
     }
     setResume(file);
     setError(null);
+  }
+
+  function clearPickedResume() {
+    setResume(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -70,7 +109,16 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
       form.set("name", name.trim());
       form.set("portfolio_url", portfolioUrl.trim());
       form.set("linkedin_url", linkedinUrl.trim());
-      if (resume) form.set("resume", resume);
+      if (savedResumes) {
+        // A saved resume travels as its id — the server copies the stored
+        // URL onto the application; nothing is uploaded again.
+        const chosen =
+          savedResumes.find((entry) => `saved:${entry.id}` === resumeChoice) ?? null;
+        if (chosen) form.set("saved_resume_id", chosen.id);
+        else if (resumeChoice === "upload" && resume) form.set("resume", resume);
+      } else if (resume) {
+        form.set("resume", resume);
+      }
 
       const response = await fetch(`/api/jobs/${job.id}/apply`, {
         method: "POST",
@@ -187,33 +235,39 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
               className="hidden"
               onChange={(event) => pickResume(event.target.files?.[0] ?? null)}
             />
-            {resume ? (
-              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
-                <FileText strokeWidth={2.5} size={15} className="shrink-0 text-accent" />
-                <span className="min-w-0 flex-1 truncate font-body text-sm text-foreground">
-                  {resume.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResume(null);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="modal-btn modal-btn-secondary shrink-0 !h-7 text-[12px]"
-                >
-                  <X strokeWidth={2.5} size={12} />
-                  Remove
-                </button>
+            {savedResumes ? (
+              <div className="flex flex-col gap-1.5">
+                {savedResumes.map((entry) => (
+                  <ResumeOption
+                    key={entry.id}
+                    checked={resumeChoice === `saved:${entry.id}`}
+                    onSelect={() => setResumeChoice(`saved:${entry.id}`)}
+                    label={entry.fileName}
+                    meta={resumeMeta(entry)}
+                    badge={entry.isDefault ? "Default" : undefined}
+                  />
+                ))}
+                <ResumeOption
+                  checked={resumeChoice === "upload"}
+                  onSelect={() => setResumeChoice("upload")}
+                  label="Upload a new file"
+                />
+                {resumeChoice === "upload" &&
+                  (resume ? (
+                    <PickedResumeRow file={resume} onRemove={clearPickedResume} />
+                  ) : (
+                    <AttachResumeButton onClick={() => fileInputRef.current?.click()} />
+                  ))}
+                <ResumeOption
+                  checked={resumeChoice === "none"}
+                  onSelect={() => setResumeChoice("none")}
+                  label="No resume"
+                />
               </div>
+            ) : resume ? (
+              <PickedResumeRow file={resume} onRemove={clearPickedResume} />
             ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 py-3.5 font-body text-sm text-foreground-muted transition-colors hover:border-accent hover:text-foreground"
-              >
-                <Upload strokeWidth={2.5} size={15} />
-                Attach a resume
-              </button>
+              <AttachResumeButton onClick={() => fileInputRef.current?.click()} />
             )}
           </div>
 
@@ -240,5 +294,83 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
         </form>
       )}
     </Modal>
+  );
+}
+
+/** One choice in the resume radio group (a saved resume, upload, or none). */
+function ResumeOption({
+  checked,
+  onSelect,
+  label,
+  meta,
+  badge,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  label: string;
+  meta?: string;
+  badge?: string;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+        checked ? "border-accent bg-accent-soft" : "border-border hover:border-accent/40"
+      }`}
+    >
+      <input
+        type="radio"
+        name="resume-choice"
+        checked={checked}
+        onChange={onSelect}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-accent/25 ${
+          checked ? "border-accent" : "border-foreground-subtle"
+        }`}
+      >
+        {checked && <span className="h-2 w-2 rounded-full bg-accent" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-body text-sm text-foreground">{label}</span>
+        {meta && <span className="block truncate font-body text-xs text-foreground-muted">{meta}</span>}
+      </span>
+      {badge && (
+        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 font-body text-[11px] text-foreground-muted">
+          {badge}
+        </span>
+      )}
+    </label>
+  );
+}
+
+/** The picked upload, with its remove action — same row as before the picker. */
+function PickedResumeRow({ file, onRemove }: { file: File; onRemove: () => void }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
+      <FileText strokeWidth={2.5} size={15} className="shrink-0 text-accent" />
+      <span className="min-w-0 flex-1 truncate font-body text-sm text-foreground">
+        {file.name}
+      </span>
+      <button type="button" onClick={onRemove} className="modal-btn modal-btn-secondary shrink-0 !h-7 text-[12px]">
+        <X strokeWidth={2.5} size={12} />
+        Remove
+      </button>
+    </div>
+  );
+}
+
+/** The dashed attach control, identical whether the picker is shown or not. */
+function AttachResumeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 py-3.5 font-body text-sm text-foreground-muted transition-colors hover:border-accent hover:text-foreground"
+    >
+      <Upload strokeWidth={2.5} size={15} />
+      Attach a resume
+    </button>
   );
 }

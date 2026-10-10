@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { Check, Globe, MessageCircle, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ToggleRow } from "../threads/ThreadComposerControls";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { filterChip } from "../filter-chip";
 import type { CommunityResource, ResourceType } from "@/lib/communities/models/resources";
 import { RESOURCE_TYPES } from "@/lib/communities/models/resources";

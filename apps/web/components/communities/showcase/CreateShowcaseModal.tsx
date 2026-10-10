@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
-import { ToggleRow } from "../threads/ThreadComposerControls";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { filterChip } from "../filter-chip";
 import { useShowcaseFileUpload, type VideoActivity, type VideoActivityState } from "./useShowcaseFileUpload";
 import { CATEGORY_ICONS } from "./categoryIcons";

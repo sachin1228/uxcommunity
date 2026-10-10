@@ -20,8 +20,8 @@ import {
   CategoryPicker,
   ComposerMedia,
   PollComposer,
-  ToggleRow,
 } from "./ThreadComposerControls";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useThreadFileUpload } from "./useThreadFileUpload";
 
 function pollToDraft(poll: CommunityThread["poll"]): ThreadPollDraft | null {
