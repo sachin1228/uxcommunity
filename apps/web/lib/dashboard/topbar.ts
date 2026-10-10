@@ -62,6 +62,15 @@ export const PAGE_DESTINATIONS: SearchDestination[] = [
     keywords: ["calendar", "meetups", "workshops", "city"],
   },
   {
+    id: "page:saved",
+    label: "Saved",
+    href: "/dashboard/saved",
+    group: "page",
+    // "bookmarks" stays Library's keyword: a query for it must keep finding
+    // the Library row the palette has always offered.
+    keywords: ["save", "saved"],
+  },
+  {
     id: "page:notifications",
     label: "Notifications",
     href: "/dashboard/notifications",

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
+  Bookmark,
   Briefcase,
   CalendarDays,
   Compass,
@@ -41,6 +42,7 @@ const ICONS: Record<string, typeof Search> = {
   "/dashboard/library": Library,
   "/dashboard/jobs": Briefcase,
   "/dashboard/events": CalendarDays,
+  "/dashboard/saved": Bookmark,
   "/dashboard/notifications": Bell,
   "/dashboard/profile": UserCircle,
   "/dashboard/settings": Settings,
