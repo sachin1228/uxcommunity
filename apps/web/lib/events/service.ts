@@ -70,6 +70,11 @@ export async function fetchCityEventPhase(
     cursorDate?: string | null;
     cursorId?: string | null;
     now?: Date;
+    /** null = both types; true = online only; false = in person only. */
+    isOnline?: boolean | null;
+    /** Start-date window on event_date — [from, to), either side optional. */
+    from?: string | null;
+    to?: string | null;
   },
 ): Promise<{ events: CityEventItem[]; nextCursor: string | null }> {
   const { cityId, viewerId, phase, cursorDate = null, cursorId = null, now = new Date() } = opts;
@@ -83,6 +88,9 @@ export async function fetchCityEventPhase(
     p_now: now.toISOString(),
     // One extra row tells us whether another page exists without a count.
     p_limit: CITY_EVENT_PAGE_SIZE + 1,
+    p_is_online: opts.isOnline ?? null,
+    p_from: opts.from ?? null,
+    p_to: opts.to ?? null,
   });
   if (error) throw new Error("Failed to fetch city events.");
 

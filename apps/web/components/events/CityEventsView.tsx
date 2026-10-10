@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CalendarCheck2, CalendarClock, CalendarX2, MapPinned } from "lucide-react";
 import type { CityEventItem } from "@/lib/events/service";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { filterChip } from "@/components/communities/filter-chip";
 import { GradientButton } from "@/components/ui/GradientButton";
+import { Spinner } from "@/components/ui/Spinner";
 import { publishContentChange } from "@/lib/communities/content-sync";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useNowTick } from "@/lib/use-now-tick";
+import {
+  EVENT_DATE_OPTIONS,
+  EVENT_TYPE_OPTIONS,
+  filterQuery,
+  type EventDateFilter,
+  type EventTypeFilter,
+} from "./event-filters";
 
 /**
  * How often the Upcoming/Past split re-reads the clock. An event finishing
@@ -58,21 +66,68 @@ export function CityEventsView({
     past: initialPastCursor === "past" ? null : initialPastCursor,
   }));
   const [filter, setFilter] = useState<"upcoming" | "past">("upcoming");
+  const [typeFilter, setTypeFilter] = useState<EventTypeFilter>("all");
+  const [dateFilter, setDateFilter] = useState<EventDateFilter>("any");
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(loadFailed ? "Couldn't load events." : null);
+  // Filter changes refetch both phases; a stale response must not overwrite a
+  // newer one when the chips are clicked in quick succession.
+  const requestSeq = useRef(0);
 
   function updateEvents(updater: (prev: CityEventItem[]) => CityEventItem[]) {
     setEvents((prev) => mergeUniqueEvents(updater(prev)));
+  }
+
+  /**
+   * A filter change is a fresh stream: both phases are refetched from their
+   * first page with the new filters, and the old cursors are replaced — paging
+   * never mixes filter sets.
+   */
+  async function applyFilters(nextType: EventTypeFilter, nextDate: EventDateFilter) {
+    if (nextType === typeFilter && nextDate === dateFilter) return;
+    setTypeFilter(nextType);
+    setDateFilter(nextDate);
+    setLoading(true);
+    const seq = ++requestSeq.current;
+    try {
+      const params = filterQuery(nextType, nextDate, new Date());
+      const [upcomingRes, pastRes] = await Promise.all([
+        fetch(`/api/events/city?${params}`),
+        fetch(`/api/events/city?${params}&cursor=past`),
+      ]);
+      if (!upcomingRes.ok || !pastRes.ok) throw new Error();
+      const [upcomingData, pastData] = (await Promise.all([
+        upcomingRes.json(),
+        pastRes.json(),
+      ])) as Array<{ events?: CityEventItem[]; nextCursor?: string | null }>;
+      if (seq !== requestSeq.current) return;
+      setEvents(mergeUniqueEvents([...(upcomingData.events ?? []), ...(pastData.events ?? [])]));
+      setCursors({
+        upcoming: upcomingData.nextCursor === "past" ? null : upcomingData.nextCursor ?? null,
+        past: pastData.nextCursor === "past" ? null : pastData.nextCursor ?? null,
+      });
+      setError(null);
+    } catch {
+      if (seq === requestSeq.current) setError("Failed to load events.");
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
+    }
   }
 
   async function loadMore() {
     const cursor = cursors[filter];
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
+    const seq = requestSeq.current;
     try {
-      const response = await fetch(`/api/events/city?cursor=${encodeURIComponent(cursor)}`);
+      const params = filterQuery(typeFilter, dateFilter, new Date());
+      params.set("cursor", cursor);
+      const response = await fetch(`/api/events/city?${params}`);
       if (!response.ok) throw new Error();
       const data = (await response.json()) as { events?: CityEventItem[]; nextCursor?: string | null };
+      // A filter change while this was in flight already replaced the stream.
+      if (seq !== requestSeq.current) return;
       updateEvents((prev) => [...prev, ...(data.events ?? [])]);
       setCursors((current) => ({
         ...current,
@@ -126,7 +181,10 @@ export function CityEventsView({
     .filter((e) => new Date(e.end_date ?? e.event_date) < now)
     .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime());
 
-  const showFilters = cityName !== null && !error && events.length > 0;
+  const filtersActive = typeFilter !== "all" || dateFilter !== "any";
+  // The chips stay while a filter is on even if it matches nothing — otherwise
+  // an empty result would take away the only way to clear it.
+  const showFilters = cityName !== null && !error && (events.length > 0 || filtersActive || loading);
   const activeList = filter === "upcoming" ? upcoming : past;
 
   return (
@@ -148,7 +206,7 @@ export function CityEventsView({
         </div>
 
         {showFilters && (
-          <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
+          <div className={`${communityFeedLayout.pageHeaderFilters} flex flex-wrap items-center gap-2 pb-1`}>
             {[
               { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock, count: upcoming.length },
               { value: "past" as const, label: "Past", icon: CalendarCheck2, count: past.length },
@@ -167,6 +225,30 @@ export function CityEventsView({
                 </button>
               );
             })}
+            <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+            {EVENT_TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => void applyFilters(option.value, dateFilter)}
+                aria-pressed={typeFilter === option.value}
+                className={filterChip(typeFilter === option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+            <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+            {EVENT_DATE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => void applyFilters(typeFilter, option.value)}
+                aria-pressed={dateFilter === option.value}
+                className={filterChip(dateFilter === option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         )}
 
@@ -185,7 +267,11 @@ export function CityEventsView({
       </div>
 
       <div className={`${communityFeedLayout.content} px-4`}>
-        {!cityName ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24" aria-label="Loading events" role="status">
+            <Spinner size={28} />
+          </div>
+        ) : !cityName ? (
           <div className={communityFeedLayout.emptyState}>
             <MapPinned strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No city on your profile yet</h3>
@@ -198,7 +284,15 @@ export function CityEventsView({
               </GradientButton>
             </div>
           </div>
-        ) : error && events.length === 0 ? null : events.length === 0 ? (
+        ) : error && events.length === 0 ? null : events.length === 0 && filtersActive ? (
+          <div className={communityFeedLayout.emptyState}>
+            <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No matching events</h3>
+            <p className={communityFeedLayout.emptyDescription}>
+              Nothing matches these filters — widen the date or the type.
+            </p>
+          </div>
+        ) : events.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
             <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No public events in {cityName} yet</h3>
@@ -211,9 +305,11 @@ export function CityEventsView({
             <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No {filter} events</h3>
             <p className={communityFeedLayout.emptyDescription}>
-              {filter === "upcoming"
-                ? "Nothing is scheduled right now — the Past tab has what already happened."
-                : "Nothing in your city has wrapped up yet."}
+              {filtersActive
+                ? "Nothing matches these filters here — try the other tab or widen them."
+                : filter === "upcoming"
+                  ? "Nothing is scheduled right now — the Past tab has what already happened."
+                  : "Nothing in your city has wrapped up yet."}
             </p>
           </div>
         ) : (

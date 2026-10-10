@@ -42,6 +42,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // The page's filter row: type (online / in person) and the start-date
+  // window it sends as absolute instants (its own timezone's day/week/month
+  // boundaries). Both are optional and must stay constant across a paged
+  // stream — the client resends them with every cursor.
+  const typeParam = req.nextUrl.searchParams.get("type");
+  if (typeParam !== null && typeParam !== "online" && typeParam !== "in-person") {
+    return NextResponse.json({ error: "Invalid type filter." }, { status: 400 });
+  }
+  const isOnline = typeParam === "online" ? true : typeParam === "in-person" ? false : null;
+
+  let from = req.nextUrl.searchParams.get("from");
+  let to = req.nextUrl.searchParams.get("to");
+  if (from) {
+    from = normalizeUtcCursor(from) ?? from;
+    if (Number.isNaN(Date.parse(from))) {
+      return NextResponse.json({ error: "Invalid from date." }, { status: 400 });
+    }
+  }
+  if (to) {
+    to = normalizeUtcCursor(to) ?? to;
+    if (Number.isNaN(Date.parse(to))) {
+      return NextResponse.json({ error: "Invalid to date." }, { status: 400 });
+    }
+  }
+
   try {
     const { events, nextCursor } = await fetchCityEventPhase(db, {
       cityId: viewer.cityId,
@@ -49,6 +74,9 @@ export async function GET(req: NextRequest) {
       phase: rawPhase,
       cursorDate: eventDate ?? null,
       cursorId: cursorId ?? null,
+      isOnline,
+      from,
+      to,
     });
     return NextResponse.json({ events, nextCursor });
   } catch (error) {
