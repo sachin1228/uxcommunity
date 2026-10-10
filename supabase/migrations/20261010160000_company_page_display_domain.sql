@@ -17,9 +17,8 @@
 --   `get_company_page` now also returns `domain`: the display domain
 --   with the same ordering every other surface uses —
 --     verified desc, confidence rank desc, created_at asc, domain asc
---   The `domains` list and `member_count` keep their proof meaning, so
---   the page still says "No verified domains yet" when nothing has been
---   proved: the picture is decoration, the verified list is the claim.
+--   The verified list (`domains`) and `member_count` keep their proof
+--   meaning: the picture is decoration, the verified list is the claim.
 --
 -- Deploy note: the return shape gains a column, which create-or-replace
 -- cannot do, so this drops and recreates the function and reapplies its

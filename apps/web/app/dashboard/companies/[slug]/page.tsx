@@ -70,20 +70,16 @@ export default async function CompanyPage({ params }: Props) {
             )}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            {company.domains.length > 0 ? (
-              company.domains.map((entry) => (
+          {company.domains.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              {company.domains.map((entry) => (
                 <span key={entry.domain} className="flex items-center gap-1.5">
                   <span className="font-body text-sm text-foreground-muted">{entry.domain}</span>
                   <VerifiedMark size="xs" />
                 </span>
-              ))
-            ) : (
-              <span className="font-body text-sm text-foreground-subtle">
-                No verified domains yet
-              </span>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
 
           <p className="mt-2 flex items-center gap-1.5 font-body text-sm text-foreground-muted">
             <Users strokeWidth={2.5} size={12} className="text-accent" />
