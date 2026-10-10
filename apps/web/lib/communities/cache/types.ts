@@ -150,6 +150,9 @@ export interface CachedMeta {
     current_user_role?: string | null;
     /** Effective permission grants (owners: everything; admins and moderators: configured toggles). */
     current_user_permissions?: ClientCommunityPermissions | null;
+    /** The caller's own mute state — drives the header menu's mute label. */
+    notifications_muted?: boolean | null;
+    notifications_muted_until?: string | null;
   };
   members: {
     user_id: string;
@@ -200,6 +203,13 @@ export interface CachedSidebarCommunity {
   unread_content_count?: number;
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
+  /**
+   * The membership's mute state — the forever flag plus the timed-mute
+   * deadline (see lib/communities/mute: expired deadlines read as unmuted).
+   * Absent on pre-migration payloads, which read as not muted.
+   */
+  notifications_muted?: boolean | null;
+  notifications_muted_until?: string | null;
   /**
    * An event group chat's own event date — the day the room is for. Rendered as
    * the date badge on its sidebar DP (see lib/communities/event-date), and kept

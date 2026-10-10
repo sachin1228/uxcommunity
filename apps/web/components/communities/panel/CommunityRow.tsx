@@ -1,9 +1,10 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
-import { Pin } from "lucide-react";
+import { BellOff, Pin } from "lucide-react";
 import { CommunityVisibilityIcon, SignupCommunityBadge } from "../CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
+import { isCommunityMuted } from "@/lib/communities/mute";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
@@ -141,6 +142,18 @@ export const CommunityRow = memo(function CommunityRow({
                 className="inline-flex shrink-0 items-center text-foreground-muted"
               >
                 <Pin strokeWidth={2.5} size={11} aria-hidden="true" />
+              </span>
+            )}
+            {/* A muted chat wears a crossed bell: notifications are off, but
+                unread messages still count (see the chat's ⋯ menu). */}
+            {isCommunityMuted(c) && (
+              <span
+                role="img"
+                aria-label="Notifications muted"
+                title="Notifications muted"
+                className="inline-flex shrink-0 items-center text-foreground-muted"
+              >
+                <BellOff strokeWidth={2.5} size={11} aria-hidden="true" />
               </span>
             )}
             {(c.last_message || lastContent) && !typingText && (

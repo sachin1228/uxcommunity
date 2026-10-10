@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, BookMarked, Calendar, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
+import { Activity, Bell, BellOff, BookMarked, Calendar, ChevronRight, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -11,6 +11,7 @@ import { CommunityDp } from "../CommunityDp";
 import { DpWithEventDate } from "../DpWithEventDate";
 import { CommunityNameBadges } from "../CommunityBadges";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
+import { isCommunityMuted } from "@/lib/communities/mute";
 
 interface Community {
   id: string;
@@ -29,6 +30,9 @@ interface Community {
   pinned_until?: string | null;
   /** That deadline whether ahead or past — what makes the badge say ENDED. */
   event_end?: string | null;
+  /** The caller's own mute state — absent on pre-migration rows (not muted). */
+  notifications_muted?: boolean | null;
+  notifications_muted_until?: string | null;
 }
 
 interface ChatHeaderProps {
@@ -44,6 +48,11 @@ interface ChatHeaderProps {
   showActivityTab?: boolean;
   /** Used to resolve the community Lottie while meta is still loading. */
   communityId?: string;
+  /** Called after a mute save so the parent can patch its caches. */
+  onMuteChanged?: (state: {
+    notifications_muted: boolean;
+    notifications_muted_until: string | null;
+  }) => void;
 }
 
 export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "activity";
@@ -63,6 +72,15 @@ const CONFIRM_COPY: Record<NonNullable<ConfirmAction>, { title: string; body: st
     cta: "Delete chat",
   },
 };
+
+/** The durations the mute flyout offers, in menu order. */
+const MUTE_DURATIONS = [
+  { duration: "8h", label: "8 hours" },
+  { duration: "1w", label: "1 week" },
+  { duration: "always", label: "Always" },
+] as const;
+
+type MuteChoice = (typeof MUTE_DURATIONS)[number]["duration"] | "off";
 
 // ─── Confirm dialog ────────────────────────────────────────────────────────────
 function ConfirmDialog({
@@ -136,20 +154,35 @@ export const ChatHeader = memo(function ChatHeader({
   canOpenSettings = false,
   showActivityTab = false,
   communityId,
+  onMuteChanged,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
   const [openMenu, setOpenMenu] = useState<"more" | null>(null);
+  // The mute duration flyout is a second panel opened from the "more" menu —
+  // open/closed state lives beside the menu's own.
+  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Timed mutes lapse on their own without the row being rewritten, so the
+  // label is computed from the deadline, never from the column's presence.
+  const muted = isCommunityMuted(community);
+
   useEffect(() => {
     if (!openMenu) return;
     const closeOnOutside = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpenMenu(null);
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpenMenu(null);
+        setMuteMenuOpen(false);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenMenu(null);
+      if (event.key === "Escape") {
+        setOpenMenu(null);
+        setMuteMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
@@ -192,6 +225,34 @@ export const ChatHeader = memo(function ChatHeader({
   function requestAction(action: ConfirmAction) {
     setOpenMenu(null);
     setConfirmAction(action);
+  }
+
+  /**
+   * Saves the caller's mute for this community. Non-destructive and instant,
+   * so no confirm step: the menu label flips and the sidebar grows its
+   * crossed bell as confirmation.
+   */
+  async function applyMute(duration: MuteChoice) {
+    if (!community || muteBusy) return;
+    setMuteBusy(true);
+
+    const response = await dedupeFetch(`/api/communities/${community.id}/mute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duration }),
+    });
+    setMuteBusy(false);
+    if (!response.ok) return;
+
+    const result = await response.json().catch(() => null);
+    if (result) {
+      onMuteChanged?.({
+        notifications_muted: Boolean(result.notifications_muted),
+        notifications_muted_until: result.notifications_muted_until ?? null,
+      });
+    }
+    setOpenMenu(null);
+    setMuteMenuOpen(false);
   }
 
   // Members is not an owner-toggleable area, so it stays visible regardless of
@@ -283,13 +344,78 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-label="Community options"
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "more"}
-                    onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
+                    onClick={() => {
+                      setOpenMenu(openMenu === "more" ? null : "more");
+                      setMuteMenuOpen(false);
+                    }}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                   >
                     <MoreHorizontal strokeWidth={2.5} size={16} />
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                      {muted ? (
+                        /* Muted (forever or still-timed): one action, off. */
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={muteBusy}
+                          onClick={() => void applyMute("off")}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                        >
+                          {muteBusy ? (
+                            <Spinner size={11} />
+                          ) : (
+                            <Bell strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                          )}
+                          <span>Unmute notifications</span>
+                        </button>
+                      ) : (
+                        <div
+                          className="relative"
+                          onMouseEnter={() => setMuteMenuOpen(true)}
+                          onMouseLeave={() => setMuteMenuOpen(false)}
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            aria-haspopup="menu"
+                            aria-expanded={muteMenuOpen}
+                            disabled={muteBusy}
+                            onClick={() => setMuteMenuOpen((open) => !open)}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                          >
+                            <BellOff strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                            <span>Mute notifications</span>
+                            <ChevronRight strokeWidth={2.5} size={14} className="ml-auto shrink-0 text-foreground-muted" aria-hidden="true" />
+                          </button>
+                          {muteMenuOpen && (
+                            /* The flyout opens to the LEFT: the menu hugs the
+                               window's right edge, so a right-side submenu
+                               would run off screen. The outer box's padding
+                               carries the visual gap while keeping the
+                               pointer inside the flyout's subtree — that
+                               subtree membership is what keeps the wrapper's
+                               mouseleave (and so the close) from firing. */
+                            <div role="menu" aria-label="Mute notifications" className="absolute right-full top-0 z-40 pr-1">
+                              <div className="min-w-32 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                                {MUTE_DURATIONS.map(({ duration, label }) => (
+                                  <button
+                                    key={duration}
+                                    type="button"
+                                    role="menuitem"
+                                    disabled={muteBusy}
+                                    onClick={() => void applyMute(duration)}
+                                    className="block w-full rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <button
                         type="button"
                         role="menuitem"

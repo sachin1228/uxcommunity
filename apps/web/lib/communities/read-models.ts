@@ -9,7 +9,7 @@ import {
   TABLE_LOOKUP,
 } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "./dp";
-import { canStoreShowcaseFlag } from "./showcase-flag";
+import { canStoreMuteUntil, canStoreShowcaseFlag } from "./showcase-flag";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
@@ -49,8 +49,19 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   userId: string,
 ): Promise<ReadResult<Record<string, unknown>>> {
   const db = createServiceClient();
+  // The membership's mute state feeds the header's Mute notifications menu.
+  // The timed column is selected only once its migration is applied; each
+  // branch keeps a single string literal (see the note below).
+  const muteUntilSupported = await canStoreMuteUntil(db);
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
-    db.from("community_members").select("joined_at, role").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
+    (muteUntilSupported
+      ? db
+          .from("community_members")
+          .select("joined_at, role, notifications_muted, notifications_muted_until")
+      : db.from("community_members").select("joined_at, role"))
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle(),
     // showcase_enabled is read only once the showcase-toggle migration has
     // added the column; the row is spread into the response, so an explicit
     // list matters here. Each branch keeps its column list a single string
@@ -147,6 +158,10 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         invite_token: community.owner_id === userId ? community.invite_token : undefined,
         current_user_role: currentUserRole,
         current_user_permissions: currentUserPermissions,
+        // The caller's own mute state — read back by the header's menu so the
+        // label flips between "Mute notifications" and "Unmute notifications".
+        notifications_muted: (membership as unknown as { notifications_muted?: boolean | null }).notifications_muted ?? false,
+        notifications_muted_until: (membership as unknown as { notifications_muted_until?: string | null }).notifications_muted_until ?? null,
       },
       members,
       current_user_role: currentUserRole,

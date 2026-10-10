@@ -186,6 +186,33 @@ const MIN_UUID = "00000000-0000-0000-0000-000000000000";
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
 /**
+ * Whether `community_members.notifications_muted_until` exists.
+ *
+ * Checked once per server process. An environment that has not yet applied the
+ * community-mute migration must keep pushing notifications: the recipient
+ * query's `.or()` on the deadline would otherwise fail the whole page query,
+ * so before the column lands the sender simply filters on the forever-mute
+ * boolean alone (timed mutes are then not stored either — see the mute route).
+ */
+let muteUntilColumnsAvailable: boolean | null = null;
+
+async function canFilterMuteUntil(db: ServiceClient): Promise<boolean> {
+  if (muteUntilColumnsAvailable !== null) return muteUntilColumnsAvailable;
+  const { error } = await db
+    .from("community_members")
+    .select("notifications_muted_until")
+    .limit(1);
+  muteUntilColumnsAvailable = !error;
+  if (error) {
+    logEvent("warn", {
+      event: "push.mute_until_column_missing",
+      error: describeError(error),
+    });
+  }
+  return muteUntilColumnsAvailable;
+}
+
+/**
  * What one message's push delivery cost, for logging and tests.
  *
  * `deliveries` counts only pushes the provider acknowledged. Failures are split
@@ -276,10 +303,18 @@ export interface ChatPushDeps {
   receiptGraceMs?: number;
   /** Injectable so the grace wait costs tests no real time. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Whether `community_members.notifications_muted_until` exists. Probed from
+   * PostgREST once per process unless injected — tests inject it so the fake
+   * database is not asked, and pass false to pin the pre-migration behaviour.
+   */
+  muteUntilColumns?: boolean;
 }
 
 /**
- * Pushes a new chat message to every member's devices, except the sender's.
+ * Pushes a new chat message to every member's devices, except the sender's
+ * and any muted membership's (the forever flag and an unexpired timed mute
+ * alike — see the community-mute migration).
  *
  * Intentionally mirrors the web app's *browser* notifications rather than the
  * `notifications` bell: those rows were removed on purpose (too noisy, they
@@ -377,6 +412,12 @@ export async function sendChatMessagePush(
     clock() +
     Math.max(1, deps.timeBudgetMs ?? envLimit("PUSH_TIME_BUDGET_MS", PUSH_TIME_BUDGET_MS, 1));
 
+  // Timed mutes: whether the deadline column exists, and the instant the
+  // recipient query compares it against. The cutoff is second-precision (no
+  // fractional digits) so the PostgREST `.or()` value stays plain.
+  const muteUntilColumns = deps.muteUntilColumns ?? (await canFilterMuteUntil(db));
+  const muteCutoff = new Date(now().getTime()).toISOString().replace(/\.\d{3}Z$/, "Z");
+
   const report: ChatPushReport = {
     scanned: 0,
     reachable: 0,
@@ -423,13 +464,21 @@ export async function sendChatMessagePush(
       // Keyset page of recipients. Muted memberships are excluded in SQL —
       // the mute is part of "is this a recipient at all", and filtering in the
       // database keeps the page full instead of returning muted rows that get
-      // discarded client-side.
-      const membersResult = await db
+      // discarded client-side. A timed mute whose deadline is still ahead is
+      // as muted as the forever flag; an expired one is never rewritten —
+      // the comparison below is what ends those mutes.
+      let recipientPage = db
         .from("community_members")
         .select("user_id")
         .eq("community_id", communityId)
         .neq("user_id", senderId)
-        .eq("notifications_muted", false)
+        .eq("notifications_muted", false);
+      if (muteUntilColumns) {
+        recipientPage = recipientPage.or(
+          `notifications_muted_until.is.null,notifications_muted_until.lte.${muteCutoff}`,
+        );
+      }
+      const membersResult = await recipientPage
         .order("user_id", { ascending: true })
         .gt("user_id", cursor)
         .limit(chunkSize);

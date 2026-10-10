@@ -476,6 +476,7 @@ export type Database = {
           joined_at: string;
           last_read_at: string | null;
           notifications_muted: boolean;
+          notifications_muted_until: string | null;
           role: string;
           user_id: string;
         };
@@ -486,6 +487,7 @@ export type Database = {
           joined_at?: string;
           last_read_at?: string | null;
           notifications_muted?: boolean;
+          notifications_muted_until?: string | null;
           role?: string;
           user_id: string;
         };
@@ -496,6 +498,7 @@ export type Database = {
           joined_at?: string;
           last_read_at?: string | null;
           notifications_muted?: boolean;
+          notifications_muted_until?: string | null;
           role?: string;
           user_id?: string;
         };

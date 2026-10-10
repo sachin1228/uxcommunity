@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
-import { canStoreShowcaseFlag } from "./showcase-flag";
+import { canStoreMuteUntil, canStoreShowcaseFlag } from "./showcase-flag";
 import { loadEventChatSidebarMeta } from "./event-chat";
 
 type ActivityRow = {
@@ -114,6 +114,28 @@ export async function getSidebarCommunities(userId: string) {
 
   const communityRows = (communities ?? []) as SidebarCommunityRow[];
 
+  // Mute state rides the membership row and the activity RPC does not carry
+  // it, so it costs one extra bounded query. The timed column is read only
+  // once its migration is applied — before that, a membership can still be
+  // forever-muted through the boolean.
+  const { data: muteRows } = await (
+    (await canStoreMuteUntil(db))
+      ? db
+          .from("community_members")
+          .select("community_id, notifications_muted, notifications_muted_until")
+      : db.from("community_members").select("community_id, notifications_muted")
+  )
+    .eq("user_id", userId)
+    .in("community_id", rows.map((row) => row.community_id));
+
+  const muteById = new Map(
+    ((muteRows ?? []) as {
+      community_id: string;
+      notifications_muted: boolean | null;
+      notifications_muted_until?: string | null;
+    }[]).map((row) => [row.community_id, row]),
+  );
+
   const byType: Record<string, { id: string; reference_id: string | null }[]> = {};
   for (const community of communityRows) {
     if (!byType[community.type]) byType[community.type] = [];
@@ -184,6 +206,8 @@ export async function getSidebarCommunities(userId: string) {
       last_read_at: row.last_read_at,
       joined_at: row.joined_at,
       is_archived: Boolean(row.archived_at && (!message || message.created_at <= row.archived_at)),
+      notifications_muted: muteById.get(community.id)?.notifications_muted ?? false,
+      notifications_muted_until: muteById.get(community.id)?.notifications_muted_until ?? null,
       last_message: message ? {
         id: message.id,
         content: message.content ?? "",

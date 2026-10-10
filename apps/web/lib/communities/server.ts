@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_ENABLED_TABS } from "./areas";
 import { resolveCommunityDp } from "./dp";
-import { canStoreShowcaseFlag } from "./showcase-flag";
+import { canStoreMuteUntil, canStoreShowcaseFlag } from "./showcase-flag";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
 import type { CachedMeta } from "./cache";
@@ -36,8 +36,18 @@ export async function fetchCommunityMetaSSR(
 ): Promise<SSRCommunityMeta | null> {
   const db = createServiceClient();
 
+  // The membership's mute state paints the header's menu label; the timed
+  // column is read only once its migration is applied (see read-models.ts).
+  const muteUntilSupported = await canStoreMuteUntil(db);
   const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
-    db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
+    (muteUntilSupported
+      ? db
+          .from("community_members")
+          .select("joined_at, last_read_at, notifications_muted, notifications_muted_until")
+      : db.from("community_members").select("joined_at, last_read_at"))
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle(),
     // showcase_enabled is read only once the showcase-toggle migration has
     // added the column, so the first paint works before it is applied. Each
     // branch keeps a single string literal (see read-models.ts).
@@ -97,6 +107,8 @@ export async function fetchCommunityMetaSSR(
       // overwrites them client-side moments later.
       current_user_role: null,
       current_user_permissions: null,
+      notifications_muted: (membership as unknown as { notifications_muted?: boolean | null }).notifications_muted ?? false,
+      notifications_muted_until: (membership as unknown as { notifications_muted_until?: string | null }).notifications_muted_until ?? null,
     },
     members: [],
     fetchedAt: Date.now(),

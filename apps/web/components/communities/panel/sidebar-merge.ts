@@ -44,6 +44,11 @@ export function mergeStaleServerList(
       last_read_at: incoming.last_read_at,
       member_count: incoming.member_count,
       is_archived: incoming.is_archived,
+      // Mute state is only ever changed by the user themselves, so the server
+      // row is authoritative — a local optimistic patch already went through
+      // the same endpoint and both sides agree.
+      notifications_muted: incoming.notifications_muted,
+      notifications_muted_until: incoming.notifications_muted_until ?? null,
       // The event date and the pin are only ever computed server-side (the
       // date badge rides the room's own event, see lib/communities/event-date).
       event_date: incoming.event_date ?? null,
