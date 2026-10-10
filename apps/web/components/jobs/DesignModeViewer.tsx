@@ -7,7 +7,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
   FileText,
   Globe,
   Linkedin,
@@ -67,9 +66,6 @@ export function DesignModeViewer({
   // acknowledges them, so the sidebar reads the new standing immediately
   // while `router.refresh()` re-reads the page's data behind it.
   const [settled, setSettled] = useState<Record<string, ApplicationStatus>>({});
-  // TEMP: the sidebar direction under review — keep the winner, delete the
-  // two losers and the preview row once one is picked.
-  const [sidebarVariant, setSidebarVariant] = useState<1 | 2 | 3>(1);
 
   const status = settled[applicant.id] ?? applicant.status;
   // The section's own link, loaded in place. The resume entry only exists
@@ -153,298 +149,78 @@ export function DesignModeViewer({
             Back to applicants
           </button>
 
-          {/* TEMP — sidebar direction picker for review; delete the losing
-              variants and this row once a direction is chosen. */}
-          <div className="mt-4 flex items-center justify-between rounded-lg border border-dashed border-border px-3 py-1.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle">
-              Preview
-            </span>
-            <div className="flex items-center gap-0.5">
-              {([1, 2, 3] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  title={`Sidebar variant ${["A", "B", "C"][value - 1]}`}
-                  aria-label={`Sidebar variant ${["A", "B", "C"][value - 1]}`}
-                  aria-pressed={sidebarVariant === value}
-                  onClick={() => setSidebarVariant(value)}
-                  className={
-                    sidebarVariant === value
-                      ? "flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-accent font-mono text-[10px] font-semibold text-accent-foreground"
-                      : "flex h-6 w-6 cursor-pointer items-center justify-center rounded-md font-mono text-[10px] font-medium text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground"
-                  }
-                >
-                  {["A", "B", "C"][value - 1]}
-                </button>
-              ))}
-            </div>
+          <div className="mt-3 flex flex-col items-center px-2 py-2 text-center">
+            <AvatarImg
+              url={applicant.avatar_url}
+              name={applicant.name}
+              size={112}
+              className="rounded-full object-cover"
+            />
+            <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
+              {applicant.name}
+            </h2>
+            {applicant.role_label && (
+              <p className="mt-1.5 font-body text-sm text-foreground-muted">
+                {applicant.role_label}
+              </p>
+            )}
+            {applicant.city_name && (
+              <p className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
+                <MapPin strokeWidth={2.5} size={12} />
+                {applicant.city_name}
+              </p>
+            )}
+            <p className="mt-1 font-body text-xs text-foreground-subtle">
+              Applied {applicant.applied_label}
+            </p>
           </div>
 
-          {/* Variant A — the identity as a card, sections labeled. */}
-          {sidebarVariant === 1 && (
-            <>
-              <div className="mt-4 flex flex-col rounded-xl border border-border bg-surface p-5">
-                <AvatarImg
-                  url={applicant.avatar_url}
-                  name={applicant.name}
-                  size={96}
-                  className="mx-auto rounded-full object-cover ring-1 ring-border"
-                />
-                <h2 className="mt-4 text-center font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
-                  {applicant.name}
-                </h2>
-                {applicant.role_label && (
-                  <p className="mt-1 text-center font-body text-[13px] text-foreground-muted">
-                    {applicant.role_label}
-                  </p>
-                )}
-                <div aria-hidden="true" className="mt-4 h-px bg-border" />
-                <div className="mt-4 flex flex-col gap-2.5">
-                  {applicant.city_name && (
-                    <span className="inline-flex items-center gap-2 font-body text-xs text-foreground-subtle">
-                      <MapPin strokeWidth={2.5} size={13} className="text-foreground-muted" />
-                      {applicant.city_name}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-2 font-body text-xs text-foreground-subtle">
-                    <Clock strokeWidth={2.5} size={13} className="text-foreground-muted" />
-                    Applied {applicant.applied_label}
-                  </span>
-                </div>
-              </div>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <DecisionButtons
+              status={status}
+              pending={pendingId === applicant.id}
+              error={decisionError}
+              onChange={changeStatus}
+            />
+          </div>
 
-              <p className="mt-5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-foreground-subtle">
-                Decision
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <DecisionButtons
-                  status={status}
-                  pending={pendingId === applicant.id}
-                  error={decisionError}
-                  onChange={changeStatus}
-                />
-              </div>
+          {/* Previous / next across the posting's applicants — the pager
+              belongs to the reviewing column, not the page being read. */}
+          <div className="mt-2 flex h-9 items-center justify-between rounded-lg border border-border">
+            <button
+              type="button"
+              onClick={() => goTo(index - 1)}
+              disabled={index === 0}
+              aria-label="Previous applicant"
+              className="flex h-full w-10 cursor-pointer items-center justify-center rounded-l-lg text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
+            >
+              <ChevronLeft strokeWidth={2.5} size={15} />
+            </button>
+            <span className="font-body text-xs text-foreground-subtle">
+              {index + 1} of {applicants.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => goTo(index + 1)}
+              disabled={index === applicants.length - 1}
+              aria-label="Next applicant"
+              className="flex h-full w-10 cursor-pointer items-center justify-center rounded-r-lg text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
+            >
+              <ChevronRight strokeWidth={2.5} size={15} />
+            </button>
+          </div>
 
-              <p className="mt-5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-foreground-subtle">
-                Review
-              </p>
-              <div className="mt-2 flex h-9 items-center justify-between rounded-lg border border-border">
-                <button
-                  type="button"
-                  onClick={() => goTo(index - 1)}
-                  disabled={index === 0}
-                  aria-label="Previous applicant"
-                  className="flex h-full w-10 cursor-pointer items-center justify-center rounded-l-lg text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronLeft strokeWidth={2.5} size={15} />
-                </button>
-                <span className="font-body text-xs text-foreground-subtle">
-                  {index + 1} of {applicants.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goTo(index + 1)}
-                  disabled={index === applicants.length - 1}
-                  aria-label="Next applicant"
-                  className="flex h-full w-10 cursor-pointer items-center justify-center rounded-r-lg text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronRight strokeWidth={2.5} size={15} />
-                </button>
-              </div>
-
-              <p className="mt-auto pt-8 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-foreground-subtle">
-                Links
-              </p>
-              <nav aria-label="Application links" className="mt-2 flex flex-col gap-1">
-                {linkItems.map((item) => (
-                  <SideLink
-                    key={item.key}
-                    active={section === item.key}
-                    icon={item.icon}
-                    label={item.label}
-                    onClick={() => setSection(item.key)}
-                  />
-                ))}
-              </nav>
-            </>
-          )}
-
-          {/* Variant B — editorial header, everything left-aligned. */}
-          {sidebarVariant === 2 && (
-            <>
-              <div className="mt-5 flex items-center gap-3.5">
-                <AvatarImg
-                  url={applicant.avatar_url}
-                  name={applicant.name}
-                  size={64}
-                  className="rounded-full object-cover"
-                />
-                <div className="min-w-0">
-                  <h2 className="truncate font-display text-lg font-semibold tracking-[-0.01em] text-foreground">
-                    {applicant.name}
-                  </h2>
-                  {applicant.role_label && (
-                    <p className="mt-0.5 truncate font-body text-xs text-foreground-muted">
-                      {applicant.role_label}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <p className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-body text-xs text-foreground-subtle">
-                {applicant.city_name && (
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin strokeWidth={2.5} size={12} />
-                    {applicant.city_name}
-                  </span>
-                )}
-                <span>Applied {applicant.applied_label}</span>
-              </p>
-              <div aria-hidden="true" className="mt-4 h-px bg-border" />
-
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <DecisionButtons
-                  status={status}
-                  pending={pendingId === applicant.id}
-                  error={decisionError}
-                  onChange={changeStatus}
-                />
-              </div>
-
-              <div className="mt-3 flex h-9 items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => goTo(index - 1)}
-                  disabled={index === 0}
-                  aria-label="Previous applicant"
-                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronLeft strokeWidth={2.5} size={15} />
-                </button>
-                <span className="font-mono text-[11px] tabular-nums text-foreground-subtle">
-                  {index + 1} / {applicants.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goTo(index + 1)}
-                  disabled={index === applicants.length - 1}
-                  aria-label="Next applicant"
-                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronRight strokeWidth={2.5} size={15} />
-                </button>
-              </div>
-
-              <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
-                {linkItems.map((item) => {
-                  const active = section === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setSection(item.key)}
-                      className={`flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2 font-body text-sm transition-colors ${
-                        active
-                          ? "bg-accent-soft font-medium text-foreground"
-                          : "text-foreground-muted hover:bg-accent-soft hover:text-foreground"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                          active
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-accent-soft text-foreground-muted"
-                        }`}
-                      >
-                        {item.icon}
-                      </span>
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </nav>
-            </>
-          )}
-
-          {/* Variant C — the refined centered block: ringed avatar, meta as
-              chips, the rest as today with a quieter active link. */}
-          {sidebarVariant === 3 && (
-            <>
-              <div className="mt-3 flex flex-col items-center px-2 py-2 text-center">
-                <AvatarImg
-                  url={applicant.avatar_url}
-                  name={applicant.name}
-                  size={104}
-                  className="rounded-full object-cover ring-1 ring-border"
-                />
-                <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
-                  {applicant.name}
-                </h2>
-                {applicant.role_label && (
-                  <p className="mt-1.5 font-body text-sm text-foreground-muted">
-                    {applicant.role_label}
-                  </p>
-                )}
-                <div className="mt-3.5 flex flex-wrap items-center justify-center gap-1.5">
-                  {applicant.city_name && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-subtle">
-                      <MapPin strokeWidth={2.5} size={11} />
-                      {applicant.city_name}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-subtle">
-                    <Clock strokeWidth={2.5} size={11} />
-                    Applied {applicant.applied_label}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <DecisionButtons
-                  status={status}
-                  pending={pendingId === applicant.id}
-                  error={decisionError}
-                  onChange={changeStatus}
-                />
-              </div>
-
-              <div className="mt-2 flex h-9 items-center justify-between rounded-lg border border-border">
-                <button
-                  type="button"
-                  onClick={() => goTo(index - 1)}
-                  disabled={index === 0}
-                  aria-label="Previous applicant"
-                  className="flex h-full w-10 cursor-pointer items-center justify-center rounded-l-lg text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronLeft strokeWidth={2.5} size={15} />
-                </button>
-                <span className="font-body text-xs text-foreground-subtle">
-                  {index + 1} of {applicants.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goTo(index + 1)}
-                  disabled={index === applicants.length - 1}
-                  aria-label="Next applicant"
-                  className="flex h-full w-10 cursor-pointer items-center justify-center rounded-r-lg text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronRight strokeWidth={2.5} size={15} />
-                </button>
-              </div>
-
-              <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
-                {linkItems.map((item) => (
-                  <SideLink
-                    key={item.key}
-                    active={section === item.key}
-                    icon={item.icon}
-                    label={item.label}
-                    onClick={() => setSection(item.key)}
-                  />
-                ))}
-              </nav>
-            </>
-          )}
+          <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
+            {linkItems.map((item) => (
+              <SideLink
+                key={item.key}
+                active={section === item.key}
+                icon={item.icon}
+                label={item.label}
+                onClick={() => setSection(item.key)}
+              />
+            ))}
+          </nav>
         </aside>
 
         {/* The page itself. */}
@@ -704,18 +480,12 @@ function SideLink({
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 font-body text-sm transition-colors ${
+      className={`flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 font-body text-sm transition-colors ${
         active
           ? "bg-accent-soft font-medium text-foreground"
           : "text-foreground-muted hover:bg-accent-soft hover:text-foreground"
       }`}
     >
-      {active && (
-        <span
-          aria-hidden="true"
-          className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full bg-accent"
-        />
-      )}
       {icon}
       {label}
     </button>
