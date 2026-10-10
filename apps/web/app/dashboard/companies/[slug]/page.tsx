@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import { Building2, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCompanyPage } from "@/lib/companies/service";
@@ -46,7 +45,14 @@ export default async function CompanyPage({ params }: Props) {
         aria-label="Company details"
         className="overflow-hidden rounded-2xl border border-border bg-surface"
       >
-        <div className="h-24 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-orange-400" />
+        {/* A dark cover: deliberately theme-independent, not token-driven. */}
+        <div
+          className="h-24 w-full bg-[#141417]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(135deg, rgba(255,255,255,0.065) 0px, rgba(255,255,255,0.065) 1px, transparent 1px, transparent 9px)",
+          }}
+        />
 
         <div className="relative px-5 pb-5">
           <div className="-mt-9 flex items-end gap-4">
@@ -129,14 +135,6 @@ export default async function CompanyPage({ params }: Props) {
           </p>
         )}
       </section>
-
-      <p className="mt-6 flex flex-wrap items-center gap-x-1.5 font-body text-xs text-foreground-subtle">
-        <Building2 strokeWidth={2.5} size={11} />
-        Work somewhere else?
-        <Link href="/dashboard/settings" className="text-accent hover:underline">
-          Add your company
-        </Link>
-      </p>
     </div>
   );
 }
