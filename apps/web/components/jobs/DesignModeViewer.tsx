@@ -133,13 +133,14 @@ export function DesignModeViewer({
         aria-label={`${applicant.name}'s application — design view`}
         className="design-light fixed inset-0 z-[800] flex flex-col bg-background font-body text-foreground"
       >
-        {/* Top bar — the way out, the posting this application belongs to,
-            and the applicant's links as quick external opens. */}
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-4">
+        {/* Top bar — the way out and the posting this application belongs
+            to. The applicant's links live in the sidebar, so the right side
+            carries nothing here except the small-screen decisions. */}
+        <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-border bg-surface px-4">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-self-start gap-1.5 rounded-lg px-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground"
           >
             <ArrowLeft strokeWidth={2.5} size={15} />
             Back to applicants
@@ -156,29 +157,14 @@ export function DesignModeViewer({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Small screens have no sidebar, so the decisions ride here. */}
-            <div className="flex flex-wrap items-center justify-end gap-2 lg:hidden">
-              <DecisionButtons
-                status={status}
-                pending={pendingId === applicant.id}
-                error={decisionError}
-                onChange={changeStatus}
-              />
-            </div>
-            <div className="hidden items-center gap-1 sm:flex">
-              <HeaderLink href={applicant.portfolio_url} label="Portfolio">
-                <Globe strokeWidth={2.25} size={16} />
-              </HeaderLink>
-              <HeaderLink href={applicant.linkedin_url} label="LinkedIn">
-                <Linkedin strokeWidth={2.25} size={16} />
-              </HeaderLink>
-              {applicant.resume_url && (
-                <HeaderLink href={applicant.resume_url} label="Resume">
-                  <FileText strokeWidth={2.25} size={16} />
-                </HeaderLink>
-              )}
-            </div>
+          {/* Small screens have no sidebar, so the decisions ride here. */}
+          <div className="flex flex-wrap items-center justify-end justify-self-end gap-2 lg:hidden">
+            <DecisionButtons
+              status={status}
+              pending={pendingId === applicant.id}
+              error={decisionError}
+              onChange={changeStatus}
+            />
           </div>
         </header>
 
@@ -729,29 +715,6 @@ function SideLink({
       {icon}
       {label}
     </button>
-  );
-}
-
-function HeaderLink({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={label}
-      aria-label={`Open ${label}`}
-      className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground-subtle transition-colors hover:bg-accent-soft hover:text-foreground"
-    >
-      {children}
-    </a>
   );
 }
 
