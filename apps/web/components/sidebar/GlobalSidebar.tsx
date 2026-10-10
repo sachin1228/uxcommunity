@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus, Trophy } from "lucide-react";
+import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -68,12 +68,10 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
     !isMatch("/dashboard/communities", pathname) &&
     !isMatch("/dashboard/library", pathname) &&
     !isMatch("/dashboard/jobs", pathname) &&
-    !isMatch("/dashboard/competition", pathname) &&
     !isMatch("/dashboard/notifications", pathname);
   const exploreActive = pathname === "/dashboard/communities";
   const libraryActive = isMatch("/dashboard/library", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
-  const competitionActive = isMatch("/dashboard/competition", pathname);
 
   return (
     <aside
@@ -151,19 +149,6 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
             >
               <Briefcase strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/dashboard/competition"
-              className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
-                competitionActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
-              }`}
-            >
-              <Trophy strokeWidth={2.5} size={15} className="shrink-0" />
-              <span className="flex-1 truncate">Competition</span>
             </Link>
           </li>
         </ul>
