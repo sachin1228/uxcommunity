@@ -13,56 +13,57 @@ import {
   X,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
-import { ModalPortal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useApplicantDecision } from "@/lib/jobs/use-applicant-decision";
 import {
   applicationStatusLabel,
   type ApplicationStatus,
   type JobApplicantDetail,
-  type JobPost,
 } from "@/lib/jobs/types";
 
 type DesignSection = "portfolio" | "linkedin" | "resume";
 
 /**
- * The poster's "design mode" for one posting's applications: a full-screen
- * takeover that renders each application the way its applicant would present
- * it — a light-mode portfolio page with the applicant's own details and
- * filled links in the left sidebar, and the section's content on the right.
- * Deliberately light regardless of the app's theme (the `.design-light`
- * scope re-declares the light tokens): this is a preview of the applicant's
- * page, not app chrome.
+ * The poster's "design mode" for one posting's applications — a page of its
+ * own (`/dashboard/jobs/[jobId]/applicants/[applicationId]`) that renders the
+ * application the way its applicant would present it: a light-mode portfolio
+ * page with the applicant's own details and filled links in the left sidebar,
+ * and the section's content on the right. Deliberately light regardless of
+ * the app's theme (the `.design-light` scope re-declares the light tokens):
+ * this is a preview of the applicant's page, not app chrome.
  *
- * The viewer browses the list it was opened with (a snapshot, so a decision
- * never yanks the current applicant out from under the poster) and carries
- * the same decisions as the board, with the same undo. Every rendered fact is
- * filled-in data — the links the applicant submitted, nothing invented; a
- * PDF resume renders as the document itself, inline.
+ * The URL pins the applicant being reviewed — a decision refreshes the data
+ * without changing what the poster is looking at — and previous/next move
+ * through the posting's applicants by navigation, so the browser's own back
+ * button walks the same path. Every rendered fact is filled-in data — the
+ * links the applicant submitted, nothing invented; a PDF resume renders as
+ * the document itself, inline.
  */
 export function DesignModeViewer({
-  job,
+  jobId,
   applicants,
-  onClose,
+  currentId,
 }: {
-  job: JobPost;
+  jobId: string;
   applicants: JobApplicantDetail[];
-  onClose: () => void;
+  currentId: string;
 }) {
-  const { decide, pendingId, error } = useApplicantDecision(job.id);
-  const [index, setIndex] = useState(0);
+  const guard = useGuardedRouter();
+  const { decide, pendingId, error } = useApplicantDecision(jobId);
+  const index = applicants.findIndex((applicant) => applicant.id === currentId);
+  const applicant = applicants[index];
   // The first filled link is the opening page: a resume when one was
   // attached, the portfolio otherwise.
   const [section, setSection] = useState<DesignSection>(() =>
-    applicants[0].resume_url ? "resume" : "portfolio"
+    applicant.resume_url ? "resume" : "portfolio"
   );
   // Decisions made here land in this map the moment the database
   // acknowledges them, so the sidebar reads the new standing immediately
-  // while `router.refresh()` catches the board up behind the takeover.
+  // while `router.refresh()` re-reads the page's data behind it.
   const [settled, setSettled] = useState<Record<string, ApplicationStatus>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const applicant = applicants[index];
   const status = settled[applicant.id] ?? applicant.status;
   const resumeUrl = applicant.resume_url;
   const pdfResumeUrl = resumeUrl && isPdfUrl(resumeUrl) ? resumeUrl : null;
@@ -74,31 +75,34 @@ export function DesignModeViewer({
   const goTo = useCallback(
     (next: number) => {
       if (next < 0 || next >= applicants.length) return;
-      setIndex(next);
       // Resume only exists where a resume was attached; stepping onto an
       // applicant without one falls back to the first link rather than
       // showing an empty page.
       if (!applicants[next].resume_url) {
         setSection((current) => (current === "resume" ? "portfolio" : current));
       }
+      guard.push(`/dashboard/jobs/${jobId}/applicants/${applicants[next].id}`);
     },
-    [applicants]
+    [applicants, guard, jobId]
   );
 
-  // Escape closes; the arrows browse applicants like any media viewer.
+  const leave = useCallback(() => {
+    guard.push(`/dashboard/jobs/${jobId}/applicants`);
+  }, [guard, jobId]);
+
+  // Escape returns to the applicants board; the arrows browse applicants
+  // like any media viewer.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") leave();
       if (event.key === "ArrowLeft") goTo(index - 1);
       if (event.key === "ArrowRight") goTo(index + 1);
     };
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
-  }, [goTo, index, onClose]);
+  }, [goTo, index, leave]);
 
   // Each section (and each applicant) starts at the top of its page.
   useEffect(() => {
@@ -124,46 +128,107 @@ export function DesignModeViewer({
   const decisionError = error?.id === applicant.id ? error.message : null;
 
   return (
-    <ModalPortal>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${applicant.name}'s application — design view`}
-        className="design-light fixed inset-0 z-[800] flex flex-col bg-background font-body text-foreground"
-      >
-        <div className="flex min-h-0 flex-1">
-          {/* Sidebar — the applicant's own details, the poster's decisions,
-              and the applicant's filled links at the foot. Below lg this
-              column is hidden; the links ride in a horizontal strip over the
-              page instead. */}
-          <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
-            <div className="flex flex-col items-center px-2 py-2 text-center">
-              <AvatarImg
-                url={applicant.avatar_url}
-                name={applicant.name}
-                size={112}
-                className="rounded-full object-cover"
-              />
-              <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
-                {applicant.name}
-              </h2>
-              {applicant.role_label && (
-                <p className="mt-1.5 font-body text-sm text-foreground-muted">
-                  {applicant.role_label}
-                </p>
-              )}
-              {applicant.city_name && (
-                <p className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
-                  <MapPin strokeWidth={2.5} size={12} />
-                  {applicant.city_name}
-                </p>
-              )}
-              <p className="mt-1 font-body text-xs text-foreground-subtle">
-                Applied {applicant.applied_label}
+    <div className="design-light flex h-full min-h-0 flex-col bg-background font-body text-foreground">
+      <div className="flex min-h-0 flex-1">
+        {/* Sidebar — the applicant's own details, the poster's decisions,
+            and the applicant's filled links at the foot. Below lg this
+            column is hidden; the links ride in a horizontal strip over the
+            page instead. */}
+        <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
+          <div className="flex flex-col items-center px-2 py-2 text-center">
+            <AvatarImg
+              url={applicant.avatar_url}
+              name={applicant.name}
+              size={112}
+              className="rounded-full object-cover"
+            />
+            <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
+              {applicant.name}
+            </h2>
+            {applicant.role_label && (
+              <p className="mt-1.5 font-body text-sm text-foreground-muted">
+                {applicant.role_label}
               </p>
-            </div>
+            )}
+            {applicant.city_name && (
+              <p className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
+                <MapPin strokeWidth={2.5} size={12} />
+                {applicant.city_name}
+              </p>
+            )}
+            <p className="mt-1 font-body text-xs text-foreground-subtle">
+              Applied {applicant.applied_label}
+            </p>
+          </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <DecisionButtons
+              status={status}
+              pending={pendingId === applicant.id}
+              error={decisionError}
+              onChange={changeStatus}
+            />
+          </div>
+
+          <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
+            {linkItems.map((item) => (
+              <SideLink
+                key={item.key}
+                active={section === item.key}
+                icon={item.icon}
+                label={item.label}
+                onClick={() => setSection(item.key)}
+              />
+            ))}
+          </nav>
+        </aside>
+
+        {/* The page itself. */}
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          {/* The way back to the applicants board — floating over the page
+              the way the app's modal close does. Esc does the same. */}
+          <button
+            type="button"
+            onClick={leave}
+            aria-label="Back to applicants"
+            title="Back to applicants"
+            className="absolute right-3 top-3 z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-foreground-muted shadow-[0_4px_14px_rgba(0,0,0,0.10)] transition-colors hover:bg-accent-soft hover:text-foreground"
+          >
+            <X strokeWidth={2.5} size={15} />
+          </button>
+
+          {/* Below lg the sidebar is hidden, so the links — and the
+              decisions — ride in a horizontal strip; the active link
+              keeps its label. */}
+          <nav
+            aria-label="Application links"
+            className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface py-2 pl-3 pr-14 lg:hidden"
+          >
+            {linkItems.map((item) => {
+              const active = section === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  title={item.label}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setSection(item.key)}
+                  className={
+                    active
+                      ? "flex h-9 w-max shrink-0 cursor-pointer items-center rounded-full bg-accent px-3 text-accent-foreground shadow-[0_6px_20px_rgba(0,0,0,0.14)]"
+                      : "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-subtle transition-colors hover:bg-accent-soft hover:text-foreground"
+                  }
+                >
+                  {item.icon}
+                  {active && (
+                    <span className="ml-2 whitespace-nowrap font-body text-xs font-semibold">
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 pl-4">
               <DecisionButtons
                 status={status}
                 pending={pendingId === applicant.id}
@@ -171,158 +236,90 @@ export function DesignModeViewer({
                 onChange={changeStatus}
               />
             </div>
+          </nav>
 
-            <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
-              {linkItems.map((item) => (
-                <SideLink
-                  key={item.key}
-                  active={section === item.key}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => setSection(item.key)}
-                />
-              ))}
-            </nav>
-          </aside>
-
-          {/* The page itself. */}
-          <div className="relative flex min-w-0 flex-1 flex-col">
-            {/* The way out — the viewer's own close, floating over the page
-                the way the app's modals close. Esc does the same. */}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close design view"
-              title="Close design view"
-              className="absolute right-3 top-3 z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-foreground-muted shadow-[0_4px_14px_rgba(0,0,0,0.10)] transition-colors hover:bg-accent-soft hover:text-foreground"
-            >
-              <X strokeWidth={2.5} size={15} />
-            </button>
-
-            {/* Below lg the sidebar is hidden, so the links — and the
-                decisions — ride in a horizontal strip; the active link
-                keeps its label. */}
-            <nav
-              aria-label="Application links"
-              className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface py-2 pl-3 pr-14 lg:hidden"
-            >
-              {linkItems.map((item) => {
-                const active = section === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    title={item.label}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => setSection(item.key)}
-                    className={
-                      active
-                        ? "flex h-9 w-max shrink-0 cursor-pointer items-center rounded-full bg-accent px-3 text-accent-foreground shadow-[0_6px_20px_rgba(0,0,0,0.14)]"
-                        : "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-subtle transition-colors hover:bg-accent-soft hover:text-foreground"
-                    }
-                  >
-                    {item.icon}
-                    {active && (
-                      <span className="ml-2 whitespace-nowrap font-body text-xs font-semibold">
-                        {item.label}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 pl-4">
-                <DecisionButtons
-                  status={status}
-                  pending={pendingId === applicant.id}
-                  error={decisionError}
-                  onChange={changeStatus}
-                />
-              </div>
-            </nav>
-
+          <div
+            ref={scrollRef}
+            className={`min-h-0 flex-1 bg-background ${
+              resumeEmbedded ? "overflow-hidden" : "overflow-y-auto"
+            }`}
+          >
             <div
-              ref={scrollRef}
-              className={`min-h-0 flex-1 bg-background ${
-                resumeEmbedded ? "overflow-hidden" : "overflow-y-auto"
-              }`}
+              className={
+                resumeEmbedded
+                  ? "mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-24 pt-14 sm:px-10"
+                  : "mx-auto w-full max-w-3xl px-6 pb-32 pt-14 sm:px-10"
+              }
             >
-              <div
-                className={
-                  resumeEmbedded
-                    ? "mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-24 pt-14 sm:px-10"
-                    : "mx-auto w-full max-w-3xl px-6 pb-32 pt-14 sm:px-10"
-                }
-              >
-                {section === "portfolio" ? (
+              {section === "portfolio" ? (
+                <LinkSection
+                  title="Portfolio"
+                  description={`The work ${firstName(applicant.name)} shared with this application.`}
+                  icon={<Globe strokeWidth={2.25} size={20} />}
+                  iconClass="bg-accent-soft text-foreground"
+                  name={displayUrl(applicant.portfolio_url)}
+                  url={applicant.portfolio_url}
+                  openLabel="Open portfolio"
+                />
+              ) : section === "linkedin" ? (
+                <LinkSection
+                  title="LinkedIn"
+                  description={`${firstName(applicant.name)}'s professional profile, as shared with this application.`}
+                  icon={<Linkedin strokeWidth={2.25} size={20} />}
+                  iconClass="bg-[#0A66C2]/10 text-[#0A66C2]"
+                  name="LinkedIn profile"
+                  url={applicant.linkedin_url}
+                  openLabel="Open LinkedIn"
+                />
+              ) : resumeUrl ? (
+                pdfResumeUrl ? (
+                  <ResumeEmbed applicant={applicant} url={pdfResumeUrl} />
+                ) : (
                   <LinkSection
-                    title="Portfolio"
-                    description={`The work ${firstName(applicant.name)} shared with this application.`}
-                    icon={<Globe strokeWidth={2.25} size={20} />}
+                    title="Resume"
+                    description={`The document ${firstName(applicant.name)} attached to this application.`}
+                    icon={<FileText strokeWidth={2.25} size={20} />}
                     iconClass="bg-accent-soft text-foreground"
-                    name={displayUrl(applicant.portfolio_url)}
-                    url={applicant.portfolio_url}
-                    openLabel="Open portfolio"
+                    name="Resume"
+                    url={resumeUrl}
+                    openLabel="Open resume"
                   />
-                ) : section === "linkedin" ? (
-                  <LinkSection
-                    title="LinkedIn"
-                    description={`${firstName(applicant.name)}'s professional profile, as shared with this application.`}
-                    icon={<Linkedin strokeWidth={2.25} size={20} />}
-                    iconClass="bg-[#0A66C2]/10 text-[#0A66C2]"
-                    name="LinkedIn profile"
-                    url={applicant.linkedin_url}
-                    openLabel="Open LinkedIn"
-                  />
-                ) : resumeUrl ? (
-                  pdfResumeUrl ? (
-                    <ResumeEmbed applicant={applicant} url={pdfResumeUrl} />
-                  ) : (
-                    <LinkSection
-                      title="Resume"
-                      description={`The document ${firstName(applicant.name)} attached to this application.`}
-                      icon={<FileText strokeWidth={2.25} size={20} />}
-                      iconClass="bg-accent-soft text-foreground"
-                      name="Resume"
-                      url={resumeUrl}
-                      openLabel="Open resume"
-                    />
-                  )
-                ) : null}
-              </div>
+                )
+              ) : null}
             </div>
+          </div>
 
-            {/* Browse control — previous / next across the applicants this
-                view was opened on. */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-4">
-              <div className="pointer-events-auto flex h-11 items-center rounded-full border border-border bg-surface px-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-                <button
-                  type="button"
-                  onClick={() => goTo(index - 1)}
-                  disabled={index === 0}
-                  aria-label="Previous applicant"
-                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronLeft strokeWidth={2.5} size={17} />
-                </button>
-                <span className="max-w-[240px] truncate px-2 font-body text-xs text-foreground-subtle">
-                  <span className="font-semibold text-foreground">{applicant.name}</span>
-                  {` · ${index + 1} of ${applicants.length}`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goTo(index + 1)}
-                  disabled={index === applicants.length - 1}
-                  aria-label="Next applicant"
-                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
-                >
-                  <ChevronRight strokeWidth={2.5} size={17} />
-                </button>
-              </div>
+          {/* Browse control — previous / next across the posting's
+              applicants, walked by navigation so the back button follows. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-4">
+            <div className="pointer-events-auto flex h-11 items-center rounded-full border border-border bg-surface px-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+              <button
+                type="button"
+                onClick={() => goTo(index - 1)}
+                disabled={index === 0}
+                aria-label="Previous applicant"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
+              >
+                <ChevronLeft strokeWidth={2.5} size={17} />
+              </button>
+              <span className="max-w-[240px] truncate px-2 font-body text-xs text-foreground-subtle">
+                <span className="font-semibold text-foreground">{applicant.name}</span>
+                {` · ${index + 1} of ${applicants.length}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => goTo(index + 1)}
+                disabled={index === applicants.length - 1}
+                aria-label="Next applicant"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-foreground-muted"
+              >
+                <ChevronRight strokeWidth={2.5} size={17} />
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </ModalPortal>
+    </div>
   );
 }
 

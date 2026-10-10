@@ -17,11 +17,10 @@ import { BackLink } from "@/components/ui/BackLink";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
-import { DesignModeViewer } from "./DesignModeViewer";
 import { JobStateBadge, KindBadge } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useApplicantDecision } from "@/lib/jobs/use-applicant-decision";
-import type { ApplicationStatus, JobApplicantDetail, JobPost } from "@/lib/jobs/types";
+import type { ApplicationStatus, JobApplicant, JobPost } from "@/lib/jobs/types";
 import { applicationStatusLabel, workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 
@@ -47,9 +46,9 @@ const TRIAGE_TABS: { value: TriageTab; label: string }[] = [
  * view by anything but the decision itself.
  *
  * Between the posting and the list sits the design-mode card: it opens the
- * same applications as a full-screen, light-mode portfolio view
- * (`DesignModeViewer`) — the snapshot it opens with is the tab's visible
- * list, so browsing starts where the poster was looking.
+ * application as a page of its own (`DesignModeViewer`), starting at the
+ * first applicant in the tab the poster is looking at — an empty tab falls
+ * back to the whole list.
  *
  * Reads and writes are gated to the poster by the database, not by this
  * component.
@@ -59,22 +58,20 @@ export function ApplicantsBoard({
   applicants,
 }: {
   job: JobPost;
-  applicants: JobApplicantDetail[];
+  applicants: JobApplicant[];
 }) {
   const guard = useGuardedRouter();
   const { decide, pendingId, error } = useApplicantDecision(job.id);
   const [tab, setTab] = useState<TriageTab>("all");
-  // The viewer's applicant list, captured when it opens: a decision made
-  // inside it must never yank the current applicant out from under the
-  // poster, so the viewer does not re-read the filtered list on refresh.
-  const [designList, setDesignList] = useState<JobApplicantDetail[] | null>(null);
 
   const countFor = (value: TriageTab): number =>
     value === "all" ? applicants.length : applicants.filter((a) => a.status === value).length;
   const visible = tab === "all" ? applicants : applicants.filter((a) => a.status === tab);
 
+  /** Open the design view on the first applicant the poster is looking at. */
   function openDesignMode() {
-    setDesignList(visible.length > 0 ? visible : applicants);
+    const first = (visible.length > 0 ? visible : applicants)[0];
+    guard.push(`/dashboard/jobs/${job.id}/applicants/${first.id}`);
   }
 
   return (
@@ -316,14 +313,6 @@ export function ApplicantsBoard({
           ))
         )}
       </div>
-
-      {designList && (
-        <DesignModeViewer
-          job={job}
-          applicants={designList}
-          onClose={() => setDesignList(null)}
-        />
-      )}
     </div>
   );
 }
