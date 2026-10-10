@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowLeft,
   ArrowUpRight,
   Check,
   ChevronLeft,
@@ -52,7 +51,11 @@ export function DesignModeViewer({
 }) {
   const { decide, pendingId, error } = useApplicantDecision(job.id);
   const [index, setIndex] = useState(0);
-  const [section, setSection] = useState<DesignSection>("portfolio");
+  // The first filled link is the opening page: a resume when one was
+  // attached, the portfolio otherwise.
+  const [section, setSection] = useState<DesignSection>(() =>
+    applicants[0].resume_url ? "resume" : "portfolio"
+  );
   // Decisions made here land in this map the moment the database
   // acknowledges them, so the sidebar reads the new standing immediately
   // while `router.refresh()` catches the board up behind the takeover.
@@ -108,14 +111,14 @@ export function DesignModeViewer({
     );
   }
 
-  // One entry per link the applicant filled in — no more, no less. The
-  // sidebar rows and the small-screen strip are the same list.
+  // One entry per link the applicant filled in — no more, no less, resume
+  // first. The sidebar rows and the small-screen strip are the same list.
   const linkItems: { key: DesignSection; label: string; icon: ReactNode }[] = [
-    { key: "portfolio", label: "Portfolio", icon: <Globe strokeWidth={2.5} size={15} /> },
-    { key: "linkedin", label: "LinkedIn", icon: <Linkedin strokeWidth={2.5} size={15} /> },
     ...(applicant.resume_url
       ? [{ key: "resume" as const, label: "Resume", icon: <FileText strokeWidth={2.5} size={15} /> }]
       : []),
+    { key: "portfolio", label: "Portfolio", icon: <Globe strokeWidth={2.5} size={15} /> },
+    { key: "linkedin", label: "LinkedIn", icon: <Linkedin strokeWidth={2.5} size={15} /> },
   ];
 
   const decisionError = error?.id === applicant.id ? error.message : null;
@@ -128,41 +131,6 @@ export function DesignModeViewer({
         aria-label={`${applicant.name}'s application — design view`}
         className="design-light fixed inset-0 z-[800] flex flex-col bg-background font-body text-foreground"
       >
-        {/* Top bar — the way out and the posting this application belongs
-            to. The applicant's links live in the sidebar, so the right side
-            carries nothing here except the small-screen decisions. */}
-        <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-border bg-surface px-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-self-start gap-1.5 rounded-lg px-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-accent-soft hover:text-foreground"
-          >
-            <ArrowLeft strokeWidth={2.5} size={15} />
-            Back to applicants
-          </button>
-
-          <div className="hidden min-w-0 items-center gap-2 sm:flex">
-            <span className="truncate font-body text-xs text-foreground-subtle">
-              {job.title}
-              <span className="mx-1.5 text-foreground-subtle">·</span>
-              {job.company.name}
-            </span>
-            <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-foreground-muted">
-              Design view
-            </span>
-          </div>
-
-          {/* Small screens have no sidebar, so the decisions ride here. */}
-          <div className="flex flex-wrap items-center justify-end justify-self-end gap-2 lg:hidden">
-            <DecisionButtons
-              status={status}
-              pending={pendingId === applicant.id}
-              error={decisionError}
-              onChange={changeStatus}
-            />
-          </div>
-        </header>
-
         <div className="flex min-h-0 flex-1">
           {/* Sidebar — the applicant's own details, the poster's decisions,
               and the applicant's filled links at the foot. Below lg this
@@ -219,11 +187,24 @@ export function DesignModeViewer({
 
           {/* The page itself. */}
           <div className="relative flex min-w-0 flex-1 flex-col">
-            {/* Below lg the sidebar is hidden, so the links ride here as a
-                horizontal strip; the active one keeps its label. */}
+            {/* The way out — the viewer's own close, floating over the page
+                the way the app's modals close. Esc does the same. */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close design view"
+              title="Close design view"
+              className="absolute right-3 top-3 z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-foreground-muted shadow-[0_4px_14px_rgba(0,0,0,0.10)] transition-colors hover:bg-accent-soft hover:text-foreground"
+            >
+              <X strokeWidth={2.5} size={15} />
+            </button>
+
+            {/* Below lg the sidebar is hidden, so the links — and the
+                decisions — ride in a horizontal strip; the active link
+                keeps its label. */}
             <nav
               aria-label="Application links"
-              className="flex shrink-0 items-center justify-center gap-1 overflow-x-auto border-b border-border bg-surface px-3 py-2 lg:hidden"
+              className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface py-2 pl-3 pr-14 lg:hidden"
             >
               {linkItems.map((item) => {
                 const active = section === item.key;
@@ -249,6 +230,14 @@ export function DesignModeViewer({
                   </button>
                 );
               })}
+              <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 pl-4">
+                <DecisionButtons
+                  status={status}
+                  pending={pendingId === applicant.id}
+                  error={decisionError}
+                  onChange={changeStatus}
+                />
+              </div>
             </nav>
 
             <div
@@ -260,8 +249,8 @@ export function DesignModeViewer({
               <div
                 className={
                   resumeEmbedded
-                    ? "mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-24 pt-10 sm:px-10"
-                    : "mx-auto w-full max-w-3xl px-6 pb-32 pt-12 sm:px-10"
+                    ? "mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-24 pt-14 sm:px-10"
+                    : "mx-auto w-full max-w-3xl px-6 pb-32 pt-14 sm:px-10"
                 }
               >
                 {section === "portfolio" ? (
