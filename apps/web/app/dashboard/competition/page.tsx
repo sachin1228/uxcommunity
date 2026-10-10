@@ -1,19 +1,15 @@
-import { Trophy } from "lucide-react";
+import { CompetitionBoard } from "@/components/competition/CompetitionBoard";
+import { requestInstant } from "@/components/competition/week";
 
 export const metadata = { title: "Competition — uxcommunity" };
 
+/**
+ * One challenge per week. The board computes the week's phase (submissions →
+ * voting → winner) from the clock: the server passes its own instant in at
+ * request time, so the first paint already shows the right window, and the
+ * client keeps the countdown live afterwards. Session and membership are
+ * handled by the dashboard layout.
+ */
 export default function CompetitionPage() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-      <Trophy strokeWidth={2.5} size={48} className="text-foreground-muted opacity-40" />
-      <div>
-        <h1 className="font-body text-xl font-semibold text-foreground">
-          Competition
-        </h1>
-        <p className="mt-1 font-body text-sm text-foreground-muted">
-          Coming soon
-        </p>
-      </div>
-    </div>
-  );
+  return <CompetitionBoard serverNow={requestInstant()} />;
 }
