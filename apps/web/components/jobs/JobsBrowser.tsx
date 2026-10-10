@@ -185,8 +185,8 @@ export function JobsBrowser({
 
   const newBadge = (count: number | undefined) => (count && count > 0 ? `${count} new` : null);
   const tabs: { value: Tab; label: string; chip: string | null; unseen: boolean }[] = [
-    { value: "hiring", label: "#Hiring", chip: newBadge(tabNewCounts?.hiring), unseen: true },
-    { value: "referral", label: "#Referral", chip: newBadge(tabNewCounts?.referral), unseen: true },
+    { value: "hiring", label: "# Hiring", chip: newBadge(tabNewCounts?.hiring), unseen: true },
+    { value: "referral", label: "# Referral", chip: newBadge(tabNewCounts?.referral), unseen: true },
     { value: "applied", label: "Applied", chip: String(appliedJobs.length), unseen: false },
     { value: "posts", label: "My posts", chip: String(myPosts.length), unseen: false },
   ];
