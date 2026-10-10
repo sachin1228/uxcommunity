@@ -115,7 +115,7 @@ export function ResumePdf({ url }: { url: string }) {
               }}
               width={0}
               height={0}
-              className="bg-white shadow-[0_2px_14px_rgba(0,0,0,0.16)]"
+              className="border border-border bg-white shadow-[0_2px_14px_rgba(0,0,0,0.16)]"
             />
           ))}
         </div>
