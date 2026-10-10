@@ -10,7 +10,6 @@ import {
   ChevronRight,
   FileText,
   Globe,
-  Home,
   Linkedin,
   MapPin,
   UserRound,
@@ -112,15 +111,14 @@ export function DesignModeViewer({
     guard.push(`/dashboard/profile/${applicant.applicant_id}`);
   }
 
-  // One entry per section — Home plus everything the applicant filled in.
-  const sectionItems: { key: DesignSection; label: string; icon: ReactNode }[] = [
-    { key: "home", label: "Home", icon: <Home strokeWidth={2.25} size={18} /> },
-    { key: "portfolio", label: "Portfolio", icon: <Globe strokeWidth={2.25} size={18} /> },
-    { key: "linkedin", label: "LinkedIn", icon: <Linkedin strokeWidth={2.25} size={18} /> },
+  // One entry per link the applicant filled in — no more, no less. The
+  // sidebar rows and the small-screen strip are the same list.
+  const linkItems: { key: DesignSection; label: string; icon: ReactNode }[] = [
+    { key: "portfolio", label: "Portfolio", icon: <Globe strokeWidth={2.5} size={15} /> },
+    { key: "linkedin", label: "LinkedIn", icon: <Linkedin strokeWidth={2.5} size={15} /> },
     ...(applicant.resume_url
-      ? [{ key: "resume" as const, label: "Resume", icon: <FileText strokeWidth={2.25} size={18} /> }]
+      ? [{ key: "resume" as const, label: "Resume", icon: <FileText strokeWidth={2.5} size={15} /> }]
       : []),
-    { key: "profile", label: "Profile", icon: <UserRound strokeWidth={2.25} size={18} /> },
   ];
 
   const decisionError = error?.id === applicant.id ? error.message : null;
@@ -169,39 +167,44 @@ export function DesignModeViewer({
         </header>
 
         <div className="flex min-h-0 flex-1">
-          {/* Sidebar — the applicant's own details, the poster's decisions,
-              and every section at the foot: Home plus the options the
-              applicant filled in, labeled and one click from the poster's
-              eye. Below lg this column is hidden; the sections ride in a
-              horizontal strip over the page instead. */}
+          {/* Sidebar — the applicant's own details (clicking the identity
+              walks back to Home, the portfolio pattern), the poster's
+              decisions, and the applicant's filled links at the foot.
+              Below lg this column is hidden; the links ride in a horizontal
+              strip over the page instead. */}
           <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 lg:flex">
-            <div className="flex flex-col items-center text-center">
+            <button
+              type="button"
+              onClick={() => setSection("home")}
+              title="Home"
+              className="flex w-full cursor-pointer flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-surface-raised"
+            >
               <AvatarImg
                 url={applicant.avatar_url}
                 name={applicant.name}
                 size={112}
                 className="rounded-full object-cover"
               />
-              <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
+              <span className="mt-4 block font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
                 {applicant.name}
-              </h2>
+              </span>
               {applicant.role_label && (
-                <p className="mt-1.5 font-body text-sm text-foreground-muted">
+                <span className="mt-1.5 block font-body text-sm text-foreground-muted">
                   {applicant.role_label}
-                </p>
+                </span>
               )}
               {applicant.city_name && (
-                <p className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
+                <span className="mt-2 inline-flex items-center gap-1 font-body text-xs text-foreground-subtle">
                   <MapPin strokeWidth={2.5} size={12} />
                   {applicant.city_name}
-                </p>
+                </span>
               )}
-              <p className="mt-1 font-body text-xs text-foreground-subtle">
+              <span className="mt-1 block font-body text-xs text-foreground-subtle">
                 Applied {applicant.applied_label}
-              </p>
-            </div>
+              </span>
+            </button>
 
-            <div className="mt-7 grid grid-cols-2 gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2">
               <DecisionButtons
                 status={status}
                 pending={pendingId === applicant.id}
@@ -210,51 +213,28 @@ export function DesignModeViewer({
               />
             </div>
 
-            <nav aria-label="Application sections" className="mt-auto flex flex-col gap-1 pt-8">
-              <SideLink
-                active={section === "home"}
-                icon={<Home strokeWidth={2.5} size={15} />}
-                label="Home"
-                onClick={() => setSection("home")}
-              />
-              <SideLink
-                active={section === "portfolio"}
-                icon={<Globe strokeWidth={2.5} size={15} />}
-                label="Portfolio"
-                onClick={() => setSection("portfolio")}
-              />
-              <SideLink
-                active={section === "linkedin"}
-                icon={<Linkedin strokeWidth={2.5} size={15} />}
-                label="LinkedIn"
-                onClick={() => setSection("linkedin")}
-              />
-              {applicant.resume_url && (
+            <nav aria-label="Application links" className="mt-auto flex flex-col gap-1 pt-8">
+              {linkItems.map((item) => (
                 <SideLink
-                  active={section === "resume"}
-                  icon={<FileText strokeWidth={2.5} size={15} />}
-                  label="Resume"
-                  onClick={() => setSection("resume")}
+                  key={item.key}
+                  active={section === item.key}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => setSection(item.key)}
                 />
-              )}
-              <SideLink
-                active={section === "profile"}
-                icon={<UserRound strokeWidth={2.5} size={15} />}
-                label="Profile"
-                onClick={() => setSection("profile")}
-              />
+              ))}
             </nav>
           </aside>
 
           {/* The page itself. */}
           <div className="relative flex min-w-0 flex-1 flex-col">
-            {/* Below lg the sidebar is hidden, so the sections ride here as
-                a horizontal strip; the active one keeps its label. */}
+            {/* Below lg the sidebar is hidden, so the links ride here as a
+                horizontal strip; the active one keeps its label. */}
             <nav
-              aria-label="Application sections"
+              aria-label="Application links"
               className="flex shrink-0 items-center justify-center gap-1 overflow-x-auto border-b border-border bg-surface px-3 py-2 lg:hidden"
             >
-              {sectionItems.map((item) => {
+              {linkItems.map((item) => {
                 const active = section === item.key;
                 return (
                   <button
