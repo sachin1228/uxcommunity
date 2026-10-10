@@ -22,10 +22,12 @@ type Tab = "hiring" | "referral" | "applied" | "posts";
  * seeds the selection (and the tab its kind implies), so "back to this job"
  * links reopen it on arrival.
  *
- * Every posting is visible to every member — the profile match is what
- * unlocks Apply, not what hides the job — but the browse tabs only show
- * roles the member could still apply to: their own posts live under "My
- * posts", and roles they applied to move to "Applied".
+ * The feed returns every posting to every member, but the browse tabs only
+ * show roles the member could still apply to: their own posts live under "My
+ * posts", roles they applied to move to "Applied", and roles their profile
+ * misses on a gating criterion stay out entirely — `can_apply` is the same
+ * predicate the write enforces, so no card in these lists is ever "Locked
+ * for your profile".
  */
 export function JobsBrowser({
   viewer,
@@ -71,13 +73,18 @@ export function JobsBrowser({
   }, [selectedId]);
 
   const myPosts = jobs.filter((job) => job.is_mine);
-  // Applied roles leave the browse lists: their state (submitted, portfolio
-  // links) lives under "Applied" instead of among the roles still open to
-  // apply to. The open roles split by kind.
-  const hiringJobs = jobs.filter((job) => !job.is_mine && !job.applied && job.kind === "hiring");
-  const referralJobs = jobs.filter(
+  // Other members' open roles, split by kind before the profile match
+  // narrows them: applied roles leave the browse lists (their state lives
+  // under "Applied"), and the lists themselves keep only the postings this
+  // member could apply to — `can_apply` is the same predicate the write
+  // enforces, so a "Locked for your profile" card never shows in them. The
+  // pre-match lists stay for the empty state's explanation.
+  const hiringPosts = jobs.filter((job) => !job.is_mine && !job.applied && job.kind === "hiring");
+  const referralPosts = jobs.filter(
     (job) => !job.is_mine && !job.applied && job.kind === "referral"
   );
+  const hiringJobs = hiringPosts.filter((job) => job.can_apply);
+  const referralJobs = referralPosts.filter((job) => job.can_apply);
   const appliedJobs = jobs.filter((job) => !job.is_mine && job.applied);
 
   // The active tab's browse list, or null on the non-browse tabs. The pane
@@ -245,6 +252,15 @@ export function JobsBrowser({
                         Post a job
                       </button>
                     }
+                  />
+                ) : (tab === "hiring" ? hiringPosts : referralPosts).length > 0 ? (
+                  <EmptyState
+                    title={
+                      tab === "hiring"
+                        ? "No hiring roles match your profile yet"
+                        : "No referral roles match your profile yet"
+                    }
+                    body="A role lands here when your profile matches it — job title and experience level always, and city and sector unless the poster set them to All. Keep your profile current, and check back as new roles arrive."
                   />
                 ) : tab === "hiring" ? (
                   <EmptyState
