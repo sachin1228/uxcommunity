@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, CheckCircle2, Clock, ExternalLink, Globe, Lock, Pencil, Users } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, ExternalLink, Globe, Lock, Users } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { RichText } from "@/components/ui/RichText";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
-import { EditJobModal } from "./EditJobModal";
 import { JobStateBadge, KindBadge, LockedNote, MetaChip } from "./JobBadges";
 import { JobOwnerActions } from "./JobOwnerActions";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -25,9 +24,9 @@ import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types"
  * Rendered both inside the board's detail pane and, standalone, on the
  * posting's own page — the host surface owns layout, so this is content only.
  *
- * `master` is only needed for the owner's own view — the header's menu, the
- * Edit button and the form it opens — and is optional for that reason: the
- * board's pane only ever shows other members' roles, so it renders without it.
+ * `master` is only needed for the owner's own view — the header's menu and
+ * the edit form behind it — and is optional for that reason: the board's pane
+ * only ever shows other members' roles, so it renders without it.
  *
  * A posting that is not taking applications — the owner closed it, or its
  * closing date passed — says so in place of the Apply action rather than
@@ -45,7 +44,6 @@ export function JobDetail({
   const guard = useGuardedRouter();
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
 
   const mismatches = criteriaMismatches(job, viewer);
 
@@ -66,13 +64,7 @@ export function JobDetail({
               <div className="flex shrink-0 items-center gap-2 pt-1">
                 <JobStateBadge job={job} />
                 <KindBadge kind={job.kind} />
-                {job.is_mine && master && (
-                  <JobOwnerActions
-                    job={job}
-                    master={master}
-                    onEditRequested={() => setEditOpen(true)}
-                  />
-                )}
+                {job.is_mine && master && <JobOwnerActions job={job} master={master} />}
               </div>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-body text-sm text-foreground-muted">
@@ -112,26 +104,14 @@ export function JobDetail({
         {/* Actions */}
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4">
           {job.is_mine ? (
-            <>
-              <button
-                type="button"
-                onClick={() => guard.push(`/dashboard/jobs/${job.id}/applicants`)}
-                className="modal-btn modal-btn-primary"
-              >
-                <Users strokeWidth={2.5} size={14} />
-                View {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
-              </button>
-              {master && (
-                <button
-                  type="button"
-                  onClick={() => setEditOpen(true)}
-                  className="modal-btn modal-btn-secondary ml-auto !h-8 text-[12px]"
-                >
-                  <Pencil strokeWidth={2.5} size={13} />
-                  Edit
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              onClick={() => guard.push(`/dashboard/jobs/${job.id}/applicants`)}
+              className="modal-btn modal-btn-primary"
+            >
+              <Users strokeWidth={2.5} size={14} />
+              View {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
+            </button>
           ) : job.status === "closed" || job.deadline_expired ? (
             // Not taking applications replaces the Apply action entirely:
             // there is nothing to apply to, and a locked-eligibility note would
@@ -319,20 +299,6 @@ export function JobDetail({
           </a>
         )}
       </Section>
-
-      {editOpen && master && (
-        <EditJobModal
-          key={job.id}
-          open
-          job={job}
-          master={master}
-          onClose={() => setEditOpen(false)}
-          onSaved={() => {
-            setEditOpen(false);
-            router.refresh();
-          }}
-        />
-      )}
 
       {!job.is_mine && !job.applied && job.can_apply && (
         <ApplyModal
