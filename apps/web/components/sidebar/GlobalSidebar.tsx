@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus, Trophy } from "lucide-react";
+import { Briefcase, Compass, Home, Library, MessageSquare, Plus, Swords } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -162,7 +162,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Trophy strokeWidth={2.5} size={15} className="shrink-0" />
+              <Swords strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Competition</span>
             </Link>
           </li>
