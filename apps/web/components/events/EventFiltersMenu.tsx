@@ -95,7 +95,7 @@ export function EventFiltersMenu({ type, date, active, onSelect }: EventFiltersM
         className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
           active
             ? "border-accent/60 bg-accent/10 text-accent"
-            : "border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+            : "border-[color:var(--color-field-ring)] text-foreground-muted hover:bg-surface-raised hover:text-foreground"
         }`}
       >
         <SlidersHorizontal strokeWidth={2.5} size={15} />
