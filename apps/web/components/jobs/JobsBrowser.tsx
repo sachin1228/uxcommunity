@@ -11,7 +11,7 @@ import type { JobPost, JobViewer } from "@/lib/jobs/types";
 type Tab = "all" | "applied" | "posts";
 
 /**
- * The jobs board, LinkedIn-style: on "All jobs" and "Applied" the
+ * The jobs board, LinkedIn-style: on "For you" and "Applied" the
  * rail lists postings and the pane shows the selected one — selecting is
  * local state, not a route change, because `get_job_feed` already returns the
  * full detail payload for every row. "My posts" is a plain list: each post
@@ -95,7 +95,7 @@ export function JobsBrowser({
         : myPosts;
 
   const tabs: { value: Tab; label: string; count: number }[] = [
-    { value: "all", label: "All jobs", count: browseJobs.length },
+    { value: "all", label: "For you", count: browseJobs.length },
     { value: "applied", label: "Applied", count: appliedJobs.length },
     { value: "posts", label: "My posts", count: myPosts.length },
   ];
@@ -176,7 +176,7 @@ export function JobsBrowser({
               : `${paneOpen ? "hidden lg:flex" : "flex"} min-w-0 flex-col pt-4 pb-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh_-_6rem)] lg:self-start lg:overflow-y-auto`
           }
         >
-          {/* Search (All jobs only) */}
+          {/* Search (For you only) */}
           {tab === "all" && browseJobs.length > 0 && (
             <div className="relative mb-4">
               <Search
