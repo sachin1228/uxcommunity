@@ -263,6 +263,13 @@ type PerformanceRpcMap = {
     args: { p_actor_id: string; p_job_id: string };
     returns: Array<{ job_id: string }>;
   };
+  // The poster's triage of one application (see
+  // 20261010120000_job_application_triage.sql): poster-only, re-checked
+  // through the application's own job.
+  set_job_application_status: {
+    args: { p_actor_id: string; p_application_id: string; p_status: string };
+    returns: Array<{ application_id: string; application_status: string }>;
+  };
 };
 
 /** Card scopes the profile activity tabs can request. */

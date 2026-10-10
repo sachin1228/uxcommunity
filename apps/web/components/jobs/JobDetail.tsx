@@ -2,18 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, CheckCircle2, Clock, ExternalLink, Globe, Lock, Pencil, Users } from "lucide-react";
+import { Clock, ExternalLink, FileText, Globe, Lock, Users } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { Modal } from "@/components/ui/Modal";
 import { RichText } from "@/components/ui/RichText";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
-import { EditJobModal } from "./EditJobModal";
 import { JobStateBadge, KindBadge, LockedNote, MetaChip } from "./JobBadges";
 import { JobOwnerActions } from "./JobOwnerActions";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 import type { JobMasterData } from "@/lib/jobs/service";
-import type { JobPost, JobViewer } from "@/lib/jobs/types";
+import type { JobApplicationSummary, JobPost, JobViewer } from "@/lib/jobs/types";
 import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types";
 
 /**
@@ -25,13 +25,17 @@ import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types"
  * Rendered both inside the board's detail pane and, standalone, on the
  * posting's own page — the host surface owns layout, so this is content only.
  *
- * `master` is only needed for the owner's own view — the header's menu, the
- * Edit button and the form it opens — and is optional for that reason: the
- * board's pane only ever shows other members' roles, so it renders without it.
+ * `master` is only needed for the owner's own view — the header's menu and
+ * the edit form behind it — and is optional for that reason: the board's pane
+ * only ever shows other members' roles, so it renders without it.
  *
  * A posting that is not taking applications — the owner closed it, or its
  * closing date passed — says so in place of the Apply action rather than
  * presenting a button that can only fail.
+ *
+ * An applied-to posting also carries an Application status card between the
+ * posting and its poster: the submission's state and time, with the form it
+ * carried reopened in full behind View application.
  */
 export function JobDetail({
   job,
@@ -45,7 +49,7 @@ export function JobDetail({
   const guard = useGuardedRouter();
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [applicationOpen, setApplicationOpen] = useState(false);
 
   const mismatches = criteriaMismatches(job, viewer);
 
@@ -66,13 +70,7 @@ export function JobDetail({
               <div className="flex shrink-0 items-center gap-2 pt-1">
                 <JobStateBadge job={job} />
                 <KindBadge kind={job.kind} />
-                {job.is_mine && master && (
-                  <JobOwnerActions
-                    job={job}
-                    master={master}
-                    onEditRequested={() => setEditOpen(true)}
-                  />
-                )}
+                {job.is_mine && master && <JobOwnerActions job={job} master={master} />}
               </div>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-body text-sm text-foreground-muted">
@@ -109,10 +107,12 @@ export function JobDetail({
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-          {job.is_mine ? (
-            <>
+        {/* Actions — once the member has applied to an open posting there is
+            nothing left to act on: the status card above carries the
+            application in full. */}
+        {!(job.applied && job.status === "open" && !job.deadline_expired) && (
+          <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+            {job.is_mine ? (
               <button
                 type="button"
                 onClick={() => guard.push(`/dashboard/jobs/${job.id}/applicants`)}
@@ -121,106 +121,83 @@ export function JobDetail({
                 <Users strokeWidth={2.5} size={14} />
                 View {job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"}
               </button>
-              {master && (
+            ) : job.status === "closed" || job.deadline_expired ? (
+              // Not taking applications replaces the Apply action entirely:
+              // there is nothing to apply to, and a locked-eligibility note
+              // would blame the wrong thing. An existing application is still
+              // named, because it still exists — neither closing nor a passed
+              // deadline is a withdrawal. "Closed" and "expired" stay separate
+              // words: one is the owner's decision, the other the calendar's.
+              <div className="flex flex-col gap-1.5">
+                <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
+                  {job.status === "closed" ? (
+                    <Lock strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                  ) : (
+                    <Clock strokeWidth={2.5} size={14} className="shrink-0 text-amber-500" />
+                  )}
+                  {job.status === "closed" ? "This posting is closed" : "This posting has expired"}
+                </span>
+                <p className="font-body text-xs text-foreground-subtle">
+                  {job.status === "closed"
+                    ? "It is no longer accepting applications."
+                    : "Its closing date has passed, so it is no longer accepting applications."}
+                  {appliedSentence(job)}
+                </p>
+              </div>
+            ) : job.can_apply ? (
+              <>
                 <button
                   type="button"
-                  onClick={() => setEditOpen(true)}
-                  className="modal-btn modal-btn-secondary ml-auto !h-8 text-[12px]"
+                  onClick={() => setApplyOpen(true)}
+                  className="modal-btn modal-btn-primary"
                 >
-                  <Pencil strokeWidth={2.5} size={13} />
-                  Edit
+                  Apply now
                 </button>
-              )}
-            </>
-          ) : job.status === "closed" || job.deadline_expired ? (
-            // Not taking applications replaces the Apply action entirely:
-            // there is nothing to apply to, and a locked-eligibility note would
-            // blame the wrong thing. An existing application is still named,
-            // because it still exists — neither closing nor a passed deadline
-            // is a withdrawal. "Closed" and "expired" stay separate words: one
-            // is the owner's decision, the other is the calendar's.
-            <div className="flex flex-col gap-1.5">
-              <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
-                {job.status === "closed" ? (
-                  <Lock strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
-                ) : (
-                  <Clock strokeWidth={2.5} size={14} className="shrink-0 text-amber-500" />
-                )}
-                {job.status === "closed" ? "This posting is closed" : "This posting has expired"}
-              </span>
-              <p className="font-body text-xs text-foreground-subtle">
-                {job.status === "closed"
-                  ? "It is no longer accepting applications."
-                  : "Its closing date has passed, so it is no longer accepting applications."}
-                {appliedSentence(job)}
-              </p>
-            </div>
-          ) : job.applied ? (
-            <div className="flex flex-col gap-1.5">
-              <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground">
-                <CheckCircle2 strokeWidth={2.5} size={15} className="text-emerald-500" />
-                Application submitted
-                {job.my_application?.applied_label ? ` · ${job.my_application.applied_label}` : ""}
-              </span>
-              {job.my_application && (
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-body text-xs text-foreground-muted">
-                  <a
-                    href={job.my_application.portfolio_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-accent hover:underline"
-                  >
-                    <Globe strokeWidth={2.5} size={11} />
-                    Portfolio
-                  </a>
-                  <a
-                    href={job.my_application.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-accent hover:underline"
-                  >
-                    <ExternalLink strokeWidth={2.5} size={11} />
-                    LinkedIn
-                  </a>
-                  {job.my_application.resume_url && (
-                    <a
-                      href={job.my_application.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-accent hover:underline"
-                    >
-                      <Briefcase strokeWidth={2.5} size={11} />
-                      Resume
-                    </a>
-                  )}
+                <span className="font-body text-xs text-foreground-subtle">
+                  Your profile matches this role.
                 </span>
-              )}
-            </div>
-          ) : job.can_apply ? (
-            <>
+              </>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <LockedNote>Apply is locked for your profile</LockedNote>
+                <p className="font-body text-xs text-foreground-subtle">
+                  Only members whose city, sector, job title and experience level match the
+                  posting can apply.
+                  {mismatches.length > 0 ? ` Your profile differs in ${listPhrase(mismatches)}.` : ""}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Application status — the member's own application as its own card
+          between the posting and its poster (LinkedIn's shape): the state,
+          when it went, and the full submitted form behind View application. */}
+      {job.applied && job.my_application && (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="font-display text-sm font-semibold text-foreground">Application status</h2>
+          <div className="mt-3 flex items-start gap-2.5">
+            <span
+              aria-hidden="true"
+              className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+            />
+            <div className="min-w-0">
+              <p className="font-body text-sm font-medium text-foreground">Application submitted</p>
+              <p className="mt-0.5 font-body text-xs text-foreground-subtle">
+                {job.my_application.applied_label}
+              </p>
               <button
                 type="button"
-                onClick={() => setApplyOpen(true)}
-                className="modal-btn modal-btn-primary"
+                onClick={() => setApplicationOpen(true)}
+                className="mt-1.5 font-body text-xs font-medium text-accent hover:underline"
               >
-                Apply now
+                View application
               </button>
-              <span className="font-body text-xs text-foreground-subtle">
-                Your profile matches this role.
-              </span>
-            </>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <LockedNote>Apply is locked for your profile</LockedNote>
-              <p className="font-body text-xs text-foreground-subtle">
-                Only members whose city, sector, job title and experience level match the posting
-                can apply.
-                {mismatches.length > 0 ? ` Your profile differs in ${listPhrase(mismatches)}.` : ""}
-              </p>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Poster */}
       <div className="rounded-xl border border-border bg-surface p-4">
@@ -320,20 +297,6 @@ export function JobDetail({
         )}
       </Section>
 
-      {editOpen && master && (
-        <EditJobModal
-          key={job.id}
-          open
-          job={job}
-          master={master}
-          onClose={() => setEditOpen(false)}
-          onSaved={() => {
-            setEditOpen(false);
-            router.refresh();
-          }}
-        />
-      )}
-
       {!job.is_mine && !job.applied && job.can_apply && (
         <ApplyModal
           open={applyOpen}
@@ -343,7 +306,120 @@ export function JobDetail({
           onApplied={() => router.refresh()}
         />
       )}
+
+      {job.applied && job.my_application && (
+        <ApplicationModal
+          open={applicationOpen}
+          onClose={() => setApplicationOpen(false)}
+          job={job}
+          viewer={viewer}
+          application={job.my_application}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * The application exactly as it was submitted, reopened from the status
+ * card: every field the form carried, with the links live so the member can
+ * check what the poster will read.
+ */
+function ApplicationModal({
+  open,
+  onClose,
+  job,
+  viewer,
+  application,
+}: {
+  open: boolean;
+  onClose: () => void;
+  job: JobPost;
+  viewer: JobViewer;
+  application: JobApplicationSummary;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title="Your application" maxWidth="max-w-md">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
+          <AvatarImg
+            url={viewer.avatarUrl}
+            name={viewer.name}
+            size={40}
+            className="rounded-full object-cover"
+          />
+          <div className="min-w-0">
+            <p className="truncate font-body text-sm font-semibold text-foreground">{job.title}</p>
+            <p className="truncate font-body text-xs text-foreground-muted">
+              {job.company.name}
+              <span className="mx-1.5 text-foreground-subtle">·</span>
+              {job.city_name}
+            </p>
+          </div>
+        </div>
+
+        <dl className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5">
+            <dt className="font-body text-xs font-medium text-foreground-muted">Full name</dt>
+            <dd className="font-body text-sm text-foreground">{application.name}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="font-body text-xs font-medium text-foreground-muted">Portfolio</dt>
+            <dd className="min-w-0">
+              <a
+                href={application.portfolio_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
+              >
+                <Globe strokeWidth={2.5} size={12} className="shrink-0" />
+                <span className="truncate">
+                  {application.portfolio_url.replace(/^https?:\/\//, "")}
+                </span>
+              </a>
+            </dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="font-body text-xs font-medium text-foreground-muted">LinkedIn</dt>
+            <dd className="min-w-0">
+              <a
+                href={application.linkedin_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
+              >
+                <ExternalLink strokeWidth={2.5} size={12} className="shrink-0" />
+                <span className="truncate">
+                  {application.linkedin_url.replace(/^https?:\/\//, "")}
+                </span>
+              </a>
+            </dd>
+          </div>
+          {application.resume_url && (
+            <div className="flex flex-col gap-0.5">
+              <dt className="font-body text-xs font-medium text-foreground-muted">Resume</dt>
+              <dd>
+                <a
+                  href={application.resume_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent hover:underline"
+                >
+                  <FileText strokeWidth={2.5} size={12} />
+                  View resume
+                </a>
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="flex justify-end pt-1">
+          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
+            Close
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

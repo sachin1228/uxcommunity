@@ -24,11 +24,10 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
  *
  * One small menu, two placements: the owner's list hangs it off each row's
  * title row, and the posting's own page places it beside the kind tag in the
- * header. On that page the Edit button lives in the page's own actions row, so
- * the host takes the edit form over through `onEditRequested`; without that
- * prop the form opens from the menu item here (the list's way in). `master` is
- * only needed to open the edit form, so a surface without it still gets
- * Close/Reopen/Delete.
+ * header. The edit form opens from the menu everywhere, so the menu is the
+ * owner's only control cluster — a scanned card or page wants one small
+ * target, not a row of buttons. `master` is only needed to open that form, so
+ * a surface without it still gets Close/Reopen/Delete.
  *
  * A posting whose closing date has passed is offered "Change deadline" in place
  * of "Edit job": the date is the lever that brings it back, and reopening it is
@@ -42,18 +41,11 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
 export function JobOwnerActions({
   job,
   master,
-  /**
-   * Set by a surface that hosts the edit form itself (its Edit button sits
-   * elsewhere on the page); the menu item hands over instead of opening the
-   * form here.
-   */
-  onEditRequested,
   /** False when deleting should leave the member where they are (the list). */
   redirectOnDelete = true,
 }: {
   job: JobPost;
   master?: JobMasterData;
-  onEditRequested?: () => void;
   redirectOnDelete?: boolean;
 }) {
   const router = useRouter();
@@ -188,8 +180,7 @@ export function JobOwnerActions({
             role="menuitem"
             onClick={() => {
               setMenuOpen(false);
-              if (onEditRequested) onEditRequested();
-              else setEditOpen(true);
+              setEditOpen(true);
             }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
           >
