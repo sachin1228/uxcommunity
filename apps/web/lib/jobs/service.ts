@@ -2,7 +2,15 @@ import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { companyLogoUrl } from "@/lib/companies/logos";
-import type { JobApplicant, JobPost, JobStatus, ApplicationStatus, JobViewer } from "./types";
+import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
+import type {
+  JobApplicant,
+  JobApplicantDetail,
+  JobPost,
+  JobStatus,
+  ApplicationStatus,
+  JobViewer,
+} from "./types";
 
 /**
  * Server-side access to the Jobs model.
@@ -251,6 +259,67 @@ export async function getJobApplicants(
     .filter((applicant): applicant is JobApplicant => Boolean(applicant));
 
   return { ok: true, applicants };
+}
+
+/** One applicant's profile row as the design-view enrichment reads it. */
+interface ApplicantProfileRow {
+  user_id: string;
+  job_title: string | null;
+  experience_level: string | null;
+  cities: { name: string } | null;
+}
+
+/**
+ * The applicants the design view renders, each with the profile facts the
+ * SQL payload does not carry — the composed role label and the city — so
+ * the sidebar can show what the member actually filled in. Read in one
+ * batch (the applicant count does not multiply the queries), and a miss
+ * degrades to null rather than failing the board: the application itself
+ * is complete without it.
+ *
+ * The role label resolves through the same helper the profile pages use, so
+ * the design view can never disagree with a profile on how a role reads.
+ */
+export async function loadJobApplicantDetails(
+  db: SupabaseClient,
+  applicants: JobApplicant[]
+): Promise<JobApplicantDetail[]> {
+  if (applicants.length === 0) return [];
+
+  const ids = [...new Set(applicants.map((applicant) => applicant.applicant_id))];
+  const profileRead = await db
+    .from("designer_profiles")
+    .select("user_id, job_title, experience_level, cities(name)")
+    .in("user_id", ids);
+
+  if (profileRead.error) console.error("[jobs] applicant profile read failed:", profileRead.error);
+
+  const profiles = new Map(
+    ((profileRead.data ?? []) as unknown as ApplicantProfileRow[]).map((row) => [row.user_id, row])
+  );
+
+  const roleLabels = new Map(
+    await Promise.all(
+      ids.map(async (id) => {
+        const profile = profiles.get(id);
+        const label = await resolveProfileRoleLabel(
+          db,
+          profile?.job_title ?? null,
+          profile?.experience_level ?? null
+        );
+        return [id, label] as const;
+      })
+    )
+  );
+
+  return applicants.map((applicant) => {
+    const profile = profiles.get(applicant.applicant_id);
+    return {
+      ...applicant,
+      role_label: roleLabels.get(applicant.applicant_id) ?? null,
+      city_name: profile?.cities?.name ?? null,
+    };
+  });
 }
 
 /**

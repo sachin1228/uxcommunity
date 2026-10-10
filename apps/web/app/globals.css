@@ -356,6 +356,53 @@ body {
   color: var(--color-foreground);
 }
 
+/* ─── Forced-dark scope — the design-mode viewer ─────────────────────── */
+/* The jobs design view renders the DARK theme regardless of the OS
+   preference: it is a preview of the application as a page of its own, not
+   app chrome, and the dark palette is the app's signature look. Re-declaring
+   the dark values on the scope's subtree wins over the media-query overrides
+   on :root, so token-driven utilities inside read dark while the rest of the
+   app keeps following the scheme. The scrollbar overrides mirror the same
+   idea — the global thumbs are black-ish, which would be invisible on this
+   scope's dark pages. */
+.design-dark {
+  color-scheme: dark;
+
+  --color-background:        #09090B;
+  --color-background-subtle: #0E0E10;
+
+  --color-surface:           #121214;
+  --color-surface-raised:    #1B1B1F;
+  --color-surface-hover:     #17171A;
+
+  --color-foreground:        #EDEDED;
+  --color-foreground-muted:  #737373;
+  --color-foreground-subtle: #525252;
+
+  --color-accent:            #FFFFFF;
+  --color-accent-rgb:        255 255 255;
+  --color-accent-hover:      #CCCCCC;
+  --color-accent-soft:       #1F1F23;
+  --color-accent-foreground: #000000;
+
+  --color-border:            #202024;
+  --color-border-subtle:     #1D1D21;
+
+  /* The dark scheme's heavy blacks — the sheets this scope floats sit on
+     are dark, so the light scheme's whisper-soft set would vanish. */
+  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
+  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
+  --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
+}
+
+.design-dark * {
+  scrollbar-color: rgba(255 255 255 / 0.18) transparent;
+}
+
+.design-dark *::-webkit-scrollbar-thumb { background: rgba(255 255 255 / 0.18); }
+.design-dark *::-webkit-scrollbar-thumb:hover { background: rgba(255 255 255 / 0.28); }
+
 /* ─── Home-feed filter switcher ──────────────────────────────────────── */
 /* Fluid segmented control (Newest / Trending / Following). Colors come
    from the reference palette above and flip with the OS color scheme. */

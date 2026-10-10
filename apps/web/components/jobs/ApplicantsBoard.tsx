@@ -1,15 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Check, ExternalLink, FileText, Globe, Inbox, UserRound, Users, X } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  ExternalLink,
+  FileText,
+  Globe,
+  Inbox,
+  Sparkles,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { JobStateBadge, KindBadge } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { showUndoToast } from "@/lib/undo-toast";
+import { useApplicantDecision } from "@/lib/jobs/use-applicant-decision";
 import type { ApplicationStatus, JobApplicant, JobPost } from "@/lib/jobs/types";
 import { applicationStatusLabel, workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
@@ -35,6 +45,12 @@ const TRIAGE_TABS: { value: TriageTab; label: string }[] = [
  * standing — they are not routes, and switching one never moves a card out of
  * view by anything but the decision itself.
  *
+ * Between the posting and the list sits the design-mode card: it opens the
+ * application as a page of its own (`DesignModeViewer`) in a fresh tab —
+ * outside the dashboard shell, so the page is the whole page — starting at
+ * the first applicant in the tab the poster is looking at (an empty tab
+ * falls back to the whole list).
+ *
  * Reads and writes are gated to the poster by the database, not by this
  * component.
  */
@@ -45,51 +61,17 @@ export function ApplicantsBoard({
   job: JobPost;
   applicants: JobApplicant[];
 }) {
-  const router = useRouter();
   const guard = useGuardedRouter();
+  const { decide, pendingId, error } = useApplicantDecision(job.id);
   const [tab, setTab] = useState<TriageTab>("all");
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [error, setError] = useState<{ id: string; message: string } | null>(null);
 
   const countFor = (value: TriageTab): number =>
     value === "all" ? applicants.length : applicants.filter((a) => a.status === value).length;
   const visible = tab === "all" ? applicants : applicants.filter((a) => a.status === tab);
 
-  /**
-   * Move one applicant, then offer the way back. The undo runs the opposite
-   * write — `applicant.status` is the standing this click is leaving, so a
-   * poster who triaged the wrong row is one click from where they were.
-   */
-  async function setStatus(applicant: JobApplicant, status: ApplicationStatus) {
-    setError(null);
-    setPendingId(applicant.id);
-    try {
-      const response = await fetch(`/api/jobs/${job.id}/applications/${applicant.id}/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(body?.message ?? "The applicant could not be updated.");
-      }
-
-      showUndoToast({
-        message: `“${applicant.name}” moved to ${applicationStatusLabel(status)}.`,
-        actionLabel: "Undo",
-        onAction: () => setStatus(applicant, applicant.status),
-      });
-      router.refresh();
-    } catch (cause) {
-      setError({
-        id: applicant.id,
-        message: cause instanceof Error ? cause.message : "The applicant could not be updated.",
-      });
-    } finally {
-      setPendingId(null);
-    }
-  }
+  // Opened with `target="_blank"` so the poster keeps the board behind the
+  // design view; the page itself lives outside /dashboard (see its route).
+  const designHref = `/applications/${job.id}/${(visible.length > 0 ? visible : applicants)[0].id}`;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-6">
@@ -153,6 +135,41 @@ export function ApplicantsBoard({
           </div>
         </div>
       </div>
+
+      {/* Design mode — the application as a full page of its own, opened in
+          a fresh tab. The whole card is the affordance, with the button
+          shape marking where it goes. */}
+      {applicants.length > 0 && (
+        <a
+          href={designHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex w-full items-center gap-3.5 rounded-xl border border-border bg-surface p-3.5 text-left transition-colors hover:border-accent/20 hover:bg-surface-raised"
+        >
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"
+          >
+            <Sparkles strokeWidth={2.25} size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-body text-sm font-semibold text-foreground">
+              View application in design mode
+            </span>
+            <span className="mt-0.5 block font-body text-xs leading-relaxed text-foreground-muted">
+              Read {applicants.length === 1 ? "the application" : "the applications"} as a
+              light-mode portfolio page — sidebar, links and decisions, one applicant at a time.
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="modal-btn modal-btn-primary pointer-events-none shrink-0"
+          >
+            Open
+            <ArrowRight strokeWidth={2.5} size={14} />
+          </span>
+        </a>
+      )}
 
       {/* Triage tabs — the board's own tab style (count chip, accent
           underline); a decision moves a card between tabs, never out of the
@@ -281,7 +298,7 @@ export function ApplicantsBoard({
                   ) : (
                     <TriageCluster
                       status={applicant.status}
-                      onChange={(status) => void setStatus(applicant, status)}
+                      onChange={(status) => void decide(applicant, status)}
                     />
                   )}
                 </span>
