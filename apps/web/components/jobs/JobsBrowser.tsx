@@ -11,7 +11,7 @@ import type { JobPost, JobViewer } from "@/lib/jobs/types";
 type Tab = "all" | "applied" | "posts";
 
 /**
- * The jobs board, LinkedIn-style: on "All jobs" and "My applications" the
+ * The jobs board, LinkedIn-style: on "All jobs" and "Applied" the
  * rail lists postings and the pane shows the selected one — selecting is
  * local state, not a route change, because `get_job_feed` already returns the
  * full detail payload for every row. "My posts" is a plain list: each post
@@ -23,7 +23,7 @@ type Tab = "all" | "applied" | "posts";
  * Every posting is visible to every member — the profile match is what
  * unlocks Apply, not what hides the job — but the browse list only shows
  * roles the member could still apply to: their own posts live under "My
- * posts", and roles they applied to move to "My applications".
+ * posts", and roles they applied to move to "Applied".
  */
 export function JobsBrowser({
   viewer,
@@ -64,7 +64,7 @@ export function JobsBrowser({
 
   const myPosts = jobs.filter((job) => job.is_mine);
   // Applied roles leave the browse list: their state (submitted, portfolio
-  // links) lives under "My applications" instead of among the roles still
+  // links) lives under "Applied" instead of among the roles still
   // open to apply to.
   const browseJobs = jobs.filter((job) => !job.is_mine && !job.applied);
   const appliedJobs = jobs.filter((job) => !job.is_mine && job.applied);
@@ -96,7 +96,7 @@ export function JobsBrowser({
 
   const tabs: { value: Tab; label: string; count: number }[] = [
     { value: "all", label: "All jobs", count: browseJobs.length },
-    { value: "applied", label: "My applications", count: appliedJobs.length },
+    { value: "applied", label: "Applied", count: appliedJobs.length },
     { value: "posts", label: "My posts", count: myPosts.length },
   ];
 
@@ -234,7 +234,7 @@ export function JobsBrowser({
                 ) : (
                   <EmptyState
                     title="No jobs from other members yet"
-                    body="Your own posts live under My posts, and roles you apply to move to My applications — roles posted by other members will show up here."
+                    body="Your own posts live under My posts, and roles you apply to move to Applied — roles posted by other members will show up here."
                   />
                 )
               ) : tab === "applied" ? (
