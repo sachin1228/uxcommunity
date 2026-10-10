@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Calendar,
   CalendarCheck,
@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Video,
 } from "lucide-react";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import {
   EVENT_DATE_OPTIONS,
   EVENT_TYPE_OPTIONS,
@@ -42,30 +43,14 @@ interface EventFiltersMenuProps {
 
 /**
  * The Events page's filter dropdown — a bordered button opening one panel
- * with the two filter groups (same trigger/panel/outside-click shape as the
- * event options menu; the rows carry the check of the option in force).
- * Picking a row applies it and leaves the panel open, since the two groups
- * are normally set together; outside click or Escape closes it.
+ * with the two filter groups (icon rows, a check on the option in force).
+ * The panel renders through the shared DropdownMenu portal, so the page's
+ * scroll container can never clip it. Picking applies the option and leaves
+ * the panel open, since the groups are normally set together.
  */
 export function EventFiltersMenu({ type, date, active, onSelect }: EventFiltersMenuProps) {
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleOutsideClick(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false);
-    }
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handleOutsideClick);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function renderGroup(
     label: string,
@@ -86,7 +71,7 @@ export function EventFiltersMenu({ type, date, active, onSelect }: EventFiltersM
               type="button"
               onClick={() => onPick(option.value)}
               aria-pressed={isSelected}
-              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-sm text-foreground transition-colors hover:bg-surface-raised"
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 font-body text-sm text-foreground transition-colors hover:bg-white/[0.08]"
             >
               <Icon strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" aria-hidden="true" />
               <span className="flex-1 text-left">{option.label}</span>
@@ -99,8 +84,9 @@ export function EventFiltersMenu({ type, date, active, onSelect }: EventFiltersM
   }
 
   return (
-    <div ref={menuRef} className="relative shrink-0">
+    <div className="shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-label="Filter events"
@@ -114,26 +100,29 @@ export function EventFiltersMenu({ type, date, active, onSelect }: EventFiltersM
       >
         <SlidersHorizontal strokeWidth={2.5} size={15} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-10 z-20 w-56 overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+      <DropdownMenu
+        triggerRef={triggerRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        className="w-56"
+      >
+        {renderGroup(
+          "Type",
+          EVENT_TYPE_OPTIONS,
+          TYPE_ICONS,
+          type,
+          (value) => onSelect(value as EventTypeFilter, date),
+        )}
+        <div className="border-t border-white/[0.1]">
           {renderGroup(
-            "Type",
-            EVENT_TYPE_OPTIONS,
-            TYPE_ICONS,
-            type,
-            (value) => onSelect(value as EventTypeFilter, date),
+            "Date",
+            EVENT_DATE_OPTIONS,
+            DATE_ICONS,
+            date,
+            (value) => onSelect(type, value as EventDateFilter),
           )}
-          <div className="border-t border-border">
-            {renderGroup(
-              "Date",
-              EVENT_DATE_OPTIONS,
-              DATE_ICONS,
-              date,
-              (value) => onSelect(type, value as EventDateFilter),
-            )}
-          </div>
         </div>
-      )}
+      </DropdownMenu>
     </div>
   );
 }
