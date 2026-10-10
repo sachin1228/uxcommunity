@@ -353,7 +353,7 @@ export const ChatHeader = memo(function ChatHeader({
                     <MoreHorizontal strokeWidth={2.5} size={16} />
                   </button>
                   {openMenu === "more" && (
-                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       {muted ? (
                         /* Muted (forever or still-timed): one action, off. */
                         <button
