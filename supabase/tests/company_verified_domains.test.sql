@@ -28,7 +28,7 @@
 -- ============================================================
 
 create extension if not exists pgtap with schema extensions;
-select plan(118);
+select plan(121);
 
 -- ─── Isolation ──────────────────────────────────────────────
 -- The suite runs against ONE database that ships a real curated company
@@ -938,6 +938,22 @@ select is(
   'a hint does not answer a domain search'
 );
 
+-- The company page's picture resolves from the domain the company is
+-- DISPLAYED by (20261010160000): here, the unchecked hint. At the same time
+-- the verified list stays empty — the picture is decoration, and "No verified
+-- domains yet" is still exactly what the page reports.
+select is(
+  (select domain from public.get_company_page('hintco')),
+  'hintco.test',
+  'the company page resolves its picture from the hint domain'
+);
+
+select is(
+  (select jsonb_array_length(domains) from public.get_company_page('hintco')),
+  0,
+  'and it still reports no verified domains'
+);
+
 -- A member picks Hintco from the directory and gives a work email on the domain
 -- the directory knows it by. This has to open a challenge: without hints this
 -- path was closed (no verified domain to match) while the name was taken, which
@@ -1047,6 +1063,12 @@ select is(
   (select verified from public.company_domains where domain = 'hintco.test'),
   true,
   'and the claim is now the member-proved one'
+);
+
+select is(
+  (select jsonb_array_length(domains) from public.get_company_page('hintco')),
+  1,
+  'once proved, the company page lists the domain as verified'
 );
 
 select is(
