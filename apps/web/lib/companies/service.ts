@@ -66,6 +66,12 @@ export interface CompanyMemberPreview {
 
 export interface CompanyPage extends CompanyRef {
   logoUrl: string | null;
+  /**
+   * The domain the page is displayed by — its picture's source, resolved
+   * like everywhere else: the verified domain when one exists, else the
+   * directory's best hint. Not a claim: `domains` below is.
+   */
+  domain: string | null;
   isActive: boolean;
   createdAt: string;
   memberCount: number;
@@ -509,7 +515,8 @@ export async function getCompanyPage(
     id: row.id,
     name: row.name,
     slug: row.slug,
-    logoUrl: companyLogoUrl(row.logo_url, domains[0]?.domain ?? null),
+    logoUrl: companyLogoUrl(row.logo_url, row.domain),
+    domain: row.domain,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     memberCount: Number(row.member_count ?? 0),

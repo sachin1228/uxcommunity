@@ -171,6 +171,8 @@ type PerformanceRpcMap = {
       name: string;
       slug: string;
       logo_url: string | null;
+      /** Display domain (verified, else best hint) the picture resolves from. */
+      domain: string | null;
       is_active: boolean;
       created_at: string;
       member_count: number;

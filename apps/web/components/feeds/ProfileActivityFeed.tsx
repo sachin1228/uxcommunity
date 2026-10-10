@@ -128,7 +128,7 @@ function emptyStateFor(tab: ProfileActivityTab, subjectName?: string | null) {
  * endpoint and switching tabs is instant once a scope has been opened. For a
  * member's profile the endpoint also carries the member's id.
  */
-function ProfileActivityScope({
+export function ProfileActivityScope({
   scope,
   currentUserId,
   subject,
@@ -202,6 +202,10 @@ function ProfileActivityScope({
   // a delete, saving a post this tab has never listed) pulls the page again
   // instead of patching.
   //
+  // A resource's save is the menu's bookmark, every other card's is its save
+  // toggle, so the drop watches the matching flag per kind — unliking a
+  // resource must not remove a card that is still bookmarked.
+  //
   // A member's feed lists the posts they authored, so unsaving one of their
   // posts must not drop it here — the save-drop belongs to the owner's Saved
   // tab alone — and edits/deletes merge straight in.
@@ -210,13 +214,20 @@ function ProfileActivityScope({
       updateItems((current) => applyContentChanges(current, changes, feedItemKind));
     } else {
       const unsavedIds = new Set(
-        changes.filter((change) => change.patch?.user_saved === false).map((change) => change.id),
+        changes
+          .filter((change) =>
+            change.kind === "resource"
+              ? change.patch?.user_bookmarked === false
+              : change.patch?.user_saved === false,
+          )
+          .map((change) => change.id),
       );
 
       updateItems((current) => {
         const merged = applyContentChanges(current, changes, feedItemKind);
         const inScope = (item: FeedItem) =>
-          scope !== "saved" || Boolean(item.user_saved);
+          scope !== "saved" ||
+          Boolean(item._type === "resource" ? item.user_bookmarked : item.user_saved);
         if (!unsavedIds.size) return merged.filter(inScope);
         return merged.filter((item) => inScope(item) && (item.user_id === currentUserId || !unsavedIds.has(item.id)));
       });
@@ -406,4 +417,13 @@ export function ProfileActivityFeed({
       </div>
     </section>
   );
+}
+
+/**
+ * The Saved page's body: the profile's Saved scope as a standalone list, so the
+ * workspace nav and the profile's Saved tab render one component over one
+ * payload (and saving/unsaving from either surface updates both).
+ */
+export function SavedFeed({ currentUserId }: { currentUserId: string }) {
+  return <ProfileActivityScope scope="saved" currentUserId={currentUserId} subject={null} />;
 }
