@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, Linkedin, PenLine } from "lucide-react";
+import { Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -19,10 +19,16 @@ interface ProfileCardProps {
   roleLabel: string | null;
   bio: string;
   /**
-   * The verified company on the profile, or null when none is set. It is shown
-   * read-only here and changed from Settings > Profile.
+   * The verified company on the profile, or null when none is set. It rides the
+   * role line ("Mid-level Product Designer @ Figma") and is changed from
+   * Settings > Profile.
    */
   company: ProfileCompanyView | null;
+  /**
+   * Opens the "Where do you work?" picker for a member with no company yet.
+   * Omitted on read-only surfaces and when a company is already set.
+   */
+  onAddCompany?: () => void;
   /**
    * Where Edit Profile goes — the Settings Profile page, which owns the
    * identity fields and the workplace. Omitted on read-only surfaces.
@@ -51,9 +57,9 @@ function externalUrl(value: string | undefined): string | null {
 }
 
 /**
- * The profile hero: display picture, name, role line, city line, the
- * company card, bio and (on read-only surfaces) the member's links. It carries
- * no cover image and no card chrome of its own —
+ * The profile hero: display picture, name, the role line (with the workplace
+ * after an “@”), city line, bio and (on read-only surfaces) the member's links.
+ * It carries no cover image and no card chrome of its own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
  * the only image and everything here sits directly on the page. The identity
  * details behind Edit Profile live on the Settings page
@@ -67,6 +73,7 @@ export function ProfileCard({
   roleLabel,
   bio,
   company,
+  onAddCompany,
   editProfileHref,
   linkedin = "",
   portfolio = "",
@@ -128,10 +135,34 @@ export function ProfileCard({
             <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
             {/* Seniority and designation on their own line under the name,
-                as plain text — no pill, no icon. Truncated so it always stays
-                a single line however long the label runs. */}
-            {roleLabel && (
-              <p className="mt-1.5 truncate font-body text-sm text-foreground-muted">{roleLabel}</p>
+                as plain text — no pill, no icon. The verified workplace rides
+                the same line after an “@”, logo first, and leads to the
+                company's page. Truncated so it stays a single line however
+                long the label runs. */}
+            {(roleLabel || company) && (
+              <p className="mt-1.5 flex min-w-0 items-center gap-1.5 font-body text-sm text-foreground-muted">
+                {roleLabel && <span className="truncate">{roleLabel}</span>}
+                {roleLabel && company && <span aria-hidden="true">@</span>}
+                {company && (
+                  <Link
+                    href={`/dashboard/companies/${company.slug}`}
+                    title={
+                      company.isActive && company.domainVerified && company.domain
+                        ? `Verified via ${company.domain}`
+                        : undefined
+                    }
+                    className={`flex min-w-0 items-center gap-1.5 transition-colors hover:text-accent ${
+                      company.isActive ? "text-foreground-muted" : "text-foreground-subtle"
+                    }`}
+                  >
+                    <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={16} />
+                    <span className="truncate">{company.name}</span>
+                    {company.isActive && company.domainVerified && (
+                      <VerifiedMark label={false} size="xs" />
+                    )}
+                  </Link>
+                )}
+              </p>
             )}
 
             {/* City — omitted when unset, rather than leaving an empty line
@@ -152,34 +183,19 @@ export function ProfileCard({
           )}
         </div>
 
-        {/* The company has its own card under the identity block, clear of the
-            city line. It is a view here: the chip leads to the company's page,
-            and the workplace itself is changed from Settings > Profile.
-
-            A deactivated company keeps the name but loses the accent and the
-            verified mark: the company behind it is not something to advertise
-            any more. */}
-        <div className="mt-3">
-          {company && (
-            <Link
-              href={`/dashboard/companies/${company.slug}`}
-              title={
-                company.isActive && company.domainVerified && company.domain
-                  ? `Verified via ${company.domain}`
-                  : undefined
-              }
-              className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
-                company.isActive ? "text-foreground" : "text-foreground-subtle"
-              }`}
-            >
-              <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={16} />
-              <span className="truncate">{company.name}</span>
-              {company.isActive && company.domainVerified && (
-                <VerifiedMark label={false} size="xs" />
-              )}
-            </Link>
-          )}
-        </div>
+        {/* Empty state only: with no workplace set, this hollow pill opens the
+            shared "Where do you work?" picker. Once a company is verified it
+            shows on the role line above and the pill goes away. */}
+        {!company && onAddCompany && (
+          <button
+            type="button"
+            onClick={onAddCompany}
+            className="mt-3 flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+          >
+            <Plus strokeWidth={2.5} size={12} />
+            Add your company
+          </button>
+        )}
 
         {/* Bio */}
         {bio && (

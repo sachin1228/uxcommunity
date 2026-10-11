@@ -22,7 +22,8 @@ export default async function ProfilePage({ searchParams }: Props) {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const [{ data: user }, { data: profile }, { company: profileCompany }] = await Promise.all([
+  const [{ data: user }, { data: profile }, { company: profileCompany, pending: pendingCompany }] =
+    await Promise.all([
       db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
       db
         .from("designer_profiles")
@@ -31,8 +32,8 @@ export default async function ProfilePage({ searchParams }: Props) {
         )
         .eq("user_id", userId)
         .maybeSingle(),
-      // The company line on the profile. It is read-only here; the workplace
-      // is changed from Settings > Profile.
+      // The company on the role line, plus any work-email challenge still
+      // waiting on a code so the picker can reopen straight into it.
       getProfileCompanyState(db, userId),
     ]);
 
@@ -59,6 +60,7 @@ export default async function ProfilePage({ searchParams }: Props) {
       initialPortfolio={(profile as any)?.portfolio_url ?? ""}
       initialBio={(profile as any)?.bio ?? ""}
       initialCompany={profileCompany}
+      pendingCompany={pendingCompany}
     />
   );
 }

@@ -7,7 +7,11 @@ import { ProfileCard } from "./components/ProfileCard";
 import { ImagePickerModal } from "./components/ImagePickerModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
-import type { ProfileCompanyView } from "@/components/companies/types";
+import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
+import type {
+  PendingCompanyVerification,
+  ProfileCompanyView,
+} from "@/components/companies/types";
 
 interface Props {
   userId: string;
@@ -24,6 +28,7 @@ interface Props {
   initialPortfolio: string;
   initialBio: string;
   initialCompany: ProfileCompanyView | null;
+  pendingCompany: PendingCompanyVerification | null;
 }
 
 export function ProfileClient({
@@ -35,14 +40,18 @@ export function ProfileClient({
   roleLabel,
   initialBio,
   initialCompany,
+  pendingCompany,
 }: Props) {
   const router = useRouter();
   // The server is the source of truth: the client only mirrors what the last
-  // read returned, and refreshes the page after a picture change.
+  // read returned, and refreshes the page after a picture change or a company
+  // is verified.
   //
   // `initialName` is read straight from that render — nothing on this screen
   // edits it, and a copy in state would keep the first render's value forever,
   // including an empty one, which reads as a nameless hero.
+  const [showCompanyPicker, setShowCompanyPicker] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(pendingCompany);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
 
   // A newer server render (a refresh, a navigation) supersedes whatever an
@@ -139,6 +148,7 @@ export function ProfileClient({
             roleLabel={roleLabel}
             bio={initialBio}
             company={initialCompany}
+            onAddCompany={() => setShowCompanyPicker(true)}
             editProfileHref="/dashboard/settings/profile"
           />
         </div>
@@ -155,6 +165,20 @@ export function ProfileClient({
           onRemoveUpload={handleRemoveUpload}
           onSave={handleSavePicture}
           onClose={closePicturePicker}
+        />
+      )}
+
+      {/* Mounted only while open: the picker's state is per-attempt, so
+          unmounting it is what resets the search, the email and the code. */}
+      {showCompanyPicker && (
+        <AddCompanyModal
+          open
+          onClose={() => setShowCompanyPicker(false)}
+          initialPending={pendingVerification}
+          onVerified={() => {
+            setPendingVerification(null);
+            router.refresh();
+          }}
         />
       )}
     </div>
