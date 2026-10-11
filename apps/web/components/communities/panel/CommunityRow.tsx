@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
-import { BellOff, Pin } from "lucide-react";
+import { BellOff, ImageIcon, Pin } from "lucide-react";
 import { CommunityVisibilityIcon, SignupCommunityBadge } from "../CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
 import { isCommunityMuted } from "@/lib/communities/mute";
@@ -50,6 +50,22 @@ function renderTextWithEmoji(text: string) {
     parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex)}</span>);
   }
   return parts;
+}
+
+/**
+ * The word an image-only preview stands for, behind a real picture glyph —
+ * the same icon the composer's attach button wears. It used to be spelled
+ * with a camera emoji, which sits in the line the way the sender's own emoji
+ * do: here the glyph is decoration, so it carries no text of its own and the
+ * colour is inherited from the preview line it sits in.
+ */
+function ImagePreviewWord({ word }: { word: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      <ImageIcon aria-hidden="true" strokeWidth={2.5} size={13} className="shrink-0" />
+      {word}
+    </span>
+  );
 }
 
 interface CommunityRowProps {
@@ -173,7 +189,11 @@ export const CommunityRow = memo(function CommunityRow({
                 {" reacted "}
                 <NotoEmojiSvg emoji={lastReaction.emoji} size={14} className="align-middle mx-0.5" />
                 {" to: "}
-                <span>{lastReaction.messagePreview}</span>
+                {lastReaction.messagePreviewMedia === "image" ? (
+                  <ImagePreviewWord word={lastReaction.messagePreview} />
+                ) : (
+                  <span>{lastReaction.messagePreview}</span>
+                )}
               </p>
 
             ) : preview ? (
@@ -182,7 +202,11 @@ export const CommunityRow = memo(function CommunityRow({
                 {preview.prefix && (
                   <span className="font-medium">{preview.prefix}: </span>
                 )}
-                {renderTextWithEmoji(preview.text)}
+                {preview.media === "image" ? (
+                  <ImagePreviewWord word={preview.text} />
+                ) : (
+                  renderTextWithEmoji(preview.text)
+                )}
               </p>
 
             ) : (

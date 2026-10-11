@@ -125,10 +125,19 @@ test("a reply anchored to a content card names the kind, not a person", () => {
   }
 });
 
-test("an image-only message previews as a photo", () => {
+test("an image-only message previews as a photo, flagged for its glyph", () => {
+  // The word carries no emoji: the row draws a picture icon instead, so the
+  // preview cannot be mistaken for a camera the sender typed.
   assert.deepEqual(
     formatMessagePreview(message({ content: "", has_image: true })),
-    { prefix: "john", text: "📷 Photo" },
+    { prefix: "john", text: "Photo", media: "image" },
+  );
+});
+
+test("a captioned image previews its caption, with no glyph", () => {
+  assert.deepEqual(
+    formatMessagePreview(message({ content: "look at this", has_image: true })),
+    { prefix: "john", text: "look at this" },
   );
 });
 
