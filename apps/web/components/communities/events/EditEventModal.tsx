@@ -23,7 +23,6 @@ import {
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { wallTimeInputsInZone } from "@/lib/communities/timezone";
-import { HostTimeZoneField } from "./HostTimeZoneField";
 import { useNowTick } from "@/lib/use-now-tick";
 
 interface EditEventModalProps {
@@ -55,11 +54,11 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [description, setDescription] = useState(event.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(event.cover_image_url ?? null);
   const [imageUploading, setImageUploading] = useState(false);
-  // The zone the times are read in starts as the one the event was created in,
-  // so an edit made from another country shows the host's own clock and hands
-  // that same zone back. The create form defaults to the device instead.
+  // The zone the times are read in is the one the event was created in, so an
+  // edit made from another country shows the host's own clock and hands that
+  // same zone back. The create form defaults to the device instead.
   const [deviceZone] = useState(() => viewerTimeZoneName());
-  const [hostZone, setHostZone] = useState<string | null>(
+  const [hostZone] = useState<string | null>(
     () => event.host_timezone?.trim() || deviceZone,
   );
   const storedStart = toLocalInputs(event.event_date, hostZone);
@@ -85,9 +84,10 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   // so untouched edits don't fail submit-time validation.
   const minDate = startIsPast ? undefined : todayDateInput();
   const [minStartTime] = useState(() => nowTimeInput());
-  // The zone the typed times mean, beside the picker. Derived from the chosen
-  // day so an event on the far side of a DST change still names the offset it
-  // will actually run at, and the tick keeps the countdown below honest.
+  // The zone the typed times mean, shown beside the date. Derived from the
+  // chosen day so an event on the far side of a DST change still names the
+  // offset it will actually run at, and the tick keeps the countdown below
+  // honest.
   const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
   const nowTick = useNowTick();
   const startsInMinutes = minutesUntilStart(
@@ -390,26 +390,13 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   />
                 </label>
               </div>
-              <div className="font-body text-[11px] leading-snug text-foreground-subtle">
-                <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
-                {startsInMinutes !== null && (
-                  <p className="mt-1 font-medium text-accent">
-                    {startsInMinutes === 1
-                      ? "Starts in about a minute."
-                      : `Starts in about ${startsInMinutes} minutes.`}
-                  </p>
-                )}
-              </div>
-
-              {/* Which clock the times above are on — the event's own zone
-                  unless this editor says otherwise. */}
-              <HostTimeZoneField
-                value={hostZone}
-                onChange={setHostZone}
-                deviceZone={deviceZone}
-                dateInput={eventDate}
-                startIso={eventDate && eventTime ? buildIso(eventDate, eventTime) : null}
-              />
+              {startsInMinutes !== null && (
+                <p className="font-body text-[11px] font-medium text-accent">
+                  {startsInMinutes === 1
+                    ? "Starts in about a minute."
+                    : `Starts in about ${startsInMinutes} minutes.`}
+                </p>
+              )}
             </div>
           </div>
 

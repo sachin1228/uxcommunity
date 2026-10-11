@@ -18,7 +18,6 @@ import {
   viewerTimeZoneName,
   zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
-import { HostTimeZoneField } from "./HostTimeZoneField";
 import { useNowTick } from "@/lib/use-now-tick";
 
 interface CreateEventModalProps {
@@ -52,12 +51,10 @@ export function CreateEventModal({
   // submit check re-reads the clock, so time still can't slip through.
   const [minDate] = useState(() => todayDateInput());
   const [minStartTime] = useState(() => nowTimeInput());
-  // The zone the typed times mean. It starts as the device's own — what a wall
-  // clock the member just typed almost always means — and the picker below
-  // overrides it for a device set to the wrong zone, or for a host scheduling
-  // somewhere they aren't.
+  // The zone the typed times mean — the device's own, what a wall clock the
+  // member just typed almost always means.
   const [deviceZone] = useState(() => viewerTimeZoneName());
-  const [hostZone, setHostZone] = useState<string | null>(deviceZone);
+  const [hostZone] = useState<string | null>(deviceZone);
   // Derived from the chosen day so an event on the far side of a DST change
   // still names the offset it will actually run at, and the tick keeps the
   // countdown below honest.
@@ -370,28 +367,13 @@ export function CreateEventModal({
                   />
                 </label>
               </div>
-              <div className="font-body text-[11px] leading-snug text-foreground-subtle">
-                <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
-                {startsInMinutes !== null && (
-                  <p className="mt-1 font-medium text-accent">
-                    {startsInMinutes === 1
-                      ? "Starts in about a minute."
-                      : `Starts in about ${startsInMinutes} minutes.`}
-                  </p>
-                )}
-              </div>
-
-              {/* Which clock the times above are on. It defaults to the
-                  device's own and is the host's only way to say otherwise —
-                  and the one place that says everyone else reads the same
-                  moment on their own clock. */}
-              <HostTimeZoneField
-                value={hostZone}
-                onChange={setHostZone}
-                deviceZone={deviceZone}
-                dateInput={eventDate}
-                startIso={eventDate && eventTime ? buildIso(eventDate, eventTime) : null}
-              />
+              {startsInMinutes !== null && (
+                <p className="font-body text-[11px] font-medium text-accent">
+                  {startsInMinutes === 1
+                    ? "Starts in about a minute."
+                    : `Starts in about ${startsInMinutes} minutes.`}
+                </p>
+              )}
             </div>
           </div>
 
