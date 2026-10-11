@@ -27,12 +27,13 @@ import { useNowTick } from "@/lib/use-now-tick";
  * and the live pill alone carries the pulse, the beat that reads across a
  * sidebar while a window is open.
  *
- * The tile moves the way a date arrives: it springs in from the DP's corner
- * when it appears, and while the event is live a red ring pulses out of the
- * pill — the dot's beat at the pill's own scale — so the room happening right
- * now reads from further away than a word alone can. Both ride the DP's
- * corner, so the motion grows away from it, and both are plain CSS turned off
- * by the global reduce-motion guard, like every other entrance in the app.
+ * The tile moves the way a date arrives: it springs in when it appears —
+ * from its own corner for the tile, from its center for the pill centered
+ * on the DP's bottom edge — and while the event is live a red ring pulses
+ * out of the pill, the dot's beat at the pill's own scale, so the room
+ * happening right now reads from further away than a word alone can. Both
+ * are plain CSS turned off by the global reduce-motion guard, like every
+ * other entrance in the app.
  *
  * Every line scales with the tile and is fitted to the width the band actually
  * has (nothing reflows — the tile is absolutely positioned over the DP), so
@@ -176,13 +177,15 @@ export function DpWithEventDate({
       {children}
 
       {/* When the window is the news — open, or just closed — the calendar
-          steps aside for a small pill. LIVE carries a dot's pulse and, with
-          it, a ring pulsing out of the pill's shape; ENDED is the word
-          alone. No date either way: the day it belongs to has stopped being
-          the news. The anchor wraps pill and halo so the ring sizes itself
-          to whatever the pill's content renders as. */}
+          steps aside for a small pill, centered on the DP's bottom edge: a
+          label, not a corner sticker — the corner belongs to the date.
+          LIVE carries a dot's pulse and, with it, a ring pulsing out of the
+          pill's shape; ENDED is the word alone. No date either way: the day
+          it belongs to has stopped being the news. The anchor wraps pill and
+          halo so the ring sizes itself to whatever the pill's content
+          renders as. */}
       {visible && badge && isPill && (
-        <span className="pointer-events-none absolute -bottom-1 -right-1">
+        <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2">
           {isLive && (
             <span
               aria-hidden="true"
@@ -199,7 +202,7 @@ export function DpWithEventDate({
               gap: pillGap,
               paddingInline: pillPad,
             }}
-            className="event-tile-in relative flex items-center rounded-full bg-[var(--ds-red-700)] font-mono font-bold uppercase leading-none tracking-tight text-white ring-2 ring-background"
+            className="event-tile-in relative flex origin-bottom items-center rounded-full bg-[var(--ds-red-700)] font-mono font-bold uppercase leading-none tracking-tight text-white ring-2 ring-background"
           >
             {/* The live pulse, as a dot beside the word: one span swells and
                 fades on repeat, the dot it leaves from holds steady inside
@@ -242,7 +245,7 @@ export function DpWithEventDate({
             height: badgeSize,
             borderRadius: tileRadius,
           }}
-          className="event-tile-in pointer-events-none absolute -bottom-1 -right-1 flex flex-col overflow-hidden border border-black/10 bg-white leading-none ring-2 ring-background"
+          className="event-tile-in pointer-events-none absolute -bottom-1 -right-1 flex origin-bottom-right flex-col overflow-hidden border border-black/10 bg-white leading-none ring-2 ring-background"
         >
           <span
             className="flex shrink-0 items-center justify-center bg-[var(--ds-red-700)] font-mono font-bold uppercase tracking-tight text-white"
