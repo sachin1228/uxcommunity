@@ -326,7 +326,7 @@ export function CreateEventModal({
                       setEventTime("");
                     }
                   }}
-                  className="field hide-native-picker w-full cursor-pointer pr-9"
+                  className={`field hide-native-picker w-full cursor-pointer pr-9 ${eventDate ? "" : "date-empty"}`}
                 />
                 <Calendar
                   aria-hidden="true"
@@ -359,6 +359,14 @@ export function CreateEventModal({
                     }}
                     className={`field hide-native-picker w-full cursor-pointer pr-9 ${eventTime ? "" : "time-empty"}`}
                   />
+                  {!eventTime && (
+                    <span
+                      aria-hidden="true"
+                      className="time-placeholder pointer-events-none absolute bottom-0 left-3 flex h-8 items-center font-body text-sm text-foreground-subtle"
+                    >
+                      Select time
+                    </span>
+                  )}
                   <Clock
                     aria-hidden="true"
                     strokeWidth={2.5}
@@ -381,6 +389,14 @@ export function CreateEventModal({
                     onChange={(e) => setEndTime(e.target.value)}
                     className={`field hide-native-picker w-full cursor-pointer pr-9 ${endTime ? "" : "time-empty"}`}
                   />
+                  {!endTime && (
+                    <span
+                      aria-hidden="true"
+                      className="time-placeholder pointer-events-none absolute bottom-0 left-3 flex h-8 items-center font-body text-sm text-foreground-subtle"
+                    >
+                      Select time
+                    </span>
+                  )}
                   <Clock
                     aria-hidden="true"
                     strokeWidth={2.5}

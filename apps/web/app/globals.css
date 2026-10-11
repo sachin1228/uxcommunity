@@ -526,6 +526,18 @@ select:focus-visible {
     display: none;
   }
 
+  /* An empty date input's format ghost ("dd/mm/yyyy") is a placeholder like
+     any other field's, so it takes the same subtle ink. */
+  input[type="date"].date-empty:not(:focus)::-webkit-datetime-edit {
+    color: var(--color-foreground-subtle);
+  }
+
+  /* The custom time placeholder yields to the native typing segments while
+     the field is focused. */
+  label:focus-within .time-placeholder {
+    display: none;
+  }
+
   input:where(.field) {
     height: 32px;
     padding: 0 12px;
