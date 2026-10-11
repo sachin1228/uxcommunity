@@ -463,6 +463,7 @@ export function CreateEventModal({
             checked={isPublic}
             onChange={setIsPublic}
             icon={<Globe strokeWidth={2.5} size={15} />}
+            flush
           />
 
           {/* City — asked for only while the event is public, because the city
