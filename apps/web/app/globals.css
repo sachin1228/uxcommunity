@@ -519,6 +519,13 @@ select:focus-visible {
     visibility: hidden;
   }
 
+  /* The event forms draw their own calendar/clock affordance (the same
+     Lucide set as the labels); the browser's stock indicator reads as a
+     system artifact on the dark fields. */
+  input.hide-native-picker::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+
   input:where(.field) {
     height: 32px;
     padding: 0 12px;

@@ -320,7 +320,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               </label>              {/* One date selector on its own row, matching the create form:
                   the end rides the start's date, so only the two times are
                   picked, beneath the date. */}
-              <label className="block">
+              <label className="relative block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
                 </span>
@@ -347,13 +347,19 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       setEventTime("");
                     }
                   }}
-                  className="field w-full cursor-pointer"
+                  className="field hide-native-picker w-full cursor-pointer pr-9"
+                />
+                <Calendar
+                  aria-hidden="true"
+                  strokeWidth={2.5}
+                  size={15}
+                  className="pointer-events-none absolute bottom-2 right-3 text-foreground-muted"
                 />
               </label>
 
               {/* Start and end times share the row beneath the date. */}
               <div className="grid grid-cols-2 gap-3">
-                <label className="block">
+                <label className="relative block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                     <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
                   </span>
@@ -373,10 +379,16 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className={`field w-full cursor-pointer ${eventTime ? "" : "time-empty"}`}
+                    className={`field hide-native-picker w-full cursor-pointer pr-9 ${eventTime ? "" : "time-empty"}`}
+                  />
+                  <Clock
+                    aria-hidden="true"
+                    strokeWidth={2.5}
+                    size={15}
+                    className="pointer-events-none absolute bottom-2 right-3 text-foreground-muted"
                   />
                 </label>
-                <label className="block">
+                <label className="relative block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                     <Clock strokeWidth={2.5} size={11} /> End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
@@ -389,7 +401,13 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
                     }}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className={`field w-full cursor-pointer ${endTime ? "" : "time-empty"}`}
+                    className={`field hide-native-picker w-full cursor-pointer pr-9 ${endTime ? "" : "time-empty"}`}
+                  />
+                  <Clock
+                    aria-hidden="true"
+                    strokeWidth={2.5}
+                    size={15}
+                    className="pointer-events-none absolute bottom-2 right-3 text-foreground-muted"
                   />
                 </label>
               </div>
