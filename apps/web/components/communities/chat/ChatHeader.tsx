@@ -173,6 +173,7 @@ export const ChatHeader = memo(function ChatHeader({
   // The second line of the muted dropdown: when the mute lapses, or that it
   // never does. Computed here but rendered only while the dropdown is open
   // (a click), so no server render ever formats it in the wrong timezone.
+  // Day-first (en-GB) with a 12-hour clock: "11/10/2026 at 9:06 PM".
   const muteStateLabel = (() => {
     if (!muted) return null;
     if (community?.notifications_muted) return "Muted";
@@ -180,7 +181,7 @@ export const ChatHeader = memo(function ChatHeader({
     if (!until) return null;
     const deadline = new Date(until);
     if (!Number.isFinite(deadline.getTime())) return null;
-    const date = deadline.toLocaleDateString("en-US");
+    const date = deadline.toLocaleDateString("en-GB");
     const time = deadline.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     return `Muted until ${date} at ${time}`;
   })();
