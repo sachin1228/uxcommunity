@@ -164,6 +164,8 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError("Title is required."); return; }
+    if (!description.trim()) { setError("Description is required."); return; }
+    if (!coverImageUrl) { setError("Cover image is required."); return; }
     if (!eventDate || !eventTime) { setError("Event date and time are required."); return; }
     const startIso = buildIso(eventDate, eventTime);
     if (!startIso) { setError("Start time is not a valid time of day."); return; }
@@ -261,7 +263,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           {/* Description first — the card leads with it, so the form does too */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="font-normal text-foreground-subtle">(optional)</span>
+              Description <span className="text-accent">*</span>
             </span>
             <textarea
               value={description}
@@ -277,7 +279,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="flex flex-col">
               <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-                Cover image <span className="font-normal text-foreground-subtle">(optional)</span>
+                Cover image <span className="text-accent">*</span>
               </span>
               <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageSelect} />
               {coverImageUrl ? (
