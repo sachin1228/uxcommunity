@@ -130,20 +130,6 @@ export const CommunityRow = memo(function CommunityRow({
                 ("Electro ✓ 🔒", "Electro 🌐"). */}
             {badges.verified && <SignupCommunityBadge size={12} />}
             {badges.visibility && <CommunityVisibilityIcon kind={badges.visibility} />}
-            {/* An event's chat stays pinned to the top of the list until its
-                event date (see sidebar-order); the mark says why it's up
-                there instead of leaving it a mystery. The DP carries that
-                same date as a calendar badge. */}
-            {c.pinned_until && (
-              <span
-                role="img"
-                aria-label="Pinned until the event"
-                title="Pinned until the event"
-                className="inline-flex shrink-0 items-center text-foreground-muted"
-              >
-                <Pin strokeWidth={2.5} size={11} aria-hidden="true" />
-              </span>
-            )}
             {(c.last_message || lastContent) && !typingText && (
               <SidebarTimestamp
                 iso={
@@ -219,6 +205,22 @@ export const CommunityRow = memo(function CommunityRow({
                 @
               </span>
             ) : null}
+
+            {/* An event's chat stays pinned to the top of the list until its
+                event date (see sidebar-order); the mark says why it's up
+                there instead of leaving it a mystery. Rides the preview line
+                like the mute bell; the DP carries the same date as a calendar
+                badge. */}
+            {c.pinned_until && (
+              <span
+                role="img"
+                aria-label="Pinned until the event"
+                title="Pinned until the event"
+                className="inline-flex shrink-0 self-center items-center text-foreground-muted"
+              >
+                <Pin strokeWidth={2.5} size={14} aria-hidden="true" />
+              </span>
+            )}
 
             {/* Muted — the crossed bell rides the preview line, just before
                 the unread count (which keeps the corner on every row).
