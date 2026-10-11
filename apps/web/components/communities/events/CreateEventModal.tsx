@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
+import { filterChip } from "../filter-chip";
 import type { CommunityEvent } from "@/lib/communities/models/events";
 import { compressImage, compressedFile } from "@/lib/image-client";
 import {
@@ -377,14 +378,30 @@ export function CreateEventModal({
             </div>
           </div>
 
-          {/* Online toggle */}
-          <ToggleRow
-            title="Online event"
-            description="Happening virtually via a meeting link."
-            checked={isOnline}
-            onChange={setIsOnline}
-            icon={<Video strokeWidth={2.5} size={15} />}
-          />
+          {/* Either online or in person — the field below follows the choice */}
+          <div>
+            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Event type</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsOnline(true)}
+                aria-pressed={isOnline}
+                className={filterChip(isOnline)}
+              >
+                <Video size={14} strokeWidth={2.5} aria-hidden="true" />
+                Online
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOnline(false)}
+                aria-pressed={!isOnline}
+                className={filterChip(!isOnline)}
+              >
+                <MapPin size={14} strokeWidth={2.5} aria-hidden="true" />
+                In person
+              </button>
+            </div>
+          </div>
 
           {/* Location / Meet link */}
           {isOnline ? (
