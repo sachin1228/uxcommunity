@@ -230,27 +230,23 @@ export const CommunityRow = memo(function CommunityRow({
               </span>
             ) : null}
 
-            {/* An event's chat stays pinned to the top of the list until its
-                event date (see sidebar-order); the mark says why it's up
-                there instead of leaving it a mystery. Rides the preview line
-                like the mute bell; the DP carries the same date as a calendar
-                badge. */}
-            {c.pinned_until && (
-              <span
-                role="img"
-                aria-label="Pinned until the event"
-                title="Pinned until the event"
-                className="inline-flex shrink-0 self-center items-center text-foreground-muted"
-              >
-                <Pin strokeWidth={2.5} size={14} aria-hidden="true" />
+            {/* Unread badge — messages plus unread threads/showcase posts/
+                resources/events created by others. It opens the row's marks
+                and wears the blue of the member's own messages, so the count
+                is what the eye lands on first after the preview text. */}
+            {c.message_count + (c.unread_content_count ?? 0) > 0 && !active && (
+              <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-[var(--ds-blue-800)] text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
+                {c.message_count + (c.unread_content_count ?? 0) > 99
+                  ? "99+"
+                  : c.message_count + (c.unread_content_count ?? 0)}
               </span>
             )}
 
-            {/* Muted — the crossed bell rides the preview line, just before
-                the unread count (which keeps the corner on every row).
-                The line is items-start (the @ mark and badge ride the text's
-                top edge), so the bell centers itself against the row instead.
-                Notifications are off; unread messages still count. */}
+            {/* Muted — the crossed bell rides the preview line after the
+                unread count. The line is items-start (the @ mark and badge
+                ride the text's top edge), so the bell centers itself against
+                the row instead. Notifications are off; unread messages still
+                count. */}
             {isCommunityMuted(c) && (
               <span
                 role="img"
@@ -262,13 +258,19 @@ export const CommunityRow = memo(function CommunityRow({
               </span>
             )}
 
-            {/* Unread badge — messages plus unread threads/showcase posts/
-                resources/events created by others */}
-            {c.message_count + (c.unread_content_count ?? 0) > 0 && !active && (
-              <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-green-500 text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
-                {c.message_count + (c.unread_content_count ?? 0) > 99
-                  ? "99+"
-                  : c.message_count + (c.unread_content_count ?? 0)}
+            {/* An event's chat stays pinned to the top of the list until its
+                event date (see sidebar-order); the mark says why it's up
+                there instead of leaving it a mystery. It closes the row's
+                marks, after the mute bell; the DP carries the same date as a
+                calendar badge. */}
+            {c.pinned_until && (
+              <span
+                role="img"
+                aria-label="Pinned until the event"
+                title="Pinned until the event"
+                className="inline-flex shrink-0 self-center items-center text-foreground-muted"
+              >
+                <Pin strokeWidth={2.5} size={14} aria-hidden="true" />
               </span>
             )}
           </div>
