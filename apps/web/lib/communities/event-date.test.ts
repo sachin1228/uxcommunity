@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { eventDateBadge, hasEventEnded } from "./event-date";
+import { eventDateBadge, hasEventEnded, hasEventEndedBeyondGrace } from "./event-date";
 
 /** A local wall-clock time, ISO-encoded the way the API hands one over. */
 function at(year: number, month: number, day: number, hour: number, minute = 0): string {
@@ -152,27 +152,28 @@ test("an unparseable end never marks the event live or ended", () => {
   assert.equal(badge?.isEnded, false);
 });
 
-// ─── The hour after: ENDED, then the badge comes down ────────────────────────
+// ─── The half-day after: ENDED, then the badge comes down ───────────────────
 
-test("a just-ended event reads ENDED for an hour, then the badge drops", () => {
+test("a just-ended event reads ENDED for half a day, then the badge drops", () => {
   const end = at(2026, 8, 25, 11);
   const start = at(2026, 8, 25, 10);
   const atEnd = eventDateBadge(start, { now: new Date(2026, 8, 25, 11), endsAt: end });
   assert.equal(atEnd?.isLive, false);
   assert.equal(atEnd?.isEnded, true);
 
-  // Within the hour, the lifecycle has already moved past TODAY: once the
+  // Within the grace, the lifecycle has already moved past TODAY: once the
   // window closes, ENDED is the more useful fact even on the event's own day.
   const laterToday = eventDateBadge(start, { now: new Date(2026, 8, 25, 11, 30), endsAt: end });
   assert.equal(laterToday?.isEnded, true);
   assert.equal(laterToday?.isToday, true);
 
-  const nearEnd = eventDateBadge(start, { now: new Date(2026, 8, 25, 11, 59), endsAt: end });
-  assert.equal(nearEnd?.isEnded, true);
+  // The evening of the event still reads as just-over...
+  const evening = eventDateBadge(start, { now: new Date(2026, 8, 25, 22, 59), endsAt: end });
+  assert.equal(evening?.isEnded, true);
 
-  // One minute past the hour: the badge has served its purpose.
-  const after = eventDateBadge(start, { now: new Date(2026, 8, 25, 12, 1), endsAt: end });
-  assert.equal(after?.isEnded, false);
+  // ...and from the twelve-hour mark on, the badge has served its purpose.
+  const nextMorning = eventDateBadge(start, { now: new Date(2026, 8, 26, 11, 1), endsAt: end });
+  assert.equal(nextMorning?.isEnded, false);
 });
 
 test("the just-ended badge still names the day it was for", () => {
@@ -195,4 +196,21 @@ test("hasEventEnded reads the same deadline the badge does", () => {
   // No usable date: nothing to be over.
   assert.equal(hasEventEnded(null, at(2026, 8, 25, 11), new Date(2026, 8, 26)), false);
   assert.equal(hasEventEnded("not a date", null, new Date(2026, 8, 26)), false);
+});
+
+test("hasEventEndedBeyondGrace waits out the badge's twelve hours", () => {
+  const start = at(2026, 8, 25, 10);
+  const end = at(2026, 8, 25, 11);
+  // The window just closed and through the evening: the badge is still up.
+  assert.equal(hasEventEndedBeyondGrace(start, end, new Date(2026, 8, 25, 11)), false);
+  assert.equal(hasEventEndedBeyondGrace(start, end, new Date(2026, 8, 25, 22, 59)), false);
+  // The twelve-hour mark: the badge comes down, the event is over for good.
+  assert.equal(hasEventEndedBeyondGrace(start, end, new Date(2026, 8, 25, 23)), true);
+  assert.equal(hasEventEndedBeyondGrace(start, end, new Date(2026, 8, 26, 12)), true);
+  // No recorded end: the grace runs from the open-and-close instant.
+  assert.equal(hasEventEndedBeyondGrace(start, null, new Date(2026, 8, 25, 21, 59)), false);
+  assert.equal(hasEventEndedBeyondGrace(start, null, new Date(2026, 8, 25, 22)), true);
+  // No usable dates: never beyond.
+  assert.equal(hasEventEndedBeyondGrace(null, end, new Date(2026, 8, 26)), false);
+  assert.equal(hasEventEndedBeyondGrace(start, "not a date", new Date(2026, 8, 26)), false);
 });

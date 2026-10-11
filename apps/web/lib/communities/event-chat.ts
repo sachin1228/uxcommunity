@@ -3,7 +3,14 @@ import type { createServiceClient } from "@/lib/supabase/service";
 import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import { canStoreShowcaseFlag } from "./showcase-flag";
 import { enrichEventCards, EVENT_CARD_COLUMNS, loadEventAttendeePreviews } from "./event-cards";
-import { EVENT_CHAT_COMMUNITY_TYPE, canJoinEventChatWith, eventChatName } from "./event-chat-rules";
+import { hasEventEndedBeyondGrace } from "./event-date";
+import {
+  EVENT_CHAT_COMMUNITY_TYPE,
+  EVENT_CHAT_DESCRIPTION,
+  canJoinEventChatWith,
+  eventChatName,
+  roomStillWearsEvent,
+} from "./event-chat-rules";
 
 /**
  * The event group chat is an ordinary community of `type = 'event'` whose
@@ -14,9 +21,6 @@ import { EVENT_CHAT_COMMUNITY_TYPE, canJoinEventChatWith, eventChatName } from "
  */
 
 type Db = ReturnType<typeof createServiceClient>;
-
-const EVENT_CHAT_DESCRIPTION =
-  "Group chat for this event — say hi to everyone going.";
 
 export interface EventChatLink {
   id: string;
@@ -112,23 +116,44 @@ export async function ensureEventChatCommunity(
  * Keep an existing group chat in step with its event: the room is named after
  * the event and wears the same cover, so a rename or a new cover must not leave
  * a stale room (or a room pointing at a deleted image) behind.
+ *
+ * The edit reaches only rooms that still wear the event's old clothes —
+ * `previous` is the title and cover the room last saw, and each field follows
+ * only where the room still wears that field. A room its owner has made their
+ * own keeps its name and face: taking the room over is the offer beside its
+ * chat (see loadEventRoomSection), and a later event edit must never quietly
+ * undo it. Field by field rather than per room, because a room may have been
+ * renamed and still wear the event's cover, or the other way round. The
+ * cover guard also keeps the R2 cleanup honest: the caller deletes a replaced
+ * cover after this runs, and every room still pointing at it must have moved
+ * on by then.
  */
 export async function syncEventChatCommunity(
   db: Db,
   event: { id: string; title: string; coverImageUrl: string | null },
   creatorId: string,
+  previous: { title: string; coverImageUrl: string | null },
 ): Promise<string | null> {
   const id = await ensureEventChatCommunity(db, event, creatorId);
   if (!id) return null;
 
-  const { error } = await db
+  const { error: nameError } = await db
     .from("communities")
-    .update({
-      name: eventChatName(event.title),
-      image_url: event.coverImageUrl,
-    })
+    .update({ name: eventChatName(event.title) })
+    .eq("event_id", event.id)
+    .eq("name", eventChatName(previous.title));
+  if (nameError) console.error("[event-chat] group rename failed:", nameError);
+
+  let coverQuery = db
+    .from("communities")
+    .update({ image_url: event.coverImageUrl })
     .eq("event_id", event.id);
-  if (error) console.error("[event-chat] group sync failed:", error);
+  coverQuery = previous.coverImageUrl
+    ? coverQuery.eq("image_url", previous.coverImageUrl)
+    : coverQuery.is("image_url", null);
+  const { error: coverError } = await coverQuery;
+  if (coverError) console.error("[event-chat] group cover sync failed:", coverError);
+
   return id;
 }
 
@@ -137,7 +162,7 @@ export async function syncEventChatCommunity(
  * the room is for (the date badge on its DP), the deadline it stays pinned to
  * the top of the list until — the event's end, or its start when it has no
  * end — and that same deadline regardless of whether it has passed, so the
- * badge can keep saying ENDED for a day after the event wraps (the pin
+ * badge can keep saying ENDED for half a day after the event wraps (the pin
  * itself must still drop the instant it passes, which is why presence alone
  * cannot carry this).
  */
@@ -157,7 +182,7 @@ export interface EventChatSidebarMeta {
  * Only `pinnedUntil` is gated on the deadline being ahead — the client sort
  * tests presence instead of carrying a clock. The date comes back regardless
  * of whether the event has passed, because the room's DP keeps saying which
- * day it is for (and ENDED for a day after); `eventEnd` is that deadline
+ * day it is for (and ENDED for half a day after); `eventEnd` is that deadline
  * whether ahead or past, for the same reason. A lookup that fails (an
  * environment that has not applied the event-chat migration has no such
  * column) returns nothing rather than breaking the sidebar.
@@ -299,10 +324,17 @@ export async function leaveEventChat(
  * `going` is a bounded preview, not the whole list: the card shows a handful of
  * names and a count, and an event with hundreds of RSVPs must not hand a
  * sidebar that many rows. `event.rsvp_count` remains the authoritative total.
+ *
+ * `carryOn` is the owner-only offer to keep the room: true once the event is
+ * over past the ended badge's grace while the room still wears all three of
+ * the event's clothes — its name, its face, its description. One personal
+ * edit flips it false, which is how the card beside the chat retires itself
+ * without a dismissal to store.
  */
 export interface EventRoomSection {
   event: CommunityEvent;
   going: EventRsvp[];
+  carryOn: boolean;
 }
 
 /** Enough rows for the card's list, its "+N more" and a little slack. */
@@ -316,7 +348,9 @@ const GOING_PREVIEW_LIMIT = 24;
  * The link is read on its own instead of being added to the community read
  * model's column list: an environment that has not applied the event-chat
  * migration simply has no communities.event_id, and that must cost this one
- * section rather than the whole page's read model.
+ * section rather than the whole page's read model. The row's own name, face
+ * and description ride along on the same read — they are what tells whether
+ * the room is still wearing the event's clothes (see `carryOn`).
  */
 export async function loadEventRoomSection(
   db: Db,
@@ -325,10 +359,18 @@ export async function loadEventRoomSection(
 ): Promise<EventRoomSection | null> {
   const { data: link, error } = await db
     .from("communities")
-    .select("event_id")
+    .select("event_id, owner_id, name, image_url, description")
     .eq("id", communityId)
     .maybeSingle();
-  const eventId = (link as { event_id: string | null } | null)?.event_id ?? null;
+  const row =
+    (link as {
+      event_id: string | null;
+      owner_id: string | null;
+      name: string | null;
+      image_url: string | null;
+      description: string | null;
+    } | null) ?? null;
+  const eventId = row?.event_id ?? null;
   if (error || !eventId) return null;
 
   const { data: event } = await db
@@ -348,7 +390,20 @@ export async function loadEventRoomSection(
   if (!card) return null;
 
   const previews = await loadEventAttendeePreviews([eventId], GOING_PREVIEW_LIMIT);
-  return { event: card, going: previews.get(eventId) ?? [] };
+
+  const linked = event as unknown as {
+    title: string;
+    cover_image_url: string | null;
+    event_date: string | null;
+    end_date: string | null;
+  };
+  const carryOn =
+    row != null &&
+    row.owner_id === userId &&
+    roomStillWearsEvent(row, linked) &&
+    hasEventEndedBeyondGrace(linked.event_date, linked.end_date);
+
+  return { event: card, going: previews.get(eventId) ?? [], carryOn };
 }
 
 /** Columns the gate/panel need to describe the event behind a group chat. */

@@ -7,15 +7,20 @@
  * the event it belongs to read as one thing. On the day itself the tile stops
  * naming the month and says TODAY instead: the room you are about to walk into
  * is the one happening right now, which the bare date cannot say. While the
- * event is actually under way it says LIVE, and for an hour after it wraps the
- * tile says ENDED before the room reverts to a plain face — the conversation
- * stays, only the announcement comes down.
+ * event is actually under way it says LIVE, and for half a day after it wraps
+ * the tile says ENDED before the room reverts to a plain face — the
+ * conversation stays, only the announcement comes down.
  */
 const monthFormat = new Intl.DateTimeFormat("en-IN", { month: "short" });
 const weekdayFormat = new Intl.DateTimeFormat("en-IN", { weekday: "short" });
 
-/** How long the tile keeps saying ENDED after the event's window closes. */
-export const EVENT_ENDED_GRACE_MS = 60 * 60 * 1000;
+/**
+ * How long the tile keeps saying ENDED after the event's window closes — half
+ * a day. Long enough that the room everyone just left still reads as
+ * just-over through the evening and the morning after; the same hand turns the
+ * owner's offer to keep the room on (see lib/communities/event-chat).
+ */
+export const EVENT_ENDED_GRACE_MS = 12 * 60 * 60 * 1000;
 
 export interface EventDateBadge {
   /** Month abbreviation, uppercase — "SEPT". */
@@ -29,8 +34,9 @@ export interface EventDateBadge {
   /** The event's window has opened and not yet closed — the tile says LIVE. */
   isLive: boolean;
   /**
-   * The event's window has closed within the last hour — the tile says ENDED.
-   * Past the hour it is false and the caller drops the tile entirely.
+   * The event's window has closed within the ended grace (see
+   * EVENT_ENDED_GRACE_MS) — the tile says ENDED. Past the grace it is false
+   * and the caller drops the tile entirely.
    */
   isEnded: boolean;
   /**
@@ -78,6 +84,28 @@ export function hasEventEnded(
 }
 
 /**
+ * Whether the event is over past its ended grace — the announcement is down
+ * and the event is done for good. The room's owner is offered the room itself
+ * on this same clock (see loadEventRoomSection), so the tile the room wears
+ * and the offer beside its chat turn on one hand.
+ */
+export function hasEventEndedBeyondGrace(
+  startIso: string | null | undefined,
+  endsAtIso: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!startIso) return false;
+  const start = new Date(startIso);
+  if (!Number.isFinite(start.getTime())) return false;
+  const endMs = endsAtIso ? Date.parse(endsAtIso) : start.getTime();
+  return (
+    Number.isFinite(now.getTime()) &&
+    Number.isFinite(endMs) &&
+    now.getTime() >= endMs + EVENT_ENDED_GRACE_MS
+  );
+}
+
+/**
  * The badge's parts, or null when there is no usable date — an unparseable
  * timestamp must cost the badge rather than render "Invalid Date" on a DP.
  *
@@ -113,9 +141,11 @@ export function eventDateBadge(
       Number.isFinite(endMs) &&
       nowMs >= date.getTime() &&
       nowMs < endMs,
-    // The announcement comes down an hour after the event: long enough that
-    // the room everyone just left still reads as just-over, short enough that
-    // the sidebar does not fill up with tombstones.
+    // The announcement stays half a day after the event: through the evening
+    // the room everyone just left still reads as just-over, and the morning
+    // after it has said its piece — short enough that the sidebar does not
+    // fill up with tombstones, and the moment the owner's offer to keep the
+    // room turns on (see lib/communities/event-chat).
     isEnded:
       Number.isFinite(nowMs) &&
       Number.isFinite(endMs) &&

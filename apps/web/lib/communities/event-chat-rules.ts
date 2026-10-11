@@ -28,6 +28,36 @@ export function eventChatName(title: string): string {
 }
 
 /**
+ * The description every event room is born with. "Group chat for this event"
+ * is what the room wears until its owner says otherwise, and the offer to
+ * keep the room reads it as one of the three event clothes a room can still
+ * be in (see roomStillWearsEvent).
+ */
+export const EVENT_CHAT_DESCRIPTION =
+  "Group chat for this event — say hi to everyone going.";
+
+/**
+ * Whether a room still wears all three of the event's clothes — the name, the
+ * face and the description the event gave it at creation. The owner's offer
+ * to keep the room retires the moment any of the three stops matching: one
+ * personal edit means the room is being made its own and the offer has done
+ * its job. The event's own edits stop following such a room too (see
+ * syncEventChatCommunity), so the two must agree on exactly this test. A
+ * cleared description counts as the event's own — nobody wrote one, which is
+ * not a description of the room's own.
+ */
+export function roomStillWearsEvent(
+  room: { name: string | null; image_url: string | null; description: string | null },
+  event: { title: string; cover_image_url: string | null },
+): boolean {
+  return (
+    room.name === eventChatName(event.title) &&
+    (room.image_url ?? null) === (event.cover_image_url ?? null) &&
+    (room.description ?? EVENT_CHAT_DESCRIPTION) === EVENT_CHAT_DESCRIPTION
+  );
+}
+
+/**
  * Who may join the room: everybody when the event is public, and otherwise only
  * the members of the community the event was created in. An event with no
  * community and no public flag is visible to nobody, so it stays closed.

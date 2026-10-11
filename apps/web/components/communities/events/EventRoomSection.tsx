@@ -26,6 +26,8 @@ const VISIBLE_GOING = 6;
 interface EventRoomDetails {
   event: CommunityEvent;
   going: EventRsvp[];
+  /** Owner-only door, the server's answer: the room is the owner's to keep. */
+  carryOn: boolean;
 }
 
 // Same locale as the event card and its dialogs (en-IN) — the sidebar sits on
@@ -111,21 +113,28 @@ function useEventRoomDetails(communityId: string, currentUserId: string) {
 }
 
 /**
- * What the info card becomes once the room has outlived its event.
+ * The card that offers the room to its owner, shared by the two ways a room
+ * can have outlived its event.
  *
- * Deleting an event keeps its group chat (see the event delete route), which
- * leaves a room that is still wearing all three of the event's things: its
- * name is the event's title, its description says "group chat for this event",
- * and its picture is the event's cover. Those are exactly the fields the room's
- * own settings edit, so this card is only the door — the info panel is where a
- * member notices the event is over, and nothing else would tell the owner that
- * the room is theirs to keep.
- *
- * Rendered for the room's owner alone; every other member sees the room exactly
- * as it is (see CommunityRightSidebar, which only draws this when the community
- * is an event's chat with no event behind it).
+ * Both states wear the same room: its name is the event's title, its
+ * description says "group chat for this event", and its picture is the
+ * event's cover — exactly the fields the room's own settings edit, which is
+ * why this card is only the door. The info panel is where a member notices
+ * the event is over, and nothing else would tell the owner that the room is
+ * theirs to keep. Reading as one card in both states keeps the offer the same
+ * shape whichever way the event left.
  */
-export function EventRoomGoneSection({ communityId }: { communityId: string }) {
+function RoomCarryOnCard({
+  communityId,
+  headingId,
+  heading,
+  blurb,
+}: {
+  communityId: string;
+  headingId: string;
+  heading: string;
+  blurb: string;
+}) {
   const router = useGuardedRouter();
 
   function openSettings() {
@@ -137,20 +146,15 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
   }
 
   return (
-    <section
-      aria-labelledby="sidebar-room-event-heading"
-      className="border-t border-border px-5 py-5"
-    >
+    <section aria-labelledby={headingId} className="border-t border-border px-5 py-5">
       <h2
-        id="sidebar-room-event-heading"
+        id={headingId}
         className="font-display text-[15px] font-semibold text-foreground"
       >
-        Event
+        {heading}
       </h2>
       <p className="mt-3 text-pretty font-body text-sm leading-relaxed text-foreground-muted">
-        This room has outlived its event. The people in it and everything they said are still
-        here — give the room a name, a description and a picture of its own and it carries on
-        as a community.
+        {blurb}
       </p>
       <button
         type="button"
@@ -161,6 +165,54 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
         Make this room your own
       </button>
     </section>
+  );
+}
+
+/**
+ * What the info card becomes once the room has outlived its event.
+ *
+ * Deleting an event keeps its group chat (see the event delete route), which
+ * leaves a room still wearing all three of the event's things while the link
+ * its badge and its Event card read has been cleared. Rendered for the room's
+ * owner alone; every other member sees the room exactly as it is (see
+ * CommunityRightSidebar, which only draws this when the community is an
+ * event's chat with no event behind it).
+ */
+export function EventRoomGoneSection({ communityId }: { communityId: string }) {
+  return (
+    <RoomCarryOnCard
+      communityId={communityId}
+      headingId="sidebar-room-event-heading"
+      heading="Event"
+      blurb="This room has outlived its event. The people in it and everything they said are still here — give the room a name, a description and a picture of its own and it carries on as a community."
+    />
+  );
+}
+
+/**
+ * The offer that meets the room's owner once its event is over for good: the
+ * ended badge has come down — twelve hours past the close (see
+ * lib/communities/event-date) — and the event itself is still on the calendar.
+ * The Event card stays above this one (the event's page, who went): the room
+ * outlives its event the moment the event is over, and deleting the event —
+ * a host tidying the calendar, possibly months later — must not be the only
+ * way to find the room's door.
+ *
+ * Whether the offer is this room's to take is decided server-side (see
+ * loadEventRoomSection): owner, past the grace, still wearing all three of the
+ * event's clothes. One personal edit — a name, a description, a picture — and
+ * the answer flips to false, so the card retires itself without a dismissal
+ * to store — and from then on the event's edits stop following the room (see
+ * syncEventChatCommunity).
+ */
+export function EventRoomCarryOnSection({ communityId }: { communityId: string }) {
+  return (
+    <RoomCarryOnCard
+      communityId={communityId}
+      headingId="sidebar-room-carry-on-heading"
+      heading="After the event"
+      blurb="The event is over — the room and everyone in it are still here. Give the room a name, a description and a picture of its own and it carries on as a community."
+    />
   );
 }
 
@@ -212,7 +264,7 @@ export function EventRoomSection({
     );
   }
 
-  const { event, going } = details;
+  const { event, going, carryOn } = details;
   const attended = event.rsvp_count || going.length;
   // The payload is a bounded preview, so the count comes from the event while
   // the names come from the rows we have (see goingPreview).
@@ -227,122 +279,131 @@ export function EventRoomSection({
   const hostSchedule = hostScheduleForViewer(event);
 
   return (
-    <section
-      aria-labelledby="sidebar-event-heading"
-      className="border-t border-border px-5 py-5"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <h2
-          id="sidebar-event-heading"
-          className="font-display text-[15px] font-semibold text-foreground"
-        >
-          Event
-        </h2>
-        {event.user_rsvped && (
-          <span className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-body text-xs font-medium text-accent">
-            Going
-          </span>
-        )}
-      </div>
-
-      {event.cover_image_url && (
-        <img
-          src={event.cover_image_url}
-          alt={event.title}
-          className="mt-3 block h-auto w-full rounded-lg"
-        />
-      )}
-
-      <p className="mt-3 text-pretty font-body text-sm font-medium text-foreground">
-        {event.title}
-      </p>
-
-      <div className="mt-3 flex flex-col gap-2">
-        {/* Date and time in their own rows, like the event card. The times are
-            the viewer's own clock; the zone rides on the time's hover tooltip. */}
-        <Row icon={<CalendarDays strokeWidth={2.5} size={16} />}>
-          {fmtEventDate(event.event_date)}
-        </Row>
-        <Row icon={<Clock strokeWidth={2.5} size={16} />}>
-          <span>
-            <span className="block" title={eventZoneTooltip(event.event_date)}>
-              {formatEventTimeRange(event.event_date, event.end_date)}
-            </span>
-            {/* What the host set, in their own zone — the same moment, other
-                clock. Shown only when the two readings actually differ. */}
-            {hostSchedule && (
-              <span
-                className="mt-0.5 block text-xs text-foreground-subtle"
-                title={`The time the host set, in their own zone (${hostSchedule.zone}).`}
-              >
-                Host time: {hostSchedule.range} ({hostSchedule.zone})
-              </span>
-            )}
-          </span>
-        </Row>
-        <Row icon={event.is_online ? <Video strokeWidth={2.5} size={16} /> : <MapPin strokeWidth={2.5} size={16} />}>
-          {event.is_online ? "Online event" : event.location ?? "Location shared by the host"}
-        </Row>
-        <Row icon={<Users strokeWidth={2.5} size={16} />}>
-          {spotsLeft === null
-            ? `${attended} going`
-            : spotsLeft > 0
-              ? `${spotsLeft} of ${event.max_attendees} spots remaining`
-              : "No spots remaining"}
-        </Row>
-      </div>
-
-      {/* ── Who is going ─────────────────────────────────────────────── */}
-      <div className="mt-4">
-        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground-subtle">
-          Going · {attended}
-        </p>
-        {visible.length > 0 ? (
-          <ul className="mt-3 flex flex-col gap-2.5">
-            {visible.map((entry) => (
-              <li key={entry.user_id} className="flex items-center gap-2.5">
-                <Link
-                  href={profileHref(entry.user_id)}
-                  title={entry.name}
-                  className="flex min-w-0 items-center gap-2.5"
-                >
-                  <AvatarImg
-                    url={entry.avatar_url}
-                    name={entry.name}
-                    size={28}
-                    className="h-7 w-7 shrink-0 rounded-full object-cover"
-                  />
-                  <span
-                    className={`min-w-0 truncate font-body text-sm hover:underline ${
-                      entry.is_self ? "font-medium text-foreground" : "text-foreground-muted"
-                    }`}
-                  >
-                    {entry.label}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 font-body text-sm text-foreground-muted">
-            No one is going yet.
-          </p>
-        )}
-        {more > 0 && (
-          <p className="mt-2 font-body text-xs text-foreground-subtle">
-            +{more} more going
-          </p>
-        )}
-      </div>
-
-      {/* ── The event's own page ─────────────────────────────────────── */}
-      <Link
-        href={`/dashboard/events/${event.id}`}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+    <>
+      <section
+        aria-labelledby="sidebar-event-heading"
+        className="border-t border-border px-5 py-5"
       >
-        View event
-        <ArrowRight strokeWidth={2.5} size={14} aria-hidden="true" />
-      </Link>
-    </section>
+        <div className="flex items-center justify-between gap-3">
+          <h2
+            id="sidebar-event-heading"
+            className="font-display text-[15px] font-semibold text-foreground"
+          >
+            Event
+          </h2>
+          {event.user_rsvped && (
+            <span className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-body text-xs font-medium text-accent">
+              Going
+            </span>
+          )}
+        </div>
+
+        {event.cover_image_url && (
+          <img
+            src={event.cover_image_url}
+            alt={event.title}
+            className="mt-3 block h-auto w-full rounded-lg"
+          />
+        )}
+
+        <p className="mt-3 text-pretty font-body text-sm font-medium text-foreground">
+          {event.title}
+        </p>
+
+        <div className="mt-3 flex flex-col gap-2">
+          {/* Date and time in their own rows, like the event card. The times
+              are the viewer's own clock; the zone rides on the time's hover
+              tooltip. */}
+          <Row icon={<CalendarDays strokeWidth={2.5} size={16} />}>
+            {fmtEventDate(event.event_date)}
+          </Row>
+          <Row icon={<Clock strokeWidth={2.5} size={16} />}>
+            <span>
+              <span className="block" title={eventZoneTooltip(event.event_date)}>
+                {formatEventTimeRange(event.event_date, event.end_date)}
+              </span>
+              {/* What the host set, in their own zone — the same moment, other
+                  clock. Shown only when the two readings actually differ. */}
+              {hostSchedule && (
+                <span
+                  className="mt-0.5 block text-xs text-foreground-subtle"
+                  title={`The time the host set, in their own zone (${hostSchedule.zone}).`}
+                >
+                  Host time: {hostSchedule.range} ({hostSchedule.zone})
+                </span>
+              )}
+            </span>
+          </Row>
+          <Row icon={event.is_online ? <Video strokeWidth={2.5} size={16} /> : <MapPin strokeWidth={2.5} size={16} />}>
+            {event.is_online ? "Online event" : event.location ?? "Location shared by the host"}
+          </Row>
+          <Row icon={<Users strokeWidth={2.5} size={16} />}>
+            {spotsLeft === null
+              ? `${attended} going`
+              : spotsLeft > 0
+                ? `${spotsLeft} of ${event.max_attendees} spots remaining`
+                : "No spots remaining"}
+          </Row>
+        </div>
+
+        {/* ── Who is going ───────────────────────────────────────────── */}
+        <div className="mt-4">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground-subtle">
+            Going · {attended}
+          </p>
+          {visible.length > 0 ? (
+            <ul className="mt-3 flex flex-col gap-2.5">
+              {visible.map((entry) => (
+                <li key={entry.user_id} className="flex items-center gap-2.5">
+                  <Link
+                    href={profileHref(entry.user_id)}
+                    title={entry.name}
+                    className="flex min-w-0 items-center gap-2.5"
+                  >
+                    <AvatarImg
+                      url={entry.avatar_url}
+                      name={entry.name}
+                      size={28}
+                      className="h-7 w-7 shrink-0 rounded-full object-cover"
+                    />
+                    <span
+                      className={`min-w-0 truncate font-body text-sm hover:underline ${
+                        entry.is_self ? "font-medium text-foreground" : "text-foreground-muted"
+                      }`}
+                    >
+                      {entry.label}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 font-body text-sm text-foreground-muted">
+              No one is going yet.
+            </p>
+          )}
+          {more > 0 && (
+            <p className="mt-2 font-body text-xs text-foreground-subtle">
+              +{more} more going
+            </p>
+          )}
+        </div>
+
+        {/* ── The event's own page ───────────────────────────────────── */}
+        <Link
+          href={`/dashboard/events/${event.id}`}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          View event
+          <ArrowRight strokeWidth={2.5} size={14} aria-hidden="true" />
+        </Link>
+      </section>
+
+      {/* The event is over for good — its badge has come down — and the room's
+          door turns up under the card that links back to it. The answer is the
+          server's (see loadEventRoomSection), so a room already made its own
+          never flashes this. */}
+      {carryOn && <EventRoomCarryOnSection communityId={communityId} />}
+    </>
   );
 }
