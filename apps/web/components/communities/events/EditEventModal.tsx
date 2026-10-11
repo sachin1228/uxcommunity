@@ -273,7 +273,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             />
           </label>
 
-          {/* Cover image + event name/start date+time share one row */}
+          {/* The poster and the event's details share one row */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="flex flex-col">
               <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
@@ -398,62 +398,62 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                     : `Starts in about ${startsInMinutes} minutes.`}
                 </p>
               )}
+
+              {/* Either online or in person — the field below follows the choice */}
+              <div>
+                <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Event type</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsOnline(true)}
+                    aria-pressed={isOnline}
+                    className={filterChip(isOnline)}
+                  >
+                    <Video size={14} strokeWidth={2.5} aria-hidden="true" />
+                    Online
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsOnline(false)}
+                    aria-pressed={!isOnline}
+                    className={filterChip(!isOnline)}
+                  >
+                    <MapPin size={14} strokeWidth={2.5} aria-hidden="true" />
+                    In person
+                  </button>
+                </div>
+              </div>
+
+              {isOnline ? (
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
+                  </span>
+                  <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
+                    placeholder="https://meet.google.com/…"
+                    className="field w-full" />
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
+                  </span>
+                  <input value={location} onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Address or venue name"
+                    className="field w-full" />
+                </label>
+              )}
+
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                  <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
+                </span>
+                <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
+                  placeholder="Leave blank for unlimited"
+                  className="field w-full" />
+              </label>
             </div>
           </div>
-
-          {/* Either online or in person — the field below follows the choice */}
-          <div>
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Event type</span>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setIsOnline(true)}
-                aria-pressed={isOnline}
-                className={filterChip(isOnline)}
-              >
-                <Video size={14} strokeWidth={2.5} aria-hidden="true" />
-                Online
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsOnline(false)}
-                aria-pressed={!isOnline}
-                className={filterChip(!isOnline)}
-              >
-                <MapPin size={14} strokeWidth={2.5} aria-hidden="true" />
-                In person
-              </button>
-            </div>
-          </div>
-
-          {isOnline ? (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
-              </span>
-              <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
-                placeholder="https://meet.google.com/…"
-                className="field w-full" />
-            </label>
-          ) : (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
-              </span>
-              <input value={location} onChange={(e) => setLocation(e.target.value)}
-                placeholder="Address or venue name"
-                className="field w-full" />
-            </label>
-          )}
-
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
-            </span>
-            <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
-              placeholder="Leave blank for unlimited"
-              className="field w-full" />
-          </label>
 
           {/* Accent color */}
           <div>
