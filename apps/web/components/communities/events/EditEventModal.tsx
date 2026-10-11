@@ -330,6 +330,10 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   min={minDate}
                   disabled={startIsPast}
                   title={startIsPast ? "The start of an event that has already happened can't be changed" : undefined}
+                  onClick={(e) => {
+                    // Anywhere on the field opens the calendar, not only the icon.
+                    try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
+                  }}
                   onChange={(e) => {
                     setEventDate(e.target.value);
                     // Switching onto today must not keep a time that day
@@ -359,6 +363,10 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                     min={eventDate === minDate ? minStartTime : undefined}
                     disabled={startIsPast}
                     title={startIsPast ? "The start of an event that has already happened can't be changed" : undefined}
+                    onClick={(e) => {
+                      // Anywhere on the field opens the picker, not only the icon.
+                      try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
+                    }}
                     onChange={(e) => {
                       // Typing can bypass the picker's min — refuse a past
                       // time on today's date rather than accepting it here.
@@ -376,6 +384,10 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                     type="time"
                     value={endTime}
                     min={eventTime || undefined}
+                    onClick={(e) => {
+                      // Anywhere on the field opens the picker, not only the icon.
+                      try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
+                    }}
                     onChange={(e) => setEndTime(e.target.value)}
                     className={`field w-full cursor-pointer ${endTime ? "" : "time-empty"}`}
                   />
