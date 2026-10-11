@@ -6,8 +6,13 @@ import { Modal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
 import { DpWithEventDate } from "../DpWithEventDate";
 import { hasEventEnded } from "@/lib/communities/event-date";
+import { eventChatName } from "@/lib/communities/event-chat-rules";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
+import {
+  createAndJoinEventChatFromClient,
+  joinEventChatFromClient,
+} from "@/lib/communities/event-chat-client";
 import type { EventJoinAnswers } from "@/lib/communities/event-join-questions";
 import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";
 
@@ -17,6 +22,11 @@ import { EventJoinQuestionsModal } from "./EventJoinQuestionsModal";
  * Owners and anybody who already confirmed they are going see one button that
  * opens the room. Everyone else gets the same confirm step the room's own page
  * shows — joining is compulsory to take part, so it is never silent.
+ *
+ * The row is offered for any event that has not ended, whether or not the room
+ * exists yet: the group is created with the first join (see the chat route), so
+ * a roomless event — a creation that failed, or a room since removed — still
+ * has its door while the event is still to come or under way.
  */
 export function EventChatPanel({
   chatCommunityId,
@@ -24,6 +34,8 @@ export function EventChatPanel({
   chatCommunityImage,
   chatMemberCount,
   joined,
+  communityId,
+  eventId,
   eventTitle,
   eventDate,
   eventEnd,
@@ -37,6 +49,9 @@ export function EventChatPanel({
   /** How many people are in the group chat. */
   chatMemberCount?: number;
   joined: boolean;
+  /** The event's community — where the on-demand create+join request is sent. */
+  communityId: string;
+  eventId: string;
   eventTitle: string;
   /** The event's start — its group chat's DP wears it as a calendar badge. */
   eventDate?: string | null;
@@ -57,14 +72,26 @@ export function EventChatPanel({
   }
 
   async function handleJoin(answers: EventJoinAnswers) {
-    if (!chatCommunityId) return;
     setJoining(true);
     setError(null);
     try {
-      await joinEventChatFromClient(chatCommunityId, answers);
+      let roomId = chatCommunityId;
+      if (roomId) {
+        await joinEventChatFromClient(roomId, answers);
+      } else {
+        // No room yet: the join is the moment it comes into being — the
+        // server finds-or-creates it before putting the member in it. A public
+        // event with no community is addressed as "public", the same scope
+        // segment the RSVP route accepts.
+        roomId = await createAndJoinEventChatFromClient(
+          communityId || PUBLIC_CONTENT_SCOPE,
+          eventId,
+          answers,
+        );
+      }
       setConfirmOpen(false);
       setQuestionsOpen(false);
-      openChat();
+      router.push(`/dashboard/communities/${roomId}`);
     } catch (joinError) {
       setError(joinError instanceof Error ? joinError.message : "Failed to join the event chat.");
     } finally {
@@ -78,7 +105,7 @@ export function EventChatPanel({
   // The room itself keeps its history either way.
   const hasEnded = hasEventEnded(eventDate, eventEnd);
 
-  if (!chatCommunityId || hasEnded) return null;
+  if (hasEnded) return null;
 
   return (
     <>
@@ -94,9 +121,14 @@ export function EventChatPanel({
           />
         </DpWithEventDate>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-body text-sm font-medium text-foreground">{chatCommunityName ?? "Event chat"}</p>
+          {/* Roomless events get the name the room will be created with, so the
+              row reads the same before and after the first join. */}
+          <p className="truncate font-body text-sm font-medium text-foreground">
+            {chatCommunityName ?? eventChatName(eventTitle)}
+          </p>
           <p className="text-pretty font-body text-xs text-foreground-muted">
-            {typeof chatMemberCount === "number" &&
+            {chatCommunityId &&
+              typeof chatMemberCount === "number" &&
               `${chatMemberCount} ${chatMemberCount === 1 ? "member" : "members"} · `}
             {joined
               ? "You're in — talk about this event with everyone going."

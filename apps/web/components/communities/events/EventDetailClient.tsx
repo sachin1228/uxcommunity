@@ -192,6 +192,8 @@ export function EventDetailClient({
           chatCommunityImage={chatCommunityImage}
           chatMemberCount={chatMemberCount}
           joined={chatCommunityJoined}
+          communityId={communityId}
+          eventId={event.id}
           eventTitle={event.title}
           eventDate={event.event_date}
           eventEnd={event.end_date}
