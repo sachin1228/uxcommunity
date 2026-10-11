@@ -310,6 +310,24 @@ export function EventRoomSection({
           {event.title}
         </p>
 
+        {event.users && (
+          <Link
+            href={profileHref(event.user_id)}
+            title={event.users.name}
+            className="mt-1.5 inline-flex min-w-0 max-w-full items-center gap-2"
+          >
+            <AvatarImg
+              url={event.users.avatar_url}
+              name={event.users.name}
+              size={20}
+              className="h-5 w-5 shrink-0 rounded-full object-cover"
+            />
+            <span className="min-w-0 truncate font-body text-xs text-foreground-muted hover:underline">
+              Hosted by <span className="font-medium text-foreground">{event.users.name}</span>
+            </span>
+          </Link>
+        )}
+
         <div className="mt-3 flex flex-col gap-2">
           {/* Date and time in their own rows, like the event card. The times
               are the viewer's own clock; the zone rides on the time's hover
