@@ -249,7 +249,7 @@ export function EventRoomSection({
         <img
           src={event.cover_image_url}
           alt={event.title}
-          className="mt-3 aspect-video w-full rounded-lg object-cover"
+          className="mt-3 block h-auto w-full rounded-lg"
         />
       )}
 
