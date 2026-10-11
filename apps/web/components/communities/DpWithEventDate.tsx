@@ -19,12 +19,13 @@ import { useNowTick } from "@/lib/use-now-tick";
  * the event's own day it trades the month for TODAY; while the event runs the
  * tile steps aside for a small LIVE pill — a pulsing dot and the word, no
  * date: on the day itself everyone can see it is today, and the open window
- * is the whole news; and for a day after it wraps the tile returns and says
- * ENDED — then it comes down altogether and the room reverts to a plain face,
- * the conversation itself untouched. The red is the calendar's own ink rather
- * than a state signal — the same red, white and black in either theme and
- * over any DP — and the live pill alone carries the pulse, the beat that
- * reads across a sidebar while a window is open.
+ * is the whole news. For an hour after the window closes the pill says ENDED
+ * — no date either, the day has stopped being the news — and then it comes
+ * down altogether and the room reverts to a plain face, the conversation
+ * itself untouched. The red is the calendar's own ink rather than a state
+ * signal — the same red, white and black in either theme and over any DP —
+ * and the live pill alone carries the pulse, the beat that reads across a
+ * sidebar while a window is open.
  *
  * The tile moves the way a date arrives: it springs in from the DP's corner
  * when it appears, and while the event is live a red ring pulses out of the
@@ -61,18 +62,19 @@ const MONO_ADVANCE = 0.58;
 const WORD_RATIO = 0.24;
 const MIN_WORD_PX = 4;
 /**
- * The live pill's metrics, as fractions of the DP: the pill is sized by its
- * content (dot, word, padding), so unlike the tile it has no side of its own
- * to scale from — everything rides the DP instead. Height and dot are floored
- * so the smallest sizes keep a pill that still reads as one.
+ * The state pill's metrics (live and ended), as fractions of the DP: the
+ * pill is sized by its content (dot, word, padding), so unlike the tile it
+ * has no side of its own to scale from — everything rides the DP instead.
+ * Height and dot are floored so the smallest sizes keep a pill that still
+ * reads as one.
  */
-const LIVE_PILL_HEIGHT_RATIO = 0.42;
-const LIVE_PILL_FONT_RATIO = 0.22;
-const LIVE_PILL_DOT_RATIO = 0.15;
-const LIVE_PILL_GAP_RATIO = 0.06;
-const LIVE_PILL_PAD_RATIO = 0.14;
-const MIN_LIVE_PILL_HEIGHT_PX = 10;
-const MIN_LIVE_DOT_PX = 3;
+const PILL_HEIGHT_RATIO = 0.42;
+const PILL_FONT_RATIO = 0.22;
+const PILL_DOT_RATIO = 0.15;
+const PILL_GAP_RATIO = 0.06;
+const PILL_PAD_RATIO = 0.14;
+const MIN_PILL_HEIGHT_PX = 10;
+const MIN_PILL_DOT_PX = 3;
 
 /**
  * How often the tile re-reads the clock. The tile announces a moment — a
@@ -92,8 +94,8 @@ function badgeSizeFor(dpSize: number, isToday: boolean): number {
 
 /**
  * The band line's size for a month abbreviation: the word is trimmed to the
- * tile's inner width rather than allowed to spill past the band. The word
- * states go through wordFontSize.
+ * tile's inner width rather than allowed to spill past the band. TODAY goes
+ * through wordFontSize.
  */
 function topLineFontSize(badgeSize: number, glyphs: number): number {
   const monthPx = Math.max(MIN_MONTH_PX, Math.round(badgeSize * MONTH_RATIO));
@@ -103,9 +105,8 @@ function topLineFontSize(badgeSize: number, glyphs: number): number {
 }
 
 /**
- * The word states' size: one proportion of the tile everywhere, trimmed to
- * the tile's inner width like the month is, so the word never reaches the
- * band's edges.
+ * TODAY's size: one proportion of the tile everywhere, trimmed to the tile's
+ * inner width like the month is, so the word never reaches the band's edges.
  */
 function wordFontSize(badgeSize: number, glyphs: number): number {
   const heightPx = Math.max(MIN_WORD_PX, Math.round(badgeSize * WORD_RATIO));
@@ -125,10 +126,10 @@ export function DpWithEventDate({
   date?: string | null;
   /**
    * The event's end, ISO — what turns the tile into the LIVE pill between
-   * start and end. Callers hand over the room's `event_end` (the deadline
-   * whether it is ahead or past), falling back to the sidebar's
-   * `pinned_until`, which is the same instant while the event could still be
-   * running.
+   * start and end (and ENDED for an hour after). Callers hand over the room's
+   * `event_end` (the deadline whether it is ahead or past), falling back to
+   * the sidebar's `pinned_until`, which is the same instant while the event
+   * could still be running.
    */
   endsAt?: string | null;
   /** Diameter of the DP inside, which the badge scales itself from. */
@@ -140,58 +141,58 @@ export function DpWithEventDate({
   const now = useNowTick(EVENT_BADGE_TICK_MS);
   const badge = eventDateBadge(date, { endsAt, now: new Date(now) });
   // The tile wears the date for every event still to come, trades it for
-  // TODAY as the day arrives, steps aside for the LIVE pill while the window
-  // is open, says ENDED for a day after it closes, and only then comes down
-  // — the room and its history stay. The gate is "has the window closed and
-  // the grace day passed", never the state itself: an event weeks out must
-  // keep its plain date tile.
+  // TODAY as the day arrives, steps aside for the state pill while the
+  // window is open or freshly closed, and only comes down once there is
+  // nothing left to announce — the room and its history stay. The gate is
+  // "has the window closed and the grace hour passed", never the state
+  // itself: an event weeks out must keep its plain date tile.
   const visible = Boolean(badge && (!badge.isPast || badge.isEnded));
   const isEnded = Boolean(badge?.isEnded);
   const isLive = Boolean(badge?.isLive);
-  const badgeSize = visible && badge ? badgeSizeFor(dpSize, badge.isToday || isEnded) : 0;
-  const word = badge
-    ? isEnded
-      ? "Ended"
-      : badge.isToday
-        ? "Today"
-        : badge.month
-    : "";
-  // One band line, two looks: the word states scale as their own proportion,
-  // the month keeps its own.
+  // While the window is the news — open, or just closed — the calendar steps
+  // aside for the pill (see below); the tile itself only shows a plain date
+  // or TODAY.
+  const isPill = isLive || isEnded;
+  const badgeSize = visible && badge && !isPill ? badgeSizeFor(dpSize, badge.isToday) : 0;
+  const word = badge ? (badge.isToday ? "Today" : badge.month) : "";
+  // One band line, two looks: TODAY scales as the word states do, the month
+  // keeps its own proportion.
   const wordPx =
-    visible && badge && !isLive
-      ? badge.isToday || isEnded
+    visible && badge && !isPill
+      ? badge.isToday
         ? wordFontSize(badgeSize, word.length)
         : topLineFontSize(badgeSize, word.length)
       : 0;
   const tileRadius = Math.max(3, Math.round(badgeSize * TILE_RADIUS_RATIO));
-  // The live pill's metrics (see the pill's ratio block above).
-  const pillHeight = Math.max(MIN_LIVE_PILL_HEIGHT_PX, Math.round(dpSize * LIVE_PILL_HEIGHT_RATIO));
-  const pillFont = Math.round(dpSize * LIVE_PILL_FONT_RATIO);
-  const pillDot = Math.max(MIN_LIVE_DOT_PX, Math.round(dpSize * LIVE_PILL_DOT_RATIO));
-  const pillGap = Math.max(1, Math.round(dpSize * LIVE_PILL_GAP_RATIO));
-  const pillPad = Math.max(3, Math.round(dpSize * LIVE_PILL_PAD_RATIO));
+  // The state pill's metrics (see the pill's ratio block above).
+  const pillHeight = Math.max(MIN_PILL_HEIGHT_PX, Math.round(dpSize * PILL_HEIGHT_RATIO));
+  const pillFont = Math.round(dpSize * PILL_FONT_RATIO);
+  const pillDot = Math.max(MIN_PILL_DOT_PX, Math.round(dpSize * PILL_DOT_RATIO));
+  const pillGap = Math.max(1, Math.round(dpSize * PILL_GAP_RATIO));
+  const pillPad = Math.max(3, Math.round(dpSize * PILL_PAD_RATIO));
 
   return (
     <div className={`relative shrink-0 ${className}`}>
       {children}
 
-      {/* While the event is live the calendar steps aside for a small pill —
-          a dot and the word, no date: the day it belongs to has stopped
-          being the news, the open window is. The anchor wraps pill and halo
-          so the ring can size itself to whatever the pill's content renders
-          as, and a ring pulses out of the pill on the dot's beat, so the
-          room happening right now reads across a sidebar. */}
-      {visible && badge && isLive && (
+      {/* When the window is the news — open, or just closed — the calendar
+          steps aside for a small pill. LIVE carries a dot's pulse and, with
+          it, a ring pulsing out of the pill's shape; ENDED is the word
+          alone. No date either way: the day it belongs to has stopped being
+          the news. The anchor wraps pill and halo so the ring sizes itself
+          to whatever the pill's content renders as. */}
+      {visible && badge && isPill && (
         <span className="pointer-events-none absolute -bottom-1 -right-1">
-          <span
-            aria-hidden="true"
-            className="event-tile-halo absolute inset-0 rounded-full border-2"
-          />
+          {isLive && (
+            <span
+              aria-hidden="true"
+              className="event-tile-halo absolute inset-0 rounded-full border-2"
+            />
+          )}
           <span
             role="img"
-            aria-label={`Event live now, ${badge.label}`}
-            title={`Live now · ${badge.label}`}
+            aria-label={isLive ? `Event live now, ${badge.label}` : `Event ended, ${badge.label}`}
+            title={isLive ? `Live now · ${badge.label}` : badge.label}
             style={{
               height: pillHeight,
               fontSize: pillFont,
@@ -208,38 +209,33 @@ export function DpWithEventDate({
                 and the dot is sized off the DP so the swell stays its own
                 mark instead of a wash over the pill. Members who asked for
                 less motion keep the dot, without the swell. */}
-            <span
-              aria-hidden="true"
-              className="relative inline-flex shrink-0"
-              style={{ width: pillDot, height: pillDot }}
-            >
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75 motion-reduce:animate-none" />
-              <span className="relative inline-flex h-full w-full rounded-full bg-white" />
-            </span>
-            <span className="relative">Live</span>
+            {isLive && (
+              <span
+                aria-hidden="true"
+                className="relative inline-flex shrink-0"
+                style={{ width: pillDot, height: pillDot }}
+              >
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75 motion-reduce:animate-none" />
+                <span className="relative inline-flex h-full w-full rounded-full bg-white" />
+              </span>
+            )}
+            <span className="relative">{isLive ? "Live" : "Ended"}</span>
           </span>
         </span>
       )}
 
-      {visible && badge && !isLive && (
+      {visible && badge && !isPill && (
         /* The tile: a wall calendar over the DP. The red name band carries
-           the month or the state word; the white leaf below carries the day
-           in fixed ink — red, white and black are the calendar's own
-           colours, so the tile reads the same in either theme and over any
-           DP. It springs in from its anchored corner (see event-tile-in)
-           whenever the room's face first appears. Decorative for scanning,
-           but the full date is in the accessible name and the tooltip, so
-           the year the tile drops is still one hover (or screen reader)
-           away. */
+           the month or TODAY; the white leaf below carries the day in fixed
+           ink — red, white and black are the calendar's own colours, so the
+           tile reads the same in either theme and over any DP. It springs in
+           from its anchored corner (see event-tile-in) whenever the room's
+           face first appears. Decorative for scanning, but the full date is
+           in the accessible name and the tooltip, so the year the tile drops
+           is still one hover (or screen reader) away. */
         <span
           role="img"
-          aria-label={
-            isEnded
-              ? `Event ended, ${badge.label}`
-              : badge.isToday
-                ? `Event today, ${badge.label}`
-                : `Event on ${badge.label}`
-          }
+          aria-label={badge.isToday ? `Event today, ${badge.label}` : `Event on ${badge.label}`}
           title={badge.label}
           style={{
             width: badgeSize,
@@ -257,9 +253,8 @@ export function DpWithEventDate({
           >
             {word}
           </span>
-          {/* The day stays on the leaf in every state — the tile is still the
-              calendar for the room's day, it is only the band that changes its
-              story. */}
+          {/* The day stays on the leaf — whenever the calendar is up, it is
+              the calendar for the room's day. */}
           <span
             className="flex flex-1 items-center justify-center font-display font-bold tracking-tight text-black"
             style={{ fontSize: Math.round(badgeSize * DAY_RATIO) }}
