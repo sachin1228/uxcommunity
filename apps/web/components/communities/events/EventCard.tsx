@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import TruncateMarkup from "react-truncate-markup";
 import { flattenPreviewText } from "@/lib/communities/preview-text";
-import { Calendar, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
+import { Calendar, CheckCheck, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
@@ -494,7 +494,7 @@ export function EventCard({
             : `bg-[var(--accent)] ${onAccentText} shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]`
       }`}
     >
-      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
+      {rsvpPending ? "Updating…" : event.user_rsvped ? <>Going <CheckCheck strokeWidth={2.5} size={14} aria-hidden="true" /></> : full ? "Event Full" : <>I'm Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
     </button>
   ) : (
     <span className="font-display text-xs font-medium text-stone-500">This event has ended</span>
