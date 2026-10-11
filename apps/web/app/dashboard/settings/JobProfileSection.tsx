@@ -179,9 +179,6 @@ export function JobProfileSection({ initialPortfolioUrl, initialResumes }: JobPr
           placeholder="https://yourportfolio.com"
           className="field"
         />
-        <p className="font-body text-xs text-foreground-muted">
-          Fills the portfolio field when you apply to a job.
-        </p>
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border pt-4">

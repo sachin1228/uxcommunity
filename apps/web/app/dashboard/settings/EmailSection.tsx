@@ -87,10 +87,6 @@ export function EmailSection({ email, initial }: EmailSectionProps) {
           onChange={(checked) => void save({ emailProductNews: checked })}
         />
       </div>
-
-      <p className="font-body text-xs text-foreground-muted">
-        Account emails (password resets, sign-in) always send.
-      </p>
     </section>
   );
 }
