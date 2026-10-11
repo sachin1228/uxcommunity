@@ -143,13 +143,13 @@ export function EventChatPanel({
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 font-body text-sm text-foreground transition-colors hover:bg-surface-raised"
           >
             <MessageSquare strokeWidth={2.5} size={14} />
-            Open chat
+            Open
           </button>
         ) : (
           <button
             type="button"
             onClick={() => setConfirmOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3.5 py-2 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover"
           >
             <MessageSquare strokeWidth={2.5} size={14} />
             Join
