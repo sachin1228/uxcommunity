@@ -279,7 +279,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
                 Cover image <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
-              <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageSelect} />
+              <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageSelect} />
               {coverImageUrl ? (
                 <div className="relative min-h-32 w-full flex-1 overflow-hidden rounded-lg border border-border bg-surface-raised">
                   <img src={coverImageUrl} alt="Cover" className="h-full w-full object-cover" />
@@ -301,7 +301,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 >
                   {imageUploading ? <Spinner size={20} /> : <ImagePlus strokeWidth={2.5} size={20} />}
                   <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
-                  <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
+                  <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP, GIF or AVIF · max 5 MB</span>
                 </button>
               )}
             </div>
