@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, MapPin, Settings, Users, Video } from "lucide-react";
+import { ArrowRight, CalendarDays, Clock, MapPin, Settings, Users, Video } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { openCommunitySettings } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -11,7 +11,6 @@ import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import {
-  eventZoneLabel,
   eventZoneTooltip,
   formatEventTimeRange,
   hostScheduleForViewer,
@@ -38,10 +37,6 @@ function fmtEventDate(iso: string) {
     month: "short",
     year: "numeric",
   });
-}
-
-function fmtSchedule(event: CommunityEvent) {
-  return `${fmtEventDate(event.event_date)} · ${formatEventTimeRange(event.event_date, event.end_date)}`;
 }
 
 function Row({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -250,24 +245,28 @@ export function EventRoomSection({
         )}
       </div>
 
+      {event.cover_image_url && (
+        <img
+          src={event.cover_image_url}
+          alt={event.title}
+          className="mt-3 aspect-video w-full rounded-lg object-cover"
+        />
+      )}
+
       <p className="mt-3 text-pretty font-body text-sm font-medium text-foreground">
         {event.title}
       </p>
 
       <div className="mt-3 flex flex-col gap-2">
-        {/* One row carries the whole schedule — the card does the same, so a
-            multi-day event reads the same in both places. The times are the
-            viewer's own clock, so the zone rides along with them. */}
+        {/* Date and time in their own rows, like the event card. The times are
+            the viewer's own clock; the zone rides on the time's hover tooltip. */}
         <Row icon={<CalendarDays strokeWidth={2.5} size={16} />}>
+          {fmtEventDate(event.event_date)}
+        </Row>
+        <Row icon={<Clock strokeWidth={2.5} size={16} />}>
           <span>
-            <span
-              className="block"
-              title={eventZoneTooltip(event.event_date)}
-            >
-              {fmtSchedule(event)}{" "}
-              <span className="font-mono text-[11px] text-foreground-subtle">
-                ({eventZoneLabel(event.event_date)})
-              </span>
+            <span className="block" title={eventZoneTooltip(event.event_date)}>
+              {formatEventTimeRange(event.event_date, event.end_date)}
             </span>
             {/* What the host set, in their own zone — the same moment, other
                 clock. Shown only when the two readings actually differ. */}
