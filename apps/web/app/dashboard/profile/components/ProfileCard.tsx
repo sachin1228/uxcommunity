@@ -132,15 +132,17 @@ export function ProfileCard({
             <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
             {/* Seniority and designation on their own line under the name,
-                as plain text — no pill, no icon. The verified workplace rides
-                the same line after an “@”, logo first, and leads to the
-                company's page; with no workplace yet, the hollow "Add your
-                company" pill sits at the end of the line. Truncated so the
-                label stays a single line however long it runs. */}
+                as plain text — no pill, no icon. One “@” joins the role to the
+                workplace: the verified company (logo first, leading to its
+                page) when set, or the hollow "Add your company" pill when not.
+                Truncated so the label stays a single line however long it
+                runs. */}
             {(roleLabel || company || onAddCompany) && (
               <p className="mt-1.5 flex min-w-0 items-center gap-2 font-body text-sm text-foreground-muted">
                 {roleLabel && <span className="truncate">{roleLabel}</span>}
-                {roleLabel && company && <span aria-hidden="true">@</span>}
+                {roleLabel && (company || onAddCompany) && (
+                  <span aria-hidden="true">@</span>
+                )}
                 {company && (
                   <Link
                     href={`/dashboard/companies/${company.slug}`}
