@@ -34,8 +34,13 @@ interface ProfileCardProps {
    * identity fields and the workplace. Omitted on read-only surfaces.
    */
   editProfileHref?: string;
-  /** The member's portfolio link — rendered as a chip on other members' profiles when set. */
+  /** The member's portfolio link — a chip under the bio on read-only surfaces, the live circle beside LinkedIn on the owner's. */
   portfolio?: string;
+  /**
+   * Opens the add-portfolio prompt. Omitted on read-only surfaces, where the
+   * portfolio renders as the chip instead.
+   */
+  onAddPortfolio?: () => void;
   /**
    * The member's LinkedIn profile URL when saved — rendered under the city as
    * a live icon button linking out to the profile.
@@ -85,6 +90,7 @@ export function ProfileCard({
   onAddCompany,
   editProfileHref,
   portfolio = "",
+  onAddPortfolio,
   linkedinUrl,
   onAddLinkedIn,
 }: ProfileCardProps) {
@@ -204,33 +210,57 @@ export function ProfileCard({
               <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
             )}
 
-            {/* LinkedIn — a hollow circle that opens the add prompt right here
-                until a profile link is saved, then a live button out to the
-                member's profile. */}
-            {(linkedinProfileUrl || onAddLinkedIn) && (
-              <div className="mt-3">
-                {linkedinProfileUrl ? (
-                  <a
-                    href={linkedinProfileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="LinkedIn profile"
-                    title="LinkedIn"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-                  >
-                    <Linkedin strokeWidth={2.5} size={14} />
-                  </a>
-                ) : onAddLinkedIn ? (
-                  <button
-                    type="button"
-                    onClick={onAddLinkedIn}
-                    aria-label="Add your LinkedIn"
-                    title="Add your LinkedIn"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-                  >
-                    <Linkedin strokeWidth={2.5} size={14} />
-                  </button>
-                ) : null}
+            {/* LinkedIn and portfolio — hollow circles that open their add
+                prompt right here until a link is saved, then live buttons out
+                to the member's profile. */}
+            {(linkedinProfileUrl || onAddLinkedIn || onAddPortfolio) && (
+              <div className="mt-3 flex items-center gap-2">
+                {(linkedinProfileUrl || onAddLinkedIn) &&
+                  (linkedinProfileUrl ? (
+                    <a
+                      href={linkedinProfileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="LinkedIn profile"
+                      title="LinkedIn"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Linkedin strokeWidth={2.5} size={14} />
+                    </a>
+                  ) : onAddLinkedIn ? (
+                    <button
+                      type="button"
+                      onClick={onAddLinkedIn}
+                      aria-label="Add your LinkedIn"
+                      title="Add your LinkedIn"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Linkedin strokeWidth={2.5} size={14} />
+                    </button>
+                  ) : null)}
+                {onAddPortfolio &&
+                  (portfolioUrl ? (
+                    <a
+                      href={portfolioUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Portfolio"
+                      title="Portfolio"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Globe strokeWidth={2.5} size={14} />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onAddPortfolio}
+                      aria-label="Add your portfolio"
+                      title="Add your portfolio"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Globe strokeWidth={2.5} size={14} />
+                    </button>
+                  ))}
               </div>
             )}
           </div>
@@ -241,9 +271,10 @@ export function ProfileCard({
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
-        {/* Portfolio — only on other members' profiles, where it is part of
-            the point of the page. */}
-        {portfolioUrl && (
+        {/* Portfolio — the chip is for other members' profiles, where it is
+            part of the point of the page; the owner's own surface shows the
+            circle in the links row instead. */}
+        {portfolioUrl && !onAddPortfolio && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <a
               href={portfolioUrl}

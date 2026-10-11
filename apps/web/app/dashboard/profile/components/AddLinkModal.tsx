@@ -4,7 +4,26 @@ import { useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 
-interface AddLinkedInModalProps {
+const COPY = {
+  linkedin: {
+    title: "Add your LinkedIn",
+    description: "Paste your LinkedIn profile link — it shows as a button on your profile.",
+    label: "LinkedIn profile link",
+    placeholder: "https://linkedin.com/in/yourname",
+    field: "linkedin_url",
+  },
+  portfolio: {
+    title: "Add your portfolio",
+    description: "Paste your portfolio link — it shows as a button on your profile.",
+    label: "Portfolio link",
+    placeholder: "https://yourportfolio.com",
+    field: "portfolio_url",
+  },
+} as const;
+
+interface AddLinkModalProps {
+  /** Which profile link is being saved — LinkedIn or portfolio. */
+  kind: keyof typeof COPY;
   /** The current stored link, so the prompt opens on what exists. */
   initialUrl?: string;
   /** Fired with the trimmed link once the save landed. */
@@ -13,12 +32,13 @@ interface AddLinkedInModalProps {
 }
 
 /**
- * The profile hero's add-LinkedIn prompt: paste a profile link, save, and the
- * hollow circle under the city turns live. Mounted only while open, so every
- * visit starts from the stored value. Settings' LinkedIn card keeps its own
- * field for editing the link from there.
+ * The profile hero's prompt for an outside link — LinkedIn or portfolio:
+ * paste the URL, save, and the hollow circle under the city turns live.
+ * Mounted only while open, so every visit starts from the stored value.
+ * Settings keeps its own fields for both (the LinkedIn and Job profile cards).
  */
-export function AddLinkedInModal({ initialUrl = "", onSaved, onClose }: AddLinkedInModalProps) {
+export function AddLinkModal({ kind, initialUrl = "", onSaved, onClose }: AddLinkModalProps) {
+  const copy = COPY[kind];
   const [url, setUrl] = useState(initialUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +52,10 @@ export function AddLinkedInModal({ initialUrl = "", onSaved, onClose }: AddLinke
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linkedin_url: trimmed }),
+        body: JSON.stringify({ [copy.field]: trimmed }),
       });
       if (!res.ok) {
-        setError("Couldn't save your LinkedIn link. Please try again.");
+        setError("Couldn't save this link. Please try again.");
         return;
       }
       onSaved(trimmed);
@@ -47,10 +67,8 @@ export function AddLinkedInModal({ initialUrl = "", onSaved, onClose }: AddLinke
   }
 
   return (
-    <Modal open onClose={onClose} maxWidth="max-w-md" title="Add your LinkedIn">
-      <p className="mb-4 font-body text-sm text-foreground-muted">
-        Paste your LinkedIn profile link — it shows as a button on your profile.
-      </p>
+    <Modal open onClose={onClose} maxWidth="max-w-md" title={copy.title}>
+      <p className="mb-4 font-body text-sm text-foreground-muted">{copy.description}</p>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
@@ -59,17 +77,17 @@ export function AddLinkedInModal({ initialUrl = "", onSaved, onClose }: AddLinke
       )}
 
       <label
-        htmlFor="linkedin-modal-url"
+        htmlFor="profile-link-modal-url"
         className="mb-1.5 block font-body text-xs font-medium text-foreground"
       >
-        LinkedIn profile link
+        {copy.label}
       </label>
       <input
-        id="linkedin-modal-url"
+        id="profile-link-modal-url"
         type="url"
         value={url}
         onChange={(event) => setUrl(event.target.value)}
-        placeholder="https://linkedin.com/in/yourname"
+        placeholder={copy.placeholder}
         autoFocus
         className="field"
       />
