@@ -4,7 +4,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
-import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import { ProfileClient } from "./ProfileClient";
 
 export const metadata = { title: "Your Profile" };
@@ -23,27 +22,20 @@ export default async function ProfilePage({ searchParams }: Props) {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const [
-    { data: user },
-    { data: profile },
-    { company: profileCompany, pending: pendingCompany },
-    identity,
-  ] = await Promise.all([
-    db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
-    db
-      .from("designer_profiles")
-      .select(
-        "avatar_url, avatar_source, experience_level, job_title, linkedin_url, portfolio_url, bio, cities(id, name), design_sectors(id, name)"
-      )
-      .eq("user_id", userId)
-      .maybeSingle(),
-    // The company line on the profile, plus any work-email challenge still
-    // waiting on a code so the picker can reopen straight into it.
-    getProfileCompanyState(db, userId),
-    // Everything the Edit Profile modal needs: current values, select
-    // options, current official groups and per-slot cooldown locks.
-    loadProfileIdentity(userId),
-  ]);
+  const [{ data: user }, { data: profile }, { company: profileCompany, pending: pendingCompany }] =
+    await Promise.all([
+      db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
+      db
+        .from("designer_profiles")
+        .select(
+          "avatar_url, avatar_source, experience_level, job_title, linkedin_url, portfolio_url, bio, cities(id, name), design_sectors(id, name)"
+        )
+        .eq("user_id", userId)
+        .maybeSingle(),
+      // The company line on the profile, plus any work-email challenge still
+      // waiting on a code so the picker can reopen straight into it.
+      getProfileCompanyState(db, userId),
+    ]);
 
   // The role pill beside the name states seniority and designation together;
   // both are slugs, resolved by the shared helper (see `role-label.ts`).
@@ -69,7 +61,6 @@ export default async function ProfilePage({ searchParams }: Props) {
       initialBio={(profile as any)?.bio ?? ""}
       initialCompany={profileCompany}
       pendingCompany={pendingCompany}
-      identity={identity}
     />
   );
 }

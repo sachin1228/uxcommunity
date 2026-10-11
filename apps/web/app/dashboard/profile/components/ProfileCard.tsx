@@ -22,8 +22,11 @@ interface ProfileCardProps {
   company: ProfileCompanyView | null;
   /** Opens the company picker: adding when none is set, changing when one is. Omitted on read-only surfaces, where the company links to its page instead. */
   onEditCompany?: () => void;
-  /** Opens the Edit Profile modal (identity details + group swap). Omitted on read-only surfaces. */
-  onOpenEditProfile?: () => void;
+  /**
+   * Where Edit Profile goes — the Settings Profile page, which owns the
+   * identity fields and the workplace. Omitted on read-only surfaces.
+   */
+  editProfileHref?: string;
   /** The member's links — rendered as chips on other members' profiles when set. */
   linkedin?: string;
   portfolio?: string;
@@ -51,8 +54,9 @@ function externalUrl(value: string | undefined): string | null {
  * company card, bio and (on read-only surfaces) the member's links. It carries
  * no cover image and no card chrome of its own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
- * the only image and everything here sits directly on the page. The owner's
- * contact details live on the Settings page (`app/dashboard/settings`).
+ * the only image and everything here sits directly on the page. The identity
+ * details behind Edit Profile live on the Settings page
+ * (`app/dashboard/settings/profile`).
  */
 export function ProfileCard({
   name,
@@ -63,7 +67,7 @@ export function ProfileCard({
   bio,
   company,
   onEditCompany,
-  onOpenEditProfile,
+  editProfileHref,
   linkedin = "",
   portfolio = "",
 }: ProfileCardProps) {
@@ -137,22 +141,21 @@ export function ProfileCard({
             )}
           </div>
 
-          {onOpenEditProfile && (
-            <button
-              type="button"
-              onClick={onOpenEditProfile}
+          {editProfileHref && (
+            <Link
+              href={editProfileHref}
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
             >
               <PenLine strokeWidth={2.5} size={11} />
               Edit Profile
-            </button>
+            </Link>
           )}
         </div>
 
         {/* The company has its own card under the identity block, clear of the
-            city line. It is also the only place the company can be
-            managed now that Settings keeps to contact details and links: the
-            card opens the picker to replace it and Edit sits beside it.
+            city line. The owner's card opens the picker to replace it, with
+            Edit beside it; Settings > Profile manages the same company for
+            anyone who gets there from Edit Profile.
 
             There is no Remove: a member changes the workplace on their profile
             rather than dropping it, so the row carries Edit alone.

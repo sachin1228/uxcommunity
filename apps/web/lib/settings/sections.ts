@@ -6,6 +6,7 @@
 
 /** Every route the index links to; the union is what keeps the icon map total. */
 export const SETTINGS_SECTION_HREFS = [
+  "/dashboard/settings/profile",
   "/dashboard/settings/account",
   "/dashboard/settings/notifications",
   "/dashboard/settings/email",
@@ -23,6 +24,11 @@ export interface SettingsSection {
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
+  {
+    href: "/dashboard/settings/profile",
+    label: "Profile",
+    description: "Your name, role, city and workplace.",
+  },
   {
     href: "/dashboard/settings/account",
     label: "Account",
