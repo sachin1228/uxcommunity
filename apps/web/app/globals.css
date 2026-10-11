@@ -511,6 +511,14 @@ select:focus-visible {
     cursor: not-allowed;
   }
 
+  /* Chrome paints a "--:-- --" ghost inside an empty time input; once the
+     form's own labels and clock icon carry the cue, that ghost is noise.
+     Hidden while the field is empty and unfocused, back while the segments
+     are the typing target. */
+  input[type="time"].time-empty:not(:focus)::-webkit-datetime-edit {
+    visibility: hidden;
+  }
+
   input:where(.field) {
     height: 32px;
     padding: 0 12px;

@@ -365,7 +365,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className="field w-full cursor-pointer"
+                    className={`field w-full cursor-pointer ${eventTime ? "" : "time-empty"}`}
                   />
                 </label>
                 <label className="block">
@@ -377,7 +377,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                     value={endTime}
                     min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full cursor-pointer"
+                    className={`field w-full cursor-pointer ${endTime ? "" : "time-empty"}`}
                   />
                 </label>
               </div>
