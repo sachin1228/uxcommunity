@@ -19,7 +19,6 @@ import { ReportModal } from "../ReportModal";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import type { EventJoinAnswers } from "@/lib/communities/event-join-questions";
 import {
-  eventZoneLabel,
   eventZoneTooltip,
   formatEventTimeRange,
   hostScheduleForViewer,
@@ -611,18 +610,14 @@ export function EventCard({
               <Calendar strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
               {fmtEventDate(event.event_date)}
             </span>
-            {/* The viewer's own clock, with the zone named beside it: the host
-                set this time somewhere, and everyone else is reading it in
-                theirs — the label is what stops the two being confused. */}
+            {/* The viewer's own clock; the zone it is read in is named on
+                hover instead of sitting beside the time. */}
             <span
               className="inline-flex items-center gap-1.5"
               title={eventZoneTooltip(event.event_date)}
             >
               <Clock strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
               {formatEventTimeRange(event.event_date, event.end_date)}
-              <span className="font-mono text-[10px] text-stone-400">
-                ({eventZoneLabel(event.event_date)})
-              </span>
             </span>
             {/* The other half of the same moment: what the host typed, in their
                 own zone. Indented to sit under the time above it. */}
