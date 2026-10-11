@@ -42,10 +42,10 @@ interface ProfileCardProps {
    */
   linkedinUrl?: string | null;
   /**
-   * Settings' LinkedIn section, where the hollow button sends the member while
-   * no URL is saved. Omitted on read-only surfaces.
+   * Opens the add-LinkedIn prompt for a member with no link saved. Omitted on
+   * read-only surfaces.
    */
-  linkedinSettingsHref?: string;
+  onAddLinkedIn?: () => void;
 }
 
 /**
@@ -86,7 +86,7 @@ export function ProfileCard({
   editProfileHref,
   portfolio = "",
   linkedinUrl,
-  linkedinSettingsHref,
+  onAddLinkedIn,
 }: ProfileCardProps) {
   const portfolioUrl = externalUrl(portfolio);
   const linkedinProfileUrl = externalUrl(linkedinUrl);
@@ -204,10 +204,10 @@ export function ProfileCard({
               <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
             )}
 
-            {/* LinkedIn — a hollow circle until a profile link is saved (sent
-                to Settings' LinkedIn section to paste one), then a live button
-                out to the member's profile. */}
-            {(linkedinProfileUrl || linkedinSettingsHref) && (
+            {/* LinkedIn — a hollow circle that opens the add prompt right here
+                until a profile link is saved, then a live button out to the
+                member's profile. */}
+            {(linkedinProfileUrl || onAddLinkedIn) && (
               <div className="mt-3">
                 {linkedinProfileUrl ? (
                   <a
@@ -220,15 +220,16 @@ export function ProfileCard({
                   >
                     <Linkedin strokeWidth={2.5} size={14} />
                   </a>
-                ) : linkedinSettingsHref ? (
-                  <Link
-                    href={linkedinSettingsHref}
+                ) : onAddLinkedIn ? (
+                  <button
+                    type="button"
+                    onClick={onAddLinkedIn}
                     aria-label="Add your LinkedIn"
                     title="Add your LinkedIn"
                     className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
                   >
                     <Linkedin strokeWidth={2.5} size={14} />
-                  </Link>
+                  </button>
                 ) : null}
               </div>
             )}

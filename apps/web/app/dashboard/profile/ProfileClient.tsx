@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
 import { ProfileCard } from "./components/ProfileCard";
 import { ImagePickerModal } from "./components/ImagePickerModal";
+import { AddLinkedInModal } from "./components/AddLinkedInModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
@@ -54,6 +55,8 @@ export function ProfileClient({
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(pendingCompany);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [linkedinUrl, setLinkedinUrl] = useState(initialLinkedIn);
+  const [showLinkedInModal, setShowLinkedInModal] = useState(false);
 
   // A newer server render (a refresh, a navigation) supersedes whatever an
   // upload left in state. Adjusted during render — an effect would re-render a
@@ -62,6 +65,11 @@ export function ProfileClient({
   if (serverAvatarUrl !== initialAvatarUrl) {
     setServerAvatarUrl(initialAvatarUrl);
     setAvatarUrl(initialAvatarUrl);
+  }
+  const [serverLinkedInUrl, setServerLinkedInUrl] = useState(initialLinkedIn);
+  if (serverLinkedInUrl !== initialLinkedIn) {
+    setServerLinkedInUrl(initialLinkedIn);
+    setLinkedinUrl(initialLinkedIn);
   }
   const [showPicturePicker, setShowPicturePicker] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
@@ -151,8 +159,8 @@ export function ProfileClient({
             company={initialCompany}
             onAddCompany={() => setShowCompanyPicker(true)}
             editProfileHref="/dashboard/settings/profile"
-            linkedinUrl={initialLinkedIn}
-            linkedinSettingsHref="/dashboard/settings/profile#linkedin"
+            linkedinUrl={linkedinUrl}
+            onAddLinkedIn={() => setShowLinkedInModal(true)}
           />
         </div>
 
@@ -168,6 +176,18 @@ export function ProfileClient({
           onRemoveUpload={handleRemoveUpload}
           onSave={handleSavePicture}
           onClose={closePicturePicker}
+        />
+      )}
+
+      {showLinkedInModal && (
+        <AddLinkedInModal
+          initialUrl={linkedinUrl}
+          onClose={() => setShowLinkedInModal(false)}
+          onSaved={(url) => {
+            setLinkedinUrl(url);
+            setShowLinkedInModal(false);
+            router.refresh();
+          }}
         />
       )}
 
