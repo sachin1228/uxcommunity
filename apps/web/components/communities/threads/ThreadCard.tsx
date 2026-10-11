@@ -628,7 +628,7 @@ export function ThreadCard({
                 }`}
               />
               <span
-                className={`font-body text-sm font-semibold tabular-nums ${
+                className={`font-body text-sm font-semibold ${
                   thread.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >

@@ -234,7 +234,7 @@ export function ShowcaseCard({
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
               />
               <span
-                className={`font-body text-sm font-semibold tabular-nums ${
+                className={`font-body text-sm font-semibold ${
                   post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >

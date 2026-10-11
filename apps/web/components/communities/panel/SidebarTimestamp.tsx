@@ -45,7 +45,7 @@ export function SidebarTimestamp({ iso, highlight }: { iso: string; highlight?: 
       dateTime={timestamp.dateTime}
       title={timestamp.full}
       aria-label={`Last message: ${timestamp.full}`}
-      className={`ml-auto shrink-0 whitespace-nowrap font-body text-[11px] tabular-nums ${
+      className={`ml-auto shrink-0 whitespace-nowrap font-body text-[11px] ${
         highlight
           ? "text-[var(--ds-blue-800)]"
           : "text-foreground-muted"

@@ -503,7 +503,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               {/* Character counter — shown once the user is near the 500 limit */}
               {input.length > 0 && input.length >= MAX_MESSAGE_CHARS - 50 && (
                 <span
-                  className={`shrink-0 mb-0.5 font-mono text-[10px] tabular-nums ${
+                  className={`shrink-0 mb-0.5 font-mono text-[10px] ${
                     overLimit ? "text-red-400" : "text-foreground-muted/70"
                   }`}
                   aria-live="polite"

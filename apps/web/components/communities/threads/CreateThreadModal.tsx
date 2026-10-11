@@ -203,7 +203,7 @@ export function CreateThreadModal({
                 rows={4}
                 className="field w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
               />
-              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
+              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] text-foreground-subtle">
                 {body.length}/{THREAD_BODY_MAX_LENGTH}
               </span>
             </div>

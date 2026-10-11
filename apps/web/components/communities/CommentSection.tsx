@@ -429,7 +429,7 @@ function CommentRow<C extends CommunityComment>({
                     type="button"
                     onClick={() => toggleReaction(reaction.emoji)}
                     aria-pressed={reaction.reacted}
-                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2 font-body text-xs font-medium tabular-nums transition-colors ${
+                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2 font-body text-xs font-medium transition-colors ${
                       reaction.reacted
                         ? "text-[var(--ds-blue-800)] dark:text-[var(--ds-blue-900)]"
                         : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"

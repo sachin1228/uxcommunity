@@ -1128,7 +1128,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   reactionEmoji: { fontSize: 13 },
-  reactionCount: { fontSize: 12, fontFamily: 'Geist_500Medium', fontVariant: ['tabular-nums'] },
+  reactionCount: { fontSize: 12, fontFamily: 'Geist_500Medium' },
   replyButton: {
     height: 32,
     borderRadius: 8,

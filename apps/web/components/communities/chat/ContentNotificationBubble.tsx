@@ -348,7 +348,7 @@ export function ContentNotificationBubble({
                 title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
               >
                 <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
-                <span className="shrink-0 tabular-nums">{commentCount}</span>
+                <span className="shrink-0">{commentCount}</span>
               </span>
             )}
             <span

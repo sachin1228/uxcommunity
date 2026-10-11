@@ -107,7 +107,7 @@ export function ThreadPollResult({
                   <span className="min-w-0 flex-1 whitespace-pre-wrap break-words font-body text-sm font-medium leading-snug text-foreground">
                     {option}
                   </span>
-                  <span className="shrink-0 font-body text-xs font-medium tabular-nums text-foreground">
+                  <span className="shrink-0 font-body text-xs font-medium text-foreground">
                     {percents[index]}%
                   </span>
                 </div>
@@ -172,7 +172,7 @@ export function ThreadPollResult({
         </div>
       ))}
 
-      <p className="mt-3 flex flex-wrap items-center gap-x-1.5 font-body text-[11px] tabular-nums text-foreground-subtle">
+      <p className="mt-3 flex flex-wrap items-center gap-x-1.5 font-body text-[11px] text-foreground-subtle">
         <span role="status">
           <span className="font-semibold text-white">
             {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
@@ -187,7 +187,7 @@ export function ThreadPollResult({
               disabled={busy}
               aria-label="Undo your vote"
               aria-describedby={undoId}
-              className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-accent transition-colors hover:text-accent-hover hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-sm px-0.5 font-body text-[11px] font-medium text-accent transition-colors hover:text-accent-hover hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 size={11} strokeWidth={2.5} className="animate-spin" aria-hidden />
