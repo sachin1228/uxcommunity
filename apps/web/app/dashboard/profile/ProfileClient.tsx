@@ -41,6 +41,7 @@ export function ProfileClient({
   initialBio,
   initialCompany,
   pendingCompany,
+  initialLinkedIn,
 }: Props) {
   const router = useRouter();
   // The server is the source of truth: the client only mirrors what the last
@@ -150,6 +151,8 @@ export function ProfileClient({
             company={initialCompany}
             onAddCompany={() => setShowCompanyPicker(true)}
             editProfileHref="/dashboard/settings/profile"
+            linkedinUrl={initialLinkedIn}
+            linkedinSettingsHref="/dashboard/settings/profile#linkedin"
           />
         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, Plus } from "lucide-react";
+import { Camera, Globe, Linkedin, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -36,6 +36,16 @@ interface ProfileCardProps {
   editProfileHref?: string;
   /** The member's portfolio link — rendered as a chip on other members' profiles when set. */
   portfolio?: string;
+  /**
+   * The member's LinkedIn profile URL when saved — rendered under the city as
+   * a live icon button linking out to the profile.
+   */
+  linkedinUrl?: string | null;
+  /**
+   * Settings' LinkedIn section, where the hollow button sends the member while
+   * no URL is saved. Omitted on read-only surfaces.
+   */
+  linkedinSettingsHref?: string;
 }
 
 /**
@@ -43,7 +53,7 @@ interface ProfileCardProps {
  * it cannot be one. Values are user-typed, so only http(s) survives — the
  * `https://` prefix is added when the member left the scheme off.
  */
-function externalUrl(value: string | undefined): string | null {
+function externalUrl(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -75,8 +85,11 @@ export function ProfileCard({
   onAddCompany,
   editProfileHref,
   portfolio = "",
+  linkedinUrl,
+  linkedinSettingsHref,
 }: ProfileCardProps) {
   const portfolioUrl = externalUrl(portfolio);
+  const linkedinProfileUrl = externalUrl(linkedinUrl);
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
   // an empty frame.
@@ -189,6 +202,35 @@ export function ProfileCard({
                 behind. */}
             {city && (
               <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
+            )}
+
+            {/* LinkedIn — a hollow circle until a profile link is saved (sent
+                to Settings' LinkedIn section to paste one), then a live button
+                out to the member's profile. */}
+            {(linkedinProfileUrl || linkedinSettingsHref) && (
+              <div className="mt-3">
+                {linkedinProfileUrl ? (
+                  <a
+                    href={linkedinProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="LinkedIn profile"
+                    title="LinkedIn"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                  >
+                    <Linkedin strokeWidth={2.5} size={14} />
+                  </a>
+                ) : linkedinSettingsHref ? (
+                  <Link
+                    href={linkedinSettingsHref}
+                    aria-label="Add your LinkedIn"
+                    title="Add your LinkedIn"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                  >
+                    <Linkedin strokeWidth={2.5} size={14} />
+                  </Link>
+                ) : null}
+              </div>
             )}
           </div>
         </div>

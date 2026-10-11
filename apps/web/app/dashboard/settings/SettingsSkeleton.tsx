@@ -129,10 +129,10 @@ export function ProfileSkeleton() {
         <SkeletonBar className="h-7 w-32 rounded-lg" />
       </SkeletonCard>
       <SkeletonCard>
+        <SkeletonBar className="h-3 w-56 max-w-full" />
         <div className="flex items-center gap-3">
           <SkeletonBar className="h-10 w-10 shrink-0 rounded-lg" />
-          <SkeletonBar className="h-3 w-56 max-w-full" />
-          <SkeletonBar className="h-6 w-24 shrink-0" />
+          <SkeletonBar className="h-10 w-full rounded-lg" />
         </div>
       </SkeletonCard>
     </>

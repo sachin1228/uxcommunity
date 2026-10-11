@@ -23,9 +23,10 @@ export default async function ProfileSettingsPage() {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const [{ company, pending }, identity] = await Promise.all([
+  const [{ company, pending }, identity, { data: linkRow }] = await Promise.all([
     getProfileCompanyState(db, userId),
     loadProfileIdentity(userId),
+    db.from("designer_profiles").select("linkedin_url").eq("user_id", userId).maybeSingle(),
   ]);
 
   return (
@@ -34,7 +35,7 @@ export default async function ProfileSettingsPage() {
       <div className="mt-4 flex flex-col gap-4">
         <ProfileSection identity={identity} />
         <CompanySection company={company} pendingCompany={pending} />
-        <LinkedInSection />
+        <LinkedInSection initialUrl={linkRow?.linkedin_url ?? ""} />
       </div>
     </>
   );
