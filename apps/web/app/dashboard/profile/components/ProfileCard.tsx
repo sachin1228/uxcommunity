@@ -1,6 +1,5 @@
 "use client";
 
-import { Fragment } from "react";
 import Link from "next/link";
 import { Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
@@ -13,7 +12,6 @@ interface ProfileCardProps {
   /** Omitted on read-only surfaces (other members' profiles) — hides the picker overlay. */
   onOpenAvatarPicker?: () => void;
   city: string | null;
-  sector: string | null;
   /**
    * Seniority plus designation, already composed for the pill beside the name
    * ("Mid-Level Product Designer"), or null when neither is set.
@@ -49,7 +47,7 @@ function externalUrl(value: string | undefined): string | null {
 }
 
 /**
- * The profile hero: display picture, name, role line, city/sector line, the
+ * The profile hero: display picture, name, role line, city line, the
  * company card, bio and (on read-only surfaces) the member's links. It carries
  * no cover image and no card chrome of its own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
@@ -61,7 +59,6 @@ export function ProfileCard({
   avatarUrl,
   onOpenAvatarPicker,
   city,
-  sector,
   roleLabel,
   bio,
   company,
@@ -77,21 +74,10 @@ export function ProfileCard({
   // an empty frame.
   const hasPicture = Boolean(avatarUrl) && !isGeneratedProfilePicture(avatarUrl);
 
-  // Role line under the name: city and sector, separated by middots. The
-  // designation and seniority sit on the line above and the company has its own
-  // card below the block, so each kind of detail is stated once.
-  const roleParts: React.ReactNode[] = [];
-
-  // Both are plain text: the middot separators carry the line without a glyph
-  // in front of each place.
-  if (city) {
-    roleParts.push(<span key="city">{city}</span>);
-  }
-
-  if (sector) {
-    roleParts.push(<span key="sector">{sector}</span>);
-  }
-
+  // City under the name. The sector is deliberately not shown on the profile
+  // (it still shows on communities surfaces); the designation and seniority
+  // sit on the line above and the company has its own card below the block,
+  // so each kind of detail is stated once.
   return (
     <section aria-label="Profile details">
       <div>
@@ -144,17 +130,10 @@ export function ProfileCard({
               <p className="mt-1.5 truncate font-body text-sm text-foreground-muted">{roleLabel}</p>
             )}
 
-            {/* City · sector — omitted entirely when neither is set, rather
-                than leaving an empty line behind. */}
-            {roleParts.length > 0 && (
-              <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 font-body text-sm text-foreground-muted">
-                {roleParts.map((part, index) => (
-                  <Fragment key={index}>
-                    {index > 0 && <span aria-hidden="true">·</span>}
-                    {part}
-                  </Fragment>
-                ))}
-              </p>
+            {/* City — omitted when unset, rather than leaving an empty line
+                behind. */}
+            {city && (
+              <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
             )}
           </div>
 
@@ -171,7 +150,7 @@ export function ProfileCard({
         </div>
 
         {/* The company has its own card under the identity block, clear of the
-            city and sector line. It is also the only place the company can be
+            city line. It is also the only place the company can be
             managed now that Settings keeps to contact details and links: the
             card opens the picker to replace it and Edit sits beside it.
 
