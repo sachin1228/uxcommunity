@@ -6,10 +6,9 @@ import { formatSidebarTime } from "@/lib/communities/sidebar-time";
 /**
  * The row's timestamp. `highlight` is set while the row carries unread
  * activity, which prints the time in the app's blue — the same "something new
- * here" the messenger this row imitates says in green. The pair of tokens is
- * the one the rest of the app uses to write blue on either theme (the
- * light-mode blue, then the lighter one for dark panels), so an 11px stamp
- * stays readable on the near-black sidebar.
+ * here" the messenger this row imitates says in green, and the same blue the
+ * unread count beneath it wears. One token in both themes: the count and the
+ * time are one signal, so they are one colour.
  */
 export function SidebarTimestamp({ iso, highlight }: { iso: string; highlight?: boolean }) {
   const [now, setNow] = useState<Date | null>(null);
@@ -48,7 +47,7 @@ export function SidebarTimestamp({ iso, highlight }: { iso: string; highlight?: 
       aria-label={`Last message: ${timestamp.full}`}
       className={`ml-auto shrink-0 whitespace-nowrap font-body text-[11px] tabular-nums ${
         highlight
-          ? "text-[var(--ds-blue-800)] dark:text-[var(--ds-blue-900)]"
+          ? "text-[var(--ds-blue-800)]"
           : "text-foreground-muted"
       }`}
     >
