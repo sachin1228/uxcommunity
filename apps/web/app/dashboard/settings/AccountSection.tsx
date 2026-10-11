@@ -63,9 +63,6 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
           <p className="mt-1 truncate font-body text-sm text-foreground" title={email}>
             {email}
           </p>
-          <p className="mt-0.5 font-body text-xs text-foreground-muted">
-            Used for sign-in and password resets.
-          </p>
         </div>
 
         {memberSince && (
@@ -76,31 +73,33 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
         )}
 
         <div className="border-t border-border pt-4">
-          <p className="font-body text-xs font-medium text-foreground">Password</p>
-          <p className="mt-0.5 font-body text-xs text-foreground-muted">
-            Send a reset link to your email.
-          </p>
-          <div className="mt-2.5 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-body text-xs font-medium text-foreground">Password</p>
+              <p className="mt-0.5 font-body text-xs text-foreground-muted">
+                Send a reset link to your email.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => void sendResetLink()}
               disabled={sending}
-              className="modal-btn modal-btn-secondary"
+              className="modal-btn modal-btn-secondary shrink-0"
             >
               {sending && <Spinner size={13} />}
               {sending ? "Sending…" : "Send reset link"}
             </button>
-            {message && (
-              <p className="font-body text-xs text-emerald-500" role="status">
-                {message}
-              </p>
-            )}
-            {error && (
-              <p className="font-body text-xs text-red-400" role="alert">
-                {error}
-              </p>
-            )}
           </div>
+          {message && (
+            <p className="mt-2.5 font-body text-xs text-emerald-500" role="status">
+              {message}
+            </p>
+          )}
+          {error && (
+            <p className="mt-2.5 font-body text-xs text-red-400" role="alert">
+              {error}
+            </p>
+          )}
         </div>
       </div>
     </section>
