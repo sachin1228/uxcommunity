@@ -167,7 +167,7 @@ export function ProfileCard({
                 Truncated so the label stays a single line however long it
                 runs. */}
             {(roleLabel || company || onAddCompany) && (
-              <p className="mt-1.5 flex min-w-0 items-center gap-2 font-body text-sm text-foreground-muted">
+              <p className="mt-1.5 flex min-w-0 items-center gap-1 font-body text-sm text-foreground-muted">
                 {roleLabel && <span className="truncate">{roleLabel}</span>}
                 {roleLabel && (company || onAddCompany) && (
                   <span aria-hidden="true">@</span>
