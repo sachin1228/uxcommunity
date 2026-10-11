@@ -7,7 +7,7 @@
  * the event it belongs to read as one thing. On the day itself the tile stops
  * naming the month and says TODAY instead: the room you are about to walk into
  * is the one happening right now, which the bare date cannot say. While the
- * event is actually under way it says LIVE, and for a day after it wraps the
+ * event is actually under way it says LIVE, and for an hour after it wraps the
  * tile says ENDED before the room reverts to a plain face — the conversation
  * stays, only the announcement comes down.
  */
@@ -15,7 +15,7 @@ const monthFormat = new Intl.DateTimeFormat("en-IN", { month: "short" });
 const weekdayFormat = new Intl.DateTimeFormat("en-IN", { weekday: "short" });
 
 /** How long the tile keeps saying ENDED after the event's window closes. */
-export const EVENT_ENDED_GRACE_MS = 24 * 60 * 60 * 1000;
+export const EVENT_ENDED_GRACE_MS = 60 * 60 * 1000;
 
 export interface EventDateBadge {
   /** Month abbreviation, uppercase — "SEPT". */
@@ -29,8 +29,8 @@ export interface EventDateBadge {
   /** The event's window has opened and not yet closed — the tile says LIVE. */
   isLive: boolean;
   /**
-   * The event's window has closed within the last day — the tile says ENDED.
-   * Past the day it is false and the caller drops the tile entirely.
+   * The event's window has closed within the last hour — the tile says ENDED.
+   * Past the hour it is false and the caller drops the tile entirely.
    */
   isEnded: boolean;
   /**
@@ -113,9 +113,9 @@ export function eventDateBadge(
       Number.isFinite(endMs) &&
       nowMs >= date.getTime() &&
       nowMs < endMs,
-    // The announcement comes down a day after the event: long enough that the
-    // room everyone just left still reads as "that was today", short enough
-    // that the sidebar does not fill up with tombstones.
+    // The announcement comes down an hour after the event: long enough that
+    // the room everyone just left still reads as just-over, short enough that
+    // the sidebar does not fill up with tombstones.
     isEnded:
       Number.isFinite(nowMs) &&
       Number.isFinite(endMs) &&

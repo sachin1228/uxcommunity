@@ -174,16 +174,14 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
       setError("Start time can't be in the past. Pick a time from now onward.");
       return;
     }
+    if (!endTime) { setError("End time is required."); return; }
     // Same single-day rule as the create form: the end rides the start's date
     // (offset kept for legacy multi-day ends), so only an end time after the
     // start makes sense.
-    let endIso: string | null = null;
-    if (endTime) {
-      const endDate = addDaysToDateInput(eventDate, endDayOffset);
-      endIso = buildIso(endDate, endTime);
-      if (!endIso) { setError("End time is not a valid time of day."); return; }
-      if (endIso <= startIso) { setError("End time must be after the start time."); return; }
-    }
+    const endDate = addDaysToDateInput(eventDate, endDayOffset);
+    const endIso = buildIso(endDate, endTime);
+    if (!endIso) { setError("End time is not a valid time of day."); return; }
+    if (endIso <= startIso) { setError("End time must be after the start time."); return; }
     // Only asked for while the event is public — its city is where the public
     // listing shows it.
     if (isPublic && !cityId) { setError("City is required."); return; }
@@ -398,7 +396,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 </label>
                 <label className="relative block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Clock strokeWidth={2.5} size={11} /> End time <span className="font-normal text-foreground-subtle">(optional)</span>
+                    <Clock strokeWidth={2.5} size={11} /> End time <span className="text-accent">*</span>
                   </span>
                   <input
                     type="time"

@@ -743,6 +743,33 @@ select:focus-visible {
   color: inherit;
 }
 
+/* ─── Event date tile motion ─────────────────────────────────────────── */
+/* The calendar tile on an event room's DP springs in when the room's face
+   appears, and while the event is live a red ring pulses out of the pill —
+   the live dot's beat at the pill's own scale. The spring carries no origin
+   of its own: each element sets it with a utility (the corner-anchored tile
+   grows from bottom right, the centered pill from its bottom edge), and the
+   global reduce-motion guard below turns both off for members who asked for
+   less motion, the way it does for every entrance. */
+@keyframes event-tile-in {
+  0%   { opacity: 0; transform: scale(0.55); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.event-tile-in {
+  animation: event-tile-in 240ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+@keyframes event-tile-halo {
+  0%   { opacity: 0.75; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+.event-tile-halo {
+  animation: event-tile-halo 2.2s ease-out infinite;
+  border-color: var(--ds-red-700);
+}
+
 @keyframes fadeSlideUp {
   from {
     opacity: 0;

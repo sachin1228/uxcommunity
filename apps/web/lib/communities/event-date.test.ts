@@ -152,36 +152,32 @@ test("an unparseable end never marks the event live or ended", () => {
   assert.equal(badge?.isEnded, false);
 });
 
-// ─── The day after: ENDED, then the tile comes down ──────────────────────────
+// ─── The hour after: ENDED, then the badge comes down ────────────────────────
 
-test("a just-ended event reads ENDED for a day, then the badge drops", () => {
+test("a just-ended event reads ENDED for an hour, then the badge drops", () => {
   const end = at(2026, 8, 25, 11);
   const start = at(2026, 8, 25, 10);
   const atEnd = eventDateBadge(start, { now: new Date(2026, 8, 25, 11), endsAt: end });
   assert.equal(atEnd?.isLive, false);
   assert.equal(atEnd?.isEnded, true);
 
-  // Late on the event's own day, the lifecycle has already moved past TODAY:
-  // once the window closes, ENDED is the more useful fact even before midnight.
-  const laterToday = eventDateBadge(start, { now: new Date(2026, 8, 25, 23), endsAt: end });
+  // Within the hour, the lifecycle has already moved past TODAY: once the
+  // window closes, ENDED is the more useful fact even on the event's own day.
+  const laterToday = eventDateBadge(start, { now: new Date(2026, 8, 25, 11, 30), endsAt: end });
   assert.equal(laterToday?.isEnded, true);
   assert.equal(laterToday?.isToday, true);
 
-  const nextDay = eventDateBadge(start, { now: new Date(2026, 8, 26, 9), endsAt: end });
-  assert.equal(nextDay?.isEnded, true);
-  assert.equal(nextDay?.isToday, false);
+  const nearEnd = eventDateBadge(start, { now: new Date(2026, 8, 25, 11, 59), endsAt: end });
+  assert.equal(nearEnd?.isEnded, true);
 
-  const nextMorning = eventDateBadge(start, { now: new Date(2026, 8, 26, 10, 59), endsAt: end });
-  assert.equal(nextMorning?.isEnded, true);
-
-  // One minute past the day: the tile has served its purpose.
-  const after = eventDateBadge(start, { now: new Date(2026, 8, 26, 11, 1), endsAt: end });
+  // One minute past the hour: the badge has served its purpose.
+  const after = eventDateBadge(start, { now: new Date(2026, 8, 25, 12, 1), endsAt: end });
   assert.equal(after?.isEnded, false);
 });
 
-test("the just-ended tile still names the day it was for", () => {
+test("the just-ended badge still names the day it was for", () => {
   const badge = eventDateBadge(at(2026, 8, 25, 10), {
-    now: new Date(2026, 8, 25, 12),
+    now: new Date(2026, 8, 25, 11, 30),
     endsAt: at(2026, 8, 25, 11),
   });
   assert.equal(badge?.month, "SEPT");

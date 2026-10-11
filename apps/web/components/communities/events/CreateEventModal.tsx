@@ -147,14 +147,12 @@ export function CreateEventModal({
     // gone by on today's date is caught here (a minute of grace covers
     // picking "now" and reaching the button).
     if (isPastStart(startIso)) { setError("Start time can't be in the past. Pick a time from now onward."); return; }
+    if (!endTime) { setError("End time is required."); return; }
     // The end rides the start's date — one date selector covers both — so
     // only an end time after the start makes sense here.
-    let endIso: string | null = null;
-    if (endTime) {
-      endIso = buildIso(eventDate, endTime);
-      if (!endIso) { setError("End time is not a valid time of day."); return; }
-      if (endIso <= startIso) { setError("End time must be after the start time."); return; }
-    }
+    const endIso = buildIso(eventDate, endTime);
+    if (!endIso) { setError("End time is not a valid time of day."); return; }
+    if (endIso <= startIso) { setError("End time must be after the start time."); return; }
     // Only asked for while the event is public — its city is where the public
     // listing shows it. Reachable while the profile default is still loading,
     // or when the viewer has no city on their profile yet.
@@ -376,7 +374,7 @@ export function CreateEventModal({
                 </label>
                 <label className="relative block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                    <Clock strokeWidth={2.5} size={11} /> End time <span className="font-normal text-foreground-subtle">(optional)</span>
+                    <Clock strokeWidth={2.5} size={11} /> End time <span className="text-accent">*</span>
                   </span>
                   <input
                     type="time"
