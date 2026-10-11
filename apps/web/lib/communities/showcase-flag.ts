@@ -67,20 +67,30 @@ export async function canStoreJoinRequestMessage(
  * community-mute migration must keep reading memberships and pushing
  * notifications — they just cannot store or honour a timed mute. Reads that
  * select the column, and the push sender's `.or()` on it, branch on this.
+ *
+ * Unlike the probes above this caches ONLY a positive result: the normal flow
+ * is "server already running, migration applied moments later", and a cached
+ * miss would leave timed mutes dead until the process restarts. A miss
+ * re-probes on the next call (one tiny SELECT) and logs once.
  */
-let muteUntilSupported: boolean | null = null;
+let muteUntilSupported = false;
+let muteUntilWarned = false;
 
 export async function canStoreMuteUntil(
   db: ReturnType<typeof createServiceClient>,
 ): Promise<boolean> {
-  if (muteUntilSupported !== null) return muteUntilSupported;
+  if (muteUntilSupported) return true;
 
   const { error } = await db.from("community_members").select("notifications_muted_until").limit(1);
-  muteUntilSupported = !error;
-  if (error) {
+  if (!error) {
+    muteUntilSupported = true;
+    return true;
+  }
+  if (!muteUntilWarned) {
+    muteUntilWarned = true;
     console.warn(
       "[communities] community_members.notifications_muted_until is missing — apply the community-mute migration for timed mutes to persist.",
     );
   }
-  return muteUntilSupported;
+  return false;
 }

@@ -39,6 +39,7 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
   }, [toast.id, toast.durationMs, pending]);
 
   async function handleUndo() {
+    if (!toast.onAction) return;
     setPending(true);
     setError(null);
     try {
@@ -63,19 +64,21 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
           {error && <p className="mt-0.5 font-body text-xs text-red-400">{error}</p>}
         </div>
 
-        <button
-          type="button"
-          onClick={() => void handleUndo()}
-          disabled={pending}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
-        >
-          {pending ? (
-            <Spinner size={13} />
-          ) : (
-            <Undo2 strokeWidth={2.5} size={14} aria-hidden="true" />
-          )}
-          {toast.actionLabel}
-        </button>
+        {toast.onAction && (
+          <button
+            type="button"
+            onClick={() => void handleUndo()}
+            disabled={pending}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
+          >
+            {pending ? (
+              <Spinner size={13} />
+            ) : (
+              <Undo2 strokeWidth={2.5} size={14} aria-hidden="true" />
+            )}
+            {toast.actionLabel}
+          </button>
+        )}
 
         <button
           type="button"

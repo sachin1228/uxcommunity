@@ -12,6 +12,7 @@ import { DpWithEventDate } from "../DpWithEventDate";
 import { CommunityNameBadges } from "../CommunityBadges";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 import { isCommunityMuted } from "@/lib/communities/mute";
+import { showUndoToast } from "@/lib/undo-toast";
 
 interface Community {
   id: string;
@@ -169,6 +170,21 @@ export const ChatHeader = memo(function ChatHeader({
   // state is computed from the deadline, never from the column's presence.
   const muted = isCommunityMuted(community);
 
+  // The second line of the muted dropdown: when the mute lapses, or that it
+  // never does. Computed here but rendered only while the dropdown is open
+  // (a click), so no server render ever formats it in the wrong timezone.
+  const muteStateLabel = (() => {
+    if (!muted) return null;
+    if (community?.notifications_muted) return "Muted";
+    const until = community?.notifications_muted_until;
+    if (!until) return null;
+    const deadline = new Date(until);
+    if (!Number.isFinite(deadline.getTime())) return null;
+    const date = deadline.toLocaleDateString("en-US");
+    const time = deadline.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return `Muted until ${date} at ${time}`;
+  })();
+
   useEffect(() => {
     if (!openMenu) return;
     const closeOnOutside = (event: MouseEvent) => {
@@ -221,21 +237,32 @@ export const ChatHeader = memo(function ChatHeader({
   }
 
   /**
-   * Saves the caller's mute for this community. Non-destructive and instant,
-   * so no confirm step: the bell flips to its muted form and the sidebar row
-   * grows a crossed bell as confirmation.
+   * Saves the caller's mute for this community and confirms with a toast —
+   * "Chat muted" with an Undo that mutes back off, "Chat unmuted" as a plain
+   * notice. Returns whether the save landed; `reportFailure` is off for the
+   * undo path, where the toast's own "Couldn't undo that" handling owns the
+   * failure.
    */
-  async function applyMute(duration: MuteChoice) {
-    if (!community || muteBusy) return;
+  async function applyMute(
+    duration: MuteChoice,
+    { reportFailure = true }: { reportFailure?: boolean } = {},
+  ): Promise<boolean> {
+    if (!community || muteBusy) return false;
     setMuteBusy(true);
 
     const response = await dedupeFetch(`/api/communities/${community.id}/mute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ duration }),
-    });
+    }).catch(() => null);
     setMuteBusy(false);
-    if (!response.ok) return;
+
+    if (!response || !response.ok) {
+      if (reportFailure) {
+        showUndoToast({ message: "Couldn't update notifications. Try again." });
+      }
+      return false;
+    }
 
     const result = await response.json().catch(() => null);
     if (result) {
@@ -243,8 +270,22 @@ export const ChatHeader = memo(function ChatHeader({
         notifications_muted: Boolean(result.notifications_muted),
         notifications_muted_until: result.notifications_muted_until ?? null,
       });
+      if (duration === "off") {
+        showUndoToast({ message: "Chat unmuted" });
+      } else {
+        showUndoToast({
+          message: "Chat muted",
+          onAction: async () => {
+            // A failed undo rejects so the toast stays up (see UndoToast).
+            if (!(await applyMute("off", { reportFailure: false }))) {
+              throw new Error("Couldn't undo the mute.");
+            }
+          },
+        });
+      }
     }
     setOpenMenu(null);
+    return true;
   }
 
   // Members is not an owner-toggleable area, so it stays visible regardless of
@@ -354,20 +395,29 @@ export const ChatHeader = memo(function ChatHeader({
                   {openMenu === "mute" && (
                     <div role="menu" aria-label="Mute notifications" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       {muted ? (
-                        /* Muted (forever or still-timed): one action, off. */
+                        /* Muted (forever or still-timed): one action, off,
+                           with the deadline — or the forever flag — beneath
+                           it, like the chat settings it mirrors. */
                         <button
                           type="button"
                           role="menuitem"
                           disabled={muteBusy}
                           onClick={() => void applyMute("off")}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
                           {muteBusy ? (
                             <Spinner size={11} />
                           ) : (
                             <Bell strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
                           )}
-                          <span>Unmute notifications</span>
+                          <span className="min-w-0">
+                            <span className="block font-body text-xs text-foreground">Unmute notifications</span>
+                            {muteStateLabel && (
+                              <span className="mt-0.5 block font-body text-[11px] leading-tight text-foreground-muted">
+                                {muteStateLabel}
+                              </span>
+                            )}
+                          </span>
                         </button>
                       ) : (
                         MUTE_DURATIONS.map(({ duration, label }) => (

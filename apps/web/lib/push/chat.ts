@@ -188,28 +188,38 @@ type ServiceClient = ReturnType<typeof createServiceClient>;
 /**
  * Whether `community_members.notifications_muted_until` exists.
  *
- * Checked once per server process. An environment that has not yet applied the
- * community-mute migration must keep pushing notifications: the recipient
- * query's `.or()` on the deadline would otherwise fail the whole page query,
- * so before the column lands the sender simply filters on the forever-mute
- * boolean alone (timed mutes are then not stored either — see the mute route).
+ * An environment that has not yet applied the community-mute migration must
+ * keep pushing notifications: the recipient query's `.or()` on the deadline
+ * would otherwise fail the whole page query, so before the column lands the
+ * sender filters on the forever-mute boolean alone (timed mutes are then not
+ * stored either — see the mute route).
+ *
+ * Only a positive result is cached: a miss is re-probed on the next fan-out
+ * (one tiny SELECT) so applying the migration while the server runs starts
+ * working immediately instead of at the next restart. The warning logs once.
  */
-let muteUntilColumnsAvailable: boolean | null = null;
+let muteUntilColumnsAvailable = false;
+let muteUntilColumnsWarned = false;
 
 async function canFilterMuteUntil(db: ServiceClient): Promise<boolean> {
-  if (muteUntilColumnsAvailable !== null) return muteUntilColumnsAvailable;
+  if (muteUntilColumnsAvailable) return true;
+
   const { error } = await db
     .from("community_members")
     .select("notifications_muted_until")
     .limit(1);
-  muteUntilColumnsAvailable = !error;
-  if (error) {
+  if (!error) {
+    muteUntilColumnsAvailable = true;
+    return true;
+  }
+  if (!muteUntilColumnsWarned) {
+    muteUntilColumnsWarned = true;
     logEvent("warn", {
       event: "push.mute_until_column_missing",
       error: describeError(error),
     });
   }
-  return muteUntilColumnsAvailable;
+  return false;
 }
 
 /**
