@@ -1,6 +1,6 @@
 # uxcommunity/ — a home for designers
 
-A platform for UI/UX, product, and social media designers. Designers sign up directly, complete their profile, and get access to real-time community chat; admins review applications, manage members and master data, and moderate communities.
+A platform for UI/UX, product, and social media designers. Designers sign up directly, complete their profile, and get access to real-time community chat; admins review applications, manage members and master data, and moderate communities
 
 ## What the app does today
 
