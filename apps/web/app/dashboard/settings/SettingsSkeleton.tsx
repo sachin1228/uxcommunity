@@ -107,7 +107,7 @@ export function ConnectedAccountsSkeleton() {
   );
 }
 
-/** Profile — the identity fields, then the separate company card. */
+/** Profile — the identity fields, then the separate company and LinkedIn cards. */
 export function ProfileSkeleton() {
   return (
     <>
@@ -127,6 +127,13 @@ export function ProfileSkeleton() {
       </SkeletonCard>
       <SkeletonCard>
         <SkeletonBar className="h-7 w-32 rounded-lg" />
+      </SkeletonCard>
+      <SkeletonCard>
+        <div className="flex items-center gap-3">
+          <SkeletonBar className="h-10 w-10 shrink-0 rounded-lg" />
+          <SkeletonBar className="h-3 w-56 max-w-full" />
+          <SkeletonBar className="h-6 w-24 shrink-0" />
+        </div>
       </SkeletonCard>
     </>
   );
