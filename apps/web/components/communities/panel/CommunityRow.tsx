@@ -232,7 +232,7 @@ export const CommunityRow = memo(function CommunityRow({
                 title="Notifications muted"
                 className="inline-flex shrink-0 self-center items-center text-foreground-muted"
               >
-                <BellOff strokeWidth={2.5} size={16} aria-hidden="true" />
+                <BellOff strokeWidth={2.5} size={14} aria-hidden="true" />
               </span>
             )}
 
