@@ -314,15 +314,15 @@ export function EventRoomSection({
           <Link
             href={profileHref(event.user_id)}
             title={event.users.name}
-            className="mt-1.5 inline-flex min-w-0 max-w-full items-center gap-2"
+            className="mt-2 inline-flex min-w-0 max-w-full items-center gap-2.5"
           >
             <AvatarImg
               url={event.users.avatar_url}
               name={event.users.name}
-              size={20}
-              className="h-5 w-5 shrink-0 rounded-full object-cover"
+              size={24}
+              className="h-6 w-6 shrink-0 rounded-full object-cover"
             />
-            <span className="min-w-0 truncate font-body text-xs text-foreground-muted hover:underline">
+            <span className="min-w-0 truncate font-body text-sm text-foreground-muted hover:underline">
               Hosted by <span className="font-medium text-foreground">{event.users.name}</span>
             </span>
           </Link>
