@@ -2,6 +2,7 @@ import type { CommunityThread } from "@/lib/communities/models/threads";
 import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
 import type { CommunityResource } from "@/lib/communities/models/resources";
 import type { ShowcasePost } from "@/components/communities/showcase/types";
+import type { EventChatCardLink } from "@/lib/communities/event-chat";
 import type { ContentKind } from "@/lib/communities/content-sync";
 
 /**
@@ -16,14 +17,9 @@ export type FeedThread = Omit<CommunityThread, "community_id"> & { _type: "threa
  * The group-chat room behind an event, when one exists — what the feed's
  * event cards need to draw the Join/Open row (see EventChatPanel). Attached
  * by the feed route, which also says whether the viewer is already in it.
+ * Same shape the city Events page attaches (see lib/events/service).
  */
-export interface FeedEventChat {
-  id: string;
-  name: string;
-  image_url: string | null;
-  member_count: number;
-  joined: boolean;
-}
+export type FeedEventChat = EventChatCardLink;
 
 export type FeedEvent = Omit<CommunityEvent, "community_id"> & { _type: "event"; community_id: string | null; community_name: string | null; community_image: string | null; rsvps?: EventRsvp[]; chat_community?: FeedEventChat | null };
 export type FeedResource = Omit<CommunityResource, "community_id"> & { _type: "resource"; community_id: string | null; community_name: string | null; community_image: string | null };

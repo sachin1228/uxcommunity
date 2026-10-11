@@ -42,6 +42,72 @@ export async function getEventChatCommunity(
 }
 
 /**
+ * What a card's Join/Open chat row draws (see EventChatPanel): the room behind
+ * an event — id, name, picture, size — plus whether the viewer is in it.
+ *
+ * A type alias on purpose: the feed routes attach it to their JSON-ish card
+ * items, and only object-literal type aliases earn TypeScript's implicit
+ * index signature (interfaces would need a cast at every attachment point).
+ */
+export type EventChatCardLink = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  member_count: number;
+  joined: boolean;
+};
+
+/**
+ * The room behind each of these events — when one exists — for the cards that
+ * draw the chat row. Two batched reads for the whole page: the rooms, then
+ * the viewer's memberships. Events with no room are simply absent from the map.
+ */
+export async function loadEventChatCardLinks(
+  db: Db,
+  eventIds: string[],
+  viewerId: string,
+): Promise<Map<string, EventChatCardLink>> {
+  const links = new Map<string, EventChatCardLink>();
+  const ids = [...new Set(eventIds)];
+  if (!ids.length) return links;
+
+  const { data: rooms } = await db
+    .from("communities")
+    .select("id, event_id, name, image_url, member_count")
+    .in("event_id", ids)
+    .eq("is_active", true);
+  const roomRows = (rooms ?? []) as Array<{
+    id: string;
+    event_id: string | null;
+    name: string;
+    image_url: string | null;
+    member_count: number;
+  }>;
+  if (!roomRows.length) return links;
+
+  const { data: memberships } = await db
+    .from("community_members")
+    .select("community_id")
+    .eq("user_id", viewerId)
+    .in("community_id", roomRows.map((room) => room.id));
+  const joinedRoomIds = new Set(
+    ((memberships ?? []) as Array<{ community_id: string }>).map((m) => m.community_id),
+  );
+
+  for (const room of roomRows) {
+    if (!room.event_id) continue;
+    links.set(room.event_id, {
+      id: room.id,
+      name: room.name,
+      image_url: room.image_url,
+      member_count: room.member_count,
+      joined: joinedRoomIds.has(room.id),
+    });
+  }
+  return links;
+}
+
+/**
  * Find-or-create the group chat for an event and make its creator a member.
  *
  * Idempotent: the partial unique index on communities.event_id is the referee,

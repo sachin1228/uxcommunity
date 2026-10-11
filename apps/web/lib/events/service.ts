@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards } from "@/lib/communities/event-cards";
+import { loadEventChatCardLinks, type EventChatCardLink } from "@/lib/communities/event-chat";
 import type { CommunityEvent } from "@/lib/communities/models/events";
 
 /**
@@ -21,6 +22,8 @@ export const CITY_EVENT_PAGE_SIZE = 25;
 export type CityEventItem = CommunityEvent & {
   community_name?: string | null;
   community_image?: string | null;
+  /** The card's Join/Open chat row — the room behind the event, when one exists. */
+  chat_community?: EventChatCardLink | null;
 };
 
 export interface CityEventViewer {
@@ -96,7 +99,15 @@ export async function fetchCityEventPhase(
 
   const rows = (data ?? []).map(({ item }) => item as Record<string, unknown>);
   const page = rows.slice(0, CITY_EVENT_PAGE_SIZE);
-  const events = await enrichEventCards(page, viewerId);
+  const [events, chatLinks] = await Promise.all([
+    enrichEventCards(page, viewerId),
+    // The Join/Open chat row every city card carries (see EventChatPanel).
+    loadEventChatCardLinks(
+      db,
+      page.flatMap((row) => (typeof row.id === "string" ? [row.id] : [])),
+      viewerId,
+    ),
+  ]);
 
   const last = page.at(-1);
   const nextCursor =
@@ -106,5 +117,11 @@ export async function fetchCityEventPhase(
         ? "past"
         : null;
 
-  return { events, nextCursor };
+  return {
+    events: events.map((event) => ({
+      ...event,
+      chat_community: chatLinks.get(event.id) ?? null,
+    })),
+    nextCursor,
+  };
 }

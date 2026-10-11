@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { CalendarCheck2, CalendarClock, CalendarX2, MapPinned } from "lucide-react";
 import type { CityEventItem } from "@/lib/events/service";
 import { EventCard } from "@/components/communities/events/EventCard";
+import { EventChatPanel } from "@/components/communities/events/EventChatPanel";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { filterChip } from "@/components/communities/filter-chip";
 import { GradientButton } from "@/components/ui/GradientButton";
@@ -311,7 +312,26 @@ export function CityEventsView({
                     onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
                     onOpen={() => router.push(`/dashboard/events/${event.id}`)}
-                  />
+                  >
+                    {/* The same Join/Open chat row the homepage feed cards
+                        carry. The card opens the event on click; the row's
+                        controls — and its modals, which portal but still
+                        bubble through the React tree — must not also. */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <EventChatPanel
+                        chatCommunityId={event.chat_community?.id ?? null}
+                        chatCommunityName={event.chat_community?.name ?? null}
+                        chatCommunityImage={event.chat_community?.image_url ?? null}
+                        chatMemberCount={event.chat_community?.member_count}
+                        joined={event.chat_community?.joined ?? false}
+                        communityId={event.community_id ?? ""}
+                        eventId={event.id}
+                        eventTitle={event.title}
+                        eventDate={event.event_date}
+                        eventEnd={event.end_date}
+                      />
+                    </div>
+                  </EventCard>
                 </div>
               );
             })}

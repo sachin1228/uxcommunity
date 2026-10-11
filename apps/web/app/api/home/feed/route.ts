@@ -8,6 +8,7 @@ import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { HOME_FEED_SCOPES, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { loadEventAttendeePreviews } from "@/lib/communities/event-cards";
+import { loadEventChatCardLinks } from "@/lib/communities/event-chat";
 import {
   FEED_PAGE_SIZE as PAGE_SIZE,
   isFeedCard,
@@ -76,52 +77,13 @@ const loadFeedPage = unstable_cache(
     );
     if (!eventIds.length) return items;
 
-    // Same attendee previews every other event surface uses.
-    const previewMap = await loadEventAttendeePreviews(eventIds);
-
-    // The group-chat row on the feed's event cards: the room behind each event
-    // (when one exists) plus whether the viewer is already in it. Two batched
-    // reads for the whole page — the rooms, then the viewer's memberships.
-    const { data: roomRows } = await db
-      .from("communities")
-      .select("id, event_id, name, image_url, member_count")
-      .in("event_id", eventIds)
-      .eq("is_active", true);
-    const roomByEvent = new Map<
-      string,
-      { id: string; name: string; image_url: string | null; member_count: number }
-    >();
-    for (const room of (roomRows ?? []) as Array<{
-      id: string;
-      event_id: string | null;
-      name: string;
-      image_url: string | null;
-      member_count: number;
-    }>) {
-      if (room.event_id) roomByEvent.set(room.event_id, room);
-    }
-    const joinedRoomIds = new Set<string>();
-    if (roomByEvent.size) {
-      const { data: memberships } = await db
-        .from("community_members")
-        .select("community_id")
-        .eq("user_id", userId)
-        .in("community_id", [...roomByEvent.values()].map((room) => room.id));
-      for (const membership of (memberships ?? []) as Array<{ community_id: string }>) {
-        joinedRoomIds.add(membership.community_id);
-      }
-    }
-    const chatFor = (eventId: string) => {
-      const room = roomByEvent.get(eventId);
-      if (!room) return null;
-      return {
-        id: room.id,
-        name: room.name,
-        image_url: room.image_url,
-        member_count: room.member_count,
-        joined: joinedRoomIds.has(room.id),
-      };
-    };
+    // Same attendee previews every other event surface uses, and the room
+    // behind each event — when one exists — for the card's Join/Open row
+    // (see EventChatPanel). Both are batched reads for the whole page.
+    const [previewMap, chatLinks] = await Promise.all([
+      loadEventAttendeePreviews(eventIds),
+      loadEventChatCardLinks(db, eventIds, userId),
+    ]);
 
     return items.map((item) =>
       typeof item === "object" && item !== null && !Array.isArray(item)
@@ -129,7 +91,7 @@ const loadFeedPage = unstable_cache(
         ? {
             ...item,
             rsvps: (previewMap.get(item.id) ?? []) as unknown as Json,
-            chat_community: chatFor(item.id),
+            chat_community: chatLinks.get(item.id) ?? null,
           }
         : item,
     );
