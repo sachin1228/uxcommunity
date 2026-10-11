@@ -61,10 +61,12 @@ export async function PATCH(
 
   let existingQuery = db
     .from("community_events")
-    // cover_image_url is fetched so replaced/removed covers can be cleaned up
-    // from R2 after the update; event_date is fetched so a move can be told
-    // from an untouched schedule (see the host-zone note below).
-    .select("id, user_id, cover_image_url, event_date")
+    // title and cover_image_url are fetched so the group chat sync can tell
+    // which rooms still wear the event's old clothes before this edit replaces
+    // them; cover_image_url is also what the R2 cleanup below needs. event_date
+    // is fetched so a move can be told from an untouched schedule (see the
+    // host-zone note below).
+    .select("id, user_id, title, cover_image_url, event_date")
     .eq("id", eventId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
@@ -166,9 +168,16 @@ export async function PATCH(
 
   // Keep the event's group chat in step with the event it belongs to: the room
   // is named after the event and wears the same cover, so it has to follow a
-  // rename or a new cover. Runs before the R2 cleanup below so the group never
-  // points at an image the cleanup is about to delete.
+  // rename or a new cover — but only where the room still wears the event's
+  // old name or cover; a room its owner has taken over keeps its own (see
+  // syncEventChatCommunity). Runs before the R2 cleanup below so the group
+  // never points at an image the cleanup is about to delete.
   const updatedRow = data as unknown as { title: string; cover_image_url: string | null };
+  const previousRow = existing as unknown as {
+    user_id: string;
+    title: string;
+    cover_image_url: string | null;
+  };
   let chatCommunityId: string | null = null;
   try {
     chatCommunityId = await syncEventChatCommunity(
@@ -178,7 +187,11 @@ export async function PATCH(
         title: updatedRow.title,
         coverImageUrl: updatedRow.cover_image_url ?? null,
       },
-      (existing as unknown as { user_id: string }).user_id,
+      previousRow.user_id,
+      {
+        title: previousRow.title,
+        coverImageUrl: previousRow.cover_image_url ?? null,
+      },
     );
   } catch (chatError) {
     console.error("[PATCH community events] group chat sync failed:", chatError);

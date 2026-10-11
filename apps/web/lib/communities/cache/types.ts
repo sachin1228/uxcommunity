@@ -224,9 +224,9 @@ export interface CachedSidebarCommunity {
   pinned_until?: string | null;
   /**
    * That same deadline whether ahead or past — the event's end, or its start
-   * when it has none. Outlives the pin so the DP's badge can say ENDED for a
-   * day after the event wraps (see lib/communities/event-date). Absent on
-   * every other kind of community.
+   * when it has none. Outlives the pin so the DP's badge can say ENDED for
+   * half a day after the event wraps (see lib/communities/event-date). Absent
+   * on every other kind of community.
    */
   event_end?: string | null;
   last_read_at?: string | null;

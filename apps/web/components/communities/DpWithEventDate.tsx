@@ -19,9 +19,9 @@ import { useNowTick } from "@/lib/use-now-tick";
  * the event's own day it trades the month for TODAY; while the event runs the
  * tile steps aside for a small LIVE pill — a pulsing dot and the word, no
  * date: on the day itself everyone can see it is today, and the open window
- * is the whole news. For an hour after the window closes the pill says ENDED
- * — no date either, the day has stopped being the news — and then it comes
- * down altogether and the room reverts to a plain face, the conversation
+ * is the whole news. For half a day after the window closes the pill says
+ * ENDED — no date either, the day has stopped being the news — and then it
+ * comes down altogether and the room reverts to a plain face, the conversation
  * itself untouched. The red is the calendar's own ink rather than a state
  * signal — the same red, white and black in either theme and over any DP —
  * and the live pill alone carries the pulse, the beat that reads across a
@@ -127,10 +127,10 @@ export function DpWithEventDate({
   date?: string | null;
   /**
    * The event's end, ISO — what turns the tile into the LIVE pill between
-   * start and end (and ENDED for an hour after). Callers hand over the room's
-   * `event_end` (the deadline whether it is ahead or past), falling back to
-   * the sidebar's `pinned_until`, which is the same instant while the event
-   * could still be running.
+   * start and end (and ENDED for half a day after). Callers hand over the
+   * room's `event_end` (the deadline whether it is ahead or past), falling
+   * back to the sidebar's `pinned_until`, which is the same instant while the
+   * event could still be running.
    */
   endsAt?: string | null;
   /** Diameter of the DP inside, which the badge scales itself from. */
@@ -145,7 +145,7 @@ export function DpWithEventDate({
   // TODAY as the day arrives, steps aside for the state pill while the
   // window is open or freshly closed, and only comes down once there is
   // nothing left to announce — the room and its history stay. The gate is
-  // "has the window closed and the grace hour passed", never the state
+  // "has the window closed and the ended grace passed", never the state
   // itself: an event weeks out must keep its plain date tile.
   const visible = Boolean(badge && (!badge.isPast || badge.isEnded));
   const isEnded = Boolean(badge?.isEnded);
