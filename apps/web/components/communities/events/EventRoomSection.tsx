@@ -298,23 +298,11 @@ export function EventRoomSection({
           )}
         </div>
 
-        {event.cover_image_url && (
-          <img
-            src={event.cover_image_url}
-            alt={event.title}
-            className="mt-3 block h-auto w-full rounded-lg"
-          />
-        )}
-
-        <p className="mt-3 text-pretty font-body text-sm font-medium text-foreground">
-          {event.title}
-        </p>
-
         {event.users && (
           <Link
             href={profileHref(event.user_id)}
             title={event.users.name}
-            className="mt-2 inline-flex min-w-0 max-w-full items-center gap-2.5"
+            className="mt-3 inline-flex min-w-0 max-w-full items-center gap-2.5"
           >
             <AvatarImg
               url={event.users.avatar_url}
@@ -327,6 +315,18 @@ export function EventRoomSection({
             </span>
           </Link>
         )}
+
+        {event.cover_image_url && (
+          <img
+            src={event.cover_image_url}
+            alt={event.title}
+            className="mt-3 block h-auto w-full rounded-lg"
+          />
+        )}
+
+        <p className="mt-3 text-pretty font-body text-sm font-medium text-foreground">
+          {event.title}
+        </p>
 
         <div className="mt-3 flex flex-col gap-2">
           {/* Date and time in their own rows, like the event card. The times
