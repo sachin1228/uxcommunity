@@ -152,7 +152,7 @@ export function EventChatPanel({
             className="inline-flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3.5 py-2 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20"
           >
             <MessageSquare strokeWidth={2.5} size={14} />
-            Join event chat
+            Join
           </button>
         )}
       </div>
