@@ -31,6 +31,7 @@ import { collectPendingMentions } from "./chat/mention-jumps";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MessageList } from "./chat/MessageList";
+import { ChatWatermark } from "./chat/ChatWatermark";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { TypingIndicator } from "./chat/TypingIndicator";
@@ -828,6 +829,12 @@ export function CommunityChat({
     [community, sidebarEntry, communityId],
   );
 
+  const isEventRoom = displayCommunity?.type === "event";
+  // Paper only once the room has something on it — a room showing its welcome
+  // state reads as plain paper, not a poster.
+  const roomHasContent =
+    messages.length > 0 || threadEvents.length > 0 || contentEvents.length > 0;
+
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
   // Role and grants only exist on the loaded read model; the sidebar fallback
   // never carries them, so read them from `community` directly.
@@ -1013,22 +1020,36 @@ export function CommunityChat({
             canManageMembers={canManageMembers}
             canManageModerators={canManageModerators}
             isPrivate={displayCommunity?.is_private ?? false}
-            isEventChat={displayCommunity?.type === "event"}
+            isEventChat={isEventRoom}
           />
         ) : renderedTab === "activity" ? (
           <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Scrollable message body — a flex sibling of the footer (WhatsApp
-              pattern). It owns the scroll; the footer below is static, so
+          {/* Message area — paper, watermark and the scroller share one grid
+              cell, so the watermark centers on exactly what the reader sees as
+              the chat. The pane paper stays put while messages scroll (the
+              scroller above it is transparent); the footer below is a plain
+              flex sibling. */}
+          <div className="relative grid grid-rows-1 flex-1 min-h-0 overflow-hidden">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-background"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          />
+          {isEventRoom && roomHasContent && (
+            <ChatWatermark text={displayCommunity?.name ?? ""} />
+          )}
+          {/* Scrollable message body — the footer below is static, so
               messages can never flow underneath the input.                     */}
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="relative flex-1 min-h-0 overflow-y-auto bg-background"
+            className="relative col-start-1 row-start-1 min-h-0 overflow-y-auto"
             style={{
-              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-              backgroundSize: "24px 24px",
               // Scroll position above the viewport is preserved manually (see the
               // top-region compensation effect); native anchoring would double-adjust.
               overflowAnchor: "none",
@@ -1082,6 +1103,7 @@ export function CommunityChat({
               onImageClick={handleImageClick}
             />
             )}
+          </div>
           </div>
 
           {/* Static footer — separate from the scroll body, never overlapped */}
