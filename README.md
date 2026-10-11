@@ -341,15 +341,23 @@ To repair it:
    **Object Read & Write** on the media bucket. A read-only token authenticates
    fine and then fails on the first upload.
 2. Update the repository secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`
-   (GitHub → Settings → Secrets and variables → Actions). A deploy writes
-   `.dev.vars` from those secrets, so a value changed only in the Cloudflare
-   dashboard never reaches the Worker.
+   (GitHub → Settings → Secrets and variables → Actions). Every deploy pushes
+   the web Worker's secrets from these repository secrets (deploy.yml → "Set
+   web worker secrets"), so a value changed only in the Cloudflare dashboard
+   never reaches the Worker.
 3. Update the same values in every local env file — `apps/web/.dev.vars`,
    `apps/web/.env.local` and `apps/web/.env` — or local uploads keep failing
    while production works.
-4. Run `npm run verify:r2` until it passes, then deploy. Both deploy workflows
-   run that same check before the build, so a dead credential fails the deploy
-   in seconds instead of shipping an app whose every upload 500s.
+4. Run `npm run verify:r2` until it passes, then deploy — the deploy itself
+   pushes the new value onto the Worker. Both deploy workflows run that same
+   check before the build, so a dead credential fails the deploy in seconds
+   instead of shipping an app whose every upload 500s.
+
+The Worker is kept in step with the repository secrets on every deploy
+(`.github/workflows/deploy.yml` → "Set web worker secrets"). Before that push
+existed, a rotation could leave CI green and the Worker on the dead value,
+with no log connecting the two — exactly how the 2026-10-08/09 R2 rotation
+broke every production upload without failing a single deploy.
 
 ### Verifying the other service credentials
 
