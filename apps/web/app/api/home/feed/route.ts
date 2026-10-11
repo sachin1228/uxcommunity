@@ -7,8 +7,7 @@ import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { HOME_FEED_SCOPES, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
-import { loadEventAttendeePreviews } from "@/lib/communities/event-cards";
-import { loadEventChatCardLinks } from "@/lib/communities/event-chat";
+import { loadEventAttendeePreviews, loadEventChatCardLinks } from "@/lib/communities/event-cards";
 import {
   FEED_PAGE_SIZE as PAGE_SIZE,
   isFeedCard,
@@ -82,7 +81,7 @@ const loadFeedPage = unstable_cache(
     // (see EventChatPanel). Both are batched reads for the whole page.
     const [previewMap, chatLinks] = await Promise.all([
       loadEventAttendeePreviews(eventIds),
-      loadEventChatCardLinks(db, eventIds, userId),
+      loadEventChatCardLinks(eventIds, userId),
     ]);
 
     return items.map((item) =>

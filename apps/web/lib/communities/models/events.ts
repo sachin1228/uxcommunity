@@ -1,5 +1,19 @@
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 
+/**
+ * The group-chat room behind an event, when one exists — what a card's
+ * Join/Open row draws (see EventChatPanel): the room's identity and size,
+ * plus whether the viewer is already in it. Attached by `enrichEventCards`
+ * (and the feed routes), so every event surface that can draw the row has it.
+ */
+export type EventChatCardLink = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  member_count: number;
+  joined: boolean;
+};
+
 export interface CommunityEvent {
   id: string;
   community_id: string;
@@ -37,6 +51,8 @@ export interface CommunityEvent {
   user_saved: boolean;
   /** Members in the event's group room, or null when no room exists yet. */
   chat_member_count?: number | null;
+  /** The room behind the event, for the card's Join/Open chat row. */
+  chat_community?: EventChatCardLink | null;
   rsvps?: EventRsvp[];
   users: { name: string; avatar_url: string | null } | null;
 }

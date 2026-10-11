@@ -1,8 +1,7 @@
 import type { CommunityThread } from "@/lib/communities/models/threads";
-import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
+import type { CommunityEvent, EventChatCardLink, EventRsvp } from "@/lib/communities/models/events";
 import type { CommunityResource } from "@/lib/communities/models/resources";
 import type { ShowcasePost } from "@/components/communities/showcase/types";
-import type { EventChatCardLink } from "@/lib/communities/event-chat";
 import type { ContentKind } from "@/lib/communities/content-sync";
 
 /**
