@@ -14,15 +14,18 @@ export function ToggleRow({
   checked,
   onChange,
   icon,
+  flush = false,
 }: {
   title: string;
   description: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   icon?: React.ReactNode;
+  /** Drop the horizontal inset so the row lines up with a flush field stack. */
+  flush?: boolean;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3">
+    <label className={`flex cursor-pointer items-center justify-between gap-4 ${flush ? "" : "px-4"} py-3`}>
       <span className="flex items-center gap-2.5">
         {icon && <span className="shrink-0 text-foreground-muted">{icon}</span>}
         <span>

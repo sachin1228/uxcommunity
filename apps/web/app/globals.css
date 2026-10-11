@@ -511,6 +511,33 @@ select:focus-visible {
     cursor: not-allowed;
   }
 
+  /* Chrome paints a "--:-- --" ghost inside an empty time input; once the
+     form's own labels and clock icon carry the cue, that ghost is noise.
+     Hidden while the field is empty and unfocused, back while the segments
+     are the typing target. */
+  input[type="time"].time-empty:not(:focus)::-webkit-datetime-edit {
+    visibility: hidden;
+  }
+
+  /* The event forms draw their own calendar/clock affordance (the same
+     Lucide set as the labels); the browser's stock indicator reads as a
+     system artifact on the dark fields. */
+  input.hide-native-picker::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+
+  /* An empty date input's format ghost ("dd/mm/yyyy") is a placeholder like
+     any other field's, so it takes the same subtle ink. */
+  input[type="date"].date-empty:not(:focus)::-webkit-datetime-edit {
+    color: var(--color-foreground-subtle);
+  }
+
+  /* The custom time placeholder yields to the native typing segments while
+     the field is focused. */
+  label:focus-within .time-placeholder {
+    display: none;
+  }
+
   input:where(.field) {
     height: 32px;
     padding: 0 12px;

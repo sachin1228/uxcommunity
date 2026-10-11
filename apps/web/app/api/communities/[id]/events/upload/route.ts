@@ -5,7 +5,7 @@ import { uploadToR2 } from "@/lib/r2";
 import { extensionForMime } from "@/lib/image-utils";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
 
 export async function POST(
   request: NextRequest,
@@ -32,7 +32,7 @@ export async function POST(
 
   const file = formData.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "No file provided." }, { status: 422 });
-  if (!IMAGE_TYPES.has(file.type)) return NextResponse.json({ error: "Only images are supported (JPEG, PNG, WebP, GIF)." }, { status: 422 });
+  if (!IMAGE_TYPES.has(file.type)) return NextResponse.json({ error: "Only images are supported (JPEG, PNG, WebP, GIF or AVIF)." }, { status: 422 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image must be 5 MB or smaller." }, { status: 422 });
 
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

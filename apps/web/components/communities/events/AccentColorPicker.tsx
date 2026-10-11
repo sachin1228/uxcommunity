@@ -8,17 +8,17 @@ import { Check } from "lucide-react";
  * The chosen hex becomes the main color of that event's ticket card.
  */
 
-export const DEFAULT_EVENT_ACCENT = "#e8e14a";
+export const DEFAULT_EVENT_ACCENT = "#e2e8f0";
 
 export const EVENT_ACCENT_PRESETS = [
-  { value: DEFAULT_EVENT_ACCENT, label: "Citron" },
+  { value: DEFAULT_EVENT_ACCENT, label: "White" },
+  { value: "#e8e14a", label: "Citron" },
   { value: "#a78bfa", label: "Violet" },
   { value: "#38bdf8", label: "Sky" },
   { value: "#34d399", label: "Mint" },
   { value: "#fb923c", label: "Orange" },
   { value: "#f472b6", label: "Pink" },
   { value: "#f87171", label: "Red" },
-  { value: "#e2e8f0", label: "Silver" },
 ];
 
 export function AccentColorPicker({

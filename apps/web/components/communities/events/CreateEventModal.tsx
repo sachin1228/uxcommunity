@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
+import { filterChip } from "../filter-chip";
 import type { CommunityEvent } from "@/lib/communities/models/events";
 import { compressImage, compressedFile } from "@/lib/image-client";
 import {
@@ -16,9 +17,7 @@ import {
   nowTimeInput,
   todayDateInput,
   viewerTimeZoneName,
-  zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
-import { HostTimeZoneField } from "./HostTimeZoneField";
 import { useNowTick } from "@/lib/use-now-tick";
 
 interface CreateEventModalProps {
@@ -52,16 +51,10 @@ export function CreateEventModal({
   // submit check re-reads the clock, so time still can't slip through.
   const [minDate] = useState(() => todayDateInput());
   const [minStartTime] = useState(() => nowTimeInput());
-  // The zone the typed times mean. It starts as the device's own — what a wall
-  // clock the member just typed almost always means — and the picker below
-  // overrides it for a device set to the wrong zone, or for a host scheduling
-  // somewhere they aren't.
+  // The zone the typed times mean — the device's own, what a wall clock the
+  // member just typed almost always means.
   const [deviceZone] = useState(() => viewerTimeZoneName());
-  const [hostZone, setHostZone] = useState<string | null>(deviceZone);
-  // Derived from the chosen day so an event on the far side of a DST change
-  // still names the offset it will actually run at, and the tick keeps the
-  // countdown below honest.
-  const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
+  const [hostZone] = useState<string | null>(deviceZone);
   const nowTick = useNowTick();
   const startsInMinutes = minutesUntilStart(
     eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
@@ -144,6 +137,8 @@ export function CreateEventModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setError("Title is required."); return; }
+    if (!description.trim()) { setError("Description is required."); return; }
+    if (!coverImageUrl) { setError("Cover image is required."); return; }
     if (!eventDate) { setError("Event date is required."); return; }
     if (!eventTime) { setError("Event time is required."); return; }
     const startIso = buildIso(eventDate, eventTime);
@@ -160,10 +155,10 @@ export function CreateEventModal({
       if (!endIso) { setError("End time is not a valid time of day."); return; }
       if (endIso <= startIso) { setError("End time must be after the start time."); return; }
     }
-    // Required, and the picker has no empty option to fall back on — this is
-    // only reachable while the default from the profile is still loading, or
-    // when the viewer has no city on their profile yet.
-    if (!cityId) { setError("City is required."); return; }
+    // Only asked for while the event is public — its city is where the public
+    // listing shows it. Reachable while the profile default is still loading,
+    // or when the viewer has no city on their profile yet.
+    if (isPublic && !cityId) { setError("City is required."); return; }
 
     setSaving(true);
     setError(null);
@@ -238,7 +233,7 @@ export function CreateEventModal({
           {/* Description first — the card leads with it, so the form does too */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="font-normal text-foreground-subtle">(optional)</span>
+              Description <span className="text-accent">*</span>
             </span>
             <textarea
               value={description}
@@ -250,14 +245,14 @@ export function CreateEventModal({
             />
           </label>
 
-          {/* Cover image + event name/start date+time share one row */}
+          {/* The poster and the event's details share one row */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {/* Cover image */}
             <div className="flex flex-col">
               <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-                Cover image <span className="font-normal text-foreground-subtle">(optional)</span>
+                Cover image <span className="text-accent">*</span>
               </span>
-              <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageSelect} />
+              <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleImageSelect} />
               {coverImageUrl ? (
                 <div className="relative min-h-32 w-full flex-1 overflow-hidden rounded-lg border border-border bg-surface-raised">
                   <img src={coverImageUrl} alt="Cover" className="h-full w-full object-cover" />
@@ -279,12 +274,12 @@ export function CreateEventModal({
                 >
                   {imageUploading ? <Spinner size={20} /> : <ImagePlus strokeWidth={2.5} size={20} />}
                   <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
-                  <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
+                  <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP, GIF or AVIF · max 5 MB</span>
                 </button>
               )}
             </div>
 
-            {/* Event name + start date/time */}
+            {/* Event name and the schedule, beside the poster */}
             <div className="flex flex-col gap-3">
               <label className="block">
                 <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
@@ -307,20 +302,18 @@ export function CreateEventModal({
               {/* One date selector on its own row: the event happens on this
                   day, and the start and end times beneath it place it inside
                   it. */}
-              <label className="block">
+              <label className="relative block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
-                  <span
-                    className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
-                    title={`The times you enter are read in ${zoneLabel}`}
-                  >
-                    {zoneLabel}
-                  </span>
                 </span>
                 <input
                   type="date"
                   value={eventDate}
                   min={minDate}
+                  onClick={(e) => {
+                    // Anywhere on the field opens the calendar, not only the icon.
+                    try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
+                  }}
                   onChange={(e) => {
                     setEventDate(e.target.value);
                     // Switching onto today must not keep a time that day
@@ -333,14 +326,20 @@ export function CreateEventModal({
                       setEventTime("");
                     }
                   }}
-                  className="field w-full"
+                  className={`field hide-native-picker w-full cursor-pointer pr-9 ${eventDate ? "" : "date-empty"}`}
+                />
+                <Calendar
+                  aria-hidden="true"
+                  strokeWidth={2.5}
+                  size={15}
+                  className="pointer-events-none absolute bottom-2 right-3 text-foreground-muted"
                 />
               </label>
 
               {/* Start and end times share the row beneath the date — the end
                   rides the start's day, so there is no second date field. */}
               <div className="grid grid-cols-2 gap-3">
-                <label className="block">
+                <label className="relative block">
                   <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                     <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
                   </span>
@@ -348,121 +347,141 @@ export function CreateEventModal({
                     type="time"
                     value={eventTime}
                     min={eventDate === minDate ? minStartTime : undefined}
+                    onClick={(e) => {
+                      // Anywhere on the field opens the picker, not only the icon.
+                      try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
+                    }}
                     onChange={(e) => {
                       // Typing can bypass the picker's min — refuse a past
                       // time on today's date rather than accepting it here.
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className="field w-full"
+                    className={`field hide-native-picker w-full cursor-pointer pr-9 ${eventTime ? "" : "time-empty"}`}
+                  />
+                  {!eventTime && (
+                    <span
+                      aria-hidden="true"
+                      className="time-placeholder pointer-events-none absolute bottom-0 left-3 flex h-8 items-center font-body text-sm text-foreground-subtle"
+                    >
+                      Select time
+                    </span>
+                  )}
+                  <Clock
+                    aria-hidden="true"
+                    strokeWidth={2.5}
+                    size={15}
+                    className="pointer-events-none absolute bottom-2 right-3 text-foreground-muted"
                   />
                 </label>
-                <label className="block">
-                  <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                    End time <span className="font-normal text-foreground-subtle">(optional)</span>
+                <label className="relative block">
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <Clock strokeWidth={2.5} size={11} /> End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
                   <input
                     type="time"
                     value={endTime}
                     min={eventTime || undefined}
+                    onClick={(e) => {
+                      // Anywhere on the field opens the picker, not only the icon.
+                      try { e.currentTarget.showPicker?.(); } catch { /* The segments still type. */ }
+                    }}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full"
+                    className={`field hide-native-picker w-full cursor-pointer pr-9 ${endTime ? "" : "time-empty"}`}
+                  />
+                  {!endTime && (
+                    <span
+                      aria-hidden="true"
+                      className="time-placeholder pointer-events-none absolute bottom-0 left-3 flex h-8 items-center font-body text-sm text-foreground-subtle"
+                    >
+                      Select time
+                    </span>
+                  )}
+                  <Clock
+                    aria-hidden="true"
+                    strokeWidth={2.5}
+                    size={15}
+                    className="pointer-events-none absolute bottom-2 right-3 text-foreground-muted"
                   />
                 </label>
               </div>
-              <div className="font-body text-[11px] leading-snug text-foreground-subtle">
-                <p>Both times are on the chosen day. Leave the end blank for an open-ended event.</p>
-                {startsInMinutes !== null && (
-                  <p className="mt-1 font-medium text-accent">
-                    {startsInMinutes === 1
-                      ? "Starts in about a minute."
-                      : `Starts in about ${startsInMinutes} minutes.`}
-                  </p>
-                )}
+              {startsInMinutes !== null && (
+                <p className="font-body text-[11px] font-medium text-accent">
+                  {startsInMinutes === 1
+                    ? "Starts in about a minute."
+                    : `Starts in about ${startsInMinutes} minutes.`}
+                </p>
+              )}
+
+              {/* Either online or in person — the field below follows the choice */}
+              <div>
+                <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Event type</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsOnline(true)}
+                    aria-pressed={isOnline}
+                    className={filterChip(isOnline)}
+                  >
+                    <Video size={14} strokeWidth={2.5} aria-hidden="true" />
+                    Online
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsOnline(false)}
+                    aria-pressed={!isOnline}
+                    className={filterChip(!isOnline)}
+                  >
+                    <MapPin size={14} strokeWidth={2.5} aria-hidden="true" />
+                    In person
+                  </button>
+                </div>
               </div>
 
-              {/* Which clock the times above are on. It defaults to the
-                  device's own and is the host's only way to say otherwise —
-                  and the one place that says everyone else reads the same
-                  moment on their own clock. */}
-              <HostTimeZoneField
-                value={hostZone}
-                onChange={setHostZone}
-                deviceZone={deviceZone}
-                dateInput={eventDate}
-                startIso={eventDate && eventTime ? buildIso(eventDate, eventTime) : null}
-              />
+              {/* Location / Meet link */}
+              {isOnline ? (
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
+                  </span>
+                  <input
+                    type="url"
+                    value={meetLink}
+                    onChange={(e) => setMeetLink(e.target.value)}
+                    placeholder="https://meet.google.com/…"
+                    className="field w-full"
+                  />
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
+                  </span>
+                  <input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Address or venue name"
+                    className="field w-full"
+                  />
+                </label>
+              )}
+
+              {/* Max attendees */}
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                  <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional — leave blank for unlimited)</span>
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  value={maxAttendees}
+                  onChange={(e) => setMaxAttendees(e.target.value)}
+                  placeholder="e.g. 50"
+                  className="field w-full"
+                />
+              </label>
             </div>
           </div>
-
-          {/* Online toggle */}
-          <ToggleRow
-            title="Online event"
-            description="Happening virtually via a meeting link."
-            checked={isOnline}
-            onChange={setIsOnline}
-            icon={<Video strokeWidth={2.5} size={15} />}
-          />
-
-          {/* Location / Meet link */}
-          {isOnline ? (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
-              </span>
-              <input
-                type="url"
-                value={meetLink}
-                onChange={(e) => setMeetLink(e.target.value)}
-                placeholder="https://meet.google.com/…"
-                className="field w-full"
-              />
-            </label>
-          ) : (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
-              </span>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Address or venue name"
-                className="field w-full"
-              />
-            </label>
-          )}
-
-          {/* City — the listing bucket on the workspace Events page */}
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <MapPinned strokeWidth={2.5} size={11} /> City <span className="text-accent">*</span> <span className="font-normal text-foreground-subtle">(defaults to your city)</span>
-            </span>
-            <select
-              value={cityId ?? ""}
-              onChange={(e) => setCityId(e.target.value || null)}
-              className="field w-full"
-            >
-              <option value="" disabled>Select a city…</option>
-              {cities.map((city) => (
-                <option key={city.id} value={city.id}>{city.name}</option>
-              ))}
-            </select>
-          </label>
-
-          {/* Max attendees */}
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional — leave blank for unlimited)</span>
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={maxAttendees}
-              onChange={(e) => setMaxAttendees(e.target.value)}
-              placeholder="e.g. 50"
-              className="field w-full"
-            />
-          </label>
 
           {/* Accent color */}
           <div>
@@ -479,7 +498,31 @@ export function CreateEventModal({
             checked={isPublic}
             onChange={setIsPublic}
             icon={<Globe strokeWidth={2.5} size={15} />}
+            flush
           />
+
+          {/* City — asked for only while the event is public, because the city
+              Events page is the one surface the choice feeds. */}
+          {isPublic && (
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                <MapPinned strokeWidth={2.5} size={11} /> City <span className="text-accent">*</span>
+              </span>
+              <select
+                value={cityId ?? ""}
+                onChange={(e) => setCityId(e.target.value || null)}
+                className="field w-full"
+              >
+                <option value="" disabled>Select a city…</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>{city.name}</option>
+                ))}
+              </select>
+              <p className="mt-1.5 font-body text-[11px] leading-snug text-foreground-subtle">
+                Shown on this city&apos;s Events page, so people there can discover and join it.
+              </p>
+            </label>
+          )}
         </div>
 
         {error && (
