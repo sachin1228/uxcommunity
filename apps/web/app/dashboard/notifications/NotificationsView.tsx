@@ -83,8 +83,11 @@ function EmptyNotifications({
 }
 
 export function NotificationsView({ userId }: { userId: string }) {
+  // `autoMarkSeen`: mounting this view clears the bell's badge — the count is
+  // "new since you last looked" — without marking anything read. The unread
+  // state (dots, per-tab counts, Mark all read) stays exactly as it was.
   const { notifications, unreadCount, loading, markOneRead, markAllRead } =
-    useNotifications(userId);
+    useNotifications(userId, { autoMarkSeen: true });
 
   const [tab, setTab] = useState<NotificationTab>("activity");
 

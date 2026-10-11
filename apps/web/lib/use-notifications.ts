@@ -1,15 +1,30 @@
 "use client";
 
-// Shared notifications state — used by the sidebar unread badge and the
+// Shared notifications state — used by the topbar bell and the
 // /dashboard/notifications page. Fetches the first page of notifications,
 // keeps count/state in sync over the realtime notifications room, and
 // mirrors every change into the request cache so other consumers see it.
+//
+// Two counts come out of it: `unreadCount` (server truth — the number of
+// rows with read_at null) and `unseenCount` (what the bell badge shows — the
+// unread notifications created after the member last opened the list).
+// Opening the list advances a seen watermark without marking anything read,
+// so the badge clears while the unread dots stay.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
+import {
+  advanceSeenAt,
+  countUnseenSince,
+  forgetSeenAt,
+  newestCreatedAt,
+  readSeenAt,
+  seenStorageKey,
+  subscribeSeenAt,
+} from "@/lib/notifications-seen";
 import {
   fetchJsonCached,
   getCachedRequest,
@@ -50,7 +65,21 @@ export interface NotificationItem {
 
 const MAX_ITEMS = 30;
 
-export function useNotifications(userId: string) {
+interface UseNotificationsOptions {
+  /**
+   * True on the notifications page: while it is mounted every change to the
+   * loaded list advances the seen watermark to its newest item, so the bell
+   * badge reads zero while the list is on screen — and starts from one for
+   * anything that arrives after the member leaves. read_at is never touched.
+   */
+  autoMarkSeen?: boolean;
+}
+
+export function useNotifications(
+  userId: string,
+  options: UseNotificationsOptions = {},
+) {
+  const { autoMarkSeen = false } = options;
   initRequestCache(userId);
   const isVisible = useDocumentVisible();
   const cached = getCachedRequest<{ notifications?: NotificationItem[]; unread_count?: number }>(
@@ -62,6 +91,7 @@ export function useNotifications(userId: string) {
     () => cached?.notifications ?? [],
   );
   const [unreadCount, setUnreadCount] = useState(() => cached?.unread_count ?? 0);
+  const [seenAt, setSeenAt] = useState<string | null>(() => readSeenAt(userId));
 
   const patchNotificationCache = useCallback(
     (
@@ -138,6 +168,35 @@ export function useNotifications(userId: string) {
       userId,
     );
   }, [userId]);
+
+  // The seen watermark lives in a module-level store (backed by localStorage,
+  // shared across tabs via the storage event), so when the notifications page
+  // advances it, every mounted badge re-reads it and clears immediately.
+  useEffect(() => {
+    const reRead = () => setSeenAt(readSeenAt(userId));
+    const unsubscribe = subscribeSeenAt(reRead);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== seenStorageKey(userId)) return;
+      forgetSeenAt(userId);
+      reRead();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [userId]);
+
+  // On the notifications page, being looked at is what clears the badge: each
+  // change to the visible list advances the watermark past everything in it
+  // (the monotonic guard keeps it from ever going backwards). Arrivals show up
+  // in the list without bumping the badge while the page is open; once the
+  // member leaves, the next arrival counts from one again.
+  useEffect(() => {
+    if (!autoMarkSeen) return;
+    const newest = newestCreatedAt(notifications);
+    if (newest !== null) advanceSeenAt(userId, newest);
+  }, [autoMarkSeen, notifications, userId]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -252,9 +311,18 @@ export function useNotifications(userId: string) {
     }).catch((error) => console.error("[notifications] mark all read failed", error));
   }, [patchNotificationCache, unreadCount]);
 
+  // What the bell badge shows: unread notifications newer than the last look
+  // at the list. Before the member has ever opened it there is no watermark,
+  // and the server's unread total stands in — the familiar all-time count.
+  const unseenCount = useMemo(
+    () => (seenAt ? countUnseenSince(notifications, seenAt) : unreadCount),
+    [notifications, seenAt, unreadCount],
+  );
+
   return {
     notifications,
     unreadCount,
+    unseenCount,
     loading,
     markOneRead,
     markAllRead,
