@@ -174,8 +174,9 @@ export const ChatHeader = memo(function ChatHeader({
   // never does. Computed here but rendered only while the dropdown is open
   // (a click), so no server render ever formats it in the wrong timezone.
   // No explicit locale: the browser's own region settings decide the date
-  // order and clock (11/10/2026 here, 10/11/2026 there), matching how the
-  // member writes dates elsewhere.
+  // order (11/10/2026 here, 10/11/2026 there), matching how the member
+  // writes dates elsewhere. The clock stays 12-hour everywhere, even in
+  // regions whose convention is a 24-hour one.
   const muteStateLabel = (() => {
     if (!muted) return null;
     if (community?.notifications_muted) return "Muted";
@@ -184,7 +185,7 @@ export const ChatHeader = memo(function ChatHeader({
     const deadline = new Date(until);
     if (!Number.isFinite(deadline.getTime())) return null;
     const date = deadline.toLocaleDateString();
-    const time = deadline.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    const time = deadline.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
     return `Muted until ${date} at ${time}`;
   })();
 
