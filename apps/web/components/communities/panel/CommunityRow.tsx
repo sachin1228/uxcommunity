@@ -144,18 +144,6 @@ export const CommunityRow = memo(function CommunityRow({
                 <Pin strokeWidth={2.5} size={11} aria-hidden="true" />
               </span>
             )}
-            {/* A muted chat wears a crossed bell: notifications are off, but
-                unread messages still count (see the chat's ⋯ menu). */}
-            {isCommunityMuted(c) && (
-              <span
-                role="img"
-                aria-label="Notifications muted"
-                title="Notifications muted"
-                className="inline-flex shrink-0 items-center text-foreground-muted"
-              >
-                <BellOff strokeWidth={2.5} size={11} aria-hidden="true" />
-              </span>
-            )}
             {(c.last_message || lastContent) && !typingText && (
               <SidebarTimestamp
                 iso={
@@ -231,6 +219,20 @@ export const CommunityRow = memo(function CommunityRow({
                 @
               </span>
             ) : null}
+
+            {/* Muted — the crossed bell rides the preview line, just before
+                the unread count (which keeps the corner on every row).
+                Notifications are off; unread messages still count. */}
+            {isCommunityMuted(c) && (
+              <span
+                role="img"
+                aria-label="Notifications muted"
+                title="Notifications muted"
+                className="inline-flex shrink-0 items-center text-foreground-muted"
+              >
+                <BellOff strokeWidth={2.5} size={11} aria-hidden="true" />
+              </span>
+            )}
 
             {/* Unread badge — messages plus unread threads/showcase posts/
                 resources/events created by others */}
