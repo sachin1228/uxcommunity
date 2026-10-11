@@ -156,6 +156,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
         currentUserId={currentUserId}
         onChange={updateItems}
         onOpenCommunityPreview={setPreviewCommunityId}
+        showEventChat
         emptyState={(
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>

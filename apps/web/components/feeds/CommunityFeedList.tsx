@@ -3,6 +3,7 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
+import { EventChatPanel } from "@/components/communities/events/EventChatPanel";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import { ShowcaseCard } from "@/components/communities/showcase/ShowcaseCard";
 import { CreateShowcaseModal } from "@/components/communities/showcase/CreateShowcaseModal";
@@ -43,6 +44,12 @@ interface CommunityFeedListProps {
    * the community.
    */
   onOpenCommunityPreview?: (communityId: string) => void;
+  /**
+   * Home feed only: draw the event's group-chat row inside each event card —
+   * the same row the event page carries, wired to the same join/open flow.
+   * The profile tabs skip it (their Events tab is event history).
+   */
+  showEventChat?: boolean;
 }
 
 /**
@@ -65,6 +72,7 @@ export function CommunityFeedList({
   emptyState,
   showPastEvents = false,
   onOpenCommunityPreview,
+  showEventChat = false,
 }: CommunityFeedListProps) {
   const router = useGuardedRouter();
   const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);  const [deletingShowcase, setDeletingShowcase] = useState<FeedShowcase | null>(null);
@@ -331,7 +339,27 @@ export function CommunityFeedList({
                   onLikeChanged={handleEventLikeChanged}
                   onSaveChanged={handleEventSaveChanged}
                   onCommunityClick={() => openCommunity(group.item.community_id)}
-                />
+                >
+                  {showEventChat && (
+                    // The card itself opens the event on click; the row's
+                    // controls — and its modals, which portal but still bubble
+                    // through the React tree — must not also trigger that.
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <EventChatPanel
+                        chatCommunityId={group.item.chat_community?.id ?? null}
+                        chatCommunityName={group.item.chat_community?.name ?? null}
+                        chatCommunityImage={group.item.chat_community?.image_url ?? null}
+                        chatMemberCount={group.item.chat_community?.member_count}
+                        joined={group.item.chat_community?.joined ?? false}
+                        communityId={group.item.community_id ?? ""}
+                        eventId={group.item.id}
+                        eventTitle={group.item.title}
+                        eventDate={group.item.event_date}
+                        eventEnd={group.item.end_date}
+                      />
+                    </div>
+                  )}
+                </EventCard>
               </li>
             );
           }

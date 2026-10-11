@@ -9,6 +9,7 @@ import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import type { CommunityEvent } from "@/lib/communities/models/events";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
+import { EventChatPanel } from "./EventChatPanel";
 import { EventGroupCreatedModal } from "./EventGroupCreatedModal";
 import { communityFeedLayout } from "../feed-layout";
 import { filterChip } from "../filter-chip";
@@ -332,7 +333,26 @@ export function EventsView({
                     onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
                     onOpen={() => router.push(`/dashboard/communities/${communityId}/events/${event.id}`)}
-                  />
+                  >
+                    {/* The same Join/Open chat row every other event card
+                        carries. The card opens the event on click; the row's
+                        controls — and its modals, which portal but still
+                        bubble through the React tree — must not also. */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <EventChatPanel
+                        chatCommunityId={event.chat_community?.id ?? null}
+                        chatCommunityName={event.chat_community?.name ?? null}
+                        chatCommunityImage={event.chat_community?.image_url ?? null}
+                        chatMemberCount={event.chat_community?.member_count}
+                        joined={event.chat_community?.joined ?? false}
+                        communityId={communityId}
+                        eventId={event.id}
+                        eventTitle={event.title}
+                        eventDate={event.event_date}
+                        eventEnd={event.end_date}
+                      />
+                    </div>
+                  </EventCard>
                 </div>
               );
             })}

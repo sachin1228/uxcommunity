@@ -27,3 +27,34 @@ export async function joinEventChatFromClient(
 
   invalidateOnJoin(communityId);
 }
+
+/**
+ * Confirm joining an event's group chat when the room does not exist yet —
+ * the event page offers its Join row for any event that has not ended, and
+ * this is the door for an event whose group was never created. The server
+ * finds-or-creates the room and puts the member in it; the sidebar cache is
+ * dropped the same way a normal join does, so the new room appears there.
+ * Returns the room's community id, ready to open.
+ */
+export async function createAndJoinEventChatFromClient(
+  communityId: string,
+  eventId: string,
+  answers: EventJoinAnswers,
+): Promise<string> {
+  const response = await fetch(`/api/communities/${communityId}/events/${eventId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+  });
+
+  const data = (await response.json().catch(() => null)) as
+    | { chat_community_id?: string; error?: string }
+    | null;
+
+  if (!response.ok || !data?.chat_community_id) {
+    throw new Error(data?.error ?? "Failed to join the event chat.");
+  }
+
+  invalidateOnJoin(data.chat_community_id);
+  return data.chat_community_id;
+}

@@ -6,25 +6,29 @@ import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
 import { useNotifications } from "@/lib/use-notifications";
 
 /**
- * The notifications entry point and its unread badge.
+ * The notifications entry point and its badge.
  *
  * It used to live in the sidebar's brand row, but a badge is only useful where
  * the member can always see it — the sidebar scrolls away and is closed below
  * 500px. It now belongs to the topbar, which is always on screen.
+ *
+ * The badge counts what is new since the member last opened the list (see
+ * useNotifications): opening it clears the number without marking anything
+ * read, and the next notification starts the count from one again.
  *
  * `useNotifications` syncs every instance through the shared request cache, so
  * this badge and the notifications page stay in step.
  */
 export function NotificationBell({ userId }: { userId: string }) {
   const pathname = usePathname();
-  const { unreadCount } = useNotifications(userId);
+  const { unseenCount } = useNotifications(userId);
   const active = pathname === "/dashboard/notifications";
 
   return (
     <Link
       href="/dashboard/notifications"
       aria-label={
-        unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"
+        unseenCount > 0 ? `${unseenCount} new notifications` : "Notifications"
       }
       aria-current={active ? "page" : undefined}
       title="Notifications"
@@ -35,12 +39,12 @@ export function NotificationBell({ userId }: { userId: string }) {
       }`}
     >
       <NotificationBellIcon size={18} />
-      {unreadCount > 0 && (
+      {unseenCount > 0 && (
         <span
           className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white"
           aria-hidden
         >
-          {unreadCount > 99 ? "99+" : unreadCount}
+          {unseenCount > 99 ? "99+" : unseenCount}
         </span>
       )}
     </Link>

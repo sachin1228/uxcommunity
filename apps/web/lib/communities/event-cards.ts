@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
-import type { CommunityEvent, EventRsvp } from "@/lib/communities/models/events";
+import type { CommunityEvent, EventChatCardLink, EventRsvp } from "@/lib/communities/models/events";
 import { enrichCommunityEvents } from "./read-models";
 
 /**
@@ -97,25 +97,56 @@ async function loadEventCommentCounts(eventIds: string[]): Promise<Map<string, n
 }
 
 /**
- * How many members each event's group chat has, keyed by event id — the number
- * the RSVP confirm dialog shows on the room's row. One room per event (the
- * partial unique index on `communities.event_id`), and an event without a room
- * simply has no entry. Best-effort: an environment without the event-chat
- * migration loses the count, never the card.
+ * The room behind each of these events — when one exists — for the cards that
+ * draw the Join/Open chat row (see EventChatPanel): id, name, picture, size,
+ * and whether the viewer is already in it. Two batched reads for the whole
+ * page: the rooms, then the viewer's memberships. An event without a room is
+ * simply absent from the map.
  */
-async function loadEventChatMemberCounts(
+export async function loadEventChatCardLinks(
   eventIds: string[],
-): Promise<Map<string, number | null>> {
-  const counts = new Map<string, number | null>();
-  const { data, error } = await createServiceClient()
+  viewerId: string,
+): Promise<Map<string, EventChatCardLink>> {
+  const links = new Map<string, EventChatCardLink>();
+  const ids = [...new Set(eventIds)];
+  if (!ids.length) return links;
+
+  const db = createServiceClient();
+  const { data: rooms, error } = await db
     .from("communities")
-    .select("event_id, member_count")
-    .in("event_id", eventIds);
-  if (error) return counts;
-  for (const row of (data ?? []) as Array<{ event_id: string | null; member_count: number | null }>) {
-    if (row.event_id) counts.set(row.event_id, row.member_count ?? null);
+    .select("id, event_id, name, image_url, member_count")
+    .in("event_id", ids)
+    .eq("is_active", true);
+  if (error) return links;
+  const roomRows = (rooms ?? []) as Array<{
+    id: string;
+    event_id: string | null;
+    name: string;
+    image_url: string | null;
+    member_count: number;
+  }>;
+  if (!roomRows.length) return links;
+
+  const { data: memberships } = await db
+    .from("community_members")
+    .select("community_id")
+    .eq("user_id", viewerId)
+    .in("community_id", roomRows.map((room) => room.id));
+  const joinedRoomIds = new Set(
+    ((memberships ?? []) as Array<{ community_id: string }>).map((m) => m.community_id),
+  );
+
+  for (const room of roomRows) {
+    if (!room.event_id) continue;
+    links.set(room.event_id, {
+      id: room.id,
+      name: room.name,
+      image_url: room.image_url,
+      member_count: room.member_count,
+      joined: joinedRoomIds.has(room.id),
+    });
   }
-  return counts;
+  return links;
 }
 
 /**
@@ -132,8 +163,10 @@ async function loadEventChatMemberCounts(
  * - `rsvps` previews are attached unless the caller passes `withRsvps: false`
  *   because it already loaded the full attendee list (the detail pages reuse
  *   that list for the avatar strip);
- * - `chat_member_count` comes from the event's group room when one exists (the
- *   RSVP confirm shows it on the room's row); no room yet leaves it null.
+ * - `chat_member_count` and `chat_community` come from the event's group room
+ *   when one exists — the RSVP confirm dialog shows the former on the room's
+ *   row, and the cards draw their Join/Open chat row (see EventChatPanel) from
+ *   the latter; no room yet leaves both null.
  */
 export async function enrichEventCards(
   rows: Array<Record<string, unknown>>,
@@ -150,18 +183,24 @@ export async function enrichEventCards(
   const needsCommentCount = !carriesField(enriched, "comment_count");
   const needsRsvps = withRsvps && !carriesField(enriched, "rsvps");
 
-  const [commentCounts, previews, chatMemberCounts] = await Promise.all([
+  const [commentCounts, previews, chatLinks] = await Promise.all([
     needsCommentCount && ids.length ? loadEventCommentCounts(ids) : null,
     needsRsvps && ids.length ? loadEventAttendeePreviews(ids) : null,
-    ids.length ? loadEventChatMemberCounts(ids) : null,
+    ids.length ? loadEventChatCardLinks(ids, currentUserId) : null,
   ]);
 
-  return enriched.map((row) => ({
-    ...row,
-    ...(commentCounts ? { comment_count: commentCounts.get(row.id as string) ?? 0 } : {}),
-    ...(previews ? { rsvps: previews.get(row.id as string) ?? [] } : {}),
-    ...(chatMemberCounts
-      ? { chat_member_count: chatMemberCounts.get(row.id as string) ?? null }
-      : {}),
-  })) as unknown as CommunityEvent[];
+  return enriched.map((row) => {
+    const chat = chatLinks?.get(row.id as string) ?? null;
+    return {
+      ...row,
+      ...(commentCounts ? { comment_count: commentCounts.get(row.id as string) ?? 0 } : {}),
+      ...(previews ? { rsvps: previews.get(row.id as string) ?? [] } : {}),
+      ...(chatLinks
+        ? {
+            chat_member_count: chat?.member_count ?? null,
+            chat_community: chat,
+          }
+        : {}),
+    };
+  }) as unknown as CommunityEvent[];
 }

@@ -7,7 +7,7 @@ import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { HOME_FEED_SCOPES, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
-import { loadEventAttendeePreviews } from "@/lib/communities/event-cards";
+import { loadEventAttendeePreviews, loadEventChatCardLinks } from "@/lib/communities/event-cards";
 import {
   FEED_PAGE_SIZE as PAGE_SIZE,
   isFeedCard,
@@ -76,13 +76,22 @@ const loadFeedPage = unstable_cache(
     );
     if (!eventIds.length) return items;
 
-    // Same attendee previews every other event surface uses.
-    const previewMap = await loadEventAttendeePreviews(eventIds);
+    // Same attendee previews every other event surface uses, and the room
+    // behind each event — when one exists — for the card's Join/Open row
+    // (see EventChatPanel). Both are batched reads for the whole page.
+    const [previewMap, chatLinks] = await Promise.all([
+      loadEventAttendeePreviews(eventIds),
+      loadEventChatCardLinks(eventIds, userId),
+    ]);
 
     return items.map((item) =>
       typeof item === "object" && item !== null && !Array.isArray(item)
         && item._type === "event" && typeof item.id === "string"
-        ? { ...item, rsvps: (previewMap.get(item.id) ?? []) as unknown as Json }
+        ? {
+            ...item,
+            rsvps: (previewMap.get(item.id) ?? []) as unknown as Json,
+            chat_community: chatLinks.get(item.id) ?? null,
+          }
         : item,
     );
   },

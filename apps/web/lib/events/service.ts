@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards } from "@/lib/communities/event-cards";
-import type { CommunityEvent } from "@/lib/communities/models/events";
+import type { CommunityEvent, EventChatCardLink } from "@/lib/communities/models/events";
 
 /**
  * Server-side access to the city Events page — the workspace page listing the
@@ -21,6 +21,8 @@ export const CITY_EVENT_PAGE_SIZE = 25;
 export type CityEventItem = CommunityEvent & {
   community_name?: string | null;
   community_image?: string | null;
+  /** The card's Join/Open chat row — the room behind the event, when one exists. */
+  chat_community?: EventChatCardLink | null;
 };
 
 export interface CityEventViewer {
@@ -96,6 +98,8 @@ export async function fetchCityEventPhase(
 
   const rows = (data ?? []).map(({ item }) => item as Record<string, unknown>);
   const page = rows.slice(0, CITY_EVENT_PAGE_SIZE);
+  // The shared serializer attaches the room behind each event too, for the
+  // Join/Open chat row the city cards draw (see EventChatPanel).
   const events = await enrichEventCards(page, viewerId);
 
   const last = page.at(-1);
