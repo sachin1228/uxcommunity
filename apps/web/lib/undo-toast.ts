@@ -19,8 +19,12 @@ export interface UndoToastRequest {
   actionLabel?: string;
   /** How long the offer stays up. Defaults to UNDO_TOAST_MS. */
   durationMs?: number;
-  /** What taking the offer does. A rejected promise keeps the toast up. */
-  onAction: () => void | Promise<void>;
+  /**
+   * What taking the offer does. A rejected promise keeps the toast up.
+   * Omitted for a plain notice with nothing to take back ("Chat unmuted") —
+   * the toast then shows the message and the dismiss button alone.
+   */
+  onAction?: () => void | Promise<void>;
 }
 
 export interface UndoToastState {
@@ -29,7 +33,8 @@ export interface UndoToastState {
   message: string;
   actionLabel: string;
   durationMs: number;
-  onAction: () => void | Promise<void>;
+  /** Null for a plain notice (no action button). */
+  onAction: (() => void | Promise<void>) | null;
 }
 
 /** Long enough to notice and decide, short enough to still be an "after" message. */
@@ -55,7 +60,7 @@ export function showUndoToast(request: UndoToastRequest): number {
     message: request.message,
     actionLabel: request.actionLabel ?? DEFAULT_ACTION_LABEL,
     durationMs: request.durationMs ?? UNDO_TOAST_MS,
-    onAction: request.onAction,
+    onAction: request.onAction ?? null,
   };
   current = toast;
   emit();

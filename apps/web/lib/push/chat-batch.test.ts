@@ -89,6 +89,8 @@ interface FakeState {
   /** Ascending recipient ids, before the sender/mute filters are applied. */
   members: string[];
   muted: Set<string>;
+  /** Timed mutes: recipient id → notifications_muted_until deadline (ISO). */
+  mutedUntil: Map<string, string>;
   tokens: Map<string, string[]>;
   prefs: Map<string, Record<string, unknown>>;
   throttle: Map<string, { window_started_at: string; sent_count: number }>;
@@ -103,6 +105,7 @@ function fakeState(overrides: Partial<FakeState> = {}): FakeState {
     communityName: "Designers",
     members: [],
     muted: new Set(),
+    mutedUntil: new Map(),
     tokens: new Map(),
     prefs: new Map(),
     throttle: new Map(),
@@ -171,6 +174,18 @@ function createFakeDb(state: FakeState) {
         if (ctx.filters.notifications_muted === false) {
           rows = rows.filter((id) => !state.muted.has(id));
         }
+        // Timed mutes: matches the sender's
+        // `notifications_muted_until.is.null,notifications_muted_until.lte.<cutoff>`
+        // or-filter — no deadline at all, or one that has already passed.
+        const orFilter = ctx.filters.or;
+        if (typeof orFilter === "string") {
+          const cutoffMatch = /notifications_muted_until\.lte\.(\S+)$/.exec(orFilter);
+          const cutoff = cutoffMatch ? Date.parse(cutoffMatch[1]!) : Infinity;
+          rows = rows.filter((id) => {
+            const until = state.mutedUntil.get(id);
+            return !until || Date.parse(until) <= cutoff;
+          });
+        }
         rows = rows.slice(0, ctx.limit ?? rows.length);
         return { data: rows.map((user_id) => ({ user_id })), error: null };
       }
@@ -197,6 +212,10 @@ function createFakeDb(state: FakeState) {
       },
       neq: (column: string, value: unknown) => {
         ctx.filters[`neq:${column}`] = value;
+        return api;
+      },
+      or: (filter: string) => {
+        ctx.filters.or = filter;
         return api;
       },
       gt: (_column: string, value: unknown) => {
@@ -286,6 +305,10 @@ function deps(
     db: db as never,
     now: () => new Date("2026-09-26T12:00:00Z"),
     clock: () => 1_000_000,
+    // Pre-migration behaviour by default: no deadline column, no probe query —
+    // exactly the query counts the tests below were written against.
+    // Timed-mute tests opt in explicitly.
+    muteUntilColumns: false,
     ...overrides,
   };
 }
@@ -441,6 +464,74 @@ test("sender, muted members and disabled-preference members are not pushed", asy
   assert.equal(normalPush.channelId, AUDIBLE_CHANNEL_ID);
   assert.equal(normalPush.badge, 7);
   assert.equal(normalPush.collapseId, `community-${BASE_PARAMS.communityId}`);
+});
+
+// The menu's durations ("8 hours", "1 week") are stored as a deadline on the
+// membership and the row is never rewritten when it lapses — so the recipient
+// query has to compare the deadline, not test the column's presence.
+test("a timed mute excludes its member only while the deadline is still ahead", async () => {
+  const forever = userId(1);
+  const timedOut = userId(2);
+  const timedExpired = userId(3);
+  const plain = userId(4);
+
+  const state = fakeState({
+    members: [forever, timedOut, timedExpired, plain],
+    muted: new Set([forever]),
+    mutedUntil: new Map([
+      // deps() pins `now` to 2026-09-26T12:00:00Z.
+      [timedOut, "2026-09-27T12:00:00Z"],
+      [timedExpired, "2026-09-26T11:59:59Z"],
+    ]),
+    tokens: new Map([
+      [forever, ["token-forever"]],
+      [timedOut, ["token-timed-out"]],
+      [timedExpired, ["token-expired"]],
+      [plain, ["token-plain"]],
+    ]),
+  });
+
+  const { db } = createFakeDb(state);
+  let delivered: Array<{ to: string }> = [];
+
+  await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    muteUntilColumns: true,
+    send: async (messages) => {
+      delivered = messages;
+      return acceptAll(messages);
+    },
+  }));
+
+  assert.deepEqual(
+    delivered.map((m) => m.to).sort(),
+    ["token-expired", "token-plain"],
+    "the ever-muted and still-timed-out members are excluded; the lapsed mute pushes again",
+  );
+});
+
+// Before the mute migration is applied there is no deadline column, so the
+// recipient query must not name it — naming it would fail the whole page and
+// silence every push. Timed mutes simply do not exist yet, and the forever
+// flag alone filters recipients.
+test("without the deadline column the page query omits it and pushes carry on", async () => {
+  const timed = userId(1);
+  const state = fakeState({
+    members: [timed],
+    mutedUntil: new Map([[timed, "2026-09-27T12:00:00Z"]]),
+    tokens: new Map([[timed, ["token-timed"]]]),
+  });
+
+  const { db } = createFakeDb(state);
+  const sent: string[] = [];
+  const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+    send: async (messages) => {
+      sent.push(...messages.map((m) => m.to));
+      return acceptAll(messages);
+    },
+  }));
+
+  assert.deepEqual(sent, ["token-timed"]);
+  assert.equal(report.complete, true);
 });
 
 test("only audible pushes consume the audible budget", async () => {

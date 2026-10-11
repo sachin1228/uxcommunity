@@ -1,9 +1,10 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
-import { Pin } from "lucide-react";
+import { BellOff, Pin } from "lucide-react";
 import { CommunityVisibilityIcon, SignupCommunityBadge } from "../CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
+import { isCommunityMuted } from "@/lib/communities/mute";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
@@ -218,6 +219,22 @@ export const CommunityRow = memo(function CommunityRow({
                 @
               </span>
             ) : null}
+
+            {/* Muted — the crossed bell rides the preview line, just before
+                the unread count (which keeps the corner on every row).
+                The line is items-start (the @ mark and badge ride the text's
+                top edge), so the bell centers itself against the row instead.
+                Notifications are off; unread messages still count. */}
+            {isCommunityMuted(c) && (
+              <span
+                role="img"
+                aria-label="Notifications muted"
+                title="Notifications muted"
+                className="inline-flex shrink-0 self-center items-center text-foreground-muted"
+              >
+                <BellOff strokeWidth={2.5} size={14} aria-hidden="true" />
+              </span>
+            )}
 
             {/* Unread badge — messages plus unread threads/showcase posts/
                 resources/events created by others */}

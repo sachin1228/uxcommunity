@@ -5,7 +5,9 @@ import dynamic from "next/dynamic";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { AtSign, ChevronDown } from "lucide-react";
 import {
+  metaCache,
   msgCache,
+  patchSidebarCommunity,
   patchSidebarMessageContent,
   registerCommunitySettingsOpener,
   sidebarStore,
@@ -19,7 +21,7 @@ import {
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 import type { MentionCandidate } from "@/lib/communities/mentions";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
-import { initRequestCache } from "@/lib/request-cache";
+import { initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import type { CommunityPermission } from "@/lib/communities/permissions";
 import type { SSRCommunitySections } from "@/lib/communities/server";
 import { Spinner } from "@/components/ui/Spinner";
@@ -818,6 +820,9 @@ export function CommunityChat({
           event_date: sidebarEntry.event_date,
           pinned_until: sidebarEntry.pinned_until,
           event_end: sidebarEntry.event_end,
+          // Same for the mute state: the menu works before meta arrives.
+          notifications_muted: sidebarEntry.notifications_muted,
+          notifications_muted_until: sidebarEntry.notifications_muted_until,
         }
       : null),
     [community, sidebarEntry, communityId],
@@ -870,6 +875,28 @@ export function CommunityChat({
   }, [handleTabChange]);
   const handleSettingsClick = useCallback(() => setShowSettings(true), []);
 
+  // A mute save is durable server-side, but every client cache still holds
+  // the pre-mute membership — patch the header's meta, its request cache and
+  // the sidebar entry so the menu label, the row's crossed bell and the
+  // browser-notification gate all flip in the same frame.
+  const handleMuteChanged = useCallback(
+    (state: { notifications_muted: boolean; notifications_muted_until: string | null }) => {
+      setCommunity((prev) => (prev ? { ...prev, ...state } : prev));
+      const cached = metaCache.get(communityId);
+      if (cached) {
+        metaCache.set(communityId, { ...cached, community: { ...cached.community, ...state } });
+      }
+      patchCachedRequest<{ community: CachedMeta["community"] }>(
+        `/api/communities/${communityId}`,
+        (current) => ({ ...current, community: { ...current.community, ...state } }),
+      );
+      patchSidebarCommunity(communityId, state);
+    },
+    // setCommunity is a useState setter from useChatData (stable identity);
+    // eslint can't see across the hook boundary, so it is listed.
+    [communityId, setCommunity],
+  );
+
   // The room's info card sits outside this component (it is mounted by the
   // communities layout), so it asks for the settings modal through the
   // registry in lib/communities/cache rather than by routing: this view owns
@@ -899,6 +926,7 @@ export function CommunityChat({
           canOpenSettings={canOpenSettings}
           showActivityTab={canManageModerators}
           communityId={communityId}
+          onMuteChanged={handleMuteChanged}
         />
 
         <Modal

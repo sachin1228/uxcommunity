@@ -84,9 +84,17 @@ test("an offer carries its action and per-offer options", async () => {
   assert.equal(toast?.actionLabel, "Yes, undo");
   assert.equal(toast?.durationMs, 2500);
 
-  await toast?.onAction();
+  await toast?.onAction?.();
   assert.equal(undone, 1);
 
+  dismissUndoToast(id);
+  assert.equal(getUndoToast(), null);
+});
+
+test("a request without an action raises a plain notice", () => {
+  clear();
+  const id = showUndoToast({ message: "Chat unmuted" });
+  assert.equal(getUndoToast()?.onAction, null);
   dismissUndoToast(id);
   assert.equal(getUndoToast(), null);
 });

@@ -12,6 +12,7 @@ import { patchCachedRequest } from "@/lib/request-cache";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { noteCommunityActivity, scheduleMarkRead } from "@/lib/communities/read-manager";
 import { notifyIncomingCommunityMessage } from "@/lib/communities/message-notifications";
+import { isCommunityMuted } from "@/lib/communities/mute";
 import { compareByRecentActivity } from "./sidebar-order";
 
 interface Options {
@@ -202,9 +203,15 @@ export function useSidebarRealtime({
             })),
           );
           if (!isOwn) {
-            const communityName = communitiesRef.current.find((item) => item.id === row.community_id)?.name ?? "Community chat";
-            const senderNamePromise = knownName ? Promise.resolve(knownName) : resolveName(row.community_id, row.user_id);
-            void senderNamePromise.then((senderName) => notifyIncomingCommunityMessage(userId, { id: row.id, communityId: row.community_id, communityName, senderId: row.user_id, senderName, content: row.content, hasImage: !!row.image_url, isReply: !!row.reply_to_id }));
+            const entry = communitiesRef.current.find((item) => item.id === row.community_id);
+            // A muted community still raises its unread badge — the member is
+            // just not notified (see the chat header's Mute notifications
+            // menu; the push sender honours the same flag for mobile).
+            if (!entry || !isCommunityMuted(entry)) {
+              const communityName = entry?.name ?? "Community chat";
+              const senderNamePromise = knownName ? Promise.resolve(knownName) : resolveName(row.community_id, row.user_id);
+              void senderNamePromise.then((senderName) => notifyIncomingCommunityMessage(userId, { id: row.id, communityId: row.community_id, communityName, senderId: row.user_id, senderName, content: row.content, hasImage: !!row.image_url, isReply: !!row.reply_to_id }));
+            }
           }
           if (!isOwn && !resolvedNames.has(row.user_id)) {
             const commId = row.community_id; const msgAt = row.created_at; const senderId = row.user_id;

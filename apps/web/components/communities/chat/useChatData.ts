@@ -50,6 +50,9 @@ export interface Community {
   /** Carried through from CachedMeta["community"]; absent on sidebar fallbacks. */
   current_user_role?: CachedMeta["community"]["current_user_role"];
   current_user_permissions?: CachedMeta["community"]["current_user_permissions"];
+  /** The caller's own mute state — drives the header menu (see lib/communities/mute). */
+  notifications_muted?: boolean | null;
+  notifications_muted_until?: string | null;
 }
 
 export interface Member {

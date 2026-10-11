@@ -124,7 +124,18 @@ export function invalidateOnCommunityDeleted(communityId: string): void {
  */
 export function patchSidebarCommunity(
   communityId: string,
-  patch: Partial<Pick<CachedSidebarCommunity, "name" | "image_url" | "is_private" | "enabled_tabs" | "showcase_enabled">>,
+  patch: Partial<
+    Pick<
+      CachedSidebarCommunity,
+      | "name"
+      | "image_url"
+      | "is_private"
+      | "enabled_tabs"
+      | "showcase_enabled"
+      | "notifications_muted"
+      | "notifications_muted_until"
+    >
+  >,
 ): void {
   if (sidebarStore.data) {
     sidebarStore.data = {

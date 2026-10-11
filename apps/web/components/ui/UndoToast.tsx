@@ -39,6 +39,7 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
   }, [toast.id, toast.durationMs, pending]);
 
   async function handleUndo() {
+    if (!toast.onAction) return;
     setPending(true);
     setError(null);
     try {
@@ -56,35 +57,37 @@ function UndoToastBody({ toast }: { toast: UndoToastState }) {
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3 shadow-lg"
+        className="pointer-events-auto flex w-fit max-w-md items-center gap-2.5 rounded-full bg-surface-raised py-2 pl-4 pr-2 shadow-[0_0_0_1px_var(--modal-ring),0_24px_70px_-20px_var(--modal-drop)]"
       >
         <div className="min-w-0 flex-1">
           <p className="text-pretty font-body text-sm text-foreground">{toast.message}</p>
           {error && <p className="mt-0.5 font-body text-xs text-red-400">{error}</p>}
         </div>
 
-        <button
-          type="button"
-          onClick={() => void handleUndo()}
-          disabled={pending}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
-        >
-          {pending ? (
-            <Spinner size={13} />
-          ) : (
-            <Undo2 strokeWidth={2.5} size={14} aria-hidden="true" />
-          )}
-          {toast.actionLabel}
-        </button>
+        {toast.onAction && (
+          <button
+            type="button"
+            onClick={() => void handleUndo()}
+            disabled={pending}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 font-body text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
+          >
+            {pending ? (
+              <Spinner size={13} />
+            ) : (
+              <Undo2 strokeWidth={2.5} size={14} aria-hidden="true" />
+            )}
+            {toast.actionLabel}
+          </button>
+        )}
 
         <button
           type="button"
           onClick={() => dismissUndoToast(toast.id)}
           disabled={pending}
           aria-label="Dismiss"
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-background-subtle hover:text-foreground disabled:opacity-60"
+          className="flex size-6 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-background-subtle hover:text-foreground disabled:opacity-60"
         >
-          <X strokeWidth={2.5} size={15} />
+          <X strokeWidth={2.5} size={14} />
         </button>
       </div>
     </div>
