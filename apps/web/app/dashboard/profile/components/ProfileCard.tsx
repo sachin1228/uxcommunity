@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
+import { Camera, Globe, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -34,8 +34,7 @@ interface ProfileCardProps {
    * identity fields and the workplace. Omitted on read-only surfaces.
    */
   editProfileHref?: string;
-  /** The member's links — rendered as chips on other members' profiles when set. */
-  linkedin?: string;
+  /** The member's portfolio link — rendered as a chip on other members' profiles when set. */
   portfolio?: string;
 }
 
@@ -75,10 +74,8 @@ export function ProfileCard({
   company,
   onAddCompany,
   editProfileHref,
-  linkedin = "",
   portfolio = "",
 }: ProfileCardProps) {
-  const linkedinUrl = externalUrl(linkedin);
   const portfolioUrl = externalUrl(portfolio);
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
@@ -202,32 +199,19 @@ export function ProfileCard({
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
-        {/* Links — only on other members' profiles, where they are the point
-            of the page. A member edits their own links from Edit Profile. */}
-        {(linkedinUrl || portfolioUrl) && (
+        {/* Portfolio — only on other members' profiles, where it is part of
+            the point of the page. */}
+        {portfolioUrl && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {linkedinUrl && (
-              <a
-                href={linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-              >
-                <Linkedin strokeWidth={2.5} size={12} />
-                LinkedIn
-              </a>
-            )}
-            {portfolioUrl && (
-              <a
-                href={portfolioUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-              >
-                <Globe strokeWidth={2.5} size={12} />
-                Portfolio
-              </a>
-            )}
+            <a
+              href={portfolioUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+            >
+              <Globe strokeWidth={2.5} size={12} />
+              Portfolio
+            </a>
           </div>
         )}
 
