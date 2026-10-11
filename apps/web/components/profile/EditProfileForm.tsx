@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2, Lock, Minus } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityNameBadges, SignupCommunityBadge } from "@/components/communities/CommunityBadges";
@@ -23,9 +24,11 @@ import {
  * last four also place them in official communities. So the form tells BOTH
  * stories: the fields first, then what saving them implies.
  *
- *   1. form    — the fields, with locked slots disabled under their cooldown;
- *   2. confirm — the old → new values, the groups the change leaves/joins
- *                (DP and name), and the three-month cost of the change.
+ *   1. form    — the fields, inline, with locked slots disabled under their
+ *                cooldown;
+ *   2. confirm — a modal over the form, stating the old → new values, the
+ *                groups the change leaves/joins (DP and name) and the
+ *                three-month cost.
  *
  * Saving reports what actually happened as an inline panel above the fields
  * (the groups left/joined), and rebases the draft on what was just saved — the
@@ -570,134 +573,147 @@ export function EditProfileForm({ data, onSaved }: Props) {
         </div>
       )}
 
-      {/* ── 2. Confirm — values, groups and the three-month cost ── */}
+      {/* ── 2. Confirm — the impact review, in a modal over the form ──
+
+          The card keeps the fields; the steps that tell the member what the
+          change does (old → new values, the groups left/joined, the three-month
+          cost) open over it, so the review reads as a decision rather than
+          another section of the page. Closing it returns to the form with the
+          draft intact. */}
       {step === "confirm" && (
-        <div>
-          <p className="mb-5 font-body text-xs text-foreground-muted">
-            Review what changes. Nothing has been saved yet.
-          </p>
-
-          {errorLines.length > 0 && (
-            <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3" role="alert">
-              {errorLines.map((line) => (
-                <p key={line} className="font-body text-xs leading-relaxed text-red-400">
-                  {line}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3.5">
-            {nameChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Name
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">{baseline.name}</span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{trimmedName}</span>
-              </div>
-            )}
-            {titleChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Job title
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentTitleName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedTitle?.name}</span>
-              </div>
-            )}
-            {levelChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Experience level
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentLevelName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedLevel?.name}</span>
-              </div>
-            )}
-            {cityChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  City
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentCityName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedCity?.name}</span>
-              </div>
-            )}
-            {sectorChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Industry Sector
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentSectorName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedSector?.name}</span>
-              </div>
-            )}
-          </div>
-
-          {moves.length > 0 && (
-            <div className="mt-4 rounded-xl border border-border bg-surface-raised px-4 py-3.5">
-              <p className="mb-2.5 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                Communities that will change
-              </p>
-              <p className="mb-3.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
-                Members are only placed in official communities that match their details — this
-                keeps communities relatable and spam-free. {moves.map(moveSentence).join(" ")}
-              </p>
-              <MoveRows moves={moves} />
-            </div>
-          )}
-
-          {/* The cost: each spent slot is locked for three months. */}
-          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3">
-            <p className="font-body text-xs font-medium text-amber-400">
-              {spentSlots.length === 1
-                ? `${slotLabel[spentSlots[0]]} can be changed once every 3 months.`
-                : "Each of these can be changed once every 3 months."}
+        <Modal
+          open
+          onClose={() => setStep("form")}
+          maxWidth="max-w-xl"
+          title="Review changes"
+        >
+          <div>
+            <p className="mb-5 font-body text-xs text-foreground-muted">
+              Nothing has been saved yet — confirm to apply these changes.
             </p>
-            <ul className="mt-1.5 flex flex-col gap-0.5">
-              {spentSlots.map((slot) => (
-                <li key={slot} className="font-body text-[11px] leading-relaxed text-amber-400/90">
-                  {slotLabel[slot]} — next change available on {formatDate(slotUnlockDate(new Date()))}
-                </li>
-              ))}
-            </ul>
-          </div>
 
-          <div className="mt-6 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setStep("form")}
-              disabled={submitting}
-              className="flex items-center gap-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              <ArrowLeft strokeWidth={2.5} size={12} />
-              Back to edit
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={submitting}
-              className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting && <Loader2 strokeWidth={2.5} size={13} className="animate-spin" />}
-              Confirm changes
-            </button>
+            {errorLines.length > 0 && (
+              <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3" role="alert">
+                {errorLines.map((line) => (
+                  <p key={line} className="font-body text-xs leading-relaxed text-red-400">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3.5">
+              {nameChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Name
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">{baseline.name}</span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{trimmedName}</span>
+                </div>
+              )}
+              {titleChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Job title
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentTitleName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedTitle?.name}</span>
+                </div>
+              )}
+              {levelChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Experience level
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentLevelName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedLevel?.name}</span>
+                </div>
+              )}
+              {cityChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    City
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentCityName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedCity?.name}</span>
+                </div>
+              )}
+              {sectorChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Industry Sector
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentSectorName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedSector?.name}</span>
+                </div>
+              )}
+            </div>
+
+            {moves.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border bg-surface-raised px-4 py-3.5">
+                <p className="mb-2.5 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                  Communities that will change
+                </p>
+                <p className="mb-3.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
+                  Members are only placed in official communities that match their details — this
+                  keeps communities relatable and spam-free. {moves.map(moveSentence).join(" ")}
+                </p>
+                <MoveRows moves={moves} />
+              </div>
+            )}
+
+            {/* The cost: each spent slot is locked for three months. */}
+            <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3">
+              <p className="font-body text-xs font-medium text-amber-400">
+                {spentSlots.length === 1
+                  ? `${slotLabel[spentSlots[0]]} can be changed once every 3 months.`
+                  : "Each of these can be changed once every 3 months."}
+              </p>
+              <ul className="mt-1.5 flex flex-col gap-0.5">
+                {spentSlots.map((slot) => (
+                  <li key={slot} className="font-body text-[11px] leading-relaxed text-amber-400/90">
+                    {slotLabel[slot]} — next change available on {formatDate(slotUnlockDate(new Date()))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setStep("form")}
+                disabled={submitting}
+                className="flex items-center gap-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                <ArrowLeft strokeWidth={2.5} size={12} />
+                Back to edit
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={submitting}
+                className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting && <Loader2 strokeWidth={2.5} size={13} className="animate-spin" />}
+                Confirm changes
+              </button>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );
