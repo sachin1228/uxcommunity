@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, PenLine, Plus } from "lucide-react";
+import { Camera, Globe, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -124,13 +124,23 @@ export function ProfileCard({
           )}
         </div>
 
-        {/* Name and the role line stack on the left; Edit sits at the right
-            edge, level with the last line of that block — the same place the
-            reference header keeps its actions. */}
-        <div className="mt-4 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
+        {/* Edit shares the name's row, pinned to the right edge; the role
+            line and the city stack under it. */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="min-w-0 truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
+            {editProfileHref && (
+              <Link
+                href={editProfileHref}
+                className="shrink-0 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                Edit
+              </Link>
+            )}
+          </div>
+
+          <div className="min-w-0">
             {/* Seniority and designation on their own line under the name,
                 as plain text — no pill, no icon. One “@” joins the role to the
                 workplace: the verified company (logo first, leading to its
@@ -181,16 +191,6 @@ export function ProfileCard({
               <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
             )}
           </div>
-
-          {editProfileHref && (
-            <Link
-              href={editProfileHref}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              <PenLine strokeWidth={2.5} size={11} />
-              Edit Profile
-            </Link>
-          )}
         </div>
 
         {/* Bio */}
