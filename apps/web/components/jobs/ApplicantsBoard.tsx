@@ -20,6 +20,7 @@ import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { JobStateBadge, KindBadge } from "./JobBadges";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { useApplicantDecision } from "@/lib/jobs/use-applicant-decision";
+import { designModeHref } from "@/lib/jobs/design-href";
 import type { ApplicationStatus, JobApplicant, JobPost } from "@/lib/jobs/types";
 import { applicationStatusLabel, workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
@@ -49,7 +50,8 @@ const TRIAGE_TABS: { value: TriageTab; label: string }[] = [
  * application as a page of its own (`DesignModeViewer`) in a fresh tab —
  * outside the dashboard shell, so the page is the whole page — starting at
  * the first applicant in the tab the poster is looking at (an empty tab
- * falls back to the whole list).
+ * falls back to the whole list). A posting with no applications yet has no
+ * page to open, so the card is simply absent.
  *
  * Reads and writes are gated to the poster by the database, not by this
  * component.
@@ -71,7 +73,8 @@ export function ApplicantsBoard({
 
   // Opened with `target="_blank"` so the poster keeps the board behind the
   // design view; the page itself lives outside /dashboard (see its route).
-  const designHref = `/applications/${job.id}/${(visible.length > 0 ? visible : applicants)[0].id}`;
+  // Null on a posting with no applications yet, which is what hides the card.
+  const designHref = designModeHref(job.id, visible, applicants);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-6">
@@ -139,7 +142,7 @@ export function ApplicantsBoard({
       {/* Design mode — the application as a full page of its own, opened in
           a fresh tab. The whole card is the affordance, with the button
           shape marking where it goes. */}
-      {applicants.length > 0 && (
+      {designHref && (
         <a
           href={designHref}
           target="_blank"
