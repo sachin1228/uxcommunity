@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
+import { Camera, Globe, Linkedin, PenLine } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -18,10 +18,11 @@ interface ProfileCardProps {
    */
   roleLabel: string | null;
   bio: string;
-  /** The verified company on the profile, or null when none is set. */
+  /**
+   * The verified company on the profile, or null when none is set. It is shown
+   * read-only here and changed from Settings > Profile.
+   */
   company: ProfileCompanyView | null;
-  /** Opens the company picker: adding when none is set, changing when one is. Omitted on read-only surfaces, where the company links to its page instead. */
-  onEditCompany?: () => void;
   /**
    * Where Edit Profile goes — the Settings Profile page, which owns the
    * identity fields and the workplace. Omitted on read-only surfaces.
@@ -66,7 +67,6 @@ export function ProfileCard({
   roleLabel,
   bio,
   company,
-  onEditCompany,
   editProfileHref,
   linkedin = "",
   portfolio = "",
@@ -153,89 +153,32 @@ export function ProfileCard({
         </div>
 
         {/* The company has its own card under the identity block, clear of the
-            city line. The owner's card opens the picker to replace it, with
-            Edit beside it; Settings > Profile manages the same company for
-            anyone who gets there from Edit Profile.
+            city line. It is a view here: the chip leads to the company's page,
+            and the workplace itself is changed from Settings > Profile.
 
-            There is no Remove: a member changes the workplace on their profile
-            rather than dropping it, so the row carries Edit alone.
-
-            A deactivated company keeps the name and stays open to replacing,
-            but loses the accent and the verified mark: the company behind it is
-            not something to advertise any more. */}
+            A deactivated company keeps the name but loses the accent and the
+            verified mark: the company behind it is not something to advertise
+            any more. */}
         <div className="mt-3">
-          {company ? (
-            onEditCompany ? (
-              <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onEditCompany}
-                  title={
-                    company.isActive
-                      ? company.domainVerified && company.domain
-                        ? `Verified via ${company.domain} — change it`
-                        : "Change company"
-                      : "This company is no longer active — add another"
-                  }
-                  className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
-                    company.isActive ? "text-foreground" : "text-foreground-subtle"
-                  }`}
-                >
-                  <CompanyLogo
-                    name={company.name}
-                    logoUrl={company.logoUrl}
-                    size={16}
-                  />
-                  <span className="truncate">{company.name}</span>
-                  {company.isActive && company.domainVerified && (
-                    <VerifiedMark label={false} size="xs" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={onEditCompany}
-                  aria-label={`Edit the company on your profile: ${company.name}`}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-                >
-                  <PenLine strokeWidth={2.5} size={11} />
-                  Edit
-                </button>
-              </div>
-            ) : (
-              // Read-only surfaces show the same chip, but it leads to the
-              // company's page instead of the picker.
-              <Link
-                href={`/dashboard/companies/${company.slug}`}
-                title={
-                  company.isActive && company.domainVerified && company.domain
-                    ? `Verified via ${company.domain}`
-                    : undefined
-                }
-                className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
-                  company.isActive ? "text-foreground" : "text-foreground-subtle"
-                }`}
-              >
-                <CompanyLogo
-                  name={company.name}
-                  logoUrl={company.logoUrl}
-                  size={16}
-                />
-                <span className="truncate">{company.name}</span>
-                {company.isActive && company.domainVerified && (
-                  <VerifiedMark label={false} size="xs" />
-                )}
-              </Link>
-            )
-          ) : onEditCompany ? (
-            <button
-              type="button"
-              onClick={onEditCompany}
-              className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+          {company && (
+            <Link
+              href={`/dashboard/companies/${company.slug}`}
+              title={
+                company.isActive && company.domainVerified && company.domain
+                  ? `Verified via ${company.domain}`
+                  : undefined
+              }
+              className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
+                company.isActive ? "text-foreground" : "text-foreground-subtle"
+              }`}
             >
-              <Plus strokeWidth={2.5} size={12} />
-              Add your company
-            </button>
-          ) : null}
+              <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={16} />
+              <span className="truncate">{company.name}</span>
+              {company.isActive && company.domainVerified && (
+                <VerifiedMark label={false} size="xs" />
+              )}
+            </Link>
+          )}
         </div>
 
         {/* Bio */}
