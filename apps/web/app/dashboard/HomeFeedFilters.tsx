@@ -10,7 +10,7 @@ type IconComponent = ComponentType<{ size?: string | number; strokeWidth?: strin
 
 /** Labels for the feed source selector (see lib/feeds/home-feed-options). */
 const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
-  public: "For You",
+  public: "Public Posts",
   communities: "Your Communities",
 };
 /** Same glyphs the sidebar rows use for a community's visibility. */
