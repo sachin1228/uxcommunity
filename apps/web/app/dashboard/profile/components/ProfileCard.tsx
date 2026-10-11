@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, Linkedin, PenLine, Plus } from "lucide-react";
+import { Camera, Globe, PenLine, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -18,14 +18,23 @@ interface ProfileCardProps {
    */
   roleLabel: string | null;
   bio: string;
-  /** The verified company on the profile, or null when none is set. */
+  /**
+   * The verified company on the profile, or null when none is set. It rides the
+   * role line ("Mid-level Product Designer @ Figma") and is changed from
+   * Settings > Profile.
+   */
   company: ProfileCompanyView | null;
-  /** Opens the company picker: adding when none is set, changing when one is. Omitted on read-only surfaces, where the company links to its page instead. */
-  onEditCompany?: () => void;
-  /** Opens the Edit Profile modal (identity details + group swap). Omitted on read-only surfaces. */
-  onOpenEditProfile?: () => void;
-  /** The member's links — rendered as chips on other members' profiles when set. */
-  linkedin?: string;
+  /**
+   * Opens the "Where do you work?" picker for a member with no company yet.
+   * Omitted on read-only surfaces and when a company is already set.
+   */
+  onAddCompany?: () => void;
+  /**
+   * Where Edit Profile goes — the Settings Profile page, which owns the
+   * identity fields and the workplace. Omitted on read-only surfaces.
+   */
+  editProfileHref?: string;
+  /** The member's portfolio link — rendered as a chip on other members' profiles when set. */
   portfolio?: string;
 }
 
@@ -47,12 +56,13 @@ function externalUrl(value: string | undefined): string | null {
 }
 
 /**
- * The profile hero: display picture, name, role line, city line, the
- * company card, bio and (on read-only surfaces) the member's links. It carries
- * no cover image and no card chrome of its own —
+ * The profile hero: display picture, name, the role line (with the workplace
+ * after an “@”), city line, bio and (on read-only surfaces) the member's links.
+ * It carries no cover image and no card chrome of its own —
  * the dotted texture is the page backdrop (`ProfileClient`), so the picture is
- * the only image and everything here sits directly on the page. The owner's
- * contact details live on the Settings page (`app/dashboard/settings`).
+ * the only image and everything here sits directly on the page. The identity
+ * details behind Edit Profile live on the Settings page
+ * (`app/dashboard/settings/profile`).
  */
 export function ProfileCard({
   name,
@@ -62,12 +72,10 @@ export function ProfileCard({
   roleLabel,
   bio,
   company,
-  onEditCompany,
-  onOpenEditProfile,
-  linkedin = "",
+  onAddCompany,
+  editProfileHref,
   portfolio = "",
 }: ProfileCardProps) {
-  const linkedinUrl = externalUrl(linkedin);
   const portfolioUrl = externalUrl(portfolio);
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
@@ -124,10 +132,47 @@ export function ProfileCard({
             <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
             {/* Seniority and designation on their own line under the name,
-                as plain text — no pill, no icon. Truncated so it always stays
-                a single line however long the label runs. */}
-            {roleLabel && (
-              <p className="mt-1.5 truncate font-body text-sm text-foreground-muted">{roleLabel}</p>
+                as plain text — no pill, no icon. One “@” joins the role to the
+                workplace: the verified company (logo first, leading to its
+                page) when set, or the hollow "Add your company" pill when not.
+                Truncated so the label stays a single line however long it
+                runs. */}
+            {(roleLabel || company || onAddCompany) && (
+              <p className="mt-1.5 flex min-w-0 items-center gap-2 font-body text-sm text-foreground-muted">
+                {roleLabel && <span className="truncate">{roleLabel}</span>}
+                {roleLabel && (company || onAddCompany) && (
+                  <span aria-hidden="true">@</span>
+                )}
+                {company && (
+                  <Link
+                    href={`/dashboard/companies/${company.slug}`}
+                    title={
+                      company.isActive && company.domainVerified && company.domain
+                        ? `Verified via ${company.domain}`
+                        : undefined
+                    }
+                    className={`flex min-w-0 items-center gap-1.5 transition-colors hover:text-accent ${
+                      company.isActive ? "text-foreground-muted" : "text-foreground-subtle"
+                    }`}
+                  >
+                    <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={16} />
+                    <span className="truncate">{company.name}</span>
+                    {company.isActive && company.domainVerified && (
+                      <VerifiedMark label={false} size="xs" />
+                    )}
+                  </Link>
+                )}
+                {!company && onAddCompany && (
+                  <button
+                    type="button"
+                    onClick={onAddCompany}
+                    className="flex w-fit shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                  >
+                    <Plus strokeWidth={2.5} size={12} />
+                    Add your company
+                  </button>
+                )}
+              </p>
             )}
 
             {/* City — omitted when unset, rather than leaving an empty line
@@ -137,102 +182,15 @@ export function ProfileCard({
             )}
           </div>
 
-          {onOpenEditProfile && (
-            <button
-              type="button"
-              onClick={onOpenEditProfile}
+          {editProfileHref && (
+            <Link
+              href={editProfileHref}
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
             >
               <PenLine strokeWidth={2.5} size={11} />
               Edit Profile
-            </button>
+            </Link>
           )}
-        </div>
-
-        {/* The company has its own card under the identity block, clear of the
-            city line. It is also the only place the company can be
-            managed now that Settings keeps to contact details and links: the
-            card opens the picker to replace it and Edit sits beside it.
-
-            There is no Remove: a member changes the workplace on their profile
-            rather than dropping it, so the row carries Edit alone.
-
-            A deactivated company keeps the name and stays open to replacing,
-            but loses the accent and the verified mark: the company behind it is
-            not something to advertise any more. */}
-        <div className="mt-3">
-          {company ? (
-            onEditCompany ? (
-              <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onEditCompany}
-                  title={
-                    company.isActive
-                      ? company.domainVerified && company.domain
-                        ? `Verified via ${company.domain} — change it`
-                        : "Change company"
-                      : "This company is no longer active — add another"
-                  }
-                  className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
-                    company.isActive ? "text-foreground" : "text-foreground-subtle"
-                  }`}
-                >
-                  <CompanyLogo
-                    name={company.name}
-                    logoUrl={company.logoUrl}
-                    size={16}
-                  />
-                  <span className="truncate">{company.name}</span>
-                  {company.isActive && company.domainVerified && (
-                    <VerifiedMark label={false} size="xs" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={onEditCompany}
-                  aria-label={`Edit the company on your profile: ${company.name}`}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-                >
-                  <PenLine strokeWidth={2.5} size={11} />
-                  Edit
-                </button>
-              </div>
-            ) : (
-              // Read-only surfaces show the same chip, but it leads to the
-              // company's page instead of the picker.
-              <Link
-                href={`/dashboard/companies/${company.slug}`}
-                title={
-                  company.isActive && company.domainVerified && company.domain
-                    ? `Verified via ${company.domain}`
-                    : undefined
-                }
-                className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
-                  company.isActive ? "text-foreground" : "text-foreground-subtle"
-                }`}
-              >
-                <CompanyLogo
-                  name={company.name}
-                  logoUrl={company.logoUrl}
-                  size={16}
-                />
-                <span className="truncate">{company.name}</span>
-                {company.isActive && company.domainVerified && (
-                  <VerifiedMark label={false} size="xs" />
-                )}
-              </Link>
-            )
-          ) : onEditCompany ? (
-            <button
-              type="button"
-              onClick={onEditCompany}
-              className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              <Plus strokeWidth={2.5} size={12} />
-              Add your company
-            </button>
-          ) : null}
         </div>
 
         {/* Bio */}
@@ -240,32 +198,19 @@ export function ProfileCard({
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
-        {/* Links — only on other members' profiles, where they are the point
-            of the page. A member edits their own links from Edit Profile. */}
-        {(linkedinUrl || portfolioUrl) && (
+        {/* Portfolio — only on other members' profiles, where it is part of
+            the point of the page. */}
+        {portfolioUrl && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {linkedinUrl && (
-              <a
-                href={linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-              >
-                <Linkedin strokeWidth={2.5} size={12} />
-                LinkedIn
-              </a>
-            )}
-            {portfolioUrl && (
-              <a
-                href={portfolioUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-              >
-                <Globe strokeWidth={2.5} size={12} />
-                Portfolio
-              </a>
-            )}
+            <a
+              href={portfolioUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+            >
+              <Globe strokeWidth={2.5} size={12} />
+              Portfolio
+            </a>
           </div>
         )}
 

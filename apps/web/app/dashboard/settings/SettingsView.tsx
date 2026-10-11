@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { Bell, Briefcase, ChevronRight, KeyRound, Link2, Mail, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  Briefcase,
+  ChevronRight,
+  KeyRound,
+  Link2,
+  Mail,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
 import {
   SETTINGS_SECTIONS,
   type SettingsSectionHref,
@@ -18,6 +27,7 @@ import {
 
 /** Icon per row. Keyed by the route union, so a new row cannot ship without one. */
 const ICONS: Record<SettingsSectionHref, LucideIcon> = {
+  "/dashboard/settings/profile": UserRound,
   "/dashboard/settings/account": KeyRound,
   "/dashboard/settings/notifications": Bell,
   "/dashboard/settings/email": Mail,
@@ -31,7 +41,7 @@ export function SettingsView() {
       <div className="mb-8">
         <h1 className="font-display text-2xl font-semibold text-foreground">Settings</h1>
         <p className="mt-0.5 font-body text-sm text-foreground-muted">
-          Manage your account, notifications and job profile.
+          Manage your profile, account, notifications and job profile.
         </p>
       </div>
 

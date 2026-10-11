@@ -1,13 +1,9 @@
-import { Linkedin } from "lucide-react";
-
 /**
- * Connected accounts — deliberately static.
+ * Connected accounts — deliberately empty for now.
  *
- * No OAuth exists anywhere in the product yet, so this card shows the one
- * connection that is coming (LinkedIn, the source of the experience a job
- * application would autofill from) as a non-interactive row with a "Coming
- * soon" chip. Nothing here is a dead button: there is no control to click at
- * all until the flow exists.
+ * No OAuth exists anywhere in the product yet, so there is nothing to connect
+ * and no control that would be a dead button. LinkedIn, the first account we
+ * plan to offer, lives on the Profile settings page until the flow exists.
  */
 export function ConnectedAccountsSection() {
   return (
@@ -24,19 +20,11 @@ export function ConnectedAccountsSection() {
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background">
-          <Linkedin strokeWidth={2.5} size={18} className="text-foreground-muted" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-body text-sm font-medium text-foreground">LinkedIn</p>
-          <p className="font-body text-xs text-foreground-muted">
-            Import your experience and autofill job applications.
-          </p>
-        </div>
-        <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1 font-body text-[11px] text-foreground-muted">
-          Coming soon
-        </span>
+      <div className="rounded-xl border border-dashed border-border bg-background px-4 py-4">
+        <p className="font-body text-sm text-foreground-muted">No accounts connected yet.</p>
+        <p className="mt-1 font-body text-xs text-foreground-subtle">
+          We&apos;ll list them here as they become available.
+        </p>
       </div>
     </section>
   );

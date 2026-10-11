@@ -83,7 +83,6 @@ export default async function MemberProfilePage({ params, searchParams }: Props)
             roleLabel={roleLabel}
             bio={(profile as any)?.bio ?? ""}
             company={companyState.company}
-            linkedin={(profile as any)?.linkedin_url ?? ""}
             portfolio={(profile as any)?.portfolio_url ?? ""}
           />
         </div>

@@ -17,17 +17,23 @@ import {
 } from "@/lib/profile/identity";
 
 /**
- * "Edit profile" — the two-step modal behind the profile hero's Edit button.
+ * "Edit profile" — the two-step editor behind the profile hero's Edit button.
  *
- * The details edited here are the ones a member picked at signup (name,
- * job title, experience level, city, sector — never the display picture),
- * and the last four also place them in official communities. So the modal
- * tells BOTH stories: the fields first, then what saving them implies.
+ * The details edited here are the ones a member picked at signup (name, job
+ * title, experience level, city, sector — never the display picture), and the
+ * last four also place them in official communities. So the form tells BOTH
+ * stories: the fields first, then what saving them implies.
  *
- *   1. form    — the fields, with locked slots disabled under their cooldown;
- *   2. confirm — the old → new values, the groups the change leaves/joins
- *                (DP and name), and the three-month cost of the change;
- *   3. done    — the server's report of what actually happened.
+ *   1. form    — the fields, inline, with locked slots disabled under their
+ *                cooldown;
+ *   2. confirm — a modal over the form, stating the old → new values, the
+ *                groups the change leaves/joins (DP and name) and the
+ *                three-month cost.
+ *
+ * Saving reports what actually happened as an inline panel above the fields
+ * (the groups left/joined), and rebases the draft on what was just saved — the
+ * baseline advances so the next edit diffs against the values the database
+ * holds, without the caller having to remount the form.
  *
  * The database is the authority for the cooldown and the swap (one atomic
  * RPC — see update_profile_identity); this component never mutates caches,
@@ -35,14 +41,15 @@ import {
  */
 
 interface Props {
-  open: boolean;
   data: ProfileIdentityPayload;
-  onClose: () => void;
   /** Fired once the change was applied, so the page behind can refresh. */
   onSaved: () => void;
 }
 
-type Step = "form" | "confirm" | "done";
+type Step = "form" | "confirm";
+
+/** The identity values this form edits — the shape of `data.current`. */
+type IdentityDraft = ProfileIdentityPayload["current"];
 
 const slotLabel: Record<IdentitySlot, string> = {
   name: "Name",
@@ -73,7 +80,7 @@ function GroupContent({
   name: string;
   imageUrl: string | null;
   type: IdentityDimension;
-  /** The group being left reads muted, struck through (the modal's "old value" language). */
+  /** The group being left reads muted, struck through (the form's "old value" language). */
   leaving?: boolean;
 }) {
   return (
@@ -201,10 +208,13 @@ function LockNote({ until }: { until: string }) {
   );
 }
 
-export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
-  // Mounted only while open (the caller unmounts on close), so the draft is
-  // initialised from props once and cannot leak between attempts.
+export function EditProfileForm({ data, onSaved }: Props) {
   const [step, setStep] = useState<Step>("form");
+
+  // The baseline is the values the database holds. It starts from the server
+  // payload and advances to the draft on a successful save, so a second edit
+  // diffs against what was actually written without remounting this component.
+  const [baseline, setBaseline] = useState<IdentityDraft>(data.current);
 
   const [name, setName] = useState(data.current.name);
   const [cityId, setCityId] = useState(data.current.city_id ?? "");
@@ -218,12 +228,12 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
 
   // ── Draft diff ──
   const trimmedName = name.trim();
-  const nameChanged = trimmedName !== data.current.name;
+  const nameChanged = trimmedName !== baseline.name;
   const nameValid = trimmedName.length >= 2 && trimmedName.length <= 100;
-  const cityChanged = cityId !== "" && cityId !== (data.current.city_id ?? "");
-  const sectorChanged = sectorId !== "" && sectorId !== (data.current.sector_id ?? "");
-  const levelChanged = levelSlug !== "" && levelSlug !== (data.current.experience_level ?? "");
-  const titleChanged = titleSlug !== "" && titleSlug !== (data.current.job_title ?? "");
+  const cityChanged = cityId !== "" && cityId !== (baseline.city_id ?? "");
+  const sectorChanged = sectorId !== "" && sectorId !== (baseline.sector_id ?? "");
+  const levelChanged = levelSlug !== "" && levelSlug !== (baseline.experience_level ?? "");
+  const titleChanged = titleSlug !== "" && titleSlug !== (baseline.job_title ?? "");
   const anyChange = nameChanged || cityChanged || sectorChanged || levelChanged || titleChanged;
 
   const selectedCity = data.options.cities.find((o) => o.id === cityId) ?? null;
@@ -231,15 +241,15 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
   const selectedLevel = data.options.levels.find((o) => o.id === levelSlug) ?? null;
   const selectedTitle = data.options.titles.find((o) => o.id === titleSlug) ?? null;
 
-  const currentCityName = data.options.cities.find((o) => o.id === data.current.city_id)?.name ?? "—";
-  const currentSectorName = data.options.sectors.find((o) => o.id === data.current.sector_id)?.name ?? "—";
+  const currentCityName = data.options.cities.find((o) => o.id === baseline.city_id)?.name ?? "—";
+  const currentSectorName = data.options.sectors.find((o) => o.id === baseline.sector_id)?.name ?? "—";
   const currentLevelName =
-    data.options.levels.find((o) => o.id === data.current.experience_level)?.name ??
-    data.current.experience_level ??
+    data.options.levels.find((o) => o.id === baseline.experience_level)?.name ??
+    baseline.experience_level ??
     "—";
   const currentTitleName =
-    data.options.titles.find((o) => o.id === data.current.job_title)?.name ??
-    data.current.job_title ??
+    data.options.titles.find((o) => o.id === baseline.job_title)?.name ??
+    baseline.job_title ??
     "—";
 
   const moves: Move[] = [];
@@ -301,6 +311,18 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
 
   const canReview = anyChange && nameValid;
 
+  /** Put every field back to what the database holds, clearing any status. */
+  function resetDraft() {
+    setName(baseline.name);
+    setCityId(baseline.city_id ?? "");
+    setSectorId(baseline.sector_id ?? "");
+    setLevelSlug(baseline.experience_level ?? "");
+    setTitleSlug(baseline.job_title ?? "");
+    setErrorLines([]);
+    setResult(null);
+    setStep("form");
+  }
+
   async function handleConfirm() {
     setSubmitting(true);
     setErrorLines([]);
@@ -343,12 +365,22 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
         return;
       }
 
+      // The save landed: rebase on the draft we just wrote and report what the
+      // server did, staying on the form so the change can be read in place.
+      setBaseline({
+        name: trimmedName,
+        city_id: cityId || null,
+        sector_id: sectorId || null,
+        experience_level: levelSlug || null,
+        job_title: titleSlug || null,
+      });
       setResult({
         changed_fields: body.changed_fields ?? [],
         left_communities: body.left_communities ?? [],
         joined_communities: body.joined_communities ?? [],
       });
-      setStep("done");
+      setStep("form");
+      setErrorLines([]);
       onSaved();
     } catch {
       setErrorLines(["Network error. Please try again."]);
@@ -363,14 +395,65 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
     "w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="max-w-xl" title={step === "done" ? undefined : "Edit profile"}>
+    <>
       {/* ── 1. The form ── */}
       {step === "form" && (
         <div>
-          <p className="-mt-2 mb-5 font-body text-xs text-foreground-muted">
-            Step 1 of 2 — pick your details. Changing your city, industry sector, job title or
-            experience level moves you between the official groups they created; you will confirm on
-            the next step.
+          {result && (
+            <div
+              className="mb-5 rounded-xl border border-accent/30 bg-accent/10 px-3.5 py-3"
+              role="status"
+            >
+              <p className="flex items-center gap-1.5 font-body text-xs font-medium text-accent">
+                <Check strokeWidth={2.5} size={13} />
+                Profile updated
+              </p>
+              {(result.left_communities.length > 0 || result.joined_communities.length > 0) && (
+                <div className="mt-3 flex flex-col gap-3">
+                  {result.left_communities.length > 0 && (
+                    <div className="rounded-xl border border-border bg-surface px-3.5 py-2.5">
+                      <p className="mb-2 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                        Left
+                      </p>
+                      <ul className="flex flex-col gap-2">
+                        {result.left_communities.map((group) => (
+                          <li key={group.id} className="flex items-center gap-2">
+                            <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} />
+                            <span className="min-w-0 truncate font-body text-sm text-foreground-subtle">
+                              {group.name}
+                            </span>
+                            <SignupCommunityBadge size={11} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {result.joined_communities.length > 0 && (
+                    <div className="rounded-xl border border-border bg-surface px-3.5 py-2.5">
+                      <p className="mb-2 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                        Joined
+                      </p>
+                      <ul className="flex flex-col gap-2">
+                        {result.joined_communities.map((group) => (
+                          <li key={group.id} className="flex items-center gap-2">
+                            <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} />
+                            <span className="min-w-0 truncate font-body text-sm text-foreground">
+                              {group.name}
+                            </span>
+                            <SignupCommunityBadge size={11} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="mb-5 font-body text-xs text-foreground-muted">
+            Pick your details. Changing your city, industry sector, job title or experience level
+            moves you between the official groups they created; you will confirm on the next step.
           </p>
 
           {errorLines.length > 0 && (
@@ -385,11 +468,11 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
 
           <div className="flex flex-col gap-5">
             <div>
-              <label htmlFor="edit-profile-name" className={fieldLabelCls}>
+              <label htmlFor="settings-profile-name" className={fieldLabelCls}>
                 <span>Name</span>
               </label>
               <input
-                id="edit-profile-name"
+                id="settings-profile-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -468,14 +551,18 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
           <div className="mt-6 flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-md px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+              onClick={resetDraft}
+              disabled={!anyChange && !result}
+              className="rounded-md px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Cancel
+              Reset
             </button>
             <button
               type="button"
-              onClick={() => setStep("confirm")}
+              onClick={() => {
+                setResult(null);
+                setStep("confirm");
+              }}
               disabled={!canReview}
               className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -486,198 +573,148 @@ export function EditProfileModal({ open, data, onClose, onSaved }: Props) {
         </div>
       )}
 
-      {/* ── 2. Confirm — values, groups and the three-month cost ── */}
+      {/* ── 2. Confirm — the impact review, in a modal over the form ──
+
+          The card keeps the fields; the steps that tell the member what the
+          change does (old → new values, the groups left/joined, the three-month
+          cost) open over it, so the review reads as a decision rather than
+          another section of the page. Closing it returns to the form with the
+          draft intact. */}
       {step === "confirm" && (
-        <div>
-          <p className="-mt-2 mb-5 font-body text-xs text-foreground-muted">
-            Step 2 of 2 — review what changes. Nothing has been saved yet.
-          </p>
+        <Modal
+          open
+          onClose={() => setStep("form")}
+          maxWidth="max-w-xl"
+          title="Review changes"
+        >
+          <div>
+            <p className="mb-5 font-body text-xs text-foreground-muted">
+              Nothing has been saved yet — confirm to apply these changes.
+            </p>
 
-          {errorLines.length > 0 && (
-            <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3" role="alert">
-              {errorLines.map((line) => (
-                <p key={line} className="font-body text-xs leading-relaxed text-red-400">
-                  {line}
+            {errorLines.length > 0 && (
+              <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3" role="alert">
+                {errorLines.map((line) => (
+                  <p key={line} className="font-body text-xs leading-relaxed text-red-400">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3.5">
+              {nameChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Name
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">{baseline.name}</span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{trimmedName}</span>
+                </div>
+              )}
+              {titleChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Job title
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentTitleName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedTitle?.name}</span>
+                </div>
+              )}
+              {levelChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Experience level
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentLevelName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedLevel?.name}</span>
+                </div>
+              )}
+              {cityChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    City
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentCityName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedCity?.name}</span>
+                </div>
+              )}
+              {sectorChanged && (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                    Industry Sector
+                  </span>
+                  <span className="font-body text-sm text-foreground-muted line-through">
+                    {currentSectorName}
+                  </span>
+                  <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
+                  <span className="font-body text-sm font-medium text-foreground">{selectedSector?.name}</span>
+                </div>
+              )}
+            </div>
+
+            {moves.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border bg-surface-raised px-4 py-3.5">
+                <p className="mb-2.5 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                  Communities that will change
                 </p>
-              ))}
-            </div>
-          )}
+                <p className="mb-3.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
+                  Members are only placed in official communities that match their details — this
+                  keeps communities relatable and spam-free. {moves.map(moveSentence).join(" ")}
+                </p>
+                <MoveRows moves={moves} />
+              </div>
+            )}
 
-          <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3.5">
-            {nameChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Name
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">{data.current.name}</span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{trimmedName}</span>
-              </div>
-            )}
-            {titleChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Job title
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentTitleName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedTitle?.name}</span>
-              </div>
-            )}
-            {levelChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Experience level
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentLevelName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedLevel?.name}</span>
-              </div>
-            )}
-            {cityChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  City
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentCityName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedCity?.name}</span>
-              </div>
-            )}
-            {sectorChanged && (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-28 shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                  Industry Sector
-                </span>
-                <span className="font-body text-sm text-foreground-muted line-through">
-                  {currentSectorName}
-                </span>
-                <ArrowRight strokeWidth={2.5} size={12} className="text-foreground-subtle" />
-                <span className="font-body text-sm font-medium text-foreground">{selectedSector?.name}</span>
-              </div>
-            )}
-          </div>
-
-          {moves.length > 0 && (
-            <div className="mt-4 rounded-xl border border-border bg-surface-raised px-4 py-3.5">
-              <p className="mb-2.5 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                Communities that will change
+            {/* The cost: each spent slot is locked for three months. */}
+            <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3">
+              <p className="font-body text-xs font-medium text-amber-400">
+                {spentSlots.length === 1
+                  ? `${slotLabel[spentSlots[0]]} can be changed once every 3 months.`
+                  : "Each of these can be changed once every 3 months."}
               </p>
-              <p className="mb-3.5 font-body text-[11px] leading-relaxed text-foreground-subtle">
-                Members are only placed in official communities that match their details — this
-                keeps communities relatable and spam-free. {moves.map(moveSentence).join(" ")}
-              </p>
-              <MoveRows moves={moves} />
+              <ul className="mt-1.5 flex flex-col gap-0.5">
+                {spentSlots.map((slot) => (
+                  <li key={slot} className="font-body text-[11px] leading-relaxed text-amber-400/90">
+                    {slotLabel[slot]} — next change available on {formatDate(slotUnlockDate(new Date()))}
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
 
-          {/* The cost: each spent slot is locked for three months. */}
-          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3">
-            <p className="font-body text-xs font-medium text-amber-400">
-              {spentSlots.length === 1
-                ? `${slotLabel[spentSlots[0]]} can be changed once every 3 months.`
-                : "Each of these can be changed once every 3 months."}
-            </p>
-            <ul className="mt-1.5 flex flex-col gap-0.5">
-              {spentSlots.map((slot) => (
-                <li key={slot} className="font-body text-[11px] leading-relaxed text-amber-400/90">
-                  {slotLabel[slot]} — next change available on {formatDate(slotUnlockDate(new Date()))}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mt-6 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setStep("form")}
-              disabled={submitting}
-              className="flex items-center gap-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              <ArrowLeft strokeWidth={2.5} size={12} />
-              Back to edit
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={submitting}
-              className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting && <Loader2 strokeWidth={2.5} size={13} className="animate-spin" />}
-              Confirm changes
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── 3. The server's report ── */}
-      {step === "done" && (
-        <div className="py-2 text-center">
-          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-accent/10 text-accent">
-            <Check strokeWidth={2.5} size={20} />
-          </span>
-          <h2 className="mt-3 font-display text-lg font-semibold text-foreground">Profile updated</h2>
-
-          {(result?.left_communities.length ?? 0) > 0 || (result?.joined_communities.length ?? 0) > 0 ? (
-            <div className="mt-4 flex flex-col gap-3 text-left">
-              {(result?.left_communities.length ?? 0) > 0 && (
-                <div className="rounded-xl border border-border bg-surface-raised px-4 py-3">
-                  <p className="mb-2 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                    Left
-                  </p>
-                  <ul className="flex flex-col gap-2">
-                    {result!.left_communities.map((group) => (
-                      <li key={group.id} className="flex items-center gap-2">
-                        <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} />
-                        <span className="min-w-0 truncate font-body text-sm text-foreground-subtle">
-                          {group.name}
-                        </span>
-                        <SignupCommunityBadge size={11} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {(result?.joined_communities.length ?? 0) > 0 && (
-                <div className="rounded-xl border border-border bg-surface-raised px-4 py-3">
-                  <p className="mb-2 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-                    Joined
-                  </p>
-                  <ul className="flex flex-col gap-2">
-                    {result!.joined_communities.map((group) => (
-                      <li key={group.id} className="flex items-center gap-2">
-                        <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} />
-                        <span className="min-w-0 truncate font-body text-sm text-foreground">
-                          {group.name}
-                        </span>
-                        <SignupCommunityBadge size={11} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+            <div className="mt-6 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setStep("form")}
+                disabled={submitting}
+                className="flex items-center gap-1.5 font-body text-xs text-foreground-muted transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                <ArrowLeft strokeWidth={2.5} size={12} />
+                Back to edit
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={submitting}
+                className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting && <Loader2 strokeWidth={2.5} size={13} className="animate-spin" />}
+                Confirm changes
+              </button>
             </div>
-          ) : (
-            <p className="mt-2 font-body text-sm text-foreground-muted">
-              Your communities stay the same.
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-5 w-full rounded-md bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
-          >
-            Done
-          </button>
-        </div>
+          </div>
+        </Modal>
       )}
-    </Modal>
+    </>
   );
 }
