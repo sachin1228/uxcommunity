@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, PenLine, Plus } from "lucide-react";
+import { Camera, Globe, Linkedin, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -34,8 +34,23 @@ interface ProfileCardProps {
    * identity fields and the workplace. Omitted on read-only surfaces.
    */
   editProfileHref?: string;
-  /** The member's portfolio link — rendered as a chip on other members' profiles when set. */
+  /** The member's portfolio link — a chip under the bio on read-only surfaces, the live circle beside LinkedIn on the owner's. */
   portfolio?: string;
+  /**
+   * Opens the add-portfolio prompt. Omitted on read-only surfaces, where the
+   * portfolio renders as the chip instead.
+   */
+  onAddPortfolio?: () => void;
+  /**
+   * The member's LinkedIn profile URL when saved — the live circle under the
+   * city on the owner's surface, a chip after the bio on read-only ones.
+   */
+  linkedinUrl?: string | null;
+  /**
+   * Opens the add-LinkedIn prompt for a member with no link saved. Omitted on
+   * read-only surfaces.
+   */
+  onAddLinkedIn?: () => void;
 }
 
 /**
@@ -43,7 +58,7 @@ interface ProfileCardProps {
  * it cannot be one. Values are user-typed, so only http(s) survives — the
  * `https://` prefix is added when the member left the scheme off.
  */
-function externalUrl(value: string | undefined): string | null {
+function externalUrl(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -75,8 +90,12 @@ export function ProfileCard({
   onAddCompany,
   editProfileHref,
   portfolio = "",
+  onAddPortfolio,
+  linkedinUrl,
+  onAddLinkedIn,
 }: ProfileCardProps) {
   const portfolioUrl = externalUrl(portfolio);
+  const linkedinProfileUrl = externalUrl(linkedinUrl);
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
   // an empty frame.
@@ -124,13 +143,23 @@ export function ProfileCard({
           )}
         </div>
 
-        {/* Name and the role line stack on the left; Edit sits at the right
-            edge, level with the last line of that block — the same place the
-            reference header keeps its actions. */}
-        <div className="mt-4 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
+        {/* Edit shares the name's row, pinned to the right edge; the role
+            line and the city stack under it. */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="min-w-0 truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
 
+            {editProfileHref && (
+              <Link
+                href={editProfileHref}
+                className="shrink-0 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                Edit
+              </Link>
+            )}
+          </div>
+
+          <div className="min-w-0">
             {/* Seniority and designation on their own line under the name,
                 as plain text — no pill, no icon. One “@” joins the role to the
                 workplace: the verified company (logo first, leading to its
@@ -180,17 +209,62 @@ export function ProfileCard({
             {city && (
               <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
             )}
-          </div>
 
-          {editProfileHref && (
-            <Link
-              href={editProfileHref}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              <PenLine strokeWidth={2.5} size={11} />
-              Edit Profile
-            </Link>
-          )}
+            {/* LinkedIn and portfolio — the owner's circles: hollow until a
+                link is saved (they open the add prompt right here), then live
+                buttons out to the member's profile. Read-only surfaces show
+                the labeled chips after the bio instead. */}
+            {(onAddLinkedIn || onAddPortfolio) && (
+              <div className="mt-3 flex items-center gap-2">
+                {onAddLinkedIn &&
+                  (linkedinProfileUrl ? (
+                    <a
+                      href={linkedinProfileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="LinkedIn profile"
+                      title="LinkedIn"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Linkedin strokeWidth={2.5} size={14} />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onAddLinkedIn}
+                      aria-label="Add your LinkedIn"
+                      title="Add your LinkedIn"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Linkedin strokeWidth={2.5} size={14} />
+                    </button>
+                  ))}
+                {onAddPortfolio &&
+                  (portfolioUrl ? (
+                    <a
+                      href={portfolioUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Portfolio"
+                      title="Portfolio"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Globe strokeWidth={2.5} size={14} />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onAddPortfolio}
+                      aria-label="Add your portfolio"
+                      title="Add your portfolio"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border bg-surface text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                    >
+                      <Globe strokeWidth={2.5} size={14} />
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bio */}
@@ -198,19 +272,33 @@ export function ProfileCard({
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
-        {/* Portfolio — only on other members' profiles, where it is part of
-            the point of the page. */}
-        {portfolioUrl && (
+        {/* The member's outside links as labeled chips — read-only surfaces
+            only; the owner's own surface shows the circles in the hero
+            instead. */}
+        {!onAddLinkedIn && !onAddPortfolio && (linkedinProfileUrl || portfolioUrl) && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <a
-              href={portfolioUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              <Globe strokeWidth={2.5} size={12} />
-              Portfolio
-            </a>
+            {linkedinProfileUrl && (
+              <a
+                href={linkedinProfileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <Linkedin strokeWidth={2.5} size={12} />
+                LinkedIn
+              </a>
+            )}
+            {portfolioUrl && (
+              <a
+                href={portfolioUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <Globe strokeWidth={2.5} size={12} />
+                Portfolio
+              </a>
+            )}
           </div>
         )}
 

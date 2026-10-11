@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
 import { ProfileCard } from "./components/ProfileCard";
 import { ImagePickerModal } from "./components/ImagePickerModal";
+import { AddLinkModal } from "./components/AddLinkModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
@@ -41,6 +42,8 @@ export function ProfileClient({
   initialBio,
   initialCompany,
   pendingCompany,
+  initialLinkedIn,
+  initialPortfolio,
 }: Props) {
   const router = useRouter();
   // The server is the source of truth: the client only mirrors what the last
@@ -53,6 +56,9 @@ export function ProfileClient({
   const [showCompanyPicker, setShowCompanyPicker] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(pendingCompany);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [linkedinUrl, setLinkedinUrl] = useState(initialLinkedIn);
+  const [portfolioUrl, setPortfolioUrl] = useState(initialPortfolio);
+  const [linkModal, setLinkModal] = useState<"linkedin" | "portfolio" | null>(null);
 
   // A newer server render (a refresh, a navigation) supersedes whatever an
   // upload left in state. Adjusted during render — an effect would re-render a
@@ -61,6 +67,16 @@ export function ProfileClient({
   if (serverAvatarUrl !== initialAvatarUrl) {
     setServerAvatarUrl(initialAvatarUrl);
     setAvatarUrl(initialAvatarUrl);
+  }
+  const [serverLinkedInUrl, setServerLinkedInUrl] = useState(initialLinkedIn);
+  if (serverLinkedInUrl !== initialLinkedIn) {
+    setServerLinkedInUrl(initialLinkedIn);
+    setLinkedinUrl(initialLinkedIn);
+  }
+  const [serverPortfolioUrl, setServerPortfolioUrl] = useState(initialPortfolio);
+  if (serverPortfolioUrl !== initialPortfolio) {
+    setServerPortfolioUrl(initialPortfolio);
+    setPortfolioUrl(initialPortfolio);
   }
   const [showPicturePicker, setShowPicturePicker] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
@@ -150,6 +166,10 @@ export function ProfileClient({
             company={initialCompany}
             onAddCompany={() => setShowCompanyPicker(true)}
             editProfileHref="/dashboard/settings/profile"
+            portfolio={portfolioUrl}
+            onAddPortfolio={() => setLinkModal("portfolio")}
+            linkedinUrl={linkedinUrl}
+            onAddLinkedIn={() => setLinkModal("linkedin")}
           />
         </div>
 
@@ -165,6 +185,20 @@ export function ProfileClient({
           onRemoveUpload={handleRemoveUpload}
           onSave={handleSavePicture}
           onClose={closePicturePicker}
+        />
+      )}
+
+      {linkModal && (
+        <AddLinkModal
+          kind={linkModal}
+          initialUrl={linkModal === "linkedin" ? linkedinUrl : portfolioUrl}
+          onClose={() => setLinkModal(null)}
+          onSaved={(url) => {
+            if (linkModal === "linkedin") setLinkedinUrl(url);
+            else setPortfolioUrl(url);
+            setLinkModal(null);
+            router.refresh();
+          }}
         />
       )}
 
