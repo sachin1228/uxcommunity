@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Clock, MapPin, Settings, Users, Video } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCheck, Clock, MapPin, Settings, Users, Video } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { openCommunitySettings } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -292,8 +292,9 @@ export function EventRoomSection({
             Event
           </h2>
           {event.user_rsvped && (
-            <span className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-body text-xs font-medium text-accent">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-body text-xs font-medium text-emerald-400">
               Going
+              <CheckCheck strokeWidth={2.5} size={11} aria-hidden="true" />
             </span>
           )}
         </div>
