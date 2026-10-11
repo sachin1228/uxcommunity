@@ -42,8 +42,8 @@ interface ProfileCardProps {
    */
   onAddPortfolio?: () => void;
   /**
-   * The member's LinkedIn profile URL when saved — rendered under the city as
-   * a live icon button linking out to the profile.
+   * The member's LinkedIn profile URL when saved — the live circle under the
+   * city on the owner's surface, a chip after the bio on read-only ones.
    */
   linkedinUrl?: string | null;
   /**
@@ -210,12 +210,13 @@ export function ProfileCard({
               <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
             )}
 
-            {/* LinkedIn and portfolio — hollow circles that open their add
-                prompt right here until a link is saved, then live buttons out
-                to the member's profile. */}
-            {(linkedinProfileUrl || onAddLinkedIn || onAddPortfolio) && (
+            {/* LinkedIn and portfolio — the owner's circles: hollow until a
+                link is saved (they open the add prompt right here), then live
+                buttons out to the member's profile. Read-only surfaces show
+                the labeled chips after the bio instead. */}
+            {(onAddLinkedIn || onAddPortfolio) && (
               <div className="mt-3 flex items-center gap-2">
-                {(linkedinProfileUrl || onAddLinkedIn) &&
+                {onAddLinkedIn &&
                   (linkedinProfileUrl ? (
                     <a
                       href={linkedinProfileUrl}
@@ -227,7 +228,7 @@ export function ProfileCard({
                     >
                       <Linkedin strokeWidth={2.5} size={14} />
                     </a>
-                  ) : onAddLinkedIn ? (
+                  ) : (
                     <button
                       type="button"
                       onClick={onAddLinkedIn}
@@ -237,7 +238,7 @@ export function ProfileCard({
                     >
                       <Linkedin strokeWidth={2.5} size={14} />
                     </button>
-                  ) : null)}
+                  ))}
                 {onAddPortfolio &&
                   (portfolioUrl ? (
                     <a
@@ -271,20 +272,33 @@ export function ProfileCard({
           <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
-        {/* Portfolio — the chip is for other members' profiles, where it is
-            part of the point of the page; the owner's own surface shows the
-            circle in the links row instead. */}
-        {portfolioUrl && !onAddPortfolio && (
+        {/* The member's outside links as labeled chips — read-only surfaces
+            only; the owner's own surface shows the circles in the hero
+            instead. */}
+        {!onAddLinkedIn && !onAddPortfolio && (linkedinProfileUrl || portfolioUrl) && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <a
-              href={portfolioUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              <Globe strokeWidth={2.5} size={12} />
-              Portfolio
-            </a>
+            {linkedinProfileUrl && (
+              <a
+                href={linkedinProfileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <Linkedin strokeWidth={2.5} size={12} />
+                LinkedIn
+              </a>
+            )}
+            {portfolioUrl && (
+              <a
+                href={portfolioUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <Globe strokeWidth={2.5} size={12} />
+                Portfolio
+              </a>
+            )}
           </div>
         )}
 
