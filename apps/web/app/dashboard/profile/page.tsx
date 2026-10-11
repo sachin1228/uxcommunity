@@ -63,7 +63,6 @@ export default async function ProfilePage({ searchParams }: Props) {
       avatarUrl={(profile as any)?.avatar_url ?? null}
       avatarSource={(profile as any)?.avatar_source ?? null}
       city={(profile as any)?.cities?.name ?? null}
-      sector={(profile as any)?.design_sectors?.name ?? null}
       roleLabel={roleLabel}
       initialLinkedIn={(profile as any)?.linkedin_url ?? ""}
       initialPortfolio={(profile as any)?.portfolio_url ?? ""}

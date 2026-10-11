@@ -25,7 +25,6 @@ interface Props {
   avatarUrl: string | null;
   avatarSource: string | null;
   city: string | null;
-  sector: string | null;
   /** Seniority plus designation for the pill beside the name. */
   roleLabel: string | null;
   initialLinkedIn: string;
@@ -44,7 +43,6 @@ export function ProfileClient({
   initialName,
   avatarUrl: initialAvatarUrl,
   city,
-  sector,
   roleLabel,
   initialBio,
   initialCompany,
@@ -137,7 +135,7 @@ export function ProfileClient({
 
   // An identity edit moves the member between official communities, so the
   // sidebar and explore caches are stale by definition — bust them, then let
-  // the server render re-supply this card with the new name/city/sector.
+  // the server render re-supply this card with the new name/city.
   function handleIdentitySaved() {
     invalidateCommunitiesList();
     router.refresh();
@@ -162,7 +160,6 @@ export function ProfileClient({
             avatarUrl={avatarUrl}
             onOpenAvatarPicker={() => setShowPicturePicker(true)}
             city={city}
-            sector={sector}
             roleLabel={roleLabel}
             bio={initialBio}
             company={initialCompany}

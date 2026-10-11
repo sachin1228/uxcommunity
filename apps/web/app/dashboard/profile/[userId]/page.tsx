@@ -80,7 +80,6 @@ export default async function MemberProfilePage({ params, searchParams }: Props)
             name={name}
             avatarUrl={(profile as any)?.avatar_url ?? null}
             city={(profile as any)?.cities?.name ?? null}
-            sector={(profile as any)?.design_sectors?.name ?? null}
             roleLabel={roleLabel}
             bio={(profile as any)?.bio ?? ""}
             company={companyState.company}
