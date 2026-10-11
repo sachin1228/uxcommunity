@@ -32,6 +32,8 @@ export function SuggestedCommunitiesCard({
 
   const visible = communities.filter((community) => !joinedIds.has(community.id));
 
+  if (visible.length === 0) return null;
+
   function hide(id: string, hidden: boolean) {
     setJoinedIds((current) => {
       const next = new Set(current);
@@ -88,46 +90,38 @@ export function SuggestedCommunitiesCard({
         </p>
       )}
 
-      {visible.length === 0 ? (
-        <p className="px-4 pb-4 font-body text-xs leading-relaxed text-foreground-muted">
-          {error
-            ? "Nothing to show right now."
-            : "You're in every community that matches your profile — check back as new ones open."}
-        </p>
-      ) : (
-        <ul className="flex flex-col px-4 pb-3">
-          {visible.map((community) => (
-            <li
-              key={community.id}
-              className="flex items-center gap-3 py-2.5"
+      <ul className="flex flex-col px-4 pb-3">
+        {visible.map((community) => (
+          <li
+            key={community.id}
+            className="flex items-center gap-3 py-2.5"
+          >
+            <CommunityDp imageUrl={community.image_url} name={community.name} size={34} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-body text-sm font-medium text-foreground">
+                {community.name}
+              </p>
+              {community.description && (
+                <p className="mt-0.5 line-clamp-1 font-body text-[11px] text-foreground-muted">
+                  {community.description}
+                </p>
+              )}
+              <p className="mt-0.5 font-body text-[11px] text-foreground-subtle">
+                {formatMembers(community.member_count)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleJoin(community.id)}
+              disabled={pendingId !== null}
+              aria-label={`Join ${community.name}`}
+              className="shrink-0 rounded-full bg-accent px-3 py-1 font-body text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
             >
-              <CommunityDp imageUrl={community.image_url} name={community.name} size={34} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-body text-sm font-medium text-foreground">
-                  {community.name}
-                </p>
-                {community.description && (
-                  <p className="mt-0.5 line-clamp-1 font-body text-[11px] text-foreground-muted">
-                    {community.description}
-                  </p>
-                )}
-                <p className="mt-0.5 font-body text-[11px] text-foreground-subtle">
-                  {formatMembers(community.member_count)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleJoin(community.id)}
-                disabled={pendingId !== null}
-                aria-label={`Join ${community.name}`}
-                className="shrink-0 rounded-full bg-accent px-3 py-1 font-body text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
-              >
-                {pendingId === community.id ? "Joining…" : "Join"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+              {pendingId === community.id ? "Joining…" : "Join"}
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
