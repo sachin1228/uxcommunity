@@ -15,7 +15,7 @@ export function ChatWatermark({ text }: { text: string }) {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 flex select-none items-center justify-center overflow-hidden px-8"
     >
-      <span className="text-balance text-center font-watermark text-[32px] uppercase italic tracking-normal text-foreground opacity-[0.04]">
+      <span className="text-balance text-center font-watermark text-[32px] font-medium italic tracking-normal text-foreground opacity-[0.08]">
         {text}
       </span>
     </div>
