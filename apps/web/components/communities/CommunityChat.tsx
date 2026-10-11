@@ -1025,9 +1025,13 @@ export function CommunityChat({
         ) : renderedTab === "activity" ? (
           <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
-          <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Pane paper — the dot grid (and an event room's watermark) stays
-              put while messages scroll: the scroller above it is transparent. */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Message area — paper, watermark and the scroller share one grid
+              cell, so the watermark centers on exactly what the reader sees as
+              the chat. The pane paper stays put while messages scroll (the
+              scroller above it is transparent); the footer below is a plain
+              flex sibling. */}
+          <div className="relative grid grid-rows-1 flex-1 min-h-0 overflow-hidden">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-background"
@@ -1039,13 +1043,12 @@ export function CommunityChat({
           {isEventRoom && roomHasContent && (
             <ChatWatermark text={displayCommunity?.name ?? ""} />
           )}
-          {/* Scrollable message body — a flex sibling of the footer (WhatsApp
-              pattern). It owns the scroll; the footer below is static, so
+          {/* Scrollable message body — the footer below is static, so
               messages can never flow underneath the input.                     */}
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="relative flex-1 min-h-0 overflow-y-auto"
+            className="relative col-start-1 row-start-1 min-h-0 overflow-y-auto"
             style={{
               // Scroll position above the viewport is preserved manually (see the
               // top-region compensation effect); native anchoring would double-adjust.
@@ -1100,6 +1103,7 @@ export function CommunityChat({
               onImageClick={handleImageClick}
             />
             )}
+          </div>
           </div>
 
           {/* Static footer — separate from the scroll body, never overlapped */}
