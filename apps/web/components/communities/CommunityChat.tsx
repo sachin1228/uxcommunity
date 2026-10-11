@@ -31,8 +31,7 @@ import { collectPendingMentions } from "./chat/mention-jumps";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MessageList } from "./chat/MessageList";
-// TEMP — watermark variant preview (remove with the extras in ChatWatermark)
-import { ChatWatermark, WatermarkVariantSwitcher, type WatermarkVariant } from "./chat/ChatWatermark";
+import { ChatWatermark } from "./chat/ChatWatermark";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { TypingIndicator } from "./chat/TypingIndicator";
@@ -125,8 +124,6 @@ export function CommunityChat({
   const [hasMounted, setHasMounted] = useState(false);
   const { activeTab, handleTabChange } = useCommunityTabs(initialTab);
   const [showSettings, setShowSettings] = useState(false);
-  // TEMP — watermark variant preview
-  const [wmVariant, setWmVariant] = useState<WatermarkVariant | "off">("A");
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
 
   // Seed every first-page endpoint before child passive effects run. This keeps
@@ -1035,13 +1032,7 @@ export function CommunityChat({
               backgroundSize: "24px 24px",
             }}
           />
-          {/* TEMP — watermark variant preview, event group rooms only */}
-          {isEventRoom && (
-            <ChatWatermark text={displayCommunity?.name ?? ""} variant={wmVariant} />
-          )}
-          {isEventRoom && (
-            <WatermarkVariantSwitcher value={wmVariant} onChange={setWmVariant} />
-          )}
+          {isEventRoom && <ChatWatermark text={displayCommunity?.name ?? ""} />}
           {/* Scrollable message body — a flex sibling of the footer (WhatsApp
               pattern). It owns the scroll; the footer below is static, so
               messages can never flow underneath the input.                     */}
