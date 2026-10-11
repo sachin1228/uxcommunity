@@ -9,10 +9,10 @@ import {
   Check,
   Layers,
   MapPin,
-  SlidersHorizontal,
   Video,
 } from "lucide-react";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { FilterIcon } from "@/components/ui/FilterIcon";
 import {
   EVENT_DATE_OPTIONS,
   EVENT_TYPE_OPTIONS,
@@ -98,7 +98,7 @@ export function EventFiltersMenu({ type, date, active, onSelect }: EventFiltersM
             : "border-[color:var(--color-field-ring)] text-foreground-muted hover:bg-surface-raised hover:text-foreground"
         }`}
       >
-        <SlidersHorizontal strokeWidth={2.5} size={15} />
+        <FilterIcon size={16} />
       </button>
       <DropdownMenu
         triggerRef={triggerRef}
