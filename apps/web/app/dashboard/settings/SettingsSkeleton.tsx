@@ -107,7 +107,7 @@ export function ConnectedAccountsSkeleton() {
   );
 }
 
-/** Profile — the five identity fields, then the company row. */
+/** Profile — the identity fields, then the separate company card. */
 export function ProfileSkeleton() {
   return (
     <>
@@ -124,10 +124,9 @@ export function ProfileSkeleton() {
             <SkeletonBar className="h-10 w-full rounded-lg" />
           </div>
         </div>
-        <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <SkeletonBar className="h-3.5 w-24" />
-          <SkeletonBar className="h-7 w-32 rounded-lg" />
-        </div>
+      </SkeletonCard>
+      <SkeletonCard>
+        <SkeletonBar className="h-7 w-32 rounded-lg" />
       </SkeletonCard>
     </>
   );

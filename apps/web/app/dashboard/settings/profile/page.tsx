@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import { ProfileSection } from "../ProfileSection";
+import { CompanySection } from "../CompanySection";
 import { SettingsBackLink } from "../SettingsBackLink";
 
 export const metadata = { title: "Profile — Settings" };
@@ -29,8 +30,9 @@ export default async function ProfileSettingsPage() {
   return (
     <>
       <SettingsBackLink />
-      <div className="mt-4">
-        <ProfileSection identity={identity} company={company} pendingCompany={pending} />
+      <div className="mt-4 flex flex-col gap-4">
+        <ProfileSection identity={identity} />
+        <CompanySection company={company} pendingCompany={pending} />
       </div>
     </>
   );
