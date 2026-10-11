@@ -195,14 +195,14 @@ export function ProfileCard({
                         : "Change company"
                       : "This company is no longer active — add another"
                   }
-                  className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
+                  className={`flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
                     company.isActive ? "text-foreground" : "text-foreground-subtle"
                   }`}
                 >
                   <CompanyLogo
                     name={company.name}
                     logoUrl={company.logoUrl}
-                    size={18}
+                    size={16}
                   />
                   <span className="truncate">{company.name}</span>
                   {company.isActive && company.domainVerified && (
@@ -229,14 +229,14 @@ export function ProfileCard({
                     ? `Verified via ${company.domain}`
                     : undefined
                 }
-                className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 font-body text-sm transition-colors hover:border-accent/40 ${
+                className={`flex w-fit min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 font-body text-xs transition-colors hover:border-accent/40 ${
                   company.isActive ? "text-foreground" : "text-foreground-subtle"
                 }`}
               >
                 <CompanyLogo
                   name={company.name}
                   logoUrl={company.logoUrl}
-                  size={18}
+                  size={16}
                 />
                 <span className="truncate">{company.name}</span>
                 {company.isActive && company.domainVerified && (
@@ -248,9 +248,9 @@ export function ProfileCard({
             <button
               type="button"
               onClick={onEditCompany}
-              className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+              className="flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
             >
-              <Plus strokeWidth={2.5} size={14} />
+              <Plus strokeWidth={2.5} size={12} />
               Add your company
             </button>
           ) : null}
