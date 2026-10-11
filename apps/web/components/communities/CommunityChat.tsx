@@ -31,6 +31,8 @@ import { collectPendingMentions } from "./chat/mention-jumps";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MessageList } from "./chat/MessageList";
+// TEMP — watermark variant preview (remove with the extras in ChatWatermark)
+import { ChatWatermark, WatermarkVariantSwitcher, type WatermarkVariant } from "./chat/ChatWatermark";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { TypingIndicator } from "./chat/TypingIndicator";
@@ -123,6 +125,8 @@ export function CommunityChat({
   const [hasMounted, setHasMounted] = useState(false);
   const { activeTab, handleTabChange } = useCommunityTabs(initialTab);
   const [showSettings, setShowSettings] = useState(false);
+  // TEMP — watermark variant preview
+  const [wmVariant, setWmVariant] = useState<WatermarkVariant | "off">("A");
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
 
   // Seed every first-page endpoint before child passive effects run. This keeps
@@ -828,6 +832,8 @@ export function CommunityChat({
     [community, sidebarEntry, communityId],
   );
 
+  const isEventRoom = displayCommunity?.type === "event";
+
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
   // Role and grants only exist on the loaded read model; the sidebar fallback
   // never carries them, so read them from `community` directly.
@@ -1013,22 +1019,37 @@ export function CommunityChat({
             canManageMembers={canManageMembers}
             canManageModerators={canManageModerators}
             isPrivate={displayCommunity?.is_private ?? false}
-            isEventChat={displayCommunity?.type === "event"}
+            isEventChat={isEventRoom}
           />
         ) : renderedTab === "activity" ? (
           <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Pane paper — the dot grid (and an event room's watermark) stays
+              put while messages scroll: the scroller above it is transparent. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-background"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          />
+          {/* TEMP — watermark variant preview, event group rooms only */}
+          {isEventRoom && (
+            <ChatWatermark text={displayCommunity?.name ?? ""} variant={wmVariant} />
+          )}
+          {isEventRoom && (
+            <WatermarkVariantSwitcher value={wmVariant} onChange={setWmVariant} />
+          )}
           {/* Scrollable message body — a flex sibling of the footer (WhatsApp
               pattern). It owns the scroll; the footer below is static, so
               messages can never flow underneath the input.                     */}
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="relative flex-1 min-h-0 overflow-y-auto bg-background"
+            className="relative flex-1 min-h-0 overflow-y-auto"
             style={{
-              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-              backgroundSize: "24px 24px",
               // Scroll position above the viewport is preserved manually (see the
               // top-region compensation effect); native anchoring would double-adjust.
               overflowAnchor: "none",
