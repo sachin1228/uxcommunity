@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, Bell, BellOff, BookMarked, Calendar, ChevronRight, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
+import { Activity, Bell, BellOff, BookMarked, Calendar, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -157,32 +157,25 @@ export const ChatHeader = memo(function ChatHeader({
   onMuteChanged,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
-  const [openMenu, setOpenMenu] = useState<"more" | null>(null);
-  // The mute duration flyout is a second panel opened from the "more" menu —
-  // open/closed state lives beside the menu's own.
-  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
+  // Which header dropdown is open — the mute control's or the ⋯ options'.
+  // One state for both, so opening either closes the other.
+  const [openMenu, setOpenMenu] = useState<"more" | "mute" | null>(null);
   const [muteBusy, setMuteBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Timed mutes lapse on their own without the row being rewritten, so the
-  // label is computed from the deadline, never from the column's presence.
+  // state is computed from the deadline, never from the column's presence.
   const muted = isCommunityMuted(community);
 
   useEffect(() => {
     if (!openMenu) return;
     const closeOnOutside = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setOpenMenu(null);
-        setMuteMenuOpen(false);
-      }
+      if (!menuRef.current?.contains(event.target as Node)) setOpenMenu(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpenMenu(null);
-        setMuteMenuOpen(false);
-      }
+      if (event.key === "Escape") setOpenMenu(null);
     };
     document.addEventListener("mousedown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
@@ -229,8 +222,8 @@ export const ChatHeader = memo(function ChatHeader({
 
   /**
    * Saves the caller's mute for this community. Non-destructive and instant,
-   * so no confirm step: the menu label flips and the sidebar grows its
-   * crossed bell as confirmation.
+   * so no confirm step: the bell flips to its muted form and the sidebar row
+   * grows a crossed bell as confirmation.
    */
   async function applyMute(duration: MuteChoice) {
     if (!community || muteBusy) return;
@@ -252,7 +245,6 @@ export const ChatHeader = memo(function ChatHeader({
       });
     }
     setOpenMenu(null);
-    setMuteMenuOpen(false);
   }
 
   // Members is not an owner-toggleable area, so it stays visible regardless of
@@ -338,22 +330,29 @@ export const ChatHeader = memo(function ChatHeader({
                     <Settings strokeWidth={2.5} size={15} />
                   </button>
                 )}
+                {/* Notifications — its own control beside the ⋯ menu rather
+                    than an item inside it. Plain bell while notifications are
+                    on, crossed bell while muted (matching the sidebar badge);
+                    the dropdown carries the durations / the off switch. */}
                 <div className="relative">
                   <button
                     type="button"
-                    aria-label="Community options"
+                    aria-label={muted ? "Unmute notifications" : "Mute notifications"}
+                    title={muted ? "Unmute notifications" : "Mute notifications"}
                     aria-haspopup="menu"
-                    aria-expanded={openMenu === "more"}
-                    onClick={() => {
-                      setOpenMenu(openMenu === "more" ? null : "more");
-                      setMuteMenuOpen(false);
-                    }}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                    aria-expanded={openMenu === "mute"}
+                    disabled={muteBusy}
+                    onClick={() => setOpenMenu(openMenu === "mute" ? null : "mute")}
+                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                   >
-                    <MoreHorizontal strokeWidth={2.5} size={16} />
+                    {muted ? (
+                      <BellOff strokeWidth={2.5} size={15} />
+                    ) : (
+                      <Bell strokeWidth={2.5} size={15} />
+                    )}
                   </button>
-                  {openMenu === "more" && (
-                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                  {openMenu === "mute" && (
+                    <div role="menu" aria-label="Mute notifications" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       {muted ? (
                         /* Muted (forever or still-timed): one action, off. */
                         <button
@@ -371,51 +370,35 @@ export const ChatHeader = memo(function ChatHeader({
                           <span>Unmute notifications</span>
                         </button>
                       ) : (
-                        <div
-                          className="relative"
-                          onMouseEnter={() => setMuteMenuOpen(true)}
-                          onMouseLeave={() => setMuteMenuOpen(false)}
-                        >
+                        MUTE_DURATIONS.map(({ duration, label }) => (
                           <button
+                            key={duration}
                             type="button"
                             role="menuitem"
-                            aria-haspopup="menu"
-                            aria-expanded={muteMenuOpen}
                             disabled={muteBusy}
-                            onClick={() => setMuteMenuOpen((open) => !open)}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                            onClick={() => void applyMute(duration)}
+                            className="block w-full rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                           >
-                            <BellOff strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
-                            <span>Mute notifications</span>
-                            <ChevronRight strokeWidth={2.5} size={14} className="ml-auto shrink-0 text-foreground-muted" aria-hidden="true" />
+                            {label}
                           </button>
-                          {muteMenuOpen && (
-                            /* The flyout opens to the LEFT: the menu hugs the
-                               window's right edge, so a right-side submenu
-                               would run off screen. The outer box's padding
-                               carries the visual gap while keeping the
-                               pointer inside the flyout's subtree — that
-                               subtree membership is what keeps the wrapper's
-                               mouseleave (and so the close) from firing. */
-                            <div role="menu" aria-label="Mute notifications" className="absolute right-full top-0 z-40 pr-1">
-                              <div className="min-w-32 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                                {MUTE_DURATIONS.map(({ duration, label }) => (
-                                  <button
-                                    key={duration}
-                                    type="button"
-                                    role="menuitem"
-                                    disabled={muteBusy}
-                                    onClick={() => void applyMute(duration)}
-                                    className="block w-full rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
-                                  >
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        ))
                       )}
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label="Community options"
+                    aria-haspopup="menu"
+                    aria-expanded={openMenu === "more"}
+                    onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
+                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                  >
+                    <MoreHorizontal strokeWidth={2.5} size={16} />
+                  </button>
+                  {openMenu === "more" && (
+                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       <button
                         type="button"
                         role="menuitem"
