@@ -830,6 +830,10 @@ export function CommunityChat({
   );
 
   const isEventRoom = displayCommunity?.type === "event";
+  // Paper only once the room has something on it — a room showing its welcome
+  // state reads as plain paper, not a poster.
+  const roomHasContent =
+    messages.length > 0 || threadEvents.length > 0 || contentEvents.length > 0;
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
   // Role and grants only exist on the loaded read model; the sidebar fallback
@@ -1032,7 +1036,9 @@ export function CommunityChat({
               backgroundSize: "24px 24px",
             }}
           />
-          {isEventRoom && <ChatWatermark text={displayCommunity?.name ?? ""} />}
+          {isEventRoom && roomHasContent && (
+            <ChatWatermark text={displayCommunity?.name ?? ""} />
+          )}
           {/* Scrollable message body — a flex sibling of the footer (WhatsApp
               pattern). It owns the scroll; the footer below is static, so
               messages can never flow underneath the input.                     */}
