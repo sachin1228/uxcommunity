@@ -134,10 +134,11 @@ export function ProfileCard({
             {/* Seniority and designation on their own line under the name,
                 as plain text — no pill, no icon. The verified workplace rides
                 the same line after an “@”, logo first, and leads to the
-                company's page. Truncated so it stays a single line however
-                long the label runs. */}
-            {(roleLabel || company) && (
-              <p className="mt-1.5 flex min-w-0 items-center gap-1.5 font-body text-sm text-foreground-muted">
+                company's page; with no workplace yet, the hollow "Add your
+                company" pill sits at the end of the line. Truncated so the
+                label stays a single line however long it runs. */}
+            {(roleLabel || company || onAddCompany) && (
+              <p className="mt-1.5 flex min-w-0 items-center gap-2 font-body text-sm text-foreground-muted">
                 {roleLabel && <span className="truncate">{roleLabel}</span>}
                 {roleLabel && company && <span aria-hidden="true">@</span>}
                 {company && (
@@ -159,6 +160,16 @@ export function ProfileCard({
                     )}
                   </Link>
                 )}
+                {!company && onAddCompany && (
+                  <button
+                    type="button"
+                    onClick={onAddCompany}
+                    className="flex w-fit shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+                  >
+                    <Plus strokeWidth={2.5} size={12} />
+                    Add your company
+                  </button>
+                )}
               </p>
             )}
 
@@ -179,20 +190,6 @@ export function ProfileCard({
             </Link>
           )}
         </div>
-
-        {/* Empty state only: with no workplace set, this hollow pill opens the
-            shared "Where do you work?" picker. Once a company is verified it
-            shows on the role line above and the pill goes away. */}
-        {!company && onAddCompany && (
-          <button
-            type="button"
-            onClick={onAddCompany}
-            className="mt-3 flex w-fit items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-          >
-            <Plus strokeWidth={2.5} size={12} />
-            Add your company
-          </button>
-        )}
 
         {/* Bio */}
         {bio && (
