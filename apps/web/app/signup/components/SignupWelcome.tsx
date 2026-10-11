@@ -83,7 +83,7 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-display text-2xl font-semibold text-foreground tabular-nums">
+          <span className="font-display text-2xl font-semibold text-foreground">
             {Math.round(progress)}%
           </span>
         </div>

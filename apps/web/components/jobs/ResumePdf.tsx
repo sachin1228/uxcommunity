@@ -127,7 +127,7 @@ export function ResumePdf({ url }: { url: string }) {
         <RailButton label="Zoom out" disabled={zoom <= ZOOM_LEVELS[0]} onClick={zoomOut}>
           <Minus strokeWidth={2.5} size={15} />
         </RailButton>
-        <span className="w-10 py-0.5 text-center font-body text-[11px] font-medium tabular-nums text-foreground-muted">
+        <span className="w-10 py-0.5 text-center font-body text-[11px] font-medium text-foreground-muted">
           {zoom}%
         </span>
         <RailButton

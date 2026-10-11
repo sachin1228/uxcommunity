@@ -28,16 +28,23 @@ export function formatContentPreview(content: Content): {
 
 /**
  * The sidebar preview line for the community's last message: "john: hi",
- * "You: 📷 Photo", and the reply variants. A reply anchored to a
- * thread/showcase/resource/event card carries no `reply_to_user` (nobody's
- * message was answered) — it names the kind instead, mirroring the chat's
- * reply chip: "You replied to a thread: …".
+ * "You: Photo" for an image with no caption, and the reply variants. A reply
+ * anchored to a thread/showcase/resource/event card carries no `reply_to_user`
+ * (nobody's message was answered) — it names the kind instead, mirroring the
+ * chat's reply chip: "You replied to a thread: …".
+ *
+ * An image-only message is the one preview nobody typed, so it is returned as
+ * its own fact (`media`) rather than as a camera emoji inside `text`: the row
+ * draws the photo glyph before the word, the way the messenger it is imitating
+ * does, and a glyph cannot be confused with emoji the sender actually sent.
  */
 export function formatMessagePreview(
   msg: NonNullable<CachedSidebarCommunity["last_message"]>,
 ): {
   prefix?: string;
   text: string;
+  /** Set when the message is an image with no caption; the row draws the glyph. */
+  media?: "image";
 } {
   const sender = msg.is_own
     ? "You"
@@ -45,7 +52,7 @@ export function formatMessagePreview(
       ? msg.user.name.split(" ")[0]
       : "Someone";
   if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
-  if (msg.has_image && !msg.content) return { prefix: sender, text: "📷 Photo" };
+  if (msg.has_image && !msg.content) return { prefix: sender, text: "Photo", media: "image" };
   if (msg.is_reply) {
     const to = msg.reply_to_user ?? null;
     if (!to && msg.reply_to_content_kind) {

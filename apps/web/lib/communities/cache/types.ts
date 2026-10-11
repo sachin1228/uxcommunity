@@ -175,6 +175,9 @@ export interface SidebarLastReaction {
   isOwn: boolean;
   /** Content snippet of the message that was reacted to. */
   messagePreview: string;
+  /** Set when that message was an image with no caption, so the preview draws
+   * the photo glyph before the word instead of a camera emoji. */
+  messagePreviewMedia?: "image" | null;
   /** Set when the reaction was left on a "created a …" card (thread /
    * showcase / resource / event) instead of a chat message. */
   contentKind?: ContentEventKind | null;

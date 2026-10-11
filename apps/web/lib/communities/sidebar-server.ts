@@ -233,6 +233,11 @@ export async function getSidebarCommunities(userId: string) {
           : reaction.content_kind
             ? `${/^[aeiou]/i.test(reaction.content_kind) ? "an" : "a"} ${reaction.content_kind}`
             : reaction.has_image ? "Photo" : "a message",
+        // Only the image word is decorated, and only when the word came from
+        // the image itself — a caption or a card title is text someone wrote.
+        messagePreviewMedia: reaction.has_image && !reaction.message_content && !reaction.content_kind
+          ? "image"
+          : null,
       } : null,
     };
   }).sort((a, b) => (b.last_message?.created_at ?? "").localeCompare(a.last_message?.created_at ?? ""));

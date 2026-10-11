@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
-import { BellOff, Pin } from "lucide-react";
+import { BellOff, ImageIcon, Pin } from "lucide-react";
 import { CommunityVisibilityIcon, SignupCommunityBadge } from "../CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
 import { isCommunityMuted } from "@/lib/communities/mute";
@@ -52,6 +52,22 @@ function renderTextWithEmoji(text: string) {
   return parts;
 }
 
+/**
+ * The word an image-only preview stands for, behind a real picture glyph —
+ * the same icon the composer's attach button wears. It used to be spelled
+ * with a camera emoji, which sits in the line the way the sender's own emoji
+ * do: here the glyph is decoration, so it carries no text of its own and the
+ * colour is inherited from the preview line it sits in.
+ */
+function ImagePreviewWord({ word }: { word: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      <ImageIcon aria-hidden="true" strokeWidth={2.5} size={13} className="shrink-0" />
+      {word}
+    </span>
+  );
+}
+
 interface CommunityRowProps {
   c: Community;
   active: boolean;
@@ -82,12 +98,19 @@ export const CommunityRow = memo(function CommunityRow({
   // A thread/showcase/resource/event created after the newest message takes
   // over the preview line ("john created a thread") — mirroring the chat
   // timeline, where the same event renders as its own notification card. The
-  // unread content items also raise the green badge below.
+  // unread content items also raise the unread count below.
   const lastContent =
     c.last_content && contentIsNewerThanLastMessage(c.last_content, c)
       ? c.last_content
       : null;
   const contentPreview = lastContent ? formatContentPreview(lastContent) : null;
+  // The row's unread total: messages plus unread threads/showcase posts/
+  // resources/events created by others. It closes the row's marks — after the
+  // mute bell and the pin — and it is what turns the timestamp blue, the same
+  // "there is something new here" the messenger this row imitates says in
+  // green. Nothing is unread while the community is open in front of you.
+  const unreadCount = c.message_count + (c.unread_content_count ?? 0);
+  const hasUnread = unreadCount > 0 && !active;
 
   // Throttle prefetch to avoid hammering the network on rapid mouse moves.
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,6 +160,7 @@ export const CommunityRow = memo(function CommunityRow({
                     ? c.last_message!.created_at
                     : lastContent.created_at
                 }
+                highlight={hasUnread}
               />
             )}
           </div>
@@ -173,7 +197,11 @@ export const CommunityRow = memo(function CommunityRow({
                 {" reacted "}
                 <NotoEmojiSvg emoji={lastReaction.emoji} size={14} className="align-middle mx-0.5" />
                 {" to: "}
-                <span>{lastReaction.messagePreview}</span>
+                {lastReaction.messagePreviewMedia === "image" ? (
+                  <ImagePreviewWord word={lastReaction.messagePreview} />
+                ) : (
+                  <span>{lastReaction.messagePreview}</span>
+                )}
               </p>
 
             ) : preview ? (
@@ -182,7 +210,11 @@ export const CommunityRow = memo(function CommunityRow({
                 {preview.prefix && (
                   <span className="font-medium">{preview.prefix}: </span>
                 )}
-                {renderTextWithEmoji(preview.text)}
+                {preview.media === "image" ? (
+                  <ImagePreviewWord word={preview.text} />
+                ) : (
+                  renderTextWithEmoji(preview.text)
+                )}
               </p>
 
             ) : (
@@ -194,8 +226,8 @@ export const CommunityRow = memo(function CommunityRow({
             {/* Unread @mention mark — the same signal the chat's "@" pill
                 gives once the community is open, surfaced here for the
                 communities the member is not looking at. It is a plain mark:
-                the number beside it is the community's normal unread count,
-                not a mention tally. */}
+                the count at the end of the row is the community's normal
+                unread count, not a mention tally. */}
             {c.mention_count ? (
               <span
                 className="shrink-0 font-body text-[14px] font-bold leading-none text-accent"
@@ -206,27 +238,10 @@ export const CommunityRow = memo(function CommunityRow({
               </span>
             ) : null}
 
-            {/* An event's chat stays pinned to the top of the list until its
-                event date (see sidebar-order); the mark says why it's up
-                there instead of leaving it a mystery. Rides the preview line
-                like the mute bell; the DP carries the same date as a calendar
-                badge. */}
-            {c.pinned_until && (
-              <span
-                role="img"
-                aria-label="Pinned until the event"
-                title="Pinned until the event"
-                className="inline-flex shrink-0 self-center items-center text-foreground-muted"
-              >
-                <Pin strokeWidth={2.5} size={14} aria-hidden="true" />
-              </span>
-            )}
-
-            {/* Muted — the crossed bell rides the preview line, just before
-                the unread count (which keeps the corner on every row).
-                The line is items-start (the @ mark and badge ride the text's
-                top edge), so the bell centers itself against the row instead.
-                Notifications are off; unread messages still count. */}
+            {/* Muted — the crossed bell rides the preview line ahead of the
+                count. The line is items-start (the @ mark and count ride the
+                text's top edge), so the bell centers itself against the row
+                instead. Notifications are off; unread messages still count. */}
             {isCommunityMuted(c) && (
               <span
                 role="img"
@@ -238,13 +253,29 @@ export const CommunityRow = memo(function CommunityRow({
               </span>
             )}
 
-            {/* Unread badge — messages plus unread threads/showcase posts/
-                resources/events created by others */}
-            {c.message_count + (c.unread_content_count ?? 0) > 0 && !active && (
-              <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-green-500 text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
-                {c.message_count + (c.unread_content_count ?? 0) > 99
-                  ? "99+"
-                  : c.message_count + (c.unread_content_count ?? 0)}
+            {/* An event's chat stays pinned to the top of the list until its
+                event date (see sidebar-order); the mark says why it's up
+                there instead of leaving it a mystery. It follows the mute
+                bell and hands the row to the count; the DP carries the same
+                date as a calendar badge. */}
+            {c.pinned_until && (
+              <span
+                role="img"
+                aria-label="Pinned until the event"
+                title="Pinned until the event"
+                className="inline-flex shrink-0 self-center items-center text-foreground-muted"
+              >
+                <Pin strokeWidth={2.5} size={14} aria-hidden="true" />
+              </span>
+            )}
+
+            {/* Unread count — messages plus unread threads/showcase posts/
+                resources/events created by others. It closes the row's marks
+                and wears the blue of the member's own messages, the same blue
+                the timestamp takes (`SidebarTimestamp`). */}
+            {hasUnread && (
+              <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-[var(--ds-blue-800)] text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </div>

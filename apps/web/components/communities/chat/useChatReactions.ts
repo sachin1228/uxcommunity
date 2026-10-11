@@ -111,8 +111,11 @@ export function useChatReactions({
         const messagePreview = message.content
           ? quotePreview(message.content)
           : message.image_url
-            ? "📷 Photo"
+            ? "Photo"
             : "a message";
+        // The image word wears the photo glyph (see SidebarLastReaction); the
+        // sidebar server and the realtime reaction path send the same flag.
+        const messagePreviewMedia = !message.content && message.image_url ? "image" : null;
 
         const paintIntent = (desiredEmoji: ReactionIntent) => {
           const latest = msgCache.get(communityId)?.find((item) => item.id === msgId);
@@ -131,6 +134,7 @@ export function useChatReactions({
                   firstName: "You",
                   isOwn: true,
                   messagePreview,
+                  messagePreviewMedia,
                 },
           );
         };

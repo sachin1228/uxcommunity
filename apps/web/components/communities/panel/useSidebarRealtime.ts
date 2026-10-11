@@ -131,10 +131,23 @@ export function useSidebarRealtime({
       return null;
     }
 
-    function reactionPreview(row: ReactionRow, message: ReactionMessage | null): string {
-      if (message?.content) return `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`;
-      if (message?.image_url) return "📷 Photo";
-      return "a message";
+    /** The reacted message as a preview, and whether it was an image.
+     * The image case says "Photo" and flags itself, exactly as the server's
+     * own reaction preview does, so a reaction that arrives live and one
+     * loaded from the sidebar render the same line. */
+    function reactionPreview(
+      row: ReactionRow,
+      message: ReactionMessage | null,
+    ): { text: string; media: "image" | null } {
+      if (message?.content) {
+        const quote = message.content.slice(0, 40);
+        return {
+          text: `"${quote}${message.content.length > 40 ? "…" : ""}"`,
+          media: null,
+        };
+      }
+      if (message?.image_url) return { text: "Photo", media: "image" };
+      return { text: "a message", media: null };
     }
 
     function applyReaction(row: ReactionRow, message?: ReactionMessage | null) {
@@ -143,13 +156,15 @@ export function useSidebarRealtime({
         applyUpdate(prev, row.community_id, (c) => {
           if (c.lastReaction?.createdAt && row.created_at && c.lastReaction.createdAt > row.created_at) return c;
           const fallbackMessage = c.last_message?.id === row.message_id ? c.last_message : null;
+          const preview = reactionPreview(row, message ?? (fallbackMessage ? { content: fallbackMessage.content, image_url: fallbackMessage.has_image ? "present" : null } : null));
           return {
             ...c,
             lastReaction: {
               messageId: row.message_id, createdAt: row.created_at, emoji: row.emoji,
               firstName: isOwn ? "You" : (resolvedNames.get(row.user_id)?.split(" ")[0] ?? "Someone"),
               isOwn,
-              messagePreview: reactionPreview(row, message ?? (fallbackMessage ? { content: fallbackMessage.content, image_url: fallbackMessage.has_image ? "present" : null } : null)),
+              messagePreview: preview.text,
+              messagePreviewMedia: preview.media,
             },
           };
         }),
