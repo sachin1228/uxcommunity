@@ -26,6 +26,14 @@ import { useNowTick } from "@/lib/use-now-tick";
  * and over any DP — and LIVE alone carries the pulse, the beat that reads
  * across a sidebar while a window is open.
  *
+ * The tile moves the way a date arrives: it springs in from the DP's corner
+ * when it appears, and while the event is live a red ring pulses out of it —
+ * the dot's beat at the tile's own scale — so the room happening right now
+ * reads from further away than a word alone can. Both ride the tile's anchor
+ * (bottom right), so the motion grows away from the DP, and both are plain
+ * CSS turned off by the global reduce-motion guard, like every other entrance
+ * in the app.
+ *
  * Every line scales with the tile and is fitted to the width the band actually
  * has (nothing reflows — the tile is absolutely positioned over the DP), so
  * the header's large one reads at the same weight as a sidebar row's small.
@@ -160,6 +168,7 @@ export function DpWithEventDate({
         ? wordFontSize(badgeSize, word.length, isLive ? liveDotSize + liveDotGap : 0)
         : topLineFontSize(badgeSize, word.length)
       : 0;
+  const tileRadius = Math.max(3, Math.round(badgeSize * TILE_RADIUS_RATIO));
 
   return (
     <div className={`relative shrink-0 ${className}`}>
@@ -170,9 +179,11 @@ export function DpWithEventDate({
            the month, the state word, and LIVE's pulse; the white leaf below
            carries the day in fixed ink — red, white and black are the
            calendar's own colours, so the tile reads the same in either theme
-           and over any DP. Decorative for scanning, but the full date is in
-           the accessible name and the tooltip, so the year the tile drops is
-           still one hover (or screen reader) away. */
+           and over any DP. It springs in from its anchored corner (see
+           event-tile-in) whenever the room's face first appears. Decorative
+           for scanning, but the full date is in the accessible name and the
+           tooltip, so the year the tile drops is still one hover (or screen
+           reader) away. */
         <span
           role="img"
           aria-label={
@@ -188,9 +199,9 @@ export function DpWithEventDate({
           style={{
             width: badgeSize,
             height: badgeSize,
-            borderRadius: Math.max(3, Math.round(badgeSize * TILE_RADIUS_RATIO)),
+            borderRadius: tileRadius,
           }}
-          className="pointer-events-none absolute -bottom-1 -right-1 flex flex-col overflow-hidden border border-black/10 bg-white leading-none ring-2 ring-background"
+          className="event-tile-in pointer-events-none absolute -bottom-1 -right-1 flex flex-col overflow-hidden border border-black/10 bg-white leading-none ring-2 ring-background"
         >
           <span
             className="flex shrink-0 items-center justify-center bg-[var(--ds-red-700)] font-mono font-bold uppercase tracking-tight text-white"
@@ -199,16 +210,16 @@ export function DpWithEventDate({
               fontSize: wordPx,
             }}
           >
-            {/* The live pulse, as a dot beside the word: one span swells and
-                fades on repeat, the dot it leaves from holds steady inside it —
-                the beat the word names, legible at a glance across a sidebar of
-                rooms. Riding beside the word rather than filling the band
-                behind it keeps the tile readable while it moves, and the dot is
-                sized off the tile so the swell stays its own mark instead of a
-                wash over the band. Members who asked for less motion keep the
-                dot, without the swell. */}
-            {isLive ? (
-              <span className="relative flex items-center" style={{ gap: liveDotGap }}>
+            <span className="relative flex items-center" style={{ gap: isLive ? liveDotGap : undefined }}>
+              {/* The live pulse, as a dot beside the word: one span swells and
+                  fades on repeat, the dot it leaves from holds steady inside
+                  it — the beat the word names, legible at a glance across a
+                  sidebar of rooms. Riding beside the word rather than filling
+                  the band behind it keeps the tile readable while it moves,
+                  and the dot is sized off the tile so the swell stays its own
+                  mark instead of a wash over the band. Members who asked for
+                  less motion keep the dot, without the swell. */}
+              {isLive && (
                 <span
                   aria-hidden="true"
                   className="relative inline-flex shrink-0"
@@ -217,11 +228,9 @@ export function DpWithEventDate({
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75 motion-reduce:animate-none" />
                   <span className="relative inline-flex h-full w-full rounded-full bg-white" />
                 </span>
-                <span className="relative">{word}</span>
-              </span>
-            ) : (
+              )}
               <span className="relative">{word}</span>
-            )}
+            </span>
           </span>
           {/* The day stays on the leaf in every state — the tile is still the
               calendar for the room's day, it is only the band that changes its
@@ -233,6 +242,18 @@ export function DpWithEventDate({
             {badge.day}
           </span>
         </span>
+      )}
+
+      {/* While the event is live a ring pulses out of the tile — the dot's
+          beat at the tile's own scale, so the room happening right now reads
+          across a sidebar before its word does. Painted after the tile so the
+          ring draws over the tile's own cutout instead of hiding behind it. */}
+      {visible && badge && isLive && (
+        <span
+          aria-hidden="true"
+          className="event-tile-halo pointer-events-none absolute -bottom-1 -right-1 border-2"
+          style={{ width: badgeSize, height: badgeSize, borderRadius: tileRadius }}
+        />
       )}
     </div>
   );
