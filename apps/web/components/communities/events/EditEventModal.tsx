@@ -188,9 +188,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
       if (!endIso) { setError("End time is not a valid time of day."); return; }
       if (endIso <= startIso) { setError("End time must be after the start time."); return; }
     }
-    // Required. Events from before the city column existed open on the empty
-    // placeholder, so the first edit is also where they get their city.
-    if (!cityId) { setError("City is required."); return; }
+    // Only asked for while the event is public — its city is where the public
+    // listing shows it.
+    if (isPublic && !cityId) { setError("City is required."); return; }
 
     setSaving(true);
     setError(null);
@@ -446,23 +446,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             </label>
           )}
 
-          {/* City — the listing bucket on the workspace Events page */}
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <MapPinned strokeWidth={2.5} size={11} /> City <span className="text-accent">*</span> <span className="font-normal text-foreground-subtle">(shown on that city&apos;s Events page)</span>
-            </span>
-            <select
-              value={cityId ?? ""}
-              onChange={(e) => setCityId(e.target.value || null)}
-              className="field w-full"
-            >
-              <option value="" disabled>Select a city…</option>
-              {cities.map((city) => (
-                <option key={city.id} value={city.id}>{city.name}</option>
-              ))}
-            </select>
-          </label>
-
           <label className="block">
             <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
               <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
@@ -487,6 +470,29 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             onChange={setIsPublic}
             icon={<Globe strokeWidth={2.5} size={15} />}
           />
+
+          {/* City — asked for only while the event is public, because the city
+              Events page is the one surface the choice feeds. */}
+          {isPublic && (
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                <MapPinned strokeWidth={2.5} size={11} /> City <span className="text-accent">*</span>
+              </span>
+              <select
+                value={cityId ?? ""}
+                onChange={(e) => setCityId(e.target.value || null)}
+                className="field w-full"
+              >
+                <option value="" disabled>Select a city…</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>{city.name}</option>
+                ))}
+              </select>
+              <p className="mt-1.5 font-body text-[11px] leading-snug text-foreground-subtle">
+                Shown on this city&apos;s Events page, so people there can discover and join it.
+              </p>
+            </label>
+          )}
         </div>
 
         {error && (
