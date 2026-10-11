@@ -35,6 +35,19 @@ const geistMono = localFont({
   variable: "--font-mono",
 });
 
+/**
+ * The event room's watermark — an elegant italic serif, vendored like the
+ * others so the build stays offline (see fonts/README.md). Consumed through
+ * the `font-watermark` family in tailwind.config.ts.
+ */
+const playfairItalic = localFont({
+  src: "./fonts/playfair-display-italic-latin.woff2",
+  weight: "400 900",
+  style: "italic",
+  display: "swap",
+  variable: "--font-watermark",
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://uxcommunity.in"),
   title: `${APP_NAME} — ${APP_TAGLINE}`,
@@ -80,7 +93,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={`${geist.variable} ${geistMono.variable} ${playfairItalic.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-background text-foreground antialiased">
