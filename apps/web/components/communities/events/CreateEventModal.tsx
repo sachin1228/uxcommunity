@@ -17,7 +17,6 @@ import {
   nowTimeInput,
   todayDateInput,
   viewerTimeZoneName,
-  zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { useNowTick } from "@/lib/use-now-tick";
 
@@ -56,10 +55,6 @@ export function CreateEventModal({
   // member just typed almost always means.
   const [deviceZone] = useState(() => viewerTimeZoneName());
   const [hostZone] = useState<string | null>(deviceZone);
-  // Derived from the chosen day so an event on the far side of a DST change
-  // still names the offset it will actually run at, and the tick keeps the
-  // countdown below honest.
-  const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
   const nowTick = useNowTick();
   const startsInMinutes = minutesUntilStart(
     eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
@@ -310,12 +305,6 @@ export function CreateEventModal({
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
-                  <span
-                    className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
-                    title={`The times you enter are read in ${zoneLabel}`}
-                  >
-                    {zoneLabel}
-                  </span>
                 </span>
                 <input
                   type="date"
@@ -333,7 +322,7 @@ export function CreateEventModal({
                       setEventTime("");
                     }
                   }}
-                  className="field w-full"
+                  className="field w-full cursor-pointer"
                 />
               </label>
 
@@ -354,19 +343,19 @@ export function CreateEventModal({
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className="field w-full"
+                    className="field w-full cursor-pointer"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                    End time <span className="font-normal text-foreground-subtle">(optional)</span>
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <Clock strokeWidth={2.5} size={11} /> End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
                   <input
                     type="time"
                     value={endTime}
                     min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full"
+                    className="field w-full cursor-pointer"
                   />
                 </label>
               </div>

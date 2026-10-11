@@ -21,7 +21,6 @@ import {
   startMovedByEdit,
   todayDateInput,
   viewerTimeZoneName,
-  zoneLabelForDateInput,
 } from "@/lib/communities/event-time";
 import { wallTimeInputsInZone } from "@/lib/communities/timezone";
 import { useNowTick } from "@/lib/use-now-tick";
@@ -85,11 +84,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   // so untouched edits don't fail submit-time validation.
   const minDate = startIsPast ? undefined : todayDateInput();
   const [minStartTime] = useState(() => nowTimeInput());
-  // The zone the typed times mean, shown beside the date. Derived from the
-  // chosen day so an event on the far side of a DST change still names the
-  // offset it will actually run at, and the tick keeps the countdown below
-  // honest.
-  const zoneLabel = zoneLabelForDateInput(eventDate, hostZone);
   const nowTick = useNowTick();
   const startsInMinutes = minutesUntilStart(
     eventDate && eventTime ? buildIso(eventDate, eventTime) : null,
@@ -329,12 +323,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                   <Calendar strokeWidth={2.5} size={11} /> Date <span className="text-accent">*</span>
-                  <span
-                    className="ml-auto font-mono text-[10px] font-normal text-foreground-subtle"
-                    title={`The times you enter are read in ${zoneLabel}`}
-                  >
-                    {zoneLabel}
-                  </span>
                 </span>
                 <input
                   type="date"
@@ -355,7 +343,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       setEventTime("");
                     }
                   }}
-                  className="field w-full"
+                  className="field w-full cursor-pointer"
                 />
               </label>
 
@@ -377,19 +365,19 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                       if (eventDate === minDate && e.target.value && e.target.value < minStartTime) return;
                       setEventTime(e.target.value);
                     }}
-                    className="field w-full"
+                    className="field w-full cursor-pointer"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                    End time <span className="font-normal text-foreground-subtle">(optional)</span>
+                  <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
+                    <Clock strokeWidth={2.5} size={11} /> End time <span className="font-normal text-foreground-subtle">(optional)</span>
                   </span>
                   <input
                     type="time"
                     value={endTime}
                     min={eventTime || undefined}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="field w-full"
+                    className="field w-full cursor-pointer"
                   />
                 </label>
               </div>
