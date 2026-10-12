@@ -54,21 +54,28 @@ export const DmListPane = memo(function DmListPane({
   return (
     <aside className={`flex h-full min-h-0 w-full flex-col border-r border-border bg-background min-[500px]:w-[19rem] min-[500px]:shrink-0 ${className}`}>
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-4">
+        {/* The glyph, not the hit area, is what lines up. Two insets stack up
+            between this button's box and the ink: the 20px icon centred in a
+            32px button (6px) and the chevron's own ink inside its 20px box
+            (~6.5px at strokeWidth 2.5). -ml-[12.5px] cancels both, so the
+            chevron's edge sits on the pane's content edge — the same left
+            inset as the brand logo above it, the search field and the rows
+            below. The round hit area bleeds left into the padding instead. */}
         <button
           type="button"
           onClick={onBack}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="-ml-[12.5px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           aria-label="Back"
           title="Back"
         >
           <ChevronLeft size={20} strokeWidth={2.5} />
         </button>
-        <h1 className="font-body text-lg font-semibold text-foreground">Messages</h1>
+        <h1 className="font-body text-base font-semibold text-foreground">Messages</h1>
       </header>
 
       {/* Search — same field, glyph and copy as the members pane. Escape clears
           the query so the full list is always one key away. */}
-      <div className="shrink-0 px-3 pb-1 pt-2">
+      <div className="shrink-0 px-3 pb-1 pt-3 sm:px-4">
         <div className="relative">
           <Search
             size={14}
@@ -120,11 +127,14 @@ export const DmListPane = memo(function DmListPane({
             const reaction = conversation.last_reaction ?? null;
             const typingText = typingByConversation.get(conversation.id) ?? "";
             return (
+              // px-3/sm:px-4 — the brand's own inset (the topbar logo starts at
+              // pl-3, then pl-4 from sm), so avatars, search field and chevron
+              // share one left edge.
               <button
                 key={conversation.id}
                 type="button"
                 onClick={() => onSelect(conversation.id)}
-                className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors sm:px-4 ${
                   active ? "bg-surface-raised" : "hover:bg-surface-raised/60"
                 }`}
                 aria-current={active ? "true" : undefined}
