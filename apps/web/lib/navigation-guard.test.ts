@@ -165,16 +165,24 @@ test("settleNavigation releases the lock once the route settles", () => {
   clock.restore()
 })
 
-test("link click guard swallows clicks on the current-route link", () => {
+test("link click guard refreshes the page when its own route's link is clicked", () => {
   const listeners: Array<{ type: string; fn: (e: unknown) => void; capture: boolean }> = []
   ;(globalThis as { document?: unknown }).document = {
     addEventListener: (type: string, fn: (e: unknown) => void, capture: boolean) => {
       listeners.push({ type, fn, capture })
     },
     removeEventListener: () => undefined,
+    querySelector: () => null,
   }
-  const windowLike = { location: { pathname: "/dashboard/communities" } }
+  const assigned: string[] = []
+  const windowLike = {
+    location: {
+      pathname: "/dashboard/communities",
+      assign: (url: string) => assigned.push(url),
+    },
+  }
   ;(globalThis as unknown as { window?: unknown }).window = windowLike
+  ;(globalThis as unknown as { history?: unknown }).history = { scrollRestoration: "auto" }
 
   const cleanup = installLinkClickGuard(800)
   const handler = listeners.find((l) => l.type === "click")!.fn
@@ -196,7 +204,18 @@ test("link click guard swallows clicks on the current-route link", () => {
 
   const sameRoute = makeClick("/dashboard/communities")
   handler(sameRoute)
-  assert.equal(sameRoute.defaultPrevented, true, "clicking the current route is a no-op")
+  assert.equal(sameRoute.defaultPrevented, true, "the guard owns the click")
+  assert.deepEqual(assigned, ["/dashboard/communities"], "current-route click refreshes the page")
+  assert.equal(
+    (globalThis as unknown as { history: { scrollRestoration: string } }).history.scrollRestoration,
+    "manual",
+    "scroll restoration is off so the refresh lands at the top",
+  )
+
+  const burst = makeClick("/dashboard/communities")
+  handler(burst)
+  assert.equal(burst.defaultPrevented, true, "the burst click is swallowed")
+  assert.deepEqual(assigned, ["/dashboard/communities"], "the burst does not restart the load")
 
   const otherRoute = makeClick("/dashboard/communities/c1")
   handler(otherRoute)
@@ -205,6 +224,7 @@ test("link click guard swallows clicks on the current-route link", () => {
   cleanup()
   delete (globalThis as { document?: unknown }).document
   delete (globalThis as unknown as { window?: unknown }).window
+  delete (globalThis as unknown as { history?: unknown }).history
 })
 
 test("link click guard swallows rapid duplicate clicks on the same internal link", () => {

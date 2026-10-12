@@ -9,9 +9,10 @@
  * can never permanently block navigation:
  *
  *   - A push/replace to a destination seen within the lock window is ignored.
- *   - Navigating to the route you're already on is always a no-op (this kills
- *     the duplicate RSC GETs from re-clicking a sidebar link for the current
- *     page).
+ *   - A push/replace to the route you're already on is a no-op for programmatic
+ *     navigation. A link CLICK is different: clicking the link for the page
+ *     you're on refreshes the page (see `refreshPage`) — the LinkedIn-style
+ *     "re-open the current section" gesture — rather than being dropped.
  *   - The lock expires automatically (default 800 ms) or as soon as the route
  *     settles via `settleNavigation`, after which the same destination can be
  *     navigated to again.
@@ -38,6 +39,9 @@ export const BACK_LOCK_MS = 300;
 const pendingNavigations = new Map<string, number>();
 let lastBackAt = 0;
 let installedClickGuard: (() => void) | null = null;
+/** Set once a current-route click has started a page refresh, so a click
+ *  burst during the unload doesn't restart the load over and over. */
+let refreshing = false;
 
 function normalizePath(path: string): string {
   const withoutQueryAndHash = path.split("?")[0].split("#")[0];
@@ -54,9 +58,12 @@ function samePath(a: string, b: string): boolean {
  * True when a push/replace to `href` should proceed (not a duplicate).
  *
  * Two kinds of duplicates are rejected:
- *   1. Already here — `currentPath` equals `href`. This is the biggest source
- *      of duplicate GETs: re-clicking the sidebar link for the page you're on
- *      fires another RSC request for no reason. It's always a no-op.
+ *   1. Already here — `currentPath` equals `href`. The biggest source of
+ *      duplicate GETs: re-clicking the sidebar link for the page you're on
+ *      used to fire another RSC request for no reason. Still a no-op —
+ *      link clicks never reach here, because the click guard turns a click
+ *      on the current route into a page refresh instead
+ *      (see `installLinkClickGuard` and `refreshPage`).
  *   2. A transition to the same destination is already pending within the lock
  *      window. The lock is released early by `settleNavigation` once the route
  *      actually changes, so a legit re-click right after settling works.
@@ -101,6 +108,7 @@ export function settleNavigation(pathname: string): void {
 export function resetNavigationGuard() {
   pendingNavigations.clear();
   lastBackAt = 0;
+  refreshing = false;
 }
 
 function isInternalHref(href: string): boolean {
@@ -115,6 +123,20 @@ function isInternalHref(href: string): boolean {
 }
 
 /**
+ * Reloads `href` as a full document load — the refresh a click on the link for
+ * the page you're already on performs. A real load rather than a router push,
+ * so every cached list and feed on the page re-fetches; scroll restoration is
+ * switched off first, so the page comes back at the top the way re-opening a
+ * section does elsewhere, not mid-scroll where you left it.
+ */
+export function refreshPage(href: string): void {
+  if (typeof window === "undefined") return;
+  if (typeof history !== "undefined") history.scrollRestoration = "manual";
+  document.querySelector("main")?.scrollTo?.(0, 0);
+  window.location.assign(href);
+}
+
+/**
  * Global protection for `<Link>` components.
  *
  * Next.js `<Link>` calls the router internally, so `useGuardedRouter()` does
@@ -122,6 +144,10 @@ function isInternalHref(href: string): boolean {
  * swallows rapid repeated clicks on the same internal anchor — a burst of 10
  * clicks on one link produces a single route transition (and therefore a
  * single RSC request) instead of 10.
+ *
+ * A click on a link whose destination is the route already on screen is
+ * special-cased: instead of the old silent no-op it refreshes the page (see
+ * `refreshPage`), while a burst of such clicks during the load stays swallowed.
  *
  * Returns a cleanup function. Idempotent: installing twice is a no-op.
  */
@@ -142,10 +168,23 @@ export function installLinkClickGuard(lockMs = NAVIGATION_LOCK_MS): () => void {
 
     const currentPath =
       typeof window === "undefined" ? undefined : window.location.pathname;
+    if (currentPath && samePath(currentPath, href)) {
+      // Re-clicking the link for the page you're on refreshes it. Swallow the
+      // click either way so Next.js' own handler can't also start a client-side
+      // transition on top of the load, and swallow the burst after the first
+      // refresh so a click storm doesn't restart the load over and over.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!refreshing) {
+        refreshing = true;
+        refreshPage(href);
+      }
+      return;
+    }
     if (!allowNavigation(href, lockMs, currentPath)) {
-      // Already on this route, or a transition to this exact destination is
-      // already pending — swallow this click before Next.js' own handler can
-      // start another navigation (and another RSC request).
+      // A transition to this exact destination is already pending — swallow
+      // this click before Next.js' own handler can start another navigation
+      // (and another RSC request).
       event.preventDefault();
       event.stopImmediatePropagation();
     }
