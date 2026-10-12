@@ -8,9 +8,8 @@
  */
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { exploreStore } from "./explore-store";
+import { EXPLORE_STORE_CHANGED_EVENT, exploreStore } from "./explore-store";
 import {
-  COMMUNITY_VIEWER_STATE_EVENT,
   SIDEBAR_CHANGED_EVENT,
   invalidateOnJoin,
   setCommunityViewerState,
@@ -73,7 +72,7 @@ test("a request is recorded as pending, with membership untouched", () => {
 
   assert.equal(cachedRow().has_pending_request, true);
   assert.equal(cachedRow().joined, false);
-  assert.deepEqual(announced, [COMMUNITY_VIEWER_STATE_EVENT]);
+  assert.deepEqual(announced, [EXPLORE_STORE_CHANGED_EVENT]);
 });
 
 test("a join records the membership and clears the pending request", () => {
@@ -86,7 +85,7 @@ test("a join records the membership and clears the pending request", () => {
   assert.equal(cachedRow().has_pending_request, false);
   // Two facts, two events: the sidebar's membership list is stale (refetch) and
   // the Explore projection moved (re-render from the store).
-  assert.deepEqual(announced, [SIDEBAR_CHANGED_EVENT, COMMUNITY_VIEWER_STATE_EVENT]);
+  assert.deepEqual(announced, [SIDEBAR_CHANGED_EVENT, EXPLORE_STORE_CHANGED_EVENT]);
 });
 
 test("a request leaves the sidebar alone, a join drops its stale list", () => {
@@ -107,7 +106,7 @@ test("a withdraw clears the flag and joins nothing", () => {
 
   assert.equal(cachedRow().has_pending_request, false);
   assert.equal(cachedRow().joined, false);
-  assert.deepEqual(announced, [COMMUNITY_VIEWER_STATE_EVENT]);
+  assert.deepEqual(announced, [EXPLORE_STORE_CHANGED_EVENT]);
 });
 
 test("a fetch that confirms the cached row rewrites nothing and stays silent", () => {
@@ -128,7 +127,7 @@ test("a fetch corrects a stale row without dropping the sidebar", () => {
 
   assert.equal(cachedRow().joined, true);
   assert.ok(sidebarStore.data, "re-reading the truth is not a membership change");
-  assert.deepEqual(announced, [COMMUNITY_VIEWER_STATE_EVENT]);
+  assert.deepEqual(announced, [EXPLORE_STORE_CHANGED_EVENT]);
 });
 
 test("a community the cached list does not hold is left alone", () => {

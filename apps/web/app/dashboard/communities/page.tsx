@@ -10,12 +10,13 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import {
-  COMMUNITY_VIEWER_STATE_EVENT,
   exploreStore,
   EXPLORE_STALE_MS,
   setCommunityViewerState,
+  setExploreCommunities,
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
+import { useExploreCommunities } from "@/lib/communities/cache/use-community-stores";
 
 type Community = CachedExploreCommunity;
 
@@ -171,10 +172,16 @@ function CommunityCard({
 
 export default function CommunitiesIndexPage() {
   const router = useGuardedRouter();
-  const [communities, setCommunities] = useState<Community[]>(
-    () => exploreStore.data?.communities ?? [],
-  );
-  const [loading, setLoading]         = useState(() => exploreStore.data === null);
+  // The rows come straight from the shared store: a request filed from the home
+  // feed, an acceptance, a withdraw and a fresh fetch all land there, and every
+  // one of them re-renders this list. The page keeps no copy of its own — that
+  // copy is what let Explore offer "Request to join" for a community the member
+  // had already asked to join from the feed.
+  const communities = useExploreCommunities();
+  // "nothing to show yet", i.e. no fetch has settled for an empty store. Rows in
+  // the store (cached or fresh) end the spinner even while a refetch runs.
+  const [settled, setSettled]         = useState(() => exploreStore.data !== null);
+  const loading                       = !settled && communities.length === 0;
   const [activeTab, setActiveTab]     = useState<TabValue>("all");
   const [search, setSearch]           = useState("");
   const [joinTarget, setJoinTarget]   = useState<Community | null>(null);
@@ -183,53 +190,33 @@ export default function CommunitiesIndexPage() {
 
   const load = useCallback(() => {
     if (exploreStore.data && Date.now() - exploreStore.data.fetchedAt < EXPLORE_STALE_MS) {
-      setLoading(false);
+      setSettled(true);
       return;
     }
     if (exploreStore.inflight) {
-      exploreStore.inflight.then(() => {
-        if (exploreStore.data) setCommunities(exploreStore.data.communities);
-        setLoading(false);
-      });
-      if (exploreStore.data) setLoading(false);
+      // Another mount is already fetching; this one just waits for it and
+      // stops its own spinner when the answer lands (in the store).
+      void exploreStore.inflight.finally(() => setSettled(true));
       return;
     }
     const p: Promise<void> = fetch("/api/communities/all")
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => {
         if (!d) return;
-        const fresh = d.communities ?? [];
-        exploreStore.data = { communities: fresh, fetchedAt: Date.now() };
-        setCommunities(fresh);
+        setExploreCommunities(d.communities ?? []);
       })
       .catch(() => {})
       .finally(() => {
         exploreStore.inflight = null;
-        setLoading(false);
+        setSettled(true);
       });
     exploreStore.inflight = p;
-    if (exploreStore.data) setLoading(false);
   }, []);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
-
-  /**
-   * This list renders the shared explore rows, so a write from anywhere else —
-   * the home feed's popup, a withdraw, an acceptance — re-renders it too. The
-   * page keeps no copy of its own: a second copy is how Explore could still
-   * offer "Request to join" for a community the member had already asked to
-   * join from the feed.
-   */
-  useEffect(() => {
-    const reRead = () => {
-      if (exploreStore.data) setCommunities(exploreStore.data.communities);
-    };
-    window.addEventListener(COMMUNITY_VIEWER_STATE_EVENT, reRead);
-    return () => window.removeEventListener(COMMUNITY_VIEWER_STATE_EVENT, reRead);
-  }, []);
 
   /**
    * Public join (or an auto-accepted request): the member is in — open the chat.
