@@ -11,8 +11,13 @@ type PerformanceRpcMap = {
     // id) cursor added by 20261013100000_community_message_compound_cursor.
     // They are OPTIONAL here on purpose: they are omitted when the deployed
     // database has not had that migration applied yet, and the route then
-    // degrades to the timestamp-only cursor (which can re-include equal rows,
-    // never skip them). See lib/communities/message-cursor-support.ts.
+    // degrades to the timestamp-only cursor. That fallback is NOT
+    // correctness-equivalent: run against the PRE-migration function its
+    // `after` branch filters `created_at > p_after` strictly, so it can SKIP
+    // messages sharing the boundary timestamp. Apply the migration BEFORE
+    // deploying the build that sends the id halves. See
+    // lib/communities/message-cursor-support.ts and
+    // lib/communities/read-models.ts.
     args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number; p_content_ids: string[] | null; p_before_id?: string | null; p_after_id?: string | null };
     returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users: Json; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
   };

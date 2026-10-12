@@ -16,11 +16,20 @@
 --      boundary and one was skipped; the id tiebreak makes the order total, so
 --      before/after paging can never skip or loop."
 --
---   This migration applies the same fix to the community page. The timestamp
---   halves (p_before / p_after) keep working on their own — a caller that omits
---   the id halves degrades to the previous behaviour, which can only re-include
---   equal-timestamp rows, never skip them (a NULL id degrades to the all-zero
---   sentinel for `after` and the all-ones sentinel for `before`).
+--   This migration applies the same fix to the community page. A caller that
+--   sends only the timestamp halves but DOES reach this function still pages
+--   safely: a NULL id degrades to the all-zero sentinel for `after` and the
+--   all-ones sentinel for `before`, so the row-value comparison can only
+--   RE-INCLUDE equal-timestamp rows, never skip them (duplicates are harmless —
+--   the client dedupes by id).
+--
+--   That safety does NOT extend to the PRE-migration function: its `after`
+--   branch filtered `created_at > p_after` strictly, so it CAN skip
+--   equal-timestamp rows it has not returned yet. The application's
+--   timestamp-only fallback therefore runs against the OLD function and can
+--   lose messages — which is exactly why this migration must be applied BEFORE
+--   the new application build (see DEPLOYMENT ORDER below, and the matching
+--   note in apps/web/lib/communities/read-models.ts).
 --
 -- SHAPE OF THE FIX
 --   The new arguments are appended AFTER p_content_ids, and every one of them
@@ -32,13 +41,27 @@
 --   — because overlapping defaults on two overloads is precisely the
 --   "function ... is not unique" (42725) failure 20260929090000 fixed.
 --
--- DEPLOYMENT ORDER (both directions are safe)
---   * Migration first: an app build that still sends seven named arguments
---     resolves to this function through its defaults.
---   * App first: the new build's nine-argument call fails with PGRST202 against
---     the un-migrated function, which the route treats as "compound cursors are
---     not available yet" and retries with the timestamp halves only
---     (see apps/web/lib/communities/message-cursor-support.ts).
+-- DEPLOYMENT ORDER (MIGRATION FIRST — REQUIRED)
+--   Apply this migration BEFORE deploying the application build that sends the
+--   compound cursor.
+--
+--   * Migration first (required, safe): an app build that still sends seven
+--     named arguments resolves to this function through its defaults, and the
+--     new build's nine-argument call resolves immediately. Correct pagination
+--     from the first request, no fallback involved.
+--
+--   * App first (NOT safe): the new build's nine-argument call fails with
+--     PGRST202 against the un-migrated seven-argument function, and the route
+--     falls back to the timestamp-only cursor
+--     (apps/web/lib/communities/message-cursor-support.ts). The old function's
+--     `after` branch filters `created_at > p_after` strictly, so that fallback
+--     CAN SKIP messages that share the boundary timestamp — the very defect
+--     this migration fixes.
+--
+--   The fallback exists only so a staged rollout degrades instead of turning
+--   every chat page load into a 500; it is NOT an equally safe order. Its
+--   correctness limitation is documented in
+--   apps/web/lib/communities/read-models.ts.
 --
 -- COST
 --   `create index` (not CONCURRENTLY) takes a SHARE lock that blocks writes for

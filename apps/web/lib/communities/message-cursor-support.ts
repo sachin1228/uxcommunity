@@ -19,10 +19,19 @@
  *     * after a PGRST202 the tracker answers "not supported" for
  *       `retryAfterUnsupportedMs` (60 s), and calls fall back to the
  *       timestamp-only cursor — the OLD call shape, which the new function also
- *       accepts through its defaults, so the fallback works on both;
+ *       accepts through its defaults, so the fallback RESOLVES on both sides of
+ *       the migration;
  *     * once the window expires the compound call is attempted again, so
  *       applying the migration heals a running deployment within a minute and
  *       without a restart.
+ *
+ *   RESOLVING IS ALL THE FALLBACK GUARANTEES. Run against the un-migrated
+ *   function it inherits that function's defect: its `after` branch filters
+ *   `created_at > p_after` strictly, so messages sharing the boundary timestamp
+ *   can be SKIPPED. This fallback is a stopgap that degrades a staged rollout
+ *   instead of erroring — apply
+ *   20261013100000_community_message_compound_cursor.sql BEFORE deploying the
+ *   build that sends the id halves (see read-models.ts for the detail).
  *
  * A negative answer is deliberately NOT cached forever and a positive one is
  * never invalidated by a stale negative: "server already running, migration
