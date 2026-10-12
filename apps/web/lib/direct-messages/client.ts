@@ -17,7 +17,6 @@ export const dmUrls = {
   messageReactions: (messageId: string) =>
     `/api/dm/messages/${messageId}/reactions`,
   unread: "/api/dm/unread",
-  people: (query: string) => `/api/dm/people?q=${encodeURIComponent(query)}`,
 } as const;
 
 /**

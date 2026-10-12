@@ -41,10 +41,3 @@ export interface DmConversationSummary {
   my_last_read_at: string | null;
   last_message_at: string | null;
 }
-
-/** A person pickable in the "new message" search. */
-export interface DmPerson {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-}
