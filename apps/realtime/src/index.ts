@@ -1,6 +1,6 @@
 import { jwtVerify } from "jose";
 import type { Env } from "./env";
-import { resolveRoomTarget } from "./room-routing";
+import { isUserScopedRoomAllowed, resolveRoomTarget } from "./room-routing";
 import { resolveSessionConfig } from "./session-config";
 import { runBoundedPool } from "./subscriptions";
 import { isRetryableStatus, retryWithBackoff } from "./retry";
@@ -133,6 +133,14 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
   const userId = session?.userId;
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  // A user-scoped room (user:, notifications:, profile:, dm:) is an instance
+  // keyed by the member it belongs to — opening one for someone ELSE would
+  // attach this socket to their private stream. Community rooms are authorized
+  // by their Durable Object instead, so only user-scoped names are checked.
+  if (!isUserScopedRoomAllowed(room, userId)) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   // A user-scoped room name (`user:${userId}`) is already resolved; community

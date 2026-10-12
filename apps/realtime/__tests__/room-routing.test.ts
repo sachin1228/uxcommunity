@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  isUserScopedRoomAllowed,
   resolveRoomTarget,
   USER_ROOM_PREFIXES,
   type RoomRoutingBindings,
@@ -48,6 +49,16 @@ describe("resolveRoomTarget", () => {
 
     expect(target.namespace).toBe(env.USER_DO);
     expect(target.name).toBe("user:user-42");
+  });
+
+  it("routes dm:<userId> to that user's UserDO instance", () => {
+    // The DM stream is one logical room per user, multiplexed over the same
+    // user socket as notifications — not a room per conversation.
+    const env = bindings();
+    const target = resolveRoomTarget(env, "dm:8f14e45f-ceea-467a-9a3c-1b1d3e2f4a5b");
+
+    expect(target.namespace).toBe(env.USER_DO);
+    expect(target.name).toBe("user:8f14e45f-ceea-467a-9a3c-1b1d3e2f4a5b");
   });
 
   it("accepts an already-resolved user:<userId> room", () => {
@@ -95,6 +106,52 @@ describe("resolveRoomTarget", () => {
   it("covers exactly the user-scoped prefixes the server publishes", () => {
     // Guards against a new user-scoped room being added in the web app without
     // extending the routing prefixes — the symptom would be silent non-delivery.
-    expect([...USER_ROOM_PREFIXES]).toEqual(["notifications:", "profile:"]);
+    expect([...USER_ROOM_PREFIXES]).toEqual(["notifications:", "profile:", "dm:"]);
+  });
+});
+
+/**
+ * The upgrade gate: user-scoped rooms may only be opened for the caller's own
+ * instance. Before this check, a socket could connect with
+ * `room=user:<victim>` and subscribe to that member's notifications/DM stream —
+ * the DO instance is the only access boundary these rooms have.
+ */
+describe("isUserScopedRoomAllowed", () => {
+  const ME = "user-me";
+
+  it("allows the caller's own user instance", () => {
+    expect(isUserScopedRoomAllowed("user:user-me", ME)).toBe(true);
+  });
+
+  it("rejects another member's user instance", () => {
+    expect(isUserScopedRoomAllowed("user:user-victim", ME)).toBe(false);
+  });
+
+  it("allows the caller's own logical rooms", () => {
+    expect(isUserScopedRoomAllowed("notifications:user-me", ME)).toBe(true);
+    expect(isUserScopedRoomAllowed("profile:user-me", ME)).toBe(true);
+    expect(isUserScopedRoomAllowed("dm:user-me", ME)).toBe(true);
+  });
+
+  it("rejects logical rooms addressed to someone else", () => {
+    expect(isUserScopedRoomAllowed("notifications:user-victim", ME)).toBe(false);
+    expect(isUserScopedRoomAllowed("dm:user-victim", ME)).toBe(false);
+  });
+
+  it("rejects a suffix scam hiding behind the prefix", () => {
+    // `dm:user-me:extra` must not pass a bare startsWith comparison.
+    expect(isUserScopedRoomAllowed("dm:user-me:extra", ME)).toBe(false);
+    expect(isUserScopedRoomAllowed("user:user-me:extra", ME)).toBe(false);
+  });
+
+  it("rejects the pre-identity placeholder socket", () => {
+    // The client opens `user:global` only pre-init; it can never belong to a
+    // real user and was a wasted handshake — now it is refused outright.
+    expect(isUserScopedRoomAllowed("user:global", ME)).toBe(false);
+  });
+
+  it("leaves community-scoped rooms to their own authorization", () => {
+    expect(isUserScopedRoomAllowed("chat:community-1", ME)).toBe(true);
+    expect(isUserScopedRoomAllowed("thread-comments:thread-1", ME)).toBe(true);
   });
 });
