@@ -7,7 +7,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityDp } from "./CommunityDp";
 import { CommunityNameBadges } from "./CommunityBadges";
 
-/** The facts the modal renders — a subset of the Explore list's community row. */
+/** The facts the community dialog renders — a subset of the Explore list's row. */
 export interface JoinableCommunity {
   id: string;
   name: string;
@@ -19,38 +19,56 @@ export interface JoinableCommunity {
 }
 
 /**
- * The join flow behind every Explore "Join" / "Request to join" button.
+ * The one community dialog, everywhere a community is introduced and joined.
  *
- * Both visibilities start the same way — a card with the community's own
- * "about" (the description its admin wrote) and one primary button:
+ * Explore's join buttons, the home feed's "posted in …" popup, the Suggested
+ * Communities rail and the community page's non-member preview all render this
+ * body, so the design can never drift between surfaces: a centered identity
+ * header, the admin-written about (public) or the private notice, and one
+ * primary action with an optional Cancel.
  *
- *   - Public: "Join community" joins immediately and hands the member off to
- *     the group chat (the caller navigates on `onJoined`).
- *   - Private: the card explains the community is private and the button
- *     becomes "Request to join"; sending it swaps the modal to a confirmation
- *     ("Request sent — we'll notify you once an owner accepts").
+ * The states, in order:
+ *   - member   → "View community".
+ *   - requested→ the "Request sent — we'll notify you" confirmation.
+ *   - closed   → a profile-gated notice (no action that cannot work).
+ *   - open     → Join community (public) or Request to join (private).
  *
- * The network call lives here, mirroring the preview card's join flow, so every
- * caller only has to react to the outcome. Errors stay inside the modal.
+ * The network call lives here so every caller only reacts to the outcome;
+ * errors stay inside the dialog.
  */
-export function JoinCommunityModal({
+export function CommunityJoinDialog({
   community,
+  joined = false,
+  canJoin = true,
+  hasPendingRequest = false,
   onClose,
   onJoined,
   onRequested,
+  onViewCommunity,
 }: {
   community: JoinableCommunity;
-  onClose: () => void;
-  /** Fired when membership is granted — the caller opens the community chat. */
-  onJoined: (communityId: string) => void;
-  /** Fired when a private request is recorded — the caller persists the pending state. */
-  onRequested: (communityId: string) => void;
+  /** The viewer already belongs — the dialog offers "View community". */
+  joined?: boolean;
+  /** False when the community is closed to this profile — a notice, no action. */
+  canJoin?: boolean;
+  /** True when the viewer already has a pending request for it. */
+  hasPendingRequest?: boolean;
+  /** Closes the dialog. Omitted on the non-modal (page) surface, which hides Cancel. */
+  onClose?: () => void;
+  /** Membership granted — the caller opens the community chat. */
+  onJoined?: (communityId: string) => void;
+  /** A private request was recorded — the caller persists the pending state. */
+  onRequested?: (communityId: string) => void;
+  /** "View community" for an existing membership. */
+  onViewCommunity?: () => void;
 }) {
   const isPrivate = community.is_private === true;
   const [submitting, setSubmitting] = useState(false);
-  const [requested, setRequested] = useState(false);
+  const [requested, setRequested] = useState(hasPendingRequest);
+  const [joinedNow, setJoinedNow] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isMember = joined || joinedNow;
   const memberCount = community.member_count.toLocaleString();
 
   async function submit() {
@@ -73,9 +91,10 @@ export function JoinCommunityModal({
 
       if (data.status === "requested") {
         setRequested(true);
-        onRequested(community.id);
+        onRequested?.(community.id);
       } else {
-        onJoined(community.id);
+        setJoinedNow(true);
+        onJoined?.(community.id);
       }
     } catch {
       setError("Network error. Please try again.");
@@ -84,10 +103,21 @@ export function JoinCommunityModal({
     }
   }
 
+  const cancelButton = onClose ? (
+    <button
+      type="button"
+      onClick={onClose}
+      disabled={submitting}
+      className="w-full rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
+    >
+      Cancel
+    </button>
+  ) : null;
+
   return (
-    <Modal open onClose={onClose} maxWidth="max-w-md" panelClassName="p-6">
+    <>
       {/* ── Who you're joining ── */}
-      <div className="flex flex-col items-center pt-2 text-center">
+      <div className="flex flex-col items-center text-center">
         <CommunityDp
           imageUrl={community.image_url}
           name={community.name}
@@ -108,7 +138,17 @@ export function JoinCommunityModal({
         </p>
       </div>
 
-      {requested ? (
+      {isMember ? (
+        <div className="mt-6 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => (onViewCommunity ?? onClose)?.()}
+            className="w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            View community
+          </button>
+        </div>
+      ) : requested ? (
         <div className="mt-6 flex flex-col items-center text-center">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-accent">
             <CheckCircle2 size={22} strokeWidth={2.5} aria-hidden="true" />
@@ -120,14 +160,42 @@ export function JoinCommunityModal({
             Your request to join {community.name} has been sent. We&apos;ll notify
             you once an owner accepts it.
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-5 w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Done
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-5 w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Done
+            </button>
+          )}
         </div>
+      ) : !canJoin ? (
+        <>
+          <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-border bg-surface-raised px-3.5 py-3">
+            <Lock
+              size={14}
+              strokeWidth={2.5}
+              className="mt-0.5 shrink-0 text-foreground-subtle"
+              aria-hidden="true"
+            />
+            <p className="font-body text-xs leading-relaxed text-foreground-muted">
+              This community isn&apos;t open to your profile. Update your profile
+              to join.
+            </p>
+          </div>
+          {onClose && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <>
           {community.description && (
@@ -173,17 +241,38 @@ export function JoinCommunityModal({
                   ? "Joining…"
                   : "Join community"}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="w-full rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
-            >
-              Cancel
-            </button>
+            {cancelButton}
           </div>
         </>
       )}
+    </>
+  );
+}
+
+/**
+ * The dialog inside a Modal. Explore's join buttons and the Suggested
+ * Communities rail use this; the home-feed popup and the community page render
+ * the same body through their own surface.
+ */
+export function JoinCommunityModal({
+  community,
+  onClose,
+  onJoined,
+  onRequested,
+}: {
+  community: JoinableCommunity;
+  onClose: () => void;
+  onJoined: (communityId: string) => void;
+  onRequested: (communityId: string) => void;
+}) {
+  return (
+    <Modal open onClose={onClose} maxWidth="max-w-md" panelClassName="p-6">
+      <CommunityJoinDialog
+        community={community}
+        onClose={onClose}
+        onJoined={onJoined}
+        onRequested={onRequested}
+      />
     </Modal>
   );
 }

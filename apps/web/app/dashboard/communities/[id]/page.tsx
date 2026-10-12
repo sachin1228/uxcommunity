@@ -60,7 +60,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   // read-only preview with a Join action, not "Community not found." The chat
   // itself stays members-only (the read model and message routes refuse
   // non-members), so this page only shows what is already public — the same
-  // facts the Explore page shows — plus how much public content led here.
+  // facts the Explore page shows — plus the viewer's join eligibility.
   // An unknown/inactive community falls through to the chat's own
   // "Community not found" state.
   if (!ssrData) {
@@ -75,7 +75,6 @@ export default async function CommunityPage({ params, searchParams }: Props) {
           imageUrl={preview.image_url}
           description={preview.description}
           memberCount={preview.member_count}
-          publicCounts={preview.public_counts}
           canJoin={preview.can_join}
           hasPendingRequest={preview.has_pending_request}
           joined={preview.joined}
