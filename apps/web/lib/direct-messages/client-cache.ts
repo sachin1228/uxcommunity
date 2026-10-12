@@ -13,7 +13,12 @@
  * msgCache.
  */
 
-import type { DmConversationSummary, DmMessage, DmPreviewMessage } from "./types";
+import type {
+  DmConversationSummary,
+  DmLastReaction,
+  DmMessage,
+  DmPreviewMessage,
+} from "./types";
 
 const MAX_CACHED_CONVERSATIONS = 30;
 
@@ -94,12 +99,117 @@ export function bumpConversationWithMessage(
     ...conversation,
     last_message: args.message,
     last_message_at: args.message.created_at,
+    // A message is newer activity than any reaction — it takes the preview
+    // line back (the community sidebar clears lastReaction on the same event).
+    last_reaction: null,
     unread_count:
       isOwnMessage || args.activelyReading
         ? conversation.unread_count
         : conversation.unread_count + 1,
   };
   return [bumped, ...current.filter((c) => c.id !== args.conversationId)];
+}
+
+/**
+ * Set (or clear) a conversation's reaction preview.
+ *
+ * Guards, mirroring the community sidebar's reaction merge: a delayed event
+ * for an older reaction never overwrites a newer one, and a no-op patch
+ * returns the SAME array so the memoized list pane bails out.
+ */
+export function patchConversationReaction(
+  current: DmConversationSummary[],
+  args: { conversationId: string; lastReaction: DmLastReaction | null },
+): DmConversationSummary[] {
+  const index = current.findIndex((c) => c.id === args.conversationId);
+  if (index === -1) return current;
+  const conversation = current[index];
+  const existing = conversation.last_reaction ?? null;
+  const next = args.lastReaction;
+  if (next) {
+    if (existing && existing.createdAt > next.createdAt) return current;
+    if (
+      existing &&
+      existing.messageId === next.messageId &&
+      existing.reactorId === next.reactorId &&
+      existing.emoji === next.emoji &&
+      existing.createdAt === next.createdAt &&
+      // The body too: a lazily resolved preview replaces the "a message"
+      // stand-in under the SAME reaction, and must not be treated as a no-op.
+      existing.messagePreview === next.messagePreview &&
+      existing.messagePreviewMedia === next.messagePreviewMedia
+    ) {
+      return current;
+    }
+  } else if (!existing) {
+    return current;
+  }
+  const updated = current.slice();
+  updated[index] = { ...conversation, last_reaction: next };
+  return updated;
+}
+
+/**
+ * Reconcile one freshly fetched conversation with what this client has already
+ * read.
+ *
+ * A list response produced before a read PATCH landed still carries the old
+ * `unread_count` and the old `my_last_read_at`; taking it at face value
+ * resurrected the badge the moment the thread opened (the community sidebar
+ * avoids this by patching its store, this is the DM equivalent). When the
+ * newest message the payload knows about is at or before the read floor,
+ * nothing in it can still be unread — so the row keeps its cleared count.
+ *
+ * Messages that arrived AFTER the floor leave the payload alone, so genuine
+ * new unread activity is never hidden.
+ */
+export function applyReadFloor(
+  conversation: DmConversationSummary,
+  readFloor: string | null,
+): DmConversationSummary {
+  if (!readFloor || !conversation.last_message_at) return conversation;
+  const floorMs = new Date(readFloor).getTime();
+  if (new Date(conversation.last_message_at).getTime() > floorMs) return conversation;
+
+  const markerMs = conversation.my_last_read_at
+    ? new Date(conversation.my_last_read_at).getTime()
+    : -Infinity;
+  if (conversation.unread_count === 0 && markerMs >= floorMs) return conversation;
+
+  return {
+    ...conversation,
+    unread_count: 0,
+    my_last_read_at: markerMs >= floorMs ? conversation.my_last_read_at : readFloor,
+  };
+}
+
+/**
+ * Keep a locally painted reaction preview across a list refetch.
+ *
+ * The server publishes the reaction and the list projection catches up a beat
+ * later, so a refresh that lands in between carries no `last_reaction` and
+ * would wipe the line the member just watched appear — the community sidebar
+ * avoids this by merging its local reaction over the fetched row
+ * (sidebar-merge). This is that merge.
+ *
+ * A payload whose newest message is NEWER than the local reaction wins: the
+ * server suppresses a reaction behind a later message, so that is the
+ * payload telling us the preview is genuinely stale.
+ */
+export function applyLocalReaction(
+  conversation: DmConversationSummary,
+  local: DmLastReaction | null | undefined,
+): DmConversationSummary {
+  if (!local) return conversation;
+  const incoming = conversation.last_reaction ?? null;
+  if (incoming && incoming.createdAt >= local.createdAt) return conversation;
+  if (
+    conversation.last_message_at &&
+    new Date(conversation.last_message_at).getTime() > new Date(local.createdAt).getTime()
+  ) {
+    return conversation;
+  }
+  return { ...conversation, last_reaction: local };
 }
 
 /**
