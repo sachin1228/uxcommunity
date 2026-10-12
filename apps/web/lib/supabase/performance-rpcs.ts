@@ -7,7 +7,13 @@ type AggregateBase = { id: string };
 
 type PerformanceRpcMap = {
   get_community_message_page: {
-    args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number; p_content_ids: string[] | null };
+    // p_before_id / p_after_id are the id halves of the compound (created_at,
+    // id) cursor added by 20261013100000_community_message_compound_cursor.
+    // They are OPTIONAL here on purpose: they are omitted when the deployed
+    // database has not had that migration applied yet, and the route then
+    // degrades to the timestamp-only cursor (which can re-include equal rows,
+    // never skip them). See lib/communities/message-cursor-support.ts.
+    args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number; p_content_ids: string[] | null; p_before_id?: string | null; p_after_id?: string | null };
     returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users: Json; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };

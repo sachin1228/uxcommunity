@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import type { CachedMessage } from "@/lib/communities/cache";
+import { oldestRealCursor, type MessageCursor } from "@/lib/communities/messages";
 import { anchorOffset, scrollAnchorDelta, type ScrollAnchor } from "./chatUtils";
 
 const useIsomorphicLayoutEffect =
@@ -13,7 +14,8 @@ interface UseMessageListAnchorOptions {
   hasMoreAbove: boolean;
   loadingOlder: boolean;
   loading: boolean;
-  fetchOlderMessages: (before: string) => Promise<void>;
+  /** Loads the page above the given compound cursor. */
+  fetchOlderMessages: (before: MessageCursor) => Promise<void>;
   /** Owned by useScrollAndUnread — the scrollable message body. */
   scrollContainerRef: RefObject<HTMLDivElement>;
   /** False while useScrollAndUnread is still resolving the initial position. */
@@ -45,9 +47,13 @@ export function useMessageListAnchor({
   // Keep the callback ref current on every render (no deps needed).
   useEffect(() => {
     loadOlderCallbackRef.current = () => {
-      const oldest = messages.find((m) => !m.id.startsWith("temp-"));
-      if (!oldest || !hasMoreAbove || loadingOlder) return;
-      fetchOlderMessages(oldest.created_at);
+      if (!hasMoreAbove || loadingOlder) return;
+      // Both halves of the cursor, taken under the server's own total order
+      // (created_at, id) so the page above can never skip an equal-timestamp
+      // row that shares the oldest message's timestamp.
+      const before = oldestRealCursor(messages);
+      if (!before) return;
+      void fetchOlderMessages(before);
     };
   });
 

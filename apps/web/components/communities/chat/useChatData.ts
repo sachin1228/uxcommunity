@@ -16,19 +16,24 @@ import {
   getCachedRequest,
   setCachedRequest,
 } from "@/lib/request-cache";
+import { communityMessagePageSearch } from "@/lib/communities/message-cursor";
+import {
+  mergeCommunityMessages,
+  newestRealCursor,
+  persistableMessages,
+  runCatchUp,
+  type MessageCursor,
+} from "@/lib/communities/messages";
 
 /** Must match PAGE_SIZE in the messages API route. */
 const PAGE_SIZE = 50;
 
 /**
- * PostgREST serializes UTC timestamptz values with a "+00:00" offset, but the
- * Cloudflare runtime decodes a '+' inside a query value as a space — mangling
- * the cursor ("…+00:00" → "… 00:00") before the API can read it. Send cursors
- * in the "…Z" form so pagination survives the trip unchanged.
+ * Ceiling on pages drained in one catch-up pass — the same bound the DM chat
+ * uses (MAX_CATCH_UP_PAGES). A reconnect after a long absence therefore applies
+ * up to 20 pages of missed messages per pass instead of the newest 50 only.
  */
-function utcCursor(iso: string): string {
-  return iso.endsWith("+00:00") ? `${iso.slice(0, -6)}Z` : iso;
-}
+const MAX_CATCH_UP_PAGES = 20;
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -177,110 +182,135 @@ export function useChatData({
   }, [communityId, currentUserId]);
 
   // ── Fetch messages (full or incremental via ?after=ISO) ───────────────────
-  const fetchMessages = useCallback(
-    async (after?: string, force = false): Promise<void> => {
+  /**
+   * One message page. `after` drains forward from a compound cursor; passing
+   * null fetches the newest page. Returns the page so the drain can walk it.
+   *
+   * Cursors are `(created_at, id)` — see ./message-cursor.ts. The page itself is
+   * NOT merged here: every caller merges through applyFetchedPage so all four
+   * writers share one rule.
+   */
+  const fetchMessagePage = useCallback(
+    async (after: MessageCursor | null, force: boolean): Promise<Message[]> => {
       const targetId = communityId;
-      if (!after) {
-        await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
-      }
-      const url = after
-        ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}&withContentReactions=1`
-        : `/api/communities/${targetId}/messages?withContentReactions=1`;
+      const url = `/api/communities/${targetId}/messages${communityMessagePageSearch(
+        after ? { after } : {},
+        { contentReactions: true },
+      )}`;
 
       // Incremental (?after=) reads must NEVER be served from cache: the cache
       // can hold an older empty catch-up answer, which would drop the very
       // messages this fetch exists to find. `force` bypasses the stale window.
-      return fetchJsonCached<{ messages?: Message[]; content_reactions?: ContentReactionRow[] }>(
-        url,
-        { staleMs: after ? 0 : 3 * 60_000, force: after ? force || true : force },
-        currentUserId,
-      )
-        .then((d) => {
-          if (!d) return;
-          if (d.content_reactions?.length) onContentReactions?.(d.content_reactions);
-          const incoming: Message[] = d.messages ?? [];
-          if (after) {
-            const existing   = msgCache.get(targetId) ?? [];
-            const existingIds = new Set(existing.map((m) => m.id));
-            const toAdd = incoming.filter((m) => !existingIds.has(m.id));
-            if (toAdd.length > 0) {
-              const cacheSnapshot = [
-                ...existing.filter((m) => !m.id.startsWith("temp-")),
-                ...toAdd,
-              ].sort(
-                (a, b) =>
-                  new Date(a.created_at).getTime() -
-                  new Date(b.created_at).getTime()
-              );
-              msgCache.set(targetId, cacheSnapshot);
-            }
-            setMessages((prev) => {
-              if (communityIdRef.current !== targetId) return prev;
-              const prevIds     = new Set(prev.map((m) => m.id));
-              const toAddToPrev = incoming.filter((m) => !prevIds.has(m.id));
-              if (toAddToPrev.length === 0) return prev;
-              const merged = [
-                ...prev.filter((m) => !m.id.startsWith("temp-")),
-                ...toAddToPrev,
-              ].sort(
-                (a, b) =>
-                  new Date(a.created_at).getTime() -
-                  new Date(b.created_at).getTime()
-              );
-              msgCache.set(targetId, merged);
-              return merged;
-            });
-          } else {
-            msgCache.set(targetId, incoming);
-            msgFetchedAt.set(targetId, Date.now());
-            evictIfNeeded();
-            if (communityIdRef.current === targetId) {
-              setMessages(incoming);
-              // If we got fewer than a full page, there's nothing older to load.
-              setHasMoreAbove(incoming.length >= PAGE_SIZE);
-            }
-          }
-        })
-        .catch(() => {});
+      const d = await fetchJsonCached<{
+        messages?: Message[];
+        content_reactions?: ContentReactionRow[];
+      }>(url, { staleMs: after ? 0 : 3 * 60_000, force: after ? true : force }, currentUserId);
+      if (d.content_reactions?.length) onContentReactions?.(d.content_reactions);
+      return d.messages ?? [];
     },
     // onContentReactions is a stable useCallback in CommunityChat; keeping it
-    // out avoids re-creating fetchMessages on every parent render.
+    // out avoids re-creating the fetch on every parent render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [communityId, currentUserId]
+    [communityId, currentUserId],
   );
 
-  // ── Fetch older messages (upward pagination via ?before=ISO) ─────────────
+  /**
+   * Fold a fetched page into state and the message cache.
+   *
+   * mergeCommunityMessages is the single rule for every path: a row we already
+   * hold wins, so messages realtime delivered while the request was in flight —
+   * and the optimistic bubble of a send in progress — survive a page arriving
+   * late. The cache only ever receives persistable (non-optimistic) rows, so a
+   * remount cannot resurrect a "sending" bubble.
+   */
+  const applyFetchedPage = useCallback(
+    (page: Message[]) => {
+      const targetId = communityId;
+      if (page.length === 0) return;
+      setMessages((prev) => {
+        if (communityIdRef.current !== targetId) return prev;
+        const merged = mergeCommunityMessages(prev, page);
+        if (merged === prev) return prev;
+        msgCache.set(targetId, persistableMessages(merged));
+        return merged;
+      });
+    },
+    [communityId],
+  );
+
+  /**
+   * The newest page — a first load, or a forced refresh after a failure. The
+   * page is MERGED, never assigned: realtime messages that landed while this
+   * request was in flight are newer than its snapshot and must not be dropped.
+   */
+  const fetchMessages = useCallback(
+    async (force = false): Promise<void> => {
+      const targetId = communityId;
+      await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
+      const page = await fetchMessagePage(null, force).catch(() => null);
+      if (page === null || communityIdRef.current !== targetId) return;
+      applyFetchedPage(page);
+      msgFetchedAt.set(targetId, Date.now());
+      evictIfNeeded();
+      // If we got fewer than a full page, there's nothing older to load.
+      setHasMoreAbove(page.length >= PAGE_SIZE);
+    },
+    [communityId, currentUserId, fetchMessagePage, applyFetchedPage],
+  );
+
+  /**
+   * Drain everything newer than `from` (or the newest page when there is no
+   * cursor), one page at a time.
+   *
+   * The community chat used to fetch ONE page per trigger, so a reconnect after
+   * more than a page of missed messages left a permanent gap in the window. The
+   * walk is bounded and self-terminating (see runCatchUp): a short or empty page
+   * ends it, a cursor that does not advance ends it, a failure is reported
+   * rather than thrown, and a community switch cancels it before the next paint.
+   */
+  const catchUpMessages = useCallback(
+    async (from: MessageCursor | null = null): Promise<void> => {
+      const targetId = communityId;
+      await runCatchUp<Message>({
+        from,
+        pageSize: PAGE_SIZE,
+        maxPages: MAX_CATCH_UP_PAGES,
+        fetchPage: (after) =>
+          communityIdRef.current === targetId
+            ? fetchMessagePage(after, true)
+            : Promise.resolve([]),
+        onPage: (page) => {
+          if (communityIdRef.current !== targetId) return;
+          applyFetchedPage(page);
+        },
+        isCancelled: () => communityIdRef.current !== targetId,
+      });
+    },
+    [communityId, fetchMessagePage, applyFetchedPage],
+  );
+
+  // ── Fetch older messages (upward pagination via ?before=ISO) ────
   const fetchOlderMessages = useCallback(
-    async (before: string): Promise<void> => {
+    async (before: MessageCursor): Promise<void> => {
       if (isFetchingOlderRef.current) return;
       isFetchingOlderRef.current = true;
       setLoadingOlder(true);
       const targetId = communityId;
       try {
-        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(utcCursor(before))}&withContentReactions=1`;
-        const d = await fetchJsonCached<{ messages?: Message[]; content_reactions?: ContentReactionRow[] }>(
-          url,
-          { staleMs: 30_000 },
-          currentUserId,
-        );
+        const url = `/api/communities/${targetId}/messages${communityMessagePageSearch(
+          { before },
+          { contentReactions: true },
+        )}`;
+        const d = await fetchJsonCached<{
+          messages?: Message[];
+          content_reactions?: ContentReactionRow[];
+        }>(url, { staleMs: 30_000 }, currentUserId);
         if (communityIdRef.current !== targetId) return;
         if (d.content_reactions?.length) onContentReactions?.(d.content_reactions);
         const incoming: Message[] = d.messages ?? [];
         if (incoming.length < PAGE_SIZE) setHasMoreAbove(false);
         if (incoming.length === 0) return;
-        setMessages((prev) => {
-          const prevIds = new Set(prev.map((m) => m.id));
-          const toAdd   = incoming.filter((m) => !prevIds.has(m.id));
-          if (toAdd.length === 0) return prev;
-          const merged  = [
-            ...toAdd,
-            ...prev.filter((m) => !m.id.startsWith("temp-")),
-          ].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          msgCache.set(targetId, merged);
-          return merged;
-        });
+        applyFetchedPage(incoming);
       } catch {
         // Network error — leave state as-is
       } finally {
@@ -291,7 +321,7 @@ export function useChatData({
     // onContentReactions is a stable useCallback in CommunityChat; keeping it
     // out avoids re-creating fetchOlderMessages on every parent render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [communityId, currentUserId]
+    [communityId, currentUserId, applyFetchedPage],
   );
 
   // ── On communityId change: show cache instantly, then hydrate once ────────
@@ -404,10 +434,14 @@ export function useChatData({
       // another community. The sidebar keeps this community's chat socket
       // alive, so no reconnect fires when they switch back — without this the
       // window would show stale history until the next focus event.
+      //
+      // A client that holds NO message yet needs no drain: the bootstrap or the
+      // first-page fetch above has just delivered the newest page, which is the
+      // only page a cursor-less catch-up could return. Skipping it there saves a
+      // duplicate request per first visit.
       if (!cancelled && communityIdRef.current === communityId) {
-        const cachedNow = msgCache.get(communityId) ?? [];
-        const lastRealNow = cachedNow.filter((m) => !m.id.startsWith("temp-")).at(-1);
-        void fetchMessages(lastRealNow?.created_at, true).catch(() => undefined);
+        const from = newestRealCursor(msgCache.get(communityId) ?? []);
+        if (from) void catchUpMessages(from).catch(() => undefined);
       }
     })();
 
@@ -429,6 +463,7 @@ export function useChatData({
     loadingOlder,
     setMessages,
     fetchMessages,
+    catchUpMessages,
     fetchOlderMessages,
     communityIdRef,
     membersRef,

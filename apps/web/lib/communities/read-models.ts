@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityPermissions, resolveCommunityRole } from "./manager-role";
 import {
+  isUnknownRpcArgumentsError,
+  messagePageCompoundCursor,
+} from "./message-cursor-support";
+import {
   getExperienceLevelNameMap,
   getMasterNameMap,
   TABLE_LOOKUP,
@@ -375,10 +379,32 @@ export async function loadCommunityRules(
   return { ok: true, data: { rules: data ?? [] } };
 }
 
+/** A cursor id half must be a uuid before it reaches the RPC's uuid argument. */
+const UUID_CURSOR_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The community message page, oldest-first or newest-first.
+ *
+ * The cursor is compound — `(created_at, id)` — because one timestamp can hold
+ * several messages: paging on the timestamp alone could drop the equal-timestamp
+ * rows on the far side of a page boundary (see
+ * 20261013100000_community_message_compound_cursor.sql). `before` walks up into
+ * history, `after` drains forward from the newest message a client already has,
+ * and both halves travel together so the order is total and paging can never
+ * skip or loop.
+ */
 export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,
-  cursors: { before?: string | null; after?: string | null } = {},
+  cursors: {
+    before?: string | null;
+    after?: string | null;
+    /** Id half of the `before` cursor; omitted degrades to timestamp-only. */
+    beforeId?: string | null;
+    /** Id half of the `after` cursor; omitted degrades to timestamp-only. */
+    afterId?: string | null;
+  } = {},
   /** Content-item ids ("created a …" cards) whose reactions ride along. */
   contentIds: string[] = [],
 ): Promise<ReadResult<{ messages: unknown[]; content_reactions?: unknown }>> {
@@ -398,10 +424,24 @@ export async function loadCommunityMessagePage(
     : membership.joined_at;
   const before = normalizeUtcCursor(cursors.before);
   const after = normalizeUtcCursor(cursors.after);
-  if ((cursors.before && !before) || (cursors.after && !after)) {
+  const beforeId = cursors.beforeId ?? null;
+  const afterId = cursors.afterId ?? null;
+  // A malformed half is rejected rather than silently dropped: silently
+  // degrading a compound cursor to a timestamp-only one is exactly how a
+  // client would start re-reading a burst instead of continuing past it.
+  if (
+    (cursors.before && !before) ||
+    (cursors.after && !after) ||
+    (beforeId && !UUID_CURSOR_PATTERN.test(beforeId)) ||
+    (afterId && !UUID_CURSOR_PATTERN.test(afterId))
+  ) {
     return { ok: false, status: 400, error: "Invalid cursor." };
   }
-  const { data, error } = await callPerformanceRpc(db, "get_community_message_page", {
+
+  // The page branches on `p_after`: when it is set the before halves are unused
+  // (the RPC's two branches are mutually exclusive), so they are nulled here to
+  // keep one unambiguous call.
+  const baseArgs = {
     p_community_id: communityId,
     p_user_id: userId,
     p_history_start: historyStart,
@@ -409,7 +449,26 @@ export async function loadCommunityMessagePage(
     p_after: after,
     p_limit: MESSAGE_PAGE_SIZE,
     p_content_ids: contentIds.length ? contentIds : null,
-  });
+  };
+  const useCompoundCursor = messagePageCompoundCursor.supportsCompoundCursor();
+  let { data, error } = await callPerformanceRpc(
+    db,
+    "get_community_message_page",
+    useCompoundCursor
+      ? { ...baseArgs, p_before_id: after ? null : beforeId, p_after_id: afterId }
+      : baseArgs,
+  );
+
+  // PGRST202: the deployed database still has the seven-argument function, i.e.
+  // the compound-cursor migration has not been applied yet. Record that so the
+  // next minute of requests skip the call that cannot succeed, and retry once
+  // with the timestamp-only shape — which the new function also accepts, so
+  // this fallback works on both sides of the migration.
+  if (error && useCompoundCursor && isUnknownRpcArgumentsError(error)) {
+    messagePageCompoundCursor.noteUnsupported();
+    ({ data, error } = await callPerformanceRpc(db, "get_community_message_page", baseArgs));
+  }
+  if (!error) messagePageCompoundCursor.noteSupported();
 
   if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
   const rows = (data ?? []) as Array<Record<string, unknown>>;

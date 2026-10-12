@@ -8,6 +8,11 @@ import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/commun
 import type { CachedContentEvent, CachedMessage, CachedThreadEvent, ContentEventKind, MessageDeletedByRole, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
+import {
+  compareCommunityMessages,
+  newestRealCursor,
+  type MessageCursor,
+} from "@/lib/communities/messages";
 import { applyContentCommentCount, pickOptimisticMatch } from "./chatUtils";
 
 type Message = CachedMessage;
@@ -15,7 +20,11 @@ type Message = CachedMessage;
 interface UseRealtimeChatOptions {
   communityId: string;
   currentUserId: string;
-  fetchMessages: (after?: string, force?: boolean) => Promise<void>;
+  /**
+   * Drains everything newer than the given compound cursor, one page at a time
+   * (see useChatData's catchUpMessages). Null means "the newest page".
+   */
+  catchUpMessages: (from?: MessageCursor | null) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
   /** Permanent "<name> created a …" cards (threads/showcase/resources/events). */
@@ -31,7 +40,7 @@ interface UseRealtimeChatOptions {
 export function useRealtimeChat({
   communityId,
   currentUserId,
-  fetchMessages,
+  catchUpMessages,
   setMessages,
   setThreadEvents,
   setContentEvents,
@@ -48,14 +57,16 @@ export function useRealtimeChat({
   // "no new messages" answer would drop the very messages we're catching up on.
   const catchUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedCatchUp = useCallback(
-    (after?: string) => {
+    (from: MessageCursor | null) => {
       if (catchUpTimerRef.current) clearTimeout(catchUpTimerRef.current);
       catchUpTimerRef.current = setTimeout(() => {
         catchUpTimerRef.current = null;
-        fetchMessages(after, true);
+        // Fire-and-forget: the drain reports its own stop reason and the next
+        // trigger (focus, reconnect, next event) retries anything it missed.
+        void catchUpMessages(from);
       }, 300);
     },
-    [fetchMessages],
+    [catchUpMessages],
   );
 
   useEffect(() => () => {
@@ -82,11 +93,10 @@ export function useRealtimeChat({
     // communities alive, so switching into an already-connected community fires
     // NO status event — without this, messages sent while the user was in
     // another community would not load until the next focus/visibility change.
-    const cachedForCatchUp = msgCache.get(communityId) ?? [];
-    const lastRealForCatchUp = cachedForCatchUp
-      .filter((m) => !m.id.startsWith("temp-"))
-      .at(-1);
-    debouncedCatchUp(lastRealForCatchUp?.created_at ?? undefined);
+    // The cursor is the newest real row under the (created_at, id) order — the
+    // same total order the server pages on, so the drain resumes exactly where
+    // this client stopped.
+    debouncedCatchUp(newestRealCursor(msgCache.get(communityId) ?? []));
 
     // ── New messages ───────────────────────────────────────────────────────
     unsubscribes.push(
@@ -208,11 +218,10 @@ export function useRealtimeChat({
               : newRow.image_url ?? null,
             mentions: newRow.mentions ?? [],
           };
-          const next = [...withoutTemp, incoming].sort(
-            (a, b) =>
-              new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
-          );
+          // One total order for every writer (see lib/communities/messages):
+          // (created_at, id), the order the pagination cursor names a position
+          // in. Sorting on the timestamp alone let a burst reorder itself.
+          const next = [...withoutTemp, incoming].sort(compareCommunityMessages);
           msgCache.set(communityId, next);
 
           if (newRow.reply_to_id && !replyTo) {
@@ -567,9 +576,7 @@ export function useRealtimeChat({
     // On reconnect, run catch-up
     const unsubStatus = realtimeClient.onStatus((connected) => {
       if (!connected) return;
-      const cached   = msgCache.get(communityId) ?? [];
-      const lastReal = cached.filter((m) => !m.id.startsWith("temp-")).at(-1);
-      debouncedCatchUp(lastReal?.created_at ?? undefined);
+      debouncedCatchUp(newestRealCursor(msgCache.get(communityId) ?? []));
     });
 
     return () => {
@@ -578,15 +585,13 @@ export function useRealtimeChat({
       unsubRoom();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, fetchMessages, isVisible]);
+  }, [communityId, catchUpMessages, isVisible]);
 
   // ── Tab visibility / window focus catch-up ────────────────────────────────
   useEffect(() => {
     const handleCatchUp = () => {
       if (document.visibilityState !== "visible") return;
-      const cached   = msgCache.get(communityId) ?? [];
-      const lastReal = cached.filter((m) => !m.id.startsWith("temp-")).at(-1);
-      debouncedCatchUp(lastReal?.created_at ?? undefined);
+      debouncedCatchUp(newestRealCursor(msgCache.get(communityId) ?? []));
     };
     document.addEventListener("visibilitychange", handleCatchUp);
     window.addEventListener("focus", handleCatchUp);
