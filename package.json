@@ -84,6 +84,7 @@
     "test:message-page-reactions": "bash supabase/tests/run-local.sh supabase/tests/message_page_content_reactions.test.sql",
     "test:message-page-rpc": "bash supabase/tests/run-local.sh supabase/tests/message_page_rpc_signature.test.sql",
     "test:community-areas": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/areas.test.ts",
+    "test:community-chat-pagination": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/messages.test.ts apps/web/lib/communities/message-cursor.test.ts apps/web/lib/communities/message-cursor-support.test.ts",
     "test:event-chat": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/event-chat-rules.test.ts",
     "test:event-join-questions": "tsx --test apps/web/lib/communities/event-join-questions.test.ts",
     "test:event-date": "tsx --test apps/web/lib/communities/event-date.test.ts",

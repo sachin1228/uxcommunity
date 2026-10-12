@@ -2,7 +2,9 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(27);
 
-select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer','uuid[]']);
+-- Nine arguments: the compound (created_at, id) cursor halves are appended
+-- after p_content_ids (see 20261013100000_community_message_compound_cursor).
+select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer','uuid[]','uuid','uuid']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
 select has_function('public', 'get_all_communities', array['uuid']);
 select has_function('public', 'get_thread_list_aggregates', array['uuid','uuid[]']);

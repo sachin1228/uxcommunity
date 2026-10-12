@@ -194,7 +194,7 @@ export function CommunityChat({
     hasMoreAbove,
     loadingOlder,
     setMessages,
-    fetchMessages,
+    catchUpMessages,
     fetchOlderMessages,
     communityIdRef,
     membersRef,
@@ -441,7 +441,7 @@ export function CommunityChat({
   useRealtimeChat({
     communityId,
     currentUserId,
-    fetchMessages,
+    catchUpMessages,
     setMessages,
     setThreadEvents,
     setContentEvents,

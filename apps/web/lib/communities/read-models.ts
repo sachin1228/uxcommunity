@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityPermissions, resolveCommunityRole } from "./manager-role";
 import {
+  isUnknownRpcArgumentsError,
+  messagePageCompoundCursor,
+} from "./message-cursor-support";
+import {
   getExperienceLevelNameMap,
   getMasterNameMap,
   TABLE_LOOKUP,
@@ -14,6 +18,7 @@ import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
 import { isCommunityMember } from "./membership";
+import { logEvent } from "@/lib/observability/log";
 // One shared experience-level label cleaner — see ./comment-authors.ts.
 import { cleanDesignation } from "./comment-authors";
 
@@ -375,10 +380,32 @@ export async function loadCommunityRules(
   return { ok: true, data: { rules: data ?? [] } };
 }
 
+/** A cursor id half must be a uuid before it reaches the RPC's uuid argument. */
+const UUID_CURSOR_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The community message page, oldest-first or newest-first.
+ *
+ * The cursor is compound — `(created_at, id)` — because one timestamp can hold
+ * several messages: paging on the timestamp alone could drop the equal-timestamp
+ * rows on the far side of a page boundary (see
+ * 20261013100000_community_message_compound_cursor.sql). `before` walks up into
+ * history, `after` drains forward from the newest message a client already has,
+ * and both halves travel together so the order is total and paging can never
+ * skip or loop.
+ */
 export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,
-  cursors: { before?: string | null; after?: string | null } = {},
+  cursors: {
+    before?: string | null;
+    after?: string | null;
+    /** Id half of the `before` cursor; omitted degrades to timestamp-only. */
+    beforeId?: string | null;
+    /** Id half of the `after` cursor; omitted degrades to timestamp-only. */
+    afterId?: string | null;
+  } = {},
   /** Content-item ids ("created a …" cards) whose reactions ride along. */
   contentIds: string[] = [],
 ): Promise<ReadResult<{ messages: unknown[]; content_reactions?: unknown }>> {
@@ -398,10 +425,24 @@ export async function loadCommunityMessagePage(
     : membership.joined_at;
   const before = normalizeUtcCursor(cursors.before);
   const after = normalizeUtcCursor(cursors.after);
-  if ((cursors.before && !before) || (cursors.after && !after)) {
+  const beforeId = cursors.beforeId ?? null;
+  const afterId = cursors.afterId ?? null;
+  // A malformed half is rejected rather than silently dropped: silently
+  // degrading a compound cursor to a timestamp-only one is exactly how a
+  // client would start re-reading a burst instead of continuing past it.
+  if (
+    (cursors.before && !before) ||
+    (cursors.after && !after) ||
+    (beforeId && !UUID_CURSOR_PATTERN.test(beforeId)) ||
+    (afterId && !UUID_CURSOR_PATTERN.test(afterId))
+  ) {
     return { ok: false, status: 400, error: "Invalid cursor." };
   }
-  const { data, error } = await callPerformanceRpc(db, "get_community_message_page", {
+
+  // The page branches on `p_after`: when it is set the before halves are unused
+  // (the RPC's two branches are mutually exclusive), so they are nulled here to
+  // keep one unambiguous call.
+  const baseArgs = {
     p_community_id: communityId,
     p_user_id: userId,
     p_history_start: historyStart,
@@ -409,9 +450,62 @@ export async function loadCommunityMessagePage(
     p_after: after,
     p_limit: MESSAGE_PAGE_SIZE,
     p_content_ids: contentIds.length ? contentIds : null,
-  });
+  };
+  const useCompoundCursor = messagePageCompoundCursor.supportsCompoundCursor();
+  // Tracks whether the COMPOUND call itself resolved. A successful fallback is
+  // not proof that the compound arguments work, so it must not clear the
+  // suppression (see the noteSupported call below).
+  let compoundResolved = useCompoundCursor;
+  let { data, error } = await callPerformanceRpc(
+    db,
+    "get_community_message_page",
+    useCompoundCursor
+      ? { ...baseArgs, p_before_id: after ? null : beforeId, p_after_id: afterId }
+      : baseArgs,
+  );
 
-  if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
+  // The deployed database still has the seven-argument function, i.e. the
+  // compound-cursor migration has not been applied yet (a CONFIRMED missing
+  // signature — see isUnknownRpcArgumentsError). Record that so the next minute
+  // of requests skip the call that cannot succeed, and retry once with the
+  // timestamp-only shape.
+  //
+  // Compatibility: `baseArgs` names exactly the seven parameters both signatures
+  // share — `p_community_id, p_user_id, p_history_start, p_before, p_after,
+  // p_limit, p_content_ids`. The OLD function (20260814050000) declares those
+  // seven; the NEW one (20261013100000) declares them first and defaults the two
+  // id halves, so the same named call resolves on BOTH sides of the migration.
+  //
+  // TEMPORARY CORRECTNESS LIMITATION (staged deploys only). On an un-migrated
+  // database this retry pages on `created_at` ALONE, and the old function's
+  // `after` branch filters `created_at > p_after` strictly. Messages that share
+  // the boundary timestamp and were not in the previous page can therefore be
+  // SKIPPED until a reload refills the window — exactly the defect
+  // 20261013100000 fixes. The client merge dedupes by id, so the reverse
+  // (re-including equal-timestamp rows) is harmless. The migration is a STOPGAP
+  // for the staging window only: apply 20261013100000 BEFORE deploying code that
+  // depends on the compound cursor so this fallback is never the normal path.
+  if (error && useCompoundCursor && isUnknownRpcArgumentsError(error)) {
+    messagePageCompoundCursor.noteUnsupported();
+    compoundResolved = false;
+    ({ data, error } = await callPerformanceRpc(db, "get_community_message_page", baseArgs));
+  }
+  // Only a compound call that actually resolved is a positive observation.
+  // Calling this unconditionally after a fallback would clear the suppression and
+  // re-attempt the impossible compound call on every request, defeating the
+  // once-per-window cost this tracker exists to pay.
+  if (!error && compoundResolved) messagePageCompoundCursor.noteSupported();
+
+  // Genuine database failures surface here — with their code recorded, never as
+  // a silently degraded fallback page.
+  if (error) {
+    logEvent("error", {
+      event: "community.messages.page_failed",
+      community_id: communityId,
+      error_code: (error as { code?: string | null }).code ?? null,
+    });
+    return { ok: false, status: 500, error: "Failed to fetch messages." };
+  }
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   // The RPC ships the page's content-reaction groups on a SINGLE row (they are
   // a lateral aggregate over the whole page, not a per-message field) and also

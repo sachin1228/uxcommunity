@@ -58,12 +58,18 @@ export async function GET(
     req.nextUrl.searchParams.get("withContentReactions") === "1"
       ? await loadContentEventIds(communityId)
       : [];
+  // Cursors are compound — (created_at, id) — so a burst of same-timestamp
+  // messages can never straddle a page boundary and lose a row. The id halves
+  // are optional: a caller that omits them pages on the timestamp alone, which
+  // degrades to re-including equal rows rather than skipping them.
   const result = await loadCommunityMessagePage(
     communityId,
     session.userId!,
     {
       before: req.nextUrl.searchParams.get("before"),
       after: req.nextUrl.searchParams.get("after"),
+      beforeId: req.nextUrl.searchParams.get("before_id"),
+      afterId: req.nextUrl.searchParams.get("after_id"),
     },
     contentIds,
   );
