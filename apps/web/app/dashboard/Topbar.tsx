@@ -7,6 +7,7 @@ import { BrandLogo } from "@/components/ui/BrandLogo";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 import { DashboardSearch } from "./DashboardSearch";
 import { NotificationBell } from "./NotificationBell";
+import { DmTopbarButton } from "@/components/direct-messages/DmTopbarButton";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { isApplePlatform } from "@/lib/dashboard/topbar";
 
@@ -114,9 +115,10 @@ export function Topbar({ userId, user }: Props) {
 
       <div className="order-2 min-w-0 flex-1 min-[500px]:order-3" />
 
-      {/* Bell, then profile: the account controls stay pinned to the right edge
-          at every width. */}
+      {/* Messages, bell, then profile: the account controls stay pinned to the
+          right edge at every width. */}
       <div className="order-4 flex min-w-0 items-center gap-3">
+        <DmTopbarButton userId={userId} />
         <NotificationBell userId={userId} />
         <ProfileDropdown name={user.name} email={user.email} avatarUrl={user.avatarUrl} />
       </div>
