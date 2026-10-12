@@ -8,13 +8,14 @@ import {
   loadDmConversationForUser,
   loadDmMessagePage,
 } from "@/lib/direct-messages/server";
+import { isAllowedDmImageUrl } from "@/lib/direct-messages/assets";
 import { publishDmEvent } from "@/lib/direct-messages/publish";
 
 const MAX_CONTENT_CHARS = 2000;
 const MAX_IMAGE_URL_CHARS = 2048;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** GET /api/dm/conversations/[id]/messages?before=…&after=… */
+/** GET /api/dm/conversations/[id]/messages?before=…&before_id=…&after=…&after_id=… */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -27,9 +28,13 @@ export async function GET(
   }
 
   const { id: conversationId } = await params;
+  // Cursors are compound — (created_at, id) — so a burst of same-millisecond
+  // messages can never straddle a page boundary. See dm_hardening migration.
   const result = await loadDmMessagePage(conversationId, session.userId!, {
     before: req.nextUrl.searchParams.get("before"),
+    beforeId: req.nextUrl.searchParams.get("before_id"),
     after: req.nextUrl.searchParams.get("after"),
+    afterId: req.nextUrl.searchParams.get("after_id"),
   });
 
   return result.ok
@@ -41,9 +46,11 @@ interface ParsedSend {
   content: string;
   imageUrl: string | null;
   replyToId: string | null;
+  /** The client's idempotency key for this logical send (a UUID), or null. */
+  clientNonce: string | null;
 }
 
-function parseSendBody(body: unknown): { ok: true; value: ParsedSend } | { ok: false; reason: "malformed" | "empty" | "too_long" | "bad_image" } {
+function parseSendBody(body: unknown): { ok: true; value: ParsedSend } | { ok: false; reason: "malformed" | "empty" | "too_long" | "bad_image" | "bad_nonce" } {
   if (typeof body !== "object" || body === null) return { ok: false, reason: "malformed" };
   const record = body as Record<string, unknown>;
 
@@ -72,7 +79,15 @@ function parseSendBody(body: unknown): { ok: true; value: ParsedSend } | { ok: f
     replyToId = record.reply_to_id;
   }
 
-  return { ok: true, value: { content, imageUrl, replyToId } };
+  let clientNonce: string | null = null;
+  if (record.client_nonce !== undefined && record.client_nonce !== null) {
+    if (typeof record.client_nonce !== "string" || !UUID_RE.test(record.client_nonce)) {
+      return { ok: false, reason: "bad_nonce" };
+    }
+    clientNonce = record.client_nonce;
+  }
+
+  return { ok: true, value: { content, imageUrl, replyToId, clientNonce } };
 }
 
 /**
@@ -156,7 +171,14 @@ export async function POST(
     }
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { content, imageUrl, replyToId } = parsed.value;
+  const { content, imageUrl, replyToId, clientNonce } = parsed.value;
+
+  // The URL is client input, not "what the upload route just returned": only
+  // this conversation's own uploads (or a GIPHY gif) may be attached. Pure
+  // string validation — nothing is fetched server-side.
+  if (imageUrl && !isAllowedDmImageUrl(imageUrl, conversationId)) {
+    return NextResponse.json({ error: "Invalid image URL." }, { status: 422 });
+  }
 
   // An anchor that turns out not to exist in this conversation is silently
   // dropped rather than failing the send (same posture as the community chat).
@@ -180,6 +202,9 @@ export async function POST(
         content: content || null,
         reply_to_id: replyToIdValid,
         image_url: imageUrl,
+        // The sender-scoped idempotency key (see dm_hardening migration):
+        // a retried send collides here instead of inserting a duplicate.
+        client_nonce: clientNonce,
       })
       .select("id, content, created_at, user_id, reply_to_id, image_url")
       .single(),
@@ -192,10 +217,61 @@ export async function POST(
       reply_to_id: string | null;
       image_url: string | null;
     } | null;
-    error: unknown;
+    error: { code?: string } | null;
   };
 
   if (insertErr || !inserted) {
+    // 23505 on this insert can only be the (user_id, client_nonce) unique
+    // index: the original send committed but its response never reached the
+    // client, which is retrying with the same nonce. Return the original row
+    // — do NOT re-publish (the first request already fanned it out; clients
+    // dedupe by id anyway).
+    if (clientNonce && insertErr?.code === "23505") {
+      const { data: existing } = (await db
+        .from("dm_messages")
+        .select("id, content, created_at, user_id, reply_to_id, image_url, conversation_id")
+        .eq("user_id", userId)
+        .eq("client_nonce", clientNonce)
+        .maybeSingle()) as unknown as {
+        data: {
+          id: string;
+          content: string | null;
+          created_at: string;
+          user_id: string;
+          reply_to_id: string | null;
+          image_url: string | null;
+          conversation_id: string;
+        } | null;
+      };
+
+      if (existing && existing.conversation_id === conversationId) {
+        const timing = timer.finish({ query_count: 3 });
+        return NextResponse.json(
+          {
+            duplicate: true,
+            message: {
+              id: existing.id,
+              content: existing.content,
+              created_at: existing.created_at,
+              user_id: existing.user_id,
+              reply_to_id: existing.reply_to_id,
+              image_url: existing.image_url ?? null,
+              conversation_id: conversationId,
+              users: null,
+              reactions: [],
+              reply_to: null,
+            },
+          },
+          { status: 200, headers: { "Server-Timing": timing } },
+        );
+      }
+      if (existing) {
+        return NextResponse.json(
+          { error: "This send id was already used in another conversation." },
+          { status: 409 },
+        );
+      }
+    }
     console.error("[POST dm message] insert error:", insertErr);
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }

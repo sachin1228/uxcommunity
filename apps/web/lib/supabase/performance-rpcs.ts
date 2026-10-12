@@ -295,7 +295,9 @@ type PerformanceRpcMap = {
       p_conversation_id: string;
       p_user_id: string;
       p_before: string | null;
+      p_before_id: string | null;
       p_after: string | null;
+      p_after_id: string | null;
       p_limit: number;
     };
     returns: Array<{
@@ -315,6 +317,17 @@ type PerformanceRpcMap = {
   get_dm_unread_total: {
     args: { p_user_id: string };
     returns: number;
+  };
+  mark_dm_conversation_read: {
+    args: {
+      p_conversation_id: string;
+      p_user_id: string;
+      p_last_read_at: string;
+    };
+    returns: Array<{
+      previous_marked_at: string | null;
+      marked_at: string;
+    }>;
   };
   get_or_create_dm_conversation: {
     args: { p_me: string; p_peer: string };

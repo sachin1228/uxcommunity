@@ -22,3 +22,27 @@ export function normalizeUtcCursor(value: string | null | undefined): string | n
 export function toUtcCursor(value: string): string {
   return value.endsWith("+00:00") ? `${value.slice(0, -6)}Z` : value;
 }
+
+/**
+ * Query string for a compound (created_at, id) page cursor.
+ *
+ * Both halves travel together: `before`/`after` alone address a millisecond
+ * that can hold several messages, and paging on the timestamp alone is what
+ * let a same-millisecond burst straddle a page boundary and lose a row. The
+ * id half disambiguates; see 20261012120000_dm_hardening.sql.
+ */
+export function dmCursorQuery(cursors: {
+  before?: { ts: string; id: string } | null;
+  after?: { ts: string; id: string } | null;
+}): string {
+  const parts: string[] = [];
+  if (cursors.before) {
+    parts.push(`before=${encodeURIComponent(toUtcCursor(cursors.before.ts))}`);
+    parts.push(`before_id=${encodeURIComponent(cursors.before.id)}`);
+  }
+  if (cursors.after) {
+    parts.push(`after=${encodeURIComponent(toUtcCursor(cursors.after.ts))}`);
+    parts.push(`after_id=${encodeURIComponent(cursors.after.id)}`);
+  }
+  return parts.length > 0 ? `?${parts.join("&")}` : "";
+}

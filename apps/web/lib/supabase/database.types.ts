@@ -1193,6 +1193,7 @@ export type Database = {
       };
       dm_messages: {
         Row: {
+          client_nonce: string | null;
           content: string | null;
           conversation_id: string;
           created_at: string;
@@ -1204,6 +1205,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          client_nonce?: string | null;
           content?: string | null;
           conversation_id: string;
           created_at?: string;
@@ -1215,6 +1217,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          client_nonce?: string | null;
           content?: string | null;
           conversation_id?: string;
           created_at?: string;
@@ -2780,7 +2783,9 @@ export type Database = {
       get_dm_message_page: {
         Args: {
           p_after?: string;
+          p_after_id?: string;
           p_before?: string;
+          p_before_id?: string;
           p_conversation_id: string;
           p_limit?: number;
           p_user_id: string;
@@ -2982,6 +2987,17 @@ export type Database = {
           p_job_title?: string;
         };
         Returns: Json;
+      };
+      mark_dm_conversation_read: {
+        Args: {
+          p_conversation_id: string;
+          p_last_read_at?: string;
+          p_user_id: string;
+        };
+        Returns: {
+          marked_at: string;
+          previous_marked_at: string;
+        }[];
       };
     };
     Enums: {

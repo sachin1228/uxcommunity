@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadDmConversationForUser } from "@/lib/direct-messages/server";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteR2AssetIfUnreferenced, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { createServerTimer } from "@/lib/server-timing";
 
 const MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB raw upload limit
@@ -109,4 +109,55 @@ export async function POST(
     console.error("[dm-image-upload] R2 error:", err);
     return finish(NextResponse.json({ error: "Upload failed." }, { status: 500 }));
   }
+}
+
+/**
+ * DELETE /api/dm/conversations/[id]/upload  { url }
+ *
+ * Remove an upload whose send was abandoned (cancelled before the message
+ * row could exist). Only assets under THIS conversation's prefix qualify —
+ * the URL is client input, so the same DM-asset rule as a send applies. The
+ * delete is skipped while any dm_messages row still references the URL, so a
+ * racing successful send can never lose its image; a repeat call for an
+ * already-gone object is a harmless no-op.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  let session;
+  try {
+    session = await requireSession("user");
+  } catch (e) {
+    return e as Response;
+  }
+  const userId = session.userId!;
+  const { id: conversationId } = await params;
+
+  const db = createServiceClient();
+  const access = await loadDmConversationForUser(db, conversationId, userId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  let url = "";
+  try {
+    const body = (await request.json()) as { url?: unknown };
+    url = typeof body.url === "string" ? body.url.trim() : "";
+  } catch {
+    // Fall through to the 400 below.
+  }
+
+  const key = url ? parseR2Key(url) : null;
+  if (!url || !key || !key.startsWith(`dm/${conversationId}/`)) {
+    return NextResponse.json(
+      { error: "Not an upload of this conversation." },
+      { status: 422 },
+    );
+  }
+
+  const result = await deleteR2AssetIfUnreferenced(db, url, [
+    { table: "dm_messages", column: "image_url" },
+  ]);
+  return NextResponse.json({ ok: true, status: result.status });
 }

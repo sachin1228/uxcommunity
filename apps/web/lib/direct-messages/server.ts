@@ -31,6 +31,8 @@ export interface DmConversationRow {
 const CONVERSATION_COLUMNS =
   "id, user_a, user_b, created_at, last_message_at, user_a_last_read_at, user_b_last_read_at";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** The conversation's two participant ids (canonically ordered). */
 export function dmParticipants(row: { user_a: string; user_b: string }): [string, string] {
   return [row.user_a, row.user_b];
@@ -129,7 +131,12 @@ export async function loadDmConversations(
 export async function loadDmMessagePage(
   conversationId: string,
   userId: string,
-  cursors: { before?: string | null; after?: string | null } = {},
+  cursors: {
+    before?: string | null;
+    beforeId?: string | null;
+    after?: string | null;
+    afterId?: string | null;
+  } = {},
 ): Promise<ReadResult<{ messages: unknown[] }>> {
   const db = createServiceClient();
 
@@ -138,9 +145,19 @@ export async function loadDmMessagePage(
     return { ok: false, status: access.status, error: access.error };
   }
 
+  // Cursors are compound (created_at, id): the timestamp alone cannot order
+  // same-millisecond messages, and paging on it could skip one. A malformed
+  // half is rejected rather than silently degraded.
   const before = normalizeUtcCursor(cursors.before);
   const after = normalizeUtcCursor(cursors.after);
-  if ((cursors.before && !before) || (cursors.after && !after)) {
+  const beforeId = cursors.beforeId ?? null;
+  const afterId = cursors.afterId ?? null;
+  if (
+    (cursors.before && !before) ||
+    (cursors.after && !after) ||
+    (beforeId && !UUID_PATTERN.test(beforeId)) ||
+    (afterId && !UUID_PATTERN.test(afterId))
+  ) {
     return { ok: false, status: 400, error: "Invalid cursor." };
   }
 
@@ -148,7 +165,9 @@ export async function loadDmMessagePage(
     p_conversation_id: conversationId,
     p_user_id: userId,
     p_before: after ? null : before,
+    p_before_id: after ? null : beforeId,
     p_after: after,
+    p_after_id: afterId,
     p_limit: DM_MESSAGE_PAGE_SIZE,
   });
   if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
