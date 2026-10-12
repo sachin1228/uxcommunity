@@ -10,9 +10,10 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import {
+  COMMUNITY_VIEWER_STATE_EVENT,
   exploreStore,
   EXPLORE_STALE_MS,
-  invalidateOnJoin,
+  setCommunityViewerState,
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
 
@@ -215,32 +216,28 @@ export default function CommunitiesIndexPage() {
     return () => clearTimeout(t);
   }, [load]);
 
-  /** Patch one community in both the page state and the shared explore store. */
-  const patchCommunity = useCallback((communityId: string, patch: Partial<Community>) => {
-    setCommunities((prev) =>
-      prev.map((c) => (c.id === communityId ? { ...c, ...patch } : c)),
-    );
-    if (exploreStore.data) {
-      exploreStore.data = {
-        ...exploreStore.data,
-        communities: exploreStore.data.communities.map((c) =>
-          c.id === communityId ? { ...c, ...patch } : c,
-        ),
-      };
-    }
+  /**
+   * This list renders the shared explore rows, so a write from anywhere else —
+   * the home feed's popup, a withdraw, an acceptance — re-renders it too. The
+   * page keeps no copy of its own: a second copy is how Explore could still
+   * offer "Request to join" for a community the member had already asked to
+   * join from the feed.
+   */
+  useEffect(() => {
+    const reRead = () => {
+      if (exploreStore.data) setCommunities(exploreStore.data.communities);
+    };
+    window.addEventListener(COMMUNITY_VIEWER_STATE_EVENT, reRead);
+    return () => window.removeEventListener(COMMUNITY_VIEWER_STATE_EVENT, reRead);
   }, []);
 
-  /** Public join (or an auto-accepted request): the member is in — open the chat. */
+  /**
+   * Public join (or an auto-accepted request): the member is in — open the chat.
+   * The dialog has already recorded the membership in the shared cache.
+   */
   function handleJoined(communityId: string) {
-    patchCommunity(communityId, { joined: true, has_pending_request: false });
-    invalidateOnJoin(communityId);
     setJoinTarget(null);
     router.push(`/dashboard/communities/${communityId}`);
-  }
-
-  /** Private community: the request is recorded, the member waits for approval. */
-  function handleRequested(communityId: string) {
-    patchCommunity(communityId, { joined: false, has_pending_request: true });
   }
 
   /** Take back a pending request — the row leaves the Requests tab on success. */
@@ -256,7 +253,7 @@ export default function CommunitiesIndexPage() {
         setErrorMsg("Couldn't withdraw the request. Please try again.");
         return;
       }
-      patchCommunity(community.id, { joined: false, has_pending_request: false });
+      setCommunityViewerState(community.id, { joined: false });
     } catch {
       setErrorMsg("Network error. Please try again.");
     } finally {
@@ -424,9 +421,11 @@ export default function CommunitiesIndexPage() {
       {joinTarget && (
         <JoinCommunityModal
           community={joinTarget}
+          joined={joinTarget.joined}
+          canJoin={joinTarget.can_join}
+          hasPendingRequest={joinTarget.has_pending_request}
           onClose={() => setJoinTarget(null)}
           onJoined={handleJoined}
-          onRequested={handleRequested}
         />
       )}
     </div>

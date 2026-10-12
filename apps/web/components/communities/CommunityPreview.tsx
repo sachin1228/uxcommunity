@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CommunityJoinDialog } from "./JoinCommunityModal";
+import { syncCommunityViewerState } from "@/lib/communities/cache";
 
 /**
  * What a non-member sees instead of the chat when they open a community from a
@@ -46,6 +48,13 @@ export function CommunityPreview({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // The server just resolved where this viewer stands (a non-member — members
+  // get the chat), so publish that answer: a cached Explore list fetched before
+  // the request cannot keep offering a community they already asked to join.
+  useEffect(() => {
+    syncCommunityViewerState(communityId, { joined: false, hasPendingRequest });
+  }, [communityId, hasPendingRequest]);
 
   /** Joining lands in the group chat the member just unlocked. */
   function openCommunity() {

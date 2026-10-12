@@ -43,21 +43,101 @@ export const sidebarStore: {
 
 export const SIDEBAR_STALE_MS = 60_000;
 
+// ─── Where the viewer stands with one community ───────────────────────────────
+
+/**
+ * Fired when a community's viewer state moved — a request was filed, withdrawn
+ * or accepted, or a fetched answer corrected a stale row.
+ *
+ * Deliberately NOT SIDEBAR_CHANGED_EVENT: that one means "the membership list is
+ * stale, refetch it", and filing a request changes no membership. Surfaces that
+ * only render the Explore projection (the Explore page's own list) listen here
+ * and re-read the store, so one write updates every one of them.
+ */
+export const COMMUNITY_VIEWER_STATE_EVENT = "uxcommunity:community-viewer-state";
+
+export interface CommunityViewerState {
+  /** The viewer belongs to the community. */
+  joined: boolean;
+  /** A private community is waiting on the owner's answer. */
+  hasPendingRequest?: boolean;
+}
+
+/**
+ * Applies a viewer state to the cached Explore row, and says whether the row
+ * actually moved — so a fetch that merely confirms what the list already said
+ * stays silent.
+ */
+function patchCachedViewerState(
+  communityId: string,
+  state: CommunityViewerState,
+): boolean {
+  // Someone who belongs is not waiting for approval, so the two flags are one
+  // fact, not two independent toggles.
+  const pending = state.joined ? false : Boolean(state.hasPendingRequest);
+  const data = exploreStore.data;
+  const current = data?.communities.find((c) => c.id === communityId);
+  if (!data || !current) return false;
+  if (current.joined === state.joined && Boolean(current.has_pending_request) === pending) {
+    return false;
+  }
+  exploreStore.data = {
+    ...data,
+    communities: data.communities.map((c) =>
+      c.id === communityId
+        ? { ...c, joined: state.joined, has_pending_request: pending }
+        : c,
+    ),
+  };
+  return true;
+}
+
+/**
+ * The one writer of where the viewer stands with a community.
+ *
+ * Every surface that shows this fact reads the same cached row: the Explore
+ * list, the join dialog (whatever opened it — Explore, the home-feed popup, the
+ * Suggested Communities rail), and the Requests tab. So every surface records
+ * the outcome HERE and nowhere else: a request filed from the home feed cannot
+ * leave Explore offering to request all over again, because there is no second
+ * copy to fall out of step.
+ *
+ * A join is a membership change, so the sidebar projection is dropped exactly as
+ * it always was; a request — or a repeat of a state the list already holds —
+ * touches only the Explore row.
+ */
+export function setCommunityViewerState(
+  communityId: string,
+  state: CommunityViewerState,
+): void {
+  const moved = patchCachedViewerState(communityId, state);
+  if (state.joined) {
+    sidebarStore.data     = null;
+    sidebarStore.inflight = null;
+    invalidateRequest("/api/communities");
+    notifySidebarChanged();
+  }
+  if (moved) notifyViewerStateChanged();
+}
+
+/**
+ * Reconciles the cached row with an answer a surface just fetched (the
+ * community preview endpoint). Nothing is assumed to have changed — the sidebar
+ * keeps its list, because a member simply re-reading a community is not a
+ * membership change.
+ */
+export function syncCommunityViewerState(
+  communityId: string,
+  state: CommunityViewerState,
+): void {
+  if (patchCachedViewerState(communityId, state)) notifyViewerStateChanged();
+}
+
 // ─── Cache-invalidation helpers (join / leave) ────────────────────────────────
 
+/** A join, in the one vocabulary above. Kept for its many callers. */
 export function invalidateOnJoin(communityId: string): void {
-  if (exploreStore.data) {
-    exploreStore.data = {
-      ...exploreStore.data,
-      communities: exploreStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, joined: true } : c
-      ),
-    };
-  }
-  sidebarStore.data     = null;
-  sidebarStore.inflight = null;
-  invalidateRequest("/api/communities");
-  notifySidebarChanged();
+  setCommunityViewerState(communityId, { joined: true });
 }
 
 export function invalidateCommunitiesList(): void {
@@ -70,14 +150,7 @@ export function invalidateCommunitiesList(): void {
 }
 
 export function invalidateOnLeave(communityId: string): void {
-  if (exploreStore.data) {
-    exploreStore.data = {
-      ...exploreStore.data,
-      communities: exploreStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, joined: false } : c
-      ),
-    };
-  }
+  syncCommunityViewerState(communityId, { joined: false });
   if (sidebarStore.data) {
     sidebarStore.data = {
       ...sidebarStore.data,
@@ -215,6 +288,12 @@ export const SIDEBAR_REACTION_CHANGED_EVENT = "uxcommunity:sidebar-reaction-chan
  * refetch, because the cached /api/communities snapshot predates the send.
  */
 export const SIDEBAR_MESSAGE_CHANGED_EVENT = "uxcommunity:sidebar-message-changed";
+
+function notifyViewerStateChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(COMMUNITY_VIEWER_STATE_EVENT));
+  }
+}
 
 function notifySidebarChanged(): void {
   if (typeof window !== "undefined") {

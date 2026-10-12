@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
-import { invalidateOnJoin } from "@/lib/communities/cache";
 import type { SuggestedCommunity } from "@/lib/home/suggested";
 
 function formatMembers(count: number): string {
@@ -41,9 +40,8 @@ export function SuggestedCommunitiesCard({
       next.add(id);
       return next;
     });
-    // Tell the sidebar's community list (and the Explore page) that this member
-    // now belongs here — one event, both surfaces.
-    invalidateOnJoin(id);
+    // The dialog records the new membership in the shared cache; this rail only
+    // has to stop showing the community and follow the member in.
     setJoinTarget(null);
     router.push(`/dashboard/communities/${id}`);
   }

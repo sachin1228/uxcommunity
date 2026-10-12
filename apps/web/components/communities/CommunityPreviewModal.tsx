@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityJoinDialog } from "./JoinCommunityModal";
+import { syncCommunityViewerState } from "@/lib/communities/cache";
 import type { CommunityPreviewData } from "@/lib/communities/preview";
 
 /**
@@ -42,6 +43,15 @@ export function CommunityPreviewModal({
       const data = (await res.json()) as { preview?: CommunityPreviewData };
       setPreview(data.preview ?? null);
       setDeleted(false);
+      // This endpoint answers live, so it is the authority on where the viewer
+      // stands: correct the cached rows here rather than leaving a list that was
+      // fetched before the request (or the acceptance) to offer it again.
+      if (data.preview) {
+        syncCommunityViewerState(data.preview.id, {
+          joined: data.preview.joined,
+          hasPendingRequest: data.preview.has_pending_request,
+        });
+      }
     } catch {
       setDeleted(false);
       setPreview(null);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Lock, Users } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { setCommunityViewerState } from "@/lib/communities/cache";
 import { CommunityDp } from "./CommunityDp";
 import { CommunityNameBadges } from "./CommunityBadges";
 
@@ -90,11 +91,16 @@ export function CommunityJoinDialog({
         return;
       }
 
+      // Record the outcome in the shared cache rather than leaving it to each
+      // caller: whichever surface opened this dialog, every surface that shows
+      // the community reads the same row from here on.
       if (data.status === "requested") {
         setRequested(true);
+        setCommunityViewerState(community.id, { joined: false, hasPendingRequest: true });
         onRequested?.(community.id);
       } else {
         setJoinedNow(true);
+        setCommunityViewerState(community.id, { joined: true });
         onJoined?.(community.id);
       }
     } catch {
@@ -269,28 +275,43 @@ export function CommunityJoinDialog({
 }
 
 /**
- * The dialog inside a Modal. Explore's join buttons and the Suggested
- * Communities rail use this; the home-feed popup and the community page render
- * the same body through their own surface.
+ * The dialog inside a Modal, for callers that open it over their own page.
+ *
+ * It forwards the viewer's standing with the community (joined, can_join,
+ * has_pending_request) exactly as given, because those flags are what put the
+ * dialog in the right state — a wrapper that dropped them silently showed
+ * "Request to join" for a community the member had already asked to join.
  */
 export function JoinCommunityModal({
   community,
+  joined,
+  canJoin,
+  hasPendingRequest,
   onClose,
   onJoined,
   onRequested,
+  onViewCommunity,
 }: {
   community: JoinableCommunity;
+  joined?: boolean;
+  canJoin?: boolean;
+  hasPendingRequest?: boolean;
   onClose: () => void;
-  onJoined: (communityId: string) => void;
-  onRequested: (communityId: string) => void;
+  onJoined?: (communityId: string) => void;
+  onRequested?: (communityId: string) => void;
+  onViewCommunity?: () => void;
 }) {
   return (
     <Modal open onClose={onClose} maxWidth="max-w-md" panelClassName="p-6">
       <CommunityJoinDialog
         community={community}
+        joined={joined}
+        canJoin={canJoin}
+        hasPendingRequest={hasPendingRequest}
         onClose={onClose}
         onJoined={onJoined}
         onRequested={onRequested}
+        onViewCommunity={onViewCommunity}
       />
     </Modal>
   );
