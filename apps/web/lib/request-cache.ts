@@ -152,7 +152,12 @@ export async function fetchJsonCached<T>(
         const message = body && typeof body === "object" && "error" in body
           ? String(body.error)
           : `Request failed (${response.status})`
-        throw new Error(message)
+        // The status rides along so callers can tell a permanent failure (400 /
+        // 403) from a transient one (429 / 5xx) without parsing the message —
+        // see isRetryableCatchUpError in lib/communities/messages.
+        const error = new Error(message) as Error & { status?: number }
+        error.status = response.status
+        throw error
       }
       entries.delete(key)
       entries.set(key, { value: body as T, fetchedAt: Date.now() })

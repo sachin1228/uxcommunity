@@ -18,6 +18,7 @@ import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
 import { isCommunityMember } from "./membership";
+import { logEvent } from "@/lib/observability/log";
 // One shared experience-level label cleaner — see ./comment-authors.ts.
 import { cleanDesignation } from "./comment-authors";
 
@@ -451,6 +452,10 @@ export async function loadCommunityMessagePage(
     p_content_ids: contentIds.length ? contentIds : null,
   };
   const useCompoundCursor = messagePageCompoundCursor.supportsCompoundCursor();
+  // Tracks whether the COMPOUND call itself resolved. A successful fallback is
+  // not proof that the compound arguments work, so it must not clear the
+  // suppression (see the noteSupported call below).
+  let compoundResolved = useCompoundCursor;
   let { data, error } = await callPerformanceRpc(
     db,
     "get_community_message_page",
@@ -459,18 +464,48 @@ export async function loadCommunityMessagePage(
       : baseArgs,
   );
 
-  // PGRST202: the deployed database still has the seven-argument function, i.e.
-  // the compound-cursor migration has not been applied yet. Record that so the
-  // next minute of requests skip the call that cannot succeed, and retry once
-  // with the timestamp-only shape — which the new function also accepts, so
-  // this fallback works on both sides of the migration.
+  // The deployed database still has the seven-argument function, i.e. the
+  // compound-cursor migration has not been applied yet (a CONFIRMED missing
+  // signature — see isUnknownRpcArgumentsError). Record that so the next minute
+  // of requests skip the call that cannot succeed, and retry once with the
+  // timestamp-only shape.
+  //
+  // Compatibility: `baseArgs` names exactly the seven parameters both signatures
+  // share — `p_community_id, p_user_id, p_history_start, p_before, p_after,
+  // p_limit, p_content_ids`. The OLD function (20260814050000) declares those
+  // seven; the NEW one (20261013100000) declares them first and defaults the two
+  // id halves, so the same named call resolves on BOTH sides of the migration.
+  //
+  // TEMPORARY CORRECTNESS LIMITATION (staged deploys only). On an un-migrated
+  // database this retry pages on `created_at` ALONE, and the old function's
+  // `after` branch filters `created_at > p_after` strictly. Messages that share
+  // the boundary timestamp and were not in the previous page can therefore be
+  // SKIPPED until a reload refills the window — exactly the defect
+  // 20261013100000 fixes. The client merge dedupes by id, so the reverse
+  // (re-including equal-timestamp rows) is harmless. The migration is a STOPGAP
+  // for the staging window only: apply 20261013100000 BEFORE deploying code that
+  // depends on the compound cursor so this fallback is never the normal path.
   if (error && useCompoundCursor && isUnknownRpcArgumentsError(error)) {
     messagePageCompoundCursor.noteUnsupported();
+    compoundResolved = false;
     ({ data, error } = await callPerformanceRpc(db, "get_community_message_page", baseArgs));
   }
-  if (!error) messagePageCompoundCursor.noteSupported();
+  // Only a compound call that actually resolved is a positive observation.
+  // Calling this unconditionally after a fallback would clear the suppression and
+  // re-attempt the impossible compound call on every request, defeating the
+  // once-per-window cost this tracker exists to pay.
+  if (!error && compoundResolved) messagePageCompoundCursor.noteSupported();
 
-  if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
+  // Genuine database failures surface here — with their code recorded, never as
+  // a silently degraded fallback page.
+  if (error) {
+    logEvent("error", {
+      event: "community.messages.page_failed",
+      community_id: communityId,
+      error_code: (error as { code?: string | null }).code ?? null,
+    });
+    return { ok: false, status: 500, error: "Failed to fetch messages." };
+  }
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   // The RPC ships the page's content-reaction groups on a SINGLE row (they are
   // a lateral aggregate over the whole page, not a per-message field) and also

@@ -146,6 +146,18 @@ export interface CatchUpResult {
   stoppedBy: CatchUpStop;
   /** Set only when `stoppedBy` is "error" — the drain never throws. */
   error?: unknown;
+  /**
+   * Where a later pass must resume when this one stopped with work still
+   * outstanding: the last compound cursor it successfully processed (for
+   * "max-pages"), or the page it was fetching when the fetch failed (for
+   * "error"). Null when the history drained, or when the stop cannot be
+   * continued ("cancelled", "repeated-cursor").
+   *
+   * `resumeFrom` is a REQUEST, not a promise: "max-pages" does not prove more
+   * messages exist — the page cap may simply have been reached — so a caller
+   * that continues and finds an empty page has confirmed the drain.
+   */
+  resumeFrom: MessageCursor | null;
 }
 
 export interface CatchUpOptions<T extends CursorMessage> {
@@ -201,45 +213,50 @@ export async function runCatchUp<T extends CursorMessage>(
   let applied = 0;
 
   for (let index = 0; index < Math.max(1, maxPages); index += 1) {
-    if (isCancelled?.()) return { pages, applied, stoppedBy: "cancelled" };
+    if (isCancelled?.()) return { pages, applied, stoppedBy: "cancelled", resumeFrom: null };
 
     let page: T[];
     try {
       page = await fetchPage(cursor);
     } catch (error) {
-      return { pages, applied, stoppedBy: "error", error };
+      // Resume from the cursor this fetch was issued for: pages already applied
+      // stay applied (dedupe by id makes a re-read harmless), and nothing after
+      // the failure is skipped.
+      return { pages, applied, stoppedBy: "error", error, resumeFrom: cursor };
     }
     pages += 1;
 
-    if (isCancelled?.()) return { pages, applied, stoppedBy: "cancelled" };
-    if (page.length === 0) return { pages, applied, stoppedBy: "empty" };
+    if (isCancelled?.()) return { pages, applied, stoppedBy: "cancelled", resumeFrom: null };
+    if (page.length === 0) return { pages, applied, stoppedBy: "empty", resumeFrom: null };
 
     onPage?.(page, cursor);
     applied += page.length;
 
     // With no cursor the server answers with the newest page; there is nothing
     // newer to walk to, and a second call could only repeat it.
-    if (cursor === null) return { pages, applied, stoppedBy: "complete" };
+    if (cursor === null) return { pages, applied, stoppedBy: "complete", resumeFrom: null };
 
-    if (page.length < pageSize) return { pages, applied, stoppedBy: "complete" };
+    if (page.length < pageSize) return { pages, applied, stoppedBy: "complete", resumeFrom: null };
 
     const next = newestPageCursor(page);
     // No real row to advance past (a page of optimistic rows only): stop rather
     // than re-fetch the same page forever.
-    if (!next) return { pages, applied, stoppedBy: "complete" };
+    if (!next) return { pages, applied, stoppedBy: "complete", resumeFrom: null };
 
     const key = `${next.ts}|${next.id}`;
     if (key === `${cursor.ts}|${cursor.id}`) {
-      return { pages, applied, stoppedBy: "repeated-cursor" };
+      return { pages, applied, stoppedBy: "repeated-cursor", resumeFrom: null };
     }
     if (usedCursors.has(key)) {
-      return { pages, applied, stoppedBy: "repeated-cursor" };
+      return { pages, applied, stoppedBy: "repeated-cursor", resumeFrom: null };
     }
     usedCursors.add(key);
     cursor = next;
   }
 
-  return { pages, applied, stoppedBy: "max-pages" };
+  // The cap, not a drained history: hand the last confirmed cursor back so the
+  // caller can continue from exactly where this pass stopped.
+  return { pages, applied, stoppedBy: "max-pages", resumeFrom: cursor };
 }
 
 /**
@@ -250,4 +267,206 @@ export async function runCatchUp<T extends CursorMessage>(
  */
 function newestPageCursor<T extends CursorMessage>(page: T[]): MessageCursor | null {
   return newestRealCursor(page);
+}
+
+/**
+ * Is a failed catch-up page worth retrying?
+ *
+ * The catch-up client reads `/api/communities/[id]/messages`, which answers 400
+ * for a malformed cursor, 403 for a non-member and 500 for a database failure;
+ * the transport itself rejects with a TypeError when the network drops. A 400 or
+ * 403 can never succeed on retry — the request is permanently wrong — so only
+ * transient shapes (network failures, timeouts, rate limits, 5xx) are retryable.
+ * Anything unrecognised counts as transient but is still bounded by the caller's
+ * retry budget, so an unknown error can never retry forever.
+ */
+export function isRetryableCatchUpError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return true;
+  const status = (error as { status?: unknown }).status;
+  if (typeof status !== "number") {
+    // No HTTP status: fetchJsonCached attaches one to every response, so its
+    // absence means the request never reached a response — a network drop or a
+    // timeout. Both are transient.
+    return true;
+  }
+  if (status === 408 || status === 429) return true;
+  if (status >= 500) return true;
+  if (status >= 400) return false;
+  return true;
+}
+
+/**
+ * Bounded, cancellable driver around {@link runCatchUp}.
+ *
+ * One pass cannot drain an arbitrarily long backlog (that is what `maxPages` is
+ * for), so a client that was away for longer than one pass of history would keep
+ * a permanent gap. This controller turns one trigger into as many passes as the
+ * backlog needs — while keeping every guard the review asked for:
+ *
+ *   * AT MOST ONE drain runs at a time. A trigger that arrives mid-drain is
+ *     remembered (newest start point wins) and drained after the current one,
+ *     so concurrent triggers cannot multiply the requests;
+ *   * a drain is capped at `maxPassesPerDrain` passes. If the backlog is still
+ *     not drained, the remainder is handed to a DEFERRED pass scheduled from the
+ *     last confirmed cursor, so a long backlog drains without a new user trigger
+ *     and without one trigger starving the UI;
+ *   * a deferred pass never overlaps a running drain;
+ *   * a transient failure is retried a bounded `maxRetries` times, from the last
+ *     confirmed cursor. A permanent failure (400/403) is not retried, and once
+ *     the budget is spent the drain ends — the next reconnect, visibility change
+ *     or explicit trigger retries from the newest cached cursor;
+ *   * every pass's stop reason is reported through `onPass`, so a result is never
+ *     silently discarded;
+ *   * `dispose()` (community switch / unmount) makes `isCancelled` true, so no
+ *     in-flight pass paints and no deferred pass is issued.
+ */
+export interface CatchUpControllerOptions<T extends CursorMessage> {
+  /** Server page size. A shorter page ends a pass. */
+  pageSize: number;
+  /** Hard cap on pages fetched in ONE pass. */
+  maxPagesPerPass: number;
+  /** Hard cap on passes in one drain before the rest is deferred. */
+  maxPassesPerDrain?: number;
+  /** Consecutive transient-failure retries allowed inside one drain. */
+  maxRetries?: number;
+  /** Fetch one page strictly after `after`; null fetches the newest page. */
+  fetchPage: (after: MessageCursor | null) => Promise<T[]>;
+  /** Called per non-empty page, in arrival order. */
+  onPage?: (page: T[], after: MessageCursor | null) => void;
+  /** True once the caller has been superseded (community switched, unmount). */
+  isCancelled?: () => boolean;
+  /** Observability: called once per pass with its stop reason. */
+  onPass?: (result: CatchUpResult) => void;
+  /** Delay before a deferred continuation pass. */
+  continuationDelayMs?: number;
+  /** Base delay before a transient-failure retry (multiplied by attempt). */
+  retryBaseDelayMs?: number;
+  /** Injectable delay (tests drive it synchronously). */
+  sleep?: (delayMs: number) => Promise<void>;
+}
+
+export interface CatchUpController {
+  /**
+   * Request a drain from `from`. Resolves when the started drain (and its
+   * same-tick passes) is done; a request arriving mid-drain is queued and
+   * resolves immediately.
+   */
+  start(from: MessageCursor | null): Promise<void>;
+  /** True while a drain is executing. */
+  isRunning(): boolean;
+  /** Stop everything for good — community switch or unmount. */
+  dispose(): void;
+}
+
+export function createCatchUpController<T extends CursorMessage>(
+  options: CatchUpControllerOptions<T>,
+): CatchUpController {
+  const {
+    pageSize,
+    maxPagesPerPass,
+    maxPassesPerDrain = 4,
+    maxRetries = 2,
+    fetchPage,
+    onPage,
+    isCancelled,
+    onPass,
+    continuationDelayMs = 750,
+    retryBaseDelayMs = 1_000,
+    sleep = (delayMs) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)),
+  } = options;
+
+  let disposed = false;
+  let running = false;
+  /** A start requested while a drain ran; at most one, newest start point wins. */
+  let queued: MessageCursor | null | undefined;
+
+  const cancelled = () => disposed || Boolean(isCancelled?.());
+
+  async function drain(from: MessageCursor | null): Promise<void> {
+    running = true;
+    try {
+      let cursor: MessageCursor | null = from;
+      let passes = 0;
+      let retries = 0;
+
+      for (;;) {
+        if (cancelled()) return;
+
+        const result = await runCatchUp<T>({
+          from: cursor,
+          pageSize,
+          maxPages: maxPagesPerPass,
+          fetchPage,
+          onPage,
+          isCancelled: cancelled,
+        });
+        passes += 1;
+        onPass?.(result);
+
+        if (result.stoppedBy === "cancelled") return;
+
+        if (result.stoppedBy === "error") {
+          if (!isRetryableCatchUpError(result.error) || retries >= maxRetries) return;
+          retries += 1;
+          cursor = result.resumeFrom;
+          await sleep(retryBaseDelayMs * retries);
+          continue;
+        }
+
+        retries = 0;
+
+        // Only a page-cap stop can leave work behind, and only with a resume
+        // point. "empty"/"complete" mean the history is drained; "repeated-cursor"
+        // ends the walk so a pathological server cannot loop.
+        if (result.stoppedBy !== "max-pages" || !result.resumeFrom) return;
+        cursor = result.resumeFrom;
+
+        if (passes >= maxPassesPerDrain) {
+          // Defer the remainder: one trigger never spins, but the backlog still
+          // drains without waiting for the next user interaction.
+          const target = cursor;
+          void (async () => {
+            await sleep(continuationDelayMs);
+            if (cancelled() || running) return;
+            await start(target);
+          })();
+          return;
+        }
+
+        // Yield between passes so a long drain cannot starve the UI.
+        await sleep(0);
+      }
+    } catch {
+      // A controller bug must never reject a fire-and-forget drain. The next
+      // trigger retries from the newest cached cursor.
+    } finally {
+      running = false;
+      flushQueued();
+    }
+  }
+
+  function flushQueued(): void {
+    if (disposed || running || queued === undefined) return;
+    const next = queued;
+    queued = undefined;
+    void drain(next);
+  }
+
+  function start(from: MessageCursor | null): Promise<void> {
+    if (cancelled()) return Promise.resolve();
+    if (running) {
+      queued = from;
+      return Promise.resolve();
+    }
+    return drain(from);
+  }
+
+  return {
+    start,
+    isRunning: () => running,
+    dispose: () => {
+      disposed = true;
+      queued = undefined;
+    },
+  };
 }

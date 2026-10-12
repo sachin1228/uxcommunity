@@ -18,22 +18,34 @@ import {
 } from "@/lib/request-cache";
 import { communityMessagePageSearch } from "@/lib/communities/message-cursor";
 import {
+  createCatchUpController,
   mergeCommunityMessages,
   newestRealCursor,
   persistableMessages,
-  runCatchUp,
+  type CatchUpController,
   type MessageCursor,
 } from "@/lib/communities/messages";
+import { logEvent } from "@/lib/observability/log";
 
 /** Must match PAGE_SIZE in the messages API route. */
 const PAGE_SIZE = 50;
 
 /**
- * Ceiling on pages drained in one catch-up pass — the same bound the DM chat
+ * Ceiling on pages drained in one catch-up PASS — the same bound the DM chat
  * uses (MAX_CATCH_UP_PAGES). A reconnect after a long absence therefore applies
  * up to 20 pages of missed messages per pass instead of the newest 50 only.
  */
 const MAX_CATCH_UP_PAGES = 20;
+
+/**
+ * Passes one trigger may run before the remainder is deferred to a scheduled
+ * pass. Together with MAX_CATCH_UP_PAGES this caps one trigger's request count
+ * (4 × 20 pages) while still draining a longer backlog without a new trigger.
+ */
+const MAX_CATCH_UP_PASSES_PER_DRAIN = 4;
+
+/** Bounded transient-failure retries inside a single drain. */
+const MAX_CATCH_UP_RETRIES = 2;
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -260,33 +272,81 @@ export function useChatData({
 
   /**
    * Drain everything newer than `from` (or the newest page when there is no
-   * cursor), one page at a time.
+   * cursor), one page at a time, until the history is confirmed drained.
    *
    * The community chat used to fetch ONE page per trigger, so a reconnect after
    * more than a page of missed messages left a permanent gap in the window. The
-   * walk is bounded and self-terminating (see runCatchUp): a short or empty page
-   * ends it, a cursor that does not advance ends it, a failure is reported
-   * rather than thrown, and a community switch cancels it before the next paint.
+   * controller (createCatchUpController) runs a bounded pass, then continues from
+   * the last confirmed compound cursor — either immediately (up to a pass cap)
+   * or on a scheduled pass — so a long backlog drains without a new trigger, while
+   * a single drain stays bounded, non-overlapping, and cancellable on a community
+   * switch or unmount. Each pass's stop reason is reported (never discarded).
    */
+  const catchUpControllerRef = useRef<CatchUpController | null>(null);
+  const catchUpControllerCommunityRef = useRef<string | null>(null);
+
+  /**
+   * The catch-up controller for the current community, built on first use and
+   * reused until the community changes. It is created inside a callback rather
+   * than during render so it never reads a ref mid-render.
+   */
+  const getCatchUpController = useCallback((): CatchUpController => {
+    if (
+      catchUpControllerRef.current &&
+      catchUpControllerCommunityRef.current === communityId
+    ) {
+      return catchUpControllerRef.current;
+    }
+    // The outgoing community's controller — and any pass it deferred — must not
+    // paint into the incoming chat.
+    catchUpControllerRef.current?.dispose();
+    const targetId = communityId;
+    const isCurrent = () => communityIdRef.current === targetId;
+    const controller = createCatchUpController<Message>({
+      pageSize: PAGE_SIZE,
+      maxPagesPerPass: MAX_CATCH_UP_PAGES,
+      maxPassesPerDrain: MAX_CATCH_UP_PASSES_PER_DRAIN,
+      maxRetries: MAX_CATCH_UP_RETRIES,
+      fetchPage: async (after) => (isCurrent() ? fetchMessagePage(after, true) : []),
+      onPage: (page) => {
+        if (!isCurrent()) return;
+        applyFetchedPage(page);
+      },
+      isCancelled: () => !isCurrent(),
+      // Stop reasons are reported, never discarded. Only ids/counts are logged
+      // (see lib/observability/log): no message bodies, no tokens.
+      onPass: (result) => {
+        if (result.stoppedBy === "complete" || result.stoppedBy === "empty") return;
+        logEvent(result.stoppedBy === "error" ? "warn" : "info", {
+          event: "community.chat.catch_up",
+          community_id: targetId,
+          stop: result.stoppedBy,
+          pages: result.pages,
+          applied: result.applied,
+          ...(result.error ? { error: result.error } : {}),
+        });
+      },
+    });
+    catchUpControllerRef.current = controller;
+    catchUpControllerCommunityRef.current = communityId;
+    return controller;
+  }, [communityId, fetchMessagePage, applyFetchedPage]);
+
+  // Unmount: stop any in-flight or deferred catch-up pass.
+  useEffect(
+    () => () => {
+      catchUpControllerRef.current?.dispose();
+      catchUpControllerRef.current = null;
+      catchUpControllerCommunityRef.current = null;
+    },
+    [],
+  );
+
   const catchUpMessages = useCallback(
     async (from: MessageCursor | null = null): Promise<void> => {
-      const targetId = communityId;
-      await runCatchUp<Message>({
-        from,
-        pageSize: PAGE_SIZE,
-        maxPages: MAX_CATCH_UP_PAGES,
-        fetchPage: (after) =>
-          communityIdRef.current === targetId
-            ? fetchMessagePage(after, true)
-            : Promise.resolve([]),
-        onPage: (page) => {
-          if (communityIdRef.current !== targetId) return;
-          applyFetchedPage(page);
-        },
-        isCancelled: () => communityIdRef.current !== targetId,
-      });
+      await getCatchUpController().start(from);
     },
-    [communityId, fetchMessagePage, applyFetchedPage],
+    [getCatchUpController],
   );
 
   // ── Fetch older messages (upward pagination via ?before=ISO) ────

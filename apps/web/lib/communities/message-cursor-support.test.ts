@@ -54,22 +54,71 @@ test("a positive observation clears the suppression immediately", () => {
   assert.equal(support.supportsCompoundCursor(), true);
 });
 
-test("only a missing-function answer counts as unsupported", () => {
+test("a confirmed missing function/signature is the only unsupported answer", () => {
   // PostgREST's own code for "argument names not in the schema cache".
   assert.equal(isUnknownRpcArgumentsError({ code: "PGRST202" }), true);
-  // Older versions answer a signature mismatch with a plain 404.
-  assert.equal(isUnknownRpcArgumentsError({ code: "404" }), true);
-  // The message is the belt to the code's braces.
+  // Older PostgREST versions answer a signature mismatch with 404 — but only a
+  // body that names THIS function is proof.
   assert.equal(
-    isUnknownRpcArgumentsError({ code: "PGRST100", message: "Could not find the function public.x in the schema cache" }),
+    isUnknownRpcArgumentsError({
+      code: "404",
+      message:
+        "Could not find the function public.get_community_message_page(p_after, p_after_id) in the schema cache",
+    }),
     true,
   );
+  // Some layers drop the code; the message naming this function still suffices.
+  assert.equal(
+    isUnknownRpcArgumentsError({
+      code: null,
+      message:
+        "Could not find the function public.get_community_message_page(p_community_id) in the schema cache",
+    }),
+    true,
+  );
+});
 
-  // Everything else is a real failure and must surface as a 500 rather than
-  // being swallowed into the timestamp-only fallback.
-  assert.equal(isUnknownRpcArgumentsError({ code: "23505", message: "duplicate key" }), false);
-  assert.equal(isUnknownRpcArgumentsError({ code: "42P01" }), false);
+test("an unrelated 404 is never proof the cursor arguments are unsupported", () => {
+  // A bare 404 (a missing route, a proxy error) carries no capability signal.
+  assert.equal(isUnknownRpcArgumentsError({ code: "404" }), false);
+  assert.equal(isUnknownRpcArgumentsError({ code: "404", message: "Not Found" }), false);
+  // A 404 naming a DIFFERENT function is a different problem entirely.
+  assert.equal(
+    isUnknownRpcArgumentsError({
+      code: "404",
+      message: "Could not find the function public.some_other_rpc(p_id) in the schema cache",
+    }),
+    false,
+  );
+});
+
+test("an unrelated schema-cache error is not swallowed into the fallback", () => {
+  // PGRST205: "Could not find the table … in the schema cache" — a real failure,
+  // not a compound-cursor capability signal.
+  assert.equal(
+    isUnknownRpcArgumentsError({
+      code: "PGRST205",
+      message: "Could not find the table 'public.community_messages' in the schema cache",
+    }),
+    false,
+  );
+  assert.equal(
+    isUnknownRpcArgumentsError({ message: 'relation "community_messages" does not exist' }),
+    false,
+  );
+});
+
+test("permission, timeout and database failures surface rather than fall back", () => {
+  assert.equal(isUnknownRpcArgumentsError({ code: "42501", message: "permission denied for function" }), false);
+  assert.equal(
+    isUnknownRpcArgumentsError({ code: "57014", message: "canceling statement due to statement timeout" }),
+    false,
+  );
+  assert.equal(isUnknownRpcArgumentsError({ code: "23505", message: "duplicate key value" }), false);
+  assert.equal(isUnknownRpcArgumentsError({ code: "08006", message: "connection failure" }), false);
+  assert.equal(isUnknownRpcArgumentsError({ code: "42P01", message: "relation does not exist" }), false);
   assert.equal(isUnknownRpcArgumentsError(new Error("network down")), false);
   assert.equal(isUnknownRpcArgumentsError(null), false);
   assert.equal(isUnknownRpcArgumentsError(undefined), false);
+  assert.equal(isUnknownRpcArgumentsError("nope"), false);
 });

@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   compareCommunityMessages,
+  createCatchUpController,
   cursorOf,
   isOptimistic,
+  isRetryableCatchUpError,
   mergeCommunityMessages,
   newestRealCursor,
   oldestRealCursor,
   persistableMessages,
   runCatchUp,
+  type CatchUpStop,
 } from "./messages";
 import type { MessageCursor } from "./message-cursor";
 
@@ -373,4 +376,381 @@ test("a page holding only optimistic rows ends the pass instead of looping", asy
 
   assert.equal(result.stoppedBy, "complete");
   assert.equal(fetches, 1);
+});
+
+// ─── Continuation, cancellation and retry (the catch-up controller) ────────
+//
+// A single pass is capped (see maxPages), and a client that was away for longer
+// than one pass of history used to keep a permanent gap. The controller turns a
+// trigger into as many passes as the backlog needs — bounded, non-overlapping,
+// resumable and cancellable.
+
+/**
+ * A sleep that resolves 0 ms immediately (the between-pass yield) and queues
+ * longer delays (the deferred continuation / retry backoff) for manual release.
+ */
+function manualSleep() {
+  const pending: Array<() => void> = [];
+  const delays: number[] = [];
+  const sleep = (delayMs: number) => {
+    if (delayMs <= 0) return Promise.resolve();
+    delays.push(delayMs);
+    return new Promise<void>((resolve) => pending.push(resolve));
+  };
+  return { sleep, pending, delays };
+}
+
+async function releasePending(pending: Array<() => void>) {
+  while (pending.length > 0) {
+    pending.shift()!();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+test("runCatchUp hands back the last confirmed cursor when it hits the page cap", async () => {
+  const rows = Array.from({ length: 120 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, sorted } = feed(rows);
+
+  const result = await runCatchUp<Row>({
+    from: cursorOf(sorted[0]),
+    pageSize: PAGE_SIZE,
+    maxPages: 2,
+    fetchPage,
+  });
+
+  assert.equal(result.stoppedBy, "max-pages");
+  // Exactly the cursor the next pass must resume from: the last row applied.
+  assert.deepEqual(result.resumeFrom, cursorOf(sorted[100]));
+});
+
+test("runCatchUp hands back the failing cursor so a retry resumes where it stopped", async () => {
+  const rows = Array.from({ length: 120 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, sorted } = feed(rows);
+  let calls = 0;
+
+  const result = await runCatchUp<Row>({
+    from: cursorOf(sorted[0]),
+    pageSize: PAGE_SIZE,
+    maxPages: 5,
+    fetchPage: async (after) => {
+      calls += 1;
+      if (calls === 2) throw Object.assign(new Error("offline"), { status: 503 });
+      return fetchPage(after);
+    },
+  });
+
+  assert.equal(result.stoppedBy, "error");
+  assert.deepEqual(result.resumeFrom, cursorOf(sorted[50]));
+});
+
+test("a drained pass has no resume point", async () => {
+  const result = await runCatchUp<Row>({
+    from: { ts: at(0), id: "m0" },
+    pageSize: PAGE_SIZE,
+    maxPages: 5,
+    fetchPage: async () => [],
+  });
+  assert.equal(result.stoppedBy, "empty");
+  assert.equal(result.resumeFrom, null);
+});
+
+test("a backlog longer than one pass drains across passes, resuming from the last cursor each time", async () => {
+  const rows = Array.from({ length: 230 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, calls, sorted } = feed(rows);
+  const applied: string[] = [];
+  const stops: CatchUpStop[] = [];
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 2,
+    maxPassesPerDrain: 8,
+    fetchPage,
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+    onPass: (result) => stops.push(result.stoppedBy),
+    sleep: () => Promise.resolve(),
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+
+  // 229 missed messages at 50/page, two pages per pass: 100 + 100 + 29.
+  assert.deepEqual(stops, ["max-pages", "max-pages", "complete"]);
+  assert.deepEqual(applied, sorted.slice(1).map((row) => row.id));
+  assert.equal(new Set(applied).size, applied.length, "no message applied twice");
+
+  // Each pass resumed at the exact row the previous one stopped on.
+  assert.deepEqual(calls[0], cursorOf(sorted[0]));
+  assert.deepEqual(calls[2], cursorOf(sorted[100]));
+  assert.deepEqual(calls[4], cursorOf(sorted[200]));
+});
+
+test("the pass cap defers the remainder to one scheduled continuation", async () => {
+  const rows = Array.from({ length: 230 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, calls, sorted } = feed(rows);
+  const applied: string[] = [];
+  const { sleep, pending, delays } = manualSleep();
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 2,
+    maxPassesPerDrain: 1,
+    continuationDelayMs: 750,
+    fetchPage,
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+    sleep,
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+
+  // One pass only; the rest is deferred, not run by this trigger.
+  assert.equal(applied.length, 100);
+  assert.deepEqual(calls.map((cursor) => cursor?.id), ["m0", "m50"]);
+  assert.equal(controller.isRunning(), false);
+  assert.equal(delays.length, 1, "exactly one continuation scheduled");
+  assert.equal(pending.length, 1);
+
+  await releasePending(pending);
+
+  assert.deepEqual(applied, sorted.slice(1).map((row) => row.id));
+  assert.equal(calls.length, 5);
+  // Each deferred pass resumed at the last row the previous one applied.
+  assert.deepEqual(calls[2], cursorOf(sorted[100]));
+  assert.deepEqual(calls[4], cursorOf(sorted[200]));
+  assert.equal(pending.length, 0);
+});
+
+test("cancellation between passes of one drain stops before the next fetch", async () => {
+  const rows = Array.from({ length: 230 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, calls, sorted } = feed(rows);
+  const applied: string[] = [];
+  let cancelled = false;
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 2,
+    maxPassesPerDrain: 8,
+    fetchPage,
+    isCancelled: () => cancelled,
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+    onPass: (result) => {
+      // The user switches community the moment the first pass ends.
+      if (result.stoppedBy === "max-pages") cancelled = true;
+    },
+    sleep: () => Promise.resolve(),
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+
+  assert.equal(calls.length, 2, "the second pass never ran");
+  assert.equal(applied.length, 100);
+});
+
+test("a cancelled deferred pass issues no request", async () => {
+  const rows = Array.from({ length: 230 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, calls, sorted } = feed(rows);
+  const applied: string[] = [];
+  const { sleep, pending } = manualSleep();
+  let cancelled = false;
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 2,
+    maxPassesPerDrain: 1,
+    fetchPage,
+    isCancelled: () => cancelled,
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+    sleep,
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+  assert.equal(applied.length, 100);
+  assert.equal(pending.length, 1);
+
+  // The community switched while the continuation slept.
+  cancelled = true;
+  await releasePending(pending);
+
+  assert.equal(calls.length, 2, "a cancelled continuation never fetches");
+  assert.equal(applied.length, 100);
+});
+
+test("dispose stops a deferred continuation (unmount)", async () => {
+  const rows = Array.from({ length: 230 }, (_, index) => msg(`m${index}`, at(index)));
+  const { fetchPage, calls, sorted } = feed(rows);
+  const { sleep, pending } = manualSleep();
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 2,
+    maxPassesPerDrain: 1,
+    fetchPage,
+    sleep,
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+  assert.equal(pending.length, 1);
+
+  controller.dispose();
+  await releasePending(pending);
+
+  assert.equal(calls.length, 2, "no pass runs after dispose");
+});
+
+test("concurrent triggers cannot start overlapping drains", async () => {
+  const rows = Array.from({ length: 120 }, (_, index) => msg(`m${index}`, at(index)));
+  const sorted = rows.slice().sort(compareCommunityMessages);
+  const key = (row: { created_at: string; id: string }) => `${row.created_at}|${row.id}`;
+  let inFlight = 0;
+  let maxInFlight = 0;
+  let fetches = 0;
+
+  const fetchPage = async (after: MessageCursor | null): Promise<Row[]> => {
+    inFlight += 1;
+    fetches += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    inFlight -= 1;
+    if (!after) return sorted.slice(-PAGE_SIZE).reverse();
+    const start = sorted.findIndex((row) => key(row) === `${after.ts}|${after.id}`);
+    return sorted.slice(start + 1, start + 1 + PAGE_SIZE);
+  };
+
+  const applied: string[] = [];
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 5,
+    maxPassesPerDrain: 4,
+    fetchPage,
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+    sleep: () => Promise.resolve(),
+  });
+
+  const first = controller.start(cursorOf(sorted[0]));
+  assert.equal(controller.isRunning(), true);
+  // A burst of triggers lands while the first drain is in flight.
+  const burst = [
+    controller.start(cursorOf(sorted[0])),
+    controller.start(cursorOf(sorted[0])),
+    controller.start(cursorOf(sorted[0])),
+  ];
+  await Promise.all([first, ...burst]);
+
+  assert.equal(maxInFlight, 1, "only one page fetch is ever in flight");
+  // The burst coalesces into at most one extra drain (3 fetches for one drain).
+  assert.ok(fetches <= 6, `fetch count stays bounded (got ${fetches})`);
+  assert.deepEqual([...new Set(applied)], sorted.slice(1).map((row) => row.id));
+});
+
+test("a transient failure is retried a bounded number of times from the last cursor", async () => {
+  const rows = Array.from({ length: 6 }, (_, index) => msg(`m${index}`, at(index)));
+  const sorted = rows.slice().sort(compareCommunityMessages);
+  const stops: CatchUpStop[] = [];
+  const applied: string[] = [];
+  let attempts = 0;
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 5,
+    maxRetries: 2,
+    fetchPage: async () => {
+      attempts += 1;
+      if (attempts <= 2) throw Object.assign(new Error("network down"), { status: 503 });
+      return sorted.slice(1);
+    },
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+    onPass: (result) => stops.push(result.stoppedBy),
+    sleep: () => Promise.resolve(),
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+
+  assert.deepEqual(stops, ["error", "error", "complete"]);
+  assert.equal(attempts, 3, "initial attempt plus two retries");
+  assert.deepEqual(applied, sorted.slice(1).map((row) => row.id));
+});
+
+test("the retry budget is finite and a later trigger recovers", async () => {
+  const rows = Array.from({ length: 6 }, (_, index) => msg(`m${index}`, at(index)));
+  const sorted = rows.slice().sort(compareCommunityMessages);
+  const stops: CatchUpStop[] = [];
+  let failing = true;
+
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 5,
+    maxRetries: 1,
+    fetchPage: async () => {
+      if (failing) throw Object.assign(new Error("server error"), { status: 500 });
+      return sorted.slice(1);
+    },
+    onPass: (result) => stops.push(result.stoppedBy),
+    sleep: () => Promise.resolve(),
+  });
+
+  await controller.start(cursorOf(sorted[0]));
+  assert.deepEqual(stops, ["error", "error"], "the initial attempt plus one retry, then it gives up");
+
+  // The next reconnect / visibility / explicit trigger retries and succeeds.
+  failing = false;
+  await controller.start(cursorOf(sorted[0]));
+  assert.equal(stops.at(-1), "complete");
+});
+
+test("a permanent failure is never retried", async () => {
+  let attempts = 0;
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 5,
+    maxRetries: 3,
+    fetchPage: async () => {
+      attempts += 1;
+      throw Object.assign(new Error("Not a member of this community."), { status: 403 });
+    },
+    sleep: () => Promise.resolve(),
+  });
+
+  await controller.start({ ts: at(0), id: "m0" });
+  assert.equal(attempts, 1, "an authorization failure is permanent — no retry");
+});
+
+test("only transient catch-up failures are retryable", () => {
+  assert.equal(isRetryableCatchUpError({ status: 500 }), true);
+  assert.equal(isRetryableCatchUpError({ status: 503 }), true);
+  assert.equal(isRetryableCatchUpError({ status: 429 }), true);
+  assert.equal(isRetryableCatchUpError({ status: 408 }), true);
+  // No status means the request never reached a response — a network drop.
+  assert.equal(isRetryableCatchUpError(new Error("Failed to fetch")), true);
+  assert.equal(isRetryableCatchUpError(undefined), true);
+  // Permanent: the request itself is wrong.
+  assert.equal(isRetryableCatchUpError({ status: 400 }), false);
+  assert.equal(isRetryableCatchUpError({ status: 401 }), false);
+  assert.equal(isRetryableCatchUpError({ status: 403 }), false);
+  assert.equal(isRetryableCatchUpError({ status: 404 }), false);
+  assert.equal(isRetryableCatchUpError({ status: 422 }), false);
+});
+
+// ─── Equal-timestamp boundaries (PR #620 recheck) ─────────────────────────
+
+test("a same-timestamp burst split by a page boundary is not skipped", async () => {
+  const t = at(0);
+  const rows = [
+    ...Array.from({ length: 60 }, (_, index) => msg(`a${String(index).padStart(2, "0")}`, t)),
+    msg("later", at(10)),
+  ];
+  const { fetchPage, calls, sorted } = feed(rows);
+  const applied: string[] = [];
+
+  const result = await runCatchUp<Row>({
+    from: cursorOf(sorted[0]),
+    pageSize: PAGE_SIZE,
+    maxPages: 5,
+    fetchPage,
+    onPage: (page) => applied.push(...page.map((row) => row.id)),
+  });
+
+  assert.equal(result.stoppedBy, "complete");
+  assert.deepEqual(applied, sorted.slice(1).map((row) => row.id));
+  // The boundary landed inside the burst; the follow-up resumed at the exact id
+  // after the last row, never at the shared timestamp.
+  assert.equal(calls[1]!.ts, t);
+  assert.equal(calls[1]!.id, "a50");
 });
