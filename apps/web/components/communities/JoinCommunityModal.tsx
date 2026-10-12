@@ -28,7 +28,8 @@ export interface JoinableCommunity {
  * primary action with an optional Cancel.
  *
  * The states, in order:
- *   - member   → "you're already a member" — a statement, nothing to click.
+ *   - member   → the "already a member" line, plus "View community" when the
+ *                caller has a community to open.
  *   - requested→ the "Request sent — we'll notify you" confirmation.
  *   - closed   → a profile-gated notice (no action that cannot work).
  *   - open     → Join community (public) or Request to join (private).
@@ -44,9 +45,10 @@ export function CommunityJoinDialog({
   onClose,
   onJoined,
   onRequested,
+  onViewCommunity,
 }: {
   community: JoinableCommunity;
-  /** The viewer already belongs — the dialog says so and nothing else. */
+  /** The viewer already belongs — the dialog says so, then offers the community. */
   joined?: boolean;
   /** False when the community is closed to this profile — a notice, no action. */
   canJoin?: boolean;
@@ -58,6 +60,8 @@ export function CommunityJoinDialog({
   onJoined?: (communityId: string) => void;
   /** A private request was recorded — the caller persists the pending state. */
   onRequested?: (communityId: string) => void;
+  /** Opens the community the viewer already belongs to. */
+  onViewCommunity?: () => void;
 }) {
   const isPrivate = community.is_private === true;
   const [submitting, setSubmitting] = useState(false);
@@ -136,17 +140,30 @@ export function CommunityJoinDialog({
       </div>
 
       {isMember ? (
-        <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-border bg-surface-raised px-3.5 py-3">
-          <CheckCircle2
-            size={14}
-            strokeWidth={2.5}
-            className="mt-0.5 shrink-0 text-accent"
-            aria-hidden="true"
-          />
-          <p className="font-body text-xs leading-relaxed text-foreground-muted">
-            You&apos;re already a member of this community.
-          </p>
-        </div>
+        <>
+          <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-border bg-surface-raised px-3.5 py-3">
+            <CheckCircle2
+              size={14}
+              strokeWidth={2.5}
+              className="mt-0.5 shrink-0 text-accent"
+              aria-hidden="true"
+            />
+            <p className="font-body text-xs leading-relaxed text-foreground-muted">
+              You&apos;re already a member of this community.
+            </p>
+          </div>
+          {onViewCommunity && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={onViewCommunity}
+                className="w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                View community
+              </button>
+            </div>
+          )}
+        </>
       ) : requested ? (
         <div className="mt-6 flex flex-col items-center text-center">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-accent">
