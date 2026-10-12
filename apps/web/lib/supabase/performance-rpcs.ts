@@ -277,6 +277,56 @@ type PerformanceRpcMap = {
     args: { p_actor_id: string; p_application_id: string; p_status: string };
     returns: Array<{ application_id: string; application_status: string }>;
   };
+  // Direct messages (see 20261012100000_direct_messages.sql). All four are
+  // service-role only; the routes re-check participation before calling.
+  get_dm_conversations: {
+    args: { p_user_id: string };
+    returns: Array<{
+      conversation_id: string;
+      peer: Json;
+      last_message: Json;
+      unread_count: number;
+      my_last_read_at: string | null;
+      last_message_at: string | null;
+    }>;
+  };
+  get_dm_message_page: {
+    args: {
+      p_conversation_id: string;
+      p_user_id: string;
+      p_before: string | null;
+      p_after: string | null;
+      p_limit: number;
+    };
+    returns: Array<{
+      id: string;
+      content: string | null;
+      created_at: string;
+      user_id: string;
+      reply_to_id: string | null;
+      image_url: string | null;
+      deleted_at: string | null;
+      edited_at: string | null;
+      users: Json;
+      reactions: Json;
+      reply_to: Json;
+    }>;
+  };
+  get_dm_unread_total: {
+    args: { p_user_id: string };
+    returns: number;
+  };
+  get_or_create_dm_conversation: {
+    args: { p_me: string; p_peer: string };
+    returns: Array<{
+      id: string;
+      user_a: string;
+      user_b: string;
+      created_at: string;
+      last_message_at: string | null;
+      my_last_read_at: string | null;
+    }>;
+  };
 };
 
 /** Card scopes the profile activity tabs can request. */
