@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
+import { DotField } from "@/components/ui/DotField";
 import { ProfileCard } from "./components/ProfileCard";
 import { ImagePickerModal } from "./components/ImagePickerModal";
 import { AddLinkModal } from "./components/AddLinkModal";
@@ -145,9 +146,10 @@ export function ProfileClient({
   return (
     <div className="relative min-h-full">
       {/* Full-bleed dotted backdrop for the page: the texture belongs to the
-          page, not to a card, so the hero sits directly on it. It is masked to
-          fade out down the page, so the dots open the page and then vanish. */}
-      <div className="grid-dots grid-dots-fade pointer-events-none absolute inset-0" aria-hidden="true" />
+          page, not to a card, so the hero sits directly on it. DotField owns
+          the dot lattice — it fades out down the page and stirs under the
+          pointer without leaving the page. */}
+      <DotField />
 
       {/* The display picture leads the page with open space above it, the way
           the reference pane opens. The title stays in the document outline and

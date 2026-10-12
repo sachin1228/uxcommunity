@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { useGuardedRouter } from "@/lib/navigation-guard";
+import { useGuardedRouter, refreshPage } from "@/lib/navigation-guard";
 import { realtimePool } from "@/lib/realtime/pool";
 import {
   sidebarStore,
@@ -291,6 +291,16 @@ export function useSidebarCommunities(userId: string) {
   // recreated on navigation — the only time the rows legitimately need a
   // refresh anyway.
   const handleNavigate = useCallback((id: string) => {
+    const target = `/dashboard/communities/${id}`;
+    // Re-clicking the community that is already open refreshes it — the same
+    // re-click gesture the sidebar's nav links perform for their own pages
+    // (see `refreshPage`). The badge work below belongs to opening a
+    // community that is not on screen.
+    if (pathname === target) {
+      refreshPage(target);
+      return;
+    }
+
     // Read the pre-zero snapshot first; the optimistic badge clearing below
     // would otherwise make the manager think there is nothing to mark read.
     const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
@@ -341,8 +351,8 @@ export function useSidebarCommunities(userId: string) {
       return updated;
     });
 
-    router.push(`/dashboard/communities/${id}`);
-  }, [router]);
+    router.push(target);
+  }, [pathname, router]);
 
   return {
     communities: communities.filter((c) => !c.is_archived),

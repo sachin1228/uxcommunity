@@ -389,27 +389,32 @@ export function ProfileActivityFeed({
       <nav
         role="tablist"
         aria-label={subject ? `${subject.name}'s posts` : "Your posts"}
-        className="flex items-center gap-1 overflow-x-auto border-b border-border md:gap-3"
+        className="overflow-x-auto border-b border-border"
       >
-        {tabs.map(({ value, label, icon: Icon }) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === value}
-            onClick={() => handleTabChange(value)}
-            className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
-              activeTab === value
-                ? "border-accent text-foreground"
-                : "border-transparent text-foreground-muted hover:text-foreground"
-            }`}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
-              {label}
-            </span>
-          </button>
-        ))}
+        {/* Centred via auto margins on a shrink-wrapped row — unlike
+            `justify-center`, an overflowing row keeps its first tabs reachable
+            when the strip has to scroll on narrow screens. */}
+        <div className="mx-auto flex w-max items-center gap-1 md:gap-3">
+          {tabs.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === value}
+              onClick={() => handleTabChange(value)}
+              className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
+                activeTab === value
+                  ? "border-accent text-foreground"
+                  : "border-transparent text-foreground-muted hover:text-foreground"
+              }`}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                {label}
+              </span>
+            </button>
+          ))}
+        </div>
       </nav>
 
       <div className="pt-4">
