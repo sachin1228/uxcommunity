@@ -275,6 +275,13 @@ export function DirectMessagesView({
     setLightboxIndex(null);
   }, []);
 
+  // The window has no dashboard sidebar; the list heading's back arrow is the
+  // exit — plain history back, so it returns to whichever surface (profile,
+  // feed, sidebar) opened the window.
+  const handleBack = useCallback(() => {
+    window.history.back();
+  }, []);
+
   // ── Message actions ───────────────────────────────────────────────────────
   const focusComposer = useCallback(() => {
     setTimeout(() => {
@@ -568,6 +575,7 @@ export function DirectMessagesView({
         currentUserId={userId}
         loading={conversations === null}
         onSelect={openConversation}
+        onBack={handleBack}
         className={activeId ? "hidden min-[500px]:flex" : "flex"}
       />
 

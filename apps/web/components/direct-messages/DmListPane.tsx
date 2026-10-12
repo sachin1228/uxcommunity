@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { ChevronLeft } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { fmtTimeAgo } from "@/components/communities/chat/chatUtils";
@@ -27,6 +28,7 @@ export const DmListPane = memo(function DmListPane({
   currentUserId,
   loading,
   onSelect,
+  onBack,
   className = "",
 }: {
   conversations: DmConversationSummary[] | null;
@@ -34,11 +36,23 @@ export const DmListPane = memo(function DmListPane({
   currentUserId: string;
   loading: boolean;
   onSelect: (conversationId: string) => void;
+  /** History back — the window has no sidebar, so the heading carries the
+   *  exit to wherever the member came from. */
+  onBack: () => void;
   className?: string;
 }) {
   return (
     <aside className={`flex h-full min-h-0 w-full flex-col border-r border-border bg-background min-[500px]:w-[19rem] min-[500px]:shrink-0 ${className}`}>
-      <header className="flex h-14 shrink-0 items-center border-b border-border px-4">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          aria-label="Back"
+          title="Back"
+        >
+          <ChevronLeft size={20} strokeWidth={2.5} />
+        </button>
         <h1 className="font-body text-lg font-semibold text-foreground">Messages</h1>
       </header>
 
