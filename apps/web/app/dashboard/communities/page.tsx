@@ -17,19 +17,17 @@ import {
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
 import { useExploreCommunities } from "@/lib/communities/cache/use-community-stores";
+import {
+  EXPLORE_TABS,
+  visibleExploreRows,
+  type ExploreTabValue,
+} from "@/lib/communities/explore-filter";
 
 type Community = CachedExploreCommunity;
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
 const LOCK_REASON: Record<string, string> = {};
-
-const TABS = [
-  { label: "All",      value: "all"      },
-  { label: "Requests", value: "requests" },
-] as const;
-
-type TabValue = typeof TABS[number]["value"];
 
 // ── Compact Reddit-style card ─────────────────────────────────────────────────
 
@@ -182,7 +180,7 @@ export default function CommunitiesIndexPage() {
   // the store (cached or fresh) end the spinner even while a refetch runs.
   const [settled, setSettled]         = useState(() => exploreStore.data !== null);
   const loading                       = !settled && communities.length === 0;
-  const [activeTab, setActiveTab]     = useState<TabValue>("all");
+  const [activeTab, setActiveTab]     = useState<ExploreTabValue>("all");
   const [search, setSearch]           = useState("");
   const [joinTarget, setJoinTarget]   = useState<Community | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
@@ -250,24 +248,16 @@ export default function CommunitiesIndexPage() {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
 
-  const HIDDEN_TYPES = new Set(["sector", "city", "experience_level", "job_title"]);
-
-  const searchTerm = search.trim().toLowerCase();
-  const matchesSearch = (c: Community) => c.name.toLowerCase().includes(searchTerm);
-
-  const visible = communities.filter((c) => {
-    // The Requests tab is the member's own pending private-community requests —
-    // not a slice of the discovery list, so joined/hidden-type rules do not apply.
-    if (activeTab === "requests") return Boolean(c.has_pending_request) && matchesSearch(c);
-    if (c.joined) return false;
-    if (HIDDEN_TYPES.has(c.type)) return false;
-    return matchesSearch(c);
-  });
+  // Which tab hides what lives in lib/communities/explore-filter.ts, so the rule
+  // is pinned by tests rather than by reading this JSX.
+  const visible = visibleExploreRows(communities, activeTab, search);
 
   const isAllTab      = activeTab === "all";
   const isRequestsTab = activeTab === "requests";
-  const recommended   = isAllTab ? visible.filter((c) => c.can_join) : [];
-  const rest          = isAllTab ? visible.filter((c) => !c.can_join) : [];
+  // Recommended = the member can join outright; the rest need a request, an
+  // invite or a profile change. The split reads the same on every browse tab.
+  const recommended   = visible.filter((c) => c.can_join);
+  const rest          = visible.filter((c) => !c.can_join);
 
   return (
     <div className="flex flex-col h-full">
@@ -298,8 +288,8 @@ export default function CommunitiesIndexPage() {
         </div>
 
         {/* Pill filters */}
-        <div className="flex items-center gap-2 pb-1">
-          {TABS.map((tab) => {
+        <div className="flex flex-wrap items-center gap-2 pb-1">
+          {EXPLORE_TABS.map((tab) => {
             const isActive = activeTab === tab.value;
             return (
               <button
@@ -384,9 +374,9 @@ export default function CommunitiesIndexPage() {
             {/* Joined / locked / all communities */}
             {rest.length > 0 && (
               <section>
-                {isAllTab && recommended.length > 0 && (
+                {recommended.length > 0 && (
                   <h2 className="font-display text-sm font-semibold text-foreground mb-3">
-                    All communities
+                    {isAllTab ? "All communities" : "More communities"}
                   </h2>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
