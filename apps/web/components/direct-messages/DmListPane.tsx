@@ -19,14 +19,17 @@ function previewText(conversation: DmConversationSummary, currentUserId: string)
 
 /**
  * The conversation list pane. Rows follow the sidebar's vocabulary: avatar,
- * name, time, one-line preview, blue unread pill. Conversations start from a
- * member's profile ("Message" chip), so this pane carries no compose flow.
+ * name, time, one-line preview, blue unread pill — and, while the peer types,
+ * the community sidebar's "typing…" line in the preview's place. Conversations
+ * start from a member's profile ("Message" chip), so this pane carries no
+ * compose flow.
  */
 export const DmListPane = memo(function DmListPane({
   conversations,
   activeId,
   currentUserId,
   loading,
+  typingByConversation,
   onSelect,
   onBack,
   className = "",
@@ -35,6 +38,10 @@ export const DmListPane = memo(function DmListPane({
   activeId: string | null;
   currentUserId: string;
   loading: boolean;
+  /** conversationId → typing label. Takes the preview line's place, exactly as
+   *  the community sidebar's rows do. Referentially stable between typing
+   *  transitions, so idle sweeps never re-render a row. */
+  typingByConversation: Map<string, string>;
   onSelect: (conversationId: string) => void;
   /** History back — the window has no sidebar, so the heading carries the
    *  exit to wherever the member came from. */
@@ -73,6 +80,7 @@ export const DmListPane = memo(function DmListPane({
           (conversations ?? []).map((conversation) => {
             const active = conversation.id === activeId;
             const preview = previewText(conversation, currentUserId);
+            const typingText = typingByConversation.get(conversation.id) ?? "";
             return (
               <button
                 key={conversation.id}
@@ -94,22 +102,29 @@ export const DmListPane = memo(function DmListPane({
                     <span className="min-w-0 truncate font-body text-sm font-medium text-foreground">
                       {conversation.peer.name}
                     </span>
-                    {conversation.last_message_at && (
+                    {!typingText && conversation.last_message_at && (
                       <span className="shrink-0 font-body text-[11px] text-foreground-muted">
                         {fmtTimeAgo(conversation.last_message_at)}
                       </span>
                     )}
                   </span>
                   <span className="mt-0.5 flex items-center justify-between gap-2">
-                    <span
-                      className={`min-w-0 truncate font-body text-xs ${
-                        conversation.last_message?.deleted_at
-                          ? "italic text-foreground-muted/70"
-                          : "text-foreground-muted"
-                      }`}
-                    >
-                      {preview}
-                    </span>
+                    {typingText ? (
+                      /* Typing — highest priority, like the community sidebar */
+                      <span className="min-w-0 truncate font-body text-xs text-accent">
+                        {typingText}
+                      </span>
+                    ) : (
+                      <span
+                        className={`min-w-0 truncate font-body text-xs ${
+                          conversation.last_message?.deleted_at
+                            ? "italic text-foreground-muted/70"
+                            : "text-foreground-muted"
+                        }`}
+                      >
+                        {preview}
+                      </span>
+                    )}
                     {conversation.unread_count > 0 && (
                       <span
                         className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-1 font-body text-[10px] font-semibold leading-none text-white"

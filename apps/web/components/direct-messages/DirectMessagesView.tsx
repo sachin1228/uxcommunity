@@ -596,6 +596,7 @@ export function DirectMessagesView({
         activeId={activeId}
         currentUserId={userId}
         loading={conversations === null}
+        typingByConversation={typing.typingByConversation}
         onSelect={openConversation}
         onBack={handleBack}
         className={activeId ? "hidden min-[500px]:flex" : "flex"}

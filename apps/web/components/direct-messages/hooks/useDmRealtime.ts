@@ -217,10 +217,12 @@ export function useDmRealtime({
 
             return next;
           });
-
-          // The peer's typing indicator clears the moment their message lands.
-          if (!isOwnMessage) onTypingCleared(row.conversation_id, row.user_id);
         }
+
+        // A message always ends its sender's typing pulse — including in a
+        // background conversation, whose list row would otherwise keep its
+        // "typing…" label until the 3.5 s expiry.
+        if (!isOwnMessage) onTypingCleared(row.conversation_id, row.user_id);
 
         // ── Conversation list + read marker ─────────────────────────────────
         const preview: DmPreviewMessage = {
