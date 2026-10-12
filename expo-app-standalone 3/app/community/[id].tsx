@@ -506,7 +506,10 @@ export default function CommunityChat() {
 
       {isLoading && (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.chatOwnBubble} />
+          {/* The UI accent, like every other loading state in the app — the
+              own-bubble blue reads at ~3.5:1 against the chat background in the
+              dark theme, a third of what the accent gets. */}
+          <ActivityIndicator color={colors.accent} />
         </View>
       )}
 
@@ -553,7 +556,7 @@ export default function CommunityChat() {
           ListHeaderComponent={
             isLoadingMore ? (
               <View style={styles.loadMoreSpinner}>
-                <ActivityIndicator size="small" color={colors.chatOwnBubble} />
+                <ActivityIndicator size="small" color={colors.accent} />
               </View>
             ) : null
           }
