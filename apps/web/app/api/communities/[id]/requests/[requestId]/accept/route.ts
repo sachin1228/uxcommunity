@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
+import { communityHref, deferNotification, joinRequestAcceptedNotice } from "@/lib/notifications";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/accept
@@ -49,7 +50,10 @@ export async function POST(
     .eq("id", requestId);
 
   // Audit trail
-  const { data: targetUser } = await db.from("users").select("name").eq("id", request.user_id).maybeSingle();
+  const [{ data: targetUser }, { data: community }] = await Promise.all([
+    db.from("users").select("name").eq("id", request.user_id).maybeSingle(),
+    db.from("communities").select("name").eq("id", communityId).maybeSingle(),
+  ]);
   await logCommunityActivity(db, {
     communityId,
     actorId: userId,
@@ -57,6 +61,25 @@ export async function POST(
     action: "join_request_accepted",
     targetUserId: request.user_id,
     details: { member_name: targetUser?.name ?? null },
+  });
+
+  // Tell the requester they're in. Deferred (after the response) and
+  // best-effort: the acceptance itself stands whether or not the notice lands,
+  // and its failure only logs. It renders under the notifications page's Other
+  // tab and links straight into the community chat.
+  const acceptedNotice = joinRequestAcceptedNotice(
+    (community as { name?: string } | null)?.name ?? "the community",
+  );
+  deferNotification({
+    userId: request.user_id,
+    actorId: userId,
+    communityId,
+    type: "join_request_accepted",
+    entityType: "community",
+    entityId: communityId,
+    title: () => acceptedNotice.title,
+    body: acceptedNotice.body,
+    href: communityHref(communityId),
   });
 
   return NextResponse.json({ success: true });

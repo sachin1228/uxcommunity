@@ -11,8 +11,10 @@ import type { Json } from "@/lib/supabase/database.types";
  * The notification types the app still generates: engagement on the user's own
  * content (comments, replies, likes), event RSVPs, manager/platform removals
  * of the user's content, the thank-you a reporter gets once their report has
- * been reviewed, the all-clear when an admin undoes a removal, and the roles
- * posted that match a member's profile (see lib/jobs/notifications.ts).
+ * been reviewed, the all-clear when an admin undoes a removal, the roles
+ * posted that match a member's profile (see lib/jobs/notifications.ts), and
+ * the approval a member gets once an owner accepts their private-community
+ * join request.
  *
  * The community broadcasts ("started a new thread", "shared a new resource",
  * "created a new event") and the chat @mention rows are gone — no route
@@ -34,9 +36,16 @@ export type NotificationType =
   | "event_deleted"
   | "report_reviewed"
   | "content_restored"
-  | "job_match";
+  | "job_match"
+  | "join_request_accepted";
 
-export type NotificationEntityType = "thread" | "showcase" | "resource" | "event" | "job";
+export type NotificationEntityType =
+  | "thread"
+  | "showcase"
+  | "resource"
+  | "event"
+  | "job"
+  | "community";
 
 /** The content kinds a removal notice can be about, and how it names them. */
 const REMOVED_CONTENT_LABELS = {
@@ -100,6 +109,21 @@ export function contentRestoredNotice(
   return {
     title: `Your ${REMOVED_CONTENT_LABELS[kind]} was restored`,
     body: `We put it back up${snippet ? ` — "${snippet}"` : ""}.`,
+  };
+}
+
+/**
+ * The notice a member gets when the owner/admin reviews their request to join
+ * a private community and accepts it. The row links straight into the room, so
+ * the member's next tap lands in the group chat.
+ */
+export function joinRequestAcceptedNotice(communityName: string): {
+  title: string;
+  body: string;
+} {
+  return {
+    title: `You're in — ${communityName}`,
+    body: `Your request to join ${communityName} was accepted. Open the community to say hi.`,
   };
 }
 

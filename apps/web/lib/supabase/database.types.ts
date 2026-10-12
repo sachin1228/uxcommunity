@@ -2705,6 +2705,7 @@ export type Database = {
         Returns: {
           can_join: boolean;
           description: string;
+          has_pending_request: boolean;
           id: string;
           image_url: string;
           is_private: boolean;

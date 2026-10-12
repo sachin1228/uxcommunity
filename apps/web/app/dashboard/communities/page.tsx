@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, Lock } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -33,11 +33,9 @@ type TabValue = typeof TABS[number]["value"];
 function CommunityCard({
   c,
   onJoin,
-  joining,
 }: {
   c: Community;
-  onJoin: (id: string) => void;
-  joining: boolean;
+  onJoin: (community: Community) => void;
 }) {
   const router              = useGuardedRouter();
   const locked              = !c.can_join && !c.joined;
@@ -133,11 +131,10 @@ function CommunityCard({
             </button>
           ) : (
             <button
-              onClick={() => onJoin(c.id)}
-              disabled={joining}
-              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors disabled:opacity-60"
+              onClick={() => onJoin(c)}
+              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors"
             >
-              {joining ? "…" : c.is_private ? "Request to join" : "Join"}
+              {c.is_private ? "Request to join" : "Join"}
             </button>
           )}
         </div>
@@ -156,14 +153,14 @@ function CommunityCard({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CommunitiesIndexPage() {
+  const router = useGuardedRouter();
   const [communities, setCommunities] = useState<Community[]>(
     () => exploreStore.data?.communities ?? [],
   );
-  const [loading, setLoading]     = useState(() => exploreStore.data === null);
-  const [activeTab, setActiveTab] = useState<TabValue>("all");
-  const [search, setSearch]       = useState("");
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg]   = useState<string | null>(null);
+  const [loading, setLoading]       = useState(() => exploreStore.data === null);
+  const [activeTab, setActiveTab]   = useState<TabValue>("all");
+  const [search, setSearch]         = useState("");
+  const [joinTarget, setJoinTarget] = useState<Community | null>(null);
 
   const load = useCallback(() => {
     if (exploreStore.data && Date.now() - exploreStore.data.fetchedAt < EXPLORE_STALE_MS) {
@@ -200,62 +197,32 @@ export default function CommunitiesIndexPage() {
     return () => clearTimeout(t);
   }, [load]);
 
-  async function handleJoin(communityId: string) {
-    if (joiningId) return;
-    setJoiningId(communityId);
-    setErrorMsg(null);
-
-    // Optimistic update
+  /** Patch one community in both the page state and the shared explore store. */
+  const patchCommunity = useCallback((communityId: string, patch: Partial<Community>) => {
     setCommunities((prev) =>
-      prev.map((c) => c.id === communityId ? { ...c, joined: true } : c),
+      prev.map((c) => (c.id === communityId ? { ...c, ...patch } : c)),
     );
-    // Notify sidebar immediately so it starts re-fetching
-    invalidateOnJoin(communityId);
-
-    try {
-      const res = await dedupeFetch(`/api/communities/${communityId}/join`, { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        // Roll back optimistic update on failure
-        setCommunities((prev) =>
-          prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
-        );
-        if (exploreStore.data) {
-          exploreStore.data = {
-            ...exploreStore.data,
-            communities: exploreStore.data.communities.map((c) =>
-              c.id === communityId ? { ...c, joined: false } : c,
-            ),
-          };
-        }
-        setErrorMsg(data.error ?? "Failed to join. Please try again.");
-        setTimeout(() => setErrorMsg(null), 4000);
-      } else if (data.status === "requested") {
-        // Private community — request sent, not yet a member
-        setCommunities((prev) =>
-          prev.map((c) => c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c),
-        );
-        if (exploreStore.data) {
-          exploreStore.data = {
-            ...exploreStore.data,
-            communities: exploreStore.data.communities.map((c) =>
-              c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c,
-            ),
-          };
-        }
-        setErrorMsg("Request sent! Waiting for owner approval.");
-        setTimeout(() => setErrorMsg(null), 4000);
-      }
-    } catch {
-      setCommunities((prev) =>
-        prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
-      );
-      setErrorMsg("Network error. Please try again.");
-      setTimeout(() => setErrorMsg(null), 4000);
-    } finally {
-      setJoiningId(null);
+    if (exploreStore.data) {
+      exploreStore.data = {
+        ...exploreStore.data,
+        communities: exploreStore.data.communities.map((c) =>
+          c.id === communityId ? { ...c, ...patch } : c,
+        ),
+      };
     }
+  }, []);
+
+  /** Public join (or an auto-accepted request): the member is in — open the chat. */
+  function handleJoined(communityId: string) {
+    patchCommunity(communityId, { joined: true, has_pending_request: false });
+    invalidateOnJoin(communityId);
+    setJoinTarget(null);
+    router.push(`/dashboard/communities/${communityId}`);
+  }
+
+  /** Private community: the request is recorded, the member waits for approval. */
+  function handleRequested(communityId: string) {
+    patchCommunity(communityId, { joined: false, has_pending_request: true });
   }
 
   // ── Filtering ──────────────────────────────────────────────────────────────
@@ -323,13 +290,6 @@ export default function CommunitiesIndexPage() {
         </div>
       </div>
 
-      {/* ── Error banner ─────────────────────────────────────────────────── */}
-      {errorMsg && (
-        <div className="mx-6 mb-3 shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 font-body text-xs text-red-400">
-          {errorMsg}
-        </div>
-      )}
-
       {/* ── Community lists ───────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
         {loading ? (
@@ -353,8 +313,7 @@ export default function CommunitiesIndexPage() {
                     <CommunityCard
                       key={c.id}
                       c={c}
-                      onJoin={handleJoin}
-                      joining={joiningId === c.id}
+                      onJoin={setJoinTarget}
                     />
                   ))}
                 </div>
@@ -374,8 +333,7 @@ export default function CommunitiesIndexPage() {
                     <CommunityCard
                       key={c.id}
                       c={c}
-                      onJoin={handleJoin}
-                      joining={joiningId === c.id}
+                      onJoin={setJoinTarget}
                     />
                   ))}
                 </div>
@@ -384,6 +342,16 @@ export default function CommunitiesIndexPage() {
           </>
         )}
       </div>
+
+      {/* ── Join / request modal ─────────────────────────────────────────── */}
+      {joinTarget && (
+        <JoinCommunityModal
+          community={joinTarget}
+          onClose={() => setJoinTarget(null)}
+          onJoined={handleJoined}
+          onRequested={handleRequested}
+        />
+      )}
     </div>
   );
 }
