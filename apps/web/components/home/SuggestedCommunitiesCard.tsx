@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
 import { invalidateOnJoin } from "@/lib/communities/cache";
 import type { SuggestedCommunity } from "@/lib/home/suggested";
 
@@ -15,55 +16,36 @@ function formatMembers(count: number): string {
  * Suggested communities — open communities this member is not in yet, biggest
  * first.
  *
- * Joining mirrors the Explore page: the row disappears optimistically, the
- * shared community caches are invalidated so the left sidebar picks the
- * community up immediately, and a rejected join puts the row back with the
- * server's reason. Only communities that can be joined outright are suggested
- * here, so there is no request-to-join state to render.
+ * Join opens the same JoinCommunityModal the Explore page and the community
+ * preview use, so this rail joins identically: the dialog shows the community's
+ * own about before the member commits, then lands them in the group chat. Only
+ * communities that can be joined outright are suggested here (the selection
+ * excludes private ones), so the dialog's request path never appears.
  */
 export function SuggestedCommunitiesCard({
   communities,
 }: {
   communities: SuggestedCommunity[];
 }) {
+  const router = useRouter();
   const [joinedIds, setJoinedIds] = useState<ReadonlySet<string>>(() => new Set());
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [joinTarget, setJoinTarget] = useState<SuggestedCommunity | null>(null);
 
   const visible = communities.filter((community) => !joinedIds.has(community.id));
 
   if (visible.length === 0) return null;
 
-  function hide(id: string, hidden: boolean) {
+  function handleJoined(id: string) {
     setJoinedIds((current) => {
       const next = new Set(current);
-      if (hidden) next.add(id);
-      else next.delete(id);
+      next.add(id);
       return next;
     });
-  }
-
-  async function handleJoin(id: string) {
-    if (pendingId) return;
-    setPendingId(id);
-    setError(null);
-    hide(id, true);
     // Tell the sidebar's community list (and the Explore page) that this member
     // now belongs here — one event, both surfaces.
     invalidateOnJoin(id);
-
-    try {
-      const res = await dedupeFetch(`/api/communities/${id}/join`, { method: "POST" });
-      if (res.ok) return;
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      hide(id, false);
-      setError(data.error ?? "Failed to join. Please try again.");
-    } catch {
-      hide(id, false);
-      setError("Network error. Please try again.");
-    } finally {
-      setPendingId(null);
-    }
+    setJoinTarget(null);
+    router.push(`/dashboard/communities/${id}`);
   }
 
   return (
@@ -80,15 +62,6 @@ export function SuggestedCommunitiesCard({
           Suggested Communities
         </h2>
       </div>
-
-      {error && (
-        <p
-          role="alert"
-          className="mx-4 mb-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 font-body text-[11px] leading-snug text-red-400"
-        >
-          {error}
-        </p>
-      )}
 
       <ul className="flex flex-col px-4 pb-3">
         {visible.map((community) => (
@@ -112,16 +85,32 @@ export function SuggestedCommunitiesCard({
             </div>
             <button
               type="button"
-              onClick={() => void handleJoin(community.id)}
-              disabled={pendingId !== null}
+              onClick={() => setJoinTarget(community)}
               aria-label={`Join ${community.name}`}
-              className="shrink-0 rounded-full bg-accent px-3 py-1 font-body text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
+              className="shrink-0 rounded-full bg-accent px-3 py-1 font-body text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              {pendingId === community.id ? "Joining…" : "Join"}
+              Join
             </button>
           </li>
         ))}
       </ul>
+
+      {joinTarget && (
+        <JoinCommunityModal
+          community={{
+            id: joinTarget.id,
+            name: joinTarget.name,
+            type: joinTarget.type,
+            is_private: joinTarget.is_private,
+            image_url: joinTarget.image_url,
+            description: joinTarget.description,
+            member_count: joinTarget.member_count,
+          }}
+          onClose={() => setJoinTarget(null)}
+          onJoined={handleJoined}
+          onRequested={() => setJoinTarget(null)}
+        />
+      )}
     </section>
   );
 }

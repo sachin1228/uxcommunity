@@ -81,7 +81,7 @@ export function NotificationsSection({ initial }: NotificationsSectionProps) {
             Notifications
           </h2>
           <p className="mt-0.5 font-body text-xs text-foreground-muted">
-            Chat pushes from your communities.
+            Push alerts from your communities.
           </p>
         </div>
         <SaveStatus state={saveState} />
@@ -96,6 +96,12 @@ export function NotificationsSection({ initial }: NotificationsSectionProps) {
           description="Get push alerts for new chat messages."
           checked={prefs.chatPushEnabled}
           onChange={(checked) => void save({ chatPushEnabled: checked })}
+        />
+        <ToggleRow
+          title="Community updates"
+          description="Get push alerts when an owner accepts your request to join."
+          checked={prefs.communityPushEnabled}
+          onChange={(checked) => void save({ communityPushEnabled: checked })}
         />
         <ToggleRow
           title="Message sound"

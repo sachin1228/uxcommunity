@@ -92,6 +92,9 @@ export interface QuietHoursInput {
 /** What a member who has never opened the settings screen gets. */
 export const DEFAULT_NOTIFICATION_PREFERENCES = {
   chat_push_enabled: true,
+  // Non-chat community updates (today, the accepted-join-request notice) have
+  // their own switch — see the community_push_enabled migration.
+  community_push_enabled: true,
   chat_sound: "default" as const,
   quiet_hours_enabled: false,
   quiet_hours_start: "22:00",

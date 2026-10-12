@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
 import { communityHref, deferNotification, joinRequestAcceptedNotice } from "@/lib/notifications";
+import { deferJoinRequestAcceptedPush } from "@/lib/push/membership";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/accept
@@ -67,9 +68,8 @@ export async function POST(
   // best-effort: the acceptance itself stands whether or not the notice lands,
   // and its failure only logs. It renders under the notifications page's Other
   // tab and links straight into the community chat.
-  const acceptedNotice = joinRequestAcceptedNotice(
-    (community as { name?: string } | null)?.name ?? "the community",
-  );
+  const communityName = (community as { name?: string } | null)?.name ?? "the community";
+  const acceptedNotice = joinRequestAcceptedNotice(communityName);
   deferNotification({
     userId: request.user_id,
     actorId: userId,
@@ -80,6 +80,15 @@ export async function POST(
     title: () => acceptedNotice.title,
     body: acceptedNotice.body,
     href: communityHref(communityId),
+  });
+
+  // And wake their phone with the same news, subject to their own notification
+  // preferences (community updates switch, quiet hours, sound). Also deferred
+  // and best-effort: a push must never reach back into the manager's accept.
+  deferJoinRequestAcceptedPush({
+    userId: request.user_id,
+    communityId,
+    communityName,
   });
 
   return NextResponse.json({ success: true });

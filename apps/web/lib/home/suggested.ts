@@ -33,6 +33,9 @@ export interface SuggestedCommunitySource {
 export interface SuggestedCommunity {
   id: string;
   name: string;
+  /** Carried so the join dialog draws the same name badges as everywhere else. */
+  type: string;
+  is_private: boolean;
   description: string | null;
   image_url: string | null;
   member_count: number;
@@ -68,6 +71,8 @@ export function pickSuggestedCommunities(
     .map((community) => ({
       id: community.id,
       name: community.name,
+      type: community.type,
+      is_private: community.is_private,
       description: community.description,
       image_url: community.image_url,
       member_count: community.member_count,

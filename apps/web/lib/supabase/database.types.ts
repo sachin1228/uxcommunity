@@ -1711,6 +1711,7 @@ export type Database = {
         Row: {
           chat_push_enabled: boolean;
           chat_sound: string;
+          community_push_enabled: boolean;
           created_at: string;
           email_community_activity: boolean;
           email_job_updates: boolean;
@@ -1725,6 +1726,7 @@ export type Database = {
         Insert: {
           chat_push_enabled?: boolean;
           chat_sound?: string;
+          community_push_enabled?: boolean;
           created_at?: string;
           email_community_activity?: boolean;
           email_job_updates?: boolean;
@@ -1739,6 +1741,7 @@ export type Database = {
         Update: {
           chat_push_enabled?: boolean;
           chat_sound?: string;
+          community_push_enabled?: boolean;
           created_at?: string;
           email_community_activity?: boolean;
           email_job_updates?: boolean;

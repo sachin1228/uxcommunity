@@ -6,6 +6,7 @@ import { Check, Lock } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
 import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -22,8 +23,8 @@ type Community = CachedExploreCommunity;
 const LOCK_REASON: Record<string, string> = {};
 
 const TABS = [
-  { label: "All",        value: "all"  },
-  { label: "Member-led", value: "user" },
+  { label: "All",      value: "all"      },
+  { label: "Requests", value: "requests" },
 ] as const;
 
 type TabValue = typeof TABS[number]["value"];
@@ -33,9 +34,14 @@ type TabValue = typeof TABS[number]["value"];
 function CommunityCard({
   c,
   onJoin,
+  onWithdraw,
+  withdrawing = false,
 }: {
   c: Community;
   onJoin: (community: Community) => void;
+  /** Present on the Requests tab; turns the pending row into a withdraw action. */
+  onWithdraw?: (community: Community) => void;
+  withdrawing?: boolean;
 }) {
   const router              = useGuardedRouter();
   const locked              = !c.can_join && !c.joined;
@@ -123,12 +129,22 @@ function CommunityCard({
               )}
             </>
           ) : c.has_pending_request ? (
-            <button
-              disabled
-              className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
-            >
-              Request sent
-            </button>
+            onWithdraw ? (
+              <button
+                onClick={() => onWithdraw(c)}
+                disabled={withdrawing}
+                className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors disabled:opacity-60"
+              >
+                {withdrawing ? "…" : "Withdraw"}
+              </button>
+            ) : (
+              <button
+                disabled
+                className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
+              >
+                Request sent
+              </button>
+            )
           ) : (
             <button
               onClick={() => onJoin(c)}
@@ -157,10 +173,12 @@ export default function CommunitiesIndexPage() {
   const [communities, setCommunities] = useState<Community[]>(
     () => exploreStore.data?.communities ?? [],
   );
-  const [loading, setLoading]       = useState(() => exploreStore.data === null);
-  const [activeTab, setActiveTab]   = useState<TabValue>("all");
-  const [search, setSearch]         = useState("");
-  const [joinTarget, setJoinTarget] = useState<Community | null>(null);
+  const [loading, setLoading]         = useState(() => exploreStore.data === null);
+  const [activeTab, setActiveTab]     = useState<TabValue>("all");
+  const [search, setSearch]           = useState("");
+  const [joinTarget, setJoinTarget]   = useState<Community | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg]       = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (exploreStore.data && Date.now() - exploreStore.data.fetchedAt < EXPLORE_STALE_MS) {
@@ -225,21 +243,47 @@ export default function CommunitiesIndexPage() {
     patchCommunity(communityId, { joined: false, has_pending_request: true });
   }
 
+  /** Take back a pending request — the row leaves the Requests tab on success. */
+  async function handleWithdraw(community: Community) {
+    if (withdrawingId) return;
+    setWithdrawingId(community.id);
+    setErrorMsg(null);
+    try {
+      const res = await dedupeFetch(`/api/communities/${community.id}/join`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setErrorMsg("Couldn't withdraw the request. Please try again.");
+        return;
+      }
+      patchCommunity(community.id, { joined: false, has_pending_request: false });
+    } catch {
+      setErrorMsg("Network error. Please try again.");
+    } finally {
+      setWithdrawingId(null);
+    }
+  }
+
   // ── Filtering ──────────────────────────────────────────────────────────────
 
   const HIDDEN_TYPES = new Set(["sector", "city", "experience_level", "job_title"]);
 
-  const filtered = communities.filter((c) => {
+  const searchTerm = search.trim().toLowerCase();
+  const matchesSearch = (c: Community) => c.name.toLowerCase().includes(searchTerm);
+
+  const visible = communities.filter((c) => {
+    // The Requests tab is the member's own pending private-community requests —
+    // not a slice of the discovery list, so joined/hidden-type rules do not apply.
+    if (activeTab === "requests") return Boolean(c.has_pending_request) && matchesSearch(c);
     if (c.joined) return false;
     if (HIDDEN_TYPES.has(c.type)) return false;
-    const matchesTab    = activeTab === "all" || c.type === activeTab;
-    const matchesSearch = c.name.toLowerCase().includes(search.trim().toLowerCase());
-    return matchesTab && matchesSearch;
+    return matchesSearch(c);
   });
 
-  const isAllTab    = activeTab === "all";
-  const recommended = isAllTab ? filtered.filter((c) => c.can_join) : [];
-  const rest        = isAllTab ? filtered.filter((c) => !c.can_join) : filtered;
+  const isAllTab      = activeTab === "all";
+  const isRequestsTab = activeTab === "requests";
+  const recommended   = isAllTab ? visible.filter((c) => c.can_join) : [];
+  const rest          = isAllTab ? visible.filter((c) => !c.can_join) : [];
 
   return (
     <div className="flex flex-col h-full">
@@ -286,9 +330,16 @@ export default function CommunitiesIndexPage() {
                 {tab.label}
               </button>
             );
-          }          )}
+          })}
         </div>
       </div>
+
+      {/* ── Error banner ─────────────────────────────────────────────────── */}
+      {errorMsg && (
+        <div className="mx-6 mb-3 shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 font-body text-xs text-red-400">
+          {errorMsg}
+        </div>
+      )}
 
       {/* ── Community lists ───────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
@@ -296,7 +347,33 @@ export default function CommunitiesIndexPage() {
           <div className="flex justify-center py-16">
             <Spinner className="h-5 w-5" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : isRequestsTab ? (
+          visible.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="font-body text-sm text-foreground-muted">No pending requests</p>
+              <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
+                Requests you send to private communities will wait here until an owner accepts them.
+              </p>
+            </div>
+          ) : (
+            <section>
+              <h2 className="font-display text-sm font-semibold text-foreground mb-3">
+                Pending requests
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {visible.map((c) => (
+                  <CommunityCard
+                    key={c.id}
+                    c={c}
+                    onJoin={setJoinTarget}
+                    onWithdraw={handleWithdraw}
+                    withdrawing={withdrawingId === c.id}
+                  />
+                ))}
+              </div>
+            </section>
+          )
+        ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <p className="font-body text-sm text-foreground-muted">No communities found</p>
           </div>
