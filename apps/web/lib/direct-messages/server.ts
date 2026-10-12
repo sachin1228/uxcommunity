@@ -158,7 +158,8 @@ export async function loadDmMessagePage(
   return { ok: true, data: { messages: (data ?? []).slice().reverse() } };
 }
 
-/** What the topbar badge shows: unread peer messages across all conversations. */
+/** What the topbar badge shows: conversations with unread peer messages —
+ *  how many people have messaged you. */
 export async function loadDmUnreadTotal(
   userId: string,
 ): Promise<ReadResult<{ count: number }>> {

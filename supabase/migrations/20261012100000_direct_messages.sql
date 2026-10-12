@@ -352,8 +352,8 @@ as $$
 $$;
 
 -- ─── 10. RPC: the badge total ───────────────────────────────
--- Messages from the peer newer than the viewer's read marker, across all
--- conversations — what the topbar DM badge shows.
+-- Conversations with at least one peer message newer than the viewer's read
+-- marker — the topbar DM badge counts PEOPLE who messaged you, not messages.
 create or replace function public.get_dm_unread_total(
   p_user_id uuid
 )
@@ -363,22 +363,20 @@ stable
 security definer
 set search_path = ''
 as $$
-  select coalesce(sum(cnt), 0)::integer
-    from (
-      select (
-        select count(*)
-          from public.dm_messages m
-         where m.conversation_id = c.id
-           and m.user_id <> p_user_id
-           and m.created_at > coalesce(
-                 case when c.user_a = p_user_id then c.user_a_last_read_at
-                      else c.user_b_last_read_at end,
-                 '-infinity'::timestamptz
-               )
-      ) as cnt
-        from public.dm_conversations c
-       where c.user_a = p_user_id or c.user_b = p_user_id
-    ) as per_conversation;
+  select count(*)::integer
+    from public.dm_conversations c
+   where (c.user_a = p_user_id or c.user_b = p_user_id)
+     and exists (
+       select 1
+         from public.dm_messages m
+        where m.conversation_id = c.id
+          and m.user_id <> p_user_id
+          and m.created_at > coalesce(
+                case when c.user_a = p_user_id then c.user_a_last_read_at
+                     else c.user_b_last_read_at end,
+                '-infinity'::timestamptz
+              )
+     );
 $$;
 
 -- ─── 11. Grants: functions to service_role only ─────────────

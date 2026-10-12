@@ -18,7 +18,7 @@ export function DmTopbarButton({ userId }: { userId: string }) {
   return (
     <Link
       href="/dashboard/messages"
-      aria-label={unreadCount > 0 ? `${unreadCount} unread messages` : "Messages"}
+      aria-label={unreadCount > 0 ? `${unreadCount} unread conversations` : "Messages"}
       aria-current={active ? "page" : undefined}
       title="Messages"
       className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${

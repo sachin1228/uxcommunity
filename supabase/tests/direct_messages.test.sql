@@ -102,18 +102,20 @@ select is(
 );
 
 -- ─── Unread maths ───────────────────────────────────────────
--- Viewer has never read: 2 peer messages in conv 1 + 1 in conv 2.
+-- The badge counts CONVERSATIONS with unread peer messages (people who
+-- messaged you), not messages: viewer has 3 unread messages but they sit in
+-- two conversations (2 in conv 1, 1 in conv 2).
 select is(
   public.get_dm_unread_total('11111111-1111-1111-1111-111111111111'),
-  3,
-  'a fresh viewer counts every peer message as unread'
+  2,
+  'the badge counts unread conversations, not messages'
 );
 
 -- The author only counts the viewer's reply, not their own messages.
 select is(
   public.get_dm_unread_total('22222222-2222-2222-2222-222222222222'),
   1,
-  'own messages never count as unread'
+  'own messages never count towards the conversation total'
 );
 
 update public.dm_conversations
@@ -123,7 +125,7 @@ update public.dm_conversations
 select is(
   public.get_dm_unread_total('11111111-1111-1111-1111-111111111111'),
   1,
-  'marking conversation 1 read drops only its messages from the total'
+  'marking conversation 1 read drops it from the count'
 );
 
 -- ─── Message page ───────────────────────────────────────────
