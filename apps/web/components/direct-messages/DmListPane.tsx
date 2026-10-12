@@ -5,17 +5,14 @@ import { ChevronLeft } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { fmtTimeAgo } from "@/components/communities/chat/chatUtils";
+import { NotoEmojiSvg } from "@/components/communities/chat/NotoEmojiSvg";
+import {
+  ImagePreviewWord,
+  renderTextWithEmoji,
+} from "@/components/communities/panel/sidebar-preview-parts";
+import { messagePreview } from "@/lib/direct-messages/preview-text";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
 import { DmChatIcon } from "./DmChatIcon";
-
-/** The one-line preview of a conversation's newest message. */
-function previewText(conversation: DmConversationSummary, currentUserId: string): string {
-  const last = conversation.last_message;
-  if (!last) return "";
-  if (last.deleted_at) return "This message was deleted";
-  const body = last.content?.trim() || (last.image_url ? "📷 Photo" : "");
-  return last.user_id === currentUserId ? `You: ${body}` : body;
-}
 
 /**
  * The conversation list pane. Rows follow the sidebar's vocabulary: avatar,
@@ -79,7 +76,8 @@ export const DmListPane = memo(function DmListPane({
         ) : (
           (conversations ?? []).map((conversation) => {
             const active = conversation.id === activeId;
-            const preview = previewText(conversation, currentUserId);
+            const preview = messagePreview(conversation.last_message, currentUserId);
+            const reaction = conversation.last_reaction ?? null;
             const typingText = typingByConversation.get(conversation.id) ?? "";
             return (
               <button
@@ -114,17 +112,42 @@ export const DmListPane = memo(function DmListPane({
                       <span className="min-w-0 truncate font-body text-xs text-accent">
                         {typingText}
                       </span>
-                    ) : (
+                    ) : reaction ? (
+                      /* Reaction — "John reacted ❤️ to: \"ok\"", the same line the
+                         community sidebar draws, above the message preview. */
+                      <span className="min-w-0 truncate font-body text-xs text-foreground-muted">
+                        <span className="font-medium">{reaction.firstName}</span>
+                        {" reacted "}
+                        <NotoEmojiSvg
+                          emoji={reaction.emoji}
+                          size={14}
+                          className="align-middle mx-0.5"
+                        />
+                        {" to: "}
+                        {reaction.messagePreviewMedia === "image" ? (
+                          <ImagePreviewWord word={reaction.messagePreview} />
+                        ) : (
+                          <span>{reaction.messagePreview}</span>
+                        )}
+                      </span>
+                    ) : preview.text ? (
                       <span
                         className={`min-w-0 truncate font-body text-xs ${
-                          conversation.last_message?.deleted_at
+                          preview.deleted
                             ? "italic text-foreground-muted/70"
                             : "text-foreground-muted"
                         }`}
                       >
-                        {preview}
+                        {preview.prefix && (
+                          <span className="font-medium">{preview.prefix}: </span>
+                        )}
+                        {preview.media === "image" ? (
+                          <ImagePreviewWord word={preview.text} />
+                        ) : (
+                          renderTextWithEmoji(preview.text)
+                        )}
                       </span>
-                    )}
+                    ) : null}
                     {conversation.unread_count > 0 && (
                       <span
                         className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-1 font-body text-[10px] font-semibold leading-none text-white"

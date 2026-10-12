@@ -5,7 +5,13 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { pickOptimisticMatch } from "@/components/communities/chat/chatUtils";
-import { dmCache, bumpConversationWithMessage, patchConversationPreview } from "@/lib/direct-messages/client-cache";
+import {
+  dmCache,
+  bumpConversationWithMessage,
+  patchConversationPreview,
+  patchConversationReaction,
+} from "@/lib/direct-messages/client-cache";
+import { reactionPreviewText } from "@/lib/direct-messages/preview-text";
 import { markConversationRead, isActivelyReading } from "@/lib/direct-messages/read-manager";
 import {
   compareDmMessages,
@@ -15,7 +21,12 @@ import {
 } from "@/lib/direct-messages/messages";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { applyReactionDelete, applyReactionInsert } from "@/lib/communities/cache";
-import type { DmConversationSummary, DmMessage, DmPreviewMessage } from "@/lib/direct-messages/types";
+import type {
+  DmConversationSummary,
+  DmLastReaction,
+  DmMessage,
+  DmPreviewMessage,
+} from "@/lib/direct-messages/types";
 import type { MessageDeletedByRole, ReplyPreview } from "@/lib/communities/cache";
 
 interface DmMessageEvent {
@@ -49,6 +60,7 @@ export function useDmRealtime({
   userId,
   activeConversationIdRef,
   conversationsRef,
+  threadMessagesRef,
   setConversations,
   refreshConversations,
   setMessages,
@@ -63,6 +75,8 @@ export function useDmRealtime({
   userId: string;
   activeConversationIdRef: MutableRefObject<string | null>;
   conversationsRef: MutableRefObject<DmConversationSummary[] | null>;
+  /** The open thread's messages — used to caption a reaction preview. */
+  threadMessagesRef: MutableRefObject<DmMessage[]>;
   setConversations: (
     next:
       | DmConversationSummary[]
@@ -326,11 +340,124 @@ export function useDmRealtime({
     );
 
     // ── Reactions ───────────────────────────────────────────────────────────
+    /**
+     * The reacted-to message's body, for the row's reaction preview: the open
+     * thread first, then the row's own last message, else null (the caller
+     * fetches it lazily). Mirrors the community sidebar's fallback chain.
+     */
+    const reactionSource = (
+      conversationId: string,
+      messageId: string,
+    ): { content: string | null; hasImage: boolean } | null => {
+      if (activeConversationIdRef.current === conversationId) {
+        const inThread = threadMessagesRef.current.find((m) => m.id === messageId);
+        if (inThread) return { content: inThread.content, hasImage: Boolean(inThread.image_url) };
+      }
+      const row = conversationsRef.current?.find((c) => c.id === conversationId);
+      if (row?.last_message?.id === messageId) {
+        return { content: row.last_message.content, hasImage: Boolean(row.last_message.image_url) };
+      }
+      return null;
+    };
+
+    const buildLastReaction = (
+      args: { conversationId: string; messageId: string; reactorId: string; emoji: string; createdAt: string },
+      source: { content: string | null; hasImage: boolean } | null,
+    ): DmLastReaction => {
+      const preview = reactionPreviewText(source);
+      const isOwn = args.reactorId === userId;
+      const peerFirstName =
+        conversationsRef.current
+          ?.find((c) => c.id === args.conversationId)
+          ?.peer?.name?.split(" ")[0] ?? "Someone";
+      return {
+        messageId: args.messageId,
+        reactorId: args.reactorId,
+        emoji: args.emoji,
+        createdAt: args.createdAt,
+        firstName: isOwn ? "You" : peerFirstName,
+        isOwn,
+        messagePreview: preview.text,
+        messagePreviewMedia: preview.media,
+      };
+    };
+
+    /**
+     * Confirm a reaction on the conversation row — for EVERY conversation, not
+     * only the open one, exactly like the community sidebar. DMs are 1:1, so
+     * the reactor is either the viewer or the peer the row already names: no
+     * name lookup is needed, only the reacted message's body.
+     */
+    const applyRowReaction = (args: {
+      conversationId: string;
+      messageId: string;
+      reactorId: string;
+      emoji: string;
+      createdAt: string;
+    }) => {
+      const source = reactionSource(args.conversationId, args.messageId);
+      setConversations((prev) =>
+        patchConversationReaction(prev, {
+          conversationId: args.conversationId,
+          lastReaction: buildLastReaction(args, source),
+        }),
+      );
+      if (source) return;
+      // Reaction on an older message in a background conversation — resolve
+      // the body once; the row reads "a message" until it lands.
+      const targetId = args.messageId;
+      fetch(`/api/dm/messages/${targetId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((message: { content: string | null; image_url: string | null } | null) => {
+          if (!message) return;
+          setConversations((prev) =>
+            patchConversationReaction(prev, {
+              conversationId: args.conversationId,
+              lastReaction: buildLastReaction(args, {
+                content: message.content,
+                hasImage: Boolean(message.image_url),
+              }),
+            }),
+          );
+        })
+        .catch(() => {});
+    };
+
+    const clearRowReaction = (args: {
+      conversationId: string;
+      messageId: string;
+      reactorId: string;
+      emoji: string;
+    }) => {
+      setConversations((prev) => {
+        const current = prev.find((c) => c.id === args.conversationId)?.last_reaction;
+        if (
+          !current ||
+          current.messageId !== args.messageId ||
+          current.emoji !== args.emoji ||
+          current.reactorId !== args.reactorId
+        ) {
+          return prev;
+        }
+        return patchConversationReaction(prev, {
+          conversationId: args.conversationId,
+          lastReaction: null,
+        });
+      });
+    };
+
     unsubscribes.push(
       realtimeClient.on(dmRoom, "dm-reaction-insert", (data) => {
-        const r = data as { conversation_id: string; message_id: string; user_id: string; emoji: string };
-        if (!r?.message_id) return;
+        const r = data as { conversation_id: string; message_id: string; user_id: string; emoji: string; created_at?: string };
+        if (!r?.message_id || !r.conversation_id) return;
         if (r.user_id === userId && shouldSuppressReactionEcho(r.conversation_id, r.message_id, r.user_id)) return;
+        applyRowReaction({
+          conversationId: r.conversation_id,
+          messageId: r.message_id,
+          reactorId: r.user_id,
+          emoji: r.emoji,
+          createdAt: r.created_at ?? new Date().toISOString(),
+        });
         if (activeConversationIdRef.current !== r.conversation_id) return;
         setMessages((prev) => {
           const next = prev.map((m) =>
@@ -348,10 +475,17 @@ export function useDmRealtime({
       realtimeClient.on(dmRoom, "dm-reaction-update", (data) => {
         const { old: oldR, new: newR } = data as {
           old: { conversation_id: string; message_id: string; user_id: string; emoji: string };
-          new: { conversation_id: string; message_id: string; user_id: string; emoji: string };
+          new: { conversation_id: string; message_id: string; user_id: string; emoji: string; created_at?: string };
         };
-        if (!newR?.message_id) return;
+        if (!newR?.message_id || !newR.conversation_id) return;
         if (newR.user_id === userId && shouldSuppressReactionEcho(newR.conversation_id, newR.message_id, newR.user_id)) return;
+        applyRowReaction({
+          conversationId: newR.conversation_id,
+          messageId: newR.message_id,
+          reactorId: newR.user_id,
+          emoji: newR.emoji,
+          createdAt: newR.created_at ?? new Date().toISOString(),
+        });
         if (activeConversationIdRef.current !== newR.conversation_id) return;
         setMessages((prev) => {
           const next = prev.map((m) => {
@@ -368,8 +502,14 @@ export function useDmRealtime({
     unsubscribes.push(
       realtimeClient.on(dmRoom, "dm-reaction-delete", (data) => {
         const r = data as { conversation_id: string; message_id: string; user_id: string; emoji: string };
-        if (!r?.message_id || !r.user_id || !r.emoji) return;
+        if (!r?.message_id || !r.user_id || !r.emoji || !r.conversation_id) return;
         if (r.user_id === userId && shouldSuppressReactionEcho(r.conversation_id, r.message_id, r.user_id)) return;
+        clearRowReaction({
+          conversationId: r.conversation_id,
+          messageId: r.message_id,
+          reactorId: r.user_id,
+          emoji: r.emoji,
+        });
         if (activeConversationIdRef.current !== r.conversation_id) return;
         setMessages((prev) => {
           const next = prev.map((m) =>

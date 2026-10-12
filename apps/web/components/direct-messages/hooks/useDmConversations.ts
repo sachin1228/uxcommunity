@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchJsonCached } from "@/lib/request-cache";
-import { applyReadFloor, dmCache } from "@/lib/direct-messages/client-cache";
+import { applyLocalReaction, applyReadFloor, dmCache } from "@/lib/direct-messages/client-cache";
 import { getReadFloor } from "@/lib/direct-messages/read-manager";
 import { dmUrls } from "@/lib/direct-messages/client";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
@@ -40,10 +40,17 @@ export function useDmConversations({ userId }: { userId: string }) {
         );
         // A payload fetched before this client's read PATCH landed carries the
         // pre-read unread counts; the read floor keeps those from resurrecting
-        // the badge the user just cleared.
-        const next = (data.conversations ?? []).map((conversation) =>
-          applyReadFloor(conversation, getReadFloor(conversation.id)),
+        // the badge the user just cleared. The locally painted reaction preview
+        // is merged over the payload the same way, because the server's
+        // reaction publish and this projection are not in step — a refetch in
+        // between used to wipe the line the member just watched appear.
+        const previousById = new Map(
+          (dmCache.getConversations() ?? []).map((c) => [c.id, c] as const),
         );
+        const next = (data.conversations ?? []).map((conversation) => {
+          const withFloor = applyReadFloor(conversation, getReadFloor(conversation.id));
+          return applyLocalReaction(withFloor, previousById.get(conversation.id)?.last_reaction);
+        });
         dmCache.setConversations(next);
         setConversationsState(next);
       } catch {

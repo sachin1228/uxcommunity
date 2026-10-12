@@ -288,6 +288,8 @@ type PerformanceRpcMap = {
       unread_count: number;
       my_last_read_at: string | null;
       last_message_at: string | null;
+      /** Newest reaction event per conversation (null once a newer message exists). */
+      last_reaction: Json;
     }>;
   };
   get_dm_message_page: {

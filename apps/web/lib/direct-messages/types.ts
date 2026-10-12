@@ -31,6 +31,28 @@ export interface DmPreviewMessage {
   edited_at: string | null;
 }
 
+/**
+ * The newest reaction event on a conversation, as its list row previews it —
+ * the DM counterpart of the community sidebar's `lastReaction`. The row reads
+ * "John reacted ❤️ to: \"ok\"", and a later message clears it.
+ */
+export interface DmLastReaction {
+  /** The message that received the reaction. */
+  messageId: string;
+  /** Who reacted — kept so realtime delete/update events can be matched. */
+  reactorId: string;
+  emoji: string;
+  /** Ordering guard between a fetched payload and later realtime events. */
+  createdAt: string;
+  /** First name of the reactor ("You" when it is the viewer). */
+  firstName: string;
+  isOwn: boolean;
+  /** Snippet of the reacted message's body, or a "Photo"/"a message" stand-in. */
+  messagePreview: string;
+  /** Set when the reacted message was an image with no caption. */
+  messagePreviewMedia: "image" | null;
+}
+
 /** One row of the conversation list (get_dm_conversations). */
 export interface DmConversationSummary {
   id: string;
@@ -40,4 +62,6 @@ export interface DmConversationSummary {
   unread_count: number;
   my_last_read_at: string | null;
   last_message_at: string | null;
+  /** Most recent reaction — previewed instead of the message when set. */
+  last_reaction?: DmLastReaction | null;
 }

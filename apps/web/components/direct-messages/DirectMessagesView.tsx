@@ -109,6 +109,7 @@ export function DirectMessagesView({
     conversationId: activeId,
     currentUserId: userId,
     setMessages: setThreadMessages,
+    setConversations,
   });
   const scroll = useDmScrollAndUnread({
     conversationId: activeId,
@@ -238,11 +239,19 @@ export function DirectMessagesView({
     handleImageClear,
   } = send;
 
+  // The open thread's messages, read by the realtime hook to caption a
+  // reaction preview (the reacted message's body is not in the list payload).
+  const threadMessagesRef = useRef<DmMessage[]>([]);
+  useEffect(() => {
+    threadMessagesRef.current = thread.messages;
+  }, [thread.messages]);
+
   // ── Realtime (one subscription for every conversation) ────────────────────
   useDmRealtime({
     userId,
     activeConversationIdRef: activeIdRef,
     conversationsRef,
+    threadMessagesRef,
     setConversations,
     refreshConversations: refresh,
     setMessages: setThreadMessages,
