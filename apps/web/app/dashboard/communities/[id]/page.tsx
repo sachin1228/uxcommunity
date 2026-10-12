@@ -63,9 +63,13 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   // facts the Explore page shows — plus the viewer's join eligibility.
   // An unknown/inactive community falls through to the chat's own
   // "Community not found" state.
+  //
+  // A member is never sent here, even when the read model above failed to load:
+  // the preview introduces a community they already belong to, and the chat
+  // loads its own metadata client-side.
   if (!ssrData) {
     const preview = await loadCommunityPreview(createServiceClient(), id, userId).catch(() => null);
-    if (preview) {
+    if (preview && !preview.joined) {
       return (
         <CommunityPreview
           communityId={preview.id}
@@ -77,7 +81,6 @@ export default async function CommunityPage({ params, searchParams }: Props) {
           memberCount={preview.member_count}
           canJoin={preview.can_join}
           hasPendingRequest={preview.has_pending_request}
-          joined={preview.joined}
         />
       );
     }

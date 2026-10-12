@@ -57,7 +57,7 @@ export function CommunityPreviewModal({
     return () => window.clearTimeout(t);
   }, [load]);
 
-  /** Both the member's "View community" and a fresh join land in the chat. */
+  /** A fresh join lands in the chat the member just unlocked. */
   function openCommunity() {
     onClose();
     router.push(`/dashboard/communities/${communityId}`);
@@ -85,7 +85,6 @@ export function CommunityPreviewModal({
           hasPendingRequest={preview.has_pending_request}
           onClose={onClose}
           onJoined={openCommunity}
-          onViewCommunity={openCommunity}
         />
       ) : (
         <div className="flex min-h-40 flex-col items-center justify-center gap-2">

@@ -19,6 +19,9 @@ import { CommunityJoinDialog } from "./JoinCommunityModal";
  * instead of a button that cannot work. A community that has been deleted never
  * reaches this component — the page falls through to "Community not found", and
  * the home-feed popup shows its own deleted state.
+ *
+ * Members never reach it either: the page renders the chat for them, so this is
+ * only ever the non-member introduction.
  */
 export function CommunityPreview({
   communityId,
@@ -30,7 +33,6 @@ export function CommunityPreview({
   memberCount,
   canJoin = true,
   hasPendingRequest = false,
-  joined = false,
 }: {
   communityId: string;
   name: string;
@@ -41,13 +43,11 @@ export function CommunityPreview({
   memberCount: number;
   canJoin?: boolean;
   hasPendingRequest?: boolean;
-  /** True when the viewer already belongs to this community. */
-  joined?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  /** Joining (or opening an existing membership) lands in the group chat. */
+  /** Joining lands in the group chat the member just unlocked. */
   function openCommunity() {
     const target = `/dashboard/communities/${communityId}`;
     // Already on this community's page: a push would be a no-op, so refresh and
@@ -69,11 +69,9 @@ export function CommunityPreview({
             description,
             member_count: memberCount,
           }}
-          joined={joined}
           canJoin={canJoin}
           hasPendingRequest={hasPendingRequest}
           onJoined={openCommunity}
-          onViewCommunity={openCommunity}
         />
       </div>
     </div>
