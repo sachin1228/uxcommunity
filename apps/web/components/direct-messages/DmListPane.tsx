@@ -1,7 +1,7 @@
 "use client";
 
-import { memo } from "react";
-import { ChevronLeft } from "lucide-react";
+import { memo, useState } from "react";
+import { ChevronLeft, Search } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { fmtTimeAgo } from "@/components/communities/chat/chatUtils";
@@ -11,6 +11,7 @@ import {
   renderTextWithEmoji,
 } from "@/components/communities/panel/sidebar-preview-parts";
 import { messagePreview } from "@/lib/direct-messages/preview-text";
+import { filterConversations } from "@/lib/direct-messages/search";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
 import { DmChatIcon } from "./DmChatIcon";
 
@@ -19,7 +20,8 @@ import { DmChatIcon } from "./DmChatIcon";
  * name, time, one-line preview, blue unread pill — and, while the peer types,
  * the community sidebar's "typing…" line in the preview's place. Conversations
  * start from a member's profile ("Message" chip), so this pane carries no
- * compose flow.
+ * compose flow. A search box filters the rows by peer name — kept as the
+ * pane's own state so a keystroke never re-renders the thread beside it.
  */
 export const DmListPane = memo(function DmListPane({
   conversations,
@@ -45,6 +47,10 @@ export const DmListPane = memo(function DmListPane({
   onBack: () => void;
   className?: string;
 }) {
+  const [query, setQuery] = useState("");
+  const all = conversations ?? [];
+  const visible = filterConversations(all, query);
+
   return (
     <aside className={`flex h-full min-h-0 w-full flex-col border-r border-border bg-background min-[500px]:w-[19rem] min-[500px]:shrink-0 ${className}`}>
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-4">
@@ -60,12 +66,38 @@ export const DmListPane = memo(function DmListPane({
         <h1 className="font-body text-lg font-semibold text-foreground">Messages</h1>
       </header>
 
+      {/* Search — same field, glyph and copy as the members pane. Escape clears
+          the query so the full list is always one key away. */}
+      <div className="shrink-0 px-3 pb-1 pt-2">
+        <div className="relative">
+          <Search
+            size={14}
+            strokeWidth={2.5}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted"
+          />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && query) {
+                e.stopPropagation();
+                setQuery("");
+              }
+            }}
+            placeholder="Search conversations…"
+            aria-label="Search conversations"
+            className="field w-full pl-8 pr-3"
+          />
+        </div>
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {conversations === null && loading ? (
           <div className="flex h-full items-center justify-center" role="status" aria-label="Loading conversations">
             <Spinner size={22} />
           </div>
-        ) : (conversations ?? []).length === 0 ? (
+        ) : all.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <DmChatIcon size={28} className="text-foreground-muted/60" />
             <p className="font-body text-sm text-foreground-muted">No conversations yet.</p>
@@ -73,8 +105,16 @@ export const DmListPane = memo(function DmListPane({
               Start one from any member profile.
             </p>
           </div>
+        ) : visible.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <Search size={24} strokeWidth={2} className="text-foreground-muted/60" />
+            <p className="font-body text-sm text-foreground-muted">No conversations found</p>
+            <p className="font-body text-xs text-foreground-muted/70">
+              Try a different name.
+            </p>
+          </div>
         ) : (
-          (conversations ?? []).map((conversation) => {
+          visible.map((conversation) => {
             const active = conversation.id === activeId;
             const preview = messagePreview(conversation.last_message, currentUserId);
             const reaction = conversation.last_reaction ?? null;
