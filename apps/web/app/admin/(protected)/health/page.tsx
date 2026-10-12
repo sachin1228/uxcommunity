@@ -1,8 +1,8 @@
 // System Health — one screen that answers "is the thing users depend on
 // reachable right now?" for every external service the product leans on:
-// Cloudflare R2 (uploads), Supabase (every read and write), the realtime Worker
-// (chat/typing/presence), Upstash (rate limiting), Resend (email) and GIPHY
-// (GIF search).
+// Cloudflare R2 (uploads), the Next.js incremental cache bucket, Supabase
+// (every read and write), the realtime Worker (chat/typing/presence), Upstash
+// (rate limiting), Resend (email) and GIPHY (GIF search).
 //
 // It exists because the 2026-10-09 upload outage was only visible from inside
 // the failing routes: a rejected R2 credential turned every upload into a 500
@@ -34,6 +34,7 @@ import {
   Database,
   HardDrive,
   HeartPulse,
+  Layers,
   Mail,
   Radio,
   TriangleAlert,
@@ -50,6 +51,7 @@ export const dynamic = "force-dynamic";
 
 const ICONS = {
   r2: HardDrive,
+  "r2-cache": Layers,
   supabase: Database,
   realtime: Radio,
   upstash: Zap,
@@ -136,9 +138,9 @@ export default async function SystemHealthPage() {
             System Health
           </h1>
           <p className="mt-1 max-w-2xl font-body text-xs text-foreground-muted">
-            Live reachability of every service the product depends on. Checks are read-only —
-            re-checking never writes to storage, delivers a realtime event, sends an email, or
-            changes a row.
+            Live reachability of every service the product depends on, plus the size of the Next.js
+            cache bucket it fills up. Checks are read-only — re-checking never writes to storage,
+            delivers a realtime event, sends an email, or changes a row.
           </p>
         </div>
 

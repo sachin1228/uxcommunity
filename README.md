@@ -393,13 +393,19 @@ this check.
 ### Dependency health and alerts
 
 `/admin/health` answers "is every external service up?" with a check per
-dependency — R2, Supabase, the realtime Worker, Upstash, Resend and GIPHY — each
-with status, latency, a plain-language detail and the value to fix. Every probe
-is inert, so the page can be re-checked freely: R2 lists a `healthcheck/` prefix
-and writes nothing, Supabase counts rows without transferring them, and the
-realtime probe publishes an **empty** event list (the Worker checks the secret,
-refuses the payload, and delivers nothing). `/api/admin/health` serves the same
-report to a monitor and answers 503 while something is unhealthy.
+dependency — R2, the Next.js cache bucket, Supabase, the realtime Worker,
+Upstash, Resend and GIPHY — each with status, latency, a plain-language detail
+and the value to fix. Every probe is inert, so the page can be re-checked
+freely: R2 lists a `healthcheck/` prefix and writes nothing, the cache bucket is
+listed through its own Worker binding and counted (objects, bytes, and the build
+prefixes they belong to), Supabase counts rows without transferring them, and
+the realtime probe publishes an **empty** event list (the Worker checks the
+secret, refuses the payload, and delivers nothing). `/api/admin/health` serves
+the same report to a monitor and answers 503 while something is unhealthy.
+
+The cache bucket is the one probe that needs a Worker: a local `next dev` server
+has no bindings at all, and the card says so rather than reporting a fault that
+does not exist.
 
 Nobody has to open the page to find out. The realtime Worker runs a scheduled
 monitor (a Durable Object alarm, state in `apps/realtime/src/alert-monitor.ts`)
@@ -413,6 +419,13 @@ addresses in `ADMIN_EMAIL` through Resend:
 Only services a user would notice are alertable (R2, Supabase, realtime, Resend).
 A dead GIPHY key or an Upstash blip still shows on the page — it just never wakes
 anyone up, which is the point.
+
+The cache bucket check is the one entry that is about size rather than
+reachability. That bucket only grows — every deploy writes the same small key set
+under a fresh build prefix and nothing expires the previous ones — so the card
+reports the object count, the size and the split between the newest build and
+everything older, and turns degraded past 25,000 entries or 1 GiB. It never
+emails: a bucket that has grown is a cleanup job, not an outage.
 
 ## CI/CD
 

@@ -2,14 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  CACHE_BUCKET_BINDING,
+  CACHE_MAX_PAGES,
+  CACHE_WARN_OBJECTS,
+  CacheBindingMissingError,
   checkDatabase,
   checkDependencies,
   checkGiphy,
+  checkR2Cache,
   checkR2Media,
   checkRealtimeWorker,
   checkResend,
   checkUpstash,
   HEALTHCHECK_PREFIX,
+  scanCacheBucket,
+  type CacheBucketPage,
 } from "./dependencies";
 
 /** The 401 that took every upload route down on 2026-10-09. */
@@ -28,6 +35,28 @@ function stubFetch(status: number) {
     return new Response(status === 200 ? "ok" : "nope", { status });
   }) as unknown as typeof fetch;
   return { fetchImpl, calls };
+}
+
+/**
+ * One listing page of incremental-cache entries.
+ *
+ * Entries are `[key, size, written]` so a test can put different builds in
+ * different pages and still control which one looks newest — the property the
+ * scan sorts on.
+ */
+function cachePage(
+  entries: Array<[key: string, size: number, uploaded?: string]>,
+  options: { cursor?: string; truncated?: boolean } = {},
+): CacheBucketPage {
+  return {
+    objects: entries.map(([key, size, uploaded]) => ({
+      key,
+      size,
+      uploaded: Date.parse(uploaded ?? "2026-10-01T00:00:00.000Z"),
+    })),
+    truncated: options.truncated ?? false,
+    ...(options.cursor ? { cursor: options.cursor } : {}),
+  };
 }
 
 const withPublicBase = async (fn: () => Promise<void>) => {
@@ -101,6 +130,137 @@ test("a missing public URL is down before any request is made", async () => {
   } finally {
     if (previous !== undefined) process.env.R2_PUBLIC_URL = previous;
   }
+});
+
+test("a scan adds objects, bytes and build prefixes up across pages, newest build first", async () => {
+  const cursors: Array<string | undefined> = [];
+  const usage = await scanCacheBucket(async (cursor) => {
+    cursors.push(cursor);
+    if (!cursor) {
+      return cachePage(
+        [
+          ["incremental-cache/build-old/a.cache", 100, "2026-09-01T00:00:00.000Z"],
+          ["incremental-cache/build-old/b.cache", 100, "2026-09-02T00:00:00.000Z"],
+          ["loose-key-without-a-build", 25, "2026-08-01T00:00:00.000Z"],
+        ],
+        { truncated: true, cursor: "page-2" },
+      );
+    }
+    return cachePage([["incremental-cache/build-new/c.cache", 50, "2026-10-10T00:00:00.000Z"]]);
+  });
+
+  assert.deepEqual(cursors, [undefined, "page-2"], "page two must start from page one's cursor");
+  assert.equal(usage.objectCount, 4);
+  assert.equal(usage.totalBytes, 275);
+  assert.equal(usage.truncated, false);
+  assert.deepEqual(
+    usage.builds.map((build) => [build.buildId, build.objects, build.bytes]),
+    [
+      ["build-new", 1, 50],
+      ["build-old", 2, 200],
+      ["(unrecognised keys)", 1, 25],
+    ],
+    "newest build first, and a key that names no build is still counted",
+  );
+});
+
+test("a bucket that never ends stops at the page cap and says its numbers are lower bounds", async () => {
+  let calls = 0;
+  const usage = await scanCacheBucket(async () => {
+    calls += 1;
+    return cachePage([[`incremental-cache/build-${calls}/${calls}.cache`, 10]], {
+      truncated: true,
+      cursor: `cursor-${calls}`,
+    });
+  });
+
+  assert.equal(calls, CACHE_MAX_PAGES, "one check must never walk a runaway bucket");
+  assert.equal(usage.objectCount, CACHE_MAX_PAGES);
+  assert.equal(usage.truncated, true);
+});
+
+test("a truncated page with no cursor ends the scan instead of repeating it", async () => {
+  let calls = 0;
+  const usage = await scanCacheBucket(async () => {
+    calls += 1;
+    return cachePage([["incremental-cache/build/a.cache", 1]], { truncated: true });
+  });
+
+  assert.equal(calls, 1, "without a cursor the next listing would be the same page again");
+  assert.equal(usage.truncated, false, "nothing was left unread");
+});
+
+test("the cache bucket check reports the numbers and stays healthy while they are modest", async () => {
+  const check = await checkR2Cache(async () => ({
+    objectCount: 9_920,
+    totalBytes: 239.86 * 1024 ** 2,
+    builds: [
+      { buildId: "build-new", objects: 12, bytes: 300_000, lastUploaded: Date.parse("2026-10-12") },
+      { buildId: "build-old", objects: 9_908, bytes: 251_202_428, lastUploaded: Date.parse("2026-10-01") },
+    ],
+    truncated: false,
+  }));
+
+  assert.equal(check.status, "ok");
+  assert.equal(check.id, "r2-cache");
+  assert.equal(check.severity, "supporting");
+  assert.equal(check.alerts, false, "a grown bucket is a cleanup job, not an outage");
+  assert.match(check.detail, /9,920 objects/);
+  assert.match(check.detail, /239\.86 MB/);
+  assert.match(check.detail, /2 build prefixes/);
+  assert.match(check.detail, /everything older holds 239\.57 MB/);
+  assert.equal(check.hint, undefined, "nothing to fix yet");
+});
+
+test("a bucket past the warning line degrades, naming what grows it", async () => {
+  const check = await checkR2Cache(async () => ({
+    objectCount: CACHE_WARN_OBJECTS + 1,
+    totalBytes: 1024 ** 3,
+    builds: [{ buildId: "build-new", objects: 12, bytes: 1000, lastUploaded: Date.parse("2026-10-12") }],
+    truncated: true,
+  }));
+
+  assert.equal(check.status, "degraded");
+  assert.match(check.detail, /lower bounds/);
+  assert.match(check.hint ?? "", /25,000/);
+  assert.match(check.hint ?? "", /deploy/);
+});
+
+test("no cache binding is down, and points at the binding rather than the media credential", async () => {
+  const check = await checkR2Cache(async () => {
+    throw new CacheBindingMissingError();
+  });
+
+  assert.equal(check.status, "down");
+  assert.match(check.detail, /per-isolate memory/);
+  assert.match(check.hint ?? "", new RegExp(CACHE_BUCKET_BINDING));
+  assert.match(check.hint ?? "", /apps\/web\/wrangler\.toml/);
+  assert.equal(check.hint?.includes("R2_ACCESS_KEY_ID"), false);
+});
+
+test("a process that is not a Worker reports nothing to read, not a fault", async () => {
+  // No injected scanner: this exercises the real path. A Node test process has
+  // no Cloudflare context — the same shape as a local `next dev` server, which
+  // is where the card was first read — and neither is a broken deploy, so
+  // neither may put a red card on the page.
+  const check = await checkR2Cache();
+
+  assert.equal(check.status, "ok");
+  assert.match(check.detail, /Not running on Cloudflare/);
+  assert.equal(check.hint, undefined, "nothing is broken, so there is nothing to fix");
+  assert.equal(check.severity, "supporting");
+});
+
+test("a bucket that answers an error degrades without blaming the binding", async () => {
+  const check = await checkR2Cache(async () => {
+    const error = new Error("NoSuchBucket");
+    error.name = "NoSuchBucket";
+    throw error;
+  });
+
+  assert.equal(check.status, "degraded");
+  assert.match(check.detail, /NoSuchBucket/);
+  assert.equal(check.hint?.includes(CACHE_BUCKET_BINDING), false);
 });
 
 test("the database check reports the query answer, and the error when it fails", async () => {
@@ -232,6 +392,12 @@ test("GIPHY is supporting only: its key can fail without paging anyone", async (
 /** Every probe stubbed healthy, so the report can be exercised offline. */
 const allHealthy = () => ({
   r2: async () => ({ objects: [] }),
+  "r2-cache": async () => ({
+    objectCount: 4,
+    totalBytes: 4096,
+    builds: [{ buildId: "build", objects: 4, bytes: 4096, lastUploaded: 0 }],
+    truncated: false,
+  }),
   database: async () => {},
   realtime: { url: "https://rt.example.in", secret: "s", fetchImpl: stubFetch(400).fetchImpl },
   upstash: { url: "https://up.example.in", token: "t", fetchImpl: stubFetch(200).fetchImpl },
@@ -247,7 +413,7 @@ test("the report separates what must page an admin from what must not", async ()
     assert.deepEqual(healthy.alerts, []);
     assert.deepEqual(
       healthy.checks.map((entry) => entry.id),
-      ["r2", "supabase", "realtime", "upstash", "resend", "giphy"],
+      ["r2", "r2-cache", "supabase", "realtime", "upstash", "resend", "giphy"],
     );
     assert.ok(Date.parse(healthy.checkedAt) > 0);
 
@@ -261,7 +427,7 @@ test("the report separates what must page an admin from what must not", async ()
     });
     assert.equal(critical.healthy, false);
     assert.deepEqual(critical.alerts.map((entry) => entry.id), ["r2"]);
-    assert.equal(critical.checks.filter((entry) => entry.status === "ok").length, 5);
+    assert.equal(critical.checks.filter((entry) => entry.status === "ok").length, 6);
 
     // A broken supporting service is visible but stays silent: the app still
     // serves, and an admin should not be woken for GIF search.
