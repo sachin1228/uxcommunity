@@ -62,9 +62,9 @@ export const CommunityRow = memo(function CommunityRow({
   const contentPreview = lastContent ? formatContentPreview(lastContent) : null;
   // The row's unread total: messages plus unread threads/showcase posts/
   // resources/events created by others. It closes the row's marks — after the
-  // mute bell and the pin — and it is what turns the timestamp blue, the same
-  // "there is something new here" the messenger this row imitates says in
-  // green. Nothing is unread while the community is open in front of you.
+  // mute bell and the pin — and it is the row's only "there is something new
+  // here" signal; the timestamp above stays in its normal colour. Nothing is
+  // unread while the community is open in front of you.
   const unreadCount = c.message_count + (c.unread_content_count ?? 0);
   const hasUnread = unreadCount > 0 && !active;
 
@@ -116,7 +116,6 @@ export const CommunityRow = memo(function CommunityRow({
                     ? c.last_message!.created_at
                     : lastContent.created_at
                 }
-                highlight={hasUnread}
               />
             )}
           </div>
@@ -227,8 +226,7 @@ export const CommunityRow = memo(function CommunityRow({
 
             {/* Unread count — messages plus unread threads/showcase posts/
                 resources/events created by others. It closes the row's marks
-                and wears the blue of the member's own messages, the same blue
-                the timestamp takes (`SidebarTimestamp`). */}
+                and wears the blue of the member's own messages. */}
             {hasUnread && (
               <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-[var(--ds-blue-800)] text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
                 {unreadCount > 99 ? "99+" : unreadCount}

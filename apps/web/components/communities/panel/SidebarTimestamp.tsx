@@ -4,13 +4,11 @@ import { useEffect, useState } from "react";
 import { formatSidebarTime } from "@/lib/communities/sidebar-time";
 
 /**
- * The row's timestamp. `highlight` is set while the row carries unread
- * activity, which prints the time in the app's blue — the same "something new
- * here" the messenger this row imitates says in green, and the same blue the
- * unread count beneath it wears. One token in both themes: the count and the
- * time are one signal, so they are one colour.
+ * The row's timestamp. It always prints in the muted foreground colour:
+ * unread activity is signalled by the row's unread count alone, so the time
+ * stays quiet even while the row carries something new.
  */
-export function SidebarTimestamp({ iso, highlight }: { iso: string; highlight?: boolean }) {
+export function SidebarTimestamp({ iso }: { iso: string }) {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -45,11 +43,7 @@ export function SidebarTimestamp({ iso, highlight }: { iso: string; highlight?: 
       dateTime={timestamp.dateTime}
       title={timestamp.full}
       aria-label={`Last message: ${timestamp.full}`}
-      className={`ml-auto shrink-0 whitespace-nowrap font-body text-[11px] font-medium ${
-        highlight
-          ? "text-[var(--ds-blue-800)]"
-          : "text-foreground-muted"
-      }`}
+      className="ml-auto shrink-0 whitespace-nowrap font-body text-[11px] font-medium text-foreground-muted"
     >
       {timestamp.label}
     </time>
