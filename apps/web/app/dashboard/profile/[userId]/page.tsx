@@ -6,6 +6,7 @@ import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/perfor
 import { isProfileId } from "@/lib/profile/links";
 import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
+import { DotField } from "@/components/ui/DotField";
 import { ProfileCard } from "../components/ProfileCard";
 
 interface Props {
@@ -70,7 +71,7 @@ export default async function MemberProfilePage({ params, searchParams }: Props)
     <div className="relative min-h-full">
       {/* Same dotted backdrop as the owner's profile page — the texture
           belongs to the page, not to a card. */}
-      <div className="grid-dots grid-dots-fade pointer-events-none absolute inset-0" aria-hidden="true" />
+      <DotField />
 
       <div className="relative mx-auto max-w-3xl px-4 pt-24 pb-12 lg:px-6">
         <h1 className="sr-only">{name}&apos;s profile</h1>

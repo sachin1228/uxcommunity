@@ -116,7 +116,7 @@ export function ProfileCard({
             (`AvatarImg`), rather than a flat placeholder of its own — a member
             with no display picture should read the same here as in the
             topbar. */}
-        <div className="group relative h-24 w-24 shrink-0">
+        <div className="group relative mx-auto h-24 w-24 shrink-0">
           {hasPicture ? (
             <div className="h-24 w-24 overflow-hidden rounded-full border border-border bg-accent/20 shadow-lg">
               <AvatarImg
@@ -143,19 +143,23 @@ export function ProfileCard({
           )}
         </div>
 
-        {/* Edit shares the name's row, pinned to the right edge; the role
-            line and the city stack under it. */}
+        {/* Edit shares the name's row, pinned to the right edge. The name sits
+            in an equal-sided grid so it stays centred even with Edit beside
+            it; the role line and the city stack centred under it. */}
         <div className="mt-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="min-w-0 truncate font-display text-2xl font-semibold text-foreground">{name}</h2>
+          <div className="grid grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3">
+            <span aria-hidden="true" />
+            <h2 className="min-w-0 truncate text-center font-display text-2xl font-semibold text-foreground">{name}</h2>
 
-            {editProfileHref && (
+            {editProfileHref ? (
               <Link
                 href={editProfileHref}
-                className="shrink-0 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+                className="shrink-0 justify-self-end rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
               >
                 Edit
               </Link>
+            ) : (
+              <span aria-hidden="true" />
             )}
           </div>
 
@@ -167,7 +171,7 @@ export function ProfileCard({
                 Truncated so the label stays a single line however long it
                 runs. */}
             {(roleLabel || company || onAddCompany) && (
-              <p className="mt-1.5 flex min-w-0 items-center gap-1 font-body text-sm text-foreground-muted">
+              <p className="mt-1.5 flex min-w-0 items-center justify-center gap-1 font-body text-sm text-foreground-muted">
                 {roleLabel && <span className="truncate">{roleLabel}</span>}
                 {roleLabel && (company || onAddCompany) && (
                   <span aria-hidden="true">@</span>
@@ -207,7 +211,7 @@ export function ProfileCard({
             {/* City — omitted when unset, rather than leaving an empty line
                 behind. */}
             {city && (
-              <p className="mt-1.5 font-body text-sm text-foreground-muted">{city}</p>
+              <p className="mt-1.5 text-center font-body text-sm text-foreground-muted">{city}</p>
             )}
 
             {/* LinkedIn and portfolio — the owner's circles: hollow until a
@@ -215,7 +219,7 @@ export function ProfileCard({
                 buttons out to the member's profile. Read-only surfaces show
                 the labeled chips after the bio instead. */}
             {(onAddLinkedIn || onAddPortfolio) && (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex items-center justify-center gap-2">
                 {onAddLinkedIn &&
                   (linkedinProfileUrl ? (
                     <a
@@ -269,14 +273,14 @@ export function ProfileCard({
 
         {/* Bio */}
         {bio && (
-          <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
+          <p className="mx-auto mt-3 max-w-prose text-center font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
         {/* The member's outside links as labeled chips — read-only surfaces
             only; the owner's own surface shows the circles in the hero
             instead. */}
         {!onAddLinkedIn && !onAddPortfolio && (linkedinProfileUrl || portfolioUrl) && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             {linkedinProfileUrl && (
               <a
                 href={linkedinProfileUrl}
