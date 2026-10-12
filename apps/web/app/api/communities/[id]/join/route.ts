@@ -159,7 +159,11 @@ export async function POST(
       };
       return NextResponse.json(
         {
-          error: `You can only join this ${labels[community.type] ?? "profile"} community if it matches your profile. Update your profile to join.`,
+          error: `You can only join this ${labels[community.type] ?? "profile"} community if it matches your profile.${
+            community.is_private
+              ? " Update your profile to match, then request to join."
+              : " Update your profile to match and you'll join automatically."
+          }`,
           code:  "PROFILE_MISMATCH",
         },
         { status: 403 },

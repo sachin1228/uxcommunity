@@ -180,8 +180,11 @@ export function CommunityJoinDialog({
               aria-hidden="true"
             />
             <p className="font-body text-xs leading-relaxed text-foreground-muted">
-              This community isn&apos;t open to your profile. Update your profile
-              to join.
+              An official community built from member profiles — only members
+              whose profile matches can join.{" "}
+              {isPrivate
+                ? "Update your profile to match, then request to join."
+                : "Update your profile to match and you'll join automatically."}
             </p>
           </div>
           {onClose && (
