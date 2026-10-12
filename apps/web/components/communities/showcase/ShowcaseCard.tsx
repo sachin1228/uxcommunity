@@ -156,10 +156,16 @@ export function ShowcaseCard({
           }}
           className="mt-3 block cursor-pointer overflow-hidden rounded-xl border border-border bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
+          {/* Native aspect ratio, capped at 480px tall — never cropped. A fixed
+              full-width box with object-cover zoomed the media and clipped its
+              edges, so the same image rendered differently here than on a
+              thread card. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={item.url}
             alt={`Preview of ${post.title}`}
-            className="max-h-[480px] w-full object-cover"
+            draggable={false}
+            className="mx-auto block max-h-[480px] max-w-full w-auto transition-opacity hover:opacity-95"
           />
         </div>
       );
