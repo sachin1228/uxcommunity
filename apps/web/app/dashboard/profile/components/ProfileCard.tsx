@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Camera, Globe, Linkedin, Plus } from "lucide-react";
+import { Camera, Globe, Linkedin, MapPin, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
@@ -211,7 +211,10 @@ export function ProfileCard({
             {/* City — omitted when unset, rather than leaving an empty line
                 behind. */}
             {city && (
-              <p className="mt-1.5 text-center font-body text-sm text-foreground-muted">{city}</p>
+              <p className="mt-1.5 flex items-center justify-center gap-1.5 font-body text-sm text-foreground-muted">
+                <MapPin strokeWidth={2.5} size={14} className="shrink-0" aria-hidden="true" />
+                {city}
+              </p>
             )}
 
             {/* LinkedIn and portfolio — the owner's circles: hollow until a
