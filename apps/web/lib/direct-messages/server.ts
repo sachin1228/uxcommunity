@@ -3,7 +3,13 @@ import { createServiceClient, type ServiceClient } from "@/lib/supabase/service"
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { normalizeUtcCursor } from "./cursor";
 import { DM_MESSAGE_PAGE_SIZE } from "./constants";
-import type { DmConversationSummary, DmPeer, DmPreviewMessage } from "./types";
+import { reactionPreviewText } from "./preview-text";
+import type {
+  DmConversationSummary,
+  DmLastReaction,
+  DmPeer,
+  DmPreviewMessage,
+} from "./types";
 
 /**
  * Server-side read models for direct messages.
@@ -102,6 +108,17 @@ export async function loadDmPeer(
   };
 }
 
+/** The reaction columns get_dm_conversations projects per conversation. */
+interface DmListReactionRow {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+  reactor_name: string | null;
+  message_content: string | null;
+  has_image: boolean;
+}
+
 /** The conversation list for the DM pane (one RPC round trip). */
 export async function loadDmConversations(
   userId: string,
@@ -115,6 +132,7 @@ export async function loadDmConversations(
   const conversations: DmConversationSummary[] = [];
   for (const row of data ?? []) {
     if (!row.peer) continue;
+    const reaction = row.last_reaction as unknown as DmListReactionRow | null;
     conversations.push({
       id: row.conversation_id,
       peer: row.peer as unknown as DmPeer,
@@ -122,9 +140,29 @@ export async function loadDmConversations(
       unread_count: row.unread_count ?? 0,
       my_last_read_at: row.my_last_read_at ?? null,
       last_message_at: row.last_message_at ?? null,
+      last_reaction: reaction ? toLastReaction(reaction, userId) : null,
     });
   }
   return { ok: true, data: { conversations } };
+}
+
+/** Project one projected reaction row into the shape the list row renders. */
+function toLastReaction(row: DmListReactionRow, viewerId: string): DmLastReaction {
+  const preview = reactionPreviewText({
+    content: row.message_content,
+    hasImage: row.has_image,
+  });
+  const isOwn = row.user_id === viewerId;
+  return {
+    messageId: row.message_id,
+    reactorId: row.user_id,
+    emoji: row.emoji,
+    createdAt: row.created_at,
+    firstName: isOwn ? "You" : row.reactor_name?.split(" ")[0] ?? "Someone",
+    isOwn,
+    messagePreview: preview.text,
+    messagePreviewMedia: preview.media,
+  };
 }
 
 /** One message page (newest-first from SQL, reversed for the timeline). */

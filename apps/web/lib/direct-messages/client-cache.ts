@@ -13,7 +13,12 @@
  * msgCache.
  */
 
-import type { DmConversationSummary, DmMessage, DmPreviewMessage } from "./types";
+import type {
+  DmConversationSummary,
+  DmLastReaction,
+  DmMessage,
+  DmPreviewMessage,
+} from "./types";
 
 const MAX_CACHED_CONVERSATIONS = 30;
 
@@ -94,12 +99,54 @@ export function bumpConversationWithMessage(
     ...conversation,
     last_message: args.message,
     last_message_at: args.message.created_at,
+    // A message is newer activity than any reaction — it takes the preview
+    // line back (the community sidebar clears lastReaction on the same event).
+    last_reaction: null,
     unread_count:
       isOwnMessage || args.activelyReading
         ? conversation.unread_count
         : conversation.unread_count + 1,
   };
   return [bumped, ...current.filter((c) => c.id !== args.conversationId)];
+}
+
+/**
+ * Set (or clear) a conversation's reaction preview.
+ *
+ * Guards, mirroring the community sidebar's reaction merge: a delayed event
+ * for an older reaction never overwrites a newer one, and a no-op patch
+ * returns the SAME array so the memoized list pane bails out.
+ */
+export function patchConversationReaction(
+  current: DmConversationSummary[],
+  args: { conversationId: string; lastReaction: DmLastReaction | null },
+): DmConversationSummary[] {
+  const index = current.findIndex((c) => c.id === args.conversationId);
+  if (index === -1) return current;
+  const conversation = current[index];
+  const existing = conversation.last_reaction ?? null;
+  const next = args.lastReaction;
+  if (next) {
+    if (existing && existing.createdAt > next.createdAt) return current;
+    if (
+      existing &&
+      existing.messageId === next.messageId &&
+      existing.reactorId === next.reactorId &&
+      existing.emoji === next.emoji &&
+      existing.createdAt === next.createdAt &&
+      // The body too: a lazily resolved preview replaces the "a message"
+      // stand-in under the SAME reaction, and must not be treated as a no-op.
+      existing.messagePreview === next.messagePreview &&
+      existing.messagePreviewMedia === next.messagePreviewMedia
+    ) {
+      return current;
+    }
+  } else if (!existing) {
+    return current;
+  }
+  const updated = current.slice();
+  updated[index] = { ...conversation, last_reaction: next };
+  return updated;
 }
 
 /**
