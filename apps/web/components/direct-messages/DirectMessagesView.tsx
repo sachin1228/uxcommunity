@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessageSquare } from "lucide-react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
 import { invalidateRequest } from "@/lib/request-cache";
@@ -14,6 +13,7 @@ import type {
   DmPreviewMessage,
 } from "@/lib/direct-messages/types";
 import type { MessageDeletedByRole, ReplyPreview } from "@/lib/communities/cache";
+import { DmChatIcon } from "./DmChatIcon";
 import { DmListPane } from "./DmListPane";
 import { DmThread } from "./DmThread";
 import { useDmConversations } from "./hooks/useDmConversations";
@@ -625,7 +625,7 @@ export function DirectMessagesView({
           />
         ) : (
           <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <MessageSquare size={32} strokeWidth={1.5} className="text-foreground-muted/50" aria-hidden />
+            <DmChatIcon size={32} className="text-foreground-muted/50" />
             <p className="font-body text-sm text-foreground-muted">
               {hasConversations
                 ? "Select a conversation."

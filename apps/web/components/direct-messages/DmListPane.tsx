@@ -1,11 +1,11 @@
 "use client";
 
 import { memo } from "react";
-import { MessageSquare } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { fmtTimeAgo } from "@/components/communities/chat/chatUtils";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
+import { DmChatIcon } from "./DmChatIcon";
 
 /** The one-line preview of a conversation's newest message. */
 function previewText(conversation: DmConversationSummary, currentUserId: string): string {
@@ -49,7 +49,7 @@ export const DmListPane = memo(function DmListPane({
           </div>
         ) : (conversations ?? []).length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            <MessageSquare size={28} strokeWidth={1.75} className="text-foreground-muted/60" aria-hidden />
+            <DmChatIcon size={28} className="text-foreground-muted/60" />
             <p className="font-body text-sm text-foreground-muted">No conversations yet.</p>
             <p className="font-body text-xs text-foreground-muted/70">
               Start one from any member profile.
