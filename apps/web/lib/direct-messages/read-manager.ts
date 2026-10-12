@@ -31,6 +31,31 @@ const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingLastReadAt = new Map<string, string>();
 const listeners = new Set<(conversationId: string, markedAt: string) => void>();
 
+/**
+ * Highest read position this client has acknowledged per conversation.
+ *
+ * The conversation-list fetch consults it so a payload produced BEFORE a read
+ * PATCH landed cannot resurrect the badge the user just cleared — the same job
+ * the sidebar store does for the community chat. Without it, any list refresh
+ * that raced the read (realtime catch-up, window focus, a remount within the
+ * request cache's stale window) put the old unread count straight back, and
+ * the once-per-open mark guard then left it there.
+ */
+const readFloor = new Map<string, string>();
+
+/** Newest position recorded as read for a conversation, or null. */
+export function getReadFloor(conversationId: string): string | null {
+  return readFloor.get(conversationId) ?? null;
+}
+
+/** Record that everything up to `at` is read on this client (monotonic). */
+export function recordReadFloor(conversationId: string, at: string): void {
+  const current = readFloor.get(conversationId);
+  if (!current || new Date(at).getTime() > new Date(current).getTime()) {
+    readFloor.set(conversationId, at);
+  }
+}
+
 /** Is the viewer looking at this conversation right now (tab visible)? */
 export function isActivelyReading(conversationId: string): boolean {
   if (typeof document !== "undefined" && document.visibilityState !== "visible") {
@@ -74,6 +99,7 @@ async function sendRead(conversationId: string, attempt = 0): Promise<void> {
     // The listener hears the SERVER's effective marker (greatest of stored
     // and sent), so the list's unread state always mirrors the database.
     const markedAt = data?.markedAt ?? lastReadAt;
+    recordReadFloor(conversationId, markedAt);
     for (const listener of listeners) listener(conversationId, markedAt);
   } catch {
     // One bounded retry — a blip must not leave the badge stuck on a
@@ -98,6 +124,9 @@ export function markConversationRead(
     const pending = pendingLastReadAt.get(conversationId);
     if (!pending || new Date(incoming).getTime() > new Date(pending).getTime()) {
       pendingLastReadAt.set(conversationId, incoming);
+      // Reflect the request optimistically: the list must not resurrect this
+      // conversation's badge while the PATCH is still in flight.
+      recordReadFloor(conversationId, incoming);
     }
   }
 

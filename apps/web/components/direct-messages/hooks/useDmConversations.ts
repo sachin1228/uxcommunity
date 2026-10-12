@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchJsonCached } from "@/lib/request-cache";
-import { dmCache } from "@/lib/direct-messages/client-cache";
+import { applyReadFloor, dmCache } from "@/lib/direct-messages/client-cache";
+import { getReadFloor } from "@/lib/direct-messages/read-manager";
 import { dmUrls } from "@/lib/direct-messages/client";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
 
@@ -37,7 +38,12 @@ export function useDmConversations({ userId }: { userId: string }) {
           { staleMs: 30_000, force },
           userId,
         );
-        const next = data.conversations ?? [];
+        // A payload fetched before this client's read PATCH landed carries the
+        // pre-read unread counts; the read floor keeps those from resurrecting
+        // the badge the user just cleared.
+        const next = (data.conversations ?? []).map((conversation) =>
+          applyReadFloor(conversation, getReadFloor(conversation.id)),
+        );
         dmCache.setConversations(next);
         setConversationsState(next);
       } catch {

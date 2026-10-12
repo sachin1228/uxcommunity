@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
-import { invalidateRequest } from "@/lib/request-cache";
+import { invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
 import { bumpConversationWithMessage } from "@/lib/direct-messages/client-cache";
 import { dmUrls } from "@/lib/direct-messages/client";
-import { onConversationRead, markConversationRead, setActiveConversation } from "@/lib/direct-messages/read-manager";
+import {
+  onConversationRead,
+  markConversationRead,
+  recordReadFloor,
+  setActiveConversation,
+} from "@/lib/direct-messages/read-manager";
 import { newestRealMessage } from "@/lib/direct-messages/messages";
 import type {
   DmConversationSummary,
@@ -256,18 +261,57 @@ export function DirectMessagesView({
     return () => setActiveConversation(null);
   }, [activeId]);
 
-  // Opening a conversation reports it read ONCE its messages are actually on
-  // screen — and only up to the newest DISPLAYED message, because "now"
-  // could swallow one that raced the request. Once per open, however many
-  // messages stream in afterwards (those mark through the realtime path).
-  const markedOpenRef = useRef<string | null>(null);
+  // Opening a conversation clears its row immediately — the community sidebar
+  // zeroes on open and only then confirms with the server. Waiting for the
+  // PATCH left the badge lit for the whole round trip, and any list refresh
+  // that raced it put the old count straight back. The read floor records what
+  // this open has acknowledged so a stale payload cannot bring the count back,
+  // and the cached list is patched so a refetch inside the stale window
+  // doesn't replay the pre-read payload either.
+  useEffect(() => {
+    if (!activeId) return;
+    const opened = conversationsRef.current?.find((c) => c.id === activeId);
+    if (opened?.last_message_at) recordReadFloor(activeId, opened.last_message_at);
+
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeId && c.unread_count !== 0 ? { ...c, unread_count: 0 } : c,
+      ),
+    );
+    patchCachedRequest<{ conversations?: DmConversationSummary[] }>(
+      dmUrls.conversations,
+      (current) => ({
+        ...current,
+        conversations: (current?.conversations ?? []).map((c) =>
+          c.id === activeId ? { ...c, unread_count: 0 } : c,
+        ),
+      }),
+      userId,
+    );
+  }, [activeId, setConversations, userId]);
+
+  // Report the conversation read once its messages are on screen — up to the
+  // newest DISPLAYED message, because "now" could swallow one that raced the
+  // request. Re-arms whenever that newest timestamp advances, so a first mark
+  // made from a partly-loaded page can never wedge the marker; the read
+  // manager debounces and cools down the follow-up requests.
+  const markedThroughRef = useRef<{ conversationId: string | null; through: number }>({
+    conversationId: null,
+    through: 0,
+  });
   useEffect(() => {
     if (!activeId || !thread.initialReady) return;
-    if (markedOpenRef.current === activeId) return;
     const newest = newestRealMessage(thread.messages);
     if (!newest) return;
-    markedOpenRef.current = activeId;
-    markConversationRead(activeId, { immediate: true, lastReadAt: newest.created_at });
+    const through = new Date(newest.created_at).getTime();
+    const marked = markedThroughRef.current;
+    if (marked.conversationId === activeId && through <= marked.through) return;
+    const isFirstMarkThisOpen = marked.conversationId !== activeId;
+    markedThroughRef.current = { conversationId: activeId, through };
+    markConversationRead(activeId, {
+      immediate: isFirstMarkThisOpen,
+      lastReadAt: newest.created_at,
+    });
   }, [activeId, thread.initialReady, thread.messages]);
 
   useEffect(() => {
@@ -285,6 +329,24 @@ export function DirectMessagesView({
           }
           return { ...c, unread_count: 0, my_last_read_at: markedAt };
         }),
+      );
+      // Mirror the cleared row into the cached list too: a refetch within the
+      // stale window must not replay the pre-read unread count (the community
+      // sidebar patches its store for the same reason).
+      patchCachedRequest<{ conversations?: DmConversationSummary[] }>(
+        dmUrls.conversations,
+        (current) => ({
+          ...current,
+          conversations: (current?.conversations ?? []).map((c) =>
+            c.id === conversationId
+              ? c.my_last_read_at &&
+                new Date(c.my_last_read_at).getTime() >= new Date(markedAt).getTime()
+                ? c
+                : { ...c, unread_count: 0, my_last_read_at: markedAt }
+              : c,
+          ),
+        }),
+        userId,
       );
       invalidateRequest(dmUrls.unread, userId);
     });

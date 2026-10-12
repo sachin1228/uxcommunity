@@ -103,6 +103,40 @@ export function bumpConversationWithMessage(
 }
 
 /**
+ * Reconcile one freshly fetched conversation with what this client has already
+ * read.
+ *
+ * A list response produced before a read PATCH landed still carries the old
+ * `unread_count` and the old `my_last_read_at`; taking it at face value
+ * resurrected the badge the moment the thread opened (the community sidebar
+ * avoids this by patching its store, this is the DM equivalent). When the
+ * newest message the payload knows about is at or before the read floor,
+ * nothing in it can still be unread — so the row keeps its cleared count.
+ *
+ * Messages that arrived AFTER the floor leave the payload alone, so genuine
+ * new unread activity is never hidden.
+ */
+export function applyReadFloor(
+  conversation: DmConversationSummary,
+  readFloor: string | null,
+): DmConversationSummary {
+  if (!readFloor || !conversation.last_message_at) return conversation;
+  const floorMs = new Date(readFloor).getTime();
+  if (new Date(conversation.last_message_at).getTime() > floorMs) return conversation;
+
+  const markerMs = conversation.my_last_read_at
+    ? new Date(conversation.my_last_read_at).getTime()
+    : -Infinity;
+  if (conversation.unread_count === 0 && markerMs >= floorMs) return conversation;
+
+  return {
+    ...conversation,
+    unread_count: 0,
+    my_last_read_at: markerMs >= floorMs ? conversation.my_last_read_at : readFloor,
+  };
+}
+
+/**
  * Patch the conversation's preview when its last message is edited or
  * deleted (the list row mirrors the newest message; older rows are not in
  * the list's payload at all).
