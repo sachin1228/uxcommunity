@@ -86,6 +86,7 @@ export default async function MemberProfilePage({ params, searchParams }: Props)
             company={companyState.company}
             portfolio={(profile as any)?.portfolio_url ?? ""}
             linkedinUrl={(profile as any)?.linkedin_url ?? null}
+            messageHref={`/dashboard/messages?peer=${userId}`}
           />
         </div>
 

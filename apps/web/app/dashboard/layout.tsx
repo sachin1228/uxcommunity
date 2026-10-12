@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
+import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { UndoToast } from "@/components/ui/UndoToast";
 import { Topbar } from "./Topbar";
 
@@ -71,9 +72,11 @@ export default async function DashboardLayout({
       <Topbar userId={userId} user={sidebarUser} />
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        <div className="hidden h-full min-[500px]:block">
-          <GlobalSidebar userId={userId} />
-        </div>
+        <SidebarRouteGate>
+          <div className="hidden h-full min-[500px]:block">
+            <GlobalSidebar userId={userId} />
+          </div>
+        </SidebarRouteGate>
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           {children}

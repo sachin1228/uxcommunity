@@ -1097,6 +1097,161 @@ export type Database = {
           },
         ];
       };
+      dm_conversations: {
+        Row: {
+          created_at: string;
+          id: string;
+          last_message_at: string | null;
+          user_a: string;
+          user_a_last_read_at: string | null;
+          user_b: string;
+          user_b_last_read_at: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          last_message_at?: string | null;
+          user_a: string;
+          user_a_last_read_at?: string | null;
+          user_b: string;
+          user_b_last_read_at?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          last_message_at?: string | null;
+          user_a?: string;
+          user_a_last_read_at?: string | null;
+          user_b?: string;
+          user_b_last_read_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dm_conversations_user_a_fkey";
+            columns: ["user_a"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_conversations_user_b_fkey";
+            columns: ["user_b"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dm_message_reactions: {
+        Row: {
+          conversation_id: string;
+          created_at: string;
+          emoji: string;
+          id: string;
+          message_id: string;
+          user_id: string;
+        };
+        Insert: {
+          conversation_id: string;
+          created_at?: string;
+          emoji: string;
+          id?: string;
+          message_id: string;
+          user_id: string;
+        };
+        Update: {
+          conversation_id?: string;
+          created_at?: string;
+          emoji?: string;
+          id?: string;
+          message_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dm_message_reactions_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "dm_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_message_reactions_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: false;
+            referencedRelation: "dm_messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_message_reactions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dm_messages: {
+        Row: {
+          client_nonce: string | null;
+          content: string | null;
+          conversation_id: string;
+          created_at: string;
+          deleted_at: string | null;
+          edited_at: string | null;
+          id: string;
+          image_url: string | null;
+          reply_to_id: string | null;
+          user_id: string;
+        };
+        Insert: {
+          client_nonce?: string | null;
+          content?: string | null;
+          conversation_id: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
+          id?: string;
+          image_url?: string | null;
+          reply_to_id?: string | null;
+          user_id: string;
+        };
+        Update: {
+          client_nonce?: string | null;
+          content?: string | null;
+          conversation_id?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          edited_at?: string | null;
+          id?: string;
+          image_url?: string | null;
+          reply_to_id?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dm_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "dm_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_messages_reply_to_id_fkey";
+            columns: ["reply_to_id"];
+            isOneToOne: false;
+            referencedRelation: "dm_messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_messages_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       event_chat_join_responses: {
         Row: {
           community_id: string;
@@ -2614,6 +2769,45 @@ export type Database = {
               users: Json;
             }[];
           };
+      get_dm_conversations: {
+        Args: { p_user_id: string };
+        Returns: {
+          conversation_id: string;
+          last_message: Json;
+          last_message_at: string;
+          my_last_read_at: string;
+          peer: Json;
+          unread_count: number;
+        }[];
+      };
+      get_dm_message_page: {
+        Args: {
+          p_after?: string;
+          p_after_id?: string;
+          p_before?: string;
+          p_before_id?: string;
+          p_conversation_id: string;
+          p_limit?: number;
+          p_user_id: string;
+        };
+        Returns: {
+          content: string;
+          created_at: string;
+          deleted_at: string;
+          edited_at: string;
+          id: string;
+          image_url: string;
+          reactions: Json;
+          reply_to: Json;
+          reply_to_id: string;
+          user_id: string;
+          users: Json;
+        }[];
+      };
+      get_dm_unread_total: {
+        Args: { p_user_id: string };
+        Returns: number;
+      };
       get_event_attendee_previews: {
         Args: { p_event_ids: string[]; p_limit?: number };
         Returns: {
@@ -2680,6 +2874,17 @@ export type Database = {
               item: Json;
             }[];
           };
+      get_or_create_dm_conversation: {
+        Args: { p_me: string; p_peer: string };
+        Returns: {
+          created_at: string;
+          id: string;
+          last_message_at: string;
+          my_last_read_at: string;
+          user_a: string;
+          user_b: string;
+        }[];
+      };
       get_profile_feed_page: {
         Args: { p_before?: string; p_limit?: number; p_scope?: string; p_user_id: string };
         Returns: {
@@ -2782,6 +2987,17 @@ export type Database = {
           p_job_title?: string;
         };
         Returns: Json;
+      };
+      mark_dm_conversation_read: {
+        Args: {
+          p_conversation_id: string;
+          p_last_read_at?: string;
+          p_user_id: string;
+        };
+        Returns: {
+          marked_at: string;
+          previous_marked_at: string;
+        }[];
       };
     };
     Enums: {

@@ -7,6 +7,9 @@ export const realtimeRooms = {
   chat: (communityId: string) => `chat:${communityId}`,
   presence: (communityId: string) => `presence:${communityId}`,
   notifications: (userId: string) => `notifications:${userId}`,
+  /** Direct messages — ONE logical room per user; every conversation
+   *  multiplexes over it (see apps/realtime room-routing). */
+  dm: (userId: string) => `dm:${userId}`,
   threads: (communityId: string) => `threads:${communityId}`,
   threadComments: (threadId: string) => `thread-comments:${threadId}`,
   events: (communityId: string) => `events:${communityId}`,

@@ -5,6 +5,7 @@ import { Camera, Globe, Linkedin, MapPin, Plus } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import type { ProfileCompanyView } from "@/components/companies/types";
+import { DmChatIcon } from "@/components/direct-messages/DmChatIcon";
 
 interface ProfileCardProps {
   name: string;
@@ -51,6 +52,12 @@ interface ProfileCardProps {
    * read-only surfaces.
    */
   onAddLinkedIn?: () => void;
+  /**
+   * The "Message" chip on read-only surfaces — a link into the DM window that
+   * get-or-creates the conversation with this member. Omitted on the owner's
+   * own surface (you cannot message yourself).
+   */
+  messageHref?: string;
 }
 
 /**
@@ -93,6 +100,7 @@ export function ProfileCard({
   onAddPortfolio,
   linkedinUrl,
   onAddLinkedIn,
+  messageHref,
 }: ProfileCardProps) {
   const portfolioUrl = externalUrl(portfolio);
   const linkedinProfileUrl = externalUrl(linkedinUrl);
@@ -281,9 +289,19 @@ export function ProfileCard({
 
         {/* The member's outside links as labeled chips — read-only surfaces
             only; the owner's own surface shows the circles in the hero
-            instead. */}
-        {!onAddLinkedIn && !onAddPortfolio && (linkedinProfileUrl || portfolioUrl) && (
+            instead. Messaging anyone starts here, so the Message chip is the
+            first thing in the row. */}
+        {!onAddLinkedIn && !onAddPortfolio && (messageHref || linkedinProfileUrl || portfolioUrl) && (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            {messageHref && (
+              <Link
+                href={messageHref}
+                className="flex items-center gap-1.5 rounded-full bg-[var(--ds-blue-800)] px-3 py-1.5 font-body text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)]"
+              >
+                <DmChatIcon size={12} />
+                Message
+              </Link>
+            )}
             {linkedinProfileUrl && (
               <a
                 href={linkedinProfileUrl}

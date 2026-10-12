@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
+import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { DashboardSearch } from "./DashboardSearch";
 import { NotificationBell } from "./NotificationBell";
+import { DmTopbarButton } from "@/components/direct-messages/DmTopbarButton";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { isApplePlatform } from "@/lib/dashboard/topbar";
 
@@ -83,7 +85,9 @@ export function Topbar({ userId, user }: Props) {
           own w-[17rem]), so everything after it starts where the content column
           does — the bar's two halves line up with the two panes below. */}
       <div className="order-1 flex min-w-0 items-center gap-2 pl-3 sm:pl-4 min-[500px]:w-[17rem] min-[500px]:shrink-0">
-        <MobileSidebar userId={userId} />
+        <SidebarRouteGate>
+          <MobileSidebar userId={userId} />
+        </SidebarRouteGate>
         <Link
           href="/dashboard"
           className="flex min-w-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -114,9 +118,10 @@ export function Topbar({ userId, user }: Props) {
 
       <div className="order-2 min-w-0 flex-1 min-[500px]:order-3" />
 
-      {/* Bell, then profile: the account controls stay pinned to the right edge
-          at every width. */}
+      {/* Messages, bell, then profile: the account controls stay pinned to the
+          right edge at every width. */}
       <div className="order-4 flex min-w-0 items-center gap-3">
+        <DmTopbarButton userId={userId} />
         <NotificationBell userId={userId} />
         <ProfileDropdown name={user.name} email={user.email} avatarUrl={user.avatarUrl} />
       </div>

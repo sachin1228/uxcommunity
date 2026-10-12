@@ -35,8 +35,40 @@ export interface RoomRoutingBindings {
  * `COMMUNITY_ROOM_PREFIXES`: anything that is not a community room travels over
  * the user socket, and anything the server publishes in that set must resolve
  * to a `user:${userId}` instance.
+ *
+ * `dm:` is the direct-messages stream: ONE logical room per user
+ * (`dm:${userId}`) carrying every conversation's events. All DM traffic
+ * multiplexes over the user socket that already exists for notifications — no
+ * per-conversation socket and no per-conversation Durable Object, so a user
+ * with 500 conversations costs exactly the same as a user with one.
  */
-export const USER_ROOM_PREFIXES = ["notifications:", "profile:"] as const;
+export const USER_ROOM_PREFIXES = ["notifications:", "profile:", "dm:"] as const;
+
+/**
+ * Whether the authenticated user may open `room` over a WebSocket.
+ *
+ * Community rooms are authorized inside their Durable Object (membership
+ * check); user-scoped rooms have no such check on the DO side — the namespace
+ * instance IS the authorization boundary, and that only holds if the room
+ * name is forced to the caller's own instance. Without this, any authenticated
+ * socket could connect with `room=user:<victim>` (or `notifications:<victim>`,
+ * `dm:<victim>`) and read another member's private stream.
+ *
+ * Keep it in sync with USER_ROOM_PREFIXES and the client's socket keying.
+ */
+export function isUserScopedRoomAllowed(room: string, userId: string): boolean {
+  // An already-resolved user instance (`user:${userId}`).
+  if (room.startsWith("user:")) {
+    return room === `user:${userId}`;
+  }
+  for (const prefix of USER_ROOM_PREFIXES) {
+    if (room.startsWith(prefix)) {
+      return room === `${prefix}${userId}`;
+    }
+  }
+  // Community-scoped rooms carry their own authorization.
+  return true;
+}
 
 /**
  * Resolve which Durable Object owns a logical room.
