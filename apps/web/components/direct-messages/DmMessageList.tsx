@@ -153,7 +153,7 @@ export const DmMessageList = memo(function DmMessageList({
       {messages.length === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 py-16">
           {peer && (
-            <AvatarImg url={peer.avatar_url} name={peer.name} size={48} className="shrink-0" />
+            <AvatarImg url={peer.avatar_url} name={peer.name} size={48} className="shrink-0 rounded-full object-cover" />
           )}
           <p className="font-body text-sm text-foreground-muted text-center">
             Say hi to <span className="font-medium text-foreground">{peer?.name ?? "them"}</span>.

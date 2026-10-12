@@ -136,7 +136,7 @@ export function DmThread({
           href={profileHref(peer.id)}
           className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-surface-raised"
         >
-          <AvatarImg url={peer.avatar_url} name={peer.name} size={36} className="shrink-0" />
+          <AvatarImg url={peer.avatar_url} name={peer.name} size={36} className="shrink-0 rounded-full object-cover" />
           <span className="min-w-0 truncate font-body text-sm font-semibold text-foreground">
             {peer.name}
           </span>

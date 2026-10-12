@@ -73,7 +73,7 @@ export const DmListPane = memo(function DmListPane({
                   url={conversation.peer.avatar_url}
                   name={conversation.peer.name}
                   size={44}
-                  className="shrink-0"
+                  className="shrink-0 rounded-full object-cover"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
