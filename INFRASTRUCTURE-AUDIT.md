@@ -728,7 +728,7 @@ Routing between the two is owned by `apps/realtime/src/room-routing.ts`
 ## R2 Storage
 | Bucket | Purpose | Public URL |
 |---|---|---|
-| `uxcommunity-web-next-cache` (wrangler binding `NEXT_INC_CACHE_R2_BUCKET`) | Next.js incremental cache (ISR / unstable_cache) — REQUIRED by OpenNext; do NOT delete | internal (R2 binding, not public) |
+| `uxcommunity-web-next-cache` (wrangler binding `NEXT_INC_CACHE_R2_BUCKET`) | Next.js incremental cache (ISR / unstable_cache) — REQUIRED by OpenNext; do NOT delete. Nothing expires it either: each deploy writes the same keys under a new build prefix and leaves the previous ones behind, so `/admin/health` reports its object count, size and newest-vs-older build split, and turns degraded past 25,000 entries or 1 GiB | internal (R2 binding, not public) |
 | Media bucket, configured via `R2_BUCKET_NAME` env (prod: `drafthub`) | All uploaded media: images, videos, audio, PDFs, attachments, avatars, master-data images, lottie | `R2_PUBLIC_URL/<key>` |
 
 ### Media caching architecture (Cloudflare edge cache)
