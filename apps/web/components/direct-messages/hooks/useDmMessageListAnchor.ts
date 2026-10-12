@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import { anchorOffset, scrollAnchorDelta, type ScrollAnchor } from "@/components/communities/chat/chatUtils";
+import { cursorAfter, type MessageCursor } from "@/lib/direct-messages/messages";
 import type { DmMessage } from "@/lib/direct-messages/types";
 
 const useIsomorphicLayoutEffect =
@@ -29,7 +30,7 @@ export function useDmMessageListAnchor({
   hasMoreAbove: boolean;
   loadingOlder: boolean;
   loading: boolean;
-  fetchOlderMessages: (before: string) => Promise<void>;
+  fetchOlderMessages: (before: MessageCursor) => Promise<void>;
   scrollContainerRef: RefObject<HTMLDivElement>;
   initialPositionResolved: boolean;
 }) {
@@ -40,7 +41,9 @@ export function useDmMessageListAnchor({
     loadOlderCallbackRef.current = () => {
       const oldest = messages.find((m) => !m.id.startsWith("temp-"));
       if (!oldest || !hasMoreAbove || loadingOlder) return;
-      void fetchOlderMessages(oldest.created_at);
+      // The compound cursor, not the bare timestamp — same-millisecond
+      // history would otherwise repeat or skip across the page boundary.
+      void fetchOlderMessages(cursorAfter(oldest));
     };
   });
 

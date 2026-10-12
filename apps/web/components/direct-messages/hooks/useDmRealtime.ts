@@ -7,6 +7,12 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { pickOptimisticMatch } from "@/components/communities/chat/chatUtils";
 import { dmCache, bumpConversationWithMessage, patchConversationPreview } from "@/lib/direct-messages/client-cache";
 import { markConversationRead, isActivelyReading } from "@/lib/direct-messages/read-manager";
+import {
+  compareDmMessages,
+  cursorAfter,
+  newestRealMessage,
+  type MessageCursor,
+} from "@/lib/direct-messages/messages";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { applyReactionDelete, applyReactionInsert } from "@/lib/communities/cache";
 import type { DmConversationSummary, DmMessage, DmPreviewMessage } from "@/lib/direct-messages/types";
@@ -69,7 +75,7 @@ export function useDmRealtime({
   realtimeInsertPendingRef: MutableRefObject<boolean>;
   realtimeWasNearBottomRef: MutableRefObject<boolean>;
   /** Incremental catch-up for the OPEN conversation (`after` = last known). */
-  fetchActiveCatchUp: (after?: string) => void;
+  fetchActiveCatchUp: (after?: MessageCursor) => void;
   onTypingEvent: (event: {
     conversation_id: string;
     user_id: string;
@@ -91,8 +97,8 @@ export function useDmRealtime({
       const activeId = activeConversationIdRef.current;
       if (activeId) {
         const cached = dmCache.getMessages(activeId) ?? [];
-        const lastReal = cached.filter((m) => !m.id.startsWith("temp-")).at(-1);
-        fetchActiveCatchUp(lastReal?.created_at);
+        const newest = newestRealMessage(cached);
+        fetchActiveCatchUp(newest ? cursorAfter(newest) : undefined);
       }
     }, 300);
   }, [refreshConversations, fetchActiveCatchUp, activeConversationIdRef]);
@@ -183,9 +189,7 @@ export function useDmRealtime({
                 ? matchedTemp.image_url
                 : row.image_url ?? null,
             };
-            const next = [...withoutTemp, incoming].sort(
-              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            );
+            const next = [...withoutTemp, incoming].sort(compareDmMessages);
 
             // Parent preview not resolvable from state — fetch it lazily.
             if (row.reply_to_id && !replyTo) {
@@ -246,7 +250,14 @@ export function useDmRealtime({
         }
 
         if (!isOwnMessage && isActivelyReading(row.conversation_id)) {
-          markConversationRead(row.conversation_id);
+          // Only a reader who is AT the bottom has actually seen this message;
+          // scrolled-up arrivals stay unread (the badge refetch picks them
+          // up), and the marker records the message's own timestamp — never
+          // "now", which could swallow anything that raced the request.
+          const wasNearBottom = realtimeWasNearBottomRef.current;
+          if (!initialScrollDoneRef.current || wasNearBottom) {
+            markConversationRead(row.conversation_id, { lastReadAt: row.created_at });
+          }
         }
       }),
     );

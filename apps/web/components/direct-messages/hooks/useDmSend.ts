@@ -5,6 +5,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { compressImage, compressedFile, preloadImage } from "@/lib/image-client";
 import { dmUrls } from "@/lib/direct-messages/client";
 import { dmCache } from "@/lib/direct-messages/client-cache";
+import { compareDmMessages } from "@/lib/direct-messages/messages";
 import type { DmMessage, DmPreviewMessage } from "@/lib/direct-messages/types";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { MAX_MESSAGE_CHARS, scrollChatToBottom } from "@/components/communities/chat/chatUtils";
@@ -30,9 +31,18 @@ interface UseDmSendOptions {
 }
 
 type RetryData = {
+  /** The conversation the send belongs to — captured at dispatch, because
+   *  the user can switch threads and cancel/retry from anywhere. */
+  conversationId: string;
   file: File | null;
   content: string;
   replyTo: ReplyPreview | null;
+  /** Idempotency key for this LOGICAL send — reused by every retry, so the
+   *  server can recognize a re-sent attempt after a lost response. */
+  nonce: string;
+  /** URL of an upload this send already completed; a retry reuses it rather
+   *  than uploading the file again. */
+  uploadedUrl: string | null;
 };
 
 type SendArgs = {
@@ -41,7 +51,23 @@ type SendArgs = {
   imagePreviewUrl: string | null;
   replyTo: ReplyPreview | null;
   tempId: string;
+  nonce: string;
+  /** Uploaded URL carried over from a previous attempt (retry path). */
+  preUploadedUrl?: string | null;
 };
+
+/**
+ * A client-side idempotency key. `crypto.randomUUID` is available in every
+ * supported browser (secure contexts); the fallback keeps the shape valid.
+ */
+function newNonce(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+    (Number(c) ^ ((Math.random() * 16) >> (Number(c) / 4))).toString(16),
+  );
+}
 
 /**
  * Sending side of the DM composer — same optimistic contract as the
@@ -144,6 +170,18 @@ export function useDmSend({
     abortControllersRef.current.get(tempId)?.abort();
     abortControllersRef.current.delete(tempId);
     const retryData = failedRetryDataRef.current.get(tempId);
+    if (retryData?.uploadedUrl) {
+      // The upload finished but the send never did — release the asset.
+      // The server skips the delete if a racing send already stored the URL,
+      // and a later retry re-uploads (never a stale URL).
+      const { conversationId: uploadConversationId, uploadedUrl } = retryData;
+      retryData.uploadedUrl = null;
+      void fetch(dmUrls.conversationUpload(uploadConversationId), {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: uploadedUrl }),
+      }).catch(() => {});
+    }
     if (!retryData?.file) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       failedRetryDataRef.current.delete(tempId);
@@ -158,14 +196,19 @@ export function useDmSend({
     imagePreviewUrl,
     replyTo: msgReplyTo,
     tempId,
+    nonce,
+    preUploadedUrl,
   }: SendArgs): Promise<void> {
     const targetConversationId = conversationIdRef.current;
     if (!targetConversationId) return;
 
     failedRetryDataRef.current.set(tempId, {
+      conversationId: targetConversationId,
       file: imageFile,
       content,
       replyTo: msgReplyTo,
+      nonce,
+      uploadedUrl: preUploadedUrl ?? null,
     });
 
     const optimistic: DmMessage = {
@@ -196,9 +239,10 @@ export function useDmSend({
     abortControllersRef.current.set(tempId, abortController);
 
     try {
-      let uploadedImageUrl: string | null = null;
+      // A retry reuses the URL the previous attempt already uploaded.
+      let uploadedImageUrl: string | null = preUploadedUrl ?? null;
 
-      if (imageFile) {
+      if (imageFile && !uploadedImageUrl) {
         const fileToSend = await (async () => {
           try {
             return compressedFile(await compressImage(imageFile), imageFile);
@@ -226,6 +270,10 @@ export function useDmSend({
         const headerUrl = uploadRes.headers.get("X-Image-Url")?.trim() ?? "";
         uploadedImageUrl = bodyUrl || headerUrl;
         if (!uploadedImageUrl) throw new Error("Image upload failed: the server returned an invalid response.");
+        // Remember it on the retry payload, so a cancel can release the
+        // asset and a retry can reuse it instead of uploading again.
+        const entry = failedRetryDataRef.current.get(tempId);
+        if (entry) entry.uploadedUrl = uploadedImageUrl;
       }
 
       const imagePreload = uploadedImageUrl ? preloadImage(uploadedImageUrl) : null;
@@ -237,14 +285,19 @@ export function useDmSend({
           content,
           reply_to_id: msgReplyTo?.id ?? null,
           image_url: uploadedImageUrl,
-          client_nonce: tempId,
+          // The idempotency key for this logical send — stable across
+          // retries, so a lost response cannot mint a duplicate message.
+          client_nonce: nonce,
         }),
         signal: abortController.signal,
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (res.status === 201) {
+      // 201 = inserted; 200 = the server recognized the nonce and returned
+      // the ORIGINAL row (our first attempt landed but its response was
+      // lost). Both confirm this bubble.
+      if (res.ok) {
         setHideUnreadDivider(true);
         const message = data.message as DmMessage | undefined;
         if (!message) throw new Error("Server returned success without a message.");
@@ -264,7 +317,7 @@ export function useDmSend({
           const next = prev
             .filter((m) => m.id !== tempId && m.id !== message.id);
           next.push(merged);
-          next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          next.sort(compareDmMessages);
           dmCache.setMessages(targetConversationId, next.filter((m) => !m.id.startsWith("temp-")));
           return next;
         });
@@ -337,7 +390,14 @@ export function useDmSend({
     if (inputRef.current) inputRef.current.style.height = "24px";
     inputRef.current?.focus();
 
-    await beginSend({ content, imageFile, imagePreviewUrl, replyTo: currentReplyTo, tempId });
+    await beginSend({
+      content,
+      imageFile,
+      imagePreviewUrl,
+      replyTo: currentReplyTo,
+      tempId,
+      nonce: newNonce(),
+    });
   }
 
   const handleRetrySend = useCallback(
@@ -350,14 +410,17 @@ export function useDmSend({
       failedRetryDataRef.current.delete(failedTempId);
 
       setError(null);
-      const tempId = nextTempId();
       const imagePreviewUrl = retryData.file ? URL.createObjectURL(retryData.file) : null;
+      // The SAME nonce: this is the same logical send, and the server answers
+      // a recognized nonce with the original row instead of a duplicate.
       await beginSend({
         content: retryData.content,
         imageFile: retryData.file,
         imagePreviewUrl,
         replyTo: retryData.replyTo,
-        tempId,
+        tempId: failedTempId,
+        nonce: retryData.nonce,
+        preUploadedUrl: retryData.uploadedUrl,
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -410,11 +473,11 @@ export function useDmSend({
         const res = await dedupeFetch(dmUrls.conversationMessages(targetConversationId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: "", image_url: gifUrl, client_nonce: tempId }),
+          body: JSON.stringify({ content: "", image_url: gifUrl, client_nonce: newNonce() }),
           signal: abortController.signal,
         });
         const data = await res.json().catch(() => ({}));
-        if (res.status === 201) {
+        if (res.ok) {
           setHideUnreadDivider(true);
           const message = data.message as DmMessage | undefined;
           if (!message) throw new Error("No message in response");
@@ -430,7 +493,7 @@ export function useDmSend({
             };
             const next = prev.filter((m) => m.id !== tempId && m.id !== message.id);
             next.push(merged);
-            next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            next.sort(compareDmMessages);
             dmCache.setMessages(targetConversationId, next.filter((m) => !m.id.startsWith("temp-")));
             return next;
           });

@@ -6,7 +6,8 @@ import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
 import { invalidateRequest } from "@/lib/request-cache";
 import { bumpConversationWithMessage } from "@/lib/direct-messages/client-cache";
 import { dmUrls } from "@/lib/direct-messages/client";
-import { onConversationRead, setActiveConversation } from "@/lib/direct-messages/read-manager";
+import { onConversationRead, markConversationRead, setActiveConversation } from "@/lib/direct-messages/read-manager";
+import { newestRealMessage } from "@/lib/direct-messages/messages";
 import type {
   DmConversationSummary,
   DmMessage,
@@ -255,14 +256,35 @@ export function DirectMessagesView({
     return () => setActiveConversation(null);
   }, [activeId]);
 
+  // Opening a conversation reports it read ONCE its messages are actually on
+  // screen — and only up to the newest DISPLAYED message, because "now"
+  // could swallow one that raced the request. Once per open, however many
+  // messages stream in afterwards (those mark through the realtime path).
+  const markedOpenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeId || !thread.initialReady) return;
+    if (markedOpenRef.current === activeId) return;
+    const newest = newestRealMessage(thread.messages);
+    if (!newest) return;
+    markedOpenRef.current = activeId;
+    markConversationRead(activeId, { immediate: true, lastReadAt: newest.created_at });
+  }, [activeId, thread.initialReady, thread.messages]);
+
   useEffect(() => {
     return onConversationRead((conversationId, markedAt) => {
       setConversations((prev) =>
-        prev.map((c) =>
-          c.id === conversationId
-            ? { ...c, unread_count: 0, my_last_read_at: markedAt }
-            : c,
-        ),
+        prev.map((c) => {
+          if (c.id !== conversationId) return c;
+          // The server's effective marker is authoritative, but a slower
+          // in-flight response must not regress what the list displays.
+          if (
+            c.my_last_read_at &&
+            new Date(c.my_last_read_at).getTime() >= new Date(markedAt).getTime()
+          ) {
+            return c;
+          }
+          return { ...c, unread_count: 0, my_last_read_at: markedAt };
+        }),
       );
       invalidateRequest(dmUrls.unread, userId);
     });
