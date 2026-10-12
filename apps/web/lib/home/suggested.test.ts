@@ -105,12 +105,16 @@ test("honours the limit and returns the card's fields only", () => {
   );
 
   assert.equal(suggested.length, 2);
+  // `type` and `is_private` ride along for the shared join dialog's name
+  // badges; everything else the source row carries is dropped.
   assert.deepEqual(Object.keys(suggested[0]).sort(), [
     "description",
     "id",
     "image_url",
+    "is_private",
     "member_count",
     "name",
+    "type",
   ]);
 });
 

@@ -1,22 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
-import {
-  CommunityPreviewCard,
-} from "./CommunityPreview";
+import { CommunityJoinDialog } from "./JoinCommunityModal";
+import { syncCommunityViewerState } from "@/lib/communities/cache";
 import type { CommunityPreviewData } from "@/lib/communities/preview";
 
 /**
  * The feed's "posted in …" popup.
  *
- * A non-member who clicks a feed card's community label gets this modal
- * instead of navigating away: the same preview card the community page
- * server-renders (shared CommunityPreviewCard), fetched from
- * /api/communities/[id]/preview, so joining happens right here in the feed
- * without losing the list. Used by the home feed and the profile activity
- * tabs.
+ * A member who clicks a feed card's community label gets this modal instead of
+ * navigating away, fetched from /api/communities/[id]/preview. It renders the
+ * same community dialog the Explore page and the community page use, so the
+ * design is identical everywhere; joining happens right here in the feed.
  *
  * A 404 means the community is gone (deleted or deactivated) rather than
  * unreachable — cards of soft-deleted communities stay in the feeds, so the
@@ -29,9 +27,9 @@ export function CommunityPreviewModal({
   communityId: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [preview, setPreview] = useState<CommunityPreviewData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
   const load = useCallback(async () => {
@@ -39,16 +37,22 @@ export function CommunityPreviewModal({
       const res = await fetch(`/api/communities/${communityId}/preview`);
       if (!res.ok) {
         setDeleted(res.status === 404);
-        setFailed(res.status !== 404);
         setPreview(null);
         return;
       }
       const data = (await res.json()) as { preview?: CommunityPreviewData };
       setPreview(data.preview ?? null);
-      setFailed(false);
       setDeleted(false);
+      // This endpoint answers live, so it is the authority on where the viewer
+      // stands: correct the cached rows here rather than leaving a list that was
+      // fetched before the request (or the acceptance) to offer it again.
+      if (data.preview) {
+        syncCommunityViewerState(data.preview.id, {
+          joined: data.preview.joined,
+          hasPendingRequest: data.preview.has_pending_request,
+        });
+      }
     } catch {
-      setFailed(true);
       setDeleted(false);
       setPreview(null);
     } finally {
@@ -63,50 +67,36 @@ export function CommunityPreviewModal({
     return () => window.clearTimeout(t);
   }, [load]);
 
+  /** A fresh join, and a member's "View community", both land in the chat. */
+  function openCommunity() {
+    onClose();
+    router.push(`/dashboard/communities/${communityId}`);
+  }
+
   return (
-    <Modal
-      open
-      onClose={onClose}
-      maxWidth="max-w-md"
-      panelClassName="p-0"
-      hideCloseButton
-    >
+    <Modal open onClose={onClose} maxWidth="max-w-md" panelClassName="p-6">
       {loading ? (
-        <div className="flex min-h-48 items-center justify-center">
+        <div className="flex min-h-40 items-center justify-center">
           <Spinner size={22} />
         </div>
       ) : deleted ? (
-        <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="flex min-h-40 flex-col items-center justify-center gap-3 text-center">
           <p className="font-body text-sm font-medium text-foreground-muted">This community was deleted</p>
           <p className="max-w-xs font-body text-xs text-foreground-subtle">
             Posts from it stay in your feed, but there&apos;s no community to open or join anymore.
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-1 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised"
-          >
-            Close
-          </button>
         </div>
       ) : preview ? (
-        <div className="px-4 pb-4 pt-7">
-          <CommunityPreviewCard
-            key={`${communityId}:${preview.has_pending_request}:${preview.joined}`}
-            communityId={preview.id}
-            name={preview.name}
-            type={preview.type}
-            isPrivate={preview.is_private}
-            imageUrl={preview.image_url}
-            description={preview.description}
-            memberCount={preview.member_count}
-            publicCounts={preview.public_counts}
-            canJoin={preview.can_join}
-            hasPendingRequest={preview.has_pending_request}
-            joined={preview.joined}
-            footerNote="You're seeing this community's public posts from the home feed. Joining adds the community's chat and every post to your sidebar."
-          />
-        </div>
+        <CommunityJoinDialog
+          key={`${communityId}:${preview.has_pending_request}:${preview.joined}`}
+          community={preview}
+          joined={preview.joined}
+          canJoin={preview.can_join}
+          hasPendingRequest={preview.has_pending_request}
+          onClose={onClose}
+          onJoined={openCommunity}
+          onViewCommunity={openCommunity}
+        />
       ) : (
         <div className="flex min-h-40 flex-col items-center justify-center gap-2">
           <p className="font-body text-sm font-medium text-foreground-muted">Couldn&apos;t load this community</p>
@@ -114,7 +104,6 @@ export function CommunityPreviewModal({
             type="button"
             onClick={() => {
               setLoading(true);
-              setFailed(false);
               void load();
             }}
             className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised"

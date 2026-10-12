@@ -38,6 +38,7 @@ const ALL_TYPES: NotificationType[] = [
   "report_reviewed",
   "content_restored",
   "job_match",
+  "join_request_accepted",
 ];
 
 test("every generated notification type lands in a tab", () => {
@@ -77,10 +78,10 @@ test("job matches render under the Jobs tab", () => {
   assert.equal(page.unreadByTab.jobs, 1);
 });
 
-// The Other tab renders manager/platform removals of the user's content and
-// the reporter's thank-you; a type it is not given stays invisible instead of
-// leaking into another tab.
-test("content-removal notices render under the Other tab", () => {
+// The Other tab renders manager/platform removals of the user's content, the
+// reporter's thank-you and the accepted join requests; a type it is not given
+// stays invisible instead of leaking into another tab.
+test("content-removal and join-request notices render under the Other tab", () => {
   for (const type of [
     "thread_deleted",
     "showcase_deleted",
@@ -88,6 +89,7 @@ test("content-removal notices render under the Other tab", () => {
     "event_deleted",
     "report_reviewed",
     "content_restored",
+    "join_request_accepted",
   ] as NotificationType[]) {
     assert.equal(notificationTabFor(type), "other", type);
   }
@@ -96,10 +98,11 @@ test("content-removal notices render under the Other tab", () => {
     item("n1", "thread_deleted", "2026-09-15T10:00:00Z"),
     item("n2", "thread_like", "2026-09-15T09:00:00Z"),
     item("n3", "resource_deleted", "2026-09-15T08:00:00Z", "2026-09-15T08:30:00Z"),
+    item("n4", "join_request_accepted", "2026-09-15T07:00:00Z"),
   ]);
 
-  assert.deepEqual(page.other.map((n) => n.id), ["n1", "n3"]);
-  assert.equal(page.unreadByTab.other, 1);
+  assert.deepEqual(page.other.map((n) => n.id), ["n1", "n3", "n4"]);
+  assert.equal(page.unreadByTab.other, 2);
 });
 
 test("a type no tab declares stays invisible", () => {

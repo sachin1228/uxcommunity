@@ -53,7 +53,7 @@ export async function GET() {
     db
       .from("notification_preferences")
       .select(
-        "chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, email_job_updates, email_community_activity, email_product_news",
+        "chat_push_enabled, community_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, email_job_updates, email_community_activity, email_product_news",
       )
       .eq("user_id", userId)
       .maybeSingle(),
@@ -72,6 +72,9 @@ export async function GET() {
       chatPushEnabled:
         (row?.chat_push_enabled as boolean | undefined) ??
         DEFAULT_NOTIFICATION_PREFERENCES.chat_push_enabled,
+      communityPushEnabled:
+        (row?.community_push_enabled as boolean | undefined) ??
+        DEFAULT_NOTIFICATION_PREFERENCES.community_push_enabled,
       chatSound:
         (row?.chat_sound as "default" | "silent" | undefined) ??
         DEFAULT_NOTIFICATION_PREFERENCES.chat_sound,
@@ -126,6 +129,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "chatPushEnabled must be a boolean." }, { status: 422 });
     }
     update.chat_push_enabled = body.chatPushEnabled;
+  }
+
+  if ("communityPushEnabled" in body) {
+    if (typeof body.communityPushEnabled !== "boolean") {
+      return NextResponse.json(
+        { error: "communityPushEnabled must be a boolean." },
+        { status: 422 },
+      );
+    }
+    update.community_push_enabled = body.communityPushEnabled;
   }
 
   if ("chatSound" in body) {

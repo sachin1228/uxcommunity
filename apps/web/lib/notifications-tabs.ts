@@ -34,12 +34,13 @@ const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
  * - `jobs` — the roles posted that match the member's profile: the poster
  *   decides who it targets, the match is the same predicate Apply enforces,
  *   and the row links to the role (lib/jobs/notifications.ts).
- * - `other` — removals and report outcomes: a community owner/admin/moderator
- *   or the platform removed the user's content (the routes that log
- *   thread_deleted & co. also send the author a notification), plus the
- *   thank-you a reporter gets once their report was actioned. Add any further
- *   types here; update the tab's empty-state copy in NotificationsView to
- *   match.
+ * - `other` — removals, report outcomes and membership decisions: a community
+ *   owner/admin/moderator or the platform removed the user's content (the
+ *   routes that log thread_deleted & co. also send the author a notification),
+ *   the thank-you a reporter gets once their report was actioned, and the
+ *   approval a member gets when their private-community join request is
+ *   accepted. Add any further types here; update the tab's empty-state copy in
+ *   NotificationsView to match.
  *
  * Nothing renders until a tab claims its type, so an unlisted type stays
  * invisible rather than leaking into a tab that did not ask for it.
@@ -61,6 +62,7 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "event_deleted",
     "report_reviewed",
     "content_restored",
+    "join_request_accepted",
   ]),
 };
 

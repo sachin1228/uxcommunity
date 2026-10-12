@@ -31,9 +31,13 @@ import {
   patchCachedRequest,
   setCachedRequest,
 } from "@/lib/request-cache";
+
 import { evictCommunityState } from "./community-cache";
 import { clearReactionTombstone } from "./reactions";
-import { exploreStore } from "./explore-store";
+import {
+  exploreStore,
+  notifyExploreStoreChanged,
+} from "./explore-store";
 import type { CachedSidebarCommunity, SidebarLastReaction } from "./types";
 
 export const sidebarStore: {
@@ -43,21 +47,140 @@ export const sidebarStore: {
 
 export const SIDEBAR_STALE_MS = 60_000;
 
+// ─── The store's own write path ───────────────────────────────────────────────
+
+/**
+ * Fired whenever the sidebar rows change — one fetch landing, one realtime
+ * preview, one optimistic send. Listeners re-read the store and re-render.
+ *
+ * This is what lets a component render the shared rows directly instead of
+ * copying them into its own state: a copy only learns about writes that go
+ * through the component that owns it, which is how two views of the same list
+ * drifted apart in the first place.
+ *
+ * Deliberately NOT SIDEBAR_CHANGED_EVENT: that one means "the membership list is
+ * stale, refetch it". A preview patch is not a reason to hit the network.
+ */
+export const SIDEBAR_STORE_CHANGED_EVENT = "uxcommunity:sidebar-store-changed";
+
+/** Replaces the rows (a fetch landed, or a membership changed) and tells listeners. */
+export function setSidebarCommunities(
+  communities: CachedSidebarCommunity[],
+  options: { fetchedAt?: number } = {},
+): void {
+  sidebarStore.data = { communities, fetchedAt: options.fetchedAt ?? Date.now() };
+  notifySidebarStoreChanged();
+}
+
+/**
+ * The one way a row is edited: apply the update to the store's own rows, mirror
+ * the same update into the cached /api/communities snapshot (a replay inside the
+ * stale window must not resurrect the preview the update just replaced), and tell
+ * the listeners. React state is never a second base to reconcile against — that
+ * reconciliation used to be spelled out at every call site.
+ */
+export function updateSidebarCommunities(
+  update: (current: CachedSidebarCommunity[]) => CachedSidebarCommunity[],
+): void {
+  const current = sidebarStore.data;
+  if (current) {
+    sidebarStore.data = { ...current, communities: update(current.communities) };
+  }
+  // Mirrored even with no store rows: a chat opened straight from a link can
+  // send before the sidebar has ever loaded, and its optimistic preview still
+  // has to survive the next cache-hit replay.
+  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+    "/api/communities",
+    (cached) => ({ ...cached, communities: update(cached.communities) }),
+  );
+  if (current) notifySidebarStoreChanged();
+}
+
+// ─── Where the viewer stands with one community ───────────────────────────────
+
+export interface CommunityViewerState {
+  /** The viewer belongs to the community. */
+  joined: boolean;
+  /** A private community is waiting on the owner's answer. */
+  hasPendingRequest?: boolean;
+}
+
+/**
+ * Applies a viewer state to the cached Explore row, and says whether the row
+ * actually moved — so a fetch that merely confirms what the list already said
+ * stays silent.
+ */
+function patchCachedViewerState(
+  communityId: string,
+  state: CommunityViewerState,
+): boolean {
+  // Someone who belongs is not waiting for approval, so the two flags are one
+  // fact, not two independent toggles.
+  const pending = state.joined ? false : Boolean(state.hasPendingRequest);
+  const data = exploreStore.data;
+  const current = data?.communities.find((c) => c.id === communityId);
+  if (!data || !current) return false;
+  if (current.joined === state.joined && Boolean(current.has_pending_request) === pending) {
+    return false;
+  }
+  exploreStore.data = {
+    ...data,
+    communities: data.communities.map((c) =>
+      c.id === communityId
+        ? { ...c, joined: state.joined, has_pending_request: pending }
+        : c,
+    ),
+  };
+  return true;
+}
+
+
+/**
+ * The one writer of where the viewer stands with a community.
+ *
+ * Every surface that shows this fact reads the same cached row: the Explore
+ * list, the join dialog (whatever opened it — Explore, the home-feed popup, the
+ * Suggested Communities rail), and the Requests tab. So every surface records
+ * the outcome HERE and nowhere else: a request filed from the home feed cannot
+ * leave Explore offering to request all over again, because there is no second
+ * copy to fall out of step.
+ *
+ * A join is a membership change, so the sidebar projection is dropped exactly as
+ * it always was; a request — or a repeat of a state the list already holds —
+ * touches only the Explore row.
+ */
+export function setCommunityViewerState(
+  communityId: string,
+  state: CommunityViewerState,
+): void {
+  const moved = patchCachedViewerState(communityId, state);
+  if (state.joined) {
+    sidebarStore.data     = null;
+    sidebarStore.inflight = null;
+    invalidateRequest("/api/communities");
+    notifySidebarChanged();
+  }
+  if (moved) notifyExploreStoreChanged();
+}
+
+/**
+ * Reconciles the cached row with an answer a surface just fetched (the
+ * community preview endpoint). Nothing is assumed to have changed — the sidebar
+ * keeps its list, because a member simply re-reading a community is not a
+ * membership change.
+ */
+export function syncCommunityViewerState(
+  communityId: string,
+  state: CommunityViewerState,
+): void {
+  if (patchCachedViewerState(communityId, state)) notifyExploreStoreChanged();
+}
+
 // ─── Cache-invalidation helpers (join / leave) ────────────────────────────────
 
+/** A join, in the one vocabulary above. Kept for its many callers. */
 export function invalidateOnJoin(communityId: string): void {
-  if (exploreStore.data) {
-    exploreStore.data = {
-      ...exploreStore.data,
-      communities: exploreStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, joined: true } : c
-      ),
-    };
-  }
-  sidebarStore.data     = null;
-  sidebarStore.inflight = null;
-  invalidateRequest("/api/communities");
-  notifySidebarChanged();
+  setCommunityViewerState(communityId, { joined: true });
 }
 
 export function invalidateCommunitiesList(): void {
@@ -70,22 +193,11 @@ export function invalidateCommunitiesList(): void {
 }
 
 export function invalidateOnLeave(communityId: string): void {
-  if (exploreStore.data) {
-    exploreStore.data = {
-      ...exploreStore.data,
-      communities: exploreStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, joined: false } : c
-      ),
-    };
-  }
+  syncCommunityViewerState(communityId, { joined: false });
   if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
-    };
-    setCachedRequest("/api/communities", {
-      communities: sidebarStore.data.communities,
-    });
+    const remaining = sidebarStore.data.communities.filter((c) => c.id !== communityId);
+    setSidebarCommunities(remaining, { fetchedAt: sidebarStore.data.fetchedAt });
+    setCachedRequest("/api/communities", { communities: remaining });
   } else {
     invalidateRequest("/api/communities");
   }
@@ -102,13 +214,9 @@ export function invalidateOnCommunityDeleted(communityId: string): void {
     };
   }
   if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
-    };
-    setCachedRequest("/api/communities", {
-      communities: sidebarStore.data.communities,
-    });
+    const remaining = sidebarStore.data.communities.filter((c) => c.id !== communityId);
+    setSidebarCommunities(remaining, { fetchedAt: sidebarStore.data.fetchedAt });
+    setCachedRequest("/api/communities", { communities: remaining });
   } else {
     invalidateRequest("/api/communities");
   }
@@ -137,29 +245,16 @@ export function patchSidebarCommunity(
     >
   >,
 ): void {
-  if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, ...patch } : c
-      ),
-    };
-    patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
-      "/api/communities",
-      (current) => ({
-        communities: current.communities.map((community) =>
-          community.id === communityId ? { ...community, ...patch } : community
-        ),
-      }),
-    );
-  }
+  updateSidebarCommunities((current) =>
+    current.map((c) => (c.id === communityId ? { ...c, ...patch } : c)),
+  );
   notifySidebarChanged();
 }
 
 /**
  * Optimistically updates a community's reaction preview in the shared sidebar
- * cache. The sidebar listens for this event, so chat actions render there in
- * the same frame instead of waiting for the database and Realtime round trip.
+ * cache, so chat actions render there in the same frame instead of waiting for
+ * the database and Realtime round trip.
  */
 export function patchSidebarReaction(
   communityId: string,
@@ -168,53 +263,22 @@ export function patchSidebarReaction(
   if (lastReaction) {
     clearReactionTombstone(communityId, lastReaction.messageId);
   }
-  if (!sidebarStore.data) return;
-
-  const patch = (community: CachedSidebarCommunity) =>
-    community.id === communityId ? { ...community, lastReaction } : community;
-
-  sidebarStore.data = {
-    ...sidebarStore.data,
-    communities: sidebarStore.data.communities.map(patch),
-  };
-  // Mirror into the request cache so a stale-window replay can't resurrect a
-  // pre-reaction preview (same rationale as patchSidebarLastMessage).
-  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
-    "/api/communities",
-    (current) => ({
-      communities: current.communities.map(patch),
-    }),
+  updateSidebarCommunities((current) =>
+    current.map((community) =>
+      community.id === communityId ? { ...community, lastReaction } : community,
+    ),
   );
-  notifySidebarReactionChanged();
 }
 
 export function invalidateOnArchive(communityId: string): void {
-  if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, is_archived: true } : c
-      ),
-    };
-  }
+  updateSidebarCommunities((current) =>
+    current.map((c) => (c.id === communityId ? { ...c, is_archived: true } : c)),
+  );
   evictCommunityState(communityId);
   notifySidebarChanged();
 }
 
 export const SIDEBAR_CHANGED_EVENT = "uxcommunity:sidebar-changed";
-/**
- * Fired only for local reaction preview patches. Unlike SIDEBAR_CHANGED_EVENT
- * this must NOT trigger a server refetch: the cached /api/communities snapshot
- * predates the reaction, and reloading it would clobber the optimistic preview
- * (and any newer last_message) with stale rows.
- */
-export const SIDEBAR_REACTION_CHANGED_EVENT = "uxcommunity:sidebar-reaction-changed";
-/**
- * Fired only for local last-message patches (optimistic sends from the chat
- * window). Same constraints as SIDEBAR_REACTION_CHANGED_EVENT: no server
- * refetch, because the cached /api/communities snapshot predates the send.
- */
-export const SIDEBAR_MESSAGE_CHANGED_EVENT = "uxcommunity:sidebar-message-changed";
 
 function notifySidebarChanged(): void {
   if (typeof window !== "undefined") {
@@ -222,15 +286,9 @@ function notifySidebarChanged(): void {
   }
 }
 
-function notifySidebarReactionChanged(): void {
+function notifySidebarStoreChanged(): void {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(SIDEBAR_REACTION_CHANGED_EVENT));
-  }
-}
-
-function notifySidebarMessageChanged(): void {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(SIDEBAR_MESSAGE_CHANGED_EVENT));
+    window.dispatchEvent(new Event(SIDEBAR_STORE_CHANGED_EVENT));
   }
 }
 
@@ -254,23 +312,9 @@ export function patchSidebarLastMessage(
     lastReaction: null, // a new message supersedes any pending reaction preview
     last_message: lastMessage,
   });
-  if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.map((c) =>
-        c.id === communityId ? patch(c) : c
-      ),
-    };
-  }
-  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
-    "/api/communities",
-    (current) => ({
-      communities: current.communities.map((community) =>
-        community.id === communityId ? patch(community) : community
-      ),
-    }),
+  updateSidebarCommunities((current) =>
+    current.map((c) => (c.id === communityId ? patch(c) : c)),
   );
-  notifySidebarMessageChanged();
 }
 
 /** Updates the sidebar preview when an existing latest message is edited. */
@@ -287,23 +331,9 @@ export function patchSidebarMessageContent(
     };
   };
 
-  if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.map((community) =>
-        community.id === communityId ? patch(community) : community,
-      ),
-    };
-  }
-  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
-    "/api/communities",
-    (current) => ({
-      communities: current.communities.map((community) =>
-        community.id === communityId ? patch(community) : community,
-      ),
-    }),
+  updateSidebarCommunities((current) =>
+    current.map((community) => (community.id === communityId ? patch(community) : community)),
   );
-  notifySidebarMessageChanged();
 }
 
 /**
@@ -315,21 +345,7 @@ export function restoreSidebarEntry(
   communityId: string,
   entry: CachedSidebarCommunity,
 ): void {
-  if (sidebarStore.data) {
-    sidebarStore.data = {
-      ...sidebarStore.data,
-      communities: sidebarStore.data.communities.map((c) =>
-        c.id === communityId ? entry : c
-      ),
-    };
-  }
-  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
-    "/api/communities",
-    (current) => ({
-      communities: current.communities.map((community) =>
-        community.id === communityId ? entry : community
-      ),
-    }),
+  updateSidebarCommunities((current) =>
+    current.map((c) => (c.id === communityId ? entry : c)),
   );
-  notifySidebarMessageChanged();
 }

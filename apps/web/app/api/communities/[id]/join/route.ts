@@ -19,6 +19,14 @@ import { storeEventJoinResponse } from "@/lib/communities/event-join-responses";
  *  - job_title                  → user's job_title slug must resolve to matching reference_id
  *
  * For private communities, a join request is created instead of direct membership.
+ *
+ * DELETE /api/communities/[id]/join
+ *
+ * The requester withdrawing their own pending request. POST creates the request,
+ * DELETE takes it back — one resource, one pair of verbs. Idempotent and
+ * self-scoped: it only ever deletes the caller's own `pending` row, so a member
+ * can never withdraw someone else's request and an already accepted/declined one
+ * is left untouched.
  */
 export async function POST(
   req: NextRequest,
@@ -151,7 +159,11 @@ export async function POST(
       };
       return NextResponse.json(
         {
-          error: `You can only join this ${labels[community.type] ?? "profile"} community if it matches your profile. Update your profile to join.`,
+          error: `You can only join this ${labels[community.type] ?? "profile"} community if it matches your profile.${
+            community.is_private
+              ? " Update your profile to match, then request to join."
+              : " Update your profile to match and you'll join automatically."
+          }`,
           code:  "PROFILE_MISMATCH",
         },
         { status: 403 },
@@ -210,6 +222,34 @@ export async function POST(
   // Drop the cached suggestion lists so the homepage rail (and any other
   // surface reading them) stops offering a community this member just joined.
   revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  let session;
+  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  const userId = session.userId!;
+  const { id: communityId } = await params;
+
+  const db = createServiceClient();
+
+  // Scoped to the caller and to `pending`: a resolved request (accepted or
+  // declined) is history the member cannot rewrite, and another member's row is
+  // not theirs to touch.
+  const { error } = await db
+    .from("community_join_requests")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", userId)
+    .eq("status", "pending");
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to withdraw request." }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

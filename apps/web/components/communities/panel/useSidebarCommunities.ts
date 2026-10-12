@@ -6,19 +6,19 @@ import { useGuardedRouter, refreshPage } from "@/lib/navigation-guard";
 import { realtimePool } from "@/lib/realtime/pool";
 import {
   sidebarStore,
+  setSidebarCommunities,
+  updateSidebarCommunities,
   SIDEBAR_STALE_MS,
   initUserCache,
   lastReadAtOnOpen,
   SIDEBAR_CHANGED_EVENT,
-  SIDEBAR_MESSAGE_CHANGED_EVENT,
-  SIDEBAR_REACTION_CHANGED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
+import { useSidebarCommunityRows } from "@/lib/communities/cache/use-community-stores";
 import {
   fetchJsonCached,
   getCachedRequest,
   initRequestCache,
-  patchCachedRequest,
   setCachedRequest,
 } from "@/lib/request-cache";
 import { initReadManager, scheduleMarkRead } from "@/lib/communities/read-manager";
@@ -38,6 +38,48 @@ import { subscribeToNowTick } from "@/lib/use-now-tick";
 const PIN_TICK_MS = 15_000;
 
 type Community = CachedSidebarCommunity;
+
+/** The user whose rows are already seeded — the work below runs once per session. */
+let seededForUserId: string | null = null;
+
+/**
+ * Seeds the sidebar projection on first paint from the request cache, which
+ * already holds the last answer inside its stale window — that is what lets the
+ * panel paint rows instead of a spinner on a revisit.
+ *
+ * Runs during render, where the lazy state initializer used to. This is the one
+ * write to the store that does not announce itself, and deliberately so: it
+ * happens before any subscriber has read the store in this commit, so there is
+ * nothing yet to tell.
+ */
+function seedSidebarStore(userId: string): void {
+  if (seededForUserId === userId) return;
+  seededForUserId = userId;
+  initUserCache(userId);
+  initReadManager(userId);
+  initRequestCache(userId);
+  if (
+    sidebarStore.data &&
+    Date.now() - sidebarStore.data.fetchedAt < SIDEBAR_STALE_MS &&
+    !getCachedRequest("/api/communities", userId)
+  ) {
+    setCachedRequest(
+      "/api/communities",
+      { communities: sidebarStore.data.communities },
+      userId,
+    );
+  }
+  const cached = getCachedRequest<{ communities?: Community[] }>("/api/communities", userId);
+  if (cached) {
+    // The cache snapshot can predate realtime-applied previews in the store
+    // (see sidebar-merge.ts). Never let it demote newer activity on mount.
+    const merged = mergeStaleServerList(
+      sidebarStore.data?.communities ?? [],
+      cached.communities ?? [],
+    );
+    sidebarStore.data = { communities: merged, fetchedAt: Date.now() };
+  }
+}
 
 export function useSidebarCommunities(userId: string) {
   const router   = useGuardedRouter();
@@ -64,41 +106,21 @@ export function useSidebarCommunities(userId: string) {
     /\/dashboard\/communities\/([^/]+)/
   )?.[1];
 
-  const [communities, setCommunities] = useState<Community[]>(() => {
-    initUserCache(userId);
-    initReadManager(userId);
-    initRequestCache(userId);
-    if (
-      sidebarStore.data &&
-      Date.now() - sidebarStore.data.fetchedAt < SIDEBAR_STALE_MS &&
-      !getCachedRequest("/api/communities", userId)
-    ) {
-      setCachedRequest(
-        "/api/communities",
-        { communities: sidebarStore.data.communities },
-        userId,
-      );
-    }
-    const cached = getCachedRequest<{ communities?: Community[] }>("/api/communities", userId);
-    if (cached) {
-      // The cache snapshot can predate realtime-applied previews in the store
-      // (see sidebar-merge.ts). Never let it demote newer activity on mount.
-      const merged = mergeStaleServerList(
-        sidebarStore.data?.communities ?? [],
-        cached.communities ?? [],
-      );
-      sidebarStore.data = { communities: merged, fetchedAt: Date.now() };
-    }
-    return sidebarStore.data?.communities ?? [];
-  });
-  const [loading, setLoading] = useState(() => sidebarStore.data === null);
+  seedSidebarStore(userId);
+
+  // The rows are the shared store's rows, not a copy: realtime previews,
+  // mark-read patches, joins and leaves all write that one list, and this hook
+  // re-renders with whatever is in it. Component state is only for what the
+  // server has not answered yet.
+  const communities = useSidebarCommunityRows();
+  const [settled, setSettled] = useState(() => sidebarStore.data !== null);
+  const loading = !settled && communities.length === 0;
 
   const activeCommunityIdRef = useRef(activeCommunityId);
 
   // The request cache owns freshness and in-flight deduplication. sidebarStore is
   // retained as the realtime/optimistic projection consumed by existing hooks.
   const load = useCallback(async (force = false) => {
-    if (!sidebarStore.data) setLoading(true);
     try {
       const data = await fetchJsonCached<{ communities?: Community[] }>(
         "/api/communities",
@@ -111,12 +133,11 @@ export function useSidebarCommunities(userId: string) {
       // re-stamped by every mark-read patch). Replacing here is the bug that
       // sank a just-messaged community back down the list on the next open.
       const merged = mergeStaleServerList(sidebarStore.data?.communities ?? [], fresh);
-      sidebarStore.data = { communities: merged, fetchedAt: Date.now() };
-      setCommunities(merged);
+      setSidebarCommunities(merged);
     } catch (error) {
       console.error("[communities] fetch failed", error);
     } finally {
-      setLoading(false);
+      setSettled(true);
     }
   }, [userId]);
 
@@ -165,60 +186,22 @@ export function useSidebarCommunities(userId: string) {
         const clearPin = (c: Community): Community =>
           expiredSet.has(c.id) ? { ...c, pinned_until: null } : c;
 
-        // The store and the request cache are cleared together, like the
-        // message and reaction patches above: mirroring it keeps a stale-window
-        // replay of /api/communities from restoring a pin that has run out.
-        if (sidebarStore.data) {
-          sidebarStore.data = {
-            ...sidebarStore.data,
-            communities: sidebarStore.data.communities.map(clearPin),
-          };
-        }
-        patchCachedRequest<{ communities: Community[] }>(
-          "/api/communities",
-          (current) => ({ communities: current.communities.map(clearPin) }),
-          userId,
-        );
-        setCommunities(sidebarStore.data?.communities ?? []);
+        // The store and the cached snapshot are cleared together (one writer
+        // does both), so a stale-window replay of /api/communities cannot
+        // restore a pin that has run out.
+        updateSidebarCommunities((current) => current.map(clearPin));
       }, PIN_TICK_MS),
     [userId],
   );
 
-  // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
+  // Re-fetch whenever a join/leave/archive action fires the sidebar-changed
+  // event. The rows themselves need no syncing here: they are the store's, and
+  // the store's own change event already re-rendered them.
   useEffect(() => {
-    const handler = () => {
-      setCommunities(sidebarStore.data?.communities ?? []);
-      setLoading(sidebarStore.data === null);
-      load();
-    };
+    const handler = () => void load();
     window.addEventListener(SIDEBAR_CHANGED_EVENT, handler);
     return () => window.removeEventListener(SIDEBAR_CHANGED_EVENT, handler);
   }, [load]);
-
-  // Local reaction preview patches (from the chat window) must only sync the
-  // store into React state. Refetching here would replace the optimistic
-  // "You reacted …" preview with the stale /api/communities cache that
-  // predates the reaction — the exact bug where reacting to a message left
-  // the sidebar showing the old preview (or "No messages yet").
-  useEffect(() => {
-    const handler = () => {
-      setCommunities(sidebarStore.data?.communities ?? []);
-    };
-    window.addEventListener(SIDEBAR_REACTION_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(SIDEBAR_REACTION_CHANGED_EVENT, handler);
-  }, []);
-
-  // Optimistic last-message patches (the sender's own chat sends) must also
-  // only sync the store into React state — refetching would clobber the
-  // optimistic "You: …" preview with the stale /api/communities cache that
-  // predates the send, sinking the community back down the list.
-  useEffect(() => {
-    const handler = () => {
-      setCommunities(sidebarStore.data?.communities ?? []);
-    };
-    window.addEventListener(SIDEBAR_MESSAGE_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(SIDEBAR_MESSAGE_CHANGED_EVENT, handler);
-  }, []);
 
   // ── Active community change: clear badge + mark read ─────────────────────
   useEffect(() => {
@@ -235,16 +218,11 @@ export function useSidebarCommunities(userId: string) {
       if (snapshot) {
         lastReadAtOnOpen.set(activeCommunityId, snapshot.last_read_at ?? null);
         const optimisticReadAt = new Date().toISOString();
-        if (sidebarStore.data) {
-          sidebarStore.data = {
-            ...sidebarStore.data,
-            communities: sidebarStore.data.communities.map((c) =>
-              c.id === activeCommunityId
-                ? { ...c, last_read_at: optimisticReadAt }
-                : c
-            ),
-          };
-        }
+        updateSidebarCommunities((current) =>
+          current.map((c) =>
+            c.id === activeCommunityId ? { ...c, last_read_at: optimisticReadAt } : c,
+          ),
+        );
       }
     }
 
@@ -258,30 +236,24 @@ export function useSidebarCommunities(userId: string) {
       bypassCooldown: true,
     });
 
-    setCommunities((prev) => {
-      const updated = prev.map((c) =>
+    // Zero the badges on the shared rows (the optimistic read stamp above is
+    // already on them — there is no second base to copy it back from).
+    updateSidebarCommunities((current) =>
+      current.map((c) =>
         c.id === activeCommunityId
           ? { ...c, message_count: 0, mention_count: 0, unread_content_count: 0 }
-          : c
-      );
-      if (sidebarStore.data) {
-        const storeById = new Map(
-          sidebarStore.data.communities.map((c) => [c.id, c])
-        );
-        sidebarStore.data = {
-          ...sidebarStore.data,
-          communities: updated.map((c) => ({
-            ...c,
-            last_read_at: storeById.get(c.id)?.last_read_at ?? c.last_read_at,
-          })),
-        };
-      }
-      return updated;
-    });
+          : c,
+      ),
+    );
   }, [activeCommunityId]);
 
   // ── Realtime: message changes + typing indicators ────────────────────────
-  useSidebarRealtime({ communities, userId, activeCommunityIdRef, setCommunities });
+  useSidebarRealtime({
+    communities,
+    userId,
+    activeCommunityIdRef,
+    updateCommunities: updateSidebarCommunities,
+  });
   const typingMap = useSidebarTyping({ communities, userId });
 
   // ── Navigation handler ────────────────────────────────────────────────────
@@ -309,14 +281,9 @@ export function useSidebarCommunities(userId: string) {
       if (snapshot) {
         lastReadAtOnOpen.set(id, snapshot.last_read_at ?? null);
         const optimisticReadAt = new Date().toISOString();
-        if (sidebarStore.data) {
-          sidebarStore.data = {
-            ...sidebarStore.data,
-            communities: sidebarStore.data.communities.map((c) =>
-              c.id === id ? { ...c, last_read_at: optimisticReadAt } : c
-            ),
-          };
-        }
+        updateSidebarCommunities((current) =>
+          current.map((c) => (c.id === id ? { ...c, last_read_at: optimisticReadAt } : c)),
+        );
       }
     }
 
@@ -330,26 +297,15 @@ export function useSidebarCommunities(userId: string) {
       bypassCooldown: true,
     });
 
-    setCommunities((prev) => {
-      const updated = prev.map((c) =>
+    // Zero the badges on the shared rows — one base, so the optimistic read
+    // stamp written above survives without being copied back from the store.
+    updateSidebarCommunities((current) =>
+      current.map((c) =>
         c.id === id
           ? { ...c, message_count: 0, mention_count: 0, unread_content_count: 0 }
-          : c
-      );
-      if (sidebarStore.data) {
-        const storeById = new Map(
-          sidebarStore.data.communities.map((c) => [c.id, c])
-        );
-        sidebarStore.data = {
-          ...sidebarStore.data,
-          communities: updated.map((c) => ({
-            ...c,
-            last_read_at: storeById.get(c.id)?.last_read_at ?? c.last_read_at,
-          })),
-        };
-      }
-      return updated;
-    });
+          : c,
+      ),
+    );
 
     router.push(target);
   }, [pathname, router]);

@@ -50,7 +50,8 @@ export type NotificationType =
   | "event_deleted"
   | "report_reviewed"
   | "content_restored"
-  | "job_match";
+  | "job_match"
+  | "join_request_accepted";
 
 export interface NotificationItem {
   id: string;

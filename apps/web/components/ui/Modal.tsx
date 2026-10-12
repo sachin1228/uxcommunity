@@ -1,8 +1,32 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useCallback, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
+
+/**
+ * The open dialogs, oldest first.
+ *
+ * Nested dialogs are a real case — the community preview's Join action opens
+ * the join dialog on top of it — so two things have to be shared between the
+ * instances rather than owned by each: Escape closes only the topmost layer,
+ * and the page keeps its scroll lock until the last one unmounts. A
+ * module-level stack is what lets one modal know whether it is the top.
+ */
+const openModals: symbol[] = [];
+let scrollLocked = false;
+
+function lockBodyScroll() {
+  if (scrollLocked || typeof document === "undefined") return;
+  scrollLocked = true;
+  document.body.style.overflow = "hidden";
+}
+
+function unlockBodyScroll() {
+  if (!scrollLocked || typeof document === "undefined") return;
+  scrollLocked = false;
+  document.body.style.overflow = "";
+}
 
 interface ModalProps {
   open: boolean;
@@ -41,22 +65,32 @@ export function Modal({
   hideCloseButton = false,
   panelClassName,
 }: ModalProps) {
+  // Stable identity for the whole life of this instance, used to order it in
+  // `openModals` and to tell whether it is the dialog currently on top.
+  const [modalId] = useState(() => Symbol("modal"));
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      // Only the topmost open dialog reacts, so Escape peels one layer at a time.
+      if (openModals[openModals.length - 1] !== modalId) return;
+      onClose();
     },
-    [onClose]
+    [modalId, onClose]
   );
 
   useEffect(() => {
     if (!open) return;
+    openModals.push(modalId);
+    lockBodyScroll();
     document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
     return () => {
+      const index = openModals.lastIndexOf(modalId);
+      if (index !== -1) openModals.splice(index, 1);
+      if (openModals.length === 0) unlockBodyScroll();
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
     };
-  }, [open, handleKeyDown]);
+  }, [open, modalId, handleKeyDown]);
 
   if (!open) return null;
 

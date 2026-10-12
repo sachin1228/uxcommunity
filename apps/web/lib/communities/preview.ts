@@ -15,8 +15,6 @@ export interface CommunityPreviewData {
   image_url: string | null;
   description: string | null;
   member_count: number;
-  /** The public content the home feed surfaced here — empty when none. */
-  public_counts: { threads?: number; events?: number; resources?: number; showcase?: number };
   can_join: boolean;
   has_pending_request: boolean;
   /** True when the viewer already belongs to this community. */
@@ -25,9 +23,8 @@ export interface CommunityPreviewData {
 
 /**
  * Resolve the read-only preview of a community for a non-member viewer: the
- * public facts the Explore page already shows, the number of public posts per
- * content area (the rows the home feed surfaces), and the viewer's Join
- * eligibility (same rules as get_all_communities and the detail-page banner).
+ * public facts the Explore page already shows and the viewer's Join eligibility
+ * (same rules as get_all_communities and the detail-page banner).
  *
  * Returns null when the community does not exist or is inactive — the caller
  * decides what that means (the community page falls through to the chat's
@@ -64,15 +61,6 @@ export async function loadCommunityPreview(
     member_count: number | null;
   };
 
-  // One count per public content area — the same rows the home feed
-  // surfaces. Any query that fails simply hides its pill.
-  const countRows = await Promise.all([
-    db.from("community_threads").select("id", { count: "exact", head: true }).eq("community_id", communityId).eq("is_public", true),
-    db.from("community_events").select("id", { count: "exact", head: true }).eq("community_id", communityId).eq("is_public", true),
-    db.from("community_showcase_posts").select("id", { count: "exact", head: true }).eq("community_id", communityId).eq("is_public", true),
-    db.from("community_resources").select("id", { count: "exact", head: true }).eq("community_id", communityId).eq("is_public", true),
-  ]);
-
   const [{ canJoin, hasPendingRequest }, dp] = await Promise.all([
     loadJoinEligibility(
       db,
@@ -102,12 +90,6 @@ export async function loadCommunityPreview(
     image_url: dp.image_url,
     description: row.description,
     member_count: row.member_count ?? 0,
-    public_counts: {
-      ...(countRows[0].count ? { threads: countRows[0].count } : {}),
-      ...(countRows[1].count ? { events: countRows[1].count } : {}),
-      ...(countRows[2].count ? { showcase: countRows[2].count } : {}),
-      ...(countRows[3].count ? { resources: countRows[3].count } : {}),
-    },
     can_join: canJoin,
     has_pending_request: hasPendingRequest,
     joined: Boolean(membership),

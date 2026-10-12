@@ -9,6 +9,11 @@
 
 export interface PushPreferences {
   chatPushEnabled: boolean;
+  /**
+   * Non-chat community updates — today, the push that says a join request was
+   * accepted. Its own switch so a chat toggle never silently governs it.
+   */
+  communityPushEnabled: boolean;
   chatSound: "default" | "silent";
   quietHoursEnabled: boolean;
   quietHoursStart: string;

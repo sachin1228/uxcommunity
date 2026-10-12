@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Trash2,
   Undo2,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -36,6 +37,7 @@ function iconFor(type: NotificationType) {
   if (type === "report_reviewed") return Flag;
   if (type === "content_restored") return Undo2;
   if (type === "job_match") return Briefcase;
+  if (type === "join_request_accepted") return UserPlus;
   if (type.endsWith("_deleted")) return Trash2;
   if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;
@@ -204,12 +206,13 @@ export function NotificationsView({ userId }: { userId: string }) {
               hint="Roles posted that match your profile will appear here with a link to view them."
             />
           ) : (
-            /* The Other tab renders removals and report outcomes — see
-               lib/notifications-tabs.ts for where its types get declared. */
+            /* The Other tab renders removals, report outcomes and accepted
+               join requests — see lib/notifications-tabs.ts for where its
+               types get declared. */
             <EmptyNotifications
               icon={Trash2}
-              title="No removal notices"
-              hint="Removals of your posts and updates on reports you filed will show up here."
+              title="Nothing here yet"
+              hint="Removals of your posts, updates on reports you filed, and accepted join requests will show up here."
             />
           )
         ) : (

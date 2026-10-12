@@ -23,6 +23,7 @@ type PerformanceRpcMap = {
       member_count: number;
       joined: boolean;
       can_join: boolean;
+      has_pending_request: boolean;
     }>;
   };
   get_community_members_page: {

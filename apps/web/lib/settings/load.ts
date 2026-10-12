@@ -18,7 +18,7 @@ import type { SavedResume } from "./resumes";
 
 /** Every column the two preference shapes read, in one select. */
 const PREFERENCE_COLUMNS =
-  "chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, email_job_updates, email_community_activity, email_product_news";
+  "chat_push_enabled, community_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, email_job_updates, email_community_activity, email_product_news";
 
 export interface AccountSummary {
   /** The account email; falls back to the session's when the row is missing. */
@@ -77,6 +77,8 @@ export async function loadNotificationPreferences(
     push: {
       chatPushEnabled:
         data?.chat_push_enabled ?? DEFAULT_NOTIFICATION_PREFERENCES.chat_push_enabled,
+      communityPushEnabled:
+        data?.community_push_enabled ?? DEFAULT_NOTIFICATION_PREFERENCES.community_push_enabled,
       chatSound: data?.chat_sound === "silent" ? "silent" : "default",
       quietHoursEnabled:
         data?.quiet_hours_enabled ?? DEFAULT_NOTIFICATION_PREFERENCES.quiet_hours_enabled,

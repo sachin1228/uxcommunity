@@ -5,15 +5,23 @@ import { createPortal } from "react-dom";
 import { Check, Lock } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
+import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   exploreStore,
   EXPLORE_STALE_MS,
-  invalidateOnJoin,
+  setCommunityViewerState,
+  setExploreCommunities,
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
+import { useExploreCommunities } from "@/lib/communities/cache/use-community-stores";
+import {
+  EXPLORE_TABS,
+  visibleExploreRows,
+  type ExploreTabValue,
+} from "@/lib/communities/explore-filter";
 
 type Community = CachedExploreCommunity;
 
@@ -21,23 +29,19 @@ type Community = CachedExploreCommunity;
 
 const LOCK_REASON: Record<string, string> = {};
 
-const TABS = [
-  { label: "All",        value: "all"  },
-  { label: "Member-led", value: "user" },
-] as const;
-
-type TabValue = typeof TABS[number]["value"];
-
 // ── Compact Reddit-style card ─────────────────────────────────────────────────
 
 function CommunityCard({
   c,
   onJoin,
-  joining,
+  onWithdraw,
+  withdrawing = false,
 }: {
   c: Community;
-  onJoin: (id: string) => void;
-  joining: boolean;
+  onJoin: (community: Community) => void;
+  /** Present on the Requests tab; turns the pending row into a withdraw action. */
+  onWithdraw?: (community: Community) => void;
+  withdrawing?: boolean;
 }) {
   const router              = useGuardedRouter();
   const locked              = !c.can_join && !c.joined;
@@ -125,19 +129,28 @@ function CommunityCard({
               )}
             </>
           ) : c.has_pending_request ? (
-            <button
-              disabled
-              className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
-            >
-              Request sent
-            </button>
+            onWithdraw ? (
+              <button
+                onClick={() => onWithdraw(c)}
+                disabled={withdrawing}
+                className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors disabled:opacity-60"
+              >
+                {withdrawing ? "…" : "Withdraw"}
+              </button>
+            ) : (
+              <button
+                disabled
+                className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
+              >
+                Request sent
+              </button>
+            )
           ) : (
             <button
-              onClick={() => onJoin(c.id)}
-              disabled={joining}
-              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors disabled:opacity-60"
+              onClick={() => onJoin(c)}
+              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors"
             >
-              {joining ? "…" : c.is_private ? "Request to join" : "Join"}
+              {c.is_private ? "Request to join" : "Join"}
             </button>
           )}
         </div>
@@ -156,43 +169,46 @@ function CommunityCard({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CommunitiesIndexPage() {
-  const [communities, setCommunities] = useState<Community[]>(
-    () => exploreStore.data?.communities ?? [],
-  );
-  const [loading, setLoading]     = useState(() => exploreStore.data === null);
-  const [activeTab, setActiveTab] = useState<TabValue>("all");
-  const [search, setSearch]       = useState("");
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg]   = useState<string | null>(null);
+  const router = useGuardedRouter();
+  // The rows come straight from the shared store: a request filed from the home
+  // feed, an acceptance, a withdraw and a fresh fetch all land there, and every
+  // one of them re-renders this list. The page keeps no copy of its own — that
+  // copy is what let Explore offer "Request to join" for a community the member
+  // had already asked to join from the feed.
+  const communities = useExploreCommunities();
+  // "nothing to show yet", i.e. no fetch has settled for an empty store. Rows in
+  // the store (cached or fresh) end the spinner even while a refetch runs.
+  const [settled, setSettled]         = useState(() => exploreStore.data !== null);
+  const loading                       = !settled && communities.length === 0;
+  const [activeTab, setActiveTab]     = useState<ExploreTabValue>("all");
+  const [search, setSearch]           = useState("");
+  const [joinTarget, setJoinTarget]   = useState<Community | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg]       = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (exploreStore.data && Date.now() - exploreStore.data.fetchedAt < EXPLORE_STALE_MS) {
-      setLoading(false);
+      setSettled(true);
       return;
     }
     if (exploreStore.inflight) {
-      exploreStore.inflight.then(() => {
-        if (exploreStore.data) setCommunities(exploreStore.data.communities);
-        setLoading(false);
-      });
-      if (exploreStore.data) setLoading(false);
+      // Another mount is already fetching; this one just waits for it and
+      // stops its own spinner when the answer lands (in the store).
+      void exploreStore.inflight.finally(() => setSettled(true));
       return;
     }
     const p: Promise<void> = fetch("/api/communities/all")
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => {
         if (!d) return;
-        const fresh = d.communities ?? [];
-        exploreStore.data = { communities: fresh, fetchedAt: Date.now() };
-        setCommunities(fresh);
+        setExploreCommunities(d.communities ?? []);
       })
       .catch(() => {})
       .finally(() => {
         exploreStore.inflight = null;
-        setLoading(false);
+        setSettled(true);
       });
     exploreStore.inflight = p;
-    if (exploreStore.data) setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -200,79 +216,48 @@ export default function CommunitiesIndexPage() {
     return () => clearTimeout(t);
   }, [load]);
 
-  async function handleJoin(communityId: string) {
-    if (joiningId) return;
-    setJoiningId(communityId);
+  /**
+   * Public join (or an auto-accepted request): the member is in — open the chat.
+   * The dialog has already recorded the membership in the shared cache.
+   */
+  function handleJoined(communityId: string) {
+    setJoinTarget(null);
+    router.push(`/dashboard/communities/${communityId}`);
+  }
+
+  /** Take back a pending request — the row leaves the Requests tab on success. */
+  async function handleWithdraw(community: Community) {
+    if (withdrawingId) return;
+    setWithdrawingId(community.id);
     setErrorMsg(null);
-
-    // Optimistic update
-    setCommunities((prev) =>
-      prev.map((c) => c.id === communityId ? { ...c, joined: true } : c),
-    );
-    // Notify sidebar immediately so it starts re-fetching
-    invalidateOnJoin(communityId);
-
     try {
-      const res = await dedupeFetch(`/api/communities/${communityId}/join`, { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-
+      const res = await dedupeFetch(`/api/communities/${community.id}/join`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
-        // Roll back optimistic update on failure
-        setCommunities((prev) =>
-          prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
-        );
-        if (exploreStore.data) {
-          exploreStore.data = {
-            ...exploreStore.data,
-            communities: exploreStore.data.communities.map((c) =>
-              c.id === communityId ? { ...c, joined: false } : c,
-            ),
-          };
-        }
-        setErrorMsg(data.error ?? "Failed to join. Please try again.");
-        setTimeout(() => setErrorMsg(null), 4000);
-      } else if (data.status === "requested") {
-        // Private community — request sent, not yet a member
-        setCommunities((prev) =>
-          prev.map((c) => c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c),
-        );
-        if (exploreStore.data) {
-          exploreStore.data = {
-            ...exploreStore.data,
-            communities: exploreStore.data.communities.map((c) =>
-              c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c,
-            ),
-          };
-        }
-        setErrorMsg("Request sent! Waiting for owner approval.");
-        setTimeout(() => setErrorMsg(null), 4000);
+        setErrorMsg("Couldn't withdraw the request. Please try again.");
+        return;
       }
+      setCommunityViewerState(community.id, { joined: false });
     } catch {
-      setCommunities((prev) =>
-        prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
-      );
       setErrorMsg("Network error. Please try again.");
-      setTimeout(() => setErrorMsg(null), 4000);
     } finally {
-      setJoiningId(null);
+      setWithdrawingId(null);
     }
   }
 
   // ── Filtering ──────────────────────────────────────────────────────────────
 
-  const HIDDEN_TYPES = new Set(["sector", "city", "experience_level", "job_title"]);
+  // Which tab hides what lives in lib/communities/explore-filter.ts, so the rule
+  // is pinned by tests rather than by reading this JSX.
+  const visible = visibleExploreRows(communities, activeTab, search);
 
-  const filtered = communities.filter((c) => {
-    if (c.joined) return false;
-    if (HIDDEN_TYPES.has(c.type)) return false;
-    const matchesTab    = activeTab === "all" || c.type === activeTab;
-    const matchesSearch = c.name.toLowerCase().includes(search.trim().toLowerCase());
-    return matchesTab && matchesSearch;
-  });
-
-  const isAllTab    = activeTab === "all";
-  const recommended = isAllTab ? filtered.filter((c) => c.can_join) : [];
-  const rest        = isAllTab ? filtered.filter((c) => !c.can_join) : filtered;
+  const isAllTab      = activeTab === "all";
+  const isRequestsTab = activeTab === "requests";
+  // Recommended = the member can join outright; the rest need a request, an
+  // invite or a profile change. The split reads the same on every browse tab.
+  const recommended   = visible.filter((c) => c.can_join);
+  const rest          = visible.filter((c) => !c.can_join);
 
   return (
     <div className="flex flex-col h-full">
@@ -303,8 +288,8 @@ export default function CommunitiesIndexPage() {
         </div>
 
         {/* Pill filters */}
-        <div className="flex items-center gap-2 pb-1">
-          {TABS.map((tab) => {
+        <div className="flex flex-wrap items-center gap-2 pb-1">
+          {EXPLORE_TABS.map((tab) => {
             const isActive = activeTab === tab.value;
             return (
               <button
@@ -319,7 +304,7 @@ export default function CommunitiesIndexPage() {
                 {tab.label}
               </button>
             );
-          }          )}
+          })}
         </div>
       </div>
 
@@ -336,7 +321,33 @@ export default function CommunitiesIndexPage() {
           <div className="flex justify-center py-16">
             <Spinner className="h-5 w-5" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : isRequestsTab ? (
+          visible.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="font-body text-sm text-foreground-muted">No pending requests</p>
+              <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
+                Requests you send to private communities will wait here until an owner accepts them.
+              </p>
+            </div>
+          ) : (
+            <section>
+              <h2 className="font-display text-sm font-semibold text-foreground mb-3">
+                Pending requests
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {visible.map((c) => (
+                  <CommunityCard
+                    key={c.id}
+                    c={c}
+                    onJoin={setJoinTarget}
+                    onWithdraw={handleWithdraw}
+                    withdrawing={withdrawingId === c.id}
+                  />
+                ))}
+              </div>
+            </section>
+          )
+        ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <p className="font-body text-sm text-foreground-muted">No communities found</p>
           </div>
@@ -353,8 +364,7 @@ export default function CommunitiesIndexPage() {
                     <CommunityCard
                       key={c.id}
                       c={c}
-                      onJoin={handleJoin}
-                      joining={joiningId === c.id}
+                      onJoin={setJoinTarget}
                     />
                   ))}
                 </div>
@@ -364,9 +374,9 @@ export default function CommunitiesIndexPage() {
             {/* Joined / locked / all communities */}
             {rest.length > 0 && (
               <section>
-                {isAllTab && recommended.length > 0 && (
+                {recommended.length > 0 && (
                   <h2 className="font-display text-sm font-semibold text-foreground mb-3">
-                    All communities
+                    {isAllTab ? "All communities" : "More communities"}
                   </h2>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -374,8 +384,7 @@ export default function CommunitiesIndexPage() {
                     <CommunityCard
                       key={c.id}
                       c={c}
-                      onJoin={handleJoin}
-                      joining={joiningId === c.id}
+                      onJoin={setJoinTarget}
                     />
                   ))}
                 </div>
@@ -384,6 +393,18 @@ export default function CommunitiesIndexPage() {
           </>
         )}
       </div>
+
+      {/* ── Join / request modal ─────────────────────────────────────────── */}
+      {joinTarget && (
+        <JoinCommunityModal
+          community={joinTarget}
+          joined={joinTarget.joined}
+          canJoin={joinTarget.can_join}
+          hasPendingRequest={joinTarget.has_pending_request}
+          onClose={() => setJoinTarget(null)}
+          onJoined={handleJoined}
+        />
+      )}
     </div>
   );
 }
