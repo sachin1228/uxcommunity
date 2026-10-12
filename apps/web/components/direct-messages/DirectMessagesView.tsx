@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessageSquare, SquarePen } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
 import { invalidateRequest } from "@/lib/request-cache";
@@ -11,12 +11,10 @@ import { onConversationRead, setActiveConversation } from "@/lib/direct-messages
 import type {
   DmConversationSummary,
   DmMessage,
-  DmPerson,
   DmPreviewMessage,
 } from "@/lib/direct-messages/types";
 import type { MessageDeletedByRole, ReplyPreview } from "@/lib/communities/cache";
 import { DmListPane } from "./DmListPane";
-import { DmNewMessageDialog } from "./DmNewMessageDialog";
 import { DmThread } from "./DmThread";
 import { useDmConversations } from "./hooks/useDmConversations";
 import { useDmMessageListAnchor } from "./hooks/useDmMessageListAnchor";
@@ -39,16 +37,22 @@ export function DirectMessagesView({
   userId,
   currentUserName,
   currentUserAvatar,
+  initialConversation = null,
 }: {
   userId: string;
   currentUserName: string;
   currentUserAvatar: string | null;
+  /** The conversation a ?peer= handoff from a profile resolved to — opened on
+   *  the first paint, before the list (which skips conversations with no
+   *  messages) could carry it. */
+  initialConversation?: DmConversationSummary | null;
 }) {
   const { conversations, setConversations, refresh } = useDmConversations({ userId });
 
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [pendingConversation, setPendingConversation] = useState<DmConversationSummary | null>(null);
-  const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(initialConversation?.id ?? null);
+  const [pendingConversation, setPendingConversation] = useState<DmConversationSummary | null>(
+    initialConversation,
+  );
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
   const [editingMessage, setEditingMessage] = useState<DmMessage | null>(null);
   const [editingInput, setEditingInput] = useState("");
@@ -81,6 +85,15 @@ export function DirectMessagesView({
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+
+  // The ?peer= handoff has been flushed into state (initialConversation);
+  // strip it from the URL so a refresh lands on the plain window and a later
+  // Message click for the same member navigates afresh.
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(window.history.state, "", "/dashboard/messages");
+    }
+  }, []);
 
   // ── Data + behaviour hooks ────────────────────────────────────────────────
   const thread = useDmThreadData({ conversationId: activeId, userId });
@@ -255,37 +268,12 @@ export function DirectMessagesView({
     });
   }, [setConversations, userId]);
 
-  // ── Opening a conversation / starting a new one ───────────────────────────
+  // ── Opening a conversation ────────────────────────────────────────────────
   const openConversation = useCallback((conversationId: string) => {
     setActiveId(conversationId);
     setPendingConversation((prev) => (prev && prev.id !== conversationId ? null : prev));
     setLightboxIndex(null);
   }, []);
-
-  const handlePickPerson = useCallback(
-    async (person: DmPerson) => {
-      const existing = (conversationsRef.current ?? []).find((c) => c.peer.id === person.id);
-      setNewDialogOpen(false);
-      if (existing) {
-        openConversation(existing.id);
-        return;
-      }
-      try {
-        const res = await fetch(dmUrls.conversations, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ peer_user_id: person.id }),
-        });
-        const data = (await res.json().catch(() => ({}))) as { conversation?: DmConversationSummary };
-        if (!res.ok || !data.conversation) throw new Error("failed");
-        setPendingConversation(data.conversation);
-        openConversation(data.conversation.id);
-      } catch {
-        setNewDialogOpen(true);
-      }
-    },
-    [openConversation],
-  );
 
   // ── Message actions ───────────────────────────────────────────────────────
   const focusComposer = useCallback(() => {
@@ -580,7 +568,6 @@ export function DirectMessagesView({
         currentUserId={userId}
         loading={conversations === null}
         onSelect={openConversation}
-        onNewMessage={() => setNewDialogOpen(true)}
         className={activeId ? "hidden min-[500px]:flex" : "flex"}
       />
 
@@ -641,26 +628,17 @@ export function DirectMessagesView({
             <MessageSquare size={32} strokeWidth={1.5} className="text-foreground-muted/50" aria-hidden />
             <p className="font-body text-sm text-foreground-muted">
               {hasConversations
-                ? "Select a conversation or start a new one."
+                ? "Select a conversation."
                 : "Message anyone in the community — privately."}
             </p>
-            <button
-              type="button"
-              onClick={() => setNewDialogOpen(true)}
-              className="flex items-center gap-1.5 rounded-full bg-[var(--ds-blue-800)] px-4 py-1.5 font-body text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)]"
-            >
-              <SquarePen size={13} strokeWidth={2.5} />
-              New message
-            </button>
+            {!hasConversations && (
+              <p className="font-body text-xs text-foreground-muted/70">
+                Open a profile to start.
+              </p>
+            )}
           </div>
         )}
       </div>
-
-      <DmNewMessageDialog
-        open={newDialogOpen}
-        onClose={() => setNewDialogOpen(false)}
-        onPick={(person) => void handlePickPerson(person)}
-      />
 
       {lightboxIndex !== null && chatImages[lightboxIndex] && (
         <ImageLightbox
