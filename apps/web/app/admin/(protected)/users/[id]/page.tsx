@@ -206,7 +206,11 @@ export default function UserDetailPage() {
         >
           {allCommunitiesLoading ? (
             <span className="absolute inset-0 flex items-center justify-center">
-              <Spinner className="h-3.5 w-3.5" />
+              {/* The switch is filled with the accent while on (near-white in
+                  the dark theme), so the spinner borrows its text color. */}
+              <Spinner
+                className={`h-3.5 w-3.5 ${memberOfAll ? "text-accent-foreground" : "text-accent"}`}
+              />
             </span>
           ) : (
             <span

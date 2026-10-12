@@ -25,7 +25,7 @@ import {
   UserX,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { filterChip } from "./filter-chip";
 import {
   REPORT_CONTENT_LABELS,
@@ -240,15 +240,17 @@ export function ReportModal({
                   <ArrowLeft strokeWidth={2.5} size={14} />
                   Back
                 </button>
-                <button
+                <PendingButton
                   type="button"
                   onClick={() => void handleSubmit()}
-                  disabled={submitting}
+                  pending={submitting}
+                  pendingLabel="Submitting…"
+                  spinnerSize={14}
                   className="modal-btn modal-btn-primary"
                 >
-                  {submitting ? <Spinner size={14} /> : <Flag strokeWidth={2.5} size={14} />}
-                  {submitting ? "Submitting…" : "Submit report"}
-                </button>
+                  <Flag strokeWidth={2.5} size={14} />
+                  Submit report
+                </PendingButton>
               </>
             )}
           </div>

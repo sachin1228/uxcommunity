@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileText, Upload, X } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { resumeMeta, type SavedResume } from "@/lib/settings/resumes";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
@@ -306,10 +306,15 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
             >
               Cancel
             </button>
-            <button type="submit" disabled={submitting} className="modal-btn modal-btn-primary">
-              {submitting && <Spinner className="h-3.5 w-3.5 text-white" />}
-              {submitting ? "Sending…" : "Send application"}
-            </button>
+            <PendingButton
+              type="submit"
+              pending={submitting}
+              pendingLabel="Sending…"
+              spinnerSize={14}
+              className="modal-btn modal-btn-primary"
+            >
+              Send application
+            </PendingButton>
           </div>
         </form>
       )}

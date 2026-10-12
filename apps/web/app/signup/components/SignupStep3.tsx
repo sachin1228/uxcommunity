@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { Upload } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { SignupBackButton } from "./SignupStepper";
 
 interface SignupStep3Props {
@@ -93,15 +93,17 @@ export function SignupStep3({
         </button>
       )}
 
-      <button
+      <PendingButton
         type="button"
         onClick={onSave}
-        disabled={loading || !uploadPreviewUrl}
+        disabled={!uploadPreviewUrl}
+        pending={loading}
+        pendingLabel="Finishing signup…"
+        spinnerSize={16}
         className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading && <Spinner className="size-4 text-white" />}
-        {loading ? "Finishing signup…" : "Continue →"}
-      </button>
+        Continue →
+      </PendingButton>
 
       {!uploadPreviewUrl && (
         <p className="mt-3 text-center font-body text-xs text-foreground-muted">

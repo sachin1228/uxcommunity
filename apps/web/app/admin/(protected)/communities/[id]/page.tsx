@@ -16,6 +16,7 @@ import {
   Activity,
   type LucideIcon,
 } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityActionsPanel } from "@/components/admin/communities/CommunityActionsPanel";
@@ -247,13 +248,15 @@ export default function CommunityDetailPage() {
                   }}
                   className="field flex-1 max-w-md font-display text-lg font-semibold"
                 />
-                <button
+                <PendingButton
                   onClick={handleRenameSave}
-                  disabled={editLoading}
+                  pending={editLoading}
+                  spinnerSize={16}
+                  aria-label="Save name"
                   className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
                 >
-                  {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={15} />}
-                </button>
+                  <Check strokeWidth={2.5} size={15} />
+                </PendingButton>
                 <button
                   onClick={() => { setEditing(false); setEditError(null); }}
                   className="p-1 text-foreground-muted hover:text-foreground"
@@ -376,13 +379,15 @@ export default function CommunityDetailPage() {
                       <p className="font-body text-[11px] text-red-400">{editDescError}</p>
                     )}
                     <div className="flex gap-2">
-                      <button
+                      <PendingButton
                         onClick={handleDescSave}
-                        disabled={editDescLoading}
+                        pending={editDescLoading}
+                        pendingLabel="Saving description…"
+                        spinnerSize={12}
                         className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                       >
-                        {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
-                      </button>
+                        <Check strokeWidth={2.5} size={11} /> Save
+                      </PendingButton>
                       <button
                         onClick={() => { setEditingDesc(false); setEditDescError(null); }}
                         className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"

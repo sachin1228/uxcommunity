@@ -105,7 +105,11 @@ export function EditMessageModal({ message, isSaving, error, onClose, onSave }: 
                 style={({ pressed }) => [
                   styles.saveBtn,
                   {
-                    backgroundColor: canSave ? colors.chatOwnBubble : colors.subtle,
+                    // Held on the bubble blue while the save is in flight: the
+                    // white spinner below would be white-on-white in the light
+                    // theme once `canSave` goes false, which it does the moment
+                    // `isSaving` turns on.
+                    backgroundColor: canSave || isSaving ? colors.chatOwnBubble : colors.subtle,
                     opacity: pressed && canSave ? 0.85 : 1,
                   },
                 ]}

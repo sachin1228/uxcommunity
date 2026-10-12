@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -216,19 +217,15 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                         Admin
                       </span>
                     ) : (
-                      <button
+                      <PendingButton
                         onClick={() => handlePromote(member)}
-                        disabled={busyUserId === member.user_id}
+                        pending={busyUserId === member.user_id}
+                        pendingLabel="Adding as admin…"
+                        spinnerSize={12}
                         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 font-body text-xs font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-60"
                       >
-                        {busyUserId === member.user_id ? (
-                          <Spinner className="h-3 w-3" />
-                        ) : isPromoted ? (
-                          "✓ Promoted"
-                        ) : (
-                          "Add as admin"
-                        )}
-                      </button>
+                        {isPromoted ? "✓ Promoted" : "Add as admin"}
+                      </PendingButton>
                     )}
                   </li>
                 );

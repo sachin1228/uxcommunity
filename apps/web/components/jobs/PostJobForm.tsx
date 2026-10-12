@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Plus } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { AddCompanyModal } from "@/components/companies/AddCompanyModal";
 import {
@@ -197,10 +197,16 @@ export function PostJobForm({ viewer, master }: { viewer: JobViewer; master: Job
           <Link href="/dashboard/jobs" className="modal-btn modal-btn-secondary">
             Cancel
           </Link>
-          <button type="submit" disabled={submitting} className="modal-btn modal-btn-primary">
-            {submitting ? <Spinner className="h-3.5 w-3.5 text-white" /> : <Plus strokeWidth={2.5} size={14} />}
-            {submitting ? "Posting…" : "Publish job"}
-          </button>
+          <PendingButton
+            type="submit"
+            pending={submitting}
+            pendingLabel="Posting…"
+            spinnerSize={14}
+            className="modal-btn modal-btn-primary"
+          >
+            <Plus strokeWidth={2.5} size={14} />
+            Publish job
+          </PendingButton>
         </div>
       </form>
 

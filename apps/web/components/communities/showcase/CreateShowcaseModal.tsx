@@ -11,6 +11,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "@/components/ui/ToggleRow";
@@ -416,10 +417,14 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
 
           <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
             <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>
-            <button disabled={saving || uploading} className="modal-btn modal-btn-primary">
-              {saving && <Spinner size={15} className="text-white" />}
-              {saving ? "Saving…" : editing ? "Save changes" : "Share work"}
-            </button>
+            <PendingButton
+              pending={saving}
+              disabled={uploading}
+              pendingLabel="Saving…"
+              className="modal-btn modal-btn-primary"
+            >
+              {editing ? "Save changes" : "Share work"}
+            </PendingButton>
           </div>
 
           {/* Drag-and-drop overlay — shown while files hover over the modal. */}

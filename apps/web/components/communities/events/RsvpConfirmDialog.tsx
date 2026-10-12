@@ -2,7 +2,7 @@
 
 import { Check, UserX } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { EventChatPreviewRow } from "./EventChatPreviewRow";
 
 /**
@@ -91,21 +91,16 @@ export function RsvpConfirmDialog({
         >
           {joining ? "Cancel" : "No, keep going"}
         </button>
-        <button
+        <PendingButton
           type="button"
           onClick={onConfirm}
-          disabled={pending}
+          pending={pending}
+          pendingLabel={joining ? "Confirming…" : "Withdrawing…"}
           className="modal-btn modal-btn-primary"
         >
-          {pending ? (
-            <Spinner size={15} className="text-white" />
-          ) : joining ? (
-            <Check strokeWidth={2.5} size={15} />
-          ) : (
-            <UserX strokeWidth={2.5} size={15} />
-          )}
-          {pending ? (joining ? "Confirming…" : "Withdrawing…") : joining ? "Confirm RSVP" : "Yes, not going"}
-        </button>
+          {joining ? <Check strokeWidth={2.5} size={15} /> : <UserX strokeWidth={2.5} size={15} />}
+          {joining ? "Confirm RSVP" : "Yes, not going"}
+        </PendingButton>
       </div>
     </Modal>
   );

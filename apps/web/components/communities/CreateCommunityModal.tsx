@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
@@ -404,15 +404,17 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 Continue
               </button>
             ) : (
-              <button
+              <PendingButton
                 type="button"
                 onClick={handleSubmit}
-                disabled={!canContinue || submitting}
+                disabled={!canContinue}
+                pending={submitting}
+                pendingLabel="Creating..."
+                spinnerSize={14}
                 className="modal-btn modal-btn-primary"
               >
-                {submitting && <Spinner size={14} className="text-accent-foreground" />}
-                {submitting ? "Creating..." : "Create Community"}
-              </button>
+                Create Community
+              </PendingButton>
             )}
           </div>
         </>

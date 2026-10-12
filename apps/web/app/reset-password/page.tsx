@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { APP_NAME } from "@uxcommunity/shared";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 
 type PageState = "loading" | "form" | "success" | "invalid";
@@ -162,14 +163,15 @@ function ResetPasswordInner() {
                 {fieldError("confirm_password")}
               </label>
 
-              <button
+              <PendingButton
                 type="submit"
-                disabled={loading}
+                pending={loading}
+                pendingLabel="Updating password…"
+                spinnerSize={16}
                 className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading && <Spinner className="h-4 w-4 text-white" />}
-                {loading ? "Updating password…" : "Update password"}
-              </button>
+                Update password
+              </PendingButton>
             </form>
           </div>
         )}

@@ -505,7 +505,12 @@ function CommentComposer({
             accessibilityLabel={submitLabel}
             style={[
               styles.composerSend,
-              { backgroundColor: canSend ? colors.accent : colors.accentSoft },
+              // The accent stays on while the send is in flight. `canSend`
+              // excludes `sending`, so without this the spinner below — drawn
+              // in `accentForeground` — lands on `accentSoft`: black on
+              // near-black in the dark theme, white on near-white in the light
+              // one. An invisible spinner inside an apparently empty button.
+              { backgroundColor: canSend || sending ? colors.accent : colors.accentSoft },
             ]}
           >
             {sending ? (

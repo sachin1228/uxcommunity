@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, MapPinned, Users, Video, X } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "@/components/ui/ToggleRow";
@@ -538,10 +539,15 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>
-          <button type="submit" disabled={saving} className="modal-btn modal-btn-primary">
-            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
+          <PendingButton
+            type="submit"
+            pending={saving}
+            pendingLabel="Saving…"
+            className="modal-btn modal-btn-primary"
+          >
+            <Check strokeWidth={2.5} size={15} />
+            Save Changes
+          </PendingButton>
         </div>
       </form>
     </div>

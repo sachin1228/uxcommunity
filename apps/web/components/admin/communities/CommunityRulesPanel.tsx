@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, Check, X, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface Rule {
@@ -174,13 +175,15 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                 />
                 {editError && <p className="font-body text-[11px] text-red-400">{editError}</p>}
                 <div className="flex gap-2">
-                  <button
+                  <PendingButton
                     onClick={() => handleEditSave(rule.id)}
-                    disabled={editLoading}
+                    pending={editLoading}
+                    pendingLabel="Saving rule…"
+                    spinnerSize={12}
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                   >
-                    {editLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
-                  </button>
+                    <Check strokeWidth={2.5} size={11} /> Save
+                  </PendingButton>
                   <button
                     onClick={() => { setEditingId(null); setEditError(null); }}
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
@@ -254,13 +257,16 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
             {addError && <p className="font-body text-[11px] text-red-400">{addError}</p>}
           </div>
           <div className="flex gap-2">
-            <button
+            <PendingButton
               onClick={handleAdd}
-              disabled={addLoading || !newText.trim()}
+              disabled={!newText.trim()}
+              pending={addLoading}
+              pendingLabel="Adding rule…"
+              spinnerSize={12}
               className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
             >
-              {addLoading ? <Spinner className="h-3 w-3" /> : <Plus strokeWidth={2.5} size={11} />} Add rule
-            </button>
+              <Plus strokeWidth={2.5} size={11} /> Add rule
+            </PendingButton>
             <button
               onClick={() => { setAdding(false); setAddError(null); setNewText(""); }}
               className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
