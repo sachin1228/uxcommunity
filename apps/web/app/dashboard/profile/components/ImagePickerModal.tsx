@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { Upload, X } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { ModalPortal } from "@/components/ui/Modal";
 
 interface ImagePickerModalProps {
@@ -113,15 +113,17 @@ export function ImagePickerModal({
             <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
               Cancel
             </button>
-            <button
+            <PendingButton
               type="button"
               onClick={onSave}
-              disabled={saving || !uploadPreview}
+              disabled={!uploadPreview}
+              pending={saving}
+              pendingLabel="Saving…"
+              spinnerSize={14}
               className="modal-btn modal-btn-primary"
             >
-              {saving && <Spinner className="size-3.5" />}
-              {saving ? "Saving…" : "Save profile picture"}
-            </button>
+              Save profile picture
+            </PendingButton>
           </div>
         </div>
       </div>

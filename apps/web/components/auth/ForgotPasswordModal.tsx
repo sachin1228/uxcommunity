@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 
 interface ForgotPasswordModalProps {
   open: boolean;
@@ -110,14 +110,15 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
             />
           </label>
 
-          <button
+          <PendingButton
             type="submit"
-            disabled={loading}
+            pending={loading}
+            pendingLabel="Sending…"
+            spinnerSize={14}
             className="modal-btn modal-btn-primary w-full"
           >
-            {loading && <Spinner size={14} />}
-            {loading ? "Sending…" : "Send reset link"}
-          </button>
+            Send reset link
+          </PendingButton>
         </form>
       )}
     </Modal>

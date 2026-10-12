@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
 import {
   MODERATOR_DEFAULT_PERMISSIONS,
@@ -139,15 +139,17 @@ export function ModeratorPermissionsModal({
         >
           Cancel
         </button>
-        <button
+        <PendingButton
           type="button"
           onClick={() => onSave(permissions)}
-          disabled={saving || !dirty}
+          disabled={!dirty}
+          pending={saving}
+          pendingLabel={mode === "promote" ? "Making moderator…" : "Saving permissions…"}
+          spinnerSize={12}
           className="modal-btn modal-btn-primary flex-1"
         >
-          {saving && <Spinner className="h-3 w-3 text-accent-foreground" />}
           {mode === "promote" ? "Make moderator" : "Save permissions"}
-        </button>
+        </PendingButton>
       </div>
     </Modal>
   );

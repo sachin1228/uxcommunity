@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 
 interface Step1State {
   first_name: string;
@@ -147,11 +147,10 @@ export function SignupStep1({
           <FieldError errors={fieldErrors} field="confirm_password" />
         </div>
 
-        <button type="submit" disabled={loading}
+        <PendingButton type="submit" pending={loading} pendingLabel="Creating account…" spinnerSize={16}
           className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed">
-          {loading && <Spinner className="h-4 w-4 text-white" />}
-          {loading ? "Creating account…" : "Continue →"}
-        </button>
+          Continue →
+        </PendingButton>
       </form>
     </div>
   );

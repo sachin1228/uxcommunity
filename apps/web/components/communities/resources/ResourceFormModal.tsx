@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { Check, Globe, MessageCircle, X } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { filterChip } from "../filter-chip";
@@ -326,14 +327,15 @@ export function ResourceFormModal({
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
             Cancel
           </button>
-          <button
+          <PendingButton
             type="submit"
-            disabled={saving}
+            pending={saving}
+            pendingLabel={isEdit ? "Saving…" : "Sharing…"}
             className="modal-btn modal-btn-primary"
           >
-            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
-            {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}
-          </button>
+            <Check strokeWidth={2.5} size={15} />
+            {isEdit ? "Save Changes" : "Share Resource"}
+          </PendingButton>
         </div>
       </form>
     </div>,

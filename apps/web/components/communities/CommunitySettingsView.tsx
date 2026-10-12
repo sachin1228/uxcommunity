@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityNameBadges } from "./CommunityBadges";
 import {
@@ -281,15 +282,18 @@ export function CommunitySettingsView({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <PendingButton
               type="button"
               onClick={handleSave}
-              disabled={saving || !name.trim()}
+              disabled={!name.trim()}
+              pending={saving}
+              pendingLabel="Saving changes…"
+              spinnerSize={12}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? <Spinner size={12} className="text-accent-foreground" /> : <Save strokeWidth={2.5} size={12} />}
+              <Save strokeWidth={2.5} size={12} />
               Save changes
-            </button>
+            </PendingButton>
             <button
               type="button"
               onClick={onClose}

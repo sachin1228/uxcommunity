@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import {
   JobFormFields,
@@ -132,10 +132,16 @@ export function EditJobModal({ open, onClose, job, master, onSaved }: EditJobMod
           >
             Cancel
           </button>
-          <button type="submit" disabled={submitting} className="modal-btn modal-btn-primary">
-            {submitting ? <Spinner className="h-3.5 w-3.5 text-white" /> : <Save strokeWidth={2.5} size={14} />}
-            {submitting ? "Saving…" : "Save changes"}
-          </button>
+          <PendingButton
+            type="submit"
+            pending={submitting}
+            pendingLabel="Saving…"
+            spinnerSize={14}
+            className="modal-btn modal-btn-primary"
+          >
+            <Save strokeWidth={2.5} size={14} />
+            Save changes
+          </PendingButton>
         </div>
       </form>
     </Modal>

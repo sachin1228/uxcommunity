@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 
 interface ApplicationModalProps {
   open: boolean;
@@ -179,14 +179,15 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             {fieldError("portfolio_url")}
           </label>
 
-          <button
+          <PendingButton
             type="submit"
-            disabled={loading}
+            pending={loading}
+            pendingLabel="Submitting…"
+            spinnerSize={16}
             className="modal-btn modal-btn-primary mt-2 w-full"
           >
-            {loading && <Spinner className="h-4 w-4 text-white" />}
-            {loading ? "Submitting…" : "Submit Application"}
-          </button>
+            Submit Application
+          </PendingButton>
 
           <p className="text-center font-body text-xs text-foreground-muted">
             Join a curated community of designers — we review every application and send invitations to those who are approved.

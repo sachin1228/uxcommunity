@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, ClipboardList } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import {
   EVENT_JOIN_QUESTIONS,
   EVENT_JOIN_ANSWER_LIMITS,
@@ -143,26 +143,24 @@ export function EventJoinQuestionsModal({
           >
             Cancel
           </button>
-          <button
+          <PendingButton
             type="submit"
-            disabled={!ready || pending}
+            disabled={!ready}
+            pending={pending}
+            pendingLabel="Submitting…"
             className="modal-btn modal-btn-primary"
           >
-            {pending ? (
-              <Spinner size={15} className="text-white" />
-            ) : ready ? (
+            {ready ? (
               <Check strokeWidth={2.5} size={15} />
             ) : (
               <ClipboardList strokeWidth={2.5} size={15} />
             )}
-            {pending
-              ? "Submitting…"
-              : ready
-                ? confirmLabel
-                : missing === EVENT_JOIN_QUESTIONS.length
-                  ? "Answer all questions"
-                  : `${missing} question${missing === 1 ? "" : "s"} left`}
-          </button>
+            {ready
+              ? confirmLabel
+              : missing === EVENT_JOIN_QUESTIONS.length
+                ? "Answer all questions"
+                : `${missing} question${missing === 1 ? "" : "s"} left`}
+          </PendingButton>
         </div>
       </form>
     </Modal>

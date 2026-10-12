@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
 
 const COPY = {
@@ -96,15 +96,17 @@ export function AddLinkModal({ kind, initialUrl = "", onSaved, onClose }: AddLin
         <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
           Cancel
         </button>
-        <button
+        <PendingButton
           type="button"
           onClick={handleSave}
-          disabled={saving || trimmed.length === 0}
+          disabled={trimmed.length === 0}
+          pending={saving}
+          pendingLabel="Saving…"
+          spinnerSize={14}
           className="modal-btn modal-btn-primary"
         >
-          {saving && <Spinner className="size-3.5" />}
-          {saving ? "Saving…" : "Save link"}
-        </button>
+          Save link
+        </PendingButton>
       </div>
     </Modal>
   );

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
 
@@ -133,14 +133,15 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button
+            <PendingButton
               type="submit"
-              disabled={loading}
+              pending={loading}
+              pendingLabel="Logging in…"
+              spinnerSize={16}
               className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading && <Spinner className="h-4 w-4 text-white" />}
-              {loading ? "Logging in…" : "Log in"}
-            </button>
+              Log in
+            </PendingButton>
           </form>
 
           <div className="my-6 flex items-center gap-3">

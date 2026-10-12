@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 
 type Step = "form" | "sent";
@@ -116,14 +116,15 @@ export default function ForgotPasswordPage() {
                   />
                 </label>
 
-                <button
+                <PendingButton
                   type="submit"
-                  disabled={loading}
+                  pending={loading}
+                  pendingLabel="Sending…"
+                  spinnerSize={16}
                   className="flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {loading && <Spinner className="h-4 w-4 text-white" />}
-                  {loading ? "Sending…" : "Send reset link"}
-                </button>
+                  Send reset link
+                </PendingButton>
               </form>
             </>
           )}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Smile } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -359,13 +359,15 @@ export function CommentComposer<C = unknown>({
                   to send, so an empty field is just the input. Kept while a
                   post is in flight so the spinner has somewhere to live. */}
               {(body.trim().length > 0 || saving) && (
-                <button
+                <PendingButton
                   type="submit"
-                  disabled={saving}
+                  pending={saving}
+                  pendingLabel={`${submitLabel}…`}
+                  spinnerSize={14}
                   className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
-                </button>
+                  {submitLabel}
+                </PendingButton>
               )}
             </div>
           </form>
@@ -455,21 +457,19 @@ export function CommentComposer<C = unknown>({
           >
             <Smile strokeWidth={2.5} size={16} />
           </button>
-          <button
+          <PendingButton
             type="submit"
-            disabled={saving || !body.trim()}
+            disabled={!body.trim()}
+            pending={saving}
             aria-label="Send"
             title="Send"
+            spinnerSize={14}
             className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? (
-              <Spinner size={14} className="text-white" />
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]" style={{ marginLeft: 1 }}>
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            )}
-          </button>
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]" style={{ marginLeft: 1 }}>
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </PendingButton>
         </div>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { ModalPortal } from "@/components/ui/Modal";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -181,18 +181,16 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
             >
               Cancel
             </button>
-            <button
+            <PendingButton
               type="submit"
-              disabled={addLoading || imageUploading}
+              pending={addLoading || imageUploading}
+              pendingLabel={imageUploading ? "Uploading…" : `Adding ${entity}…`}
+              spinnerSize={12}
               className="modal-btn modal-btn-primary"
             >
-              {addLoading || imageUploading ? (
-                <Spinner className="h-3 w-3 text-white" />
-              ) : (
-                <Plus strokeWidth={2.5} size={13} />
-              )}
-              {imageUploading ? "Uploading…" : `Add ${entity}`}
-            </button>
+              <Plus strokeWidth={2.5} size={13} />
+              {`Add ${entity}`}
+            </PendingButton>
           </div>
         </form>
       </div>

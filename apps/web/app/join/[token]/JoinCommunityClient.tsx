@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { invalidateOnJoin } from "@/lib/communities/cache";
 import { Lock, Users, Check, ImagePlus, MessageSquare } from "lucide-react";
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
 
@@ -140,19 +140,18 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
           {(status === "idle" || status === "loading" || status === "error") && (
             <>
-              <button
+              <PendingButton
                 onClick={handleJoin}
-                disabled={status === "loading"}
+                pending={status === "loading"}
+                pendingLabel="Joining…"
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {status === "loading" ? (
-                  <><Spinner size={15} className="text-accent-foreground" /> Joining…</>
-                ) : community.is_private ? (
+                {community.is_private ? (
                   <><Lock strokeWidth={2.5} size={14} /> Request to join</>
                 ) : (
                   <><MessageSquare strokeWidth={2.5} size={14} /> Join community</>
                 )}
-              </button>
+              </PendingButton>
 
               {status === "error" && errorMsg && (
                 <p className="mt-3 text-center font-body text-xs text-red-400">{errorMsg}</p>

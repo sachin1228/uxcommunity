@@ -7,7 +7,7 @@ import {
   MessageCircle,
   X,
 } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { ModalPortal } from "@/components/ui/Modal";
 import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "@/lib/communities/models/threads";
 import { THREAD_BODY_MAX_LENGTH } from "@/lib/communities/models/threads";
@@ -263,14 +263,16 @@ export function CreateThreadModal({
           <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
             Cancel
           </button>
-          <button
+          <PendingButton
             type="submit"
-            disabled={saving || uploading}
+            pending={saving}
+            disabled={uploading}
+            pendingLabel="Posting…"
+            spinnerSize={14}
             className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent px-3 font-body text-[13px] font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Spinner size={14} className="text-white" />}
-            {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
-          </button>
+            {tab === "poll" ? "Post Poll" : "Post Thread"}
+          </PendingButton>
         </div>
 
         {/* Drag-and-drop overlay — shown while files hover over the modal. */}

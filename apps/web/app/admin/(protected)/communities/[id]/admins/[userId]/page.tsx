@@ -14,6 +14,7 @@ import {
   UserRound,
   Clock3,
 } from "lucide-react";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -167,14 +168,17 @@ export default function CommunityAdminPermissionsPage() {
           </div>
         </div>
 
-        <button
+        <PendingButton
           onClick={handleSave}
-          disabled={!dirty || saving}
+          disabled={!dirty}
+          pending={saving}
+          pendingLabel="Saving…"
+          spinnerSize={12}
           className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 font-body text-xs font-medium text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
         >
-          {saving ? <Spinner className="h-3 w-3 text-accent-foreground" /> : <Save strokeWidth={2.5} size={12} />}
-          {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
-        </button>
+          <Save strokeWidth={2.5} size={12} />
+          {dirty ? "Save changes" : "Saved"}
+        </PendingButton>
       </div>
 
       {/* Body: permissions + activity (left) | about + danger (right) */}
