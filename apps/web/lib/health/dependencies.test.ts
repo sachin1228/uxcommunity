@@ -238,13 +238,17 @@ test("no cache binding is down, and points at the binding rather than the media 
   assert.equal(check.hint?.includes("R2_ACCESS_KEY_ID"), false);
 });
 
-test("outside a Worker the real binding lookup reports a missing binding instead of throwing", async () => {
-  // No injected scanner: this exercises the default path, which has no Worker
-  // binding to read in a plain Node test process.
+test("a process that is not a Worker reports nothing to read, not a fault", async () => {
+  // No injected scanner: this exercises the real path. A Node test process has
+  // no Cloudflare context — the same shape as a local `next dev` server, which
+  // is where the card was first read — and neither is a broken deploy, so
+  // neither may put a red card on the page.
   const check = await checkR2Cache();
 
-  assert.equal(check.status, "down");
-  assert.match(check.hint ?? "", new RegExp(CACHE_BUCKET_BINDING));
+  assert.equal(check.status, "ok");
+  assert.match(check.detail, /Not running on Cloudflare/);
+  assert.equal(check.hint, undefined, "nothing is broken, so there is nothing to fix");
+  assert.equal(check.severity, "supporting");
 });
 
 test("a bucket that answers an error degrades without blaming the binding", async () => {

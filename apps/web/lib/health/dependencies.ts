@@ -24,7 +24,9 @@
  *     through its Worker binding and counted — objects, bytes, and the build
  *     prefixes they belong to. Listing is a read; the scan stops at a page cap
  *     so a bucket that has grown large cannot turn one page load into a walk of
- *     the whole thing.
+ *     the whole thing. A process that is not a Worker has no binding to read,
+ *     which is reported as nothing to check rather than as a fault: a local dev
+ *     server is not a broken deploy.
  *   - Supabase: a `head: true, count: exact` count on `users` — no rows leave
  *     the database, and it exercises the service-role key every API route uses.
  *   - Realtime: a `/publish` request carrying an EMPTY event list. The Worker
@@ -190,17 +192,33 @@ export interface CacheUsage {
 export type CacheUsageScanner = () => Promise<CacheUsage>;
 
 /**
- * Raised when this process has no incremental-cache binding to list.
+ * Raised when a Worker is running without the incremental-cache binding.
  *
- * Two different situations — running outside a Worker (local `next dev`, a
- * static build) and a Worker whose binding is genuinely absent — are the same
- * answer to the operator: there is no bucket to read, and the reason is the
- * binding, not the credential.
+ * This is the fault case, and the only one worth a red card: the Worker is
+ * deployed and should have the bucket, so a binding that is not attached means
+ * the deploy did not finish or the bucket was removed underneath it.
  */
 export class CacheBindingMissingError extends Error {
   constructor(cause?: unknown) {
-    super(`No ${CACHE_BUCKET_BINDING} binding is available to this process.`);
+    super(`No ${CACHE_BUCKET_BINDING} binding is attached to this Worker.`);
     this.name = "CacheBindingMissingError";
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
+ * Raised when this process has no Cloudflare context at all.
+ *
+ * The opposite of a fault: a local `next dev` server, a unit test and a build
+ * step are all Node processes that never have Worker bindings, and there is
+ * nothing for an operator to fix. Reported apart from
+ * {@link CacheBindingMissingError} because rendering them the same way put a
+ * permanent red card on every developer's System Health page.
+ */
+export class WorkerContextUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("This process is not a Cloudflare Worker, so it has no bindings to read.");
+    this.name = "WorkerContextUnavailableError";
     if (cause !== undefined) this.cause = cause;
   }
 }
@@ -352,6 +370,22 @@ function formatBytes(bytes: number): string {
 }
 
 /**
+ * The Worker's bindings, or {@link WorkerContextUnavailableError} when this
+ * process is not a Worker.
+ *
+ * The throw from the adapter is the discriminator: a context that exists but
+ * lacks the binding is a deployment fault, while no context at all means the
+ * question does not apply here.
+ */
+function cloudflareEnv(): CloudflareEnv {
+  try {
+    return getCloudflareContext().env;
+  } catch (cause) {
+    throw new WorkerContextUnavailableError(cause);
+  }
+}
+
+/**
  * Resolves the incremental-cache bucket from the Worker's own bindings.
  *
  * Read-only entry point: the bucket is not public and the media credential is
@@ -359,18 +393,10 @@ function formatBytes(bytes: number): string {
  * cache is holding.
  */
 function resolveCacheBucket(): CacheBucketBinding {
-  try {
-    const { env } = getCloudflareContext();
-    const bucket = env[CACHE_BUCKET_BINDING] as CacheBucketBinding | undefined;
-    if (!bucket) throw new CacheBindingMissingError();
-    return bucket;
-  } catch (error) {
-    if (error instanceof CacheBindingMissingError) throw error;
-    // No Cloudflare context at all — a local `next dev` server, or a build step
-    // asking a question about a runtime it is not in. Same answer to the
-    // operator: there is no bucket to read here.
-    throw new CacheBindingMissingError(error);
-  }
+  const env = cloudflareEnv();
+  const bucket = env[CACHE_BUCKET_BINDING] as CacheBucketBinding | undefined;
+  if (!bucket) throw new CacheBindingMissingError();
+  return bucket;
 }
 
 /** Enumerates one page of the bucket through the binding. */
@@ -466,15 +492,25 @@ export async function checkR2Cache(
     try {
       usage = await scan();
     } catch (error) {
+      // Not a Worker: no binding exists to be missing, so there is nothing to
+      // report and nothing to fix. Every other environment this runs in — the
+      // admin page in a deploy, the monitor, a preview — is a Worker.
+      if (error instanceof WorkerContextUnavailableError) {
+        return {
+          detail:
+            "Not running on Cloudflare, so there is no cache bucket to read: bindings exist only in a " +
+            "deploy or a preview, never in a local dev server.",
+        };
+      }
       if (error instanceof CacheBindingMissingError) {
         return {
           status: "down" as const,
           detail:
-            "The Worker has no Next.js cache bucket bound, so the heavy caches live only in per-isolate memory.",
+            "This Worker has no Next.js cache bucket attached, so the heavy caches live only in per-isolate memory.",
           hint:
-            `${CACHE_BUCKET_BINDING} is declared in apps/web/wrangler.toml and created by the deploy. ` +
-            "A local `next dev` server reaches no Worker bindings — apps/web/next.config.js never calls the " +
-            "adapter's dev initialiser — so this check is expected to be down there.",
+            `${CACHE_BUCKET_BINDING} is declared in apps/web/wrangler.toml and created by the deploy — ` +
+            "without it a cold isolate recomputes the home feed and the cached maps (0.8–1.8s each). " +
+            "Redeploy so the binding is attached.",
         };
       }
       return {

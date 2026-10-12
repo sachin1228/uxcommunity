@@ -403,6 +403,10 @@ the realtime probe publishes an **empty** event list (the Worker checks the
 secret, refuses the payload, and delivers nothing). `/api/admin/health` serves
 the same report to a monitor and answers 503 while something is unhealthy.
 
+The cache bucket is the one probe that needs a Worker: a local `next dev` server
+has no bindings at all, and the card says so rather than reporting a fault that
+does not exist.
+
 Nobody has to open the page to find out. The realtime Worker runs a scheduled
 monitor (a Durable Object alarm, state in `apps/realtime/src/alert-monitor.ts`)
 that asks `/api/internal/dependency-health` every few minutes and emails the
