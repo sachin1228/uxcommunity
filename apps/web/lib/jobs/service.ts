@@ -45,6 +45,7 @@ export const CREATE_JOB_FAILURE_CODES = [
   "invalid_job_title",
   "invalid_experience_level",
   "invalid_website",
+  "monthly_limit_reached",
 ] as const;
 
 export type CreateJobFailureCode = (typeof CREATE_JOB_FAILURE_CODES)[number] | "not_installed" | "unexpected";
@@ -410,6 +411,12 @@ export async function createJobPost(
 
   if (error) {
     const code = readRaised(error);
+    // The creation-limit trigger raises `limit:jobs_monthly` (see the
+    // creation-limits migration); it *is* a reviewable failure, not an
+    // unexpected one, so it maps onto the same result shape as the rest.
+    if (code === "limit:jobs_monthly") {
+      return { ok: false, code: "monthly_limit_reached" };
+    }
     const known = (CREATE_JOB_FAILURE_CODES as readonly string[]).includes(code);
     if (!known && code !== "not_installed") {
       console.error("[jobs] create failed:", error);

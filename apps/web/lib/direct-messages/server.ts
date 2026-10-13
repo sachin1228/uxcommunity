@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient, type ServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import { normalizeUtcCursor } from "./cursor";
 import { DM_MESSAGE_PAGE_SIZE } from "./constants";
 import { reactionPreviewText } from "./preview-text";
@@ -251,6 +252,13 @@ export async function findOrCreateDmConversation(
   if (error || !row) {
     if (error?.code === "22023") {
       return { ok: false, status: 422, error: "You cannot message yourself." };
+    }
+    // New conversations are capped per month (the RPC bumps the dms_monthly
+    // counter only when it genuinely creates the pair) — a blocked start
+    // carries the member-facing answer, not a 500.
+    const limited = creationLimitFromError(error);
+    if (limited === "dms_monthly") {
+      return { ok: false, status: 429, error: CREATION_LIMIT_MESSAGES.dms_monthly };
     }
     return { ok: false, status: 500, error: "Failed to start the conversation." };
   }

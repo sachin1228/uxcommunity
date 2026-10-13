@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { JOIN_LIMIT, loadJoinSlots } from "./join-slots";
 
 /**
  * Auto-join a user to every community implied by their profile:
@@ -129,16 +130,25 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
     const valid = upserted.filter((c): c is { id: string } => Boolean(c));
 
     if (valid.length) {
-      const { error: memberError } = await db
-        .from("community_members")
-        .upsert(
-          valid.map((community) => ({ community_id: community.id, user_id: userId })),
-          { onConflict: "community_id,user_id", ignoreDuplicates: true }
-        );
-      if (memberError) {
-        console.error("[auto-join] membership upsert failed:", memberError);
-      } else {
-        for (const community of valid) joinedCommunities.push(community.id);
+      // Official groups count toward the member's 7 (see join-slots), so the
+      // seeding slices down to the remaining slots: a repair run for an
+      // account already at the cap joins nothing extra rather than tripping
+      // the database's membership trigger and losing the whole batch.
+      const { memberships } = await loadJoinSlots(db, userId);
+      const joinable = valid.slice(0, Math.max(0, JOIN_LIMIT - memberships));
+
+      if (joinable.length) {
+        const { error: memberError } = await db
+          .from("community_members")
+          .upsert(
+            joinable.map((community) => ({ community_id: community.id, user_id: userId })),
+            { onConflict: "community_id,user_id", ignoreDuplicates: true }
+          );
+        if (memberError) {
+          console.error("[auto-join] membership upsert failed:", memberError);
+        } else {
+          for (const community of joinable) joinedCommunities.push(community.id);
+        }
       }
     }
   }

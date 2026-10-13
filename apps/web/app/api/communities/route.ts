@@ -7,6 +7,8 @@ import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
+import { JOIN_LIMIT, loadJoinSlots } from "@/lib/communities/join-slots";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -73,6 +75,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Description must be 500 characters or less." }, { status: 422 });
   }
 
+  // The creator joins their own community, so a member already at the
+  // 7-community cap must not spend their one-community budget on a creation
+  // that would then roll back (the counter is append-only — checked again,
+  // and enforced, by the database on the membership write below).
+  const { memberships } = await loadJoinSlots(db, userId);
+  if (memberships >= JOIN_LIMIT) {
+    return NextResponse.json(
+      { error: CREATION_LIMIT_MESSAGES.community_joins },
+      { status: 429 },
+    );
+  }
+
   let imageUrl: string | null = null;
   const file = formData.get("image");
   if (file instanceof File && file.size > 0) {
@@ -133,6 +147,10 @@ export async function POST(request: Request) {
         console.error("[community-create] failed-insert image cleanup error:", cleanupError);
       }
     }
+    const limited = creationLimitFromError(communityError);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+    }
     console.error("[community-create] insert failed:", communityError);
     return NextResponse.json({ error: "Failed to create community." }, { status: 500 });
   }
@@ -153,6 +171,12 @@ export async function POST(request: Request) {
       } catch (cleanupError) {
         console.error("[community-create] failed-membership image cleanup error:", cleanupError);
       }
+    }
+    // The creator cannot be in more than 7 communities — creating their own
+    // community at the cap rolls back to the join-limit answer, not a 500.
+    const limited = creationLimitFromError(memberError);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
     }
     console.error("[community-create] owner membership failed:", memberError);
     return NextResponse.json({ error: "Failed to create community membership." }, { status: 500 });

@@ -3003,6 +3003,10 @@ export type Database = {
           previous_marked_at: string;
         }[];
       };
+      admin_join_all_communities: {
+        Args: { p_user_id: string };
+        Returns: number;
+      };
     };
     Enums: {
       application_status: "pending" | "approved" | "rejected";

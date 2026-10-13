@@ -4,6 +4,7 @@ import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { isCommunityMember } from "@/lib/communities/membership";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import { THREAD_BODY_MAX_LENGTH, type ThreadCategory } from "@/lib/communities/models/threads";
 import {
   THREAD_CATEGORY_VALUES,
@@ -159,6 +160,10 @@ export async function POST(
     .single();
 
   if (error || !inserted) {
+    const limited = creationLimitFromError(error);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+    }
     console.error("[POST thread]", error);
     return NextResponse.json({ error: "Failed to create thread." }, { status: 500 });
   }

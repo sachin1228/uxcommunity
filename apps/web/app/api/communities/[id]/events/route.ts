@@ -9,6 +9,7 @@ import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
 import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import {
   isPastStart,
   requireZoneAwareIso,
@@ -225,7 +226,13 @@ export async function POST(
     .select(EVENT_CARD_COLUMNS)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    const limited = creationLimitFromError(error);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // The host is going to the event they just made. They are put in its group
   // chat below, and the RSVP must say the same thing or the card would invite

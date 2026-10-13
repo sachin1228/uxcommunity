@@ -46,6 +46,12 @@ select plan(137);
 
 begin;
 
+-- Creation limits (20261013120000): this file seeds many postings for one
+-- poster, which the one-job-a-month budget would refuse. The budgets
+-- themselves are exercised in creation_limits.test.sql, so seeding runs with
+-- the bypass on — transaction-local, released with this file's rollback.
+select set_config('app.bypass_creation_limits', 'on', true);
+
 -- ─── Isolation + fixtures ───────────────────────────────────
 -- The clean-up first so a failed earlier run cannot leak into this
 -- one: applications and posts carry the users, the membership and

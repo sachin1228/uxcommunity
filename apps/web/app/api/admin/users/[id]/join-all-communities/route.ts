@@ -28,33 +28,18 @@ export async function POST(
   const db = createServiceClient();
 
   if (join) {
-    // Fetch all community IDs
-    const { data: communities, error: cErr } = await db
-      .from("communities")
-      .select("id");
+    // One database transaction so the operator override (the join-cap
+    // bypass) and the writes share it — see public.admin_join_all_communities
+    // in the creation-limits migration. Joining this member into every
+    // community is an operator action, so the cap does not apply to it.
+    const { data, error } = await db.rpc("admin_join_all_communities", { p_user_id: id });
 
-    if (cErr) {
-      console.error("[admin/join-all] fetch communities:", cErr);
-      return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
+    if (error) {
+      console.error("[admin/join-all] join failed:", error);
+      return NextResponse.json({ error: "Failed to add user to communities." }, { status: 500 });
     }
 
-    const rows = (communities ?? []).map((c) => ({
-      community_id: c.id,
-      user_id: id,
-    }));
-
-    if (rows.length > 0) {
-      const { error } = await db
-        .from("community_members")
-        .upsert(rows, { onConflict: "community_id,user_id", ignoreDuplicates: true });
-
-      if (error) {
-        console.error("[admin/join-all] upsert members:", error);
-        return NextResponse.json({ error: "Failed to add user to communities." }, { status: 500 });
-      }
-    }
-
-    return NextResponse.json({ ok: true, joined: rows.length });
+    return NextResponse.json({ ok: true, joined: data ?? 0 });
   } else {
     // Remove from every community
     const { error } = await db

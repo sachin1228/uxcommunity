@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
+import { isJoinCapped } from "@/lib/communities/join-slots";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -86,6 +88,15 @@ export async function POST(
   }
 
   if (community.is_private) {
+    // A pending request holds a prospective slot (acceptance must never push
+    // the member past the standing cap), so the request is refused at the cap.
+    if (await isJoinCapped(db, userId)) {
+      return NextResponse.json(
+        { error: CREATION_LIMIT_MESSAGES.community_joins },
+        { status: 429 },
+      );
+    }
+
     // Upsert a join request (idempotent)
     const { error: reqErr } = await db
       .from("community_join_requests")
@@ -107,6 +118,10 @@ export async function POST(
 
   if (joinErr) {
     console.error("[community-join] join failed:", joinErr);
+    const limited = creationLimitFromError(joinErr);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+    }
     return NextResponse.json({ error: "Failed to join community." }, { status: 500 });
   }
 
