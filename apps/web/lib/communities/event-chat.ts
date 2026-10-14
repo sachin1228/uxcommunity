@@ -9,6 +9,8 @@ import {
   EVENT_CHAT_DESCRIPTION,
   canJoinEventChatWith,
   eventChatName,
+  roomStillOnlyChat,
+  roomStillWearsEvent,
 } from "./event-chat-rules";
 
 /**
@@ -324,10 +326,11 @@ export async function leaveEventChat(
  * sidebar that many rows. `event.rsvp_count` remains the authoritative total.
  *
  * `carryOn` is the owner-only offer to keep the room: true once the event is
- * over past the ended badge's grace. Nothing the owner does to the room
- * retires it — a personal name, description or picture only stops the
- * event's own edits from following the room (see syncEventChatCommunity) —
- * so the door stands for as long as the event does.
+ * over past the ended badge's grace while the room is still untouched — the
+ * event's own name, face and description (see roomStillWearsEvent) and no
+ * area switched on past its chat (see roomStillOnlyChat). The owner's first
+ * personal edit of any of it retires the offer: it has done its job, and the
+ * event's own edits stop following such a room (see syncEventChatCommunity).
  */
 export interface EventRoomSection {
   event: CommunityEvent;
@@ -346,7 +349,9 @@ const GOING_PREVIEW_LIMIT = 24;
  * The link is read on its own instead of being added to the community read
  * model's column list: an environment that has not applied the event-chat
  * migration simply has no communities.event_id, and that must cost this one
- * section rather than the whole page's read model.
+ * section rather than the whole page's read model. The row's own name, face
+ * and description ride along on the same read, with its areas — they are what
+ * tells whether the room is still the event's to offer (see `carryOn`).
  */
 export async function loadEventRoomSection(
   db: Db,
@@ -355,13 +360,18 @@ export async function loadEventRoomSection(
 ): Promise<EventRoomSection | null> {
   const { data: link, error } = await db
     .from("communities")
-    .select("event_id, owner_id")
+    .select("event_id, owner_id, name, image_url, description, enabled_tabs, showcase_enabled")
     .eq("id", communityId)
     .maybeSingle();
   const row =
     (link as {
       event_id: string | null;
       owner_id: string | null;
+      name: string | null;
+      image_url: string | null;
+      description: string | null;
+      enabled_tabs: string[] | null;
+      showcase_enabled: boolean | null;
     } | null) ?? null;
   const eventId = row?.event_id ?? null;
   if (error || !eventId) return null;
@@ -385,12 +395,16 @@ export async function loadEventRoomSection(
   const previews = await loadEventAttendeePreviews([eventId], GOING_PREVIEW_LIMIT);
 
   const linked = event as unknown as {
+    title: string;
+    cover_image_url: string | null;
     event_date: string | null;
     end_date: string | null;
   };
   const carryOn =
     row != null &&
     row.owner_id === userId &&
+    roomStillWearsEvent(row, linked) &&
+    roomStillOnlyChat(row.enabled_tabs, row.showcase_enabled) &&
     hasEventEndedBeyondGrace(linked.event_date, linked.end_date);
 
   return { event: card, going: previews.get(eventId) ?? [], carryOn };

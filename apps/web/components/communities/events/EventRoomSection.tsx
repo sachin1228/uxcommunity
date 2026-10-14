@@ -198,10 +198,11 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
  * only way to find the room's door.
  *
  * Whether the offer is this room's to take is decided server-side (see
- * loadEventRoomSection): owner, past the grace — and nothing more. The offer
- * never expires on personal edits: a name, a description or a picture of the
- * owner's own stops the event's edits from following the room (see
- * syncEventChatCommunity) but keeps this door standing.
+ * loadEventRoomSection): owner, past the grace, and still untouched — the
+ * event's own name, face and description, and no area switched on past its
+ * chat. One personal edit of any of it — a rename, a new picture, a
+ * description, a tab — flips the answer, and the event's edits stop following
+ * the room too (see syncEventChatCommunity).
  */
 export function EventRoomCarryOnSection({ communityId }: { communityId: string }) {
   return (
