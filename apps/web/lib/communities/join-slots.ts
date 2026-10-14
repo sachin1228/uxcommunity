@@ -1,5 +1,6 @@
 import "server-only";
 import type { createServiceClient } from "@/lib/supabase/service";
+import { CREATION_LIMIT_MESSAGES } from "@/lib/creation-limits";
 
 /**
  * The standing membership cap. The referee is the database — the
@@ -61,8 +62,40 @@ export async function loadJoinSlots(db: Db, userId: string): Promise<JoinSlots> 
   return { memberships, pendingRequests: pendingResult.count ?? 0 };
 }
 
-/** True when this member cannot take on another non-event community slot. */
-export async function isJoinCapped(db: Db, userId: string): Promise<boolean> {
-  const { memberships, pendingRequests } = await loadJoinSlots(db, userId);
-  return memberships + pendingRequests >= JOIN_LIMIT;
+/** True when memberships + pending requests already fill the cap. */
+export function isCapFull(slots: JoinSlots): boolean {
+  return slots.memberships + slots.pendingRequests >= JOIN_LIMIT;
+}
+
+/**
+ * The refusal copy says what the member's slots actually are — "6 in, 1
+ * pending" reads as exactly that instead of the generic line. The pending
+ * flavour only appears when pending requests are part of the reason; the
+ * plain seven-joined case keeps the standing copy (CREATION_LIMIT_MESSAGES).
+ */
+function pendingDetail(slots: JoinSlots, subject: "you" | "they"): string {
+  const requests = `${slots.pendingRequests} join request${slots.pendingRequests === 1 ? "" : "s"}`;
+  return subject === "you"
+    ? `You're in ${slots.memberships} communities and have ${requests} pending — that takes up your ${JOIN_LIMIT} slots.`
+    : `This member is in ${slots.memberships} communities and has ${requests} pending — that takes up their ${JOIN_LIMIT} slots.`;
+}
+
+/** Join refusal shown to the member trying to join or request a community. */
+export function joinCapMessage(slots: JoinSlots): string {
+  if (slots.pendingRequests === 0) return CREATION_LIMIT_MESSAGES.community_joins;
+  return `${pendingDetail(slots, "you")} Leave one or wait for a request to be answered.`;
+}
+
+/** Create-community refusal — the creator joins what they make. */
+export function createCapMessage(slots: JoinSlots): string {
+  if (slots.pendingRequests === 0) return CREATION_LIMIT_MESSAGES.create_at_join_cap;
+  return `${pendingDetail(slots, "you")} Leave one before creating your own.`;
+}
+
+/** Third-person refusal read by the manager who tried to accept the member. */
+export function memberCapMessage(slots: JoinSlots): string {
+  if (slots.pendingRequests === 0) {
+    return `This member is already in their ${JOIN_LIMIT} communities. They need to leave one first.`;
+  }
+  return `${pendingDetail(slots, "they")} They need to leave one first.`;
 }

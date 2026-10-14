@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
-import { isJoinCapped } from "@/lib/communities/join-slots";
+import { isCapFull, joinCapMessage, loadJoinSlots } from "@/lib/communities/join-slots";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -89,12 +89,11 @@ export async function POST(
 
   if (community.is_private) {
     // A pending request holds a prospective slot (acceptance must never push
-    // the member past the standing cap), so the request is refused at the cap.
-    if (await isJoinCapped(db, userId)) {
-      return NextResponse.json(
-        { error: CREATION_LIMIT_MESSAGES.community_joins },
-        { status: 429 },
-      );
+    // the member past the standing cap), so the request is refused at the cap
+    // — with the member's actual numbers (joined + pending) in the copy.
+    const slots = await loadJoinSlots(db, userId);
+    if (isCapFull(slots)) {
+      return NextResponse.json({ error: joinCapMessage(slots) }, { status: 429 });
     }
 
     // Upsert a join request (idempotent)
@@ -120,7 +119,14 @@ export async function POST(
     console.error("[community-join] join failed:", joinErr);
     const limited = creationLimitFromError(joinErr);
     if (limited) {
-      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+      return NextResponse.json(
+        {
+          error: limited === "community_joins"
+            ? joinCapMessage(await loadJoinSlots(db, userId))
+            : CREATION_LIMIT_MESSAGES[limited],
+        },
+        { status: 429 },
+      );
     }
     return NextResponse.json({ error: "Failed to join community." }, { status: 500 });
   }

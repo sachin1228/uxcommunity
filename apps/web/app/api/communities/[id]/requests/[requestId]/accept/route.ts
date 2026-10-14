@@ -5,6 +5,7 @@ import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } fr
 import { communityHref, deferNotification, joinRequestAcceptedNotice } from "@/lib/notifications";
 import { deferJoinRequestAcceptedPush } from "@/lib/push/membership";
 import { creationLimitFromError } from "@/lib/creation-limits";
+import { loadJoinSlots, memberCapMessage } from "@/lib/communities/join-slots";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/accept
@@ -51,7 +52,7 @@ export async function POST(
     const limited = creationLimitFromError(memberErr);
     if (limited === "community_joins") {
       return NextResponse.json(
-        { error: "This member is already in their 7 communities. They need to leave one first." },
+        { error: memberCapMessage(await loadJoinSlots(db, request.user_id)) },
         { status: 429 },
       );
     }
