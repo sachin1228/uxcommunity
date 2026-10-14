@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Ban, ChevronDown, ChevronLeft, Clock, Flag, MoreVertical, ShieldOff, XCircle } from "lucide-react";
+import { Ban, ChevronDown, ChevronLeft, Clock, Flag, Info, MoreVertical, ShieldOff, XCircle } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { PendingButton } from "@/components/ui/PendingButton";
@@ -161,6 +161,9 @@ export function DmThread({
     conversation.requested_by !== currentUserId;
   const outgoingRequest = requestState === "pending" && conversation.requested_by === currentUserId;
   const requestDeclined = requestState === "rejected";
+  // No request has been started yet — the first message about to be sent is
+  // the one that becomes a request, so the sender is told before typing.
+  const requestUnstarted = requestState === "pending" && conversation.requested_by === null;
   const composerReplaced = blockedByMe || incomingRequest || outgoingRequest || requestDeclined;
 
   const menuItemClass =
@@ -387,6 +390,16 @@ export function DmThread({
           </div>
         ) : (
           <div>
+            {requestUnstarted && (
+              <p className="flex items-start gap-2 px-4 pt-1.5 font-body text-[11px] leading-4 text-foreground-muted">
+                <Info size={12} strokeWidth={2.5} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0">
+                  You can send one message until{" "}
+                  <span className="font-medium text-foreground">{peer.name}</span> accepts
+                  your request — then you can chat regularly.
+                </span>
+              </p>
+            )}
             <ChatInput
               ref={inputRef}
               input={input}

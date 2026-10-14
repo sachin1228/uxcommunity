@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
 import { invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
-import { showUndoToast } from "@/lib/undo-toast";
 import { bumpConversationWithMessage } from "@/lib/direct-messages/client-cache";
 import { dmUrls } from "@/lib/direct-messages/client";
 import {
@@ -317,21 +316,10 @@ export function DirectMessagesView({
       }),
     );
     if (!payload) return;
+    // The thread's blocked bar (with its Unblock button) is the feedback and
+    // the way back — no toast.
     patchActiveConversation(id, { blocked_by_me: true });
-    // Reversible by one tap while the decision is fresh.
-    showUndoToast({
-      message: `You blocked ${peer.name}. They can't send you messages.`,
-      actionLabel: "Unblock",
-      onAction: async () => {
-        const response = await fetch(`${dmUrls.blocks}?user_id=${peer.id}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) throw new Error("unblock failed");
-        patchActiveConversation(id, { blocked_by_me: false });
-        void refresh(true);
-      },
-    });
-  }, [activeId, activeConversation, runFooterAction, patchActiveConversation, refresh]);
+  }, [activeId, activeConversation, runFooterAction, patchActiveConversation]);
 
   const handleUnblock = useCallback(async () => {
     const id = activeId;
