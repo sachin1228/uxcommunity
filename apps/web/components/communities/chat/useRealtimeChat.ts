@@ -352,6 +352,26 @@ export function useRealtimeChat({
       }),
     );
 
+    // ── Retention sweep ─────────────────────────────────────────────────────
+    // The scheduled sweep hard-deletes messages older than the 15-day window
+    // and tells the room with their cutoff (see message-retention-sweep.ts).
+    // Drop everything before it from state and cache — otherwise an open tab
+    // keeps showing messages that no longer exist for anyone.
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "messages-expired", (data) => {
+        const { cutoff } = data as { cutoff?: string | null };
+        if (!cutoff) return;
+        const cutoffMs = Date.parse(cutoff);
+        if (Number.isNaN(cutoffMs)) return;
+        setMessages((prev) => {
+          const next = prev.filter((m) => new Date(m.created_at).getTime() >= cutoffMs);
+          if (next.length === prev.length) return prev;
+          msgCache.set(communityId, next);
+          return next;
+        });
+      }),
+    );
+
     // ── Reactions ────────────────────────────────────────────────────────────
     unsubscribes.push(
       realtimeClient.on(chatRoom, "reaction-insert", (data) => {

@@ -18,6 +18,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   ListObjectsV2Command,
   CopyObjectCommand,
   HeadObjectCommand,
@@ -386,6 +387,50 @@ export async function deleteFromR2(key: string): Promise<void> {
   await sendR2Command(() =>
     client.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }))
   );
+}
+
+/**
+ * Bulk-delete objects with S3's multi-object DeleteObjects (1000 keys per
+ * request). Used by the chat-retention sweep, where a batch can carry hundreds
+ * of expired images and the per-key deleteR2Keys loop would be the run's
+ * slowest part. Keys are normalized by the same rules as deleteR2Keys, each
+ * request runs in Quiet mode (only failures come back), and key-level failures
+ * are reported — not thrown — so one unreadable key cannot fail a sweep batch.
+ */
+export async function deleteR2Objects(
+  keys: Array<string | null | undefined>,
+): Promise<{ deleted: string[]; failed: Array<{ key: string; error: string }> }> {
+  const normalized = normalizeR2DeleteKeys(keys);
+  const deleted: string[] = [];
+  const failed: Array<{ key: string; error: string }> = [];
+
+  if (!normalized.length) return { deleted, failed };
+  const client = getClient();
+
+  for (let i = 0; i < normalized.length; i += 1000) {
+    const chunk = normalized.slice(i, i + 1000);
+    const response = await sendR2Command(() =>
+      client.send(
+        new DeleteObjectsCommand({
+          Bucket: getBucket(),
+          Delete: { Objects: chunk.map((key) => ({ Key: key })), Quiet: true },
+        })
+      )
+    );
+    const errors = response.Errors ?? [];
+    const failedKeys = new Set(errors.map((entry) => entry.Key));
+    for (const key of chunk) {
+      if (!failedKeys.has(key)) deleted.push(key);
+    }
+    for (const entry of errors) {
+      failed.push({
+        key: entry.Key ?? "(unknown)",
+        error: entry.Message ?? entry.Code ?? "Unknown delete error",
+      });
+    }
+  }
+
+  return { deleted, failed };
 }
 
 export type R2ReferenceLookup = {

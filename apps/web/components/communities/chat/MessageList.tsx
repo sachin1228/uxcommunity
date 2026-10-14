@@ -8,6 +8,7 @@ import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
 import { ContentNotificationBubble } from "./ContentNotificationBubble";
+import { DisappearingNotice } from "./DisappearingNotice";
 import { fmtDate } from "./chatUtils";
 import { CommunityDp } from "../CommunityDp";
 import type { CachedMessage, CachedContentEvent, CachedThreadEvent, MessageDeletedByRole, MessageReaction } from "@/lib/communities/cache";
@@ -267,22 +268,25 @@ export const MessageList = memo(function MessageList({
           whose only activity is a thread or a showcase post while those fetches
           are still in flight. */}
       {mergedGroups.length === 0 && threadsReady && contentEventsReady && (
-        <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
-          <CommunityDp
-            imageUrl={displayCommunity?.image_url ?? null}
-            name={displayCommunity?.name ?? ""}
-            size={48}
-            className="bg-surface-raised"
-          />
-          <p className="font-body text-sm text-foreground-muted text-center">
-            Welcome to{" "}
-            <span className="font-medium text-foreground">
-              {displayCommunity?.name ?? ""}
-            </span>
-            !<br />
-            <span className="text-xs">Be the first to say something.</span>
-          </p>
-        </div>
+        <>
+          <DisappearingNotice />
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
+            <CommunityDp
+              imageUrl={displayCommunity?.image_url ?? null}
+              name={displayCommunity?.name ?? ""}
+              size={48}
+              className="bg-surface-raised"
+            />
+            <p className="font-body text-sm text-foreground-muted text-center">
+              Welcome to{" "}
+              <span className="font-medium text-foreground">
+                {displayCommunity?.name ?? ""}
+              </span>
+              !<br />
+              <span className="text-xs">Be the first to say something.</span>
+            </p>
+          </div>
+        </>
       )}
 
       {/* Date-grouped timeline (messages + thread notifications merged) */}
@@ -309,6 +313,14 @@ export const MessageList = memo(function MessageList({
                 </span>
               </div>
             )}
+
+            {/* The disappearing-messages notice sits under the top divider —
+                the shape WhatsApp gives it (date pill, then the system notice,
+                then the day's messages). Only once the true start of the
+                history is loaded: while older pages may exist, the top of the
+                loaded window is not the start of the conversation, and a
+                notice rendered there would float down with every prepend. */}
+            {groupIdx === 0 && !hasMoreAbove && <DisappearingNotice />}
 
             {group.items.map((item, itemIdx) => {
               if (item.kind === "thread") {

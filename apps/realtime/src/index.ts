@@ -5,6 +5,7 @@ import { resolveSessionConfig } from "./session-config";
 import { runBoundedPool } from "./subscriptions";
 import { isRetryableStatus, retryWithBackoff } from "./retry";
 import { logEvent } from "./log";
+import { runRetentionSweep } from "./retention";
 export { UserDO } from "./user";
 export { Room } from "./room";
 export { AlertMonitor } from "./alert-monitor";
@@ -75,15 +76,34 @@ function parseCookies(header: string | null): Map<string, string> {
   return cookies;
 }
 
+/** The cron expressions declared in wrangler.toml, routed in `scheduled`. */
+const ALERT_MONITOR_CRON = "*/5 * * * *";
+export const RETENTION_SWEEP_CRON = "0 */6 * * *";
+
 export default {
   /**
-   * Cron entry point for the dependency monitor (see src/alert-monitor.ts).
+   * Cron entry point. Every expression in wrangler.toml's [triggers] fires
+   * this handler; the expression tells the jobs apart.
    *
-   * The tick is deliberately thin: hand it to the Durable Object, which owns the
-   * state that decides whether this run is news or a repeat. The same fetch
-   * handler is reachable at /__scheduled under `wrangler dev --test-scheduled`.
+   *   * (every 5 min) — the dependency monitor (see src/alert-monitor.ts). The
+   *     tick is deliberately thin: hand it to the Durable Object, which owns
+   *     the state that decides whether this run is news or a repeat. The same
+   *     fetch handler is reachable at /__scheduled under
+   *     `wrangler dev --test-scheduled`.
+   *   * (every 6 h) — the community chat retention sweep (see src/retention.ts).
+   *     Stateless: a POST to the web app, which owns the deletion itself.
    */
-  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    if (controller.cron === RETENTION_SWEEP_CRON) {
+      await runRetentionSweep(env);
+      return;
+    }
+    if (controller.cron !== ALERT_MONITOR_CRON) {
+      // An expression this handler does not know (e.g. one added to the toml
+      // without a branch here): run the monitor, which is the historical
+      // default, and make the mismatch findable in the logs.
+      logEvent("warn", { event: "realtime.scheduled.unknown_cron", cron: controller.cron });
+    }
     await env.ALERT_MONITOR.get(env.ALERT_MONITOR.idFromName(ALERT_MONITOR_NAME)).fetch(
       "https://alert-monitor/run",
       { method: "POST" },
