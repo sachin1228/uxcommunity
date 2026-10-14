@@ -509,13 +509,13 @@ export const ChatHeader = memo(function ChatHeader({
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                    {label}
                     {tabDots?.[tab] ? (
                       <>
-                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true" />
+                        <span className="h-1 w-1 rounded-full bg-red-500" aria-hidden="true" />
                         <span className="sr-only">New</span>
                       </>
                     ) : null}
-                    {label}
                   </span>
                 </button>
               ))}
