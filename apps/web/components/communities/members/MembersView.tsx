@@ -59,6 +59,11 @@ interface MembersViewProps {
   isPrivate?:  boolean;
   /** Event group chats record each member's answers to the host's join questions. */
   isEventChat?: boolean;
+  /**
+   * Reported whenever the pending-requests list settles or changes, so the
+   * header's Members dot tracks this view's list (see useCommunityTabDots).
+   */
+  onPendingRequestsChange?: (count: number) => void;
 }
 
 const PAGE_SIZE = 30;
@@ -76,7 +81,7 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, canManageModerators = false, isPrivate = false, isEventChat = false }: MembersViewProps) {
+export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, canManageModerators = false, isPrivate = false, isEventChat = false, onPendingRequestsChange }: MembersViewProps) {
   // Owner, platform-appointed admins and in-app moderators share the same
   // management UI, each capability scoped by the member's grants. Only the
   // manager tier (owner / app-created community's admin) appoints moderators.
@@ -198,6 +203,15 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
       })
       .catch(() => { setRequestsLoaded(true); setRequestsLoading(false); });
   }, [communityId, manager, isPrivate]);
+
+  // The header's Members dot stays while any request is pending — it must
+  // track this list, so accepting or declining the last one brings it down
+  // in the same frame. Published only once the list has actually settled,
+  // never as a premature zero.
+  useEffect(() => {
+    if (!manager || !isPrivate || !requestsLoaded || requestsLoading) return;
+    onPendingRequestsChange?.(requests.length);
+  }, [manager, isPrivate, requestsLoaded, requestsLoading, requests, onPendingRequestsChange]);
 
   // Fetch the recorded join answers (managers + event chats only). A member
   // who joined before the questions existed simply has no row, and their row
