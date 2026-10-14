@@ -4,6 +4,7 @@ import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { isCommunityMember } from "@/lib/communities/membership";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import type { ResourceType } from "@/lib/communities/models/resources";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityResources } from "@/lib/communities/read-models";
@@ -144,6 +145,10 @@ export async function POST(
     .single();
 
   if (error || !inserted) {
+    const limited = creationLimitFromError(error);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+    }
     console.error("[POST resource]", error);
     return NextResponse.json({ error: "Failed to create resource." }, { status: 500 });
   }

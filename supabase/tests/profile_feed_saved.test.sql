@@ -10,6 +10,12 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(6);
 
+-- Creation limits (20261013120000 + 20261014120000): the fixture below posts
+-- several items for one member, which the 3-a-day budget would refuse. The
+-- budgets themselves are exercised in creation_limits.test.sql;
+-- transaction-local, released with this file's rollback.
+select set_config('app.bypass_creation_limits', 'on', true);
+
 -- Author (2222) posts two resources in Fixture A; the Viewer (1111) bookmarks
 -- one and merely likes the other — the two actions live in different tables.
 insert into public.community_resources (community_id, user_id, title, resource_type, url, created_at) values

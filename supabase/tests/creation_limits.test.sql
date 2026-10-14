@@ -10,7 +10,7 @@
 -- Exercised through the real triggers and RPCs, exactly the way
 -- production writes hit them:
 --
---   * threads and showcase posts share one 3-a-day budget
+--   * threads, showcase posts and resources share one 3-a-day budget
 --   * one event per UTC month, one job post per UTC month
 --   * one member-created community, lifetime
 --   * seven real communities at a time, event rooms excluded
@@ -117,12 +117,13 @@ with ins as (
 select ok(count(*) = 1, 'a daily post is accepted (1 of 3)') from ins;
 
 with ins as (
-  insert into public.community_threads (community_id, user_id, title, category)
+  insert into public.community_resources (community_id, user_id, title, resource_type, url)
   values ('c9c9c9c9-1111-4000-8000-000000000002',
-          'c9c9c9c9-0000-4000-8000-000000000001', 'Daily post 2', 'question')
+          'c9c9c9c9-0000-4000-8000-000000000001', 'Daily resource', 'article',
+          'https://cdn.limits.test/guide')
   returning id
 )
-select ok(count(*) = 1, 'a second post the same day is accepted (2 of 3)') from ins;
+select ok(count(*) = 1, 'a shared resource spends the same daily budget (2 of 3)') from ins;
 
 with ins as (
   insert into public.community_showcase_posts
@@ -136,11 +137,12 @@ select ok(count(*) = 1, 'a showcase post spends the same daily budget (3 of 3)')
 
 select is(
   public.limit_failure($$
-    insert into public.community_threads (community_id, user_id, title, category)
+    insert into public.community_resources (community_id, user_id, title, resource_type, url)
     values ('c9c9c9c9-1111-4000-8000-000000000004',
-            'c9c9c9c9-0000-4000-8000-000000000001', 'Fourth post', 'question')$$),
+            'c9c9c9c9-0000-4000-8000-000000000001', 'Fourth resource', 'article',
+            'https://cdn.limits.test/extra')$$),
   'limit:posts_daily',
-  'the 4th post of the day is refused'
+  'a resource is refused as the 4th post of the day'
 );
 
 delete from public.community_threads
