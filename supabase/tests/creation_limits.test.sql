@@ -1,3 +1,9 @@
+-- ⚠️ TEST FILE — NEVER RUN THIS IN THE SUPABASE SQL EDITOR or against any
+-- non-scratch database. It seeds fixture users/communities and calls
+-- admin_join_all_communities, which joins a throwaway member into EVERY
+-- community that exists. It runs only through supabase/tests/run-local.sh,
+-- which builds a throwaway database. To enforce the limits in the real
+-- project, run supabase/migrations/20261013120000_creation_limits.sql.
 -- ============================================================
 -- Creation limits — the per-member budgets
 -- ============================================================
