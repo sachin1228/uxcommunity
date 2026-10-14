@@ -37,13 +37,20 @@ new_sqlite_classes = ["AlertMonitor"]
 # app emails the admins when one of the services worth waking someone for goes
 # down (see src/alert-monitor.ts and apps/web/lib/health/alert.ts).
 #
-# Cron Triggers are per-Worker and free, which is why the monitor lives here:
+# Chat retention: every six hours this Worker POSTs the web app's internal
+# retention endpoint, which hard-deletes community chat messages older than the
+# 15-day window and removes their R2 images (see src/retention.ts and
+# apps/web/lib/communities/message-retention-sweep.ts). Six-hourly rather than
+# daily so a big first-run backlog drains the same day, and each empty run is a
+# single indexed query.
+#
+# Cron Triggers are per-Worker and free, which is why both live here:
 # the realtime Worker already runs this app's Durable Objects and already holds
 # API_URL / API_SECRET, so this adds no deployment, no secret and no resource
-# to provision. It also cannot alert about the web app itself being down — the
-# email is sent BY the web app — so that case is logged instead.
+# to provision. The monitor also cannot alert about the web app itself being
+# down — the email is sent BY the web app — so that case is logged instead.
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "0 */6 * * *"]
 
 # Invocation logs. These used to live in a duplicate config at the repository
 # root, which existed only so the Cloudflare Git integration could build from
