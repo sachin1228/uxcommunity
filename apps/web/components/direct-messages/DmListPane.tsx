@@ -48,7 +48,13 @@ export const DmListPane = memo(function DmListPane({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
-  const all = conversations ?? [];
+  // Rows this viewer should not see: a rejected request is closed for both
+  // sides, and the viewer's blocked peers drop out of their pane. The server
+  // list already omits both — this also covers locally patched state before
+  // the next refetch.
+  const all = (conversations ?? []).filter(
+    (conversation) => !conversation.blocked_by_me && conversation.request_state !== "rejected",
+  );
   const visible = filterConversations(all, query);
 
   return (
@@ -126,6 +132,13 @@ export const DmListPane = memo(function DmListPane({
             const preview = messagePreview(conversation.last_message, currentUserId);
             const reaction = conversation.last_reaction ?? null;
             const typingText = typingByConversation.get(conversation.id) ?? "";
+            // A request still awaiting THIS viewer's answer — the row says so
+            // instead of previewing the message (the thread holds the full
+            // message plus Accept / Reject).
+            const incomingRequest =
+              conversation.request_state === "pending" &&
+              conversation.requested_by !== null &&
+              conversation.requested_by !== currentUserId;
             return (
               // px-3/sm:px-4 — the brand's own inset (the topbar logo starts at
               // pl-3, then pl-4 from sm), so avatars, search field and chevron
@@ -161,6 +174,12 @@ export const DmListPane = memo(function DmListPane({
                       /* Typing — highest priority, like the community sidebar */
                       <span className="min-w-0 truncate font-body text-xs text-accent">
                         {typingText}
+                      </span>
+                    ) : incomingRequest ? (
+                      /* A pending request the viewer has not answered yet —
+                         takes the preview line's place so it cannot be missed. */
+                      <span className="min-w-0 truncate font-body text-xs font-medium text-accent">
+                        Message request
                       </span>
                     ) : reaction ? (
                       /* Reaction — "John reacted ❤️ to: \"ok\"", the same line the

@@ -11,6 +11,9 @@ function conversation(id: string, name: string): DmConversationSummary {
     unread_count: 0,
     my_last_read_at: null,
     last_message_at: null,
+    request_state: "accepted",
+    requested_by: null,
+    blocked_by_me: false,
   };
 }
 

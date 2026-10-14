@@ -26,6 +26,7 @@ import type {
   DmLastReaction,
   DmMessage,
   DmPreviewMessage,
+  DmRequestState,
 } from "@/lib/direct-messages/types";
 import type { MessageDeletedByRole, ReplyPreview } from "@/lib/communities/cache";
 
@@ -275,6 +276,37 @@ export function useDmRealtime({
             markConversationRead(row.conversation_id, { lastReadAt: row.created_at });
           }
         }
+      }),
+    );
+
+    // ── Request state ───────────────────────────────────────────────────────
+    // The other member answered the request, or a first message defined its
+    // requester. The open thread's footer reads these fields, so the composer
+    // locks (waiting / declined) or unlocks (accepted) without a refetch.
+    unsubscribes.push(
+      realtimeClient.on(dmRoom, "dm-request-update", (data) => {
+        const row = data as {
+          conversation_id?: string;
+          request_state?: string;
+          requested_by?: string | null;
+        };
+        if (!row?.conversation_id) return;
+        const requestState: DmRequestState =
+          row.request_state === "pending" || row.request_state === "rejected"
+            ? row.request_state
+            : "accepted";
+        const requestedBy = typeof row.requested_by === "string" ? row.requested_by : null;
+        setConversations((prev) => {
+          const index = prev.findIndex((c) => c.id === row.conversation_id);
+          if (index === -1) return prev;
+          const current = prev[index];
+          if (current.request_state === requestState && current.requested_by === requestedBy) {
+            return prev;
+          }
+          const next = prev.slice();
+          next[index] = { ...current, request_state: requestState, requested_by: requestedBy };
+          return next;
+        });
       }),
     );
 

@@ -13,10 +13,16 @@ export const dmUrls = {
     `/api/dm/conversations/${conversationId}/typing`,
   conversationUpload: (conversationId: string) =>
     `/api/dm/conversations/${conversationId}/upload`,
+  /** Accept / reject the pending message request. */
+  conversationRequest: (conversationId: string) =>
+    `/api/dm/conversations/${conversationId}/request`,
   message: (messageId: string) => `/api/dm/messages/${messageId}`,
   messageReactions: (messageId: string) =>
     `/api/dm/messages/${messageId}/reactions`,
   unread: "/api/dm/unread",
+  /** Block (POST) / unblock (DELETE ?user_id=). */
+  blocks: "/api/dm/blocks",
+  reports: "/api/dm/reports",
 } as const;
 
 /**

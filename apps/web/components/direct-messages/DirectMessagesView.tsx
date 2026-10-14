@@ -17,11 +17,13 @@ import type {
   DmConversationSummary,
   DmMessage,
   DmPreviewMessage,
+  DmRequestState,
 } from "@/lib/direct-messages/types";
 import type { MessageDeletedByRole, ReplyPreview } from "@/lib/communities/cache";
 import { DmChatIcon } from "./DmChatIcon";
 import { DmListPane } from "./DmListPane";
-import { DmThread } from "./DmThread";
+import { DmReportModal } from "./DmReportModal";
+import { DmThread, type DmFooterAction } from "./DmThread";
 import { useDmConversations } from "./hooks/useDmConversations";
 import { useDmMessageListAnchor } from "./hooks/useDmMessageListAnchor";
 import { useDmReactions } from "./hooks/useDmReactions";
@@ -30,6 +32,11 @@ import { useDmScrollAndUnread } from "./hooks/useDmScrollAndUnread";
 import { useDmSend } from "./hooks/useDmSend";
 import { useDmThreadData } from "./hooks/useDmThreadData";
 import { useDmTyping } from "./hooks/useDmTyping";
+
+/** Narrow an API response's request state to the three states the app knows. */
+function narrowRequestState(value: unknown): DmRequestState {
+  return value === "pending" || value === "rejected" ? value : "accepted";
+}
 /**
  * Direct messages — the whole feature's client shell.
  *
@@ -70,6 +77,9 @@ export function DirectMessagesView({
   const [editingError, setEditingError] = useState<string | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [actionPending, setActionPending] = useState<DmFooterAction>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeConversation = useMemo(
@@ -214,6 +224,126 @@ export function DirectMessagesView({
     [setConversations],
   );
 
+  // ── Request / block lifecycle ─────────────────────────────────────────────
+  /**
+   * Patch one conversation's summary everywhere it can be read from: the
+   * list state (drives the pane) and the ?peer= / open-thread fallback copy —
+   * a list refetch drops blocked and rejected rows from the server payload,
+   * and the thread must not vanish under the member while they decide.
+   */
+  const patchActiveConversation = useCallback(
+    (conversationId: string, patch: Partial<DmConversationSummary>) => {
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversationId ? { ...c, ...patch } : c)),
+      );
+      setPendingConversation((prev) =>
+        prev && prev.id === conversationId ? { ...prev, ...patch } : prev,
+      );
+    },
+    [setConversations],
+  );
+
+  /** Run one footer action with shared busy/error handling. */
+  const runFooterAction = useCallback(
+    async (action: Exclude<DmFooterAction, null>, run: () => Promise<Response>) => {
+      setActionPending(action);
+      setActionError(null);
+      try {
+        const response = await run();
+        const payload = (await response.json().catch(() => null)) as
+          | Record<string, unknown>
+          | null;
+        if (!response.ok) {
+          setActionError(
+            typeof payload?.error === "string" ? payload.error : "Something went wrong.",
+          );
+          return null;
+        }
+        return payload;
+      } catch {
+        setActionError("Network error. Please try again.");
+        return null;
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [],
+  );
+
+  const handleAcceptRequest = useCallback(async () => {
+    const id = activeId;
+    if (!id) return;
+    const payload = await runFooterAction("accept", () =>
+      fetch(dmUrls.conversationRequest(id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "accept" }),
+      }),
+    );
+    if (!payload) return;
+    patchActiveConversation(id, {
+      request_state: narrowRequestState(payload.request_state),
+      requested_by: typeof payload.requested_by === "string" ? payload.requested_by : null,
+    });
+  }, [activeId, runFooterAction, patchActiveConversation]);
+
+  const handleRejectRequest = useCallback(async () => {
+    const id = activeId;
+    if (!id) return;
+    const payload = await runFooterAction("reject", () =>
+      fetch(dmUrls.conversationRequest(id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject" }),
+      }),
+    );
+    if (!payload) return;
+    patchActiveConversation(id, {
+      request_state: narrowRequestState(payload.request_state),
+      requested_by: typeof payload.requested_by === "string" ? payload.requested_by : null,
+    });
+  }, [activeId, runFooterAction, patchActiveConversation]);
+
+  const handleBlock = useCallback(async () => {
+    const id = activeId;
+    const peer = activeConversation?.peer;
+    if (!id || !peer) return;
+    const payload = await runFooterAction("block", () =>
+      fetch(dmUrls.blocks, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: peer.id }),
+      }),
+    );
+    if (!payload) return;
+    // The thread's blocked bar (with its Unblock button) is the feedback and
+    // the way back — no toast.
+    patchActiveConversation(id, { blocked_by_me: true });
+  }, [activeId, activeConversation, runFooterAction, patchActiveConversation]);
+
+  const handleUnblock = useCallback(async () => {
+    const id = activeId;
+    const peer = activeConversation?.peer;
+    if (!id || !peer) return;
+    const payload = await runFooterAction("unblock", () =>
+      fetch(`${dmUrls.blocks}?user_id=${peer.id}`, { method: "DELETE" }),
+    );
+    if (!payload) return;
+    patchActiveConversation(id, { blocked_by_me: false });
+    void refresh(true);
+  }, [activeId, activeConversation, runFooterAction, patchActiveConversation, refresh]);
+
+  /** A send response carries the conversation's post-send request state. */
+  const handleConversationState = useCallback(
+    (conversationId: string, requestState: DmRequestState, requestedBy: string | null) => {
+      patchActiveConversation(conversationId, {
+        request_state: requestState,
+        requested_by: requestedBy,
+      });
+    },
+    [patchActiveConversation],
+  );
+
   const send = useDmSend({
     conversationId: activeId,
     currentUserId: userId,
@@ -227,6 +357,7 @@ export function DirectMessagesView({
     onPreview: handlePreview,
     onPreviewConfirmed: handlePreviewConfirmed,
     onPreviewFailed: handlePreviewFailed,
+    onConversationState: handleConversationState,
   });
   const {
     input: sendInput,
@@ -368,8 +499,23 @@ export function DirectMessagesView({
   // ── Opening a conversation ────────────────────────────────────────────────
   const openConversation = useCallback((conversationId: string) => {
     setActiveId(conversationId);
-    setPendingConversation((prev) => (prev && prev.id !== conversationId ? null : prev));
+    setActionError(null);
+    // Seed the fallback copy with what the list knows: once a refetch drops
+    // the row (blocked / rejected conversations leave the server payload),
+    // this copy is what keeps the thread on screen. The ?peer= handoff's own
+    // conversation stays as-is.
+    const summary = conversationsRef.current?.find((c) => c.id === conversationId) ?? null;
+    setPendingConversation((prev) => {
+      if (summary) return summary;
+      return prev && prev.id === conversationId ? prev : null;
+    });
     setLightboxIndex(null);
+  }, []);
+
+  // Leaving the thread drops it and any lifecycle error that belonged to it.
+  const closeConversation = useCallback(() => {
+    setActiveId(null);
+    setActionError(null);
   }, []);
 
   // The window has no dashboard sidebar; the list heading's back arrow is the
@@ -706,7 +852,7 @@ export function DirectMessagesView({
             editingSaving={editingSaving}
             editingInput={editingInput}
             editingError={editingError}
-            onBack={() => setActiveId(null)}
+            onBack={closeConversation}
             onInputChange={handleInputChange}
             onInputKeyDown={handleKeyDown}
             onInputSend={handleInputSend}
@@ -728,6 +874,13 @@ export function DirectMessagesView({
             onEditInputChange={setEditingInput}
             onEditSave={() => void handleEditSave()}
             onEditClose={handleCancelEdit}
+            onReport={() => setReportOpen(true)}
+            onBlock={() => void handleBlock()}
+            onUnblock={() => void handleUnblock()}
+            onAcceptRequest={() => void handleAcceptRequest()}
+            onRejectRequest={() => void handleRejectRequest()}
+            actionPending={actionPending}
+            actionError={actionError}
           />
         ) : (
           <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
@@ -755,6 +908,15 @@ export function DirectMessagesView({
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={(index) => setLightboxIndex(index)}
+        />
+      )}
+
+      {activeConversation && (
+        <DmReportModal
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          conversationId={activeConversation.id}
+          peerName={activeConversation.peer.name}
         />
       )}
     </div>

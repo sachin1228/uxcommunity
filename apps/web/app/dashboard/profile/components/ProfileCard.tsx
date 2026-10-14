@@ -1,11 +1,16 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { Camera, Globe, Linkedin, MapPin, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Ban, Camera, Globe, Linkedin, MapPin, MoreVertical, Plus, ShieldOff } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { PendingButton } from "@/components/ui/PendingButton";
 import type { ProfileCompanyView } from "@/components/companies/types";
 import { DmChatIcon } from "@/components/direct-messages/DmChatIcon";
+import { dmUrls } from "@/lib/direct-messages/client";
 
 interface ProfileCardProps {
   name: string;
@@ -58,6 +63,16 @@ interface ProfileCardProps {
    * own surface (you cannot message yourself).
    */
   messageHref?: string;
+  /**
+   * The read-only surfaces' block control: the ⋯ menu beside the name
+   * (Block user / Unblock user) and the blocked-state line the menu flips.
+   * Omitted on the owner's own surface.
+   */
+  blockControls?: {
+    memberId: string;
+    /** True when the VIEWER has blocked this member. */
+    blockedByMe: boolean;
+  } | null;
 }
 
 /**
@@ -85,6 +100,11 @@ function externalUrl(value: string | null | undefined): string | null {
  * the only image and everything here sits directly on the page. The identity
  * details behind Edit Profile live on the Settings page
  * (`app/dashboard/settings/profile`).
+ *
+ * While the viewer has this member blocked, the hero reduces to the identity
+ * the blocked line needs — picture, name, role, city — plus that line and its
+ * Unblock. Workplace, bio and links are not rendered, and the page skips the
+ * activity tabs behind it.
  */
 export function ProfileCard({
   name,
@@ -101,6 +121,7 @@ export function ProfileCard({
   linkedinUrl,
   onAddLinkedIn,
   messageHref,
+  blockControls = null,
 }: ProfileCardProps) {
   const portfolioUrl = externalUrl(portfolio);
   const linkedinProfileUrl = externalUrl(linkedinUrl);
@@ -108,6 +129,48 @@ export function ProfileCard({
   // avatar) is the same as having none: the hero shows its initials instead of
   // an empty frame.
   const hasPicture = Boolean(avatarUrl) && !isGeneratedProfilePicture(avatarUrl);
+
+  // ── Block control (read-only surfaces) ────────────────────────────────────
+  // The menu flips with the server state: the POST/DELETE lands, then
+  // router.refresh() re-renders the page with the new blockedByMe prop.
+  const router = useRouter();
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [blockPending, setBlockPending] = useState<"block" | "unblock" | null>(null);
+  const [blockError, setBlockError] = useState<string | null>(null);
+  const blockedByMe = blockControls?.blockedByMe ?? false;
+  // While the viewer has this member blocked the profile reduces to the
+  // identity the blocked line needs — picture, name, role, city — so the
+  // workplace, bio and links stay out of the render entirely.
+  const reducedView = blockedByMe;
+
+  async function setBlocked(block: boolean) {
+    if (!blockControls || blockPending) return;
+    setBlockPending(block ? "block" : "unblock");
+    setBlockError(null);
+    try {
+      const response = await fetch(
+        block ? dmUrls.blocks : `${dmUrls.blocks}?user_id=${blockControls.memberId}`,
+        block
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_id: blockControls.memberId }),
+            }
+          : { method: "DELETE" },
+      );
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        setBlockError(payload?.error ?? "Something went wrong.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setBlockError("Network error. Please try again.");
+    } finally {
+      setBlockPending(null);
+    }
+  }
 
   // City under the name. The sector is deliberately not shown on the profile
   // (it still shows on communities surfaces); the designation and seniority
@@ -166,6 +229,57 @@ export function ProfileCard({
               >
                 Edit
               </Link>
+            ) : blockControls ? (
+              /* The read-only surface's control cluster shares the owner's
+                 Edit slot: a ⋯ menu holding Block / Unblock. */
+              <div className="justify-self-end">
+                <button
+                  type="button"
+                  ref={menuTriggerRef}
+                  onClick={() => setMenuOpen((open) => !open)}
+                  aria-label="Member options"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:border-accent/40 hover:text-foreground"
+                >
+                  <MoreVertical strokeWidth={2.5} size={16} />
+                </button>
+                <DropdownMenu
+                  triggerRef={menuTriggerRef}
+                  open={menuOpen}
+                  onClose={() => setMenuOpen(false)}
+                  align="right"
+                  className="min-w-44 p-1"
+                >
+                  {blockedByMe ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void setBlocked(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
+                    >
+                      <ShieldOff strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                      <span>Unblock user</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void setBlocked(true);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 transition-colors hover:bg-red-400/10"
+                    >
+                      <Ban strokeWidth={2.5} size={14} className="shrink-0" />
+                      <span>Block user</span>
+                    </button>
+                  )}
+                </DropdownMenu>
+              </div>
             ) : (
               <span aria-hidden="true" />
             )}
@@ -177,14 +291,15 @@ export function ProfileCard({
                 workplace: the verified company (logo first, leading to its
                 page) when set, or the hollow "Add your company" pill when not.
                 Truncated so the label stays a single line however long it
-                runs. */}
-            {(roleLabel || company || onAddCompany) && (
+                runs. The reduced (blocked) view keeps the role but drops the
+                “@ workplace” half. */}
+            {(roleLabel || (!reducedView && (company || onAddCompany))) && (
               <p className="mt-1.5 flex min-w-0 items-center justify-center gap-1 font-body text-sm text-foreground-muted">
                 {roleLabel && <span className="truncate">{roleLabel}</span>}
-                {roleLabel && (company || onAddCompany) && (
+                {roleLabel && !reducedView && (company || onAddCompany) && (
                   <span aria-hidden="true">@</span>
                 )}
-                {company && (
+                {!reducedView && company && (
                   <Link
                     href={`/dashboard/companies/${company.slug}`}
                     title={
@@ -203,7 +318,7 @@ export function ProfileCard({
                     )}
                   </Link>
                 )}
-                {!company && onAddCompany && (
+                {!reducedView && !company && onAddCompany && (
                   <button
                     type="button"
                     onClick={onAddCompany}
@@ -282,27 +397,49 @@ export function ProfileCard({
           </div>
         </div>
 
-        {/* Bio */}
-        {bio && (
+        {/* Bio — hidden in the reduced (blocked) view. */}
+        {!reducedView && bio && (
           <p className="mx-auto mt-3 max-w-prose text-center font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
         {/* The member's outside links as labeled chips — read-only surfaces
             only; the owner's own surface shows the circles in the hero
             instead. Messaging anyone starts here, so the Message chip is the
-            first thing in the row. */}
-        {!onAddLinkedIn && !onAddPortfolio && (messageHref || linkedinProfileUrl || portfolioUrl) && (
+            first thing in the row — and while the viewer has THIS member
+            blocked the row reduces to the blocked line and its way back, with
+            the links gone. */}
+        {!onAddLinkedIn && !onAddPortfolio && (blockedByMe || messageHref || linkedinProfileUrl || portfolioUrl) && (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            {messageHref && (
-              <Link
-                href={messageHref}
-                className="flex items-center gap-1.5 rounded-full bg-[var(--ds-blue-800)] px-3 py-1.5 font-body text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)]"
-              >
-                <DmChatIcon size={12} />
-                Message
-              </Link>
+            {blockedByMe ? (
+              <span className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 font-body text-xs text-foreground-muted">
+                <Ban strokeWidth={2.5} size={12} className="shrink-0 text-red-400" aria-hidden="true" />
+                You blocked <span className="font-medium text-foreground">{name}</span>. They
+                can&apos;t message you or see your profile.
+              </span>
+            ) : (
+              messageHref && (
+                <Link
+                  href={messageHref}
+                  className="flex items-center gap-1.5 rounded-full bg-[var(--ds-blue-800)] px-3 py-1.5 font-body text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)]"
+                >
+                  <DmChatIcon size={12} />
+                  Message
+                </Link>
+              )
             )}
-            {linkedinProfileUrl && (
+            {blockedByMe && (
+              <PendingButton
+                type="button"
+                onClick={() => void setBlocked(false)}
+                pending={blockPending === "unblock"}
+                pendingLabel="Unblocking…"
+                spinnerSize={12}
+                className="modal-btn modal-btn-secondary h-7 px-3 text-xs"
+              >
+                Unblock
+              </PendingButton>
+            )}
+            {!reducedView && linkedinProfileUrl && (
               <a
                 href={linkedinProfileUrl}
                 target="_blank"
@@ -313,7 +450,7 @@ export function ProfileCard({
                 LinkedIn
               </a>
             )}
-            {portfolioUrl && (
+            {!reducedView && portfolioUrl && (
               <a
                 href={portfolioUrl}
                 target="_blank"
@@ -325,6 +462,12 @@ export function ProfileCard({
               </a>
             )}
           </div>
+        )}
+
+        {blockError && (
+          <p role="alert" className="mt-2 text-center font-body text-xs text-red-400">
+            {blockError}
+          </p>
         )}
 
       </div>

@@ -1097,11 +1097,49 @@ export type Database = {
           },
         ];
       };
+      dm_blocks: {
+        Row: {
+          blocked_id: string;
+          blocker_id: string;
+          created_at: string;
+          id: string;
+        };
+        Insert: {
+          blocked_id: string;
+          blocker_id: string;
+          created_at?: string;
+          id?: string;
+        };
+        Update: {
+          blocked_id?: string;
+          blocker_id?: string;
+          created_at?: string;
+          id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dm_blocks_blocked_id_fkey";
+            columns: ["blocked_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_blocks_blocker_id_fkey";
+            columns: ["blocker_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       dm_conversations: {
         Row: {
           created_at: string;
           id: string;
           last_message_at: string | null;
+          request_state: string;
+          requested_by: string | null;
           user_a: string;
           user_a_last_read_at: string | null;
           user_b: string;
@@ -1111,6 +1149,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           last_message_at?: string | null;
+          request_state?: string;
+          requested_by?: string | null;
           user_a: string;
           user_a_last_read_at?: string | null;
           user_b: string;
@@ -1120,12 +1160,21 @@ export type Database = {
           created_at?: string;
           id?: string;
           last_message_at?: string | null;
+          request_state?: string;
+          requested_by?: string | null;
           user_a?: string;
           user_a_last_read_at?: string | null;
           user_b?: string;
           user_b_last_read_at?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "dm_conversations_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "dm_conversations_user_a_fkey";
             columns: ["user_a"];
@@ -1246,6 +1295,77 @@ export type Database = {
           {
             foreignKeyName: "dm_messages_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dm_reports: {
+        Row: {
+          conversation_id: string | null;
+          created_at: string;
+          details: string | null;
+          id: string;
+          message_snapshot: Json;
+          reason: string;
+          reported_user_id: string | null;
+          reporter_id: string;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          status: string;
+        };
+        Insert: {
+          conversation_id?: string | null;
+          created_at?: string;
+          details?: string | null;
+          id?: string;
+          message_snapshot?: Json;
+          reason: string;
+          reported_user_id?: string | null;
+          reporter_id: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          status?: string;
+        };
+        Update: {
+          conversation_id?: string | null;
+          created_at?: string;
+          details?: string | null;
+          id?: string;
+          message_snapshot?: Json;
+          reason?: string;
+          reported_user_id?: string | null;
+          reporter_id?: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dm_reports_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "dm_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_reports_reported_user_id_fkey";
+            columns: ["reported_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_reports_reporter_id_fkey";
+            columns: ["reporter_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dm_reports_resolved_by_fkey";
+            columns: ["resolved_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];

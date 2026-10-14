@@ -85,6 +85,9 @@ export async function POST(req: NextRequest) {
     unread_count: 0,
     my_last_read_at: result.conversation.my_last_read_at,
     last_message_at: result.conversation.last_message_at,
+    request_state: result.conversation.request_state,
+    requested_by: result.conversation.requested_by,
+    blocked_by_me: result.conversation.blocked_by_me,
   };
   return NextResponse.json({ conversation }, { status: 201 });
 }

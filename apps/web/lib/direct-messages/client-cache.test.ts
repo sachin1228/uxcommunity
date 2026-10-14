@@ -16,6 +16,9 @@ function conversation(extra: Partial<DmConversationSummary> = {}): DmConversatio
     my_last_read_at: null,
     last_message_at: "2026-10-12T12:00:00.000Z",
     last_reaction: null,
+    request_state: "accepted",
+    requested_by: null,
+    blocked_by_me: false,
     ...extra,
   };
 }

@@ -45,6 +45,9 @@ export default async function MessagesPage({ searchParams }: Props) {
           unread_count: 0,
           my_last_read_at: created.conversation.my_last_read_at,
           last_message_at: created.conversation.last_message_at,
+          request_state: created.conversation.request_state,
+          requested_by: created.conversation.requested_by,
+          blocked_by_me: created.conversation.blocked_by_me,
         };
       } else if (created.status === 429) {
         limitNotice = created.error;

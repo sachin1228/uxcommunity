@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { loadDmBlockEitherWay } from "@/lib/direct-messages/server";
 import { isProfileId } from "@/lib/profile/links";
 import { callPerformanceRpc, isMemberFeedScope, isProfileFeedScope, type Json, type MemberFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
@@ -73,6 +74,19 @@ export async function GET(req: NextRequest) {
 
   const userId = session.userId!;
   const db = createServiceClient();
+
+  // A block in either direction empties the member feed: the owner blocked
+  // the viewer (the page renders the unavailable state), or the viewer blocked
+  // the owner (the page renders the reduced identity card). Either way the
+  // tabs have nothing to show; this guards a direct call. An empty page, not
+  // an error.
+  if (memberView && (await loadDmBlockEitherWay(db, userId, subjectId as string))) {
+    const body = { items: [] };
+    const timing = timer.finish({ status: 200, returned_rows: 0 });
+    const response = NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+    response.headers.set("Server-Timing", timing);
+    return response;
+  }
 
   let items: Json[];
   try {
