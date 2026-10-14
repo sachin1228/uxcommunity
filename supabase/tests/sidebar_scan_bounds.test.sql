@@ -28,6 +28,12 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(19);
 
+-- Creation limits (20261013120000 + 20261014120000): the fixtures below post
+-- a thread and a resource for one member, which the 3-a-day budget can refuse
+-- when earlier suites have spent it. The budgets themselves are exercised in
+-- creation_limits.test.sql; transaction-local, released with this rollback.
+select set_config('app.bypass_creation_limits', 'on', true);
+
 -- ─── Fixture selection ──────────────────────────────────────────────────────
 
 create temporary table fixture_membership as

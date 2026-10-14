@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
 import { communityHref, deferNotification, joinRequestAcceptedNotice } from "@/lib/notifications";
 import { deferJoinRequestAcceptedPush } from "@/lib/push/membership";
+import { creationLimitFromError } from "@/lib/creation-limits";
+import { loadJoinSlots, memberCapMessage } from "@/lib/communities/join-slots";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/accept
@@ -43,7 +45,19 @@ export async function POST(
       { onConflict: "community_id,user_id", ignoreDuplicates: true }
     );
 
-  if (memberErr) return NextResponse.json({ error: "Failed to add member." }, { status: 500 });
+  if (memberErr) {
+    // The requester may have filled their 7 slots while the request waited —
+    // the acceptance is refused (not forced through) and the manager reads
+    // why. The request stays pending for a retry after they free a slot.
+    const limited = creationLimitFromError(memberErr);
+    if (limited === "community_joins") {
+      return NextResponse.json(
+        { error: memberCapMessage(await loadJoinSlots(db, request.user_id)) },
+        { status: 429 },
+      );
+    }
+    return NextResponse.json({ error: "Failed to add member." }, { status: 500 });
+  }
 
   await db
     .from("community_join_requests")

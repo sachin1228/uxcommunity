@@ -44,6 +44,7 @@ export function DirectMessagesView({
   currentUserName,
   currentUserAvatar,
   initialConversation = null,
+  limitNotice = null,
 }: {
   userId: string;
   currentUserName: string;
@@ -52,6 +53,9 @@ export function DirectMessagesView({
    *  the first paint, before the list (which skips conversations with no
    *  messages) could carry it. */
   initialConversation?: DmConversationSummary | null;
+  /** Why a ?peer= handoff didn't open — the monthly new-conversation cap
+   *  refused it. Shown beside the empty pane's copy. */
+  limitNotice?: string | null;
 }) {
   const { conversations, setConversations, refresh } = useDmConversations({ userId });
 
@@ -737,6 +741,9 @@ export function DirectMessagesView({
               <p className="font-body text-xs text-foreground-muted/70">
                 Open a profile to start.
               </p>
+            )}
+            {limitNotice && (
+              <p className="max-w-xs font-body text-xs text-red-400">{limitNotice}</p>
             )}
           </div>
         )}

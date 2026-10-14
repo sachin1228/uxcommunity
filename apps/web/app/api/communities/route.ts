@@ -7,6 +7,8 @@ import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
+import { createCapMessage, isCapFull, loadJoinSlots } from "@/lib/communities/join-slots";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -73,6 +75,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Description must be 500 characters or less." }, { status: 422 });
   }
 
+  // The creator joins their own community, so creation needs a free slot:
+  // memberships plus pending requests must leave room for one more. Looked
+  // before writing so the answer arrives without an insert-then-rollback
+  // round trip; the database trigger is the referee for the memberships.
+  const slots = await loadJoinSlots(db, userId);
+  if (isCapFull(slots)) {
+    return NextResponse.json({ error: createCapMessage(slots) }, { status: 429 });
+  }
+
   let imageUrl: string | null = null;
   const file = formData.get("image");
   if (file instanceof File && file.size > 0) {
@@ -133,6 +144,17 @@ export async function POST(request: Request) {
         console.error("[community-create] failed-insert image cleanup error:", cleanupError);
       }
     }
+    const limited = creationLimitFromError(communityError);
+    if (limited) {
+      return NextResponse.json(
+        {
+          error: limited === "community_joins"
+            ? createCapMessage(await loadJoinSlots(db, userId))
+            : CREATION_LIMIT_MESSAGES[limited],
+        },
+        { status: 429 },
+      );
+    }
     console.error("[community-create] insert failed:", communityError);
     return NextResponse.json({ error: "Failed to create community." }, { status: 500 });
   }
@@ -153,6 +175,19 @@ export async function POST(request: Request) {
       } catch (cleanupError) {
         console.error("[community-create] failed-membership image cleanup error:", cleanupError);
       }
+    }
+    // The creator cannot be in more than 7 communities — creating their own
+    // community at the cap rolls back to the join-limit answer, not a 500.
+    const limited = creationLimitFromError(memberError);
+    if (limited) {
+      return NextResponse.json(
+        {
+          error: limited === "community_joins"
+            ? createCapMessage(await loadJoinSlots(db, userId))
+            : CREATION_LIMIT_MESSAGES[limited],
+        },
+        { status: 429 },
+      );
     }
     console.error("[community-create] owner membership failed:", memberError);
     return NextResponse.json({ error: "Failed to create community membership." }, { status: 500 });

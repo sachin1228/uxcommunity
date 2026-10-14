@@ -19,6 +19,7 @@ const STATUS_FOR_FAILURE: Record<CreateJobFailureCode, number> = {
   invalid_job_title: 422,
   invalid_experience_level: 422,
   invalid_website: 422,
+  monthly_limit_reached: 429,
   not_installed: 503,
   unexpected: 500,
 };
@@ -28,6 +29,7 @@ const MESSAGE_FOR_FAILURE: Partial<Record<CreateJobFailureCode, string>> = {
   company_not_verified:
     "A job can only be posted for a company you have verified with a work email.",
   company_inactive: "That company is no longer active.",
+  monthly_limit_reached: "You can post one job per month. Try again next month.",
   not_installed: "Jobs are not available right now.",
 };
 

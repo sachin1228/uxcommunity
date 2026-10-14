@@ -51,7 +51,8 @@
       "except": [
         "supabase/migrations/**",
         "supabase/tests/**",
-        "INFRASTRUCTURE-AUDIT.md"
+        "INFRASTRUCTURE-AUDIT.md",
+        "docs/infrastructure-cost-audit.md"
       ]
     }
   ],

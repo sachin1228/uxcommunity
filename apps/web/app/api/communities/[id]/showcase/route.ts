@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityShowcasePage } from "@/lib/communities/read-models";
@@ -72,7 +73,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // Videos are plain file uploads (stored directly by the upload route) —
   // attachments are persisted exactly as the validated client sent them.
   const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies }).select("*").single();
-  if (error || !data) return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
+  if (error || !data) {
+    const limited = creationLimitFromError(error);
+    if (limited) {
+      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+    }
+    return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
+  }
   void publishRealtimeBatch([
     {
       // The chat timeline's permanent "<name> created a showcase" card.

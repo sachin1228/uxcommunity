@@ -7,6 +7,8 @@ import { canJoinEventChat } from "@/lib/communities/event-chat";
 import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
 import { joinAnswersPayload } from "@/lib/communities/event-join-questions";
 import { storeEventJoinResponse } from "@/lib/communities/event-join-responses";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
+import { isCapFull, joinCapMessage, loadJoinSlots } from "@/lib/communities/join-slots";
 
 /**
  * POST /api/communities/[id]/join
@@ -173,6 +175,14 @@ export async function POST(
 
   // 3. Private communities require owner approval
   if (community.is_private) {
+    // A pending request holds a prospective slot (acceptance must never push
+    // the member past the standing cap), so the request is refused at the cap
+    // — with the member's actual numbers (joined + pending) in the copy.
+    const slots = await loadJoinSlots(db, userId);
+    if (isCapFull(slots)) {
+      return NextResponse.json({ error: joinCapMessage(slots) }, { status: 429 });
+    }
+
     // Delete any existing declined request to allow re-requesting
     await db
       .from("community_join_requests")
@@ -216,6 +226,17 @@ export async function POST(
     );
 
   if (error) {
+    const limited = creationLimitFromError(error);
+    if (limited) {
+      return NextResponse.json(
+        {
+          error: limited === "community_joins"
+            ? joinCapMessage(await loadJoinSlots(db, userId))
+            : CREATION_LIMIT_MESSAGES[limited],
+        },
+        { status: 429 },
+      );
+    }
     return NextResponse.json({ error: "Failed to join community." }, { status: 500 });
   }
 

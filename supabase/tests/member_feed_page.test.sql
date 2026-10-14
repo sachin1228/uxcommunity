@@ -12,6 +12,12 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(11);
 
+-- Creation limits (20261013120000): the fixture below posts five items for
+-- one member, which the 3-a-day budget would refuse. The budgets themselves
+-- are exercised in creation_limits.test.sql; this is transaction-local and
+-- released with this file's rollback.
+select set_config('app.bypass_creation_limits', 'on', true);
+
 select has_function('public', 'get_member_feed_page', array['uuid','uuid','text','timestamptz','integer']);
 
 -- Viewer and Author are both members of Fixture A (the harness seeds those
