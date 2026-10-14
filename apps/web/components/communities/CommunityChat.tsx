@@ -904,6 +904,8 @@ export function CommunityChat({
     contentEvents,
     canSeeActivity: canManageModerators,
     canSeeRequests: canSeeJoinRequests,
+    // The SSR read marker — this open's own mark-read hasn't fired yet.
+    anchorAt: initialLastReadAt,
   });
 
   // Stable header callbacks — inline arrows would recreate every render and

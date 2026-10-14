@@ -18,7 +18,13 @@
  * created later still compares as newer.
  */
 
-const STORAGE_PREFIX = "uxcommunity:community-tabs:seen:";
+/**
+ * v2: the first cut anchored never-opened tabs to the newest existing item at
+ * first load, which swallowed content that arrived between the member's last
+ * visit and their first open. The bump discards those poisoned anchors — the
+ * new anchor is the member's read watermark (see useCommunityTabDots).
+ */
+const STORAGE_PREFIX = "uxcommunity:community-tabs:seen:v2:";
 
 export type CommunityTabSeenKey = "threads" | "showcase" | "resources" | "events" | "activity";
 

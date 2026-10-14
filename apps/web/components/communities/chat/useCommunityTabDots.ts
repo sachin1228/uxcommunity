@@ -36,6 +36,14 @@ interface UseCommunityTabDotsOptions {
   canSeeActivity: boolean;
   /** Manager of a private community — the only member who sees join requests. */
   canSeeRequests: boolean;
+  /**
+   * The member's read watermark as of page load (`last_read_at` before this
+   * open marks the community read) — the anchor for tabs that were never
+   * opened: content created after the member's last visit dots, older content
+   * does not. Null/absent (never read) starts the tab at a baseline: nothing
+   * pre-existing dots, anything arriving later does.
+   */
+  anchorAt?: string | null;
 }
 
 /**
@@ -47,6 +55,12 @@ interface UseCommunityTabDotsOptions {
  * item created afterwards raises the dot again. Threads / Showcase / Resources
  * / Events compare the community's newest item of their kind; Activity
  * compares the newest management-audit row.
+ *
+ * A tab that was never opened anchors to the member's read watermark as of
+ * page load (`anchorAt`): content created since their last visit dots — they
+ * have not seen it, however they got here — content older than that does not.
+ * Opening the COMMUNITY never advances a tab watermark; only opening the tab
+ * does.
  *
  * The `/content-latest` baseline exists because the chat timeline's own
  * content-event window can be up to COMMUNITY_BOOTSTRAP_STALE_MS old — an item
@@ -64,6 +78,7 @@ export function useCommunityTabDots({
   contentEvents,
   canSeeActivity,
   canSeeRequests,
+  anchorAt = null,
 }: UseCommunityTabDotsOptions) {
   // The watermarks are an external store (localStorage + module mirror), read
   // through useSyncExternalStore: the server snapshot is null so the server
@@ -156,21 +171,18 @@ export function useCommunityTabDots({
     return next;
   }, [contentEvents, fetchedLatest]);
 
-  const globalBaseline = useMemo(() => {
-    let baseline: string | null = null;
-    for (const iso of Object.values(kindLatest)) baseline = newestIso(baseline, iso);
-    return baseline;
-  }, [kindLatest]);
-
   // Anchor never-tracked tabs and keep the open tab's watermark current.
   useEffect(() => {
     if (seen === null || !latestReady) return;
     for (const [tab, kind] of CONTENT_TABS) {
       const latest = kindLatest[kind];
       if (seen[tab] === undefined) {
-        // First ever look at this tab: everything that exists right now counts
-        // as seen — only items arriving afterwards raise a dot.
-        advance(tab, latest ?? globalBaseline ?? "");
+        // First look at this tab since it is tracked: anchor to the member's
+        // read watermark as of page load — content created after their last
+        // visit dots (they have not seen it, however they got here), older
+        // content doesn't. Opening the tab is what clears the dot, not
+        // opening the community.
+        advance(tab, anchorAt ?? "");
       } else if (activeTab === tab && latest) {
         // The tab is open — whatever its kind holds right now has been seen.
         advance(tab, latest);
@@ -178,12 +190,12 @@ export function useCommunityTabDots({
     }
     if (canSeeActivity) {
       if (seen.activity === undefined) {
-        advance("activity", kindLatest.activity ?? globalBaseline ?? "");
+        advance("activity", anchorAt ?? "");
       } else if (activeTab === "activity" && kindLatest.activity) {
         advance("activity", kindLatest.activity);
       }
     }
-  }, [seen, latestReady, kindLatest, globalBaseline, activeTab, canSeeActivity, advance]);
+  }, [seen, latestReady, kindLatest, activeTab, canSeeActivity, anchorAt, advance]);
 
   const tabDots = useMemo(() => {
     const dots: Partial<Record<ChatTab, boolean>> = {};

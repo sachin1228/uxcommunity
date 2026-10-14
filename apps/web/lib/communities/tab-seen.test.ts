@@ -43,7 +43,7 @@ test("a baseline marker fills an unset tab but never replaces a timestamp", () =
 });
 
 test("watermarks are namespaced per user and per community", () => {
-  assert.equal(tabSeenStorageKey("u1", "c1"), "uxcommunity:community-tabs:seen:u1:c1");
+  assert.equal(tabSeenStorageKey("u1", "c1"), "uxcommunity:community-tabs:seen:v2:u1:c1");
 
   const u1 = "tab-seen-test-ns-u1";
   const u2 = "tab-seen-test-ns-u2";
