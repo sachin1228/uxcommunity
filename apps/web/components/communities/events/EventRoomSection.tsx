@@ -191,10 +191,11 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
  * The offer that meets the room's owner once its event is over for good: the
  * ended badge has come down — twelve hours past the close (see
  * lib/communities/event-date) — and the event itself is still on the calendar.
- * The Event card stays above this one (the event's page, who went): the room
- * outlives its event the moment the event is over, and deleting the event —
- * a host tidying the calendar, possibly months later — must not be the only
- * way to find the room's door.
+ * It leads the panel, right under Members (see EventRoomSection), with the
+ * Event card — the event's page, who went — below it: the room outlives its
+ * event the moment the event is over, and deleting the event — a host tidying
+ * the calendar, possibly months later — must not be the only way to find the
+ * room's door.
  *
  * Whether the offer is this room's to take is decided server-side (see
  * loadEventRoomSection): owner, past the grace — and nothing more. The offer
@@ -277,6 +278,11 @@ export function EventRoomSection({
 
   return (
     <>
+      {/* The event is over for good — its badge has come down — and the room's
+          door leads the panel, right under Members. The answer is the server's
+          (see loadEventRoomSection). */}
+      {carryOn && <EventRoomCarryOnSection communityId={communityId} />}
+
       <section
         aria-labelledby="sidebar-event-heading"
         className="border-t border-border px-5 py-5"
@@ -414,11 +420,6 @@ export function EventRoomSection({
           <ArrowRight strokeWidth={2.5} size={14} aria-hidden="true" />
         </Link>
       </section>
-
-      {/* The event is over for good — its badge has come down — and the room's
-          door turns up under the card that links back to it. The answer is the
-          server's (see loadEventRoomSection). */}
-      {carryOn && <EventRoomCarryOnSection communityId={communityId} />}
     </>
   );
 }
