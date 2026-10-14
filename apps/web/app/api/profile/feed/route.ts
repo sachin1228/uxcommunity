@@ -74,6 +74,25 @@ export async function GET(req: NextRequest) {
   const userId = session.userId!;
   const db = createServiceClient();
 
+  // The profile's owner has blocked the viewer → nothing of theirs renders,
+  // and the page itself already shows the unavailable state — this guards a
+  // direct call. An empty page, not an error: the tabs simply have nothing.
+  if (memberView) {
+    const { data: blockRow } = await db
+      .from("dm_blocks")
+      .select("id")
+      .eq("blocker_id", subjectId as string)
+      .eq("blocked_id", userId)
+      .maybeSingle();
+    if (blockRow) {
+      const body = { items: [] };
+      const timing = timer.finish({ status: 200, returned_rows: 0 });
+      const response = NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+      response.headers.set("Server-Timing", timing);
+      return response;
+    }
+  }
+
   let items: Json[];
   try {
     items = await timer.measure("profile_feed_page_rpc", async () => {
