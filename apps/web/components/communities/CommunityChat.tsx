@@ -41,6 +41,7 @@ import { useChatData } from "./chat/useChatData";
 import { useChatLoadError } from "./chat/useChatLoadError";
 import { useChatReactions } from "./chat/useChatReactions";
 import { useCommunityTabs } from "./chat/useCommunityTabs";
+import { useCommunityTabDots } from "./chat/useCommunityTabDots";
 import { useContentTimeline, useLocalContentEventMirror } from "./chat/useContentTimeline";
 import { useMemberMentions } from "./chat/useMemberMentions";
 import { useMessageListAnchor } from "./chat/useMessageListAnchor";
@@ -890,6 +891,23 @@ export function CommunityChat({
   const moderationRole: MessageDeletedByRole | null =
     myRole === "owner" || myRole === "admin" || myRole === "moderator" ? myRole : null;
 
+  // "New since you last looked" dots for the nav (see useCommunityTabDots).
+  // Membership requests are visible to the same manager tier that MembersView
+  // gates its pending-requests section on.
+  const canSeeJoinRequests =
+    (isOwner || canManageMembers || canManageModerators) &&
+    (displayCommunity?.is_private ?? false);
+  const { tabDots, reportPendingRequests } = useCommunityTabDots({
+    communityId,
+    currentUserId,
+    activeTab: renderedTab,
+    contentEvents,
+    canSeeActivity: canManageModerators,
+    canSeeRequests: canSeeJoinRequests,
+    // The SSR read marker — this open's own mark-read hasn't fired yet.
+    anchorAt: initialLastReadAt,
+  });
+
   // Stable header callbacks — inline arrows would recreate every render and
   // defeat the memoized ChatHeader's bail-out on keystrokes.
   const handleHeaderTabChange = useCallback((tab: ChatTab) => {
@@ -950,6 +968,7 @@ export function CommunityChat({
           showActivityTab={canManageModerators}
           communityId={communityId}
           onMuteChanged={handleMuteChanged}
+          tabDots={tabDots}
         />
 
         <Modal
@@ -1037,6 +1056,7 @@ export function CommunityChat({
             canManageModerators={canManageModerators}
             isPrivate={displayCommunity?.is_private ?? false}
             isEventChat={isEventRoom}
+            onPendingRequestsChange={reportPendingRequests}
           />
         ) : renderedTab === "activity" ? (
           <ActivityView communityId={communityId} currentUserId={currentUserId} />

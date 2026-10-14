@@ -54,6 +54,11 @@ interface ChatHeaderProps {
     notifications_muted: boolean;
     notifications_muted_until: string | null;
   }) => void;
+  /**
+   * "New since you last looked" dots, one per tab — what the member has not
+   * seen since they last opened that tab (see useCommunityTabDots).
+   */
+  tabDots?: Partial<Record<ChatTab, boolean>>;
 }
 
 export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "activity";
@@ -156,6 +161,7 @@ export const ChatHeader = memo(function ChatHeader({
   showActivityTab = false,
   communityId,
   onMuteChanged,
+  tabDots,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
   // Which header dropdown is open — the mute control's or the ⋯ options'.
@@ -504,6 +510,12 @@ export const ChatHeader = memo(function ChatHeader({
                   <span className="inline-flex items-center gap-1.5">
                     <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                     {label}
+                    {tabDots?.[tab] ? (
+                      <>
+                        <span className="h-1 w-1 rounded-full bg-red-500" aria-hidden="true" />
+                        <span className="sr-only">New</span>
+                      </>
+                    ) : null}
                   </span>
                 </button>
               ))}
