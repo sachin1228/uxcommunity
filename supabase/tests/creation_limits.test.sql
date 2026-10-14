@@ -3,7 +3,8 @@
 -- admin_join_all_communities, which joins a throwaway member into EVERY
 -- community that exists. It runs only through supabase/tests/run-local.sh,
 -- which builds a throwaway database. To enforce the limits in the real
--- project, run supabase/migrations/20261013120000_creation_limits.sql.
+-- project, run the creation-limits migrations from supabase/migrations/
+-- (20261013120000, 20261014120000 and 20261014140000).
 -- ============================================================
 -- Creation limits — the per-member budgets
 -- ============================================================
@@ -13,13 +14,15 @@
 --   * threads, showcase posts and resources share one 3-a-day budget
 --   * one event per UTC month, one job post per UTC month
 --   * one member-created community, lifetime
---   * seven real communities at a time, event rooms excluded
+--   * seven LIVE communities at a time — event rooms excluded, deactivated
+--     and ownerless rooms not charged (count_join_slots)
 --   * five NEW DM conversations a month, existing pairs never capped
 --
 -- Also pinned here: deleting content does not refund a period budget
 -- (the counter is append-only — delete/repost churn is the bypass this
--- closes), an idempotent re-join at the cap is not refused, the admin
--- override joins past the cap, and the bypass flag never leaks.
+-- closes), an idempotent re-join at the cap is not refused, a deactivated
+-- community stops consuming a join slot, the admin override joins past the
+-- cap, and the bypass flag never leaks.
 --
 -- Namespace: c9c9c9c9-* (fresh; see the harness note about shared DBs).
 -- ============================================================
@@ -95,12 +98,13 @@ language sql stable as $$
   select to_char(now() at time zone 'utc', 'YYYY-MM')
 $$;
 
-select plan(33);
+select plan(36);
 
 -- ─── 1. Shape of the machinery ──────────────────────────────
 select has_function('public', 'bump_usage_counter', 'bump_usage_counter(...) exists');
 select has_function('public', 'enforce_membership_cap', 'the membership cap trigger function exists');
 select has_function('public', 'admin_join_all_communities', 'the operator override RPC exists');
+select has_function('public', 'count_join_slots', 'the live-count helper exists');
 select is(
   (select count(*) from public.creation_limits)::integer,
   6, 'the six budgets are seeded'
@@ -263,7 +267,7 @@ select is(
   'deleting the community does not refund the lifetime budget'
 );
 
--- ─── 6. Memberships: seven real communities, event rooms excluded ──
+-- ─── 6. Memberships: seven live communities, event rooms excluded ──
 
 with ins as (
   insert into public.community_members (community_id, user_id)
@@ -326,6 +330,29 @@ select is(
   'limit:community_joins',
   'the cap re-engages at seven'
 );
+
+-- The owner ran "Delete Community" on one of the seven: the row survives
+-- (the soft delete keeps other members' content referenced), but the room
+-- disappears from the sidebar and its leave route 404s. A room a member
+-- cannot see or exit must not hold a slot — the count is of LIVE
+-- communities only.
+update public.communities
+   set is_active = false
+ where id = 'c9c9c9c9-1111-4000-8000-000000000008';
+
+select is(
+  public.count_join_slots('c9c9c9c9-0000-4000-8000-000000000005'),
+  6,
+  'a deactivated community drops out of the live count'
+);
+
+with ins as (
+  insert into public.community_members (community_id, user_id)
+  values ('c9c9c9c9-1111-4000-8000-000000000009',
+          'c9c9c9c9-0000-4000-8000-000000000005')
+  returning community_id
+)
+select ok(count(*) = 1, 'its slot is free — the previously refused ninth join lands') from ins;
 
 -- ─── 7. DMs: five NEW conversations a month ─────────────────
 
