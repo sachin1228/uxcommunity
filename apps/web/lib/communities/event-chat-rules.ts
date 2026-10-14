@@ -58,6 +58,24 @@ export function roomStillWearsEvent(
 }
 
 /**
+ * Whether the room is still only a chat — no area of its own switched on. A
+ * room born from an event carries `["chat"]` alone, with Showcase off (see
+ * ensureEventChatCommunity); the owner switching on any other area — threads,
+ * showcase, resources, events — is the room being carried on as a community,
+ * and the offer has done its job. A row that never carried the tabs, or the
+ * showcase flag, reads as untouched: absence is not an edit.
+ */
+export function roomStillOnlyChat(
+  tabs: string[] | null | undefined,
+  showcaseEnabled: boolean | null | undefined,
+): boolean {
+  return (
+    (tabs ?? ["chat"]).every((tab) => tab === "chat") &&
+    showcaseEnabled !== true
+  );
+}
+
+/**
  * Who may join the room: everybody when the event is public, and otherwise only
  * the members of the community the event was created in. An event with no
  * community and no public flag is visible to nobody, so it stays closed.

@@ -9,6 +9,7 @@ import {
   EVENT_CHAT_DESCRIPTION,
   canJoinEventChatWith,
   eventChatName,
+  roomStillOnlyChat,
   roomStillWearsEvent,
 } from "./event-chat-rules";
 
@@ -120,11 +121,10 @@ export async function ensureEventChatCommunity(
  * The edit reaches only rooms that still wear the event's old clothes —
  * `previous` is the title and cover the room last saw, and each field follows
  * only where the room still wears that field. A room its owner has made their
- * own keeps its name and face: taking the room over is the offer beside its
- * chat (see loadEventRoomSection), and a later event edit must never quietly
- * undo it. Field by field rather than per room, because a room may have been
- * renamed and still wear the event's cover, or the other way round. The
- * cover guard also keeps the R2 cleanup honest: the caller deletes a replaced
+ * own keeps its name and face: a later event edit must never quietly undo an
+ * edit the owner made. Field by field rather than per room, because a room
+ * may have been renamed and still wear the event's cover, or the other way
+ * round. The cover guard also keeps the R2 cleanup honest: the caller deletes a replaced
  * cover after this runs, and every room still pointing at it must have moved
  * on by then.
  */
@@ -326,10 +326,11 @@ export async function leaveEventChat(
  * sidebar that many rows. `event.rsvp_count` remains the authoritative total.
  *
  * `carryOn` is the owner-only offer to keep the room: true once the event is
- * over past the ended badge's grace while the room still wears all three of
- * the event's clothes — its name, its face, its description. One personal
- * edit flips it false, which is how the card beside the chat retires itself
- * without a dismissal to store.
+ * over past the ended badge's grace while the room is still untouched — the
+ * event's own name, face and description (see roomStillWearsEvent) and no
+ * area switched on past its chat (see roomStillOnlyChat). The owner's first
+ * personal edit of any of it retires the offer: it has done its job, and the
+ * event's own edits stop following such a room (see syncEventChatCommunity).
  */
 export interface EventRoomSection {
   event: CommunityEvent;
@@ -349,8 +350,8 @@ const GOING_PREVIEW_LIMIT = 24;
  * model's column list: an environment that has not applied the event-chat
  * migration simply has no communities.event_id, and that must cost this one
  * section rather than the whole page's read model. The row's own name, face
- * and description ride along on the same read — they are what tells whether
- * the room is still wearing the event's clothes (see `carryOn`).
+ * and description ride along on the same read, with its areas — they are what
+ * tells whether the room is still the event's to offer (see `carryOn`).
  */
 export async function loadEventRoomSection(
   db: Db,
@@ -359,7 +360,7 @@ export async function loadEventRoomSection(
 ): Promise<EventRoomSection | null> {
   const { data: link, error } = await db
     .from("communities")
-    .select("event_id, owner_id, name, image_url, description")
+    .select("event_id, owner_id, name, image_url, description, enabled_tabs, showcase_enabled")
     .eq("id", communityId)
     .maybeSingle();
   const row =
@@ -369,6 +370,8 @@ export async function loadEventRoomSection(
       name: string | null;
       image_url: string | null;
       description: string | null;
+      enabled_tabs: string[] | null;
+      showcase_enabled: boolean | null;
     } | null) ?? null;
   const eventId = row?.event_id ?? null;
   if (error || !eventId) return null;
@@ -401,6 +404,7 @@ export async function loadEventRoomSection(
     row != null &&
     row.owner_id === userId &&
     roomStillWearsEvent(row, linked) &&
+    roomStillOnlyChat(row.enabled_tabs, row.showcase_enabled) &&
     hasEventEndedBeyondGrace(linked.event_date, linked.end_date);
 
   return { event: card, going: previews.get(eventId) ?? [], carryOn };

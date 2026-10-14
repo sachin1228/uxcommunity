@@ -5,6 +5,7 @@ import {
   EVENT_CHAT_NAME_MAX,
   canJoinEventChatWith,
   eventChatName,
+  roomStillOnlyChat,
   roomStillWearsEvent,
 } from "./event-chat-rules";
 
@@ -78,4 +79,19 @@ test("a coverless event and the room born without a cover match", () => {
 test("a cleared description still counts as the event's own", () => {
   // Null means nobody wrote one — not a description of the room's own.
   assert.equal(roomStillWearsEvent({ ...ROOM, description: null }, EVENT), true);
+});
+
+// The offer also stands only while the room is still just a chat (see
+// roomStillOnlyChat): the first area switched on past the chat retires it.
+test("a room that is still only a chat keeps the offer standing", () => {
+  assert.equal(roomStillOnlyChat(["chat"], false), true);
+  assert.equal(roomStillOnlyChat([], null), true);
+  assert.equal(roomStillOnlyChat(null, undefined), true);
+});
+
+test("any area past the chat retires the offer", () => {
+  assert.equal(roomStillOnlyChat(["chat", "threads"], false), false);
+  assert.equal(roomStillOnlyChat(["chat", "events"], false), false);
+  assert.equal(roomStillOnlyChat(["chat", "resources"], false), false);
+  assert.equal(roomStillOnlyChat(["chat"], true), false);
 });

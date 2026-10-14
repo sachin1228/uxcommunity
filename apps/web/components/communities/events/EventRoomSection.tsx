@@ -10,6 +10,7 @@ import { fetchJsonCached } from "@/lib/request-cache";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import { hasEventEndedBeyondGrace } from "@/lib/communities/event-date";
 import {
   eventZoneTooltip,
   formatEventTimeRange,
@@ -116,13 +117,11 @@ function useEventRoomDetails(communityId: string, currentUserId: string) {
  * The card that offers the room to its owner, shared by the two ways a room
  * can have outlived its event.
  *
- * Both states wear the same room: its name is the event's title, its
- * description says "group chat for this event", and its picture is the
- * event's cover — exactly the fields the room's own settings edit, which is
- * why this card is only the door. The info panel is where a member notices
- * the event is over, and nothing else would tell the owner that the room is
- * theirs to keep. Reading as one card in both states keeps the offer the same
- * shape whichever way the event left.
+ * The name, the description and the picture are the fields the room's own
+ * settings edit — this card is only the door to them. The info panel is where
+ * a member notices the event is over, and nothing else would tell the owner
+ * that the room is theirs to keep. Reading as one card in both states keeps
+ * the offer the same shape whichever way the event left.
  */
 function RoomCarryOnCard({
   communityId,
@@ -172,11 +171,11 @@ function RoomCarryOnCard({
  * What the info card becomes once the room has outlived its event.
  *
  * Deleting an event keeps its group chat (see the event delete route), which
- * leaves a room still wearing all three of the event's things while the link
- * its badge and its Event card read has been cleared. Rendered for the room's
- * owner alone; every other member sees the room exactly as it is (see
- * CommunityRightSidebar, which only draws this when the community is an
- * event's chat with no event behind it).
+ * leaves the room itself — its people, its name and everything they said —
+ * while the link its badge and its Event card read has been cleared. Rendered
+ * for the room's owner alone; every other member sees the room exactly as it
+ * is (see CommunityRightSidebar, which only draws this when the community is
+ * an event's chat with no event behind it).
  */
 export function EventRoomGoneSection({ communityId }: { communityId: string }) {
   return (
@@ -191,19 +190,19 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
 
 /**
  * The offer that meets the room's owner once its event is over for good: the
- * ended badge has come down — twelve hours past the close (see
- * lib/communities/event-date) — and the event itself is still on the calendar.
- * The Event card stays above this one (the event's page, who went): the room
- * outlives its event the moment the event is over, and deleting the event —
- * a host tidying the calendar, possibly months later — must not be the only
- * way to find the room's door.
+ * ended badge and the Event card have both come down — twelve hours past the
+ * close (see lib/communities/event-date) — and the event itself is still on
+ * the calendar. It leads the panel, right under Members (see EventRoomSection):
+ * the room outlives its event the moment the event is over, and deleting the
+ * event — a host tidying the calendar, possibly months later — must not be the
+ * only way to find the room's door.
  *
  * Whether the offer is this room's to take is decided server-side (see
- * loadEventRoomSection): owner, past the grace, still wearing all three of the
- * event's clothes. One personal edit — a name, a description, a picture — and
- * the answer flips to false, so the card retires itself without a dismissal
- * to store — and from then on the event's edits stop following the room (see
- * syncEventChatCommunity).
+ * loadEventRoomSection): owner, past the grace, and still untouched — the
+ * event's own name, face and description, and no area switched on past its
+ * chat. One personal edit of any of it — a rename, a new picture, a
+ * description, a tab — flips the answer, and the event's edits stop following
+ * the room too (see syncEventChatCommunity).
  */
 export function EventRoomCarryOnSection({ communityId }: { communityId: string }) {
   return (
@@ -233,6 +232,12 @@ export function EventRoomCarryOnSection({ communityId }: { communityId: string }
  * one the home feed's event card opens (/dashboard/events/[eventId]), where the
  * full description, the discussion and the Join chat row live. The room is the
  * conversation about the event, not the event itself.
+ *
+ * Twelve hours past the event's close — the same grace the ended badge keeps
+ * (see lib/communities/event-date) — nothing here is drawn at all: the room
+ * has outlived its event, so the owner's offer takes over the panel (see
+ * EventRoomCarryOnSection) and every other member's panel simply carries the
+ * room.
  */
 export function EventRoomSection({
   communityId,
@@ -265,6 +270,16 @@ export function EventRoomSection({
   }
 
   const { event, going, carryOn } = details;
+
+  // The event is over for good — the same twelve hours that bring the ended
+  // badge down (see lib/communities/event-date). The info card has said its
+  // piece: the panel moves on, the owner keeps the room's door above it, and
+  // for everybody else the event's section simply stops being drawn — the
+  // same reading the deleted-event path gives.
+  if (hasEventEndedBeyondGrace(event.event_date, event.end_date)) {
+    return carryOn ? <EventRoomCarryOnSection communityId={communityId} /> : null;
+  }
+
   const attended = event.rsvp_count || going.length;
   // The payload is a bounded preview, so the count comes from the event while
   // the names come from the rows we have (see goingPreview).
@@ -280,6 +295,11 @@ export function EventRoomSection({
 
   return (
     <>
+      {/* Past the grace the offer belongs to the early return above; drawn
+          here only when the server sees the grace pass before this client's
+          clock does (carryOn and the grace turn on one server clock). */}
+      {carryOn && <EventRoomCarryOnSection communityId={communityId} />}
+
       <section
         aria-labelledby="sidebar-event-heading"
         className="border-t border-border px-5 py-5"
@@ -417,12 +437,6 @@ export function EventRoomSection({
           <ArrowRight strokeWidth={2.5} size={14} aria-hidden="true" />
         </Link>
       </section>
-
-      {/* The event is over for good — its badge has come down — and the room's
-          door turns up under the card that links back to it. The answer is the
-          server's (see loadEventRoomSection), so a room already made its own
-          never flashes this. */}
-      {carryOn && <EventRoomCarryOnSection communityId={communityId} />}
     </>
   );
 }
