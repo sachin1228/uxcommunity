@@ -76,9 +76,15 @@ function parseCookies(header: string | null): Map<string, string> {
   return cookies;
 }
 
-/** The cron expressions declared in wrangler.toml, routed in `scheduled`. */
+/**
+ * The cron expressions declared in wrangler.toml, routed in `scheduled`.
+ *
+ * Module-local by necessity: every named export of this entry module is
+ * registered as an entrypoint, and workerd refuses to start when one is not a
+ * function or ExportedHandler (string constants included).
+ */
 const ALERT_MONITOR_CRON = "*/5 * * * *";
-export const RETENTION_SWEEP_CRON = "0 */6 * * *";
+const RETENTION_SWEEP_CRON = "0 */6 * * *";
 
 export default {
   /**
