@@ -53,6 +53,9 @@ export interface DmLastReaction {
   messagePreviewMedia: "image" | null;
 }
 
+/** The request lifecycle of a conversation (dm_conversations.request_state). */
+export type DmRequestState = "pending" | "accepted" | "rejected";
+
 /** One row of the conversation list (get_dm_conversations). */
 export interface DmConversationSummary {
   id: string;
@@ -64,4 +67,13 @@ export interface DmConversationSummary {
   last_message_at: string | null;
   /** Most recent reaction — previewed instead of the message when set. */
   last_reaction?: DmLastReaction | null;
+  /** Pending = the first message still awaits the recipient's answer. */
+  request_state: DmRequestState;
+  /** The pending request's first-message author; null until one lands. */
+  requested_by: string | null;
+  /** True when the VIEWER is the one who blocked the peer. The thread shows
+   *  the blocked state instead of the composer; blocked conversations are
+   *  absent from fetched lists already, so this only carries locally patched
+   *  state and the ?peer= handoff. */
+  blocked_by_me: boolean;
 }

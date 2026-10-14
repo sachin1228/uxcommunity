@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createServiceClient, type ServiceClient } from "@/lib/supabase/service";
 import { createServerTimer } from "@/lib/server-timing";
 import {
   dmParticipants,
+  dmPeerId,
+  loadDmBlockEitherWay,
   loadDmConversationForUser,
   loadDmMessagePage,
+  normalizeDmRequestState,
 } from "@/lib/direct-messages/server";
 import { isAllowedDmImageUrl } from "@/lib/direct-messages/assets";
 import { publishDmEvent } from "@/lib/direct-messages/publish";
+import type { DmRequestState } from "@/lib/direct-messages/types";
 
 const MAX_CONTENT_CHARS = 2000;
 const MAX_IMAGE_URL_CHARS = 2048;
@@ -90,6 +94,24 @@ function parseSendBody(body: unknown): { ok: true; value: ParsedSend } | { ok: f
   return { ok: true, value: { content, imageUrl, replyToId, clientNonce } };
 }
 
+/** The conversation's request columns, normalized for the response payload. */
+async function readRequestState(
+  db: ServiceClient,
+  conversationId: string,
+): Promise<{ request_state: DmRequestState; requested_by: string | null }> {
+  const { data } = (await db
+    .from("dm_conversations")
+    .select("request_state, requested_by")
+    .eq("id", conversationId)
+    .maybeSingle()) as unknown as {
+    data: { request_state: string; requested_by: string | null } | null;
+  };
+  return {
+    request_state: normalizeDmRequestState(data?.request_state),
+    requested_by: data?.requested_by ?? null,
+  };
+}
+
 /**
  * POST /api/dm/conversations/[id]/messages
  *
@@ -152,6 +174,38 @@ export async function POST(
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
   const conversation = access.conversation;
+
+  // ── Send gates: blocks + the request lifecycle ─────────────────────────
+  // The insert trigger enforces all of these atomically; these pre-checks
+  // exist so the member reads a sentence instead of a generic 500.
+  if (await loadDmBlockEitherWay(db, userId, dmPeerId(conversation, userId))) {
+    return NextResponse.json(
+      { error: "You can't send messages to this member." },
+      { status: 403 },
+    );
+  }
+
+  const requestState = normalizeDmRequestState(conversation.request_state);
+  if (requestState === "rejected") {
+    return NextResponse.json(
+      { error: "This message request was declined." },
+      { status: 403 },
+    );
+  }
+  if (requestState === "pending" && conversation.requested_by === userId) {
+    // The requester holds exactly one message until the request is answered.
+    const { count } = await db
+      .from("dm_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", userId);
+    if ((count ?? 0) >= 1) {
+      return NextResponse.json(
+        { error: "You can send one message until your request is accepted." },
+        { status: 403 },
+      );
+    }
+  }
 
   const senderName =
     (senderProfileResult[0]?.data as { name?: string } | null)?.name ?? null;
@@ -245,6 +299,7 @@ export async function POST(
       };
 
       if (existing && existing.conversation_id === conversationId) {
+        const state = await readRequestState(db, conversationId);
         const timing = timer.finish({ query_count: 3 });
         return NextResponse.json(
           {
@@ -261,6 +316,8 @@ export async function POST(
               reactions: [],
               reply_to: null,
             },
+            request_state: state.request_state,
+            requested_by: state.requested_by,
           },
           { status: 200, headers: { "Server-Timing": timing } },
         );
@@ -275,6 +332,15 @@ export async function POST(
     console.error("[POST dm message] insert error:", insertErr);
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
+
+  // The trigger may have moved the request state on this insert — the first
+  // message defines the requester, and the recipient replying is an implicit
+  // acceptance — so read it back: the response tells the sender's client, and
+  // a change fans out to the other member below.
+  const finalState = await readRequestState(db, conversationId);
+  const requestStateChanged =
+    finalState.request_state !== normalizeDmRequestState(conversation.request_state) ||
+    finalState.requested_by !== conversation.requested_by;
 
   // Fire-and-forget: the DB row is the source of truth; a missed event is
   // corrected by the client's next catch-up fetch.
@@ -315,17 +381,33 @@ export async function POST(
           image_url: inserted.image_url ?? null,
         },
       });
+
+      // The request state moved with this message (first message / implicit
+      // accept) — both clients patch their conversation from it.
+      if (requestStateChanged) {
+        await publishDmEvent({
+          participants: dmParticipants(conversation),
+          topic: "dm-request-update",
+          data: {
+            conversation_id: conversationId,
+            request_state: finalState.request_state,
+            requested_by: finalState.requested_by,
+          },
+        });
+      }
     } catch (err) {
       console.error("[POST dm message] realtime publish error:", err);
     }
   });
 
   const timing = timer.finish({
-    query_count: 2 + (replyToIdValid ? 1 : 0),
+    query_count: 3 + (replyToIdValid ? 1 : 0),
   });
 
   // Only the inserted row goes back — the client already has the sender's
-  // identity and the reply preview it sent, and merges them in.
+  // identity and the reply preview it sent, and merges them in. The request
+  // state rides along so the composer can swap to the waiting state (or
+  // unlock, on an implicit accept) without a list refetch.
   return NextResponse.json(
     {
       message: {
@@ -336,6 +418,8 @@ export async function POST(
         reply_to: null,
         image_url: inserted.image_url ?? null,
       },
+      request_state: finalState.request_state,
+      requested_by: finalState.requested_by,
     },
     { status: 201, headers: { "Server-Timing": timing } },
   );

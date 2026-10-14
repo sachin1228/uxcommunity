@@ -302,6 +302,10 @@ type PerformanceRpcMap = {
       last_message_at: string | null;
       /** Newest reaction event per conversation (null once a newer message exists). */
       last_reaction: Json;
+      /** pending / accepted / rejected — the message-request lifecycle. */
+      request_state: string;
+      /** The pending request's first-message author, null until one lands. */
+      requested_by: string | null;
     }>;
   };
   get_dm_message_page: {
@@ -352,6 +356,8 @@ type PerformanceRpcMap = {
       created_at: string;
       last_message_at: string | null;
       my_last_read_at: string | null;
+      request_state: string;
+      requested_by: string | null;
     }>;
   };
 };

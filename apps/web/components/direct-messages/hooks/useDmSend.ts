@@ -6,7 +6,7 @@ import { compressImage, compressedFile, preloadImage } from "@/lib/image-client"
 import { dmUrls } from "@/lib/direct-messages/client";
 import { dmCache } from "@/lib/direct-messages/client-cache";
 import { compareDmMessages } from "@/lib/direct-messages/messages";
-import type { DmMessage, DmPreviewMessage } from "@/lib/direct-messages/types";
+import type { DmMessage, DmPreviewMessage, DmRequestState } from "@/lib/direct-messages/types";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { MAX_MESSAGE_CHARS, scrollChatToBottom } from "@/components/communities/chat/chatUtils";
 
@@ -28,6 +28,14 @@ interface UseDmSendOptions {
   onPreviewConfirmed: (conversationId: string, tempId: string, preview: DmPreviewMessage) => void;
   /** Send failed before the row was confirmed — undo the optimistic bump. */
   onPreviewFailed: (conversationId: string, tempId: string) => void;
+  /** The conversation's post-send request state — the first message defines
+   *  the requester and a reply can be an implicit acceptance, so the row is
+   *  patched straight from the response, no refetch. */
+  onConversationState: (
+    conversationId: string,
+    requestState: DmRequestState,
+    requestedBy: string | null,
+  ) => void;
 }
 
 type RetryData = {
@@ -69,6 +77,25 @@ function newNonce(): string {
   );
 }
 
+/** The request columns a send response carries, defensively narrowed. */
+function readRequestStatePayload(data: unknown): {
+  requestState: DmRequestState;
+  requestedBy: string | null;
+} {
+  const record = (typeof data === "object" && data !== null ? data : {}) as {
+    request_state?: unknown;
+    requested_by?: unknown;
+  };
+  const requestState: DmRequestState =
+    record.request_state === "pending" || record.request_state === "rejected"
+      ? record.request_state
+      : "accepted";
+  return {
+    requestState,
+    requestedBy: typeof record.requested_by === "string" ? record.requested_by : null,
+  };
+}
+
 /**
  * Sending side of the DM composer — same optimistic contract as the
  * community chat's useSendMessage (temp bubble, per-send abort, retry payload,
@@ -88,6 +115,7 @@ export function useDmSend({
   onPreview,
   onPreviewConfirmed,
   onPreviewFailed,
+  onConversationState,
 }: UseDmSendOptions) {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -331,6 +359,12 @@ export function useDmSend({
           deleted_at: null,
           edited_at: null,
         });
+        const requestPayload = readRequestStatePayload(data);
+        onConversationState(
+          targetConversationId,
+          requestPayload.requestState,
+          requestPayload.requestedBy,
+        );
         failedRetryDataRef.current.delete(tempId);
       } else {
         setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)));
@@ -506,6 +540,12 @@ export function useDmSend({
             deleted_at: null,
             edited_at: null,
           });
+          const requestPayload = readRequestStatePayload(data);
+          onConversationState(
+            targetConversationId,
+            requestPayload.requestState,
+            requestPayload.requestedBy,
+          );
         } else {
           setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)));
           onPreviewFailed(targetConversationId, tempId);
@@ -522,7 +562,7 @@ export function useDmSend({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentUserId, currentUserName, currentUserAvatar, setMessages, nextTempId, onPreview, onPreviewConfirmed, onPreviewFailed],
+    [currentUserId, currentUserName, currentUserAvatar, setMessages, nextTempId, onPreview, onPreviewConfirmed, onPreviewFailed, onConversationState],
   );
 
   return {

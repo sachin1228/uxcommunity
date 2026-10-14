@@ -10,6 +10,7 @@ import type {
   DmLastReaction,
   DmPeer,
   DmPreviewMessage,
+  DmRequestState,
 } from "./types";
 
 /**
@@ -33,12 +34,19 @@ export interface DmConversationRow {
   last_message_at: string | null;
   user_a_last_read_at: string | null;
   user_b_last_read_at: string | null;
+  request_state: string;
+  requested_by: string | null;
 }
 
 const CONVERSATION_COLUMNS =
-  "id, user_a, user_b, created_at, last_message_at, user_a_last_read_at, user_b_last_read_at";
+  "id, user_a, user_b, created_at, last_message_at, user_a_last_read_at, user_b_last_read_at, request_state, requested_by";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Narrow the stored text to the three states the app knows. */
+export function normalizeDmRequestState(value: unknown): DmRequestState {
+  return value === "pending" || value === "rejected" ? value : "accepted";
+}
 
 /** The conversation's two participant ids (canonically ordered). */
 export function dmParticipants(row: { user_a: string; user_b: string }): [string, string] {
@@ -109,6 +117,92 @@ export async function loadDmPeer(
   };
 }
 
+/** True when `blockerId` has blocked `blockedId`. */
+export async function loadDmBlock(
+  db: ServiceClient,
+  blockerId: string,
+  blockedId: string,
+): Promise<boolean> {
+  const { data } = await db
+    .from("dm_blocks")
+    .select("id")
+    .eq("blocker_id", blockerId)
+    .eq("blocked_id", blockedId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
+ * True when a block exists between the two members in EITHER direction — the
+ * gate for new messages: a blocked pair accepts nothing from either side.
+ */
+export async function loadDmBlockEitherWay(
+  db: ServiceClient,
+  userOne: string,
+  userTwo: string,
+): Promise<boolean> {
+  const { data } = await db
+    .from("dm_blocks")
+    .select("blocker_id")
+    .in("blocker_id", [userOne, userTwo])
+    .in("blocked_id", [userOne, userTwo])
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
+/** One message of a report's evidence snapshot. */
+export interface DmReportSnapshotMessage {
+  id: string;
+  user_id: string;
+  author_name: string;
+  content: string | null;
+  image_url: string | null;
+  deleted_at: string | null;
+  created_at: string;
+}
+
+/**
+ * The conversation's most recent messages (oldest first), with author names —
+ * stored on the report itself so the admin queue stays self-contained and
+ * readable after the chat is deleted.
+ */
+export async function loadDmReportSnapshot(
+  db: ServiceClient,
+  conversationId: string,
+  limit = 20,
+): Promise<DmReportSnapshotMessage[]> {
+  const { data } = (await db
+    .from("dm_messages")
+    .select("id, user_id, content, image_url, deleted_at, created_at, author:users(name)")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit)) as unknown as {
+    data: Array<{
+      id: string;
+      user_id: string;
+      content: string | null;
+      image_url: string | null;
+      deleted_at: string | null;
+      created_at: string;
+      author: { name: string } | null;
+    }> | null;
+  };
+
+  return (data ?? [])
+    .slice()
+    .reverse()
+    .map((row) => ({
+      id: row.id,
+      user_id: row.user_id,
+      author_name: row.author?.name ?? "Unknown",
+      content: row.content,
+      image_url: row.image_url,
+      deleted_at: row.deleted_at,
+      created_at: row.created_at,
+    }));
+}
+
 /** The reaction columns get_dm_conversations projects per conversation. */
 interface DmListReactionRow {
   message_id: string;
@@ -142,6 +236,10 @@ export async function loadDmConversations(
       my_last_read_at: row.my_last_read_at ?? null,
       last_message_at: row.last_message_at ?? null,
       last_reaction: reaction ? toLastReaction(reaction, userId) : null,
+      request_state: normalizeDmRequestState(row.request_state),
+      requested_by: row.requested_by ?? null,
+      // The RPC already dropped conversations this viewer blocked.
+      blocked_by_me: false,
     });
   }
   return { ok: true, data: { conversations } };
@@ -236,7 +334,15 @@ export async function findOrCreateDmConversation(
 ): Promise<
   | {
       ok: true;
-      conversation: { id: string; created_at: string; last_message_at: string | null; my_last_read_at: string | null };
+      conversation: {
+        id: string;
+        created_at: string;
+        last_message_at: string | null;
+        my_last_read_at: string | null;
+        request_state: DmRequestState;
+        requested_by: string | null;
+        blocked_by_me: boolean;
+      };
     }
   | { ok: false; status: number; error: string }
 > {
@@ -262,6 +368,7 @@ export async function findOrCreateDmConversation(
     }
     return { ok: false, status: 500, error: "Failed to start the conversation." };
   }
+  const blockedByMe = await loadDmBlock(db, meId, peerId);
   return {
     ok: true,
     conversation: {
@@ -269,6 +376,9 @@ export async function findOrCreateDmConversation(
       created_at: row.created_at,
       last_message_at: row.last_message_at ?? null,
       my_last_read_at: row.my_last_read_at ?? null,
+      request_state: normalizeDmRequestState(row.request_state),
+      requested_by: row.requested_by ?? null,
+      blocked_by_me: blockedByMe,
     },
   };
 }
