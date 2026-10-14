@@ -1,6 +1,6 @@
 # Vendored web fonts
 
-Geist and Geist Mono, latin subset, as variable
+Geist, Geist Mono and Playfair Display (italic), latin subset, as variable
 `woff2` files. `app/layout.tsx` loads them through `next/font/local`, so the
 web build never talks to `fonts.googleapis.com`.
 
@@ -24,6 +24,7 @@ byte-for-byte deterministic.
 | --- | --- | --- | --- | --- |
 | `geist-latin.woff2` | Geist | latin | 100–900 (variable) | 29 KB |
 | `geist-mono-latin.woff2` | Geist Mono | latin | 100–900 (variable) | 23 KB |
+| `playfair-display-italic-latin.woff2` | Playfair Display (italic) | latin | 400–900 (variable) | 38 KB |
 
 Only `latin` is vendored because that is the only subset the app requested
 before (`subsets: ["latin"]` in the old `next/font/google` call). Text outside
@@ -37,14 +38,19 @@ those files actually carry.
 Taken from a `next/font/google` build's own download cache
 (`.next/static/media/`), i.e. the same bytes production served before the
 switch. Source: Google Fonts, Geist v5 / Geist Mono v6, latin subset.
+Playfair Display (italic) was added later, fetched through the same
+browser-UA path for the event room's watermark (see
+`components/communities/chat/ChatWatermark.tsx`).
 
 | File | sha256 |
 | --- | --- |
 | `geist-latin.woff2` | `9b6f5ff45b278c744b5f379a2c4ecbaf858a842b8eaf82ac8d21b699ca16c608` |
 | `geist-mono-latin.woff2` | `5f3d6ad60f29d6cb708414ec6887163d63bf197377ef5417d2483ff31ace6c3b` |
+| `playfair-display-italic-latin.woff2` | `54af24bd0f911f0fd7399d5445ea2023ff501d6a69f2d728f1213072f977ab14` |
 
 Licence: Geist is released under the SIL Open Font License 1.1 (Vercel), which
-permits bundling and self-hosting.
+permits bundling and self-hosting; Playfair Display is likewise OFL 1.1
+(Claus Eggers Sørensen).
 
 ## Refreshing
 

@@ -70,6 +70,12 @@ export interface Community {
   /** The caller's own mute state — drives the header menu (see lib/communities/mute). */
   notifications_muted?: boolean | null;
   notifications_muted_until?: string | null;
+  /** An event group chat's own event date — its DP wears it as a badge, and the chat's watermark clock reads it. */
+  event_date?: string | null;
+  /** Its event's end while still ahead — what makes the badge say LIVE. */
+  pinned_until?: string | null;
+  /** That deadline whether ahead or past — what makes the badge say ENDED. */
+  event_end?: string | null;
 }
 
 export interface Member {

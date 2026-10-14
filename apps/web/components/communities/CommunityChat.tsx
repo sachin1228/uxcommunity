@@ -19,9 +19,11 @@ import {
   type ReplyPreview,
 } from "@/lib/communities/cache";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
+import { hasEventEndedBeyondGrace } from "@/lib/communities/event-date";
 import type { MentionCandidate } from "@/lib/communities/mentions";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { useNowTick } from "@/lib/use-now-tick";
 import type { CommunityPermission } from "@/lib/communities/permissions";
 import type { SSRCommunitySections } from "@/lib/communities/server";
 import { Spinner } from "@/components/ui/Spinner";
@@ -31,6 +33,7 @@ import { collectPendingMentions } from "./chat/mention-jumps";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MessageList } from "./chat/MessageList";
+import { ChatWatermark } from "./chat/ChatWatermark";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { TypingIndicator } from "./chat/TypingIndicator";
@@ -829,6 +832,24 @@ export function CommunityChat({
   );
 
   const isEventRoom = displayCommunity?.type === "event";
+  // The watermark reads the same clock the room's calendar badge does (see
+  // DpWithEventDate): it stays while the event is ahead or under way and
+  // through the ended grace, then comes down with the badge — past that the
+  // room has outlived its event (see EventRoomSection), so its paper goes
+  // plain. Ticking, because the moment it responds to arrives on its own.
+  const watermarkNow = useNowTick();
+  const eventOver = Boolean(
+    displayCommunity?.event_date &&
+      hasEventEndedBeyondGrace(
+        displayCommunity.event_date,
+        displayCommunity.event_end ?? displayCommunity.pinned_until,
+        new Date(watermarkNow),
+      ),
+  );
+  // Paper only once the room has something on it — a room showing its welcome
+  // state reads as plain paper, not a poster.
+  const roomHasContent =
+    messages.length > 0 || threadEvents.length > 0 || contentEvents.length > 0;
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
   // Role and grants only exist on the loaded read model; the sidebar fallback
@@ -1021,10 +1042,11 @@ export function CommunityChat({
           <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Message area — the pane paper and the scroller share one grid
-              cell, so the paper stays put while messages scroll (the scroller
-              above it is transparent); the footer below is a plain flex
-              sibling. */}
+          {/* Message area — paper, watermark and the scroller share one grid
+              cell, so the watermark centers on exactly what the reader sees as
+              the chat. The pane paper stays put while messages scroll (the
+              scroller above it is transparent); the footer below is a plain
+              flex sibling. */}
           <div className="relative grid grid-rows-1 flex-1 min-h-0 overflow-hidden">
           <div
             aria-hidden="true"
@@ -1034,6 +1056,9 @@ export function CommunityChat({
               backgroundSize: "24px 24px",
             }}
           />
+          {isEventRoom && roomHasContent && !eventOver && (
+            <ChatWatermark text={displayCommunity?.name ?? ""} />
+          )}
           {/* Scrollable message body — the footer below is static, so
               messages can never flow underneath the input.                     */}
           <div

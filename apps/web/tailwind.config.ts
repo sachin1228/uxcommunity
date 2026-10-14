@@ -53,6 +53,7 @@ const config: Config = {
         display: ["var(--font-display)", "Geist", "sans-serif"],
         body:    ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
         mono:    ["var(--font-mono)", "Geist Mono", "ui-monospace", "monospace"],
+        watermark: ["var(--font-watermark)", "Playfair Display", "Georgia", "serif"],
       },
       boxShadow: {
         xs:   "var(--shadow-xs)",
