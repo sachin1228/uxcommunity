@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { CATEGORY_ICONS } from "./categoryIcons";
@@ -273,18 +274,11 @@ export function ShowcaseView({
                 onDelete={() => setDeletingPost(post)}
               />
             ))}
-            {nextCursor && (
-              <div className="flex justify-center py-6">
-                <button
-                  type="button"
-                  onClick={() => void loadMore()}
-                  disabled={loadingMore}
-                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
-                >
-                  {loadingMore ? "Loading…" : "Load more"}
-                </button>
-              </div>
-            )}
+            <FeedLoadMore
+              hasMore={nextCursor !== null}
+              loading={loadingMore}
+              onLoadMore={() => void loadMore()}
+            />
           </div>
         )}
       </div>

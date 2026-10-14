@@ -234,7 +234,13 @@ type PerformanceRpcMap = {
     returns: Array<{ application_id: string; created_at: string }>;
   };
   get_job_feed: {
-    args: { p_viewer_id: string; p_limit: number };
+    // p_before_created_at / p_before_id are the compound (created_at, id)
+    // cursor added by 20261015120000_job_feed_cursor. They are OPTIONAL here
+    // on purpose: they are omitted while the board shows its first page, so a
+    // pre-migration database keeps serving that call through the original
+    // two-argument signature. Cursor pages require the migration — apply it
+    // BEFORE the build that pages the board beyond its first 50 rows.
+    args: { p_viewer_id: string; p_limit: number; p_before_created_at?: string | null; p_before_id?: string | null };
     returns: Array<{ item: Json }>;
   };
   get_job_detail: {

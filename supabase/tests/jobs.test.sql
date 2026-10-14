@@ -42,7 +42,7 @@
 -- file does not depend on what other suites left behind.
 -- ============================================================
 
-select plan(137);
+select plan(140);
 
 begin;
 
@@ -633,6 +633,35 @@ select is(
    order by item ->> 'created_at' desc limit 1),
   'Design Ops Lead',
   'the feed is newest-first'
+);
+
+-- Keyset pagination (20261015120000_job_feed_cursor): the cursor is the
+-- (created_at, id) pair of the last row of the previous page; the page after
+-- it holds only strictly older rows. Omitting the cursor keeps the original
+-- first-page call working.
+select is(
+  (select count(*) from public.get_job_feed(
+     'd7d7d7d7-0000-4000-8000-000000000003', 1)),
+  1::bigint,
+  'the limit caps the page'
+);
+
+select is(
+  (select item ->> 'title' from public.get_job_feed(
+     'd7d7d7d7-0000-4000-8000-000000000003', 50,
+     (select created_at from public.job_posts where title = 'Design Ops Lead'),
+     (select id from public.job_posts where title = 'Design Ops Lead'))),
+  'Senior Product Designer',
+  'the cursor page holds only rows older than the cursor'
+);
+
+select is(
+  (select count(*) from public.get_job_feed(
+     'd7d7d7d7-0000-4000-8000-000000000003', 50,
+     (select created_at from public.job_posts where title = 'Senior Product Designer'),
+     (select id from public.job_posts where title = 'Senior Product Designer'))),
+  0::bigint,
+  'a cursor at the oldest row ends the feed'
 );
 
 select is(

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Briefcase, Plus, Search } from "lucide-react";
 import { JobCard } from "./JobCard";
 import { JobDetail } from "./JobDetail";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost, JobViewer } from "@/lib/jobs/types";
 
@@ -74,16 +75,24 @@ function newestInstant(list: JobPost[]): number {
  */
 export function JobsBrowser({
   viewer,
-  jobs,
+  initialJobs,
+  initialHasMore,
   master,
   initialJobId = null,
 }: {
   viewer: JobViewer;
-  jobs: JobPost[];
+  initialJobs: JobPost[];
+  /** Whether the RSC first page was capped — i.e. an older page exists. */
+  initialHasMore: boolean;
   master: JobMasterData;
   initialJobId?: string | null;
 }) {
   const router = useRouter();
+  // The board holds only the pages loaded so far; older postings arrive page
+  // by page under the rail (the tab counts grow with them).
+  const [jobs, setJobs] = useState(initialJobs);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
   const seeded = (initialJobId && jobs.find((job) => job.id === initialJobId)) || null;
   const [tab, setTab] = useState<Tab>(
     seeded?.is_mine
@@ -209,6 +218,30 @@ export function JobsBrowser({
     setSelectedId(jobId);
     setPaneOpen(true);
   };
+
+  /** Older postings — appended below the rail in the same newest-first order. */
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || jobs.length === 0) return;
+    const last = jobs[jobs.length - 1];
+    setLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/jobs/feed?before=${encodeURIComponent(`${last.created_at}|${last.id}`)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { jobs?: JobPost[]; has_more?: boolean };
+      const incoming = data.jobs ?? [];
+      setJobs((prev) => {
+        const ids = new Set(prev.map((job) => job.id));
+        return [...prev, ...incoming.filter((job) => !ids.has(job.id))];
+      });
+      setHasMore(Boolean(data.has_more));
+    } catch {
+      // Network error — leave the board as it is.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, jobs, loadingMore]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-6 lg:px-6">
@@ -378,6 +411,8 @@ export function JobsBrowser({
                 />
               ))}
           </div>
+
+          <FeedLoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} />
         </div>
 
         {/* Pane — the selected posting, other members' roles only */}

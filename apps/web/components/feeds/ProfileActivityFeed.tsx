@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { CommunityFeedList } from "./CommunityFeedList";
+import { FeedLoadMore } from "./FeedLoadMore";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "./types";
 import { Spinner } from "@/components/ui/Spinner";
@@ -311,18 +312,7 @@ export function ProfileActivityScope({
         showPastEvents
       />
 
-      {items.length > 0 && hasMore && (
-        <div className="flex justify-center border-t border-border py-6">
-          <button
-            type="button"
-            onClick={() => void loadMore()}
-            disabled={loadingMore}
-            className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
-          >
-            {loadingMore ? "Loading…" : "Load older posts"}
-          </button>
-        </div>
-      )}
+      <FeedLoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} />
     </>
   );
 }

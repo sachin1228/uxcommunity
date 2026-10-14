@@ -198,15 +198,24 @@ function asJobApplicant(value: Json): JobApplicant | null {
   return applicant;
 }
 
-/** Newest-first page of postings, each with the viewer's flags. */
+/** Page size of the jobs board — the page's first load and every cursor page. */
+export const JOB_FEED_PAGE_SIZE = 50;
+
+/**
+ * Newest-first page of postings, each with the viewer's flags. Pass the last
+ * row of the previous page as `before` to read the page after it (compound
+ * created_at, id cursor — see 20261015120000_job_feed_cursor).
+ */
 export async function getJobFeed(
   db: SupabaseClient,
   viewerId: string,
-  limit = 50
+  options: { limit?: number; before?: { createdAt: string; id: string } } = {}
 ): Promise<JobPost[]> {
+  const { limit = JOB_FEED_PAGE_SIZE, before } = options;
   const { data, error } = await callPerformanceRpc(db, "get_job_feed", {
     p_viewer_id: viewerId,
     p_limit: limit,
+    ...(before ? { p_before_created_at: before.createdAt, p_before_id: before.id } : {}),
   });
 
   if (error) {

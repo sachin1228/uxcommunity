@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { filterChip } from "@/components/communities/filter-chip";
 import { profileHref } from "@/lib/profile/links";
@@ -259,18 +260,7 @@ export function ActivityView({
                 })}
               </ul>
             )}
-            {hasMore && (
-              <div className="flex justify-center px-5 pb-5 pt-2">
-                <button
-                  type="button"
-                  onClick={loadOlder}
-                  disabled={loadingMore}
-                  className="rounded-lg border border-border px-4 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-60"
-                >
-                  {loadingMore ? <Spinner size={12} /> : "Load older"}
-                </button>
-              </div>
-            )}
+            <FeedLoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={() => void loadOlder()} />
           </>
         )}
       </div>
