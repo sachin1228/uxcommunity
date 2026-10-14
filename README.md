@@ -84,6 +84,7 @@ uxcommunity/
 | `docs/performance-audit.md` | Ranked API/realtime performance findings and recommendations |
 | `docs/user-deletion-audit.md` | What `DELETE /api/admin/users/[id]` removes, cascades, and leaves in R2 |
 | `INFRASTRUCTURE-AUDIT.md` | Full production infrastructure audit (deployment, flows, scale, cost) |
+| `docs/infrastructure-cost-audit.md` | Third-party services and cloud-cost audit: every billable service, current vendor prices, and a monthly cost model from 1K to 1M users (`node scripts/cost-model.mjs`) |
 
 ## Prerequisites
 
