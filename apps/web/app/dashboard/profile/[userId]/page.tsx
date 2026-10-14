@@ -38,9 +38,12 @@ export async function generateMetadata({ params }: Props) {
  * they share that the viewer may see. Your own id redirects to the editable
  * page, so a self-click from anywhere lands where editing lives.
  *
- * Blocking hides the profile: when the profile's owner has blocked the
+ * Blocking reshapes the page. When the profile's owner has blocked the
  * viewer, nothing of theirs renders — not the hero, not the tabs, not the
- * name. The viewer still gets a page so the link doesn't read as broken.
+ * name; the viewer still gets a page so the link doesn't read as broken.
+ * When the VIEWER has blocked the owner, the profile reduces to the identity
+ * hero (picture, name, role, city) with the blocked notice and Unblock — no
+ * tabs, no feed, nothing of what the member posts.
  */
 export default async function MemberProfilePage({ params, searchParams }: Props) {
   const session = await getSession();
@@ -132,12 +135,16 @@ export default async function MemberProfilePage({ params, searchParams }: Props)
           />
         </div>
 
-        <ProfileActivityFeed
-          currentUserId={viewerId}
-          initialTab={initialTab}
-          basePath={`/dashboard/profile/${userId}`}
-          subject={{ id: userId, name }}
-        />
+        {/* No tabs, no feed while the viewer blocks this member — the page is
+            the identity card and the blocked line, nothing more. */}
+        {!blockedByMe && (
+          <ProfileActivityFeed
+            currentUserId={viewerId}
+            initialTab={initialTab}
+            basePath={`/dashboard/profile/${userId}`}
+            subject={{ id: userId, name }}
+          />
+        )}
       </div>
     </div>
   );

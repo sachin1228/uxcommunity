@@ -100,6 +100,11 @@ function externalUrl(value: string | null | undefined): string | null {
  * the only image and everything here sits directly on the page. The identity
  * details behind Edit Profile live on the Settings page
  * (`app/dashboard/settings/profile`).
+ *
+ * While the viewer has this member blocked, the hero reduces to the identity
+ * the blocked line needs — picture, name, role, city — plus that line and its
+ * Unblock. Workplace, bio and links are not rendered, and the page skips the
+ * activity tabs behind it.
  */
 export function ProfileCard({
   name,
@@ -134,6 +139,10 @@ export function ProfileCard({
   const [blockPending, setBlockPending] = useState<"block" | "unblock" | null>(null);
   const [blockError, setBlockError] = useState<string | null>(null);
   const blockedByMe = blockControls?.blockedByMe ?? false;
+  // While the viewer has this member blocked the profile reduces to the
+  // identity the blocked line needs — picture, name, role, city — so the
+  // workplace, bio and links stay out of the render entirely.
+  const reducedView = blockedByMe;
 
   async function setBlocked(block: boolean) {
     if (!blockControls || blockPending) return;
@@ -282,14 +291,15 @@ export function ProfileCard({
                 workplace: the verified company (logo first, leading to its
                 page) when set, or the hollow "Add your company" pill when not.
                 Truncated so the label stays a single line however long it
-                runs. */}
-            {(roleLabel || company || onAddCompany) && (
+                runs. The reduced (blocked) view keeps the role but drops the
+                “@ workplace” half. */}
+            {(roleLabel || (!reducedView && (company || onAddCompany))) && (
               <p className="mt-1.5 flex min-w-0 items-center justify-center gap-1 font-body text-sm text-foreground-muted">
                 {roleLabel && <span className="truncate">{roleLabel}</span>}
-                {roleLabel && (company || onAddCompany) && (
+                {roleLabel && !reducedView && (company || onAddCompany) && (
                   <span aria-hidden="true">@</span>
                 )}
-                {company && (
+                {!reducedView && company && (
                   <Link
                     href={`/dashboard/companies/${company.slug}`}
                     title={
@@ -308,7 +318,7 @@ export function ProfileCard({
                     )}
                   </Link>
                 )}
-                {!company && onAddCompany && (
+                {!reducedView && !company && onAddCompany && (
                   <button
                     type="button"
                     onClick={onAddCompany}
@@ -387,8 +397,8 @@ export function ProfileCard({
           </div>
         </div>
 
-        {/* Bio */}
-        {bio && (
+        {/* Bio — hidden in the reduced (blocked) view. */}
+        {!reducedView && bio && (
           <p className="mx-auto mt-3 max-w-prose text-center font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
         )}
 
@@ -396,7 +406,8 @@ export function ProfileCard({
             only; the owner's own surface shows the circles in the hero
             instead. Messaging anyone starts here, so the Message chip is the
             first thing in the row — and while the viewer has THIS member
-            blocked it gives way to the blocked line with its way back. */}
+            blocked the row reduces to the blocked line and its way back, with
+            the links gone. */}
         {!onAddLinkedIn && !onAddPortfolio && (blockedByMe || messageHref || linkedinProfileUrl || portfolioUrl) && (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             {blockedByMe ? (
@@ -428,7 +439,7 @@ export function ProfileCard({
                 Unblock
               </PendingButton>
             )}
-            {linkedinProfileUrl && (
+            {!reducedView && linkedinProfileUrl && (
               <a
                 href={linkedinProfileUrl}
                 target="_blank"
@@ -439,7 +450,7 @@ export function ProfileCard({
                 LinkedIn
               </a>
             )}
-            {portfolioUrl && (
+            {!reducedView && portfolioUrl && (
               <a
                 href={portfolioUrl}
                 target="_blank"
