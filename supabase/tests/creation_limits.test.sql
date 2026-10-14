@@ -4,7 +4,7 @@
 -- community that exists. It runs only through supabase/tests/run-local.sh,
 -- which builds a throwaway database. To enforce the limits in the real
 -- project, run the creation-limits migrations from supabase/migrations/
--- (20261013120000, 20261014120000 and 20261014140000).
+-- (20261013120000, 20261014120000, 20261014140000 and 20261014160000).
 -- ============================================================
 -- Creation limits — the per-member budgets
 -- ============================================================
@@ -13,7 +13,8 @@
 --
 --   * threads, showcase posts and resources share one 3-a-day budget
 --   * one event per UTC month, one job post per UTC month
---   * one member-created community, lifetime
+--   * one LIVE member-created community at a time — deleting it returns the
+--     budget (counted like the sidebar), and creating needs a free join slot
 --   * seven LIVE communities at a time — event rooms excluded, deactivated
 --     and ownerless rooms not charged (count_join_slots)
 --   * five NEW DM conversations a month, existing pairs never capped
@@ -21,8 +22,9 @@
 -- Also pinned here: deleting content does not refund a period budget
 -- (the counter is append-only — delete/repost churn is the bypass this
 -- closes), an idempotent re-join at the cap is not refused, a deactivated
--- community stops consuming a join slot, the admin override joins past the
--- cap, and the bypass flag never leaks.
+-- community stops consuming a join slot, deleting your community returns
+-- its one-community budget, creating at the seven-join cap is refused, the
+-- admin override joins past the cap, and the bypass flag never leaks.
 --
 -- Namespace: c9c9c9c9-* (fresh; see the harness note about shared DBs).
 -- ============================================================
@@ -98,7 +100,7 @@ language sql stable as $$
   select to_char(now() at time zone 'utc', 'YYYY-MM')
 $$;
 
-select plan(36);
+select plan(37);
 
 -- ─── 1. Shape of the machinery ──────────────────────────────
 select has_function('public', 'bump_usage_counter', 'bump_usage_counter(...) exists');
@@ -237,7 +239,7 @@ select is(
   'a second job post in the same month is refused'
 );
 
--- ─── 5. Member-created communities: one, lifetime ───────────
+-- ─── 5. Member-created communities: one live, deleting frees it ──
 
 with ins as (
   insert into public.communities (id, name, type, owner_id, is_active)
@@ -247,24 +249,35 @@ with ins as (
 )
 select ok(count(*) = 1, 'the member''s one community is accepted') from ins;
 
+-- The app's creation flow adds the owner as a member, and the live count
+-- requires them to still be inside the community — the sidebar's own test.
+insert into public.community_members (community_id, user_id, role)
+values ('c9c9c9c9-4444-4000-8000-000000000001',
+        'c9c9c9c9-0000-4000-8000-000000000004', 'owner');
+
 select is(
   public.limit_failure($$
     insert into public.communities (name, type, owner_id, is_active)
     values ('Second Community', 'user',
             'c9c9c9c9-0000-4000-8000-000000000004', true)$$),
   'limit:communities_total',
-  'a second member-created community is refused'
+  'a second live member-created community is refused'
 );
 
-delete from public.communities where id = 'c9c9c9c9-4444-4000-8000-000000000001';
+-- The owner ran the app's Delete button: a soft delete. The row survives
+-- (member content stays referenced) but drops out of the sidebar — and out
+-- of the creation count with it, handing the budget back.
+update public.communities
+   set is_active = false
+ where id = 'c9c9c9c9-4444-4000-8000-000000000001';
 
 select is(
   public.limit_failure($$
-    insert into public.communities (name, type, owner_id, is_active)
-    values ('Replacement Community', 'user',
+    insert into public.communities (id, name, type, owner_id, is_active)
+    values ('c9c9c9c9-4444-4000-8000-000000000002', 'Replacement Community', 'user',
             'c9c9c9c9-0000-4000-8000-000000000004', true)$$),
-  'limit:communities_total',
-  'deleting the community does not refund the lifetime budget'
+  '<no exception>',
+  'deleting the community returns the one-community budget'
 );
 
 -- ─── 6. Memberships: seven live communities, event rooms excluded ──
@@ -353,6 +366,18 @@ with ins as (
   returning community_id
 )
 select ok(count(*) = 1, 'its slot is free — the previously refused ninth join lands') from ins;
+
+-- Creating a community makes its owner a member, so a member already in
+-- seven live communities (0005 is, after the join above) cannot create on
+-- top of that — the creation answers with the join-cap kind.
+select is(
+  public.limit_failure($$
+    insert into public.communities (name, type, owner_id, is_active)
+    values ('Capped Creation', 'user',
+            'c9c9c9c9-0000-4000-8000-000000000005', true)$$),
+  'limit:community_joins',
+  'creating a community is refused while the member is in seven'
+);
 
 -- ─── 7. DMs: five NEW conversations a month ─────────────────
 

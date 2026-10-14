@@ -16,9 +16,14 @@ export const CREATION_LIMIT_MESSAGES = {
   jobs_monthly: "You can post one job per month. Try again next month.",
   dms_monthly:
     "You can start conversations with up to 5 new people a month. Try again next month.",
-  communities_total: "You can only create one community on your profile.",
+  communities_total:
+    "You can only have one community of your own — delete it first to create a new one.",
   community_joins:
     "You can be in up to 7 communities at a time — leave one to join another.",
+  // Route-side only: the create-community flow speaks in "creating your own"
+  // terms, while the database raises the generic join-cap kind for it.
+  create_at_join_cap:
+    "You're in 7 communities already — leave one before creating your own.",
 } as const;
 
 export type CreationLimitKind = keyof typeof CREATION_LIMIT_MESSAGES;

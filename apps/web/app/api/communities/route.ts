@@ -7,7 +7,7 @@ import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
-import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
+import { CREATION_LIMIT_MESSAGES, creationLimitFromError, type CreationLimitKind } from "@/lib/creation-limits";
 import { JOIN_LIMIT, loadJoinSlots } from "@/lib/communities/join-slots";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -26,6 +26,15 @@ function parseJsonArray(value: FormDataEntryValue | null): string[] {
   } catch {
     return [];
   }
+}
+
+// The create flow answers in "creating your own community" terms; the
+// database raises the generic join-cap kind when the creator is already in
+// seven (creating makes them a member — see enforce_community_creation_limit).
+function createFlowLimitMessage(kind: CreationLimitKind): string {
+  return kind === "community_joins"
+    ? CREATION_LIMIT_MESSAGES.create_at_join_cap
+    : CREATION_LIMIT_MESSAGES[kind];
 }
 
 function slugify(value: string): string {
@@ -76,13 +85,13 @@ export async function POST(request: Request) {
   }
 
   // The creator joins their own community, so a member already at the
-  // 7-community cap must not spend their one-community budget on a creation
-  // that would then roll back (the counter is append-only — checked again,
-  // and enforced, by the database on the membership write below).
+  // 7-community cap cannot create one — they need a free slot first. Looked
+  // before writing so the answer arrives without an insert-then-rollback
+  // round trip; the database trigger is the referee either way.
   const { memberships } = await loadJoinSlots(db, userId);
   if (memberships >= JOIN_LIMIT) {
     return NextResponse.json(
-      { error: CREATION_LIMIT_MESSAGES.community_joins },
+      { error: CREATION_LIMIT_MESSAGES.create_at_join_cap },
       { status: 429 },
     );
   }
@@ -149,7 +158,7 @@ export async function POST(request: Request) {
     }
     const limited = creationLimitFromError(communityError);
     if (limited) {
-      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+      return NextResponse.json({ error: createFlowLimitMessage(limited) }, { status: 429 });
     }
     console.error("[community-create] insert failed:", communityError);
     return NextResponse.json({ error: "Failed to create community." }, { status: 500 });
@@ -176,7 +185,7 @@ export async function POST(request: Request) {
     // community at the cap rolls back to the join-limit answer, not a 500.
     const limited = creationLimitFromError(memberError);
     if (limited) {
-      return NextResponse.json({ error: CREATION_LIMIT_MESSAGES[limited] }, { status: 429 });
+      return NextResponse.json({ error: createFlowLimitMessage(limited) }, { status: 429 });
     }
     console.error("[community-create] owner membership failed:", memberError);
     return NextResponse.json({ error: "Failed to create community membership." }, { status: 500 });
