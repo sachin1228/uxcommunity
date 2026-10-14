@@ -116,13 +116,11 @@ function useEventRoomDetails(communityId: string, currentUserId: string) {
  * The card that offers the room to its owner, shared by the two ways a room
  * can have outlived its event.
  *
- * Both states wear the same room: its name is the event's title, its
- * description says "group chat for this event", and its picture is the
- * event's cover — exactly the fields the room's own settings edit, which is
- * why this card is only the door. The info panel is where a member notices
- * the event is over, and nothing else would tell the owner that the room is
- * theirs to keep. Reading as one card in both states keeps the offer the same
- * shape whichever way the event left.
+ * The name, the description and the picture are the fields the room's own
+ * settings edit — this card is only the door to them. The info panel is where
+ * a member notices the event is over, and nothing else would tell the owner
+ * that the room is theirs to keep. Reading as one card in both states keeps
+ * the offer the same shape whichever way the event left.
  */
 function RoomCarryOnCard({
   communityId,
@@ -172,11 +170,11 @@ function RoomCarryOnCard({
  * What the info card becomes once the room has outlived its event.
  *
  * Deleting an event keeps its group chat (see the event delete route), which
- * leaves a room still wearing all three of the event's things while the link
- * its badge and its Event card read has been cleared. Rendered for the room's
- * owner alone; every other member sees the room exactly as it is (see
- * CommunityRightSidebar, which only draws this when the community is an
- * event's chat with no event behind it).
+ * leaves the room itself — its people, its name and everything they said —
+ * while the link its badge and its Event card read has been cleared. Rendered
+ * for the room's owner alone; every other member sees the room exactly as it
+ * is (see CommunityRightSidebar, which only draws this when the community is
+ * an event's chat with no event behind it).
  */
 export function EventRoomGoneSection({ communityId }: { communityId: string }) {
   return (
@@ -199,11 +197,10 @@ export function EventRoomGoneSection({ communityId }: { communityId: string }) {
  * way to find the room's door.
  *
  * Whether the offer is this room's to take is decided server-side (see
- * loadEventRoomSection): owner, past the grace, still wearing all three of the
- * event's clothes. One personal edit — a name, a description, a picture — and
- * the answer flips to false, so the card retires itself without a dismissal
- * to store — and from then on the event's edits stop following the room (see
- * syncEventChatCommunity).
+ * loadEventRoomSection): owner, past the grace — and nothing more. The offer
+ * never expires on personal edits: a name, a description or a picture of the
+ * owner's own stops the event's edits from following the room (see
+ * syncEventChatCommunity) but keeps this door standing.
  */
 export function EventRoomCarryOnSection({ communityId }: { communityId: string }) {
   return (
@@ -420,8 +417,7 @@ export function EventRoomSection({
 
       {/* The event is over for good — its badge has come down — and the room's
           door turns up under the card that links back to it. The answer is the
-          server's (see loadEventRoomSection), so a room already made its own
-          never flashes this. */}
+          server's (see loadEventRoomSection). */}
       {carryOn && <EventRoomCarryOnSection communityId={communityId} />}
     </>
   );
