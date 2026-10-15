@@ -155,7 +155,7 @@ export const DmListPane = memo(function DmListPane({
                 <AvatarImg
                   url={conversation.peer.avatar_url}
                   name={conversation.peer.name}
-                  size={44}
+                  size={40}
                   className="shrink-0 rounded-full object-cover"
                 />
                 <span className="min-w-0 flex-1">
