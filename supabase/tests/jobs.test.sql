@@ -691,6 +691,87 @@ select is(
   'get_job_detail returns nothing for a missing job'
 );
 
+-- ─── 5b. The feed is the CARD payload; the detail keeps the prose ────────
+-- (20261015140000_job_feed_card_payload). The list stopped shipping
+-- description / responsibilities / requirements because 81% of a feed row was
+-- description text and none of it renders on a board card — measured at
+-- 1,460 B on the wire per posting, ~73 KB for a 50-row page (see
+-- docs/supabase-egress-audit.md §4 #1). The three keys must be ABSENT, not
+-- null: a null would still travel, and the client's types distinguish them.
+
+select ok(
+  not (select item ? 'description' from public.get_job_feed(
+         'd7d7d7d7-0000-4000-8000-000000000003') limit 1),
+  'a feed row carries no description'
+);
+
+select ok(
+  not (select item ? 'responsibilities' from public.get_job_feed(
+         'd7d7d7d7-0000-4000-8000-000000000003') limit 1),
+  'a feed row carries no responsibilities'
+);
+
+select ok(
+  not (select item ? 'requirements' from public.get_job_feed(
+         'd7d7d7d7-0000-4000-8000-000000000003') limit 1),
+  'a feed row carries no requirements'
+);
+
+-- The card still carries everything the cards and the rail render, including
+-- `skills` — the board's own search box filters on it, so it is card data.
+-- (`deadline_label` / `posted_label` are NOT here on purpose: they are rendered
+-- by formatJobFeedRows on the server, from these same fields.)
+select ok(
+  (select (item ? 'skills') and (item ? 'can_apply') and (item ? 'applied')
+          and (item ? 'is_mine') and (item ? 'criteria_locked')
+          and (item ? 'applicant_count') and (item ? 'my_application')
+          and (item ? 'city_name') and (item ? 'sector_name')
+          and (item ? 'closes_at') and (item ? 'status')
+   from public.get_job_feed('d7d7d7d7-0000-4000-8000-000000000003') limit 1),
+  'a feed row keeps the viewer flags, the counts and the labels'
+);
+
+-- The wildcard labels are the reason this builder is copied from
+-- 20261010130000 rather than 20261009180000; the assertion that they resolve
+-- is the one already in the wildcard section above, and because the card payload
+-- goes through the SAME builder it inherits that coverage. Nothing to re-assert
+-- here without inventing an all-cities fixture mid-file.
+
+-- The detail payload is unchanged: all three prose keys, with their content.
+select ok(
+  (select (item ? 'description') and (item ? 'responsibilities') and (item ? 'requirements')
+   from public.get_job_detail(
+     (select id from public.job_posts where title = 'Senior Product Designer'),
+     'd7d7d7d7-0000-4000-8000-000000000002'
+   )),
+  'get_job_detail still carries the prose'
+);
+
+select is(
+  (select item ->> 'description' from public.get_job_detail(
+     (select id from public.job_posts where title = 'Senior Product Designer'),
+     'd7d7d7d7-0000-4000-8000-000000000002'
+   )),
+  (select description from public.job_posts where title = 'Senior Product Designer'),
+  'the detail description is the stored one, unchanged by the card switch'
+);
+
+-- The two-argument call the rest of this file makes resolves to the builder's
+-- default (prose included), so the older assertions above keep their meaning.
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000002') ? 'description'
+   from public.job_posts jp where jp.title = 'Senior Product Designer'),
+  true,
+  'job_post_payload defaults to the full (prose-bearing) payload'
+);
+
+select is(
+  (select public.job_post_payload(jp.id, 'd7d7d7d7-0000-4000-8000-000000000002', false) ? 'description'
+   from public.job_posts jp where jp.title = 'Senior Product Designer'),
+  false,
+  'job_post_payload with p_include_prose = false drops the prose'
+);
+
 -- ─── 6. The applicants board is the poster's alone ──────────
 
 select is(

@@ -6,14 +6,14 @@ import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { Modal } from "@/components/ui/Modal";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { resumeMeta, type SavedResume } from "@/lib/settings/resumes";
-import type { JobPost, JobViewer } from "@/lib/jobs/types";
+import type { JobFeedRow, JobViewer } from "@/lib/jobs/types";
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 
 interface ApplyModalProps {
   open: boolean;
   onClose: () => void;
-  job: JobPost;
+  job: JobFeedRow;
   viewer: JobViewer;
   /** Called once the application lands, so the page behind can refresh. */
   onApplied: () => void;

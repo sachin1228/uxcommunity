@@ -1,4 +1,4 @@
-import type { JobPost, JobStatus } from "./types";
+import type { JobFeedRow, JobStatus } from "./types";
 
 /**
  * Relative labels for job timestamps. Computed on the server before
@@ -122,11 +122,15 @@ export function deadlineFields(
 
 /**
  * Feed rows: the raw postings with every label a job list renders. Shared by
- * the board's first paint (the page) and its cursor pages (the feed route) so
- * both arrive with the same server-rendered labels — SSR and hydration print
- * the same strings.
+ * the board's first paint (the page), its cursor pages (the feed route) and
+ * the single-posting read, so every surface arrives with the same
+ * server-rendered labels — SSR and hydration print the same strings.
+ *
+ * Generic over the row it is given, because the same labels belong on a list
+ * row and on a posting read in full: the caller gets back exactly the shape it
+ * passed, and a card-shaped row stays card-shaped.
  */
-export function formatJobFeedRows(jobs: JobPost[]): JobPost[] {
+export function formatJobFeedRows<T extends JobFeedRow>(jobs: T[]): T[] {
   return jobs.map((job) => ({
     ...job,
     posted_label: timeAgoLabel(job.created_at),

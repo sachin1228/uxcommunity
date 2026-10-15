@@ -7,7 +7,7 @@ import { JobCard } from "./JobCard";
 import { JobDetail } from "./JobDetail";
 import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import type { JobMasterData } from "@/lib/jobs/service";
-import type { JobPost, JobViewer } from "@/lib/jobs/types";
+import type { JobFeedRow, JobPost, JobViewer } from "@/lib/jobs/types";
 
 /** The two browse tabs. They carry an unseen-roles badge instead of a total. */
 type BrowseKind = "hiring" | "referral";
@@ -50,7 +50,7 @@ function markTabSeen(viewerId: string, kind: BrowseKind, newestPosted: number): 
 }
 
 /** The newest posting instant in a list, or 0 for an empty one. */
-function newestInstant(list: JobPost[]): number {
+function newestInstant(list: JobFeedRow[]): number {
   return list.reduce((max, job) => Math.max(max, Date.parse(job.created_at)), 0);
 }
 
@@ -59,8 +59,12 @@ function newestInstant(list: JobPost[]): number {
  * kind — "#Hiring" and "#Referral", the same two intents the cards' hashtag
  * tags name — and "Applied" joins them; on those three the rail
  * lists postings and the pane shows the selected one — selecting is local
- * state, not a route change, because `get_job_feed` already returns the full
- * detail payload for every row. "My posts" is a plain list: each post opens
+ * state, not a route change. The rail and the pane are fed by one list of CARD
+ * rows (`get_job_feed` returns the posting without its prose), so the pane
+ * opens on the row it was given and fetches the posting's three prose fields
+ * behind it: the read costs one small request per posting per session, and
+ * nothing in the pane — title, company, poster, badges, Apply, the owner's
+ * menu — waits for it. "My posts" is a plain list: each post opens
  * its own view page (`/dashboard/jobs/<id>`), not the master-detail pane.
  * Below lg the panes take turns instead of sitting side by side; `?job=` only
  * seeds the selection (and the tab its kind implies), so "back to this job"
@@ -81,7 +85,8 @@ export function JobsBrowser({
   initialJobId = null,
 }: {
   viewer: JobViewer;
-  initialJobs: JobPost[];
+  /** Card rows: the first page of the feed, exactly as the rail renders it. */
+  initialJobs: JobFeedRow[];
   /** Whether the RSC first page was capped — i.e. an older page exists. */
   initialHasMore: boolean;
   master: JobMasterData;
@@ -93,6 +98,14 @@ export function JobsBrowser({
   const [jobs, setJobs] = useState(initialJobs);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
+  // The postings read in full this session, by id. The rail's rows carry no
+  // prose, so this is what the pane's prose sections read from — and it is
+  // also the owner's own read: the edit form opens on an entry here rather
+  // than on the card-shaped row. Kept for the session, so a member selecting
+  // back and forth across the board pays for a posting's prose once.
+  const [details, setDetails] = useState<Record<string, JobPost>>({});
+  const detailsRef = useRef<Record<string, JobPost>>({});
+  const detailRequests = useRef(new Map<string, Promise<JobPost | null>>());
   const seeded = (initialJobId && jobs.find((job) => job.id === initialJobId)) || null;
   const [tab, setTab] = useState<Tab>(
     seeded?.is_mine
@@ -111,6 +124,48 @@ export function JobsBrowser({
   const [paneOpen, setPaneOpen] = useState(Boolean(seeded && !seeded.is_mine));
   const paneRef = useRef<HTMLDivElement>(null);
   const scrolledId = useRef(selectedId);
+
+  /**
+   * Read one posting in full — once. The board's rows are card-shaped, so the
+   * pane's prose (and the owner's edit form) come from here.
+   *
+   * Two caches, because two things are being prevented: `detailsRef` stops a
+   * posting from ever being read twice, and `detailRequests` stops a
+   * selection that changes twice in a moment — or the pane's own effect racing
+   * the owner's menu — from putting two requests for the SAME posting in
+   * flight. Both are refs: neither is render state, and neither may re-create
+   * this callback, which the pane's effect depends on.
+   */
+  const loadDetail = useCallback(async (jobId: string): Promise<JobPost | null> => {
+    const cached = detailsRef.current[jobId];
+    if (cached) return cached;
+
+    const inFlight = detailRequests.current.get(jobId);
+    if (inFlight) return inFlight;
+
+    const request = (async () => {
+      try {
+        const response = await fetch(`/api/jobs/${jobId}`);
+        if (!response.ok) return null;
+        const body = (await response.json()) as { job?: JobPost };
+        if (!body.job) return null;
+        // Remembered BEFORE it is published: a second caller arriving between
+        // the two reads the cache, not the network.
+        detailsRef.current = { ...detailsRef.current, [jobId]: body.job };
+        setDetails(detailsRef.current);
+        return body.job;
+      } catch {
+        // Offline, or the route failed: the pane keeps the row it has, which
+        // is everything but the prose, and the next selection can retry.
+        return null;
+      } finally {
+        detailRequests.current.delete(jobId);
+      }
+    })();
+
+    detailRequests.current.set(jobId, request);
+    return request;
+  }, []);
 
   // A click deep in a long posting can leave the page scrolled past the top
   // of the pane that just swapped contents — bring the new job back into
@@ -177,6 +232,21 @@ export function JobsBrowser({
     ? (paneJobs.find((job) => job.id === selectedId) ?? paneJobs[0] ?? null)
     : null;
   const highlightedId = paneJobs ? (selectedJob?.id ?? null) : selectedId;
+  // The pane's posting: the full read when it has arrived, the rail's own row
+  // until then. The row is what makes the wait invisible — every part of the
+  // pane except the three prose sections renders from it immediately.
+  const paneJob = selectedJob ? (details[selectedJob.id] ?? selectedJob) : null;
+  const selectedJobId = selectedJob?.id ?? null;
+
+  // Read the selected posting in full — including the board's opening
+  // selection, so its prose is on its way from the first frame. Keyed on the
+  // ID, not on `selectedJob`: that object is re-derived on every render, and an
+  // effect that depended on it would re-run for reasons that have nothing to
+  // do with which posting is open.
+  useEffect(() => {
+    if (!selectedJobId || details[selectedJobId]) return;
+    void loadDetail(selectedJobId);
+  }, [selectedJobId, details, loadDetail]);
 
   const query = search.trim().toLowerCase();
   const visibleJobs =
@@ -229,7 +299,7 @@ export function JobsBrowser({
         `/api/jobs/feed?before=${encodeURIComponent(`${last.created_at}|${last.id}`)}`,
       );
       if (!response.ok) return;
-      const data = await response.json() as { jobs?: JobPost[]; has_more?: boolean };
+      const data = await response.json() as { jobs?: JobFeedRow[]; has_more?: boolean };
       const incoming = data.jobs ?? [];
       setJobs((prev) => {
         const ids = new Set(prev.map((job) => job.id));
@@ -342,6 +412,9 @@ export function JobsBrowser({
                 key={job.id}
                 job={job}
                 master={master}
+                // The owner's edit form needs the posting's prose, which a list
+                // row does not carry — so the menu opens it on a detail read.
+                loadFullJob={loadDetail}
                 // The browse list holds other members' roles, so only "My
                 // posts" ever carries the owner's controls.
                 showOwnerActions={tab === "posts"}
@@ -430,7 +503,7 @@ export function JobsBrowser({
               Jobs
             </button>
 
-            {selectedJob && <JobDetail job={selectedJob} viewer={viewer} />}
+            {paneJob && <JobDetail job={paneJob} viewer={viewer} />}
           </div>
         )}
       </div>

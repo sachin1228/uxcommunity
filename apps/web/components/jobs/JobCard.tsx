@@ -5,12 +5,13 @@ import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { JobStateBadge, KindBadge, LockedNote } from "./JobBadges";
 import { JobOwnerActions } from "./JobOwnerActions";
 import type { JobMasterData } from "@/lib/jobs/service";
-import type { JobPost } from "@/lib/jobs/types";
+import type { JobFeedRow, JobPost } from "@/lib/jobs/types";
 import { workModeLabel } from "@/lib/jobs/types";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 
 interface JobCardProps {
-  job: JobPost;
+  /** A list row: the posting without its prose, which a card never renders. */
+  job: JobFeedRow;
   selected?: boolean;
   onSelect: () => void;
   /**
@@ -18,6 +19,11 @@ interface JobCardProps {
    * master data). A caller without it still renders the card, minus the menu.
    */
   master?: JobMasterData;
+  /**
+   * Fetches the posting in full, so the owner's edit form — the one surface
+   * that needs the prose — can open from a row that no longer carries it.
+   */
+  loadFullJob?: (jobId: string) => Promise<JobPost | null>;
   /**
    * Whether this card's actions should be shown at all. The browse list shows
    * other members' roles, so their cards never carry any.
@@ -28,9 +34,12 @@ interface JobCardProps {
 /**
  * The LinkedIn shape: the title leads, one line carries company · city (work
  * mode) · salary, and the time sits under it. Selecting is local to the board
- * — the pane beside the list renders the card's own payload, so a click is a
- * client-side switch, not a route change. The four targeting criteria live on
- * the detail pane — the card keeps the scan cheap.
+ * — the pane beside the list renders the row it was given and reads the
+ * posting's prose behind it, so a click is a client-side switch, not a route
+ * change. The four targeting criteria live on
+ * the detail pane — the card keeps the scan cheap, and so does its payload:
+ * `get_job_feed` builds rows without the posting's prose, and this type says
+ * so, so a card cannot grow a dependency on text it is not sent.
  *
  * A closed posting is marked here rather than hidden: it stays in "My posts"
  * for its owner (the feed returns it to nobody else), where the badge is what
@@ -47,6 +56,7 @@ export function JobCard({
   selected = false,
   onSelect,
   master,
+  loadFullJob,
   showOwnerActions = false,
 }: JobCardProps) {
   return (
@@ -83,7 +93,12 @@ export function JobCard({
             {/* The same menu the posting's own page carries, so a role can
                 be closed or removed without opening it. */}
             {showOwnerActions && job.is_mine && (
-              <JobOwnerActions job={job} master={master} redirectOnDelete={false} />
+              <JobOwnerActions
+                job={job}
+                master={master}
+                loadFullJob={loadFullJob}
+                redirectOnDelete={false}
+              />
             )}
           </div>
         </div>

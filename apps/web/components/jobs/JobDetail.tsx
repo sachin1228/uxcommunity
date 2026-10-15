@@ -13,7 +13,7 @@ import { JobOwnerActions } from "./JobOwnerActions";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 import type { JobMasterData } from "@/lib/jobs/service";
-import type { JobApplicationSummary, JobPost, JobViewer } from "@/lib/jobs/types";
+import type { JobApplicationSummary, JobFeedRow, JobPostView, JobViewer } from "@/lib/jobs/types";
 import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types";
 
 /**
@@ -24,6 +24,15 @@ import { criteriaMismatches, listPhrase, workModeLabel } from "@/lib/jobs/types"
  *
  * Rendered both inside the board's detail pane and, standalone, on the
  * posting's own page — the host surface owns layout, so this is content only.
+ *
+ * The payload it is given may be a FEED ROW (the board's) or a posting read in
+ * full (the standalone page): `get_job_feed` returns card rows, so the pane has
+ * everything above — title, company, poster, badges, the Apply action, the
+ * application card — from the row it already had, and the three prose sections
+ * fill in from the one detail read behind them. Those sections therefore say
+ * "still arriving" with placeholder bars rather than rendering an empty
+ * "About the role", which would be a claim about the posting instead of about
+ * the request.
  *
  * `master` is only needed for the owner's own view — the header's menu and
  * the edit form behind it — and is optional for that reason: the board's pane
@@ -42,7 +51,7 @@ export function JobDetail({
   viewer,
   master,
 }: {
-  job: JobPost;
+  job: JobPostView;
   viewer: JobViewer;
   master?: JobMasterData;
 }) {
@@ -238,38 +247,53 @@ export function JobDetail({
       </div>
 
       <Section title="About the role">
-        <RichText html={job.description} />
+        {job.description === undefined ? (
+          <ProsePending lines={4} />
+        ) : (
+          <RichText html={job.description} />
+        )}
       </Section>
 
-      {job.responsibilities.length > 0 && (
+      {/* Each list is present-but-empty on a posting that has none, and ABSENT
+          on a row whose prose has not arrived — so the section is hidden only
+          when the posting really has nothing here. */}
+      {(job.responsibilities === undefined || job.responsibilities.length > 0) && (
         <Section title="What you'll do">
-          <ul className="flex flex-col gap-2">
-            {job.responsibilities.map((item) => (
-              <li
-                key={item}
-                className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
-              >
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
-                {item}
-              </li>
-            ))}
-          </ul>
+          {job.responsibilities === undefined ? (
+            <ProsePending lines={3} />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {job.responsibilities.map((item) => (
+                <li
+                  key={item}
+                  className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
+                >
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       )}
 
-      {job.requirements.length > 0 && (
+      {(job.requirements === undefined || job.requirements.length > 0) && (
         <Section title="What we're looking for">
-          <ul className="flex flex-col gap-2">
-            {job.requirements.map((item) => (
-              <li
-                key={item}
-                className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
-              >
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
-                {item}
-              </li>
-            ))}
-          </ul>
+          {job.requirements === undefined ? (
+            <ProsePending lines={3} />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {job.requirements.map((item) => (
+                <li
+                  key={item}
+                  className="flex gap-2.5 font-body text-sm leading-relaxed text-foreground-muted"
+                >
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       )}
 
@@ -341,7 +365,7 @@ function ApplicationModal({
 }: {
   open: boolean;
   onClose: () => void;
-  job: JobPost;
+  job: JobFeedRow;
   viewer: JobViewer;
   application: JobApplicationSummary;
 }) {
@@ -430,8 +454,32 @@ function ApplicationModal({
   );
 }
 
+/**
+ * The prose placeholders: the shape of the text that is on its way, in the
+ * sidebar's pulse idiom. They stand in for CONTENT, not for the pane — every
+ * other part of the posting is already on screen from the row the board holds,
+ * so only the paragraph that is genuinely missing says so.
+ */
+function ProsePending({ lines }: { lines: number }) {
+  return (
+    <div role="status" aria-label="Loading this posting's details" className="flex flex-col gap-2.5">
+      {Array.from({ length: lines }, (_, index) => (
+        <span
+          key={index}
+          aria-hidden="true"
+          className={`block h-3.5 animate-pulse rounded-full bg-surface-raised ${
+            // A ragged last line, so the block reads as a paragraph rather
+            // than as a table of bars.
+            index === lines - 1 ? "w-2/3" : "w-full"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 /** One line telling an applicant their application still stands. */
-function appliedSentence(job: JobPost): string {
+function appliedSentence(job: JobFeedRow): string {
   if (!job.applied) return "";
   const when = job.my_application?.applied_label;
   return ` Your application was submitted${when ? ` ${when}` : ""}.`;

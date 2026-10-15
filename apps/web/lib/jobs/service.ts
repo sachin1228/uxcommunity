@@ -6,6 +6,7 @@ import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
 import type {
   JobApplicant,
   JobApplicantDetail,
+  JobFeedRow,
   JobPost,
   JobStatus,
   ApplicationStatus,
@@ -177,9 +178,17 @@ function asJsonObject(value: Json): { [key: string]: unknown } | null {
     : null;
 }
 
-/** Trust the SQL payload contract (same convention as the feed functions). */
-function asJobPost(value: Json): JobPost | null {
-  const job = asJsonObject(value) as unknown as JobPost | null;
+/**
+ * Trust the SQL payload contract (same convention as the feed functions).
+ *
+ * One reader for both shapes: the feed's rows and the full posting differ only
+ * in the prose fields, and both carry the company logo this resolves. Callers
+ * that need prose say so by asking for `JobPost` (`asJobPost`), which is the
+ * same read with the contract asserted — `get_job_detail` is the only RPC that
+ * builds it.
+ */
+function asJobFeedRow(value: Json): JobFeedRow | null {
+  const job = asJsonObject(value) as unknown as JobFeedRow | null;
   if (!job || !job.company) return job;
   // The SQL carries the stored logo + the company's domain; resolving here
   // gives the jobs surfaces the same picture the profile shows (the stored
@@ -188,6 +197,11 @@ function asJobPost(value: Json): JobPost | null {
     ...job,
     company: { ...job.company, logo_url: companyLogoUrl(job.company.logo_url, job.company.domain) },
   };
+}
+
+/** The same read, for the one caller whose RPC always builds the prose. */
+function asJobPost(value: Json): JobPost | null {
+  return asJobFeedRow(value) as JobPost | null;
 }
 
 function asJobApplicant(value: Json): JobApplicant | null {
@@ -205,12 +219,18 @@ export const JOB_FEED_PAGE_SIZE = 50;
  * Newest-first page of postings, each with the viewer's flags. Pass the last
  * row of the previous page as `before` to read the page after it (compound
  * created_at, id cursor — see 20261015120000_job_feed_cursor).
+ *
+ * CARD rows, not full postings: `get_job_feed` asks `job_post_payload` for the
+ * payload without prose, so a board page cannot carry the description of every
+ * posting it lists. The type says so, which is what keeps a card-shaped
+ * surface from rendering prose it no longer receives (see `JobFeedRow`); the
+ * full posting is one `getJobDetail` away.
  */
 export async function getJobFeed(
   db: SupabaseClient,
   viewerId: string,
   options: { limit?: number; before?: { createdAt: string; id: string } } = {}
-): Promise<JobPost[]> {
+): Promise<JobFeedRow[]> {
   const { limit = JOB_FEED_PAGE_SIZE, before } = options;
   const { data, error } = await callPerformanceRpc(db, "get_job_feed", {
     p_viewer_id: viewerId,
@@ -223,9 +243,12 @@ export async function getJobFeed(
     return [];
   }
 
-  return (data ?? []).map((row) => asJobPost(row.item)).filter((job): job is JobPost => Boolean(job));
+  return (data ?? [])
+    .map((row) => asJobFeedRow(row.item))
+    .filter((job): job is JobFeedRow => Boolean(job));
 }
 
+/** The posting in full, prose included — one RPC, one posting. */
 export async function getJobDetail(
   db: SupabaseClient,
   viewerId: string,

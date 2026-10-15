@@ -63,48 +63,39 @@ export async function PATCH(request: NextRequest) {
   const now = new Date().toISOString();
 
   if (body.all === true) {
-    const { data: rows, error } = (await db
+    // The UPDATE runs unconditionally and returns ITS OWN ids. It used to be
+    // gated on a prior `select(...)` of every unread row — the full row, body
+    // and all — whose only jobs were "is there anything to do" (the UPDATE is
+    // idempotent and already says so) and "what changed" (`.select("id")` says
+    // it in one round trip, for the rows this statement actually touched). For
+    // a member with thousands of unread notifications that pre-read transferred
+    // ~0.6 KB per row to answer a question the write already answers.
+    const { data: marked, error: updateError } = (await db
       .from("notifications")
-      .select("id, user_id, type, title, body, href, read_at, created_at")
+      .update({ read_at: now })
       .eq("user_id", userId)
-      .is("read_at", null)) as unknown as {
-      data: Array<{
-        id: string;
-        user_id: string;
-        type: string;
-        title: string;
-        body: string | null;
-        href: string;
-        read_at: string | null;
-        created_at: string;
-      }> | null;
+      .is("read_at", null)
+      .select("id")) as unknown as {
+      data: Array<{ id: string }> | null;
       error: unknown;
     };
 
-    if (error) {
-      console.error("[PATCH notifications all]", error);
+    if (updateError) {
+      console.error("[PATCH notifications all]", updateError);
       return NextResponse.json({ error: "Failed to mark notifications read." }, { status: 500 });
     }
 
-    if (rows?.length) {
-      const { error: updateError } = await db
-        .from("notifications")
-        .update({ read_at: now })
-        .eq("user_id", userId)
-        .is("read_at", null);
-      if (updateError) {
-        console.error("[PATCH notifications all]", updateError);
-        return NextResponse.json({ error: "Failed to mark notifications read." }, { status: 500 });
-      }
-
-      // Keep other open tabs' bell counts in sync.
+    // Keep other open tabs' bell counts in sync. Ids alone are enough: the
+    // `update` handler PATCHES a row it already holds, and the list it holds is
+    // the same 30 rows this member can see (see lib/use-notifications.ts).
+    if (marked?.length) {
       after(() => {
         void publishRealtimeBatch(
-          rows.map((row) => ({
+          marked.map((row) => ({
             room: realtimeRooms.notifications(userId),
             topic: "update",
             data: {
-              next: { ...row, read_at: now },
+              next: { id: row.id, read_at: now },
               old: { id: row.id, read_at: null },
             },
           })),
@@ -112,7 +103,7 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, marked_read: marked?.length ?? 0 });
   }
 
   const id = typeof body.id === "string" ? body.id : "";

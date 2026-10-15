@@ -39,6 +39,29 @@ export interface NotificationRealtimeEvent {
   data: unknown;
 }
 
+/**
+ * Fold an `update` event's `next` payload into the row the client already
+ * holds.
+ *
+ * The rule is MERGE, never replace, and that is a correctness requirement
+ * rather than a preference: the two publishers of this topic send different
+ * amounts of the row. The aggregation path (`notificationRealtimeEvent` above)
+ * sends the whole row; "mark all read" sends only `{ id, read_at }`, because
+ * the ids are all the handler needs and re-reading every unread row to publish
+ * bodies cost egress for no benefit. A replace would therefore blank the title,
+ * body and href of every row another tab had open.
+ *
+ * A patch for an id the list does not hold is ignored — the list is a bounded
+ * window (MAX_ITEMS) and an event for a row outside it is not this client's
+ * business.
+ */
+export function applyNotificationPatch<T extends { id: string }>(
+  items: T[],
+  patch: Partial<T> & { id: string },
+): T[] {
+  return items.map((item) => (item.id === patch.id ? { ...item, ...patch } : item));
+}
+
 export function notificationRealtimeEvent(
   row: NotificationCreatedRow,
   room: string,

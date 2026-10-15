@@ -25,6 +25,7 @@ import {
   seenStorageKey,
   subscribeSeenAt,
 } from "@/lib/notifications-seen";
+import { applyNotificationPatch } from "@/lib/notifications-realtime";
 import {
   fetchJsonCached,
   getCachedRequest,
@@ -235,15 +236,18 @@ export function useNotifications(
     unsubscribes.push(
       realtimeClient.on(room, "update", (data) => {
         const { next, old: previous } = data as {
-          next: NotificationItem;
+          // `next` may be the whole row (the aggregation path) or just the
+          // read receipt (mark-all-read publishes ids only) — either way the
+          // patch is MERGED, so a partial event can never blank a held row.
+          next: Partial<NotificationItem> & Pick<NotificationItem, "id">;
           old: Partial<NotificationItem>;
         };
-        setNotifications((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+        setNotifications((prev) => applyNotificationPatch(prev, next));
         if (!previous.read_at && next.read_at) {
           setUnreadCount((count) => Math.max(0, count - 1));
         }
         patchNotificationCache((current) => ({
-          notifications: current.notifications.map((item) => (item.id === next.id ? next : item)),
+          notifications: applyNotificationPatch(current.notifications, next),
           unread_count:
             !previous.read_at && next.read_at
               ? Math.max(0, current.unread_count - 1)

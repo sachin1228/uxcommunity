@@ -22,8 +22,19 @@ type PerformanceRpcMap = {
     returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users: Json; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };
+  // One PAGE of the Explore directory, ordered by (name, id) and continued with
+  // the keyset cursor's two halves (see 20261015150000_all_communities_cursor).
+  // The bound is the point: this read used to return every active community on
+  // the platform to every member, on every Explore visit.
   get_all_communities: {
-    args: { p_user_id: string };
+    args: {
+      p_user_id: string;
+      /** Clamped to 1..500 in SQL, so the unbounded read cannot be asked for. */
+      p_limit: number;
+      /** The last row of the previous page; both halves are sent together. */
+      p_after_name: string | null;
+      p_after_id: string | null;
+    };
     returns: Array<{
       id: string;
       name: string;
@@ -35,6 +46,24 @@ type PerformanceRpcMap = {
       joined: boolean;
       can_join: boolean;
       has_pending_request: boolean;
+    }>;
+  };
+  // The homepage rail's own bounded read: the biggest member-created communities
+  // the caller could one-tap join. It exists because a name-ordered page cannot
+  // express "biggest first", so bounding the directory would otherwise have
+  // narrowed the rail to the first names in the alphabet.
+  get_suggested_communities: {
+    args: { p_user_id: string; p_limit: number };
+    returns: Array<{
+      id: string;
+      name: string;
+      type: string;
+      image_url: string | null;
+      description: string | null;
+      is_private: boolean;
+      member_count: number;
+      joined: boolean;
+      can_join: boolean;
     }>;
   };
   get_community_members_page: {

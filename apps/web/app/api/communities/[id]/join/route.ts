@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { SUGGESTED_COMMUNITIES_TAG } from "@/lib/home/home-rail-cache";
+import { EXPLORE_COMMUNITIES_TAG } from "@/lib/communities/explore-cache";
 import { canJoinEventChat } from "@/lib/communities/event-chat";
 import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
 import { joinAnswersPayload } from "@/lib/communities/event-join-questions";
@@ -211,8 +212,10 @@ export async function POST(
       return NextResponse.json({ error: "Failed to submit join request." }, { status: 500 });
     }
 
-    // The community can no longer be suggested to this member as a one-tap join.
+    // The community can no longer be suggested to this member as a one-tap join,
+    // and the Explore pages now hold a stale "no request yet" flag for it.
     revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
+    revalidateTag(EXPLORE_COMMUNITIES_TAG, { expire: 0 });
 
     return NextResponse.json({ status: "requested", communityId });
   }
@@ -241,8 +244,10 @@ export async function POST(
   }
 
   // Drop the cached suggestion lists so the homepage rail (and any other
-  // surface reading them) stops offering a community this member just joined.
+  // surface reading them) stops offering a community this member just joined —
+  // and the Explore pages, whose rows carry the caller's own `joined` flag.
   revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
+  revalidateTag(EXPLORE_COMMUNITIES_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }
@@ -271,6 +276,11 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to withdraw request." }, { status: 500 });
   }
+
+  // The member's Explore rows hold `has_pending_request: true` for this
+  // community; withdrawing it has to drop those cached pages too, or a revisit
+  // within the minute would still show the request as pending.
+  revalidateTag(EXPLORE_COMMUNITIES_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }

@@ -10,7 +10,8 @@ import { EditJobModal } from "./EditJobModal";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { showUndoToast } from "@/lib/undo-toast";
 import type { JobMasterData } from "@/lib/jobs/service";
-import type { JobPost, JobStatus } from "@/lib/jobs/types";
+import type { JobFeedRow, JobPost, JobStatus } from "@/lib/jobs/types";
+import { hasJobProse } from "@/lib/jobs/types";
 
 /**
  * The posting owner's controls: Edit, Close/Reopen, Delete.
@@ -29,6 +30,13 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
  * target, not a row of buttons. `master` is only needed to open that form, so
  * a surface without it still gets Close/Reopen/Delete.
  *
+ * The form needs the posting's PROSE, which a list row no longer carries, so
+ * the menu opens it in two steps when the row is all it was given: fetch the
+ * posting in full (`loadFullJob`), then open the form on that. The fetch
+ * happens on the pick, never on render — an owner who closes a job or simply
+ * scrolls past never pays for an edit form they did not open. A row that
+ * already carries its prose (the posting's own page) opens the form directly.
+ *
  * A posting whose closing date has passed is offered "Change deadline" in place
  * of "Edit job": the date is the lever that brings it back, and reopening it is
  * the same form.
@@ -41,11 +49,14 @@ import type { JobPost, JobStatus } from "@/lib/jobs/types";
 export function JobOwnerActions({
   job,
   master,
+  loadFullJob,
   /** False when deleting should leave the member where they are (the list). */
   redirectOnDelete = true,
 }: {
-  job: JobPost;
+  job: JobFeedRow;
   master?: JobMasterData;
+  /** The full posting, for a row that arrived without its prose. */
+  loadFullJob?: (jobId: string) => Promise<JobPost | null>;
   redirectOnDelete?: boolean;
 }) {
   const router = useRouter();
@@ -53,12 +64,49 @@ export function JobOwnerActions({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  // The posting the form is open on, or null. Separate from `job` because on
+  // the list it is a SECOND, fuller read than the row the menu hangs off.
+  const [editJob, setEditJob] = useState<JobPost | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const closed = job.status === "closed";
+
+  /**
+   * Whether the form can be opened at all: it needs the master data for its
+   * pickers and the posting's prose for its fields — from the row itself when
+   * it already has it, otherwise from the fetch the list hands down.
+   */
+  const canEdit = Boolean(master) && (hasJobProse(job) || Boolean(loadFullJob));
+
+  /**
+   * Open the edit form on a posting that is complete. On the board the row is
+   * card-shaped, so the posting is fetched first; the menu is already closed,
+   * so a failure is reported beside the trigger rather than under the menu.
+   */
+  async function openEdit() {
+    setMenuOpen(false);
+    setError(null);
+
+    if (hasJobProse(job)) {
+      setEditJob(job);
+      return;
+    }
+    if (!loadFullJob) return;
+
+    setPending(true);
+    try {
+      const full = await loadFullJob(job.id);
+      if (!full) {
+        setError("The job could not be opened for editing.");
+        return;
+      }
+      setEditJob(full);
+    } finally {
+      setPending(false);
+    }
+  }
 
   /** Throws with the route's own message, so the undo offer can stay up. */
   async function setStatus(status: JobStatus): Promise<void> {
@@ -174,14 +222,11 @@ export function JobOwnerActions({
         align="right"
         className="min-w-44 p-1"
       >
-        {master && (
+        {canEdit && (
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              setMenuOpen(false);
-              setEditOpen(true);
-            }}
+            onClick={() => void openEdit()}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08]"
           >
             <Pencil strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
@@ -224,15 +269,15 @@ export function JobOwnerActions({
         </button>
       </DropdownMenu>
 
-      {editOpen && master && (
+      {editJob && master && (
         <EditJobModal
-          key={job.id}
+          key={editJob.id}
           open
-          job={job}
+          job={editJob}
           master={master}
-          onClose={() => setEditOpen(false)}
+          onClose={() => setEditJob(null)}
           onSaved={() => {
-            setEditOpen(false);
+            setEditJob(null);
             router.refresh();
           }}
         />
