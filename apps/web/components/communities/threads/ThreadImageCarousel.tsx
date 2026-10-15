@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { FeedVideo } from "@/components/communities/FeedVideo";
+import { VideoPlayer } from "@/components/communities/VideoPlayer";
 
 interface CarouselImage {
   url: string;
@@ -30,9 +30,9 @@ interface CarouselImage {
  * work on touch devices without interfering with vertical scrolling.
  *
  * Image slides render <img>; video slides (items whose `type` starts with
- * "video/") render an inline <video controls> instead. Clicking the visible
- * image reports its index via `onImageClick` so the parent can open the
- * full-screen lightbox — media never opens in a new tab.
+ * "video/") render an inline player with custom controls instead. Clicking the
+ * visible image reports its index via `onImageClick` so the parent can open
+ * the full-screen lightbox — media never opens in a new tab.
  */
 export function ThreadImageCarousel({
   images,
@@ -94,6 +94,9 @@ export function ThreadImageCarousel({
     }
   }
 
+  const activeItem = images[index];
+  const activeIsVideo = typeof activeItem?.type === "string" && activeItem.type.startsWith("video/");
+
   return (
     <div
       role="group"
@@ -134,11 +137,12 @@ export function ThreadImageCarousel({
           // Native aspect ratio, capped at 480px tall — never cropped.
           const inner = isVideo ? (
             videoReady ? (
-              <FeedVideo
+              <VideoPlayer
                 src={img.url}
                 ariaLabel={img.name}
                 active={active}
                 poster={img.poster}
+                containerClassName="relative flex h-full w-full items-center justify-center"
                 className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
               />
             ) : (
@@ -221,32 +225,36 @@ export function ThreadImageCarousel({
         <ChevronRight size={18} strokeWidth={2.5} />
       </button>
 
-      {/* Pagination indicators (carousel dots) — one per image, clickable */}
-      <div
-        role="group"
-        aria-label="Image navigation"
-        className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full bg-black/50 px-1.5 py-1"
-      >
-        {images.map((img, dotIndex) => {
-          const active = dotIndex === index;
-          return (
-            <button
-              key={img.url}
-              type="button"
-              aria-label={`Go to image ${dotIndex + 1} of ${images.length}`}
-              aria-current={active ? "true" : undefined}
-              onClick={() => setIndex(dotIndex)}
-              className="flex h-3 w-2.5 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-            >
-              <span
-                className={`block h-1.5 w-1.5 rounded-full transition-colors duration-200 ${
-                  active ? "bg-white" : "bg-white/40"
-                }`}
-              />
-            </button>
-          );
-        })}
-      </div>
+      {/* Pagination indicators (carousel dots) — one per image, clickable.
+          Hidden on video slides so they don't collide with the player's own
+          control bar; arrows and swipe still navigate from there. */}
+      {!activeIsVideo && (
+        <div
+          role="group"
+          aria-label="Image navigation"
+          className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full bg-black/50 px-1.5 py-1"
+        >
+          {images.map((img, dotIndex) => {
+            const active = dotIndex === index;
+            return (
+              <button
+                key={img.url}
+                type="button"
+                aria-label={`Go to image ${dotIndex + 1} of ${images.length}`}
+                aria-current={active ? "true" : undefined}
+                onClick={() => setIndex(dotIndex)}
+                className="flex h-3 w-2.5 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                <span
+                  className={`block h-1.5 w-1.5 rounded-full transition-colors duration-200 ${
+                    active ? "bg-white" : "bg-white/40"
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <span className="sr-only" role="status">
         {`Image ${index + 1} of ${images.length}`}

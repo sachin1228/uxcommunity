@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import { ModalPortal } from "@/components/ui/Modal";
+import { VideoPlayer } from "@/components/communities/VideoPlayer";
 import type { ShowcaseAttachment } from "./types";
 
 /**
  * Full-screen viewer for showcase media. Clicking an image on a showcase card
  * opens this modal: the current item is centered with arrow navigation and a
- * thumbnail strip. Videos render with native controls (open via the strip).
+ * thumbnail strip. Videos open via the strip and play with the shared custom
+ * controls (sound on — the viewer asked for them).
  */
 export function ShowcaseMediaLightbox({
   media,
@@ -85,11 +87,14 @@ export function ShowcaseMediaLightbox({
             )}
             {isVideo ? (
               (item.status ?? "ready") === "ready" ? (
-                <video
+                <VideoPlayer
+                  key={item.url}
                   src={item.url}
                   poster={item.poster}
-                  controls
+                  ariaLabel={item.name}
                   autoPlay
+                  autoplayInView={false}
+                  containerClassName="relative flex h-full w-full items-center justify-center"
                   className="max-h-full max-w-full rounded-sm object-contain shadow-2xl"
                 />
               ) : (

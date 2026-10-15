@@ -373,14 +373,14 @@ export function ThreadCard({
 
   function handleCardClick(event: React.MouseEvent<HTMLElement>) {
     if (!onOpen) return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video, [data-video-player]");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     onOpen();
   }
 
   function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (!onOpen || event.key !== "Enter") return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video, [data-video-player]");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     event.preventDefault();
     onOpen();
