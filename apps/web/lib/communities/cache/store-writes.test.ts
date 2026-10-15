@@ -9,8 +9,10 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import {
+  appendExploreCommunities,
   EXPLORE_STORE_CHANGED_EVENT,
   exploreStore,
+  resetExploreStore,
   setExploreCommunities,
 } from "./explore-store";
 import {
@@ -79,6 +81,75 @@ test("setExploreCommunities stamps fetchedAt and announces the store change", ()
   assert.equal(exploreStore.data?.communities.length, 1);
   assert.equal(exploreStore.data?.fetchedAt, 42);
   assert.deepEqual(announced, [EXPLORE_STORE_CHANGED_EVENT]);
+});
+
+test("a first page resets the reading position it was fetched with", () => {
+  setExploreCommunities(exploreRows(), {
+    page: { cursor: "Zed|22222222-2222-4222-8222-222222222222", hasMore: true },
+  });
+
+  assert.deepEqual(exploreStore.page, {
+    cursor: "Zed|22222222-2222-4222-8222-222222222222",
+    hasMore: true,
+  });
+
+  // A REFRESH is a new list: the old cursor must not survive it, or the next page
+  // would be read from a row the member may no longer be looking at.
+  setExploreCommunities(exploreRows());
+  assert.deepEqual(exploreStore.page, { cursor: null, hasMore: false });
+});
+
+test("the next page appends and advances the position, announcing once", () => {
+  setExploreCommunities(exploreRows(), {
+    page: { cursor: "Design system|11111111-1111-4111-8111-111111111111", hasMore: true },
+  });
+  announced = [];
+
+  const pageTwo = {
+    id: "22222222-2222-4222-8222-222222222222",
+    name: "Second page",
+    type: "user",
+    image_url: null,
+    description: null,
+    member_count: 1,
+    joined: false,
+    can_join: true,
+  } as unknown as CachedExploreCommunity;
+
+  appendExploreCommunities([pageTwo], { cursor: null, hasMore: false });
+
+  assert.deepEqual(
+    exploreStore.data?.communities.map((c) => c.id),
+    [DESIGN_SYSTEM, pageTwo.id],
+    "what the member scrolled past stays put",
+  );
+  assert.deepEqual(exploreStore.page, { cursor: null, hasMore: false });
+  assert.deepEqual(announced, [EXPLORE_STORE_CHANGED_EVENT]);
+});
+
+test("appending never shortens the list, even if a row arrives twice", () => {
+  setExploreCommunities(exploreRows());
+  const [only] = exploreRows();
+
+  appendExploreCommunities([only], { cursor: null, hasMore: false });
+
+  assert.equal(exploreStore.data?.communities.length, 1);
+  assert.equal(exploreStore.page.hasMore, false);
+});
+
+test("a reset forgets the rows AND the reading position", () => {
+  setExploreCommunities(exploreRows(), {
+    page: { cursor: "Zed|22222222-2222-4222-8222-222222222222", hasMore: true },
+  });
+
+  resetExploreStore();
+
+  assert.equal(exploreStore.data, null);
+  assert.deepEqual(
+    exploreStore.page,
+    { cursor: null, hasMore: false },
+    "the next user must not open on the last user's page two",
+  );
 });
 
 test("a row patch reaches the store and the cached snapshot together", () => {

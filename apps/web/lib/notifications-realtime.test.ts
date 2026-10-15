@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  applyNotificationPatch,
   notificationRealtimeEvent,
   type NotificationCreatedRow,
 } from "./notifications-realtime";
@@ -93,4 +94,72 @@ test("the topic follows the inserted flag, not the caller", () => {
     notificationRealtimeEvent(row({ inserted: false }), "r").topic,
     "update",
   );
+});
+
+/**
+ * M-4b — the `update` handler MERGES, so a partial event cannot blank a row.
+ *
+ * Two publishers share this topic and they send different amounts of the row:
+ * the aggregation path above sends the whole thing, while "mark all read"
+ * publishes only `{ id, read_at }` — it used to re-read every unread row (body
+ * and all) purely to build this payload, which was egress spent on fields the
+ * handler already holds. These tests pin the rule that makes that safe.
+ */
+const held = [
+  {
+    id: "n-1",
+    user_id: "u-recipient",
+    type: "thread_like" as const,
+    title: "Alice liked your thread",
+    body: "Thread title",
+    href: "/dashboard/communities/c-1/threads/t-1",
+    read_at: null as string | null,
+    created_at: "2026-09-28T10:00:00.000Z",
+  },
+  {
+    id: "n-2",
+    user_id: "u-recipient",
+    type: "thread_comment" as const,
+    title: "Bob commented",
+    body: "Nice work",
+    href: "/dashboard/communities/c-1/threads/t-2",
+    read_at: null as string | null,
+    created_at: "2026-09-28T09:00:00.000Z",
+  },
+];
+
+test("a read-receipt patch keeps every field it does not carry", () => {
+  const at = "2026-10-15T12:00:00.000Z";
+  const next = applyNotificationPatch(held, { id: "n-1", read_at: at });
+
+  assert.equal(next[0].read_at, at);
+  // The regression this guards: a replace would have dropped all four.
+  assert.equal(next[0].title, "Alice liked your thread");
+  assert.equal(next[0].body, "Thread title");
+  assert.equal(next[0].href, "/dashboard/communities/c-1/threads/t-1");
+  assert.equal(next[0].type, "thread_like");
+  // The other rows are untouched, by identity.
+  assert.equal(next[1], held[1]);
+});
+
+test("a full-row patch still updates every field it carries", () => {
+  const next = applyNotificationPatch(held, {
+    id: "n-2",
+    read_at: "2026-10-15T12:00:00.000Z",
+    title: "Bob and Carol commented",
+  });
+
+  assert.equal(next[1].title, "Bob and Carol commented");
+  assert.equal(next[1].read_at, "2026-10-15T12:00:00.000Z");
+  assert.equal(next[1].body, "Nice work");
+  assert.equal(next[0], held[0]);
+});
+
+test("a patch for an id the window does not hold is ignored", () => {
+  const next = applyNotificationPatch(held, {
+    id: "n-elsewhere",
+    read_at: "2026-10-15T12:00:00.000Z",
+  });
+
+  assert.deepEqual(next, held);
 });

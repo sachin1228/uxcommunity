@@ -5,6 +5,22 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 
 type AggregateBase = { id: string };
 
+/** The columns the four comment page functions share. `total_count`, `has_more`
+ *  and the cursor's two halves are page-level: they are set on the page's first
+ *  row and null on every other, so the payload cannot grow with the page. */
+type CommentPageRpcRow = {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  total_count: number | null;
+  has_more: boolean | null;
+  next_before: string | null;
+  next_before_id: string | null;
+};
+
 type PerformanceRpcMap = {
   get_community_message_page: {
     // p_before_id / p_after_id are the id halves of the compound (created_at,
@@ -19,11 +35,52 @@ type PerformanceRpcMap = {
     // lib/communities/message-cursor-support.ts and
     // lib/communities/read-models.ts.
     args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number; p_content_ids: string[] | null; p_before_id?: string | null; p_after_id?: string | null };
-    returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users: Json; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
+    // `users` is gone and `authors` replaces it (20261015170000_message_page_
+    // author_map): the page's distinct authors travel ONCE as a
+    // `{ user_id: { name, avatar_url, designation } }` map on a single row
+    // instead of once per message. The loader fills every message's `users`
+    // from that map before anything reads the page, so the shape the rest of
+    // the app consumes is unchanged. `authors` is therefore nullable on the
+    // rows that do not carry it, and absent entirely on an un-migrated
+    // database — the loader keeps whatever per-row `users` it finds.
+    returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users?: Json; authors?: Json | null; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
+  };
+  // ── Comment pages (20261015180000_comment_page_cursor) ─────────────────────
+  // One page of a content item's comments: a window of top-level comments, the
+  // replies under them, the item's total count and the next cursor. Before
+  // these, every comment surface read its WHOLE list on every request
+  // (docs/supabase-egress-audit.md §6). The page-level values ride on ONE row
+  // of the page; every other row carries null for them.
+  get_thread_comment_page: {
+    args: { p_thread_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { thread_id: string }>;
+  };
+  get_resource_comment_page: {
+    args: { p_resource_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { resource_id: string }>;
+  };
+  get_showcase_comment_page: {
+    args: { p_post_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { post_id: string }>;
+  };
+  get_event_comment_page: {
+    args: { p_event_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { event_id: string; image_url: string | null }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };
+  // One PAGE of the Explore directory, ordered by (name, id) and continued with
+  // the keyset cursor's two halves (see 20261015150000_all_communities_cursor).
+  // The bound is the point: this read used to return every active community on
+  // the platform to every member, on every Explore visit.
   get_all_communities: {
-    args: { p_user_id: string };
+    args: {
+      p_user_id: string;
+      /** Clamped to 1..500 in SQL, so the unbounded read cannot be asked for. */
+      p_limit: number;
+      /** The last row of the previous page; both halves are sent together. */
+      p_after_name: string | null;
+      p_after_id: string | null;
+    };
     returns: Array<{
       id: string;
       name: string;
@@ -35,6 +92,36 @@ type PerformanceRpcMap = {
       joined: boolean;
       can_join: boolean;
       has_pending_request: boolean;
+    }>;
+  };
+  // The homepage rail's own bounded read: the biggest member-created communities
+  // the caller could one-tap join. It exists because a name-ordered page cannot
+  // express "biggest first", so bounding the directory would otherwise have
+  // narrowed the rail to the first names in the alphabet.
+  // Grouped comment reactions: one row per (comment, emoji) instead of one per
+  // person, because a comment pill renders a count and the caller's own state
+  // (see 20261015160000_comment_reaction_summaries).
+  get_comment_reaction_summaries: {
+    args: { p_user_id: string; p_kind: string; p_comment_ids: string[] };
+    returns: Array<{
+      comment_id: string;
+      emoji: string;
+      reaction_count: number;
+      reacted: boolean;
+    }>;
+  };
+  get_suggested_communities: {
+    args: { p_user_id: string; p_limit: number };
+    returns: Array<{
+      id: string;
+      name: string;
+      type: string;
+      image_url: string | null;
+      description: string | null;
+      is_private: boolean;
+      member_count: number;
+      joined: boolean;
+      can_join: boolean;
     }>;
   };
   get_community_members_page: {

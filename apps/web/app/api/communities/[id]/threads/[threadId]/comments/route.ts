@@ -10,6 +10,8 @@ import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
+import { loadCommentPage, nestCommentRows } from "@/lib/communities/comment-pages";
+import { parseCommentPageRequest } from "@/lib/communities/comment-page-cursor";
 
 type EnrichedRow = Record<string, unknown> & {
   users: CommentAuthor | null;
@@ -20,11 +22,16 @@ async function attachUsers(
   db: ReturnType<typeof createServiceClient>,
   rows: Array<Record<string, unknown>>,
 ): Promise<EnrichedRow[]> {
-  return (await attachCommentAuthors(db, rows)).map((row) => ({ ...row, replies: [] as EnrichedRow[] }));
+  // `replies` is seeded here so the nesting below and the section both have the
+  // array they read; a row that came with one keeps it.
+  return (await attachCommentAuthors(db, rows)).map((row) => ({
+    ...row,
+    replies: (Array.isArray(row.replies) ? row.replies : []) as EnrichedRow[],
+  }));
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; threadId: string }> },
 ) {
   let session;
@@ -50,32 +57,26 @@ export async function GET(
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  const { data, error } = await db
-    .from("thread_comments")
-    .select("id, thread_id, user_id, parent_id, body, created_at, updated_at")
-    .eq("thread_id", threadId)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("[GET comments]", error);
+  // One page, not the thread: the newest page by default, or the page above the
+  // caller's cursor (see lib/communities/comment-pages.ts).
+  const page = await loadCommentPage(db, "threads", threadId, parseCommentPageRequest(req.nextUrl.searchParams));
+  if (page.error) {
+    console.error("[GET comments]", page.error);
     return NextResponse.json({ error: "Failed to fetch comments." }, { status: 500 });
   }
 
-  const withUsers = await attachUsers(db, (data ?? []) as Array<Record<string, unknown>>);
-
-  // Grouped emoji reactions per comment (empty lists when none / table missing),
-  // attached before nesting so replies carry their reactions too.
+  // Authors and reactions are attached while the page is still a FLAT list —
+  // both look rows up by id, so a reply that had already been nested away would
+  // be skipped, then the flat list is nested for the section.
+  const withUsers = await attachUsers(db, page.rows as Array<Record<string, unknown>>);
   const withReactions = await attachCommentReactions(db, withUsers, session.userId!, "threads");
 
-  // Nest replies under their parent
-  const topLevel = withReactions.filter((c) => !c.parent_id);
-  const replies = withReactions.filter((c) => c.parent_id);
-  for (const reply of replies) {
-    const parent = topLevel.find((c) => c.id === reply.parent_id);
-    if (parent) (parent.replies as typeof withReactions).push(reply);
-  }
-
-  return NextResponse.json({ comments: topLevel });
+  return NextResponse.json({
+    comments: nestCommentRows(withReactions),
+    totalCount: page.totalCount,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  });
 }
 
 export async function POST(

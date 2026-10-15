@@ -92,14 +92,20 @@ export interface JobApplicationSummary {
   applied_label?: string;
 }
 
-/** One posting as `job_post_payload` renders it for one viewer. */
-export interface JobPost {
+/**
+ * One posting as a LIST renders it — what `job_post_payload(…, false)` builds
+ * for `get_job_feed`, i.e. every field the board's cards, the detail header
+ * and the owner's menu render, and nothing else. The three prose fields are
+ * deliberately absent here (see `JobProse`): they are what the detail read is
+ * for, and they are ~81% of a row's bytes on the wire.
+ *
+ * Everything that only scans or labels a posting should take THIS type, so no
+ * card-shaped surface can reach for prose that its payload no longer carries.
+ */
+export interface JobFeedRow {
   id: string;
   kind: JobKind;
   title: string;
-  description: string;
-  responsibilities: string[];
-  requirements: string[];
   skills: string[];
   salary: string | null;
   website: string | null;
@@ -156,6 +162,43 @@ export interface JobPost {
   deadline_expired: boolean;
 }
 
+/**
+ * The three prose fields, and the only ones a list row omits: the posting's
+ * own page, and the board's detail pane once it has fetched it. They are the
+ * whole reason the detail read exists — everything else travels with the card.
+ */
+export interface JobProse {
+  description: string;
+  responsibilities: string[];
+  requirements: string[];
+}
+
+/**
+ * A posting in full: a feed row plus its prose. `get_job_detail` and
+ * `GET /api/jobs/<id>` return one; the board's pane renders a row and fills
+ * the prose in behind it, so the pane's own shape is `JobPostView`.
+ */
+export interface JobPost extends JobFeedRow, JobProse {}
+
+/**
+ * The board's detail pane: a row it already has, with the prose optional and
+ * filled in by one read. The header, the badges, the Apply action and the
+ * owner's menu all render from the row alone — only the three prose sections
+ * wait, which is why the pane can show the posting immediately instead of a
+ * blank card while a second request is in flight.
+ */
+export type JobPostView = JobFeedRow & Partial<JobProse>;
+
+/**
+ * Whether a row arrived with its prose — the difference between a list row
+ * and a posting that has already been read in full. A type guard rather than
+ * a truthiness test on `description`: an empty description is a posting whose
+ * author wrote none, not a posting that has not arrived.
+ */
+export function hasJobProse(row: JobFeedRow): row is JobPost {
+  return "description" in row;
+}
+
 export interface JobApplicant {
   id: string;
   applicant_id: string;
@@ -206,7 +249,7 @@ export interface JobViewer {
 }
 
 /** Human-readable names of the criteria the viewer's profile does not match. */
-export function criteriaMismatches(job: JobPost, viewer: JobViewer): string[] {
+export function criteriaMismatches(job: JobFeedRow, viewer: JobViewer): string[] {
   const mismatches: string[] = [];
   // An All dimension (NULL) is open to everyone and can never mismatch.
   if (job.city_id !== null && viewer.cityId !== job.city_id) mismatches.push("city");

@@ -4,6 +4,7 @@ import type { CommunityThread, ThreadComment } from "@/lib/communities/models/th
 import { attachPollVotes } from "@/lib/threads/poll-votes"
 import { createServiceClient } from "@/lib/supabase/service"
 import { loadCommentAuthors } from "@/lib/communities/comment-authors"
+import { loadCommentPage, nestCommentRows } from "@/lib/communities/comment-pages"
 
 type Database = ReturnType<typeof createServiceClient>
 
@@ -44,39 +45,48 @@ async function loadThread(db: Database, options: LoadOptions): Promise<Community
   }
 }
 
-async function loadComments(db: Database, threadId: string): Promise<ThreadComment[]> {
-  const { data } = await db
-    .from("thread_comments")
-    .select("id, thread_id, user_id, parent_id, body, created_at, updated_at")
-    .eq("thread_id", threadId)
-    .order("created_at", { ascending: true })
+/**
+ * The first paint's comments: ONE page, with the page-level values the client
+ * needs to continue the list.
+ *
+ * This read used to select the thread's whole discussion, and the route then
+ * selected it again on every mount (docs/supabase-egress-audit.md §6). The
+ * bound and the cursor come from the shared loader, so the server render and
+ * the client's "load more" agree on where the page ended.
+ */
+async function loadComments(db: Database, threadId: string) {
+  const page = await loadCommentPage(db, "threads", threadId)
 
-  if (!data?.length) return []
+  if (!page.rows.length) {
+    return { comments: [] as ThreadComment[], page: { totalCount: page.totalCount, hasMore: page.hasMore, nextCursor: page.nextCursor } }
+  }
 
   // Authors come from the shared resolver so the server-rendered comments match
   // the members list, instead of the pill appearing only after the client fetch.
   const authors = await loadCommentAuthors(
     db,
-    data.map((comment) => comment.user_id as string),
+    page.rows.map((comment) => comment.user_id as string),
   )
-  const enriched: ThreadComment[] = data.map((comment) => ({
+  // The page's rows are untyped records (the Supabase client is untyped until
+  // generated types are refreshed), so the thread shape is restored here.
+  const enriched = page.rows.map((comment) => ({
     ...comment,
     users: authors[(comment as { user_id: string }).user_id] ?? null,
     replies: [],
-  }))
-  const roots = enriched.filter((comment) => !comment.parent_id)
-  for (const reply of enriched.filter((comment) => comment.parent_id)) {
-    roots.find((comment) => comment.id === reply.parent_id)?.replies.push(reply)
+  })) as unknown as ThreadComment[]
+  return {
+    comments: nestCommentRows(enriched) as ThreadComment[],
+    page: { totalCount: page.totalCount, hasMore: page.hasMore, nextCursor: page.nextCursor },
   }
-  return roots
 }
 
 export async function loadThreadDetail(options: LoadOptions) {
   const db = createServiceClient()
-  const [thread, comments] = await Promise.all([
+  const [thread, commentPage] = await Promise.all([
     loadThread(db, options),
     loadComments(db, options.threadId),
   ])
+  const comments = commentPage.comments
   let threadWithVotes = thread
   if (thread) {
     const [attached] = await attachPollVotes(
@@ -88,5 +98,5 @@ export async function loadThreadDetail(options: LoadOptions) {
     // the first row is the thread row plus its vote tally.
     threadWithVotes = (attached?.[0] ?? thread) as unknown as CommunityThread
   }
-  return { db, thread: threadWithVotes, comments }
+  return { db, thread: threadWithVotes, comments, commentPage: commentPage.page }
 }

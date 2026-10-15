@@ -36,6 +36,7 @@ import { evictCommunityState } from "./community-cache";
 import { clearReactionTombstone } from "./reactions";
 import {
   exploreStore,
+  resetExploreStore,
   notifyExploreStoreChanged,
 } from "./explore-store";
 import type { CachedSidebarCommunity, SidebarLastReaction } from "./types";
@@ -186,8 +187,9 @@ export function invalidateOnJoin(communityId: string): void {
 export function invalidateCommunitiesList(): void {
   sidebarStore.data     = null;
   sidebarStore.inflight = null;
-  exploreStore.data     = null;
-  exploreStore.inflight = null;
+  // A full invalidation forgets the directory AND how far into it the member
+  // had read — the next read starts from its first page.
+  resetExploreStore();
   invalidateRequest("/api/communities");
   notifySidebarChanged();
 }

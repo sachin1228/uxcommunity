@@ -85,6 +85,7 @@ uxcommunity/
 | `docs/user-deletion-audit.md` | What `DELETE /api/admin/users/[id]` removes, cascades, and leaves in R2 |
 | `INFRASTRUCTURE-AUDIT.md` | Full production infrastructure audit (deployment, flows, scale, cost) |
 | `docs/infrastructure-cost-audit.md` | Third-party services and cloud-cost audit: every billable service, current vendor prices, and a monthly cost model from 1K to 1M users (`node scripts/cost-model.mjs`) |
+| `docs/supabase-egress-audit.md` | Supabase egress audit: measured per-call bytes, the ten hotspots ranked, and the prioritised fixes (card-only job feed, paged Explore directory, unconditional mark-all-read) |
 
 ## Prerequisites
 

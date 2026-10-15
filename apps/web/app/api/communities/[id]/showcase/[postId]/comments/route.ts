@@ -6,6 +6,8 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
+import { loadCommentPage, nestCommentRows } from "@/lib/communities/comment-pages";
+import { parseCommentPageRequest } from "@/lib/communities/comment-page-cursor";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string, requireRepliesEnabled = false) {
   const postQuery = db.from("community_showcase_posts").select("id, is_public, allow_replies").eq("id", postId).eq("community_id", communityId);
@@ -28,26 +30,38 @@ async function enrich(
   // One shared author resolver, so a comment author reads the same here as on
   // the thread / resource / event surfaces and in the members list. The rows
   // stay index-accessible for the reply nesting at the call site.
+  // `replies` is seeded here so the nesting below and the section both have the
+  // array they read.
   const authored = await attachCommentAuthors(db, rows);
   return authored.map(
     (row) =>
-      ({ ...row, replies: [] as Record<string, unknown>[] }) as Record<string, unknown> & {
+      ({
+        ...row,
+        replies: (Array.isArray(row.replies) ? row.replies : []) as Record<string, unknown>[],
+      }) as Record<string, unknown> & {
         replies: Record<string, unknown>[];
       },
   );
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id, postId } = await params; const db = createServiceClient();
   if (!(await access(db, id, postId, session.userId!))) return NextResponse.json({ error: "Post not found." }, { status: 404 });
-  const { data, error } = await db.from("showcase_comments").select("id, post_id, user_id, parent_id, body, created_at, updated_at").eq("post_id", postId).order("created_at");
-  if (error) return NextResponse.json({ error: "Failed to load comments." }, { status: 500 });
-  // Grouped emoji reactions per comment, attached before nesting so replies
-  // carry their reactions too.
-  const comments = await attachCommentReactions(db, await enrich(db, (data ?? []) as Array<Record<string, unknown>>), session.userId!, "showcase"); const top = comments.filter((comment) => !comment.parent_id);
-  for (const reply of comments.filter((comment) => comment.parent_id)) { const parent = top.find((comment) => comment.id === reply.parent_id); if (parent) parent.replies.push(reply); }
-  return NextResponse.json({ comments: top });
+  // One page, not the whole discussion: the newest page by default, or the page
+  // above the caller's cursor (see lib/communities/comment-pages.ts).
+  const page = await loadCommentPage(db, "showcase", postId, parseCommentPageRequest(request.nextUrl.searchParams));
+  if (page.error) return NextResponse.json({ error: "Failed to load comments." }, { status: 500 });
+  // Authors and reactions are attached while the page is still a FLAT list —
+  // both look rows up by id, so an already-nested reply would be skipped — and
+  // then the list is nested for the section.
+  const comments = await attachCommentReactions(db, await enrich(db, page.rows as Array<Record<string, unknown>>), session.userId!, "showcase");
+  return NextResponse.json({
+    comments: nestCommentRows(comments),
+    totalCount: page.totalCount,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {

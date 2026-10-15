@@ -9,14 +9,20 @@ import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal"
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import {
+  appendExploreCommunities,
   exploreStore,
   EXPLORE_STALE_MS,
   setCommunityViewerState,
   setExploreCommunities,
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
-import { useExploreCommunities } from "@/lib/communities/cache/use-community-stores";
+import {
+  useExploreCommunities,
+  useExploreCursor,
+  useExploreHasMore,
+} from "@/lib/communities/cache/use-community-stores";
 import {
   EXPLORE_TABS,
   visibleExploreRows,
@@ -176,10 +182,21 @@ export default function CommunitiesIndexPage() {
   // copy is what let Explore offer "Request to join" for a community the member
   // had already asked to join from the feed.
   const communities = useExploreCommunities();
+  // Where the member has read up to in the directory: the sentinel shows while
+  // the server says there is another page, and the loader pages from the
+  // cursor. Both live in the store with the rows, so a remount resumes the
+  // same list at the same place.
+  const hasMore                       = useExploreHasMore();
+  const cursor                        = useExploreCursor();
   // "nothing to show yet", i.e. no fetch has settled for an empty store. Rows in
   // the store (cached or fresh) end the spinner even while a refetch runs.
   const [settled, setSettled]         = useState(() => exploreStore.data !== null);
   const loading                       = !settled && communities.length === 0;
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Guards the sentinel against firing again while its page is in flight: the
+  // observer is re-armed on every cursor change, so it can call back twice
+  // before the first response lands.
+  const loadingMoreRef                = useRef(false);
   const [activeTab, setActiveTab]     = useState<ExploreTabValue>("all");
   const [search, setSearch]           = useState("");
   const [joinTarget, setJoinTarget]   = useState<Community | null>(null);
@@ -201,7 +218,11 @@ export default function CommunitiesIndexPage() {
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => {
         if (!d) return;
-        setExploreCommunities(d.communities ?? []);
+        // The first page REPLACES the list (this is the refresh path too), and
+        // it carries the reading position the sentinel continues from.
+        setExploreCommunities(d.communities ?? [], {
+          page: { cursor: d.next_cursor ?? null, hasMore: Boolean(d.has_more) },
+        });
       })
       .catch(() => {})
       .finally(() => {
@@ -215,6 +236,38 @@ export default function CommunitiesIndexPage() {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
+
+  /**
+   * Pull the next page in — what the end-of-list sentinel calls as it scrolls
+   * into view, on the same shared controls as every other feed.
+   *
+   * The page APPENDS: everything the member has already scrolled past stays put,
+   * and `mergeExploreRows` (behind `appendExploreCommunities`) is what keeps a
+   * row that moved between two reads from arriving twice. Search and the privacy
+   * tabs still filter client-side over what is loaded, so they narrow the list
+   * *and* the sentinel keeps deepening it underneath — which is what makes a
+   * small tab (or a common name) reachable without ever loading the directory in
+   * one go.
+   */
+  const loadMore = useCallback(() => {
+    if (!cursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    void fetch(`/api/communities/all?after=${encodeURIComponent(cursor)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (!d) return;
+        appendExploreCommunities(d.communities ?? [], {
+          cursor: d.next_cursor ?? null,
+          hasMore: Boolean(d.has_more),
+        });
+      })
+      .catch(() => {})
+      .finally(() => {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      });
+  }, [cursor]);
 
   /**
    * Public join (or an auto-accepted request): the member is in — open the chat.
@@ -391,6 +444,13 @@ export default function CommunitiesIndexPage() {
               </section>
             )}
           </>
+        )}
+
+        {/* The directory continues below the loaded rows — the same end-of-list
+            sentinel every other feed uses. Not on the Requests tab: that list is
+            the member's own pending requests, not a page of the directory. */}
+        {!isRequestsTab && (
+          <FeedLoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} />
         )}
       </div>
 

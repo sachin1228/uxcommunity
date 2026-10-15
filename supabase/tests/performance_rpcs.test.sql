@@ -1,12 +1,17 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(28);
 
 -- Nine arguments: the compound (created_at, id) cursor halves are appended
 -- after p_content_ids (see 20261013100000_community_message_compound_cursor).
 select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer','uuid[]','uuid','uuid']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
-select has_function('public', 'get_all_communities', array['uuid']);
+-- Comment reactions are grouped in SQL now: one row per (comment, emoji) rather
+-- than one per person (20261015160000_comment_reaction_summaries).
+select has_function('public', 'get_comment_reaction_summaries', array['uuid','text','uuid[]']);
+-- Explore gained a bound and a keyset cursor (20261015150000_all_communities_cursor),
+-- so its signature carries the page size and the two cursor halves.
+select has_function('public', 'get_all_communities', array['uuid','integer','text','uuid']);
 select has_function('public', 'get_thread_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_event_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_resource_list_aggregates', array['uuid','uuid[]']);

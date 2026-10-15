@@ -11,13 +11,19 @@ import type { CommunityResource, ResourceComment } from "@/lib/communities/model
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
 import { CommentSection } from "../CommentSection";
-import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { useCommentPaging } from "../use-comment-paging";
+import type { CommentPageResponse } from "../use-comment-paging";
+import type { CommentPageMeta } from "@/lib/communities/comment-page-cursor";
+import { mergeCommentRoots, updateCommentReactions } from "@/lib/communities/comment-tree";
 
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface Props {
   resource: CommunityResource;
   initialComments: ResourceComment[];
+  /** The page the server rendered with: the resource's total comment count and
+   *  the cursor for the comments older than `initialComments`. */
+  initialCommentPage?: CommentPageMeta | null;
   currentUserId: string;
   communityId: string;
   communityName: string;
@@ -33,22 +39,46 @@ interface Props {
   canModerate?: boolean;
 }
 
-export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, communityPreviewModal = false, backHref, backLabel = "Resources", canModerate = false }: Props) {
+export function ResourceDetailClient({ resource: initialResource, initialComments, initialCommentPage, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, communityPreviewModal = false, backHref, backLabel = "Resources", canModerate = false }: Props) {
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
   const isVisible = useDocumentVisible();
+  // Only one page of comments is on screen (see lib/communities/comment-pages.ts),
+  // so the count comes from the server's total, never from the list's length.
+  const paging = useCommentPaging<ResourceComment>({
+    communityId,
+    kind: "resources",
+    targetId: resource.id,
+    initial: initialCommentPage,
+  });
 
   const fetchComments = useCallback(async () => {
     try {
       const res = await fetch(`/api/communities/${communityId}/resources/${resource.id}/comments`, { cache: "no-store" });
       if (!res.ok) return;
-      const data = await res.json();
-      setComments(data.comments as ResourceComment[]);
-      const count = (data.comments as ResourceComment[]).reduce((acc: number, c: ResourceComment) => acc + 1 + (c.replies?.length ?? 0), 0);
-      setResource((r) => ({ ...r, comment_count: count }));
+      const data = (await res.json()) as CommentPageResponse<ResourceComment>;
+      setComments(data.comments ?? []);
+      paging.applyResponse(data);
+      if (typeof data.totalCount === "number") {
+        setResource((r) => ({ ...r, comment_count: data.totalCount as number }));
+      }
     } catch { /* silent */ }
-  }, [communityId, resource.id]);
+    // Only the stable half of `paging` belongs here: depending on the object would
+    // re-run this fetch whenever the cursor advances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId, resource.id, paging.applyResponse]);
+
+  /**
+   * The older page: fetched from the cursor the server issued and merged by id,
+   * so a comment already on screen (the reader's own, say) is not rendered twice.
+   * The count does not move — the server's total already included it.
+   */
+  async function handleLoadMore() {
+    const older = await paging.loadMore();
+    if (!older?.length) return;
+    setComments((prev) => mergeCommentRoots(prev, older));
+  }
 
   useEffect(() => {
     if (!isVisible) return;
@@ -143,6 +173,10 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                   allowReplies={resource.allow_replies !== false}
                   comments={comments}
                   currentUserId={currentUserId}
+                  totalCount={paging.totalCount}
+                  hasMore={paging.hasMore}
+                  loadingMore={paging.loadingMore}
+                  onLoadMore={handleLoadMore}
                   onPosted={handleCommentPosted}
                   onDeleted={handleCommentDeleted}
                   onReactionToggled={(commentId, _parentId, reactions) =>

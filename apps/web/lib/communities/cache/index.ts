@@ -31,7 +31,7 @@ import {
   msgFetchedAt,
 } from "./community-cache";
 import { clearReactionTombstones } from "./reactions";
-import { exploreStore } from "./explore-store";
+import { resetExploreStore } from "./explore-store";
 import { sidebarStore } from "./sidebar-store";
 
 export * from "./types";
@@ -63,7 +63,8 @@ export function clearAllUserCaches(): void {
   inFlightMetaFetch.clear();
   sidebarStore.data     = null;
   sidebarStore.inflight = null;
-  exploreStore.data     = null;
-  exploreStore.inflight = null;
+  // Rows AND reading position: the next user's Explore must not open on the
+  // page the last one had scrolled to.
+  resetExploreStore();
   cachedUserId          = null;
 }

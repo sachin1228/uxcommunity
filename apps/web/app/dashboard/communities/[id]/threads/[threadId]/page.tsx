@@ -14,7 +14,7 @@ export default async function ThreadDetailPage({ params }: Props) {
 
   const { id: communityId, threadId } = await params
   const userId = (session as { userId: string }).userId
-  const { db, thread, comments } = await loadThreadDetail({ communityId, threadId, userId })
+  const { db, thread, comments, commentPage } = await loadThreadDetail({ communityId, threadId, userId })
 
   const [{ data: membership }, { data: community }, managerStatus] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
@@ -29,6 +29,7 @@ export default async function ThreadDetailPage({ params }: Props) {
     <ThreadDetailClient
       thread={thread}
       initialComments={comments}
+      initialCommentPage={commentPage}
       currentUserId={userId}
       communityId={communityId}
       communityName={community?.name ?? "Community"}

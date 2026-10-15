@@ -57,6 +57,32 @@ export function useExploreCommunities(): CachedExploreCommunity[] {
   );
 }
 
+/**
+ * Whether the directory continues past the loaded rows — what the end-of-list
+ * sentinel reads to decide if there is a page to pull in.
+ *
+ * A boolean snapshot, deliberately: `useSyncExternalStore` compares snapshots by
+ * identity, so a hook that returned `{ cursor, hasMore }` would hand React a new
+ * object on every read and re-render forever. The pair is two hooks for that
+ * reason, not because the values are unrelated.
+ */
+export function useExploreHasMore(): boolean {
+  return useSyncExternalStore(
+    subscribeToExplore,
+    () => exploreStore.page.hasMore,
+    () => false,
+  );
+}
+
+/** Where the next page starts — the loaded list's cursor, or null at the end. */
+export function useExploreCursor(): string | null {
+  return useSyncExternalStore(
+    subscribeToExplore,
+    () => exploreStore.page.cursor,
+    () => null,
+  );
+}
+
 /** The cached sidebar rows — the same rows realtime, mark-read and joins write. */
 export function useSidebarCommunityRows(): CachedSidebarCommunity[] {
   return useSyncExternalStore(
