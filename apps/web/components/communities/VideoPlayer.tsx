@@ -744,14 +744,13 @@ export function VideoPlayer({
 
             <div className="flex-1" />
 
-            <div className="group/volume flex items-center">
-              {/* The slider reveals to the LEFT of the mute button: the
-                  cluster is right-anchored, so growing leftward keeps the
-                  button (and fullscreen) exactly where the cursor is —
-                  growing rightward would slide the button out from under it. */}
+            <div className="group/volume relative flex items-center">
+              {/* Vertical volume popup floating above the mute button (YT-mobile
+                  style). Absolute, so nothing in the bar ever shifts — and the
+                  button stays exactly where the cursor is. */}
               {canHover && (
-                <div className="w-0 overflow-hidden opacity-0 transition-all duration-200 ease-out group-hover/volume:w-[68px] group-hover/volume:opacity-100">
-                  <div className="px-1">
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-30 -translate-x-1/2 pb-2 group-hover/volume:pointer-events-auto">
+                  <div className="translate-y-1.5 scale-95 rounded-lg border border-white/10 bg-black/75 p-2 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out group-hover/volume:translate-y-0 group-hover/volume:scale-100 group-hover/volume:opacity-100 focus-within:translate-y-0 focus-within:scale-100 focus-within:opacity-100">
                     <VolumeSlider value={muted ? 0 : volume} onChange={setVolumeLevel} />
                   </div>
                 </div>
@@ -791,17 +790,18 @@ export function VideoPlayer({
   );
 }
 
-/** Compact volume slider revealed on hovering the mute button. */
+/** Vertical volume slider inside the popup above the mute button. */
 function VolumeSlider({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const applyFromClientX = (clientX: number) => {
+  const applyFromClientY = (clientY: number) => {
     const el = trackRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    onChange(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)));
+    if (rect.height <= 0) return;
+    // Top of the track is full volume.
+    onChange(Math.min(1, Math.max(0, 1 - (clientY - rect.top) / rect.height)));
   };
 
   const nudge = (delta: number) => onChange(Math.min(1, Math.max(0, value + delta)));
@@ -811,6 +811,7 @@ function VolumeSlider({ value, onChange }: { value: number; onChange: (value: nu
       ref={trackRef}
       role="slider"
       aria-label="Volume"
+      aria-orientation="vertical"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(value * 100)}
@@ -819,39 +820,39 @@ function VolumeSlider({ value, onChange }: { value: number; onChange: (value: nu
         event.stopPropagation();
         trackRef.current?.setPointerCapture(event.pointerId);
         setDragging(true);
-        applyFromClientX(event.clientX);
+        applyFromClientY(event.clientY);
       }}
       onPointerMove={(event) => {
-        if (dragging) applyFromClientX(event.clientX);
+        if (dragging) applyFromClientY(event.clientY);
       }}
       onPointerUp={() => setDragging(false)}
       onPointerCancel={() => setDragging(false)}
       onKeyDown={(event) => {
-        if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
-          event.preventDefault();
-          event.stopPropagation();
-          nudge(-0.05);
-        } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+        if (event.key === "ArrowUp" || event.key === "ArrowRight") {
           event.preventDefault();
           event.stopPropagation();
           nudge(0.05);
+        } else if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+          event.preventDefault();
+          event.stopPropagation();
+          nudge(-0.05);
         }
       }}
-      className="group/vol relative flex h-5 w-full cursor-pointer touch-none items-center rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-white/60"
+      className="group/vol relative flex h-16 w-4 cursor-pointer touch-none justify-center rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-white/60"
     >
-      <div className="relative h-[3px] w-full rounded-full bg-white/30">
+      <div className="relative h-full w-[3px] overflow-hidden rounded-full bg-white/30">
         <div
-          className="absolute inset-0 origin-left rounded-full bg-white"
-          style={{ transform: `scaleX(${value})` }}
+          className="absolute inset-0 origin-bottom rounded-full bg-white"
+          style={{ transform: `scaleY(${value})` }}
         />
       </div>
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 -translate-x-1/2"
-        style={{ left: `${value * 100}%` }}
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 translate-y-1/2"
+        style={{ bottom: `${value * 100}%` }}
       >
         <span
-          className={`flex h-full w-3 items-center justify-center transition-transform duration-150 ease-out ${
+          className={`flex h-3 w-3 items-center justify-center transition-transform duration-150 ease-out ${
             dragging ? "scale-100" : "scale-0 group-hover/vol:scale-100"
           }`}
         >
