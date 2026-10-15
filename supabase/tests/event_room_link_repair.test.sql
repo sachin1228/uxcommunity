@@ -1,5 +1,5 @@
 -- ============================================================
--- Account deletion with a drifted event-room link
+-- Account deletion with event rooms
 --
 -- Incident 2026-10-15: deleting an account from the admin Users page returned
 -- 500 —
@@ -7,114 +7,138 @@
 --   "communities_event_id_fkey"
 --   Key (event_id)=… is not present in table "community_events"
 --
--- The account owned a room whose communities.event_id pointed at an event row
--- that no longer exists. PostgreSQL's FK check skips the first update of a row
--- in a transaction, but every later update of that row re-checks the
--- constraint — and account deletion updates each owned room twice (the BEFORE
--- DELETE handover, then the membership counter maintenance the cascade
--- triggers), so the stale link aborted the whole deletion.
+-- The account hosted events and owned (or belonged to) the rooms that linked
+-- them. Account deletion cascades the events away, and the same transaction
+-- keeps updating the rooms (handover, membership counter maintenance).
+-- PostgreSQL skips the FK check on the first update of a row in a transaction
+-- but re-checks on every later one, and trigger firing order decides whether
+-- the counter update lands after the event cascade — when it does, the stale
+-- link aborts the whole delete.
 --
--- Fix under test — 20261015140000_event_room_link_repair: the handover in
--- 20260913150000_community_ownership_on_user_delete now drops a stale link
--- before reassigning the room, and the migration nulls the drifted links
--- already in the database (the same end state event deletion produces: the
--- room outlives its event, only the link goes).
+-- Fix under test — 20261015140000_event_room_link_repair: the BEFORE DELETE
+-- handover trigger unlinks, up front, every room pointing at an event the
+-- departing user hosts (and drops genuinely dangling links), so no later
+-- update can re-check a dead link. Rooms keep their people and their chat;
+-- only the link goes.
 --
--- A drifted row cannot be created while the FK is enforced, so the fixtures
--- seed it with the row-level triggers bypassed — the way the live row came to
--- exist (surgery or a restore predating the constraint).
---
--- Fixtures are inserted inside a transaction and rolled back.
+-- Fixtures are inserted inside a transaction and rolled back; row-level
+-- triggers are bypassed while seeding (creation budgets + the counter
+-- triggers, which would re-update the drifted rows mid-fixture).
 -- ============================================================
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(13);
 
--- The repair migration re-asserts the canonical constraint, validated.
-select ok(
-  (select convalidated from pg_constraint
-    where conname = 'communities_event_id_fkey'
-      and conrelid = 'public.communities'::regclass),
-  'the canonical event FK exists and is validated');
-
--- ─── Fixture ────────────────────────────────────────────────
--- Row-level triggers are bypassed for the whole fixture: community inserts
--- skip the per-member creation budgets, membership inserts skip the counter
--- triggers (which would re-update the drifted room and trip the stale link
--- while seeding), and the drifted links become writable at all.
 set session_replication_role = replica;
 
 insert into public.users (id, name, email, password_hash) values
-  ('e1000000-0000-0000-0000-000000000001', 'Drift fixture owner', 'drift-owner@event-room.test', 'x'),
-  ('e1000000-0000-0000-0000-000000000002', 'Drift fixture successor', 'drift-succ@event-room.test', 'x'),
-  ('e1000000-0000-0000-0000-000000000003', 'Drift fixture loner', 'drift-loner@event-room.test', 'x');
+  ('e1000000-0000-0000-0000-000000000001', 'Event fixture owner', 'event-owner@event-room.test', 'x'),
+  ('e1000000-0000-0000-0000-000000000002', 'Event fixture successor', 'event-succ@event-room.test', 'x'),
+  ('e1000000-0000-0000-0000-000000000003', 'Event fixture loner', 'event-loner@event-room.test', 'x'),
+  ('e1000000-0000-0000-0000-000000000004', 'Event fixture other', 'event-other@event-room.test', 'x');
 
--- The event a healthy room still links to. Its host community is a plain
--- fixture row; the event itself is hosted by the successor, so deleting the
--- owner below never cascades the event away.
 insert into public.communities (id, name, type, owner_id, is_active) values
-  ('e1000000-0000-0000-0000-0000000000c4', 'Drift fixture event host', 'user',
+  ('e1000000-0000-0000-0000-0000000000c4', 'Event fixture host', 'user',
    'e1000000-0000-0000-0000-000000000002', true);
 
+-- e1 belongs to the successor and survives; e2 + e3 are the departing user's
+-- and die with them.
 insert into public.community_events (id, community_id, user_id, title, event_date) values
   ('e1000000-0000-0000-0000-0000000000e1', 'e1000000-0000-0000-0000-0000000000c4',
-   'e1000000-0000-0000-0000-000000000002', 'Drift fixture event', now());
+   'e1000000-0000-0000-0000-000000000002', 'Event fixture e1', now()),
+  ('e1000000-0000-0000-0000-0000000000e2', 'e1000000-0000-0000-0000-0000000000c4',
+   'e1000000-0000-0000-0000-000000000001', 'Event fixture e2', now()),
+  ('e1000000-0000-0000-0000-0000000000e3', 'e1000000-0000-0000-0000-0000000000c4',
+   'e1000000-0000-0000-0000-000000000001', 'Event fixture e3', now());
 
--- The healthy room, and the drifted ones — their event rows are already gone.
+-- c1 (their room, surviving event), c5 (their room, their event — the
+-- incident shape), c6 (someone else's room, their event), plus a drifted
+-- room each for the owner and for the loner.
 insert into public.communities (id, name, type, owner_id, event_id, is_active) values
-  ('e1000000-0000-0000-0000-0000000000c1', 'Healthy event room', 'event',
+  ('e1000000-0000-0000-0000-0000000000c1', 'Fixture room, surviving link', 'event',
    'e1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-0000000000e1', true),
-  ('e1000000-0000-0000-0000-0000000000c2', 'Drifted event room', 'event',
+  ('e1000000-0000-0000-0000-0000000000c5', 'Fixture room of their event', 'event',
+   'e1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-0000000000e2', true),
+  ('e1000000-0000-0000-0000-0000000000c6', 'Fixture others room, their event', 'event',
+   'e1000000-0000-0000-0000-000000000004', 'e1000000-0000-0000-0000-0000000000e3', true),
+  ('e1000000-0000-0000-0000-0000000000c2', 'Fixture drifted room', 'event',
    'e1000000-0000-0000-0000-000000000001', '458f40d4-36b8-48fb-a83a-7686bc75a324', true),
-  ('e1000000-0000-0000-0000-0000000000c3', 'Drifted room, nobody left', 'event',
+  ('e1000000-0000-0000-0000-0000000000c3', 'Fixture drifted room, nobody left', 'event',
    'e1000000-0000-0000-0000-000000000003', 'd0d0d0d0-0000-0000-0000-000000000000', true);
 
 insert into public.community_members (community_id, user_id, role) values
   ('e1000000-0000-0000-0000-0000000000c1', 'e1000000-0000-0000-0000-000000000001', 'owner'),
   ('e1000000-0000-0000-0000-0000000000c1', 'e1000000-0000-0000-0000-000000000002', 'member'),
+  ('e1000000-0000-0000-0000-0000000000c5', 'e1000000-0000-0000-0000-000000000001', 'owner'),
+  ('e1000000-0000-0000-0000-0000000000c5', 'e1000000-0000-0000-0000-000000000002', 'member'),
+  ('e1000000-0000-0000-0000-0000000000c6', 'e1000000-0000-0000-0000-000000000004', 'owner'),
+  ('e1000000-0000-0000-0000-0000000000c6', 'e1000000-0000-0000-0000-000000000001', 'member'),
   ('e1000000-0000-0000-0000-0000000000c2', 'e1000000-0000-0000-0000-000000000001', 'owner'),
   ('e1000000-0000-0000-0000-0000000000c2', 'e1000000-0000-0000-0000-000000000002', 'member');
 
 set session_replication_role = origin;
 
 -- ─── The failing admin path ─────────────────────────────────
--- Plain user deletes, exactly what the admin route sends; the BEFORE DELETE
--- trigger hands each owned room over and the cascade does the rest. Before the
--- fix the owner's delete raised 23503 on the drifted room and stopped here.
-
 delete from public.users where id = 'e1000000-0000-0000-0000-000000000001';
 delete from public.users where id = 'e1000000-0000-0000-0000-000000000003';
 
 select ok(true, 'account deletions completed without a 23503');
 
--- ─── Handover outcomes ──────────────────────────────────────
+-- ─── Outcomes ───────────────────────────────────────────────
 
 select is(
   (select owner_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c1'),
   'e1000000-0000-0000-0000-000000000002'::uuid,
-  'healthy room is handed to the longest-standing remaining member');
+  'room of a surviving event is handed to the successor');
 select is(
   (select event_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c1'),
   'e1000000-0000-0000-0000-0000000000e1'::uuid,
-  'healthy room keeps its event link');
+  'surviving event link is NOT over-nulled');
+
+select is(
+  (select owner_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c5'),
+  'e1000000-0000-0000-0000-000000000002'::uuid,
+  'their room of their own event is handed to the successor');
+select is(
+  (select event_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c5'),
+  null::uuid,
+  'their room loses the link to the event they hosted');
+
+select is(
+  (select owner_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c6'),
+  'e1000000-0000-0000-0000-000000000004'::uuid,
+  'someone else''s room keeps its owner');
+select is(
+  (select event_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c6'),
+  null::uuid,
+  'someone else''s room loses the link to their hosted event');
+select ok(
+  not exists (select 1 from public.community_members
+              where community_id = 'e1000000-0000-0000-0000-0000000000c6'
+                and user_id = 'e1000000-0000-0000-0000-000000000001'),
+  'their membership in that room is gone with the account');
+
 select is(
   (select owner_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c2'),
   'e1000000-0000-0000-0000-000000000002'::uuid,
-  'drifted room is handed to the longest-standing remaining member');
+  'drifted room is handed to the successor');
 select is(
   (select event_id from public.communities where id = 'e1000000-0000-0000-0000-0000000000c2'),
   null::uuid,
-  'the drifted link is dropped during the handover');
-select is(
-  (select role from public.community_members
-    where community_id = 'e1000000-0000-0000-0000-0000000000c2'
-      and user_id = 'e1000000-0000-0000-0000-000000000002'),
-  'owner',
-  'successor holds the owner membership in the drifted room');
+  'the drifted link is dropped');
+
 select ok(
   not exists (select 1 from public.communities where id = 'e1000000-0000-0000-0000-0000000000c3'),
   'drifted room with nobody left is removed with its owner');
+select ok(
+  not exists (select 1 from public.community_events
+              where user_id = 'e1000000-0000-0000-0000-000000000001'),
+  'their hosted events are gone with the account');
+select ok(
+  exists (select 1 from public.community_events
+          where id = 'e1000000-0000-0000-0000-0000000000e1'),
+  'the successor''s event survives');
 
 select finish();
 rollback;
