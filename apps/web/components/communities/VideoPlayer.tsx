@@ -14,8 +14,8 @@ import {
 
 /** Fired (on window) whenever a feed player starts so the other feed players pause. */
 const ACTIVATE_EVENT = "video-player:activate";
-/** Idle time after which the controls fade out while playing. */
-const HIDE_DELAY_MS = 2400;
+/** Idle time after which the controls fade out — playing or paused. */
+const HIDE_DELAY_MS = 2000;
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -30,10 +30,13 @@ function formatTime(seconds: number): string {
 /**
  * Video with custom chrome — YouTube-style, trimmed to the essentials:
  * play/pause, seek bar (buffered range, hover time, drag-to-scrub), time
- * readout, mute + volume slider, fullscreen. Controls fade out while playing
- * and return on hover / pause / focus; a centered play button doubles as the
- * replay affordance; double-click or `f` toggles fullscreen; space / k toggles
- * playback, ← → seek 5s, ↑ ↓ adjust volume, m mutes.
+ * readout, mute + volume slider, fullscreen.
+ *
+ * Controls start hidden (a video never greets you with chrome) and appear on
+ * hover or focus; two idle seconds — including two seconds after the cursor
+ * leaves the player or after a pause — fade them out again, leaving only the
+ * centered play / replay button. Double-click or `f` toggles fullscreen;
+ * space / k toggles playback, ← → seek 5s, ↑ ↓ adjust volume, m mutes.
  *
  * Same import surface as the rest of the feed: on the feed surfaces
  * (`autoplayInView`) the video autoplays muted when scrolled into view,
@@ -85,7 +88,7 @@ export function VideoPlayer({
   const [volume, setVolume] = useState(1);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [hoverFraction, setHoverFraction] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -102,7 +105,6 @@ export function VideoPlayer({
   const hideTimerRef = useRef<number | null>(null);
   const scrubbingRef = useRef(false);
   const controlsHoverRef = useRef(false);
-  const focusWithinRef = useRef(false);
   const wasPlayingRef = useRef(false);
   const downPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -180,9 +182,11 @@ export function VideoPlayer({
     clearHideTimer();
     hideTimerRef.current = window.setTimeout(() => {
       hideTimerRef.current = null;
-      const video = videoRef.current;
-      if (!video || video.paused || video.ended) return;
-      if (scrubbingRef.current || controlsHoverRef.current || focusWithinRef.current) return;
+      if (scrubbingRef.current || controlsHoverRef.current) return;
+      // Keep the chrome up for keyboard users (Tab focus, not a mouse click).
+      const root = rootRef.current;
+      const active = document.activeElement;
+      if (root && active && root.contains(active) && active.matches?.(":focus-visible")) return;
       setControlsVisible(false);
     }, HIDE_DELAY_MS);
   }, [clearHideTimer]);
@@ -209,13 +213,16 @@ export function VideoPlayer({
       setPlaying(true);
       setEnded(false);
       userPausedRef.current = false;
-      // Controls fade on an idle timer while playing; paused they stay put.
+      // Any start re-arms the idle fade, so chrome that was just showing
+      // (e.g. after pressing the center button) disappears again.
       armHideTimer();
     };
     const onPause = () => {
       setPlaying(false);
-      clearHideTimer();
+      // Show the bar as pause feedback, then fade on the usual idle timer —
+      // the centered play button is what stays.
       setControlsVisible(true);
+      armHideTimer();
       // Distinguish our programmatic pauses from the viewer pressing pause.
       if (programmaticRef.current) programmaticRef.current = false;
       else userPausedRef.current = true;
@@ -556,6 +563,8 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (video && wasPlayingRef.current && video.paused) attemptPlay();
     wasPlayingRef.current = false;
+    // Re-arm the idle fade: the pointer's last move may predate the drag.
+    armHideTimer();
   };
 
   const onSurfacePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -590,21 +599,16 @@ export function VideoPlayer({
       tabIndex={0}
       aria-label={ariaLabel ? `Video: ${ariaLabel}` : "Video player"}
       className={`group/player video-player relative select-none outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${containerClassName} ${
-        !controlsVisible && canHover ? "cursor-none" : ""
+        !controlsVisible && canHover && playing ? "cursor-none" : ""
       }`}
       onMouseMove={canHover ? showControls : undefined}
+      onMouseLeave={canHover ? armHideTimer : undefined}
       onPointerDown={onSurfacePointerDown}
       onClick={onSurfaceClick}
       onDoubleClick={onSurfaceDoubleClick}
       onKeyDown={onKeyDown}
-      onFocusCapture={() => {
-        focusWithinRef.current = true;
-        showControls();
-      }}
-      onBlurCapture={() => {
-        focusWithinRef.current = false;
-        armHideTimer();
-      }}
+      onFocusCapture={showControls}
+      onBlurCapture={armHideTimer}
     >
       <video
         ref={videoRef}
