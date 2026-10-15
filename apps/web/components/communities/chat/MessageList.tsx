@@ -305,6 +305,14 @@ export const MessageList = memo(function MessageList({
 
         return (
           <div key={group.date}>
+            {/* The disappearing-messages notice opens the history, above the
+                first date pill — the room's policy line before its timeline.
+                Only once the true start of the history is loaded: while older
+                pages may exist, the top of the loaded window is not the start
+                of the conversation, and a notice rendered there would float
+                down with every prepend. */}
+            {groupIdx === 0 && !hasMoreAbove && <DisappearingNotice />}
+
             {/* Date divider */}
             {showDateDivider && (
               <div className="flex items-center justify-center py-3 px-5">
@@ -313,14 +321,6 @@ export const MessageList = memo(function MessageList({
                 </span>
               </div>
             )}
-
-            {/* The disappearing-messages notice sits under the top divider —
-                the shape WhatsApp gives it (date pill, then the system notice,
-                then the day's messages). Only once the true start of the
-                history is loaded: while older pages may exist, the top of the
-                loaded window is not the start of the conversation, and a
-                notice rendered there would float down with every prepend. */}
-            {groupIdx === 0 && !hasMoreAbove && <DisappearingNotice />}
 
             {group.items.map((item, itemIdx) => {
               if (item.kind === "thread") {
