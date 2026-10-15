@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { CommunityFeedList } from "@/components/feeds/CommunityFeedList";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "@/components/feeds/types";
 import { Spinner } from "@/components/ui/Spinner";
@@ -167,18 +168,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
         )}
       />
 
-      {items.length > 0 && hasMore && (
-        <div className="flex justify-center border-t border-border py-6">
-          <button
-            type="button"
-            onClick={() => void loadMore()}
-            disabled={loadingMore}
-            className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
-          >
-            {loadingMore ? "Loading…" : "Load older posts"}
-          </button>
-        </div>
-      )}
+      <FeedLoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} />
     </>
   );
 }

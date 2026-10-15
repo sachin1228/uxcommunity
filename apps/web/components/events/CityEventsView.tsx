@@ -5,6 +5,7 @@ import { CalendarCheck2, CalendarClock, CalendarX2, MapPinned } from "lucide-rea
 import type { CityEventItem } from "@/lib/events/service";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { EventChatPanel } from "@/components/communities/events/EventChatPanel";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { filterChip } from "@/components/communities/filter-chip";
 import { GradientButton } from "@/components/ui/GradientButton";
@@ -335,18 +336,11 @@ export function CityEventsView({
                 </div>
               );
             })}
-            {cursors[filter] && (
-              <div className="flex justify-center py-6">
-                <button
-                  type="button"
-                  onClick={() => void loadMore()}
-                  disabled={loadingMore}
-                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
-                >
-                  {loadingMore ? "Loading…" : "Load more"}
-                </button>
-              </div>
-            )}
+            <FeedLoadMore
+              hasMore={Boolean(cursors[filter])}
+              loading={loadingMore}
+              onLoadMore={() => void loadMore()}
+            />
           </div>
         )}
       </div>

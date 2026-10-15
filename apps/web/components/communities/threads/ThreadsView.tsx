@@ -18,6 +18,7 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "@/lib/communities/models/threads";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { communityFeedLayout } from "../feed-layout";
 import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
@@ -374,18 +375,7 @@ export function ThreadsView({
                   onOpen={() => router.push(`/dashboard/communities/${communityId}/threads/${thread.id}`)}
                 />
               ))}
-              {hasMore && (
-                <div className="flex justify-center py-6">
-                  <button
-                    type="button"
-                    onClick={() => void loadMore()}
-                    disabled={loadingMore}
-                    className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
-                  >
-                    {loadingMore ? "Loading…" : "Load more"}
-                  </button>
-                </div>
-              )}
+              <FeedLoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={() => void loadMore()} />
             </div>
           )}
         </div>

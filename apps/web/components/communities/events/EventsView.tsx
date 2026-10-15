@@ -11,6 +11,7 @@ import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { EventChatPanel } from "./EventChatPanel";
 import { EventGroupCreatedModal } from "./EventGroupCreatedModal";
+import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { communityFeedLayout } from "../feed-layout";
 import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
@@ -356,13 +357,11 @@ export function EventsView({
                 </div>
               );
             })}
-            {nextCursor && (
-              <div className="flex justify-center py-6">
-                <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60">
-                  {loadingMore ? "Loading…" : "Load more"}
-                </button>
-              </div>
-            )}
+            <FeedLoadMore
+              hasMore={nextCursor !== null}
+              loading={loadingMore}
+              onLoadMore={() => void loadMore()}
+            />
           </div>
         )}
       </div>

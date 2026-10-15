@@ -1,4 +1,4 @@
-import type { JobStatus } from "./types";
+import type { JobPost, JobStatus } from "./types";
 
 /**
  * Relative labels for job timestamps. Computed on the server before
@@ -118,6 +118,24 @@ export function deadlineFields(
     deadline_label: deadline.kind === "none" ? null : deadline.label,
     deadline_expired: deadline.kind === "expired",
   };
+}
+
+/**
+ * Feed rows: the raw postings with every label a job list renders. Shared by
+ * the board's first paint (the page) and its cursor pages (the feed route) so
+ * both arrive with the same server-rendered labels — SSR and hydration print
+ * the same strings.
+ */
+export function formatJobFeedRows(jobs: JobPost[]): JobPost[] {
+  return jobs.map((job) => ({
+    ...job,
+    posted_label: timeAgoLabel(job.created_at),
+    updated_label: editedLabel(job.created_at, job.updated_at),
+    ...deadlineFields(job),
+    my_application: job.my_application
+      ? { ...job.my_application, applied_label: timeAgoLabel(job.my_application.created_at) }
+      : null,
+  }));
 }
 
 /**
