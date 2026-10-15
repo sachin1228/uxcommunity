@@ -21,6 +21,7 @@ import { isCommunityMember } from "./membership";
 import { logEvent } from "@/lib/observability/log";
 // One shared experience-level label cleaner — see ./comment-authors.ts.
 import { cleanDesignation } from "./comment-authors";
+import { parseMessageAuthorMap } from "./message-authors";
 
 const MESSAGE_PAGE_SIZE = 50;
 
@@ -507,18 +508,29 @@ export async function loadCommunityMessagePage(
     return { ok: false, status: 500, error: "Failed to fetch messages." };
   }
   const rows = (data ?? []) as Array<Record<string, unknown>>;
-  // The RPC ships the page's content-reaction groups on a SINGLE row (they are
-  // a lateral aggregate over the whole page, not a per-message field) and also
-  // returns the raw anchor uuid beside the resolved reply_to_content preview.
-  // Hoist that one copy and drop it — plus the raw uuid — from every message so
-  // the page-level list is not repeated per row. Scanning for the carrying row
-  // instead of assuming index 0 keeps this independent of result ordering.
-  // Unknown-key deletes are free; the spread keeps this a plain object literal.
+  // The RPC ships the page's content-reaction groups AND its author map on a
+  // SINGLE row each (both are page-level aggregates, not per-message fields) and
+  // also returns the raw anchor uuid beside the resolved reply_to_content
+  // preview. Hoist each copy and drop it — plus the raw uuid — from every
+  // message so neither page-level value is repeated per row. Scanning for the
+  // carrying row instead of assuming index 0 keeps this independent of result
+  // ordering. Unknown-key deletes are free; the spread keeps this a plain
+  // object literal.
   const contentReactions =
     rows.find((row) => row.content_reactions != null)?.content_reactions ?? null;
+  // The page's authors, once: `{ user_id: { name, avatar_url, designation } }`
+  // (20261015170000_message_page_author_map). Filling `users` per message here is
+  // what keeps the rest of the app unchanged — the payload has paid per author
+  // instead of per message, and every consumer still reads `message.users`.
+  const authors = parseMessageAuthorMap(rows.find((row) => row.authors != null)?.authors);
   const messages = rows.map((row) => {
     const message = { ...row };
+    // Only filled in when the row has no author of its own: an optimistic or
+    // realtime row (and any page from an un-migrated database) already carries
+    // the per-row object this map is a de-duplication of.
+    if (message.users == null) message.users = authors[String(row.user_id)] ?? null;
     delete message.content_reactions;
+    delete message.authors;
     delete message.reply_to_content_id;
     return message;
   });

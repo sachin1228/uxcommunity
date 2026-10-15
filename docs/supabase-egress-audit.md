@@ -815,12 +815,39 @@ behind a per-member cache and the homepage rail moved to its own bounded top-N r
 `get_suggested_communities`), and mark-all-read is one statement whose realtime payload carries
 only ids. **P0 items 1–3 are still outstanding** — until the per-route byte counts and the
 dashboard's own egress graph are read, the percentages above remain estimates, including the
-ones this implementation is credited with.
+ones this implementation is credited with. (The same caveat now applies to the P2 figures below:
+where a measurement was taken on a development-scale page, it says so.)
 
 **P2 — bound the remaining unbounded reads**
 7. Comment cursors + grouped reaction counts (`emoji → count`) + caller-only reaction rows, across threads/resources/showcase/events. *~1.4% now, caps a viral-thread blow-up.*
 8. Chat page projection: stop embedding the per-message `users` blob (client already has members). *~1.4%.*
 9. Resource list 100 → 30; drop `attachments`/`links`/`poll` from the thread list projection.
+
+**Status of P2 (updated after implementation).** Partly landed:
+
+* **Item 7, reaction counts — done.** Comment reactions are aggregated in SQL
+  (`20261015160000_comment_reaction_summaries`): one row per `(comment, emoji)`
+  carrying the group's size and whether the caller is in it, instead of one row
+  per person. The payload the UI consumes is unchanged (a pill is a count plus
+  the caller's own highlight — nothing renders *who* reacted), so this is a pure
+  read change, and the toggle route's re-read is an aggregate now too.
+* **Item 7, comment cursors — outstanding.** The four comment lists still read
+  every comment on an item. This is the piece that caps a viral thread, and it
+  needs all four surfaces' clients paged with the read, not just the SQL side.
+* **Item 8 — done, but smaller and differently than written.** The recommendation
+  assumed the client could resolve authors from the members it already has; that
+  is **not** true here — the chat's member list is the ten most recent members
+  (`apps/web/lib/communities/read-models.ts`) while a room's history is written by
+  everyone, including people who have left. Deleting the blob would have turned
+  most names in a busy room into the "Member" placeholder, so the author is
+  resolved once per page instead (`20261015170000_message_page_author_map`): an
+  `authors` map for the page's distinct authors, attached to a single row like
+  `content_reactions`, with the loader filling each message's `users` from it. A
+  page now pays per author rather than per message, so the saving is real on a
+  busy page and ~zero on a page where every message has a different author —
+  smaller than this document's **1.4%** claim, which was measured against a
+  13-row, 13-author development page.
+* **Item 9 — not started.**
 
 **P3 — structural headroom**
 10. Section-scoped `?section=` bootstrap so a non-chat tab does not pay for the message page.

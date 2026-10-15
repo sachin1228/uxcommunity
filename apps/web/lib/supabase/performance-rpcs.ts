@@ -19,7 +19,15 @@ type PerformanceRpcMap = {
     // lib/communities/message-cursor-support.ts and
     // lib/communities/read-models.ts.
     args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number; p_content_ids: string[] | null; p_before_id?: string | null; p_after_id?: string | null };
-    returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users: Json; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
+    // `users` is gone and `authors` replaces it (20261015170000_message_page_
+    // author_map): the page's distinct authors travel ONCE as a
+    // `{ user_id: { name, avatar_url, designation } }` map on a single row
+    // instead of once per message. The loader fills every message's `users`
+    // from that map before anything reads the page, so the shape the rest of
+    // the app consumes is unchanged. `authors` is therefore nullable on the
+    // rows that do not carry it, and absent entirely on an un-migrated
+    // database — the loader keeps whatever per-row `users` it finds.
+    returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users?: Json; authors?: Json | null; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };
   // One PAGE of the Explore directory, ordered by (name, id) and continued with
@@ -52,6 +60,18 @@ type PerformanceRpcMap = {
   // the caller could one-tap join. It exists because a name-ordered page cannot
   // express "biggest first", so bounding the directory would otherwise have
   // narrowed the rail to the first names in the alphabet.
+  // Grouped comment reactions: one row per (comment, emoji) instead of one per
+  // person, because a comment pill renders a count and the caller's own state
+  // (see 20261015160000_comment_reaction_summaries).
+  get_comment_reaction_summaries: {
+    args: { p_user_id: string; p_kind: string; p_comment_ids: string[] };
+    returns: Array<{
+      comment_id: string;
+      emoji: string;
+      reaction_count: number;
+      reacted: boolean;
+    }>;
+  };
   get_suggested_communities: {
     args: { p_user_id: string; p_limit: number };
     returns: Array<{
