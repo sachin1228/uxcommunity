@@ -28,6 +28,10 @@ const iconMap: Record<ResourceType, LucideIcon> = {
   other:       Package,
 };
 
+/** One icon per resource type — the composer chips, filter rows and cards all
+ *  read from this map. */
+export const RESOURCE_TYPE_ICONS = iconMap;
+
 export function ResourceTypeIcon({ type, size = 14, className }: { type: ResourceType; size?: number; className?: string }) {
   const Icon = iconMap[type] ?? Package;
   return <Icon size={size} strokeWidth={2.5} className={className} />;
