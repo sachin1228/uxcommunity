@@ -155,7 +155,7 @@ export const DmListPane = memo(function DmListPane({
                 <AvatarImg
                   url={conversation.peer.avatar_url}
                   name={conversation.peer.name}
-                  size={44}
+                  size={40}
                   className="shrink-0 rounded-full object-cover"
                 />
                 <span className="min-w-0 flex-1">
@@ -172,19 +172,19 @@ export const DmListPane = memo(function DmListPane({
                   <span className="mt-0.5 flex items-center justify-between gap-2">
                     {typingText ? (
                       /* Typing — highest priority, like the community sidebar */
-                      <span className="min-w-0 truncate font-body text-xs text-accent">
+                      <span className="min-w-0 truncate font-body text-[13px] leading-5 text-accent">
                         {typingText}
                       </span>
                     ) : incomingRequest ? (
                       /* A pending request the viewer has not answered yet —
                          takes the preview line's place so it cannot be missed. */
-                      <span className="min-w-0 truncate font-body text-xs font-medium text-accent">
+                      <span className="min-w-0 truncate font-body text-[13px] font-medium leading-5 text-accent">
                         Message request
                       </span>
                     ) : reaction ? (
                       /* Reaction — "John reacted ❤️ to: \"ok\"", the same line the
                          community sidebar draws, above the message preview. */
-                      <span className="min-w-0 truncate font-body text-xs text-foreground-muted">
+                      <span className="min-w-0 truncate font-body text-[13px] leading-5 text-foreground-muted">
                         <span className="font-medium">{reaction.firstName}</span>
                         {" reacted "}
                         <NotoEmojiSvg
@@ -201,7 +201,7 @@ export const DmListPane = memo(function DmListPane({
                       </span>
                     ) : preview.text ? (
                       <span
-                        className={`min-w-0 truncate font-body text-xs ${
+                        className={`min-w-0 truncate font-body text-[13px] leading-5 ${
                           preview.deleted
                             ? "italic text-foreground-muted/70"
                             : "text-foreground-muted"

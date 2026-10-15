@@ -41,7 +41,7 @@ export function NotificationBell({ userId }: { userId: string }) {
       <NotificationBellIcon size={18} />
       {unseenCount > 0 && (
         <span
-          className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white"
+          className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-[14px] text-white"
           aria-hidden
         >
           {unseenCount > 99 ? "99+" : unseenCount}
