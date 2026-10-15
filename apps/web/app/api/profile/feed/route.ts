@@ -28,6 +28,10 @@ export const dynamic = "force-dynamic";
  * the same tables. There is exactly one copy of each card and one source of
  * truth in the database.
  *
+ * The `all` and kind scopes list cards the member authored; only the `saved`
+ * scope lists saves (a card someone else authored never rides along in the
+ * other tabs).
+ *
  * With `user`, the same tabs serve a member's profile: cards authored by that
  * member, limited to what the viewer may see (`get_member_feed_page`). The
  * `saved` tab is not offered there — a member's saves are private.
