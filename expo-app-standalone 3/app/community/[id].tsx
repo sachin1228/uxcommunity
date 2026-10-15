@@ -66,6 +66,7 @@ export default function CommunityChat() {
     owner: ownerParam,
     unread: unreadParam,
     read: readParam,
+    tab: tabParam,
   } = useLocalSearchParams<{
     id: string;
     name: string;
@@ -75,13 +76,24 @@ export default function CommunityChat() {
     owner?: string;
     unread?: string;
     read?: string;
+    tab?: string;
   }>();
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [headerHeight, setHeaderHeight] = useState(0);
-  const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
+  const [activeTab, setActiveTab] = useState<CommunityTab>(() => {
+    // A notification deep-link names the surface it is about (`?tab=threads`);
+    // anything unknown falls back to chat, like a push tap does.
+    const requested = tabParam?.toLowerCase();
+    return requested === 'threads' ||
+      requested === 'showcase' ||
+      requested === 'resources' ||
+      requested === 'events'
+      ? (requested as CommunityTab)
+      : 'chat';
+  });
   /** Inline emoji panel below the composer (WhatsApp-style) — closed when
    *  the chat scrolls, a tab changes, or the screen loses the composer. */
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);

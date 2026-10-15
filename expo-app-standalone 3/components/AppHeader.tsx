@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useNotifications } from '@/hooks/useNotifications';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 
 export function AppHeader() {
@@ -14,6 +15,9 @@ export function AppHeader() {
   const router = useRouter();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
+  // What the badge shows: notifications new since the member last opened the
+  // list (never the all-time unread total) — same rule as the web topbar.
+  const { unseenCount, seenLoaded } = useNotifications();
   const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
   const initials = user?.name
     ? user.name
@@ -41,10 +45,12 @@ export function AppHeader() {
 
       <View style={styles.actions}>
         <Pressable
-          accessibilityLabel="Notification settings"
+          accessibilityLabel={
+            seenLoaded && unseenCount > 0 ? `${unseenCount} new notifications` : 'Notifications'
+          }
           accessibilityRole="button"
           hitSlop={8}
-          onPress={() => router.push('/settings/notifications')}
+          onPress={() => router.push('/notifications')}
           style={({ pressed }) => [
             styles.iconButton,
             // The header sits on the page background, so the pressed state has
@@ -53,22 +59,36 @@ export function AppHeader() {
           ]}
         >
           <Feather name="bell" size={22} color={colors.mutedForeground} />
+          {seenLoaded && unseenCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unseenCount > 99 ? '99+' : unseenCount}
+              </Text>
+            </View>
+          )}
         </Pressable>
 
-        {avatarUrl ? (
-          <Image
-            accessibilityLabel={`${user?.name ?? 'User'} profile photo`}
-            source={{ uri: avatarUrl }}
-            style={[styles.avatar, styles.avatarImage]}
-            onError={() => setAvatarError(true)}
-          />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
-              {initials}
-            </Text>
-          </View>
-        )}
+        <Pressable
+          accessibilityLabel="Settings"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => router.push('/settings')}
+        >
+          {avatarUrl ? (
+            <Image
+              accessibilityLabel={`${user?.name ?? 'User'} profile photo`}
+              source={{ uri: avatarUrl }}
+              style={[styles.avatar, styles.avatarImage]}
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
+                {initials}
+              </Text>
+            </View>
+          )}
+        </Pressable>
       </View>
     </View>
   );
@@ -118,5 +138,24 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 13,
     fontFamily: 'Geist_600SemiBold',
+  },
+  // Red-500 count chip, same colours and cap as the web topbar bell.
+  badge: {
+    position: 'absolute',
+    right: -2,
+    top: -2,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontFamily: 'Geist_700Bold',
+    fontSize: 9,
+    lineHeight: 12,
   },
 });

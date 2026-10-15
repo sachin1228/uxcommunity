@@ -74,6 +74,7 @@ export async function apiFormUpload<T = unknown>(
   }
 
   if (!response.ok) {
+    await handleUnauthorized(Boolean(sessionToken), response.status);
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & { status: number; data: unknown };
@@ -91,6 +92,40 @@ export async function clearSession(): Promise<void> {
     SESSION_STORAGE_KEY,
     LEGACY_SESSION_STORAGE_KEY,
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// Session-lost signal
+// ---------------------------------------------------------------------------
+
+type SessionLostListener = () => void;
+
+const sessionLostListeners = new Set<SessionLostListener>();
+
+/**
+ * Notified when a request that carried a stored session comes back 401 — the
+ * server's way of saying the token is expired or the account is gone. The
+ * AuthContext subscribes and treats it as a sign-out; nothing else should.
+ */
+export function onSessionLost(listener: SessionLostListener): () => void {
+  sessionLostListeners.add(listener);
+  return () => {
+    sessionLostListeners.delete(listener);
+  };
+}
+
+async function handleUnauthorized(hadSession: boolean, status: number) {
+  if (status !== 401 || !hadSession) return;
+  // A 401 with no stored session is just a bad password on the login screen —
+  // only a rejected *session* means the member must be signed out.
+  await clearSession();
+  sessionLostListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // A broken listener must not turn one 401 into a crash.
+    }
+  });
 }
 
 /** Retrieve the stored session token (or null). */
@@ -156,6 +191,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!response.ok) {
+    await handleUnauthorized(Boolean(sessionToken), response.status);
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & {

@@ -116,6 +116,10 @@ export function useCommunities() {
   const load = useCallback(async () => {
     try {
       const data = await getCommunities();
+      // A load that succeeds must clear the previous failure, or a transient
+      // error at startup would pin the error screen forever (the retry would
+      // "succeed" invisibly behind it).
+      setError(null);
       setCommunities(sortByLastActivity(data));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load communities');

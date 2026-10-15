@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -22,6 +22,16 @@ export default function CommunitiesScreen() {
   const router = useRouter();
   const { communities, isLoading, error, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload]);
 
   const handleCommunityPress = useCallback(
     (community: Community) => {
@@ -99,8 +109,8 @@ export default function CommunitiesScreen() {
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
-              refreshing={false}
-              onRefresh={reload}
+              refreshing={refreshing}
+              onRefresh={() => void onRefresh()}
               tintColor={colors.primary}
               colors={[colors.primary]}
             />

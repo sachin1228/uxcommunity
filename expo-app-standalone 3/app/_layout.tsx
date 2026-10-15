@@ -11,16 +11,35 @@ import {
   Geist_700Bold,
   useFonts,
 } from '@expo-google-fonts/geist';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
 import { useColors } from '@/hooks/useColors';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/**
+ * Watches for a session that disappears *while the member is inside the app*
+ * — an expired token rejected mid-screen, or a logout — and lands them on the
+ * login screen. The entry point (`app/index.tsx`) only covers cold starts;
+ * without this an expired session left the member on dead screens.
+ */
+function SessionGate() {
+  const { user, isLoading } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading || user || pathname === '/login') return;
+    router.replace('/(auth)/login');
+  }, [isLoading, user, pathname, router]);
+
+  return null;
+}
 
 export default function RootLayout() {
   // The native window background is driven by the design-system page colour
@@ -56,6 +75,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <PushNotificationsBridge />
+                <SessionGate />
                 <Stack
                   screenOptions={{
                     headerShown: false,
@@ -67,7 +87,19 @@ export default function RootLayout() {
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen
+                    name="notifications"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
                     name="community/[id]"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="jobs/[id]"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/index"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
                   <Stack.Screen

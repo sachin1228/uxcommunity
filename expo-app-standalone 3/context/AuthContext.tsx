@@ -18,6 +18,7 @@ import React, {
   useState,
 } from 'react';
 import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth';
+import { onSessionLost } from '@/lib/api';
 import { resetRealtimeSession } from '@/lib/realtime';
 import { unregisterStoredPushTokenAsync } from '@/lib/push';
 
@@ -83,6 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  // A rejected session (expired token, deactivated account) surfaces as a 401
+  // on any request — lib/api clears the stored cookie and signals here, and
+  // the member lands back on the login screen instead of a hall of dead
+  // screens. The API call that hit the 401 still fails to its caller; this is
+  // only the session bookkeeping.
+  useEffect(() => {
+    return onSessionLost(() => {
+      resetRealtimeSession();
+      setUser(null);
+    });
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     // A previous account's sockets can still be open (an expired session never
     // called logout), and every hook would otherwise keep sharing them.
@@ -99,7 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Detach this device before the session cookie is cleared, otherwise the
     // next person to sign in here keeps receiving the previous account's pushes.
     await unregisterStoredPushTokenAsync();
-    await apiLogout();
+    try {
+      await apiLogout();
+    } catch {
+      // The server logout is best-effort: the local session was already
+      // cleared by apiLogout's finally, and a stateless JWT needs no server
+      // call to stop being used. Signing out must still succeed offline.
+    }
     setUser(null);
   }, []);
 

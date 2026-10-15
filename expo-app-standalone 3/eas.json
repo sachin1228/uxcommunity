@@ -8,19 +8,22 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in"
+        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
+        "EXPO_PUBLIC_REALTIME_URL": "https://rt.uxcommunity.in"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in"
+        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
+        "EXPO_PUBLIC_REALTIME_URL": "https://rt.uxcommunity.in"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in"
+        "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
+        "EXPO_PUBLIC_REALTIME_URL": "https://rt.uxcommunity.in"
       }
     }
   },
