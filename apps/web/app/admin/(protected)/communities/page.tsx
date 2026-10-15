@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Trash2, Sparkles, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { CommunityRow, type CommunityListItem } from "@/components/admin/communities/CommunityRow";
 
 // Main origin tabs: communities the uxcommunity app creates itself vs the
@@ -276,11 +277,7 @@ export default function AdminCommunitiesPage() {
               This will permanently delete <span className="text-red-400 font-medium">every message</span> across{" "}
               <span className="text-foreground font-medium">all {communities.length} communities</span>. Members and communities themselves are kept. This cannot be undone.
             </p>
-            {resetError && (
-              <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-                {resetError}
-              </p>
-            )}
+            {resetError && <ModalError className="mb-4">{resetError}</ModalError>}
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowResetConfirm(false); setResetError(null); }}

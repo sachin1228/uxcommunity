@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface Props {
@@ -171,7 +172,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
             )}
           </div>
 
-          {addError && <p className="font-body text-xs text-red-400">{addError}</p>}
+          {addError && <ModalError>{addError}</ModalError>}
 
           <div className="flex gap-2 justify-end pt-1">
             <button

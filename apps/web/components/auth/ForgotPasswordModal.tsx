@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 
 interface ForgotPasswordModalProps {
@@ -85,11 +86,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
             Enter your email and we'll send you a link to set a new password.
           </p>
 
-          {error && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
-              <p className="font-body text-sm text-red-400">{error}</p>
-            </div>
-          )}
+          {error && <ModalError>{error}</ModalError>}
 
           <label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">

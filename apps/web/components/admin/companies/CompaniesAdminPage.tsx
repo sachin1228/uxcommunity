@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Building2, Check, Loader2, Plus, Search, Star, Trash2, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { Spinner } from "@/components/ui/Spinner";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { companyLogoUrl } from "@/lib/companies/logos";
@@ -152,7 +153,7 @@ function AddCompanyModal({
           not a proof.
         </p>
 
-        {error && <p className="mt-3 font-body text-xs text-red-400" role="alert">{error}</p>}
+        {error && <ModalError className="mt-3">{error}</ModalError>}
 
         <div className="mt-5 flex justify-end gap-2">
           <button

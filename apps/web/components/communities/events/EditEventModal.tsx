@@ -5,6 +5,7 @@ import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, MapPinned, Users, Vid
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import { filterChip } from "../filter-chip";
@@ -531,11 +532,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           )}
         </div>
 
-        {error && (
-          <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">{error}</p>
-        )}
-
         </div>
+
+        {error && <ModalError className="shrink-0 px-5 pb-1 sm:px-6">{error}</ModalError>}
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>

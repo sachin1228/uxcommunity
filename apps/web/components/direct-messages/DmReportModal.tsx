@@ -22,6 +22,7 @@ import {
   UserX,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { filterChip } from "@/components/communities/filter-chip";
 import {
@@ -172,11 +173,7 @@ export function DmReportModal({
             </span>
           </div>
 
-          {error && (
-            <p role="alert" className="mt-3 font-body text-xs text-red-400">
-              {error}
-            </p>
-          )}
+          {error && <ModalError className="mt-3">{error}</ModalError>}
 
           <div className="mt-6 flex items-center justify-between gap-2">
             <button type="button" onClick={handleClose} className="modal-btn modal-btn-secondary">

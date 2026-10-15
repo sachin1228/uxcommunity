@@ -2,6 +2,7 @@
 
 import { Check, UserX } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { EventChatPreviewRow } from "./EventChatPreviewRow";
 
@@ -76,11 +77,7 @@ export function RsvpConfirmDialog({
         memberCount={chatMemberCount}
       />
 
-      {error && (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">
-          {error}
-        </p>
-      )}
+      {error && <ModalError className="mt-4">{error}</ModalError>}
 
       <div className="mt-6 flex items-center justify-end gap-3">
         <button
