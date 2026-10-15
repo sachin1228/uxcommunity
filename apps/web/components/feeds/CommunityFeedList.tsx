@@ -50,6 +50,11 @@ interface CommunityFeedListProps {
    * The profile tabs skip it (their Events tab is event history).
    */
   showEventChat?: boolean;
+  /**
+   * Layout of the card list itself. Defaults to the feed's single column; the
+   * Library passes a responsive grid so its shelf fills a full-width page.
+   */
+  listClassName?: string;
 }
 
 /**
@@ -73,6 +78,7 @@ export function CommunityFeedList({
   showPastEvents = false,
   onOpenCommunityPreview,
   showEventChat = false,
+  listClassName = "flex flex-col gap-4",
 }: CommunityFeedListProps) {
   const router = useGuardedRouter();
   const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);  const [deletingShowcase, setDeletingShowcase] = useState<FeedShowcase | null>(null);
@@ -297,7 +303,7 @@ export function CommunityFeedList({
 
   return (
     <>
-      <ul className="flex flex-col gap-4">
+      <ul className={listClassName}>
         {groups.map((group) => {
           if (group.kind === "thread") {
             return (

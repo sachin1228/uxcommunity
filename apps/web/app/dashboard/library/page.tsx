@@ -5,7 +5,6 @@ import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { isFeedCard, normalizeFeedCard, type FeedCardObject } from "@/lib/feeds/feed-items";
 import { LibraryView } from "@/components/library/LibraryView";
-import { communityFeedLayout } from "@/components/communities/feed-layout";
 import type { FeedItem } from "@/components/feeds/types";
 
 export const metadata = { title: "Library — uxcommunity" };
@@ -55,7 +54,9 @@ export default async function LibraryPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className={`${communityFeedLayout.content} px-4 pb-12`}>
+      {/* Full-page shelf: the wide container plus the grid inside LibraryView
+          (a curated browse surface, not a feed column). */}
+      <div className="mx-auto w-full max-w-[80rem] px-4 pb-12 md:px-6">
         <LibraryView currentUserId={userId} initialItems={items as unknown as FeedItem[]} />
       </div>
     </div>

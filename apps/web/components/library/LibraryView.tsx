@@ -130,7 +130,7 @@ export function LibraryView({
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h1 className="font-display text-xl font-semibold text-foreground">Library</h1>
-            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+            <p className="mt-1 max-w-2xl text-pretty font-body text-sm leading-5 text-foreground-muted">
               Handpicked questions, discussions, polls, showcase work and resources from across the community.
             </p>
           </div>
@@ -186,6 +186,7 @@ export function LibraryView({
         currentUserId={currentUserId}
         onChange={updateItems}
         onOpenCommunityPreview={setPreviewCommunityId}
+        listClassName="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3"
         emptyState={(
           <div className={communityFeedLayout.emptyState}>
             <EmptyIcon strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
