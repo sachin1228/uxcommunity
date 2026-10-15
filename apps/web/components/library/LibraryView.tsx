@@ -139,7 +139,7 @@ export function LibraryView({
         <div
           role="tablist"
           aria-label="Library sections"
-          className="mt-5 flex items-center gap-1 overflow-x-auto border-b border-border md:gap-3"
+          className="scrollbar-none mt-5 flex items-center gap-1 overflow-x-auto border-b border-border md:gap-3"
         >
           {TABS.map((tab) => {
             const active = kind === tab.value;
@@ -165,7 +165,7 @@ export function LibraryView({
           })}
         </div>
 
-        <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
+        <div className={`${communityFeedLayout.pageHeaderFilters} scrollbar-none flex items-center gap-2 overflow-x-auto pb-1`}>
           {CHIPS[kind].map((item) => (
             <button
               key={item.value}
