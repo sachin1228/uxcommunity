@@ -15,7 +15,7 @@ import {
 /** Fired (on window) whenever a feed player starts so the other feed players pause. */
 const ACTIVATE_EVENT = "video-player:activate";
 /** Idle time after which the controls fade out — playing or paused. */
-const HIDE_DELAY_MS = 2000;
+const HIDE_DELAY_MS = 1000;
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -33,8 +33,8 @@ function formatTime(seconds: number): string {
  * readout, mute + volume slider, fullscreen.
  *
  * Controls start hidden (a video never greets you with chrome) and appear on
- * hover or focus; two idle seconds — including two seconds after the cursor
- * leaves the player or after a pause — fade them out again, leaving only the
+ * hover or focus; one idle second — including one second after the cursor
+ * leaves the player or after a pause — fades them out again, leaving only the
  * centered play / replay button. Double-click or `f` toggles fullscreen;
  * space / k toggles playback, ← → seek 5s, ↑ ↓ adjust volume, m mutes.
  *
