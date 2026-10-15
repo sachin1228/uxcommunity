@@ -6,11 +6,13 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
+import { loadCommentPage } from "@/lib/communities/comment-pages";
+import { parseCommentPageRequest } from "@/lib/communities/comment-page-cursor";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: Params,
 ) {
   let session;
@@ -26,22 +28,26 @@ export async function GET(
   const { data: event } = await eventQuery.maybeSingle();
   if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
 
-  const { data, error } = await db
-    .from("event_comments")
-    .select("id, event_id, user_id, parent_id, body, image_url, created_at, updated_at")
-    .eq("event_id", eventId)
-    .order("created_at", { ascending: true });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // One page, not the whole discussion: the newest page by default, or the page
+  // above the caller's cursor (see lib/communities/comment-pages.ts). The event
+  // page keeps comments FLAT and builds its tree at render time, so the page's
+  // rows are returned as they came.
+  const page = await loadCommentPage(db, "events", eventId, parseCommentPageRequest(req.nextUrl.searchParams));
+  if (page.error) return NextResponse.json({ error: page.error.message }, { status: 500 });
 
   // Author info — name, avatar, designation pill — from the shared resolver.
-  const comments = await attachCommentAuthors(db, (data ?? []) as Array<Record<string, unknown>>);
+  const comments = await attachCommentAuthors(db, page.rows as Array<Record<string, unknown>>);
 
   // Grouped emoji reactions per comment, in the same flat list the page builds
   // its reply tree from.
   const withReactions = await attachCommentReactions(db, comments, session.userId!, "events");
 
-  return NextResponse.json({ comments: withReactions });
+  return NextResponse.json({
+    comments: withReactions,
+    totalCount: page.totalCount,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  });
 }
 
 export async function POST(

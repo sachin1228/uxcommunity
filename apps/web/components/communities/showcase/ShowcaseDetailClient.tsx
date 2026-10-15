@@ -12,11 +12,15 @@ import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { CommentSection } from "../CommentSection";
-import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { useCommentPaging } from "../use-comment-paging";
+import type { CommentPageResponse } from "../use-comment-paging";
+import type { CommentPageMeta } from "@/lib/communities/comment-page-cursor";
+import { mergeCommentRoots, updateCommentReactions } from "@/lib/communities/comment-tree";
 
 export function ShowcaseDetailClient({
   initialPost,
   initialComments,
+  initialCommentPage,
   currentUserId,
   communityId,
   communityName,
@@ -29,6 +33,9 @@ export function ShowcaseDetailClient({
 }: {
   initialPost: ShowcasePost;
   initialComments: ShowcaseComment[];
+  /** The page the server rendered with: the post's total comment count and the
+   *  cursor for the comments older than `initialComments`. */
+  initialCommentPage?: CommentPageMeta | null;
   currentUserId: string;
   communityId: string;
   communityName?: string;
@@ -47,24 +54,42 @@ export function ShowcaseDetailClient({
   const [editing, setEditing] = useState(false);
   const [confirmDeletePost, setConfirmDeletePost] = useState(false);
   const isVisible = useDocumentVisible();
+  // Only one page of comments is on screen (see lib/communities/comment-pages.ts),
+  // so the count comes from the server's total, never from the list's length.
+  const paging = useCommentPaging<ShowcaseComment>({
+    communityId,
+    kind: "showcase",
+    targetId: post.id,
+    initial: initialCommentPage,
+  });
   const fetchComments = useCallback(async () => {
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}/comments`,
       { cache: "no-store" },
     );
     if (response.ok) {
-      const data = await response.json();
-      setComments(data.comments);
-      setPost((value) => ({
-        ...value,
-        comment_count: data.comments.reduce(
-          (sum: number, comment: ShowcaseComment) =>
-            sum + 1 + comment.replies.length,
-          0,
-        ),
-      }));
+      const data = (await response.json()) as CommentPageResponse<ShowcaseComment>;
+      setComments(data.comments ?? []);
+      paging.applyResponse(data);
+      if (typeof data.totalCount === "number") {
+        setPost((value) => ({ ...value, comment_count: data.totalCount as number }));
+      }
     }
-  }, [communityId, post.id]);
+    // Only the stable half of `paging` belongs here: depending on the object would
+    // re-run this fetch whenever the cursor advances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId, post.id, paging.applyResponse]);
+
+  /**
+   * The older page: fetched from the cursor the server issued and merged by id,
+   * so a comment already on screen is not rendered twice. The count does not
+   * move — the server's total already included the older comments.
+   */
+  async function handleLoadMore() {
+    const older = await paging.loadMore();
+    if (!older?.length) return;
+    setComments((values) => mergeCommentRoots(values, older));
+  }
   useEffect(() => {
     if (!isVisible) return;
     const room = realtimeRooms.showcase(post.id);
@@ -151,6 +176,10 @@ export function ShowcaseDetailClient({
                 comments={comments}
                 currentUserId={currentUserId}
                 composerMaxLength={1000}
+                totalCount={paging.totalCount}
+                hasMore={paging.hasMore}
+                loadingMore={paging.loadingMore}
+                onLoadMore={handleLoadMore}
                 onPosted={posted}
                 onDeleted={deleted}
                 onReactionToggled={(commentId, _parentId, reactions) =>

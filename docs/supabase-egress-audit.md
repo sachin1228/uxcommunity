@@ -367,7 +367,7 @@ mark-all-read (§4 #5) is the same class.
 - **Files:** [threads …/comments/route.ts:54](../apps/web/app/api/communities/[id]/threads/[threadId]/comments/route.ts#L54) (+ resource/showcase/event equivalents), [comment-reactions.ts:57-58](../apps/web/lib/communities/comment-reactions.ts#L57-L58), [messages/[msgId]/reactions/route.ts:142](../apps/web/app/api/communities/[id]/messages/[msgId]/reactions/route.ts#L142), [content-events.ts:148](../apps/web/lib/communities/content-events.ts#L148).
 - **Rows / size:** **MEASURED 304 B raw per comment row** (dev data has short bodies; 5,000-char bodies are allowed, so real rows can be ~10× larger). Reactions are ~66 B/row.
 - **Impact: MEDIUM today, HIGH on a viral thread.** A 2,000-comment thread with 10k reactions is ~1 MB raw per open, and it is re-read on **every** comment-list load and every reaction toggle.
-- **Fix:** cursor-paginate with a count aggregate; for reactions return grouped counts (`emoji → count`) plus only the caller's own rows, replacing a per-user row dump.
+- **Fix (implemented — see the P2 status in §11):** cursor-paginate with a count aggregate (`20261015180000_comment_page_cursor`); for reactions return grouped counts (`emoji → count`) plus only the caller's own rows, replacing a per-user row dump (`20261015160000_comment_reaction_summaries`).
 
 ### 8. Sidebar — three calls, one row per membership
 - **Cause:** `get_sidebar_activity` is unbounded (one row per membership, each with last-message + last-reaction previews), plus a communities projection and a mute query.
@@ -623,9 +623,11 @@ must still fetch the full row (it already does, via `get_job_detail`).
 fails loudly in TypeScript. *Verify:* `X-Response-Bytes`/`response_bytes` before/after.
 
 **8.2 Cursor pagination and incremental fetching** — already excellent for chat
-(`?after=` compound cursor), events, threads, resources, showcase, jobs and DM. The
-**gaps are `get_all_communities` (no LIMIT), `get_sidebar_activity` (no LIMIT), the four
-comment lists, and the unbounded reaction reads.**
+(`?after=` compound cursor), events, threads, resources, showcase, jobs and DM, on both
+sides of the wire. Since this section was written the four **comment lists** joined them
+(`20261015180000_comment_page_cursor`, page 1 in the app build), `get_all_communities`
+gained a LIMIT and a keyset cursor, and the reaction reads became aggregates. The gap that
+remains is **`get_sidebar_activity` (no LIMIT)**.
 *Benefit:* converts #2 and #7 from platform-scaling to constant. *Trade-off:* clients
 need incremental loading; Explore already has tab filters to key the cursor on.
 *Complexity:* medium (SQL + client). *Risk:* medium — cursor correctness is subtle
@@ -759,8 +761,11 @@ per-call bytes via the fixes above doubles that headroom again.
 
 1. **Platform-scaling reads** (`get_all_communities`, `get_sidebar_activity`) — cost grows
    with total communities / memberships, not with traffic. Silent until the platform grows.
-2. **Unbounded per-item reads** (comments, reactions, notifications mark-all-read) — a
-   single viral thread or a 5,000-item inbox becomes a multi-MB response.
+2. **Unbounded per-item reads** — comments, reactions and mark-all-read have all been
+   bounded since this section was written (see the P1/P2 status in §11): the largest
+   remaining one is `get_sidebar_activity`, which costs a row per membership. A viral
+   thread is no longer the risk it was — its comment list is a page of top-level
+   comments plus the replies under them.
 3. **Prose in list payloads** — the jobs board; worst compression ratio measured (40.6%).
 4. **Coverage gap in existing instrumentation** — `estimateJsonBytes` is on 7 of 164
    routes; the biggest offenders (jobs feed, `get_all_communities`, comment routes) are
@@ -831,9 +836,27 @@ where a measurement was taken on a development-scale page, it says so.)
   per person. The payload the UI consumes is unchanged (a pill is a count plus
   the caller's own highlight — nothing renders *who* reacted), so this is a pure
   read change, and the toggle route's re-read is an aggregate now too.
-* **Item 7, comment cursors — outstanding.** The four comment lists still read
-  every comment on an item. This is the piece that caps a viral thread, and it
-  needs all four surfaces' clients paged with the read, not just the SQL side.
+* **Item 7, comment cursors — done.** The four comment lists now read a PAGE
+  (`20261015180000_comment_page_cursor`): `get_thread_comment_page`,
+  `get_resource_comment_page`, `get_showcase_comment_page` and
+  `get_event_comment_page` answer with a window of top-level comments — newest
+  first, continued with the compound `(created_at, id)` cursor the chat already
+  uses — plus the replies under those comments, the item's total count, and the
+  cursor for the next page. The page-level values (count, cursor) ride on ONE
+  row, like `content_reactions` and the author map above, so the payload cannot
+  grow with the page size. One loader serves all four routes **and** all four
+  server-rendered first paints
+  ([comment-pages.ts](../apps/web/lib/communities/comment-pages.ts)), and the
+  shared comment section grew the control the bound needs: "Load more comments
+  (N more)" under the list and "Showing X of N" beside the sort control, with
+  the count taken from the server's total rather than the length of the page on
+  screen. **The bound is the number of top-level comments.** A root's replies
+  still arrive with it, in full — replies are one level deep, they carry the same
+  per-content rate limit, and rendering a comment without the answers under it
+  would read as a regression; if one root's reply count ever becomes the problem,
+  paging replies is a separate change with its own control. Writes are untouched
+  (one comment is one row), and a database without the migration falls back to
+  the previous unbounded read, so the app build can ship first.
 * **Item 8 — done, but smaller and differently than written.** The recommendation
   assumed the client could resolve authors from the members it already has; that
   is **not** true here — the chat's member list is the ten most recent members

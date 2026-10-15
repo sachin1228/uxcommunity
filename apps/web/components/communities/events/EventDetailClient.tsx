@@ -11,7 +11,9 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
 import { EventChatPanel } from "./EventChatPanel";
 import { CommentSection } from "../CommentSection";
-import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { mergeCommentRows, updateCommentReactions } from "@/lib/communities/comment-tree";
+import { useCommentPaging } from "../use-comment-paging";
+import type { CommentPageResponse } from "../use-comment-paging";
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -68,11 +70,35 @@ export function EventDetailClient({
   const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
 
-  // Comments (flat list, built into tree on render)
+  // Comments (flat list, built into tree on render). The list is ONE page — the
+  // response carries the event's total and the cursor for older comments, and
+  // both are cached with the page so a remount keeps the "load more" control.
   const commentsUrl = `/api/communities/${communityId}/events/${initialEvent.id}/comments`;
-  const cachedComments = getCachedRequest<{ comments?: EventComment[] }>(commentsUrl, currentUserId);
+  const cachedComments = getCachedRequest<CommentPageResponse<EventComment>>(commentsUrl, currentUserId);
   const [comments, setComments] = useState<EventComment[]>(cachedComments?.comments ?? []);
   const [commentsLoading, setCommentsLoading] = useState(!cachedComments);
+  const paging = useCommentPaging<EventComment>({
+    communityId,
+    kind: "events",
+    targetId: initialEvent.id,
+    initial: cachedComments
+      ? {
+          totalCount: cachedComments.totalCount ?? null,
+          hasMore: Boolean(cachedComments.hasMore),
+          nextCursor: cachedComments.nextCursor ?? null,
+        }
+      : null,
+  });
+
+  /**
+   * The older page, merged into the same flat list the tree is built from. Ids
+   * keep it a set: a comment already on screen is not rendered twice.
+   */
+  async function handleLoadMore() {
+    const older = await paging.loadMore();
+    if (!older?.length) return;
+    setComments((prev) => mergeCommentRows(prev, older));
+  }
 
 
   useEffect(() => {
@@ -80,7 +106,7 @@ export function EventDetailClient({
 
     async function loadComments() {
       try {
-        const data = await fetchJsonCached<{ comments?: EventComment[] }>(
+        const data = await fetchJsonCached<CommentPageResponse<EventComment>>(
           commentsUrl,
           { staleMs: 15_000 },
           currentUserId,
@@ -88,7 +114,8 @@ export function EventDetailClient({
         if (!isActive) return;
         const nextComments = data.comments ?? [];
         setComments(nextComments);
-        setCachedRequest(commentsUrl, { comments: nextComments }, currentUserId);
+        paging.applyResponse(data);
+        setCachedRequest(commentsUrl, { ...data, comments: nextComments }, currentUserId);
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
         if (/event not found/i.test(message)) {
@@ -107,7 +134,10 @@ export function EventDetailClient({
     return () => {
       isActive = false;
     };
-  }, [commentsUrl, currentUserId, router, communityId]);
+    // Only the stable half of `paging` belongs here: depending on the object would
+    // re-run this fetch whenever the cursor advances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentsUrl, currentUserId, router, communityId, paging.applyResponse]);
 
   const handleLikeChanged = useCallback((eventId: string, liked: boolean, count: number) => {
     setEvent((current) => current.id === eventId
@@ -213,6 +243,10 @@ export function EventDetailClient({
                   allowReplies
                   comments={commentTree}
                   currentUserId={currentUserId}
+                  totalCount={paging.totalCount}
+                  hasMore={paging.hasMore}
+                  loadingMore={paging.loadingMore}
+                  onLoadMore={handleLoadMore}
                   composerMaxLength={2000}                          onPosted={handleCommentPosted}
                           onDeleted={handleDeleteComment}
                           // Parents and replies share one flat list here, so the

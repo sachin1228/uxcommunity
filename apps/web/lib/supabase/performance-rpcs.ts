@@ -5,6 +5,22 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 
 type AggregateBase = { id: string };
 
+/** The columns the four comment page functions share. `total_count`, `has_more`
+ *  and the cursor's two halves are page-level: they are set on the page's first
+ *  row and null on every other, so the payload cannot grow with the page. */
+type CommentPageRpcRow = {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  total_count: number | null;
+  has_more: boolean | null;
+  next_before: string | null;
+  next_before_id: string | null;
+};
+
 type PerformanceRpcMap = {
   get_community_message_page: {
     // p_before_id / p_after_id are the id halves of the compound (created_at,
@@ -28,6 +44,28 @@ type PerformanceRpcMap = {
     // rows that do not carry it, and absent entirely on an un-migrated
     // database — the loader keeps whatever per-row `users` it finds.
     returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; reply_to_content_id: string | null; image_url: string | null; deleted_at: string | null; edited_at: string | null; deleted_by: string | null; deleted_by_role: string | null; mentions: Json; users?: Json; authors?: Json | null; reactions: Json; reply_to: Json; reply_to_content: Json; content_reactions: Json }>;
+  };
+  // ── Comment pages (20261015180000_comment_page_cursor) ─────────────────────
+  // One page of a content item's comments: a window of top-level comments, the
+  // replies under them, the item's total count and the next cursor. Before
+  // these, every comment surface read its WHOLE list on every request
+  // (docs/supabase-egress-audit.md §6). The page-level values ride on ONE row
+  // of the page; every other row carries null for them.
+  get_thread_comment_page: {
+    args: { p_thread_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { thread_id: string }>;
+  };
+  get_resource_comment_page: {
+    args: { p_resource_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { resource_id: string }>;
+  };
+  get_showcase_comment_page: {
+    args: { p_post_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { post_id: string }>;
+  };
+  get_event_comment_page: {
+    args: { p_event_id: string; p_limit: number; p_before: string | null; p_before_id: string | null };
+    returns: Array<CommentPageRpcRow & { event_id: string; image_url: string | null }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };
   // One PAGE of the Explore directory, ordered by (name, id) and continued with

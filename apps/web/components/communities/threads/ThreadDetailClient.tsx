@@ -10,7 +10,10 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "@/lib/communities/models/threads";
 import { ThreadCard } from "./ThreadCard";
 import { CommentSection } from "../CommentSection";
-import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { useCommentPaging } from "../use-comment-paging";
+import type { CommentPageResponse } from "../use-comment-paging";
+import type { CommentPageMeta } from "@/lib/communities/comment-page-cursor";
+import { mergeCommentRoots, updateCommentReactions } from "@/lib/communities/comment-tree";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
@@ -26,6 +29,9 @@ import {
 interface Props {
   thread: CommunityThread;
   initialComments: ThreadComment[];
+  /** The page the server rendered with: how many comments the thread has in
+   *  total, and the cursor for the ones older than `initialComments`. */
+  initialCommentPage?: CommentPageMeta | null;
   currentUserId: string;
   communityId: string;
   communityName: string;
@@ -45,6 +51,7 @@ interface Props {
 export function ThreadDetailClient({
   thread: initialThread,
   initialComments,
+  initialCommentPage,
   currentUserId,
   communityId,
   communityName,
@@ -72,7 +79,17 @@ export function ThreadDetailClient({
   const commentsRef = useRef(comments);
   const isVisible = useDocumentVisible();
 
-  const applyComments = useCallback((nextComments: ThreadComment[]) => {
+  // Only one page of comments is ever on screen (see comment-pages.ts), so the
+  // thread's count comes from the SERVER's total — counting the list here would
+  // report the page's length as the thread's size.
+  const paging = useCommentPaging<ThreadComment>({
+    communityId,
+    kind: "threads",
+    targetId: initialThread.id,
+    initial: initialCommentPage,
+  });
+
+  const applyComments = useCallback((nextComments: ThreadComment[], serverTotal?: number | null) => {
     commentsRef.current = nextComments;
     setComments(nextComments);
     patchThreadResource<{ comments?: ThreadComment[] }>(
@@ -80,36 +97,57 @@ export function ThreadDetailClient({
       currentUserId,
       (cached) => ({ ...cached, comments: nextComments }),
     );
-    const count = nextComments.reduce((total, comment) => total + 1 + comment.replies.length, 0);
-    const nextThread = { ...threadRef.current, comment_count: count };
+    if (typeof serverTotal !== "number") return;
+    const nextThread = { ...threadRef.current, comment_count: serverTotal };
     threadRef.current = nextThread;
     setThread(nextThread);
     patchThreadResource<{ thread?: CommunityThread }>(
       detailUrl,
       currentUserId,
-      (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, comment_count: count } : nextThread }),
+      (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, comment_count: serverTotal } : nextThread }),
     );
   }, [commentsUrl, currentUserId, detailUrl]);
 
   // A remount reads SSR/cache first. Stale comments revalidate once in the background.
   useEffect(() => {
-    void fetchThreadResource<{ comments?: ThreadComment[] }>(commentsUrl, {
+    const adopt = (data: CommentPageResponse<ThreadComment>) => {
+      paging.applyResponse(data);
+      applyComments(data.comments ?? [], data.totalCount ?? null);
+    };
+    void fetchThreadResource<CommentPageResponse<ThreadComment>>(commentsUrl, {
       kind: "comments",
       userId: currentUserId,
-      onRevalidated: (data) => applyComments(data.comments ?? []),
-    }).then((data) => applyComments(data.comments ?? [])).catch(() => undefined);
-  }, [applyComments, commentsUrl, currentUserId]);
+      onRevalidated: adopt,
+    }).then(adopt).catch(() => undefined);
+    // `paging` itself is a fresh object each render, and depending on it would
+    // re-run this fetch whenever the cursor advances — its callback is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyComments, commentsUrl, currentUserId, paging.applyResponse]);
 
   const fetchComments = useCallback(async () => {
     try {
-      const data = await fetchThreadResource<{ comments?: ThreadComment[] }>(commentsUrl, {
+      const data = await fetchThreadResource<CommentPageResponse<ThreadComment>>(commentsUrl, {
         kind: "comments",
         userId: currentUserId,
         force: true,
       });
-      applyComments(data.comments ?? []);
+      paging.applyResponse(data);
+      applyComments(data.comments ?? [], data.totalCount ?? null);
     } catch { /* silent */ }
-  }, [applyComments, commentsUrl, currentUserId]);
+    // Only the stable half of `paging` belongs here (see above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyComments, commentsUrl, currentUserId, paging.applyResponse]);
+
+  /**
+   * The older page: fetched from the cursor the server (or the last response)
+   * issued, then merged by id — the reader's own new comment may already be in
+   * the list, and a page must never render one twice.
+   */
+  async function handleLoadMore() {
+    const older = await paging.loadMore();
+    if (!older?.length) return;
+    applyComments(mergeCommentRoots(commentsRef.current, older));
+  }
 
   useEffect(() => {
     if (!isVisible) return;
@@ -267,7 +305,9 @@ export function ThreadDetailClient({
     writeComments((current) => updateCommentReactions(current, commentId, reactions));
   }
 
-  const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
+  // Nothing here counts the comments that are loaded, on purpose: the page on
+  // screen is not the thread's discussion, so the number the card shows is the
+  // server's total, carried by the paging hook above.
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -320,6 +360,10 @@ export function ThreadDetailClient({
                     allowReplies={thread.allow_replies}
                     comments={comments}
                     currentUserId={currentUserId}
+                    totalCount={paging.totalCount}
+                    hasMore={paging.hasMore}
+                    loadingMore={paging.loadingMore}
+                    onLoadMore={handleLoadMore}
                     onPosted={handleCommentPosted}
                     onDeleted={handleCommentDeleted}
                     onReactionToggled={handleReactionToggled}

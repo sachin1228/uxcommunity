@@ -556,6 +556,10 @@ export function CommentSection<C extends CommunityComment>({
   emptyState,
   composerPlaceholder,
   composerMaxLength,
+  totalCount,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   onPosted,
   onDeleted,
   onReactionToggled,
@@ -572,6 +576,20 @@ export function CommentSection<C extends CommunityComment>({
   composerPlaceholder?: string;
   /** Max length for the top-level composer (default 5000). */
   composerMaxLength?: number;
+  /**
+   * The item's WHOLE comment count, roots and replies, as the server reports it.
+   * It is not `comments.length`: the list arrives a page at a time
+   * (lib/communities/comment-pages.ts), so this is the only number that describes
+   * the discussion rather than the page on screen. Null when unknown.
+   */
+  totalCount?: number | null;
+  /** Whether the server holds older comments than the ones passed in. */
+  hasMore?: boolean;
+  /** A next page is in flight: the control is disabled until it lands. */
+  loadingMore?: boolean;
+  /** Fetches the next page of top-level comments. Absent (or `hasMore` false)
+   *  when the caller already holds every comment. */
+  onLoadMore?: () => void;
   onPosted: (comment: C) => void;
   onDeleted: (id: string, parentId: string | null) => void;
   onReactionToggled?: (commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) => void;
@@ -581,6 +599,15 @@ export function CommentSection<C extends CommunityComment>({
   const [replyTarget, setReplyTarget] = useState<C | null>(null);
 
   const sorted = useMemo(() => sortCommentTree(comments, sort), [comments, sort]);
+
+  // How many comments are on screen (a root plus its replies), so the section can
+  // say how many are still off-screen rather than pretending the page is the
+  // discussion.
+  const loadedCount = useMemo(
+    () => comments.reduce((total, comment) => total + 1 + (comment.replies?.length ?? 0), 0),
+    [comments],
+  );
+  const remaining = typeof totalCount === "number" ? Math.max(0, totalCount - loadedCount) : null;
 
   // Author names in this thread, so reply mentions of them are highlighted as
   // one tag — including multi-word names.
@@ -603,10 +630,12 @@ export function CommentSection<C extends CommunityComment>({
         </div>
       )}
 
-      {/* Just the sort control: the comment count was never the thing the
-          reader needs here, and the card already ends in the list itself.
-          Sits on the left, in the comment column, rather than floating off on
-          its own against the right edge. */}
+      {/* The sort control on the left, in the comment column, rather than
+          floating off on its own against the right edge — and the count on the
+          right, which came back with paging: once the list is a page, "of what"
+          is a real question, and the reader needs to know how much of the
+          discussion is behind the button. It stays absent when the server did
+          not report a total. */}
       <div className="mt-3 flex items-center gap-4">
         <label className="flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
           <ArrowUpDown strokeWidth={2} size={13} />
@@ -621,28 +650,55 @@ export function CommentSection<C extends CommunityComment>({
           </select>
           <ChevronDown strokeWidth={2} size={12} className="-ml-4 pointer-events-none" />
         </label>
+        {typeof totalCount === "number" && (
+          <span className="ml-auto shrink-0 font-body text-xs text-foreground-muted">
+            {remaining !== null && remaining > 0
+              ? `Showing ${loadedCount} of ${totalCount}`
+              : `${totalCount} ${totalCount === 1 ? "comment" : "comments"}`}
+          </span>
+        )}
       </div>
 
       {sorted.length > 0 ? (
-        <div className="mt-4 flex flex-col gap-4">
-          {sorted.map((comment) => (
-            <CommentRow
-              key={comment.id}
-              comment={comment}
-              communityId={communityId}
-              kind={kind}
-              targetId={targetId}
-              currentUserId={currentUserId}
-              allowReplies={allowReplies}
-              mentionNames={mentionNames}
-              replyTarget={replyTarget}
-              onReplyTargetChange={setReplyTarget}
-              onDeleted={onDeleted}
-              onReplied={onPosted}
-              onReactionToggled={onReactionToggled}
-            />
-          ))}
-        </div>
+        <>
+          <div className="mt-4 flex flex-col gap-4">
+            {sorted.map((comment) => (
+              <CommentRow
+                key={comment.id}
+                comment={comment}
+                communityId={communityId}
+                kind={kind}
+                targetId={targetId}
+                currentUserId={currentUserId}
+                allowReplies={allowReplies}
+                mentionNames={mentionNames}
+                replyTarget={replyTarget}
+                onReplyTargetChange={setReplyTarget}
+                onDeleted={onDeleted}
+                onReplied={onPosted}
+                onReactionToggled={onReactionToggled}
+              />
+            ))}
+          </div>
+
+          {/* Older comments, one page per press — the control the list needs
+              now that the first request is bounded. */}
+          {onLoadMore && hasMore && (
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              aria-busy={loadingMore}
+              className="mt-4 w-full rounded-xl border border-border px-4 py-2.5 font-body text-xs font-semibold text-foreground transition-colors hover:bg-surface-raised disabled:cursor-default disabled:opacity-60"
+            >
+              {loadingMore
+                ? "Loading…"
+                : remaining !== null && remaining > 0
+                  ? `Load more comments (${remaining} more)`
+                  : "Load more comments"}
+            </button>
+          )}
+        </>
       ) : (
         emptyState ?? null
       )}

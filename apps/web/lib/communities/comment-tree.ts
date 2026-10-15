@@ -50,6 +50,61 @@ export function sortCommentTree<T extends SortableComment>(
 }
 
 /**
+ * Adds an OLDER page of comments to the list already on screen.
+ *
+ * A comment list now arrives a page at a time (oldest-last is what "load more"
+ * appends), and the older page can overlap what is already there: a realtime
+ * refresh, another tab, or the reader posting a reply while a page was in
+ * flight. Matching by id keeps the list a set — no comment is rendered twice —
+ * and a root that is already on screen still gains the replies the new page
+ * brought with it, which is the one thing a plain "skip if seen" would drop.
+ *
+ * The receiver's own order is preserved: it is the order the pages arrived in,
+ * and the section re-sorts for display (`sortCommentTree`).
+ */
+export function mergeCommentRoots<T extends { id: string; replies?: T[] }>(
+  existing: readonly T[],
+  incoming: readonly T[],
+): T[] {
+  const merged = [...existing];
+  const indexById = new Map(merged.map((row, index) => [row.id, index]));
+  for (const root of incoming) {
+    const at = indexById.get(root.id);
+    if (at === undefined) {
+      indexById.set(root.id, merged.length);
+      merged.push(root);
+      continue;
+    }
+    const current = merged[at];
+    const known = new Set((current.replies ?? []).map((reply) => reply.id));
+    const additions = (root.replies ?? []).filter((reply) => !known.has(reply.id));
+    if (additions.length) {
+      merged[at] = { ...current, replies: [...(current.replies ?? []), ...additions] };
+    }
+  }
+  return merged;
+}
+
+/**
+ * The same union for a FLAT comment list — the shape the event page keeps,
+ * building its tree at render time. Replies and roots are rows here, so one
+ * id-keyed pass is the whole merge.
+ */
+export function mergeCommentRows<T extends { id: string }>(
+  existing: readonly T[],
+  incoming: readonly T[],
+): T[] {
+  const seen = new Set(existing.map((row) => row.id));
+  const merged = [...existing];
+  for (const row of incoming) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    merged.push(row);
+  }
+  return merged;
+}
+
+/**
  * Replaces one comment's grouped reactions inside a comment list, wherever that
  * comment sits — a top-level row, a reply (nested, as threads/resources/showcase
  * keep them) or a reply in a flat list (as the event page keeps them).

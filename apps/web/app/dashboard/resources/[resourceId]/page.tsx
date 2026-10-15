@@ -5,6 +5,8 @@ import { ResourceDetailClient } from "@/components/communities/resources/Resourc
 import { HomeRail } from "@/app/dashboard/HomeRail";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
+import { loadCommentPage, nestCommentRows, commentPageMeta } from "@/lib/communities/comment-pages";
+import type { CommentPageMeta } from "@/lib/communities/comment-page-cursor";
 import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
 
 interface Props {
@@ -54,36 +56,33 @@ async function getResource(
   };
 }
 
+/**
+ * The first paint's comments: ONE page, with the page-level values the client
+ * needs to continue the list. This select used to read the resource's whole
+ * discussion on every request (docs/supabase-egress-audit.md §6).
+ */
 async function getComments(
   db: ReturnType<typeof createServiceClient>,
   resourceId: string,
-): Promise<ResourceComment[]> {
-  const { data } = await db
-    .from("resource_comments")
-    .select("id, resource_id, user_id, parent_id, body, created_at, updated_at")
-    .eq("resource_id", resourceId)
-    .order("created_at", { ascending: true });
-
-  if (!data?.length) return [];
+): Promise<{ comments: ResourceComment[]; page: CommentPageMeta }> {
+  const page = await loadCommentPage(db, "resources", resourceId);
+  if (!page.rows.length) return { comments: [], page: commentPageMeta(page) };
 
   // Name, avatar and the designation pill come from the shared author resolver,
   // so the first paint matches the members list.
-  const authors = await loadCommentAuthors(db, data.map((comment) => comment.user_id));
+  const authors = await loadCommentAuthors(
+    db,
+    page.rows.map((comment) => comment.user_id as string),
+  );
 
-  const withUsers = data.map((comment) => ({
+  const withUsers = page.rows.map((comment) => ({
     ...comment,
-    users: authors[comment.user_id] ?? null,
+    users: authors[comment.user_id as string] ?? null,
     replies: [] as ResourceComment[],
   })) as ResourceComment[];
 
   // Nest one level of replies under their parent (matches the shared CommentSection shape).
-  const topLevel = withUsers.filter((comment) => !comment.parent_id);
-  for (const reply of withUsers.filter((comment) => comment.parent_id)) {
-    const parent = topLevel.find((comment) => comment.id === reply.parent_id);
-    if (parent) parent.replies.push(reply);
-  }
-
-  return topLevel;
+  return { comments: nestCommentRows(withUsers) as ResourceComment[], page: commentPageMeta(page) };
 }
 
 export default async function ResourceDetailPage({ params }: Props) {
@@ -104,7 +103,7 @@ export default async function ResourceDetailPage({ params }: Props) {
 
   const communityId = row.community_id as string;
 
-  const [membership, resource, comments, community] = await Promise.all([
+  const [membership, resource, commentPage, community] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     getResource(db, resourceId, userId),
     getComments(db, resourceId),
@@ -138,7 +137,8 @@ export default async function ResourceDetailPage({ params }: Props) {
         <div className="mx-auto w-full max-w-[40rem]">
           <ResourceDetailClient
             resource={resource}
-            initialComments={comments}
+            initialComments={commentPage.comments}
+            initialCommentPage={commentPage.page}
             currentUserId={userId}
             communityId={communityId}
             communityName={community.data?.name ?? "Community"}

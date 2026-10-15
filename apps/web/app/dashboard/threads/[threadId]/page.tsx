@@ -12,7 +12,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
 
   const { threadId } = await params;
   const userId = (session as { userId: string }).userId;
-  const { db, thread, comments } = await loadThreadDetail({ threadId, userId });
+  const { db, thread, comments, commentPage } = await loadThreadDetail({ threadId, userId });
 
   if (!thread) redirect("/dashboard");
 
@@ -58,6 +58,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
           <ThreadDetailClient
             thread={thread}
             initialComments={comments}
+            initialCommentPage={commentPage}
             currentUserId={userId}
             communityId={communityId}
             communityName={community?.name ?? "Community"}
