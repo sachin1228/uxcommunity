@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import {
@@ -93,11 +94,7 @@ export function EditJobModal({ open, onClose, job, master, onSaved }: EditJobMod
   return (
     <Modal open={open} onClose={submitting ? () => undefined : onClose} title="Edit job" maxWidth="max-w-2xl">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {error && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-            {error}
-          </p>
-        )}
+        {error && <ModalError>{error}</ModalError>}
 
         {/* Fixed identity: what the posting is, and the proof it stands on. */}
         <div className="flex flex-col gap-1.5">

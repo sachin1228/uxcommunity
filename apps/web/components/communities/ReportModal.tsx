@@ -25,6 +25,7 @@ import {
   UserX,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { filterChip } from "./filter-chip";
 import {
@@ -203,11 +204,7 @@ export function ReportModal({
                 </span>
               </div>
 
-              {error && (
-                <p role="alert" className="mt-3 font-body text-xs text-red-400">
-                  {error}
-                </p>
-              )}
+              {error && <ModalError className="mt-3">{error}</ModalError>}
             </>
           )}
 

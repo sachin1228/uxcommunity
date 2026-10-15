@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2, HeartPulse, MessageSquareWarning } from "lucide-react";
+import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2, HeartPulse, MessageSquareWarning, Briefcase, CalendarDays, Library } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -101,6 +101,48 @@ export function AdminSidebar() {
       >
         <MessagesSquare strokeWidth={2.5} size={16} className={active("/admin/communities") ? "text-accent" : ""} />
         Communities
+      </Link>
+
+      {/* Jobs */}
+      <Link
+        href="/admin/jobs"
+        onClick={() => setPendingHref("/admin/jobs")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/jobs")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <Briefcase strokeWidth={2.5} size={16} className={active("/admin/jobs") ? "text-accent" : ""} />
+        Jobs
+      </Link>
+
+      {/* Events */}
+      <Link
+        href="/admin/events"
+        onClick={() => setPendingHref("/admin/events")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/events")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <CalendarDays strokeWidth={2.5} size={16} className={active("/admin/events") ? "text-accent" : ""} />
+        Events
+      </Link>
+
+      {/* Library — handpicked posts shown on the member Library page. */}
+      <Link
+        href="/admin/library"
+        onClick={() => setPendingHref("/admin/library")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/library")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <Library strokeWidth={2.5} size={16} className={active("/admin/library") ? "text-accent" : ""} />
+        Library
       </Link>
 
       {/* Reports */}

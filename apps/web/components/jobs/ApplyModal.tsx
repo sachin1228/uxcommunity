@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileText, Upload, X } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { resumeMeta, type SavedResume } from "@/lib/settings/resumes";
 import type { JobFeedRow, JobViewer } from "@/lib/jobs/types";
@@ -291,11 +292,7 @@ export function ApplyModal({ open, onClose, job, viewer, onApplied }: ApplyModal
             )}
           </div>
 
-          {error && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-              {error}
-            </p>
-          )}
+          {error && <ModalError>{error}</ModalError>}
 
           <div className="flex justify-end gap-2 pt-1">
             <button

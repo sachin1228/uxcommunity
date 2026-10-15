@@ -10,7 +10,7 @@ import { CommunityPostLabel } from "../CommunityPostLabel";
 import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
 import { ReportModal } from "../ReportModal";
-import { FeedVideo } from "@/components/communities/FeedVideo";
+import { VideoPlayer } from "@/components/communities/VideoPlayer";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
 import { ThreadImageCarousel } from "../threads/ThreadImageCarousel";
 import { ShowcaseMediaLightbox } from "./ShowcaseMediaLightbox";
@@ -88,17 +88,18 @@ export function ShowcaseCard({
   const media = mediaForPost(post);
 
   // The card root is a clickable link; clicks on controls (carousel arrows,
-  // dots, lightbox triggers) must not also open the detail page.
+  // dots, lightbox triggers, the video player) must not also open the detail
+  // page.
   function handleCardClick(event: React.MouseEvent<HTMLElement>) {
     if (!onOpen) return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video, [data-video-player]");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     onOpen();
   }
 
   function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (!onOpen || event.key !== "Enter") return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video, [data-video-player]");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     event.preventDefault();
     onOpen();
@@ -112,7 +113,7 @@ export function ShowcaseCard({
       if (videoReady) {
         mediaBlock = (
           <div className="mt-3 overflow-hidden rounded-xl border border-border bg-black">
-            <FeedVideo
+            <VideoPlayer
               src={item.url}
               ariaLabel={post.title}
               poster={item.poster}

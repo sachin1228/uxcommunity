@@ -5,6 +5,7 @@ import { Search, ShieldCheck, X } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import {
   CommunityAdmin,
@@ -174,14 +175,8 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto px-3 pb-3">
-          {error && (
-            <p className="px-2 py-3 font-body text-xs text-red-400">{error}</p>
-          )}
-          {promoteError && (
-            <p className="mx-2 mb-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-              {promoteError}
-            </p>
-          )}
+          {error && <ModalError className="mx-2 mt-2">{error}</ModalError>}
+          {promoteError && <ModalError className="mx-2 mb-2">{promoteError}</ModalError>}
           {busy ? (
             <div className="flex items-center justify-center py-10">
               <Spinner className="h-4 w-4" />

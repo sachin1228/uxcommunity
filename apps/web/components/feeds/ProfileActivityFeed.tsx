@@ -55,23 +55,23 @@ const PROFILE_FEED_STALE_MS = 30_000;
 const EMPTY_STATE: Record<ProfileActivityTab, { title: string; body: string }> = {
   all: {
     title: "Nothing here yet",
-    body: "Threads, showcase posts, resources and events you create or save will appear here.",
+    body: "Threads, showcase posts, resources and events you create will appear here.",
   },
   thread: {
     title: "No threads yet",
-    body: "Threads you start or save in a community will appear here.",
+    body: "Threads you start in a community will appear here.",
   },
   showcase: {
     title: "No showcase posts yet",
-    body: "Work you share or save in a community showcase will appear here.",
+    body: "Work you share in a community showcase will appear here.",
   },
   resource: {
     title: "No resources yet",
-    body: "Resources you share or save in a community will appear here.",
+    body: "Resources you share in a community will appear here.",
   },
   event: {
     title: "No events yet",
-    body: "Events you host or save in a community will appear here.",
+    body: "Events you host in a community will appear here.",
   },
   saved: {
     title: "Nothing saved yet",
@@ -196,11 +196,11 @@ export function ProfileActivityScope({
 
   // Same bus as the homepage feed: merge what other surfaces changed.
   //
-  // These tabs are membership lists ("mine or saved by me"), so a change can do
-  // more than edit a card: it can mean the card no longer belongs here at all.
-  // Unsaving a post that is only in the list because it was saved drops it
-  // immediately; everything else that changes *which* cards belong (a new post,
-  // a delete, saving a post this tab has never listed) pulls the page again
+  // The Saved tab is a membership list (exactly what was saved), so a change
+  // can mean the card no longer belongs here at all: unsaving drops it
+  // immediately. The All and kind tabs list authored cards, where a change
+  // only ever edits a card — edits/deletes merge straight in — and anything
+  // that changes *which* cards belong (a new post) pulls the page again
   // instead of patching.
   //
   // A resource's save is the menu's bookmark, every other card's is its save
@@ -319,10 +319,11 @@ export function ProfileActivityScope({
 
 /**
  * The activity tabs on the profile page: everything the member created, split
- * by card type, plus everything they saved. Cards are the community cards —
- * rendered by the same components and persisted through the same API routes as
- * the homepage feed and the community tabs, so an edit here immediately shows
- * there (and vice versa) and always lands in the database.
+ * by card type, plus a Saved tab listing everything they saved — a card the
+ * member did not author never appears outside Saved. Cards are the community
+ * cards — rendered by the same components and persisted through the same API
+ * routes as the homepage feed and the community tabs, so an edit here
+ * immediately shows there (and vice versa) and always lands in the database.
  *
  * Pass `subject` to list another member's posts instead: same cards, same tabs
  * minus Saved, with the server listing only what the viewer may see.

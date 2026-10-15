@@ -453,6 +453,55 @@ type PerformanceRpcMap = {
       requested_by: string | null;
     }>;
   };
+  // ─── Library (handpicked posts) ───
+  // All shelf rules live in the database (see
+  // supabase/migrations/20261015180000_library_curation.sql); the routes only
+  // supply ids and kinds. get_library_page projects the same card payload as
+  // the feed RPCs, so the shelf renders through the same feed cards.
+  get_library_page: {
+    args: { p_user_id: string };
+    returns: Array<{ item: Json }>;
+  };
+  admin_library_candidates: {
+    args: { p_kind: string; p_search: string; p_sort: string; p_offset: number; p_limit: number };
+    returns: Array<{
+      id: string;
+      title: string;
+      category: string;
+      community_name: string | null;
+      author_name: string | null;
+      is_public: boolean;
+      created_at: string;
+      like_count: number;
+      comment_count: number;
+      featured: boolean;
+      total_count: number;
+    }>;
+  };
+  admin_library_featured: {
+    args: Record<string, never>;
+    returns: Array<{
+      item_type: string;
+      item_id: string;
+      position: number;
+      title: string | null;
+      category: string | null;
+      community_name: string | null;
+      author_name: string | null;
+      is_public: boolean | null;
+      like_count: number;
+      comment_count: number;
+      created_at: string | null;
+    }>;
+  };
+  admin_set_library_item: {
+    args: { p_type: string; p_id: string; p_featured: boolean; p_curated_by: string | null };
+    returns: number | null;
+  };
+  admin_move_library_item: {
+    args: { p_type: string; p_id: string; p_direction: number };
+    returns: number | null;
+  };
 };
 
 /** Card scopes the profile activity tabs can request. */

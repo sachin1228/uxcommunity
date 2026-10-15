@@ -789,6 +789,26 @@ select:focus-visible {
   50%      { opacity: 1; }
 }
 
+/* ─── Video player fullscreen ────────────────────────────────────────── */
+/* The player wrapper itself goes fullscreen so the custom controls ride
+   along; the per-surface sizing utilities (height caps, rounding) give way
+   to a full-viewport, letterboxed frame. */
+.video-player:fullscreen,
+.video-player:-webkit-full-screen {
+  background: #000;
+}
+
+.video-player:fullscreen video,
+.video-player:-webkit-full-screen video {
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
+  max-width: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: contain;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

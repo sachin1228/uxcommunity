@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Check, CheckCheck, Smile, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import type { CachedMessage } from "@/lib/communities/cache";
 import { fmtTime, MAX_MESSAGE_CHARS } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
@@ -81,7 +82,7 @@ export function MessageEditModal({
         </div>
 
         <div className="shrink-0 px-6 pb-6 pt-3">
-          {error && <p className="mb-2 font-body text-xs text-red-400">{error}</p>}
+          {error && <ModalError className="mb-2">{error}</ModalError>}
           <div className="flex items-end gap-3 border-b-2 border-accent pb-2">
             <textarea
               ref={textareaRef}

@@ -16,6 +16,7 @@ import {
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
 import {
@@ -379,11 +380,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
             </div>
           )}
 
-          {error && (
-            <p className="mt-5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-              {error}
-            </p>
-          )}
+          {error && <ModalError className="mt-5">{error}</ModalError>}
 
           <div className="mt-7 flex items-center justify-between gap-3">
             <button

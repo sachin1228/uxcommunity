@@ -510,12 +510,14 @@ export const ChatHeader = memo(function ChatHeader({
                   <span className="inline-flex items-center gap-1.5">
                     <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                     {label}
-                    {tabDots?.[tab] ? (
-                      <>
-                        <span className="h-1 w-1 rounded-full bg-red-500" aria-hidden="true" />
-                        <span className="sr-only">New</span>
-                      </>
-                    ) : null}
+                    {/* The dot slot is always laid out — only its visibility
+                        toggles — so clearing a dot (opening the tab) never
+                        shifts the label or the tabs beside it. */}
+                    <span
+                      className={`h-1 w-1 rounded-full bg-red-500 ${tabDots?.[tab] ? "" : "invisible"}`}
+                      aria-hidden="true"
+                    />
+                    {tabDots?.[tab] ? <span className="sr-only">New</span> : null}
                   </span>
                 </button>
               ))}

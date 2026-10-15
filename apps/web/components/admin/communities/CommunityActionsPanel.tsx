@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 
 interface Props {
   communityId: string;
@@ -127,11 +128,7 @@ export function CommunityActionsPanel({
               </span>
               . Cannot be undone.
             </p>
-            {deleteError && (
-              <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-                {deleteError}
-              </p>
-            )}
+            {deleteError && <ModalError className="mb-4">{deleteError}</ModalError>}
             <div className="flex gap-2">
               <button
                 onClick={() => { setConfirmDelete(false); setDeleteError(null); }}

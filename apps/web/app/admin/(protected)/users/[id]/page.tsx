@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ShieldOff, ShieldCheck, Trash2, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { UserInfoCard } from "@/components/admin/users/UserInfoCard";
 import type { AdminUser, UserApplication } from "@/components/admin/users/userTypes";
@@ -240,11 +241,7 @@ export default function UserDetailPage() {
               community they own is handed to its longest-standing member, or
               deleted if nobody is left. This cannot be undone.
             </p>
-            {deleteError && (
-              <p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-                {deleteError}
-              </p>
-            )}
+            {deleteError && <ModalError className="mb-4">{deleteError}</ModalError>}
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(false)}

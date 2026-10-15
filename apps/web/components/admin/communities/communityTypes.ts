@@ -81,6 +81,7 @@ export const TYPE_LABELS: Record<string, string> = {
   experience_level: "Experience",
   job_title:        "Job Title",
   user:             "Member",
+  event:            "Event",
 };
 
 /** Includes border colour — used in the detail page type badge. */
