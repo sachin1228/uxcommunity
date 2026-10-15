@@ -14,6 +14,7 @@ import {
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { filterChip } from "../filter-chip";
 import { useShowcaseFileUpload, type VideoActivity, type VideoActivityState } from "./useShowcaseFileUpload";
@@ -409,11 +410,12 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                 />
               </div>
 
-              {(error || uploadError) && (
-                <p role="status" className="font-body text-sm text-red-400">{error ?? uploadError}</p>
-              )}
             </div>
           </div>
+
+          {(error || uploadError) && (
+            <ModalError className="shrink-0 px-5 pb-1 sm:px-6">{error ?? uploadError}</ModalError>
+          )}
 
           <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
             <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>

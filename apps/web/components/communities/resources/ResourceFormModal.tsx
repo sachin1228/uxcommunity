@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore
 import { Check, Globe, MessageCircle, X } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalError } from "@/components/ui/ModalError";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { filterChip } from "../filter-chip";
 import type { CommunityResource, ResourceType } from "@/lib/communities/models/resources";
@@ -315,13 +316,9 @@ export function ResourceFormModal({
           </div>
         </div>
 
-        {error && (
-          <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">
-            {error}
-          </p>
-        )}
-
         </div>
+
+        {error && <ModalError className="shrink-0 px-5 pb-1 sm:px-6">{error}</ModalError>}
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">

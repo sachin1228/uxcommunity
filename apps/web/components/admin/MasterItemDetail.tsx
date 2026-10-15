@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -385,9 +386,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             <p className="font-body text-xs text-foreground-muted mb-5">
               This is permanent and cannot be undone. If any designer profile references this {entity.toLowerCase()}, the delete will be blocked.
             </p>
-            {deleteError && (
-              <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">{deleteError}</p>
-            )}
+            {deleteError && <ModalError className="mb-4">{deleteError}</ModalError>}
             <div className="flex gap-2">
               <button
                 onClick={() => { setConfirmDelete(false); setDeleteError(null); }}

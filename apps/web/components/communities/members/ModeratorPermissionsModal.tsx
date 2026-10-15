@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import {
   MODERATOR_DEFAULT_PERMISSIONS,
   MODERATOR_PERMISSION_OPTIONS,
@@ -73,11 +74,7 @@ export function ModeratorPermissionsModal({
           : `Choose what ${firstName} can do in this community. Owners always keep full control.`}
       </p>
 
-      {error && (
-        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-          {error}
-        </div>
-      )}
+      {error && <ModalError className="mb-4">{error}</ModalError>}
 
       <div className="flex flex-col gap-5">
         {GROUP_ORDER.map((group) => (

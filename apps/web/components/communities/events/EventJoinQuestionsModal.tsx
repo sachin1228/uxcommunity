@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, ClipboardList } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { PendingButton } from "@/components/ui/PendingButton";
 import {
   EVENT_JOIN_QUESTIONS,
@@ -128,11 +129,7 @@ export function EventJoinQuestionsModal({
           </label>
         ))}
 
-        {error && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">
-            {error}
-          </p>
-        )}
+        {error && <ModalError>{error}</ModalError>}
 
         <div className="mt-2 flex items-center justify-end gap-3">
           <button

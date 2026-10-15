@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 
 const COPY = {
   linkedin: {
@@ -70,11 +71,7 @@ export function AddLinkModal({ kind, initialUrl = "", onSaved, onClose }: AddLin
     <Modal open onClose={onClose} maxWidth="max-w-md" title={copy.title}>
       <p className="mb-4 font-body text-sm text-foreground-muted">{copy.description}</p>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <p className="font-body text-sm text-red-400">{error}</p>
-        </div>
-      )}
+      {error && <ModalError className="mb-4">{error}</ModalError>}
 
       <label
         htmlFor="profile-link-modal-url"

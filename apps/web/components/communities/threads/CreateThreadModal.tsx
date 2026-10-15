@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "@/lib/communities/models/threads";
 import { THREAD_BODY_MAX_LENGTH } from "@/lib/communities/models/threads";
 import {
@@ -251,13 +252,7 @@ export function CreateThreadModal({
           </div>
         </div>
 
-        {error && (
-          <div className="shrink-0 px-5 pb-1 sm:px-6">
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
-              <p className="font-body text-sm text-red-400">{error}</p>
-            </div>
-          </div>
-        )}
+        {error && <ModalError className="shrink-0 px-5 pb-1 sm:px-6">{error}</ModalError>}
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">

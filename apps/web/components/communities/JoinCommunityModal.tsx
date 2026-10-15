@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Lock, Users } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { setCommunityViewerState } from "@/lib/communities/cache";
 import { CommunityDp } from "./CommunityDp";
@@ -249,7 +250,7 @@ export function CommunityJoinDialog({
             </div>
           )}
 
-          {error && <p className="mt-3 font-body text-xs text-red-400">{error}</p>}
+          {error && <ModalError className="mt-3">{error}</ModalError>}
 
           <div className="mt-6 flex flex-col gap-2">
             <button

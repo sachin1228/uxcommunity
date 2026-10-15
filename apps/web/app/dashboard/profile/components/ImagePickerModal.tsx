@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Upload, X } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 
 interface ImagePickerModalProps {
   uploadPreview: string | null;
@@ -60,11 +61,7 @@ export function ImagePickerModal({
           </div>
 
           <div className="p-5">
-            {error && (
-              <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-                <p className="font-body text-sm text-red-400">{error}</p>
-              </div>
-            )}
+            {error && <ModalError className="mb-4">{error}</ModalError>}
 
             <input
               ref={fileInputRef}

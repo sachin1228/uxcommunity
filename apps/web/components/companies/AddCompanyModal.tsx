@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, Check, Loader2, Search } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalError } from "@/components/ui/ModalError";
 import {
   checkWorkEmail,
   companyNameMatchesDomain,
@@ -657,12 +658,13 @@ export function AddCompanyModal({ open, onClose, initialPending = null, onVerifi
             className={`${fieldCls} text-center font-mono text-lg tracking-[0.4em]`}
           />
 
-          {(codeError || verifying) && (
+          {verifying && (
             <p className="mt-2 flex items-center gap-1.5 font-body text-xs text-foreground-muted" role="alert">
-              {verifying && <Loader2 strokeWidth={2.5} size={12} className="animate-spin" />}
-              {verifying ? "Verifying…" : codeError}
+              <Loader2 strokeWidth={2.5} size={12} className="animate-spin" />
+              Verifying…
             </p>
           )}
+          {codeError && !verifying && <ModalError className="mt-2">{codeError}</ModalError>}
 
           {typeof attemptsLeft === "number" && attemptsLeft < 5 && !codeError && (
             <p className="mt-2 font-body text-xs text-foreground-subtle">
