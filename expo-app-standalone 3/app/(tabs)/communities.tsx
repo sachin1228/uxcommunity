@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityRow } from '@/components/communities/CommunityRow';
@@ -17,15 +17,31 @@ import { useColors } from '@/hooks/useColors';
 import { useCommunities } from '@/hooks/useCommunities';
 import { Community } from '@/lib/communities';
 
+/** Re-read the list when returning to the tab, but at most this often. */
+const FOCUS_REFRESH_MS = 30_000;
+
 export default function CommunitiesScreen() {
   const colors = useColors();
   const router = useRouter();
   const { communities, isLoading, error, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
   const [refreshing, setRefreshing] = useState(false);
+  const lastRefreshedRef = useRef(0);
+
+  // A join from Explore, or any background reconcile, should be visible on
+  // return without a manual pull — the web sidebar updates on every render.
+  useFocusEffect(
+    useCallback(() => {
+      if (isLoading) return;
+      if (Date.now() - lastRefreshedRef.current < FOCUS_REFRESH_MS) return;
+      lastRefreshedRef.current = Date.now();
+      void reload();
+    }, [isLoading, reload]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    lastRefreshedRef.current = Date.now();
     try {
       await reload();
     } finally {

@@ -17,15 +17,30 @@ import { useAuth } from '@/context/AuthContext';
 import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContent } from '@/lib/communityContent';
-import { feedItemKey, feedItemKind, getHomeFeed, type FeedItem } from '@/lib/homeFeed';
+import {
+  feedItemKey,
+  feedItemKind,
+  getHomeFeed,
+  readStoredHomeFeedScope,
+  storeHomeFeedScope,
+  type FeedItem,
+} from '@/lib/homeFeed';
+import {
+  HOME_FEED_SCOPE_LABELS,
+  HOME_FEED_TAB_SCOPES,
+  type HomeFeedTabScope,
+} from '@/lib/homeFeedScopes';
 
 /**
  * Home — the cross-community feed.
  *
- * Renders the same cards as the community tabs (likes, saves, RSVPs and the
- * comment sheet all work identically), with a chip naming the community each
- * post came from. Posts are read-only here: editing and deleting stay on the
- * post's own community tab, where membership is known.
+ * Two disjoint scopes, like the web dashboard tabs: "Public Posts" (shared
+ * publicly, from communities the member has not joined) and "Your Communities"
+ * (every card of joined communities, public or not). The choice persists
+ * between sessions. Renders the same cards as the community tabs (likes,
+ * saves, RSVPs and the comment sheet all work identically), with a chip naming
+ * the community each post came from. Posts are read-only here: editing and
+ * deleting stay on the post's own community tab, where membership is known.
  */
 export default function HomeTab() {
   const colors = useColors();
@@ -33,6 +48,7 @@ export default function HomeTab() {
   const { user } = useAuth();
   const actions = useContentActions();
 
+  const [scope, setScope] = useState<HomeFeedTabScope>('public');
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,13 +60,24 @@ export default function HomeTab() {
 
   const resetActions = actions.reset;
 
+  // Restore the stored scope once; the default tab shows until it loads.
+  useEffect(() => {
+    let cancelled = false;
+    void readStoredHomeFeedScope().then((stored) => {
+      if (!cancelled && stored !== 'public') setScope(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const load = useCallback(
-    async (mode: 'initial' | 'refresh' = 'initial') => {
+    async (mode: 'initial' | 'refresh' = 'initial', forScope: HomeFeedTabScope = scope) => {
       if (mode === 'initial') setLoading(true);
       else setRefreshing(true);
       setError(null);
       try {
-        const page = await getHomeFeed();
+        const page = await getHomeFeed(undefined, forScope);
         setItems(page.items);
         setHasMore(page.hasMore);
         resetActions();
@@ -61,19 +88,34 @@ export default function HomeTab() {
         setRefreshing(false);
       }
     },
-    [resetActions],
+    [resetActions, scope],
   );
 
   useEffect(() => {
     void load('initial');
   }, [load]);
 
+  const switchScope = useCallback(
+    (next: HomeFeedTabScope) => {
+      if (next === scope) return;
+      setScope(next);
+      setItems([]);
+      setHasMore(true);
+      setSelected(null);
+      setCommentTarget(null);
+      void storeHomeFeedScope(next);
+      // Jump straight to the new feed, exactly like the web's remount.
+      void load('initial', next);
+    },
+    [load, scope],
+  );
+
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || items.length === 0) return;
     const last = items[items.length - 1];
     setLoadingMore(true);
     try {
-      const page = await getHomeFeed(last.created_at);
+      const page = await getHomeFeed(last.created_at, scope);
       setItems((current) => {
         const seen = new Set(current.map(feedItemKey));
         return [...current, ...page.items.filter((item) => !seen.has(feedItemKey(item)))];
@@ -84,7 +126,7 @@ export default function HomeTab() {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, items, loadingMore]);
+  }, [hasMore, items, loadingMore, scope]);
 
   const openComments = useCallback((item: CommunityContent) => {
     const match = items.find((entry) => entry.id === item.id);
@@ -111,6 +153,33 @@ export default function HomeTab() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
+
+      <View style={[styles.scopeRow, { borderBottomColor: colors.border }]}>
+        {HOME_FEED_TAB_SCOPES.map((value) => {
+          const active = scope === value;
+          return (
+            <Pressable
+              key={value}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              onPress={() => switchScope(value)}
+              style={[
+                styles.scopeTab,
+                active && { borderBottomColor: colors.foreground },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.scopeLabel,
+                  { color: active ? colors.foreground : colors.mutedForeground },
+                ]}
+              >
+                {HOME_FEED_SCOPE_LABELS[value]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -152,8 +221,9 @@ export default function HomeTab() {
               <Feather name="inbox" size={32} color={colors.foregroundSubtle} />
               <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
               <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                When community members share threads, events, resources or their work
-                publicly, they&apos;ll appear here.
+                {scope === 'communities'
+                  ? "Posts shared in your communities — threads, events, resources and work — will appear here."
+                  : "When community members share threads, events, resources or their work publicly, they'll appear here."}
               </Text>
             </View>
           }
@@ -194,6 +264,19 @@ export default function HomeTab() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  scopeRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+  },
+  scopeTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  scopeLabel: { fontFamily: 'Geist_500Medium', fontSize: 13.5 },
   list: { padding: 12, gap: 12, flexGrow: 1 },
   center: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   stateTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16 },

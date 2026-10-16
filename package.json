@@ -112,7 +112,10 @@
     "k6:seed": "node k6/scripts/seed-users.js",
     "k6:cleanup": "node k6/scripts/cleanup-users.js",
     "test:k6-fixtures": "tsx --test k6/lib/fixture.test.mjs",
-    "test:k6-realtime": "tsx --test k6/lib/realtime-fanout.test.mjs"
+    "test:k6-realtime": "tsx --test k6/lib/realtime-fanout.test.mjs",
+    "test:mobile-explore": "tsx --test \"expo-app-standalone 3/lib/explore.test.ts\"",
+    "test:mobile-home-scope": "tsx --test \"expo-app-standalone 3/lib/homeFeedScopes.test.ts\"",
+    "test:mobile-dm": "tsx --test \"expo-app-standalone 3/lib/dm.test.ts\""
   },
   "engines": {
     "node": ">=22.0.0",

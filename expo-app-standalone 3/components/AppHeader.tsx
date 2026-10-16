@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useDmUnread } from '@/hooks/useDmUnread';
 import { useNotifications } from '@/hooks/useNotifications';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 
@@ -18,6 +19,9 @@ export function AppHeader() {
   // What the badge shows: notifications new since the member last opened the
   // list (never the all-time unread total) — same rule as the web topbar.
   const { unseenCount, seenLoaded } = useNotifications();
+  // The envelope badge is the DM people-count (conversations with unread),
+  // again the web topbar's rule.
+  const dmUnread = useDmUnread();
   const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
   const initials = user?.name
     ? user.name
@@ -66,6 +70,37 @@ export function AppHeader() {
               </Text>
             </View>
           )}
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel={dmUnread > 0 ? `${dmUnread} unread messages` : 'Messages'}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => router.push('/messages')}
+          style={({ pressed }) => [
+            styles.iconButton,
+            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
+          ]}
+        >
+          <Feather name="mail" size={20} color={colors.mutedForeground} />
+          {dmUnread > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{dmUnread > 99 ? '99+' : dmUnread}</Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel="Saved"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => router.push('/saved')}
+          style={({ pressed }) => [
+            styles.iconButton,
+            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
+          ]}
+        >
+          <Feather name="bookmark" size={20} color={colors.mutedForeground} />
         </Pressable>
 
         <Pressable
