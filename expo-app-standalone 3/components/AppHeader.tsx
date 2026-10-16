@@ -1,27 +1,17 @@
 import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccountMenuSheet } from '@/components/AccountMenuSheet';
 import { BrandLogo } from '@/components/BrandLogo';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
-import { resolveProfilePictureUri } from '@/lib/profilePicture';
 
 export function AppHeader() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { user } = useAuth();
-  const [avatarError, setAvatarError] = useState(false);
-  const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
-  const initials = user?.name
-    ? user.name
-        .split(' ')
-        .slice(0, 2)
-        .map((word: string) => word[0]?.toUpperCase() ?? '')
-        .join('')
-    : '?';
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <View
@@ -39,37 +29,28 @@ export function AppHeader() {
         <Text style={[styles.logo, { color: colors.foreground }]}>uxcommunity</Text>
       </View>
 
+      {/* The avatar is the account menu's trigger — the touch version of the
+          web topbar's profile dropdown (identity, View profile, Settings,
+          Sign out). Notifications live in Settings; the header carries no
+          duplicate shortcut. */}
       <View style={styles.actions}>
         <Pressable
-          accessibilityLabel="Notification settings"
+          accessibilityLabel="Profile menu"
           accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => router.push('/settings/notifications')}
-          style={({ pressed }) => [
-            styles.iconButton,
-            // The header sits on the page background, so the pressed state has
-            // to lift onto the raised surface to be visible at all.
-            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
-          ]}
+          hitSlop={6}
+          onPress={() => setMenuOpen(true)}
+          style={({ pressed }) => [styles.avatarButton, { opacity: pressed ? 0.8 : 1 }]}
         >
-          <Feather name="bell" size={22} color={colors.mutedForeground} />
-        </Pressable>
-
-        {avatarUrl ? (
-          <Image
-            accessibilityLabel={`${user?.name ?? 'User'} profile photo`}
-            source={{ uri: avatarUrl }}
-            style={[styles.avatar, styles.avatarImage]}
-            onError={() => setAvatarError(true)}
+          <PersonAvatar
+            name={user?.name}
+            url={user?.avatar_url}
+            size={34}
+            style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
           />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
-              {initials}
-            </Text>
-          </View>
-        )}
+        </Pressable>
       </View>
+
+      <AccountMenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -98,25 +79,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  avatarButton: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImage: {
-    resizeMode: 'cover',
-  },
-  avatarText: {
-    fontSize: 13,
-    fontFamily: 'Geist_600SemiBold',
   },
 });

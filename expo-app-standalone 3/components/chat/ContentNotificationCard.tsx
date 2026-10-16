@@ -20,7 +20,7 @@ import {
   type ChatContentEvent,
 } from '@/lib/chatContentEvents';
 import { RESOURCE_TYPE_LABELS } from '@/lib/communityContent';
-import { Avatar } from './MessageBubble';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { MessageBubbleTail } from './MessageBubbleTail';
 import { ContentIcon, type ContentIconName } from './ContentIcons';
 
@@ -221,10 +221,9 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
       {/* Avatar column — own notifications skip it, matching message bubbles */}
       {!isOwn && (
         <View style={styles.avatarCol}>
-          <Avatar
+          <PersonAvatar
             name={senderName}
-            avatarUrl={event.users?.avatar_url ?? null}
-            colors={colors}
+            url={event.users?.avatar_url ?? null}
             size={28}
           />
         </View>

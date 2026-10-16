@@ -1,7 +1,7 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import type { MentionCandidate } from '@/lib/chat';
 
 /**
@@ -45,48 +45,32 @@ export function MentionSuggestions({
           keyboardShouldPersistTaps="always"
           showsVerticalScrollIndicator={false}
         >
-          {options.map((member) => {
-            const uri = resolveProfilePictureUri(member.avatar_url);
-            const initials = member.name
-              .split(' ')
-              .slice(0, 2)
-              .map((w) => w[0]?.toUpperCase() ?? '')
-              .join('');
-            return (
-              <Pressable
-                key={member.user_id}
-                onPress={() => onPick(member)}
-                accessibilityRole="button"
-                style={({ pressed }) => [
-                  styles.row,
-                  { backgroundColor: pressed ? colors.subtle : 'transparent' },
-                ]}
-              >
-                <View style={[styles.avatar, { backgroundColor: colors.surfaceRaised }]}>
-                  {uri ? (
-                    <Image source={{ uri }} style={styles.avatarImage} />
-                  ) : (
-                    <Text style={[styles.avatarText, { color: colors.mutedForeground }]}>
-                      {initials}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.rowText}>
-                  <Text numberOfLines={1} style={[styles.name, { color: colors.foreground }]}>
-                    {member.name}
+          {options.map((member) => (
+            <Pressable
+              key={member.user_id}
+              onPress={() => onPick(member)}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.row,
+                { backgroundColor: pressed ? colors.subtle : 'transparent' },
+              ]}
+            >
+              <PersonAvatar name={member.name} url={member.avatar_url} size={30} />
+              <View style={styles.rowText}>
+                <Text numberOfLines={1} style={[styles.name, { color: colors.foreground }]}>
+                  {member.name}
+                </Text>
+                {!!member.designation && (
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.designation, { color: colors.mutedForeground }]}
+                  >
+                    {member.designation}
                   </Text>
-                  {!!member.designation && (
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.designation, { color: colors.mutedForeground }]}
-                    >
-                      {member.designation}
-                    </Text>
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
+                )}
+              </View>
+            </Pressable>
+          ))}
         </ScrollView>
       )}
     </View>
@@ -118,17 +102,6 @@ const styles = StyleSheet.create({
   empty: { paddingHorizontal: 12, paddingVertical: 14 },
   emptyText: { fontSize: 12, fontFamily: 'Geist_400Regular' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 9 },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-  avatarImage: { width: 30, height: 30 },
-  avatarText: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   rowText: { flex: 1, minWidth: 0 },
   name: { fontSize: 14, fontFamily: 'Geist_500Medium' },
   designation: { fontSize: 11, fontFamily: 'Geist_400Regular' },

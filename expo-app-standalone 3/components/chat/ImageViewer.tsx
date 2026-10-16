@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fmtDate, fmtTime } from '@/lib/chat';
 import { saveImageToGallery } from '@/lib/deviceMedia';
-import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { PersonAvatar } from '@/components/PersonAvatar';
 
 /** One image from the chat timeline, as shown inside the viewer. */
 export interface LightboxImage {
@@ -173,18 +173,7 @@ export function ImageViewer({ images, index, onClose, onNavigate }: Props) {
     );
   }, [image, saving]);
 
-  const avatarUri = useMemo(
-    () => resolveProfilePictureUri(image?.avatar_url ?? null),
-    [image?.avatar_url],
-  );
-
   if (!image) return null;
-
-  const initials = (image.user_name ?? 'Unknown')
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -193,13 +182,7 @@ export function ImageViewer({ images, index, onClose, onNavigate }: Props) {
         {/* ── Header: sender info + actions ─────────────────────────────── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.avatar}>
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImage} contentFit="cover" />
-              ) : (
-                <Text style={styles.avatarInitials}>{initials}</Text>
-              )}
-            </View>
+            <PersonAvatar name={image.user_name} url={image.avatar_url ?? null} size={36} />
             <View style={styles.headerText}>
               <Text numberOfLines={1} style={styles.userName}>
                 {image.user_name ?? 'Unknown'}
@@ -334,17 +317,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: { width: 36, height: 36 },
-  avatarInitials: { color: '#FFFFFF', fontSize: 13, fontFamily: 'Geist_600SemiBold' },
   headerText: { flex: 1, minWidth: 0 },
   userName: { color: '#FFFFFF', fontSize: 14, fontFamily: 'Geist_600SemiBold' },
   timestamp: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontFamily: 'Geist_400Regular' },

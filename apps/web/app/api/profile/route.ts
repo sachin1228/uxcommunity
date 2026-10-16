@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getProfileCompanyState } from "@/lib/companies/service";
+import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
 import type { Database } from "@/lib/supabase/database.types";
 
 export async function GET() {
@@ -14,7 +16,7 @@ export async function GET() {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const [{ data: user }, { data: profile }] = await Promise.all([
+  const [{ data: user }, { data: profile }, companyState] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
       .from("designer_profiles")
@@ -23,9 +25,26 @@ export async function GET() {
       )
       .eq("user_id", userId)
       .maybeSingle(),
+    // The report alongside the read: the workplace that rides the role line,
+    // and any work-email challenge still waiting on a code.
+    getProfileCompanyState(db, userId),
   ]);
 
-  return NextResponse.json({ user, profile });
+  // Seniority plus designation, composed server-side so the mobile hero and
+  // the web hero can never disagree on how the role line reads.
+  const roleLabel = await resolveProfileRoleLabel(
+    db,
+    (profile as any)?.job_title ?? null,
+    (profile as any)?.experience_level ?? null,
+  );
+
+  return NextResponse.json({
+    user,
+    profile,
+    roleLabel,
+    company: companyState.company,
+    pendingCompany: companyState.pending,
+  });
 }
 
 export async function PATCH(request: NextRequest) {

@@ -78,6 +78,30 @@ export default function RootLayout() {
                     name="settings/notifications"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
+                  <Stack.Screen
+                    name="profile"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/index"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/profile"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/account"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/email"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/connected-accounts"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
                   <Stack.Screen name="+not-found" />
                 </Stack>
               </AuthProvider>

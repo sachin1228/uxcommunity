@@ -33,7 +33,7 @@ import {
   type CommunityComment,
 } from '@/lib/comments';
 import { commentParticipantNames, splitCommentText } from '@/lib/commentText';
-import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { PersonAvatar } from '@/components/PersonAvatar';
 
 /**
  * The community comment section, ported from the web `CommentSection`.
@@ -613,7 +613,6 @@ function CommentRow({
   const connectorColor = colors.isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.10)';
   const replyActive = replyTarget?.id === comment.id;
   const activeReplyTarget = hostsReplyComposer ? replyTarget : null;
-  const avatarUri = resolveProfilePictureUri(comment.users?.avatar_url);
   const bodySegments = useMemo(
     () => splitCommentText(comment.body, mentionNames),
     [comment.body, mentionNames],
@@ -681,15 +680,7 @@ function CommentRow({
       {/* Avatar gutter: the circle pinned left, the thread's connector bracket
           dropping from under it and curving right under the last reply. */}
       <View style={styles.gutter}>
-        {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-            <Text style={[styles.avatarText, { color: colors.foregroundMuted }]}>
-              {name.slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-        )}
+        <PersonAvatar name={name} url={comment.users?.avatar_url ?? null} size={AVATAR_SIZE} />
         {showConnector ? (
           <View style={styles.connector}>
             <View style={[styles.connectorElbow, { borderColor: connectorColor }]} />
@@ -1036,9 +1027,6 @@ const styles = StyleSheet.create({
   // Lift the row carrying an open menu above the rows below it.
   rowRaised: { zIndex: 30 },
   gutter: { width: AVATAR_SIZE, alignItems: 'center' },
-  avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 13, fontFamily: 'Geist_600SemiBold' },
 
   // The bracket drops from under the avatar and curves right under the last
   // reply: left border on the avatar's centre line, bottom border curving out

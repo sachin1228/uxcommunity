@@ -26,6 +26,10 @@ export interface NotificationPreferences {
   quietHoursEnd: string;
   /** IANA name, reported by the device when saving. */
   quietHoursTimezone: string;
+  /** The three optional email streams — mirrors the web Email settings card. */
+  emailJobUpdates: boolean;
+  emailCommunityActivity: boolean;
+  emailProductNews: boolean;
 }
 
 export interface NotificationSettings {
@@ -42,6 +46,11 @@ export const DEFAULT_PREFERENCES: NotificationPreferences = {
   quietHoursStart: '22:00',
   quietHoursEnd: '07:00',
   quietHoursTimezone: 'UTC',
+  // Email preferences default true/true/false both in the database and on
+  // the web Email card.
+  emailJobUpdates: true,
+  emailCommunityActivity: true,
+  emailProductNews: false,
 };
 
 /** The device's own timezone, so quiet hours fire at the member's night. */
