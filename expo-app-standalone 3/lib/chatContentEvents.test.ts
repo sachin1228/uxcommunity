@@ -18,6 +18,7 @@ import {
   isMissingRouteError,
   mergeChatTimeline,
   prettyUrl,
+  replyDraftFromContent,
   splitBody,
   tabForChatContentKind,
   withArticle,
@@ -156,8 +157,37 @@ test('a created event carries its schedule, cover and RSVP count', () => {
   assert.equal(event.meta?.rsvp_count, 2);
 });
 
-// ─── Timeline merge ───────────────────────────────────────────────────────
+// ─── Composer reply draft ─────────────────────────────────────────────────
 
+test('a card reply quotes its headline first line, with the kind anchor', () => {
+  const draft = replyDraftFromContent({
+    ...createdBase,
+    kind: 'event',
+    title: 'Coffee meetup\nBring your mugs',
+    community_id: 'room-1',
+    user_id: 'u-1',
+    users: { name: 'Jackie', avatar_url: null },
+  } as Parameters<typeof replyDraftFromContent>[0]);
+  assert.equal(draft.id, 'c-1');
+  assert.equal(draft.content, 'Coffee meetup');
+  assert.equal(draft.user_name, 'Jackie');
+  assert.equal(draft.content_kind, 'event');
+});
+
+test('a card reply with no title falls back to the kind noun', () => {
+  const draft = replyDraftFromContent({
+    ...createdBase,
+    kind: 'thread',
+    title: '   ',
+    reactions: [],
+    users: null,
+  } as Parameters<typeof replyDraftFromContent>[0]);
+  assert.equal(draft.content, 'Thread');
+  assert.equal(draft.user_name, 'Unknown');
+  assert.equal(draft.content_kind, 'thread');
+});
+
+// ─── Timeline merge ───────────────────────────────────────────────────────
 test('mergeChatTimeline interleaves by time with messages first on a tie', () => {
   const messages = [
     { id: 'm1', created_at: '2026-10-16T10:00:00.000Z' },

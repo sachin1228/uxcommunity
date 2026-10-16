@@ -12,8 +12,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
-import { Message } from '@/lib/communities';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, type MessageMention } from '@/lib/chat';
+import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
@@ -40,7 +40,8 @@ function SendPlaneIcon({ color, size = 18 }: { color: string; size?: number }) {
 interface Props {
   communityId: string;
   currentUserId: string;
-  replyTo: Message | null;
+  /** The draft being replied to — a message or a "created a …" card. */
+  replyTo: ReplyDraft | null;
   onCancelReply: () => void;
   onSend: (text: string, pendingImage?: PendingImage, mentions?: MessageMention[]) => void;
   onTypingChange: (text: string) => void;
@@ -202,7 +203,9 @@ export function ChatInput({
             >
               <View style={styles.replyInfo}>
                 <Text numberOfLines={1} style={[styles.replyName, { color: colors.accent }]}>
-                  {replyTo.users?.name ?? 'message'}
+                  {replyTo.content_kind
+                    ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
+                    : replyTo.user_name}
                 </Text>
                 <Text numberOfLines={2} style={[styles.replyText, { color: colors.mutedForeground }]}>
                   {replyTo.content || '📷 Image'}

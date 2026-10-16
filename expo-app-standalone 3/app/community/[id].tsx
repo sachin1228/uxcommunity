@@ -22,6 +22,7 @@ import { useTypingPresence } from '@/hooks/useTypingPresence';
 import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ContentNotificationCard } from '@/components/chat/ContentNotificationCard';
+import { ContentActionsSheet } from '@/components/chat/ContentActionsSheet';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -55,7 +56,13 @@ import {
   type MessageMention,
   type ReactionIntent,
 } from '@/lib/chat';
-import { mergeChatTimeline, tabForChatContentKind, type ChatContentEvent } from '@/lib/chatContentEvents';
+import {
+  mergeChatTimeline,
+  replyDraftFromContent,
+  tabForChatContentKind,
+  type ChatContentEvent,
+  type ReplyDraft,
+} from '@/lib/chatContentEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
@@ -201,8 +208,14 @@ export default function CommunityChat() {
 
   const { typingUsers, onInputChange, stopTyping } = useTypingPresence(id);
 
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  /**
+   * The composer's reply draft — a message or a "created a …" card (see
+   * ReplyDraft). ReplyDraft.content_kind set means the card anchor.
+   */
+  const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  /** The "created a …" card a long-press opened the actions sheet for. */
+  const [selectedContent, setSelectedContent] = useState<ChatContentEvent | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState<number | null>(null);
@@ -596,10 +609,56 @@ export default function CommunityChat() {
     setSelectedMessage(msg);
   }, []);
 
+  /**
+   * Long-press on a "created a …" card — the touch equivalent of the web
+   * card's hover actions (reaction picker + reply).
+   */
+  const handleContentLongPress = useCallback((event: ChatContentEvent) => {
+    setSelectedContent(event);
+  }, []);
+
+  /**
+   * The sheet's Reply row: seed the composer with the card as the anchor —
+   * the web handleContentReply contract (headline first line, kind-labeled
+   * chip in the composer).
+   */
+  const handleContentReply = useCallback((event: ChatContentEvent) => {
+    setReplyTo(replyDraftFromContent(event));
+  }, []);
+
+  /**
+   * The sheet's Reply row for a message: the composer draft keys off the flat
+   * fields (web handleReply parity — image-only messages quote "📷 Image").
+   */
+  const handleMessageReply = useCallback((msg: Message) => {
+    setReplyTo({
+      id: msg.id,
+      content: msg.content || (msg.image_url ? '📷 Image' : ''),
+      user_name: msg.users?.name ?? 'Unknown',
+      user_id: msg.user_id,
+    });
+  }, []);
+
   /** Jumps the list to the message a reply quotes (web parity). */
   const handleReplyPress = useCallback(
     (messageId: string) => {
       const index = rows.findIndex((row) => row.kind === 'message' && row.msg.id === messageId);
+      if (index < 0) return;
+      try {
+        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch {
+        listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
+      }
+    },
+    [rows],
+  );
+
+  /** Jumps the list to the "created a …" card a reply quotes (web parity). */
+  const handleContentChipPress = useCallback(
+    (contentId: string) => {
+      const index = rows.findIndex(
+        (row) => row.kind === 'content' && row.event.id === contentId,
+      );
       if (index < 0) return;
       try {
         listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
@@ -737,6 +796,7 @@ export default function CommunityChat() {
             isOwn={item.event.user_id === user?.id}
             currentUserId={user?.id ?? ''}
             onOpen={handleContentOpen}
+            onLongPress={handleContentLongPress}
             onReaction={handleContentReaction}
           />
         );
@@ -754,6 +814,7 @@ export default function CommunityChat() {
           onCancel={handleCancel}
           onRetry={handleRetry}
           onReplyPress={handleReplyPress}
+          onContentReplyPress={handleContentChipPress}
         />
       );
     },
@@ -765,7 +826,9 @@ export default function CommunityChat() {
       handleCancel,
       handleRetry,
       handleReplyPress,
+      handleContentChipPress,
       handleContentOpen,
+      handleContentLongPress,
       handleContentReaction,
       colors,
       initialUnreadCount,
@@ -1115,13 +1178,23 @@ export default function CommunityChat() {
         canModerate={isOwnCommunity}
         onClose={() => setSelectedMessage(null)}
         onReact={handleReaction}
-        onReply={(msg) => setReplyTo(msg)}
+        onReply={handleMessageReply}
         onCopy={handleCopy}
         onEdit={(msg) => {
           clearEditError();
           setEditingMessage(msg);
         }}
         onDelete={handleDelete}
+      />
+
+      {/* Long-press action sheet for a "created a …" card — reactions + reply
+          (the touch form of the web card's hover actions) */}
+      <ContentActionsSheet
+        event={selectedContent}
+        currentUserId={user?.id ?? ''}
+        onClose={() => setSelectedContent(null)}
+        onReact={handleContentReaction}
+        onReply={handleContentReply}
       />
 
       {/* Edit composer */}

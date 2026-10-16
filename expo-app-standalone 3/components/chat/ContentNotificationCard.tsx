@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { fmtTime, userNameColor } from '@/lib/chat';
+import { hapticImpact } from '@/lib/haptics';
 import {
   CHAT_CONTENT_KIND_THEME,
   firstLine,
@@ -37,6 +38,8 @@ interface Props {
   currentUserId: string;
   /** Open the item behind the card (its community tab). */
   onOpen: (event: ChatContentEvent) => void;
+  /** Long-press — the touch equivalent of the web card's hover actions. */
+  onLongPress: (event: ChatContentEvent) => void;
   /** Toggle/replace the current user's emoji reaction on this card. */
   onReaction: (event: ChatContentEvent, emoji: string) => void;
 }
@@ -151,6 +154,7 @@ export function ContentNotificationCard({
   isOwn,
   currentUserId,
   onOpen,
+  onLongPress,
   onReaction,
 }: Props) {
   const colors = useColors();
@@ -242,7 +246,16 @@ export function ContentNotificationCard({
 
       <View style={[styles.contentCol, { width: bubbleWidth }]}>
         <View style={styles.bubbleWrap}>
-          <View
+          {/* Long-press anywhere on the bubble opens the reaction/reply sheet —
+              the touch form of the web card's hover actions. */}
+          <Pressable
+            onLongPress={() => {
+              // The press must register in the hand at the moment the sheet
+              // slides up, exactly like a message long-press.
+              hapticImpact();
+              onLongPress(event);
+            }}
+            delayLongPress={350}
             style={[
               styles.bubble,
               { backgroundColor: isOwn ? colors.chatOwnBubble : colors.surfaceRaised, shadowColor: '#000' },
@@ -269,6 +282,11 @@ export function ContentNotificationCard({
             {/* Card — opens the item on its own community tab */}
             <Pressable
               onPress={() => onOpen(event)}
+              onLongPress={() => {
+                hapticImpact();
+                onLongPress(event);
+              }}
+              delayLongPress={350}
               accessibilityRole="button"
               accessibilityLabel={`${name} created ${withArticle(theme.label.toLowerCase())}: ${event.title || theme.label}`}
               style={({ pressed }) => [
@@ -368,7 +386,7 @@ export function ContentNotificationCard({
               onPress={(emoji) => onReaction(event, emoji)}
               colors={colors}
             />
-          </View>
+          </Pressable>
         </View>
 
         {/* Reserve room for the pills that hang below the bubble */}

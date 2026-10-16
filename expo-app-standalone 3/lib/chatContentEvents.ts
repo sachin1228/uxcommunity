@@ -65,6 +65,20 @@ export interface ChatContentEvent {
 /** Tab keys as they appear in the community nav. */
 export type ChatContentTab = 'threads' | 'showcase' | 'resources' | 'events';
 
+/**
+ * The composer's reply target — a message or a "created a …" card, in one
+ * shape like the web ReplyPreview: `content_kind` set means `id` names a
+ * content item, and both the chip copy and the send payload switch to the
+ * content-reply contract (reply_to_content instead of reply_to_id).
+ */
+export interface ReplyDraft {
+  id: string;
+  content: string;
+  user_name: string;
+  user_id: string | null;
+  content_kind?: ChatContentKind | null;
+}
+
 // ─── Per-kind visual identity ─────────────────────────────────────────────
 
 export interface ChatContentKindTheme {
@@ -126,6 +140,25 @@ export function tabForChatContentKind(kind: ChatContentKind): ChatContentTab {
 
 export function chatContentKindForTab(tab: ChatContentTab): ChatContentKind {
   return KIND_BY_TAB[tab];
+}
+
+/**
+ * The composer's reply target for a "created a …" card — the web
+ * handleContentReply contract: cards carry their body in `title`, so the
+ * chip quotes the headline's first line and falls back to the kind's noun
+ * when the card has no title.
+ */
+export function replyDraftFromContent(event: ChatContentEvent): ReplyDraft {
+  const first = (event.title.trim() || CHAT_CONTENT_KIND_THEME[event.kind].label)
+    .split('\n')[0]
+    .trim();
+  return {
+    id: event.id,
+    content: first,
+    user_name: event.users?.name ?? 'Unknown',
+    user_id: event.user_id,
+    content_kind: event.kind,
+  };
 }
 
 // ─── Text helpers (ports of the web content-notifications exports) ────────

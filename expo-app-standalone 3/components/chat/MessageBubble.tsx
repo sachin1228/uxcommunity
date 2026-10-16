@@ -14,6 +14,7 @@ import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { CHAT_CONTENT_KIND_THEME } from '@/lib/chatContentEvents';
 import {
   COLLAPSED_LINES,
   fmtTime,
@@ -40,6 +41,8 @@ interface Props {
   onRetry?: (tempId: string) => void;
   /** Jumps the list to the message this one replies to. */
   onReplyPress?: (messageId: string) => void;
+  /** Jumps the list to the "created a …" card this one replies to. */
+  onContentReplyPress?: (contentId: string) => void;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -196,6 +199,59 @@ function ReplyBubble({
         ]}
       >
         {reply.content || '📷 Image'}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Reply quote for a "created a …" notification card (thread / showcase /
+ * resource / event) — the web ContentReplyBubble: same chip as a message
+ * reply, but the first line wears the kind's label so the anchor is obvious,
+ * and tapping jumps to the card.
+ */
+function ContentReplyQuote({
+  reply,
+  isOwn,
+  colors,
+  onPress,
+}: {
+  reply: NonNullable<Message['reply_to_content']>;
+  isOwn: boolean;
+  colors: Palette;
+  onPress?: () => void;
+}) {
+  const ownText = colors.chatOwnBubbleForeground;
+  const label = CHAT_CONTENT_KIND_THEME[reply.kind].label;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={[
+        styles.replyBubble,
+        {
+          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
+          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
+        },
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.contentReplyLabel,
+          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        numberOfLines={2}
+        style={[
+          styles.replyContent,
+          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.7 : 1 },
+        ]}
+      >
+        {reply.title || label}
       </Text>
     </Pressable>
   );
@@ -438,6 +494,7 @@ export function MessageBubble({
   onCancel,
   onRetry,
   onReplyPress,
+  onContentReplyPress,
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
@@ -446,11 +503,12 @@ export function MessageBubble({
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
   const reactions = message.reactions ?? [];
   const replyTo = message.reply_to ?? null;
+  const replyToContent = message.reply_to_content ?? null;
   const imageUrl = message.image_url ?? null;
   const failed = message.status === 'failed';
   const uploading = message.status === 'sending' && !!imageUrl;
   const isDeleted = !!message.deleted_at;
-  const imageOnly = !!imageUrl && !message.content && !replyTo;
+  const imageOnly = !!imageUrl && !message.content && !replyTo && !replyToContent;
   const isFirstInGroup = !isSameAuthor;
   const showHeader = !isSameAuthor;
 
@@ -458,7 +516,12 @@ export function MessageBubble({
 
   // Big bubble-free emoji when the whole message is 1–3 emoji glyphs.
   const isEmojiMsg =
-    !isDeleted && !imageUrl && !replyTo && !!message.content && isEmojiOnly(message.content);
+    !isDeleted &&
+    !imageUrl &&
+    !replyTo &&
+    !replyToContent &&
+    !!message.content &&
+    isEmojiOnly(message.content);
 
   const ownBubbleColor = failed ? colors.chatFailedBubble : colors.chatOwnBubble;
   const bubbleBg = isOwn ? ownBubbleColor : colors.surfaceRaised;
@@ -591,6 +654,19 @@ export function MessageBubble({
                         isOwn={isOwn}
                         colors={colors}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
+                      />
+                    )}
+
+                    {!replyTo && replyToContent && (
+                      <ContentReplyQuote
+                        reply={replyToContent}
+                        isOwn={isOwn}
+                        colors={colors}
+                        onPress={
+                          onContentReplyPress
+                            ? () => onContentReplyPress(replyToContent.id)
+                            : undefined
+                        }
                       />
                     )}
 
@@ -728,6 +804,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
+  contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },
   replyContent: { fontSize: 11, lineHeight: 15 },
 
   // ── media ───────────────────────────────────────────────────────────────

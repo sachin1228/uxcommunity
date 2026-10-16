@@ -84,6 +84,13 @@ export interface ReplyPreview {
   user_id?: string | null;
 }
 
+/** The "created a …" card a message replies to (the RPC's reply_to_content). */
+export interface ContentReplyPreview {
+  id: string;
+  kind: ChatContentKind;
+  title: string;
+}
+
 export interface Message {
   id: string;
   content: string | null;
@@ -99,6 +106,8 @@ export interface Message {
   users: MessageUser | null;
   reactions: Reaction[];
   reply_to: ReplyPreview | null;
+  /** Set when this message replies to a "created a …" card instead. */
+  reply_to_content?: ContentReplyPreview | null;
   /** Client-only — not stored on the server. */
   status?: 'sending' | 'sent' | 'failed';
 }
@@ -147,6 +156,12 @@ export async function sendMessage(
   payload: {
     content?: string;
     reply_to_id?: string;
+    /**
+     * A content-anchored reply (a "created a …" card). Mutually exclusive
+     * with `reply_to_id` — the server ignores it when a message anchor is
+     * set, because a content id would never validate as a message id.
+     */
+    reply_to_content?: { id: string; kind: ChatContentKind };
     image_url?: string;
     /** Members picked from the composer's @-autocomplete. */
     mentions?: MessageMention[];
