@@ -111,7 +111,7 @@
     "k6:cleanup": "node k6/scripts/cleanup-users.js",
     "test:k6-fixtures": "tsx --test k6/lib/fixture.test.mjs",
     "test:k6-realtime": "tsx --test k6/lib/realtime-fanout.test.mjs",
-    "test:mobile-communities": "tsx --test \"expo-app-standalone 3/lib/eventDate.test.ts\" \"expo-app-standalone 3/lib/communityBadges.test.ts\" \"expo-app-standalone 3/lib/communityMute.test.ts\" \"expo-app-standalone 3/lib/sidebarOrder.test.ts\""
+    "test:mobile-communities": "tsx --test \"expo-app-standalone 3/lib/eventDate.test.ts\" \"expo-app-standalone 3/lib/communityBadges.test.ts\" \"expo-app-standalone 3/lib/communityMute.test.ts\" \"expo-app-standalone 3/lib/sidebarOrder.test.ts\" \"expo-app-standalone 3/lib/tabSeen.test.ts\""
   },
   "engines": {
     "node": ">=22.0.0",

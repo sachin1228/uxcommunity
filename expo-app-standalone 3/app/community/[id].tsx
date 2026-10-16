@@ -28,8 +28,10 @@ import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
 import { CommunityActionsSheet, type CommunityConfirmAction } from '@/components/community/CommunityActionsSheet';
 import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
+import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
+import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
 import {
   archiveCommunity,
   leaveCommunity,
@@ -152,6 +154,16 @@ export default function CommunityChat() {
   // Don't latch the unread position until we actually know it — on a push
   // deep-link the community (and therefore last_read_at) arrives a beat later.
   const readStateKnown = unreadParam !== undefined || resolved !== null;
+
+  // "New since you last looked" dots for the nav (web parity — see the hook).
+  // Anchor = the read watermark as of this open, snapshotted above before the
+  // chat marks the community read.
+  const { tabDots } = useCommunityTabDots({
+    communityId: id,
+    currentUserId: user?.id ?? '',
+    activeTab,
+    anchorAt: lastReadAt,
+  });
 
   // Track this as the active community so useCommunities won't increment
   // unread_count for incoming messages while we're looking at this chat.
@@ -918,6 +930,8 @@ export default function CommunityChat() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
+            const labelColor = active ? colors.foreground : colors.mutedForeground;
+            const showDot = tab.key !== 'chat' && !!tabDots[tab.key];
             return (
               <Pressable
                 key={tab.key}
@@ -925,18 +939,27 @@ export default function CommunityChat() {
                   setEmojiPanelOpen(false);
                   setActiveTab(tab.key);
                 }}
-                style={[styles.tab, active && { borderBottomColor: colors.chatOwnBubble }]}
+                style={[
+                  styles.tab,
+                  // The active underline wears the UI accent, like the web
+                  // header — white in the dark theme, near-black in light.
+                  { borderBottomColor: active ? colors.accent : 'transparent' },
+                ]}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: active ? colors.foreground : colors.mutedForeground },
-                  ]}
-                >
-                  {tab.label}
-                </Text>
+                <View style={styles.tabInner}>
+                  <CommunityTabIcon tab={tab.key} size={14} color={labelColor} />
+                  <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
+                  {/* The dot slot is always laid out — only its visibility
+                      toggles — so clearing a dot (opening the tab) never
+                      shifts the label or the tabs beside it (web parity). */}
+                  <View
+                    accessible={showDot}
+                    accessibilityLabel={showDot ? 'New' : undefined}
+                    style={[styles.tabDot, !showDot && styles.tabDotHidden]}
+                  />
+                </View>
               </Pressable>
             );
           })}
@@ -1068,12 +1091,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
+  tabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   tabText: {
-    fontSize: 14,
-    fontFamily: 'Geist_600SemiBold',
+    fontSize: 12,
+    fontFamily: 'Geist_500Medium',
+  },
+  tabDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    // The web dot's red-500, kept literal like the calendar tile's inks.
+    backgroundColor: '#EF4444',
+  },
+  tabDotHidden: {
+    opacity: 0,
   },
   headerAvatar: {
     width: 30,

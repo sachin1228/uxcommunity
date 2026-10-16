@@ -184,6 +184,33 @@ export async function markRead(communityId: string): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/read`, { method: 'PATCH' });
 }
 
+/** The newest created_at per content area — the tab dots' server baseline. */
+export interface CommunityContentLatest {
+  thread: string | null;
+  showcase: string | null;
+  resource: string | null;
+  event: string | null;
+}
+
+/**
+ * The newest item per content area (threads / showcase / resources / events),
+ * as the server computes it. The chat header's per-tab dots compare these
+ * against the member's per-tab watermarks (see hooks/useCommunityTabDots) —
+ * the same contract as the web's `/content-latest` baseline.
+ */
+export async function getContentLatest(communityId: string): Promise<CommunityContentLatest> {
+  const { data } = await apiFetch<{ latest?: Partial<CommunityContentLatest> }>(
+    `/api/communities/${communityId}/content-latest`
+  );
+  const latest = data.latest ?? {};
+  return {
+    thread: latest.thread ?? null,
+    showcase: latest.showcase ?? null,
+    resource: latest.resource ?? null,
+    event: latest.event ?? null,
+  };
+}
+
 /** The durations the mute menu offers, plus "off" to unmute. */
 export type CommunityMuteDuration = '8h' | '1w' | 'always' | 'off';
 
