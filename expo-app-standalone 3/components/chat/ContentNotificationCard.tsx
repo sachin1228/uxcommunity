@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -66,6 +66,32 @@ const RESOURCE_TILE_ICON: Record<string, ContentIconName> = {
   inspiration: 'sparkles',
   other: 'package',
 };
+
+/** The thumbnail column's width — images scale to it; their height follows the ratio. */
+const THUMB_WIDTH = 64;
+
+/** Natural width:height of a thumb image, measured once it loads. */
+function useImageRatio(uri: string | null): number | null {
+  const [ratio, setRatio] = useState<number | null>(null);
+  useEffect(() => {
+    setRatio(null);
+    if (!uri) return;
+    let cancelled = false;
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (!cancelled && width > 0 && height > 0) setRatio(width / height);
+      },
+      () => {
+        /* keep the square fallback */
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+  return ratio;
+}
 
 /** Reaction pills under a card — MessageBubble's pills, grouped like web. */
 function ContentReactionPills({
@@ -140,6 +166,12 @@ export function ContentNotificationCard({
   // Thumbnail precedence: real image > video poster > kind icon tile.
   const imageUrl = meta?.image_url ?? null;
   const posterUrl = imageUrl ? null : meta?.video_poster ?? null;
+  const thumbUri = imageUrl ?? posterUrl;
+  // The thumb keeps the image's own aspect at the 64px column width — never a
+  // cover crop, so a poster reads whole (its height follows the ratio; the
+  // card's own min height floors the tile).
+  const thumbRatio = useImageRatio(thumbUri);
+  const thumbHeight = thumbRatio ? Math.round(THUMB_WIDTH / thumbRatio) : THUMB_WIDTH;
   const TileIcon =
     event.kind === 'resource' && meta?.resource_type
       ? RESOURCE_TILE_ICON[meta.resource_type] ?? KIND_ICON.resource
@@ -252,20 +284,26 @@ export function ContentNotificationCard({
                 },
               ]}
             >
-              {/* Thumbnail — image, video poster, or the shared solid-ink
-                  icon tile, stretched to the card's full height (min 64px). */}
+              {/* Thumbnail — the image at its natural aspect (never cropped),
+                  or the shared solid-ink icon tile when there is none. */}
               <View style={styles.thumb}>
-                {imageUrl ? (
-                  <Image source={{ uri: imageUrl }} style={styles.thumbImage} resizeMode="cover" />
-                ) : posterUrl ? (
-                  <>
-                    <Image source={{ uri: posterUrl }} style={styles.thumbImage} resizeMode="cover" />
-                    <View style={styles.playOverlay}>
-                      <View style={styles.playCircle}>
-                        <ContentIcon name="video" size={12} color="#FFFFFF" />
+                {thumbUri ? (
+                  <View style={{ width: THUMB_WIDTH, height: thumbHeight }}>
+                    <Image
+                      source={{ uri: thumbUri }}
+                      // The box already carries the image's ratio; contain
+                      // guarantees the whole frame stays visible regardless.
+                      resizeMode="contain"
+                      style={styles.thumbImage}
+                    />
+                    {posterUrl && (
+                      <View style={styles.playOverlay}>
+                        <View style={styles.playCircle}>
+                          <ContentIcon name="video" size={12} color="#FFFFFF" />
+                        </View>
                       </View>
-                    </View>
-                  </>
+                    )}
+                  </View>
                 ) : (
                   <View style={[styles.tile, { backgroundColor: colors.foreground }]}>
                     <ContentIcon name={TileIcon} size={24} color={colors.background} />
@@ -383,8 +421,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  thumb: { width: 64, minHeight: 64, flexShrink: 0, overflow: 'hidden' },
-  thumbImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  thumb: {
+    width: THUMB_WIDTH,
+    minHeight: 64,
+    flexShrink: 0,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbImage: { width: '100%', height: '100%' },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -398,7 +443,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tile: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tile: {
+    flex: 1,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   textCol: { flex: 1, minWidth: 0, paddingVertical: 6, paddingRight: 4 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
