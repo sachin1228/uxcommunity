@@ -9,6 +9,7 @@
 
 import { apiFetch, apiFormUpload } from './api';
 import type { PreparedImage } from './prepareImage';
+import type { PendingCompanyVerification } from './companies';
 import type {
   IdentitySlot,
   IdentityUpdateResult,
@@ -51,6 +52,8 @@ export interface OwnProfile {
   profile: ProfileRow | null;
   roleLabel: string | null;
   company: ProfileCompany | null;
+  /** A work-email challenge still waiting on a code, so the picker can reopen into it. */
+  pendingCompany: PendingCompanyVerification | null;
 }
 
 export async function getOwnProfile(): Promise<OwnProfile> {
@@ -59,6 +62,7 @@ export async function getOwnProfile(): Promise<OwnProfile> {
     profile?: ProfileRow | null;
     roleLabel?: string | null;
     company?: ProfileCompany | null;
+    pendingCompany?: PendingCompanyVerification | null;
   }>('/api/profile');
 
   return {
@@ -66,6 +70,7 @@ export async function getOwnProfile(): Promise<OwnProfile> {
     profile: data.profile ?? null,
     roleLabel: data.roleLabel ?? null,
     company: data.company ?? null,
+    pendingCompany: data.pendingCompany ?? null,
   };
 }
 

@@ -21,7 +21,7 @@ import {
   type CommunityRule,
 } from '@/lib/communities';
 import { loadCommunityRoster } from '@/lib/communityRoster';
-import { Avatar } from '@/components/chat/MessageBubble';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import type { MentionCandidate } from '@/lib/chat';
 
@@ -254,10 +254,9 @@ export function CommunityInfoView({
                     member.designation ? `${member.name}, ${member.designation}` : member.name
                   }
                 >
-                  <Avatar
+                  <PersonAvatar
                     name={member.name}
-                    avatarUrl={member.avatar_url}
-                    colors={colors}
+                    url={member.avatar_url}
                     size={40}
                   />
                   <View style={styles.memberText}>

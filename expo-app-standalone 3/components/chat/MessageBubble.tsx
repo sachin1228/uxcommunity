@@ -13,7 +13,7 @@ import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
-import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { CHAT_CONTENT_KIND_THEME } from '@/lib/chatContentEvents';
 import {
   COLLAPSED_LINES,
@@ -48,54 +48,6 @@ interface Props {
 type Palette = ReturnType<typeof useColors>;
 
 const EMOJI_MESSAGE_SIZE = 48;
-
-// ---------------------------------------------------------------------------
-// Avatar
-// ---------------------------------------------------------------------------
-
-/**
- * The 28px sender avatar (image or initials tile). Exported for the chat's
- * content cards, which wear the same avatar in their left column.
- */
-export function Avatar({
-  name,
-  avatarUrl,
-  colors,
-  size = 28,
-}: {
-  name: string;
-  avatarUrl: string | null;
-  colors: Palette;
-  size?: number;
-}) {
-  const resolvedUri = resolveProfilePictureUri(avatarUrl);
-  const [imageError, setImageError] = useState(false);
-
-  const letters = name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-
-  return (
-    <View
-      style={[
-        styles.avatar,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceRaised },
-      ]}
-    >
-      {resolvedUri && !imageError ? (
-        <Image
-          source={{ uri: resolvedUri }}
-          style={{ width: size, height: size }}
-          onError={() => setImageError(true)}
-        />
-      ) : (
-        <Text style={[styles.avatarText, { color: colors.mutedForeground }]}>{letters}</Text>
-      )}
-    </View>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Reaction pills — sit half-outside the bubble, WhatsApp-style
@@ -561,7 +513,7 @@ export const MessageBubble = memo(function MessageBubble({
       {!isOwn && (
         <View style={styles.avatarCol}>
           {showHeader && (
-            <Avatar name={senderName} avatarUrl={sender?.avatar_url ?? null} colors={colors} />
+            <PersonAvatar name={senderName} url={sender?.avatar_url ?? null} size={28} />
           )}
         </View>
       )}
@@ -757,8 +709,6 @@ const styles = StyleSheet.create({
   rowCompact: { marginTop: 2 },
 
   avatarCol: { width: 28, flexShrink: 0 },
-  avatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarText: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
 
   contentCol: { flexShrink: 1, minWidth: 0 },
 

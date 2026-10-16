@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { TypingUser, typingLabelFor } from '@/hooks/useTypingPresence';
 
 function Dot({ delay, active, color }: { delay: number; active: boolean; color: string }) {
@@ -84,27 +85,15 @@ function StackedAvatar({
   index: number;
   borderColor: string;
 }) {
-  const colors = useColors();
-  const letters = user.name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-
+  // The typing list carries names only, so the shared colored-initials
+  // fallback is what shows — the web's stacked avatars do the same.
   return (
-    <View
-      style={[
-        styles.stackedAvatar,
-        {
-          backgroundColor: colors.surfaceRaised,
-          borderColor,
-          marginLeft: index === 0 ? 0 : -6,
-          zIndex: index,
-        },
-      ]}
-    >
-      <Text style={[styles.stackedAvatarText, { color: colors.mutedForeground }]}>{letters}</Text>
-    </View>
+    <PersonAvatar
+      name={user.name}
+      url={null}
+      size={16}
+      style={{ borderWidth: 1, borderColor, marginLeft: index === 0 ? 0 : -6, zIndex: index }}
+    />
   );
 }
 
@@ -129,14 +118,4 @@ const styles = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 2.5 },
   label: { fontSize: 11, fontFamily: 'Geist_400Regular', flexShrink: 1 },
   avatarStack: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
-  stackedAvatar: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  stackedAvatarText: { fontSize: 7, fontFamily: 'Geist_600SemiBold' },
 });

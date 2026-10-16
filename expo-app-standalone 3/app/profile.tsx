@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { ProfileHero } from '@/components/profile/ProfileHero';
+import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
 import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
@@ -118,6 +119,7 @@ export default function ProfileScreen() {
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [linkModal, setLinkModal] = useState<'linkedin' | 'portfolio' | null>(null);
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
 
   const resetActions = actions.reset;
 
@@ -298,6 +300,7 @@ export default function ProfileScreen() {
         onPressAvatar={() => void handleChangePicture()}
         onAddLinkedIn={() => setLinkModal('linkedin')}
         onAddPortfolio={() => setLinkModal('portfolio')}
+        onAddCompany={() => setCompanyModalOpen(true)}
         onEdit={() => router.push('/settings/profile')}
       />
 
@@ -474,6 +477,17 @@ export default function ProfileScreen() {
           initialUrl={(linkModal === 'linkedin' ? body?.linkedin_url : body?.portfolio_url) ?? ''}
           onSaved={(url) => handleLinkSaved(linkModal === 'linkedin' ? 'linkedin_url' : 'portfolio_url', url)}
           onClose={() => setLinkModal(null)}
+        />
+      ) : null}
+
+      {/* Mounted only while open: the picker's state is per-attempt, so
+          unmounting it is what resets the search, the email and the code. */}
+      {companyModalOpen ? (
+        <AddCompanyModal
+          visible
+          initialPending={profile?.pendingCompany ?? null}
+          onVerified={() => void loadProfile()}
+          onClose={() => setCompanyModalOpen(false)}
         />
       ) : null}
     </View>

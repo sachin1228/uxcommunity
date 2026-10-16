@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { CompanyMark, CompanyVerifiedMark } from '@/components/companies/CompanyMark';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { useColors } from '@/hooks/useColors';
-import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import type { ProfileCompany } from '@/lib/profile';
 
 /**
@@ -13,8 +14,8 @@ import type { ProfileCompany } from '@/lib/profile';
  * chrome; the hero sits directly on the page.
  *
  * Owner's surface only: the circles are hollow until a link is saved (they
- * open the add prompt), then live buttons out; the workplace is display-only
- * until the company flow lands on mobile.
+ * open the add prompt), then live buttons out; with no workplace yet, the
+ * role line offers the web's "Add your company" pill.
  */
 
 interface Props {
@@ -29,6 +30,8 @@ interface Props {
   onPressAvatar: () => void;
   onAddLinkedIn: () => void;
   onAddPortfolio: () => void;
+  /** Opens the "Where do you work?" picker. Omitted to hide the pill. */
+  onAddCompany?: () => void;
   onEdit: () => void;
 }
 
@@ -45,39 +48,6 @@ function openUrl(value: string | null | undefined) {
   if (url) void Linking.openURL(url).catch(() => {});
 }
 
-function initialsOf(name: string): string {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? '')
-    .join('');
-}
-
-/** The company's mark: stored logo or domain favicon, with an initial tile as
- *  the last-resort fallback — decoration, never proof (same rule as web). */
-function CompanyMark({ company, colors }: { company: ProfileCompany; colors: ReturnType<typeof useColors> }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [company.logoUrl]);
-
-  if (company.logoUrl && !failed) {
-    return (
-      <Image
-        source={{ uri: company.logoUrl }}
-        style={styles.companyLogo}
-        onError={() => setFailed(true)}
-        accessibilityIgnoresInvertColors
-      />
-    );
-  }
-  return (
-    <View style={[styles.companyTile, { backgroundColor: colors.surfaceRaised }]}>
-      <Text style={[styles.companyInitial, { color: colors.mutedForeground }]}>
-        {company.name[0]?.toUpperCase() ?? '?'}
-      </Text>
-    </View>
-  );
-}
-
 export function ProfileHero({
   name,
   avatarUrl,
@@ -90,13 +60,11 @@ export function ProfileHero({
   onPressAvatar,
   onAddLinkedIn,
   onAddPortfolio,
+  onAddCompany,
   onEdit,
 }: Props) {
   const colors = useColors();
-  const [avatarError, setAvatarError] = useState(false);
-  useEffect(() => setAvatarError(false), [avatarUrl]);
 
-  const resolvedAvatar = avatarError ? null : resolveProfilePictureUri(avatarUrl);
   const linkedin = externalUrl(linkedinUrl);
   const portfolio = externalUrl(portfolioUrl);
 
@@ -109,20 +77,12 @@ export function ProfileHero({
         accessibilityLabel="Change profile picture"
         style={styles.avatarWrap}
       >
-        {resolvedAvatar ? (
-          <Image
-            source={{ uri: resolvedAvatar }}
-            style={[styles.avatar, { borderColor: colors.border }]}
-            onError={() => setAvatarError(true)}
-            accessibilityIgnoresInvertColors
-          />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarInitials, { color: colors.primaryForeground }]}>
-              {initialsOf(name)}
-            </Text>
-          </View>
-        )}
+        <PersonAvatar
+          name={name}
+          url={avatarUrl}
+          size={96}
+          style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+        />
         <View
           style={[
             styles.cameraBadge,
@@ -157,27 +117,50 @@ export function ProfileHero({
         </View>
       </View>
 
-      {/* ── Role line — seniority + designation, then "@ workplace" ── */}
-      {(roleLabel || company) && (
+      {/* ── Role line — seniority + designation, then "@ workplace", or the
+          hollow "Add your company" pill when none is set ── */}
+      {(roleLabel || company || onAddCompany) && (
         <View style={styles.lineRow}>
           {roleLabel ? (
             <Text style={[styles.lineText, { color: colors.mutedForeground }]} numberOfLines={1}>
               {roleLabel}
             </Text>
           ) : null}
-          {roleLabel && company ? (
+          {roleLabel && (company || onAddCompany) ? (
             <Text style={[styles.lineText, { color: colors.mutedForeground }]}>@</Text>
           ) : null}
           {company ? (
             <View style={styles.companyRow}>
-              <CompanyMark company={company} colors={colors} />
+              <CompanyMark name={company.name} logoUrl={company.logoUrl} size={16} />
               <Text
                 style={[styles.lineText, { color: colors.mutedForeground }]}
                 numberOfLines={1}
               >
                 {company.name}
               </Text>
+              {company.isActive && company.domainVerified ? (
+                <CompanyVerifiedMark size={11} color={colors.accent} />
+              ) : null}
             </View>
+          ) : null}
+          {!company && onAddCompany ? (
+            <Pressable
+              onPress={onAddCompany}
+              accessibilityRole="button"
+              accessibilityLabel="Add your company"
+              style={({ pressed }) => [
+                styles.addCompanyPill,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: pressed ? colors.surfaceRaised : 'transparent',
+                },
+              ]}
+            >
+              <Feather name="plus" size={12} color={colors.mutedForeground} />
+              <Text style={[styles.addCompanyLabel, { color: colors.mutedForeground }]}>
+                Add your company
+              </Text>
+            </Pressable>
           ) : null}
         </View>
       )}
@@ -238,14 +221,6 @@ export function ProfileHero({
 const styles = StyleSheet.create({
   root: { alignItems: 'center', paddingTop: 8 },
   avatarWrap: { marginBottom: 16 },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 30, fontFamily: 'Geist_600SemiBold' },
   cameraBadge: {
     position: 'absolute',
     right: -2,
@@ -284,15 +259,18 @@ const styles = StyleSheet.create({
   },
   lineText: { fontSize: 14, fontFamily: 'Geist_400Regular', flexShrink: 1 },
   companyRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
-  companyLogo: { width: 16, height: 16, borderRadius: 4 },
-  companyTile: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
+  addCompanyPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
   },
-  companyInitial: { fontSize: 10, fontFamily: 'Geist_600SemiBold' },
+  addCompanyLabel: { fontSize: 12, fontFamily: 'Geist_400Regular' },
   circlesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   linkCircle: {
     width: 32,

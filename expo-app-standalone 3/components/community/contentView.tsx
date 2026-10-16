@@ -31,6 +31,7 @@ import {
   setContentAction,
 } from '@/lib/communityContent';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
 
 /**
@@ -336,15 +337,7 @@ export function ContentCard({
         {/* Author meta — name and relative date on one line, the category as
             the muted second line, exactly like the web `PostAuthorMeta`. */}
         <View style={styles.authorRow}>
-          {resolveProfilePictureUri(author?.avatar_url) ? (
-            <Image source={{ uri: resolveProfilePictureUri(author?.avatar_url)! }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-              <Text style={[styles.avatarText, { color: colors.foregroundMuted }]}>
-                {(author?.name ?? 'M')[0].toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <PersonAvatar name={author?.name} url={author?.avatar_url} size={34} />
           <View style={styles.authorCopy}>
             <View style={styles.authorLine}>
               <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
@@ -555,15 +548,7 @@ export function ContentDetail({
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
 
           <View style={styles.authorRow}>
-            {resolveProfilePictureUri(author?.avatar_url) ? (
-              <Image source={{ uri: resolveProfilePictureUri(author?.avatar_url)! }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-                <Text style={[styles.avatarText, { color: colors.foregroundMuted }]}>
-                  {(author?.name ?? 'M')[0].toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <PersonAvatar name={author?.name} url={author?.avatar_url} size={34} />
             <View style={styles.authorCopy}>
               <View style={styles.authorLine}>
                 <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
@@ -900,9 +885,6 @@ const styles = StyleSheet.create({
   communityLabelName: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 11 },
 
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  avatar: { width: 34, height: 34, borderRadius: 17 },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: 'Geist_600SemiBold', fontSize: 13 },
   authorCopy: { flex: 1 },
   authorLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   author: { flexShrink: 1, fontFamily: 'Geist_600SemiBold', fontSize: 14 },
