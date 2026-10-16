@@ -12,10 +12,10 @@ import { PlatformPressable } from '@react-navigation/elements';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 
 /**
- * The rule above the selected item: a medium-length segment centred over the
- * icon, not the item's full width.
+ * The rule above the selected item: a segment roughly half the item's width,
+ * centred over the icon rather than stretching edge to edge.
  */
-const INDICATOR_LENGTH = 30;
+const INDICATOR_LENGTH = 46;
 const INDICATOR_THICKNESS = 2;
 
 /**
