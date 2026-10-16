@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { fmtTime, userNameColor } from '@/lib/chat';
 import { hapticImpact } from '@/lib/haptics';
@@ -72,29 +72,6 @@ const RESOURCE_TILE_ICON: Record<string, ContentIconName> = {
 /** The thumbnail column's width — images scale to it; their height follows the ratio. */
 const THUMB_WIDTH = 64;
 
-/** Natural width:height of a thumb image, measured once it loads. */
-function useImageRatio(uri: string | null): number | null {
-  const [ratio, setRatio] = useState<number | null>(null);
-  useEffect(() => {
-    setRatio(null);
-    if (!uri) return;
-    let cancelled = false;
-    Image.getSize(
-      uri,
-      (width, height) => {
-        if (!cancelled && width > 0 && height > 0) setRatio(width / height);
-      },
-      () => {
-        /* keep the square fallback */
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [uri]);
-  return ratio;
-}
-
 /** Reaction pills under a card — MessageBubble's pills, grouped like web. */
 function ContentReactionPills({
   reactions,
@@ -149,7 +126,12 @@ function ContentReactionPills({
   );
 }
 
-export function ContentNotificationCard({
+/**
+ * Memoized like the web cards: chat-screen state changes that do not touch
+ * this card — the typing indicator ticking, presence, the emoji panel — must
+ * not re-render every visible card. Props are stable between such changes.
+ */
+export const ContentNotificationCard = memo(function ContentNotificationCard({
   event,
   isOwn,
   currentUserId,
@@ -172,8 +154,12 @@ export function ContentNotificationCard({
   const thumbUri = imageUrl ?? posterUrl;
   // The thumb keeps the image's own aspect at the 64px column width — never a
   // cover crop, so a poster reads whole (its height follows the ratio; the
-  // card's own min height floors the tile).
-  const thumbRatio = useImageRatio(thumbUri);
+  // card's own min height floors the tile). The ratio comes from the loaded
+  // image itself (expo-image's onLoad carries the source dimensions).
+  const [thumbRatio, setThumbRatio] = useState<number | null>(null);
+  useEffect(() => {
+    setThumbRatio(null);
+  }, [thumbUri]);
   const thumbHeight = thumbRatio ? Math.round(THUMB_WIDTH / thumbRatio) : THUMB_WIDTH;
   const TileIcon =
     event.kind === 'resource' && meta?.resource_type
@@ -306,8 +292,13 @@ export function ContentNotificationCard({
                       source={{ uri: thumbUri }}
                       // The box already carries the image's ratio; contain
                       // guarantees the whole frame stays visible regardless.
-                      resizeMode="contain"
+                      contentFit="contain"
                       style={styles.thumbImage}
+                      onLoad={({ source }) => {
+                        const w = source?.width ?? 0;
+                        const h = source?.height ?? 0;
+                        if (w > 0 && h > 0) setThumbRatio(w / h);
+                      }}
                     />
                     {posterUrl && (
                       <View style={styles.playOverlay}>
@@ -394,7 +385,7 @@ export function ContentNotificationCard({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

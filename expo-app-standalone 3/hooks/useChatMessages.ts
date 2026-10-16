@@ -18,6 +18,7 @@ import {
   Message,
   Reaction,
 } from '@/lib/communities';
+import { scheduleMarkRead } from '@/lib/readManager';
 import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
 import { pickOptimisticMatch } from '@/lib/chat';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
@@ -69,7 +70,9 @@ export function useChatMessages(communityId: string) {
       const bootstrap = await fetchCommunityBootstrap(communityId);
       setMessages(bootstrap.messages);
       setHasMore(bootstrap.messages.length === 50);
-      await markRead(communityId);
+      // Opening the chat is a user action — its mark-read bypasses the
+      // realtime cooldown so the badge always clears (see lib/readManager).
+      scheduleMarkRead(communityId, { bypassCooldown: true, patch: markRead });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load messages');
     } finally {
@@ -113,6 +116,8 @@ export function useChatMessages(communityId: string) {
       if (communityIdRef.current !== targetCommunityId) return;
       if (missed.length === 0) return;
       setMessages((prev) => mergeCaughtUpMessages(prev, missed));
+      // Whatever arrived while the socket was down is on screen now.
+      scheduleMarkRead(targetCommunityId, { patch: markRead });
     });
   }, [communityId]);
   useEffect(() => () => catchUp.cancel(), [catchUp]);
@@ -274,7 +279,9 @@ export function useChatMessages(communityId: string) {
           );
         });
         if (row.user_id !== user.id) {
-          markRead(communityId).catch(() => {});
+          // Debounced + cooldown-gated (lib/readManager): a busy room must not
+          // PATCH /read once per incoming message.
+          scheduleMarkRead(communityId, { patch: markRead });
         }
       }),
     );

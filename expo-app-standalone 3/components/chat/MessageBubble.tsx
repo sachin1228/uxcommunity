@@ -1,7 +1,6 @@
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Fragment, memo, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
@@ -362,23 +362,10 @@ function BubbleImage({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  // The frame's aspect, measured from the loaded image itself (expo-image's
+  // onLoad carries the source dimensions) — the old Image.getSize round trip
+  // is gone; until it lands, the 4:3 fallback holds the layout.
   const [ratio, setRatio] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Image.getSize(
-      uri,
-      (w, h) => {
-        if (!cancelled && w > 0 && h > 0) setRatio(w / h);
-      },
-      () => {
-        /* keep the 4:3 fallback */
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [uri]);
 
   const aspect = ratio ?? 4 / 3;
   let width = MEDIA_MAX_WIDTH;
@@ -404,7 +391,12 @@ function BubbleImage({
       <Image
         source={{ uri }}
         style={{ width: '100%', height: '100%', opacity: dimmed ? 0.5 : 1 }}
-        resizeMode="cover"
+        contentFit="cover"
+        onLoad={({ source }) => {
+          const w = source?.width ?? 0;
+          const h = source?.height ?? 0;
+          if (w > 0 && h > 0) setRatio(w / h);
+        }}
       />
       {standalone && showStatus && (
         <View style={[styles.mediaTimeOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
@@ -489,7 +481,13 @@ function TimeRow({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function MessageBubble({
+/**
+ * Memoized like the web MessageBubble: chat-screen state changes that do not
+ * touch this message — the typing indicator ticking, presence, the emoji
+ * panel — must not re-render every visible bubble. All props are stable
+ * between such changes (message objects only change when the row does).
+ */
+export const MessageBubble = memo(function MessageBubble({
   message,
   isOwn,
   isSameAuthor,
@@ -742,7 +740,7 @@ export function MessageBubble({
       </View>
     </View>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Styles
