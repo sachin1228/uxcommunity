@@ -116,7 +116,8 @@
     "test:mobile-explore": "tsx --test \"expo-app-standalone 3/lib/explore.test.ts\"",
     "test:mobile-home-scope": "tsx --test \"expo-app-standalone 3/lib/homeFeedScopes.test.ts\"",
     "test:mobile-dm": "tsx --test \"expo-app-standalone 3/lib/dm.test.ts\"",
-    "test:mobile-lib": "tsx --test \"expo-app-standalone 3/lib/notifications.test.ts\" \"expo-app-standalone 3/lib/jobs.test.ts\" \"expo-app-standalone 3/lib/explore.test.ts\" \"expo-app-standalone 3/lib/homeFeedScopes.test.ts\" \"expo-app-standalone 3/lib/dm.test.ts\" \"expo-app-standalone 3/lib/nameCache.test.ts\" \"expo-app-standalone 3/lib/eventTimezone.test.ts\""
+    "test:mobile-communities": "tsx --test \"expo-app-standalone 3/lib/eventDate.test.ts\" \"expo-app-standalone 3/lib/communityBadges.test.ts\" \"expo-app-standalone 3/lib/communityMute.test.ts\" \"expo-app-standalone 3/lib/sidebarOrder.test.ts\"",
+    "test:mobile-lib": "tsx --test \"expo-app-standalone 3/lib/notifications.test.ts\" \"expo-app-standalone 3/lib/jobs.test.ts\" \"expo-app-standalone 3/lib/explore.test.ts\" \"expo-app-standalone 3/lib/homeFeedScopes.test.ts\" \"expo-app-standalone 3/lib/dm.test.ts\" \"expo-app-standalone 3/lib/nameCache.test.ts\" \"expo-app-standalone 3/lib/eventTimezone.test.ts\" \"expo-app-standalone 3/lib/eventDate.test.ts\" \"expo-app-standalone 3/lib/communityBadges.test.ts\" \"expo-app-standalone 3/lib/communityMute.test.ts\" \"expo-app-standalone 3/lib/sidebarOrder.test.ts\""
   },
   "engines": {
     "node": ">=22.0.0",

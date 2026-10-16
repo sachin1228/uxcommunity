@@ -297,6 +297,24 @@ export function useChatMessages(communityId: string) {
       }),
     );
 
+    // ── Retention sweep ────────────────────────────────────────────────────
+    // The scheduled sweep hard-deletes messages older than the 15-day window
+    // and tells the room with their cutoff (see the web sweep; the same event
+    // reaches this socket). Drop everything before it — otherwise an open
+    // screen keeps showing messages that no longer exist for anyone.
+    unsubscribes.push(
+      realtimeClient.on(room, 'messages-expired', (data) => {
+        const { cutoff } = data as { cutoff?: string | null };
+        if (!cutoff) return;
+        const cutoffMs = Date.parse(cutoff);
+        if (Number.isNaN(cutoffMs)) return;
+        setMessages((prev) => {
+          const next = prev.filter((m) => new Date(m.created_at).getTime() >= cutoffMs);
+          return next.length === prev.length ? prev : next;
+        });
+      }),
+    );
+
     // Reaction insert/update/delete
     unsubscribes.push(
       realtimeClient.on(room, 'reaction-insert', (data) => {

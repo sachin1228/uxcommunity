@@ -60,21 +60,25 @@ slice shipped, remainder in §E); **Missing — planned** (not in this branch, n
 | Public join | `POST /api/communities/[id]/join` | Absent | Join action + errors | P1 | **Verified** (in Explore) |
 | Private join request + withdraw | Same endpoint; `DELETE` withdraws | Absent | Request modal (≤500 msg) + withdraw | P1 | **Verified** (in Explore, "Requests sent" tab) |
 | Community preview for non-members | `/api/communities/[id]/preview` | Absent | Preview screen | P2 | Missing — planned (Explore cards act inline instead) |
-| Mute (8h/1w/Always) | `POST /api/communities/[id]/mute` | Absent | Bell menu in chat | P1 | Missing — planned |
+| Name badges (verified seal, globe/lock) | `community-badges.ts` rules + `CommunityBadges` | Absent (private lock only) | Badge pair on the row + chat header | P1 | **Verified** (branch `feat/mobile-communities`) — same rules ported to `lib/communityBadges.ts`, seal drawn from the same path |
+| Event date badge on DPs | `DpWithEventDate` (calendar tile, TODAY, LIVE/ENDED pills) | Absent | Row + chat-header tiles | P1 | **Verified** (`feat/mobile-communities`) — `lib/eventDate.ts` + `components/communities/DpWithEventDate.tsx`, shared 15s clock |
+| Pinned event rooms | `sidebar-order.ts` (pinned first, deadline expiry) | Absent | Pinned-first order + pin mark | P1 | **Verified** (`feat/mobile-communities`) — `lib/sidebarOrder.ts`, 60s expiry tick |
+| Mute (8h/1w/Always) | `POST /api/communities/[id]/mute` | Absent | Bell menu in chat + crossed bell in list | P1 | **Verified** (`feat/mobile-communities`) — bell sheet with web copy, toasts with Undo, row bell on the shared clock |
 | Read state / unread counts | `PATCH …/read` + read-manager | Exists | — | P1 | Already implemented |
 | Tab red-dot watermarks | localStorage watermarks; members dot = pending requests | Absent | AsyncStorage port + fetches | P2 | Missing — planned |
 | Join-requests inbox (manager) | `GET …/requests`, accept/decline | Absent | Manager UI | P1 | Missing — planned (§E2) |
 | Members list / remove / roles | Members tab APIs | Partially (members list call exists) | Management UI | P2 | Missing — planned |
 | Edit/delete community, rules panel | PATCH multipart, rules JSON | Absent | Settings UI | P2 | Missing — planned |
 | Invite links | `/join/[token]` + APIs | Absent | Deep link + accept | P2 | Missing — planned |
-| Leave community | `DELETE …/members` (ownership transfer variants) | Absent | Leave action | P2 | Missing — planned |
+| Leave community | `DELETE …/members` (ownership transfer variants) | Absent | Leave action | P2 | **Verified** (`feat/mobile-communities`) — ⋯ sheet "Exit community" with the web confirm copy + store patch |
+| Delete chat (archive) | `POST …/archive` | Absent | Archive action | P2 | **Verified** (`feat/mobile-communities`) — ⋯ sheet "Delete chat", row hides, realtime un-archives |
 
 ### Community chat
 
 | Feature | Web implementation | Mobile status before | Gap | Priority | Final status |
 |---|---|---|---|---|---|
 | Send/edit/delete/reactions/typing | Chat routes + `chat:<id>` realtime | Exists (rich) | — | P1 | Already implemented |
-| 15-day retention | sweep + `messages-expired` topic | Not surfaced | Notice + prune on event | P3 | Missing — planned |
+| 15-day retention | sweep + `messages-expired` topic | Not surfaced | Notice + prune on event | P3 | **Verified** (`feat/mobile-communities`) — `DisappearingNotice` above the first date pill / empty state; `messages-expired` prunes the open chat |
 | Attachments / image upload | Upload route | Exists (chat images only) | Video/docs | P2 | Partial |
 
 ### Direct messages
@@ -252,7 +256,7 @@ app simply does not show them yet.
 2. **Profiles** — *Next action:* build own + member profile screens (`/api/profile`, `/api/profile/feed`, `/api/profile/identity` cooldowns). This also unblocks **starting a DM** (the web entry is the profile Message chip — mobile currently can only receive, reply and accept) and hosts the identity edit + avatar upload (pass the 400 px avatar cap through `prepareImage`).
 3. **Jobs management** — *Next action:* owner actions (edit/close/delete — criteria frozen once an application exists), a JSON route for the applicants board (`get_job_applicants` is RPC-only today), triage statuses, and job posting (needs the verified-company flow — companies search + work-email OTP).
 4. **Events** — *Next action:* city browse (`/api/events/city`), detail + RSVP + event-room join; then create/edit (1/month limit, cover upload) for community members. Server contracts are in the jobs/events appendix.
-5. **Community management** — *Next action:* join-requests inbox for owners/moderators (the "Members" dot depends on it), mute bell, members list + roles, edit/delete community, tab red-dot watermarks (AsyncStorage port of the web watermark store), invite links.
+5. **Community management** — *Next action:* join-requests inbox for owners/moderators (the "Members" dot depends on it), members list + roles, edit/delete community, tab red-dot watermarks (AsyncStorage port of the web watermark store), invite links. (Mute, leave/delete-chat and the event date/pin/badge surfaces shipped in `feat/mobile-communities`.)
 6. **DM secondary surface** — typing pulse, author edit/delete/reaction actions, blocks/report menus, giphy/attachment sends (send route + upload route exist; UI pending).
 7. **Notifications polish** — `Retry-After`-aware copy on 429 at login; per-type deep links beyond community/chat (profile, jobs already route); push payloads for job_match/join_accepted reuse the inbox route map once profiles exist.
 8. **Search & library** — the client-side search palette and the curated Library shelf.
