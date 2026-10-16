@@ -7,9 +7,9 @@ import { useColors } from '@/hooks/useColors';
 const GRID_SIZE = 8;
 const DOT_RADIUS = 1;
 
-/** The web mask: full strength to 80px, fully transparent by 200px. */
+/** The fade curve: full strength to 80dp, then a linear run to zero at 160dp. */
 const FADE_START = 80;
-const FADE_END = 200;
+const FADE_END = 160;
 
 /** The band the texture can ever be seen in — where the mask reaches zero. */
 export const DOT_BAND_HEIGHT = FADE_END;
@@ -35,10 +35,12 @@ const ROWS = Array.from(
 /**
  * The profile page's dotted backdrop — the mobile reading of the web
  * profile's `DotField` (apps/web/components/ui/DotField.tsx): the same
- * lattice (a dot at every 8dp tile centre, 1dp radius), the same dot colour
- * (the web `--grid-dot-color`, read through `useColors()`), and the same fade
- * mask (drawn full to 80dp, gone by 200dp), so the texture opens the page and
- * never competes with the hero below it.
+ * lattice (a dot at every 8dp tile centre, 1dp radius) and the same dot
+ * colour (the web `--grid-dot-color`, read through `useColors()`), so the
+ * texture opens the page and never competes with the hero below it.
+ *
+ * The fade keeps the web mask's shape — full strength to 80dp, then a
+ * linear run out — but the band reaches zero at 160dp, not the web's 200dp.
  *
  * The web field draws on a canvas so the dots can stir under the pointer; a
  * touch screen has no hover, so this renders the resting texture. Every dot
