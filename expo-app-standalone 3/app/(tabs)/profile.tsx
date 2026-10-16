@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AccountSideMenu } from '@/components/AccountSideMenu';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
+import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
 import { CommentsSheet } from '@/components/community/CommentsSheet';
@@ -39,6 +40,9 @@ import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
  * The hero refetches on focus so an edit made in Settings reads back the
  * moment the member returns.
  */
+
+/** The FlatList content's gutter — the dot band cancels it to run full-bleed. */
+const LIST_PADDING = 12;
 
 /** One activity tab per card scope the profile feed serves — the web order. */
 const TABS: { key: ProfileFeedScope; label: string }[] = [
@@ -292,6 +296,12 @@ export default function ProfileScreen() {
   const body = profile?.profile;
   const hero = (
     <View style={styles.heroWrap}>
+      {/* Full-bleed dotted backdrop — the web profile's texture, anchored to
+          the hero so it scrolls away with it, as on the web page. */}
+      <View pointerEvents="none" style={styles.heroDots}>
+        <DotField />
+      </View>
+
       <ProfileHero
         name={profile?.user?.name ?? user?.name ?? ''}
         avatarUrl={body?.avatar_url ?? null}
@@ -511,6 +521,16 @@ const styles = StyleSheet.create({
   menuButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Geist_600SemiBold' },
   heroWrap: { marginBottom: 4 },
+  heroDots: {
+    position: 'absolute',
+    // The list's own top gutter would leave a bare strip under the screen
+    // header, so the band starts at the list's top edge instead — the web
+    // texture begins at the page's top the same way.
+    top: -LIST_PADDING,
+    left: -LIST_PADDING,
+    right: -LIST_PADDING,
+    height: DOT_BAND_HEIGHT,
+  },
   tabsShell: {
     marginTop: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -530,7 +550,7 @@ const styles = StyleSheet.create({
   },
   tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tabText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
-  list: { padding: 12, gap: 12, flexGrow: 1 },
+  list: { padding: LIST_PADDING, gap: 12, flexGrow: 1 },
   center: {
     flex: 1,
     alignItems: 'center',

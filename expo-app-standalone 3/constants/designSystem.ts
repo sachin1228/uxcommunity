@@ -117,6 +117,8 @@ export interface SemanticTheme {
   successForeground: string;
   /** The "liked" heart (web `--like`). */
   like: string;
+  /** The profile backdrop's dots (web `--grid-dot-color`, on the `--grid-size` pitch). */
+  gridDot: string;
 }
 
 export const lightTheme: SemanticTheme = {
@@ -152,6 +154,7 @@ export const lightTheme: SemanticTheme = {
   success: '#22C55E',
   successForeground: '#FFFFFF',
   like: '#F91880',
+  gridDot: 'rgba(0, 0, 0, 0.16)',
 };
 
 export const darkTheme: SemanticTheme = {
@@ -187,6 +190,7 @@ export const darkTheme: SemanticTheme = {
   success: '#22C55E',
   successForeground: '#FFFFFF',
   like: '#F91880',
+  gridDot: 'rgba(255, 255, 255, 0.14)',
 };
 
 export const themes = { light: lightTheme, dark: darkTheme } as const;
