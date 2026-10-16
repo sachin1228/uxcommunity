@@ -185,7 +185,14 @@ export function ContentNotificationCard({
   const textColor = isOwn ? ownText : colors.foreground;
   const mutedColor = isOwn ? ownText : colors.foregroundMuted;
   const mutedOpacity = isOwn ? 0.8 : 1;
-  const bubbleMaxWidth = Math.min(screenWidth * 0.78, 420);
+  // A fixed 80% of the row's usable width. Unlike the web card (a shrink-to-
+  // fit block whose text gives it a natural width), an RN row with a flex:1 /
+  // minWidth:0 text column collapses that column to nothing when the bubble
+  // sizes itself to content — the event title truncated to two characters and
+  // the thread card lost its text column entirely. The explicit width gives
+  // the column real room and keeps every card the same, scannable size.
+  const rowAvailableWidth = screenWidth - 32 - (isOwn ? 0 : 36);
+  const bubbleWidth = Math.min(Math.floor(rowAvailableWidth * 0.8), 420);
 
   // Own bubble: translucent media card on the blue; other: the raised surface.
   const cardBg = isOwn ? 'rgba(0, 0, 0, 0.20)' : colors.isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)';
@@ -206,7 +213,7 @@ export function ContentNotificationCard({
         </View>
       )}
 
-      <View style={[styles.contentCol, { maxWidth: bubbleMaxWidth }]}>
+      <View style={[styles.contentCol, { width: bubbleWidth }]}>
         <View style={styles.bubbleWrap}>
           <View
             style={[
