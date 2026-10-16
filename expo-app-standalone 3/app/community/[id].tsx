@@ -1012,7 +1012,7 @@ export default function CommunityChat() {
         ]}
       >
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-          <Feather name="arrow-left" size={26} color={colors.foreground} />
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
 
         <View style={styles.headerCenter}>
@@ -1021,7 +1021,7 @@ export default function CommunityChat() {
           <DpWithEventDate
             date={resolved?.event_date}
             endsAt={resolved?.event_end ?? resolved?.pinned_until}
-            dpSize={36}
+            dpSize={40}
           >
             {communityImage ? (
               <Image
@@ -1333,9 +1333,9 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
@@ -1344,7 +1344,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerAvatarText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Geist_600SemiBold',
   },
   headerTitleRow: {
