@@ -467,7 +467,13 @@ function TimeRow({
         {fmtTime(message.created_at)}
       </Text>
       {isOwn && status === 'sending' && (
-        <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
+        // The spinner sits in the check mark's exact 11pt slot (scaled to fit):
+        // an ActivityIndicator's unscaled box is ~20pt and a transform does
+        // not shrink layout, so without the slot the row widened while
+        // sending and snapped back when the double check appeared.
+        <View style={styles.statusSlot}>
+          <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
+        </View>
       )}
       {isOwn && (status === 'sent' || !status) && (
         <CheckCheckIcon size={11} color={timeColor} opacity={0.7} />
@@ -833,7 +839,9 @@ const styles = StyleSheet.create({
   },
   timeRowOnMedia: { paddingRight: 4, paddingBottom: 2 },
   timeText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
-  tinySpinner: { transform: [{ scale: 0.6 }], marginLeft: -2 },
+  /** The check mark's exact box — the sending spinner renders inside it. */
+  statusSlot: { width: 11, height: 11, alignItems: 'center', justifyContent: 'center' },
+  tinySpinner: { transform: [{ scale: 0.55 }] },
 
   // ── own-message overlays ────────────────────────────────────────────────
   statusOverlay: {
