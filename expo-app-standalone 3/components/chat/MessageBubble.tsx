@@ -22,6 +22,7 @@ import {
   userNameColor,
 } from '@/lib/chat';
 import { MessageBubbleTail } from './MessageBubbleTail';
+import { CheckCheckIcon } from './CheckCheckIcon';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -349,7 +350,7 @@ function BubbleImage({
         <View style={[styles.mediaTimeOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
           <Text style={styles.mediaTimeText}>{fmtTime(createdAt)}</Text>
           {isOwn && (
-            <Ionicons name="checkmark-done-sharp" size={11} color="rgba(255,255,255,0.9)" />
+            <CheckCheckIcon size={11} color="rgba(255,255,255,0.9)" />
           )}
         </View>
       )}
@@ -409,7 +410,7 @@ function TimeRow({
         <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
       )}
       {isOwn && (status === 'sent' || !status) && (
-        <Ionicons name="checkmark-done-sharp" size={11} color={timeColor} style={{ opacity: 0.7 }} />
+        <CheckCheckIcon size={11} color={timeColor} opacity={0.7} />
       )}
       {isOwn && status === 'failed' && (
         <Text style={[styles.timeText, { color: colors.destructive }]}>!</Text>
