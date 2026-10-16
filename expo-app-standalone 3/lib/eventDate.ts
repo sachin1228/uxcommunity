@@ -14,6 +14,24 @@
  */
 const monthFormat = new Intl.DateTimeFormat('en-IN', { month: 'short' });
 const weekdayFormat = new Intl.DateTimeFormat('en-IN', { weekday: 'short' });
+const fullDateFormat = new Intl.DateTimeFormat('en-IN', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/**
+ * "Wed, 22 Oct 2026" — the date row every event card wears, the same string
+ * the web card's `fmtEventDate` prints. Null for a missing or unparseable
+ * timestamp, so a bad row loses the row instead of rendering "Invalid Date".
+ */
+export function formatEventDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return null;
+  return fullDateFormat.format(date);
+}
 
 /**
  * How long the tile keeps saying ENDED after the event's window closes — half

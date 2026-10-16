@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { AccountSideMenu } from '@/components/AccountSideMenu';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { ProfileHero } from '@/components/profile/ProfileHero';
@@ -120,6 +121,9 @@ export default function ProfileScreen() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [linkModal, setLinkModal] = useState<'linkedin' | 'portfolio' | null>(null);
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
+
+  // ── Header menu ──
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const resetActions = actions.reset;
 
@@ -343,18 +347,16 @@ export default function ProfileScreen() {
           },
         ]}
       >
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel="Menu"
           hitSlop={10}
-          onPress={() => router.back()}
-          style={styles.backButton}
+          onPress={() => setMenuOpen(true)}
+          style={styles.menuButton}
         >
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Feather name="menu" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
-        {/* Keeps the title centred against the back button. */}
-        <View style={styles.backButton} />
       </View>
 
       {profileError && !profile ? (
@@ -374,7 +376,7 @@ export default function ProfileScreen() {
           keyExtractor={feedItemKey}
           renderItem={renderItem}
           ListHeaderComponent={hero}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
           refreshControl={
@@ -490,6 +492,8 @@ export default function ProfileScreen() {
           onClose={() => setCompanyModalOpen(false)}
         />
       ) : null}
+
+      <AccountSideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -499,12 +503,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: 'Geist_600SemiBold' },
+  menuButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Geist_600SemiBold' },
   heroWrap: { marginBottom: 4 },
   tabsShell: {
     marginTop: 18,

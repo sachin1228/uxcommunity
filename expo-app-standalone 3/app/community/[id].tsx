@@ -74,7 +74,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
-import type { CommunityTab, ContentKind } from '@/lib/communityContent';
+import { isContentKind, type CommunityTab, type ContentKind } from '@/lib/communityContent';
 
 /** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
 type ChatRow =
@@ -94,6 +94,8 @@ export default function CommunityChat() {
     owner: ownerParam,
     unread: unreadParam,
     read: readParam,
+    contentKind,
+    contentId,
   } = useLocalSearchParams<{
     id: string;
     name: string;
@@ -103,6 +105,8 @@ export default function CommunityChat() {
     owner?: string;
     unread?: string;
     read?: string;
+    contentKind?: string;
+    contentId?: string;
   }>();
   const colors = useColors();
   const router = useRouter();
@@ -239,6 +243,19 @@ export default function CommunityChat() {
    * next mount.
    */
   const [openTarget, setOpenTarget] = useState<{ tab: CommunityTab; id: string } | null>(null);
+
+  /**
+   * A notification's link, walked in: the item it is about lives on its own
+   * tab, so open that tab with it already selected — the same hand-off
+   * handleContentOpen performs for a tapped "created a …" card. The route
+   * parser (lib/notifications) has vetted the kind, but a hand-written deep
+   * link has not, so it is checked again here.
+   */
+  useEffect(() => {
+    if (!isContentKind(contentKind) || !contentId) return;
+    setOpenTarget({ tab: contentKind, id: contentId });
+    setActiveTab(contentKind);
+  }, [contentKind, contentId]);
 
   /** The header bell's mute dropdown state. */
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
