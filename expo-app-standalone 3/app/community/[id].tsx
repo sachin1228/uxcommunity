@@ -1021,7 +1021,7 @@ export default function CommunityChat() {
           <DpWithEventDate
             date={resolved?.event_date}
             endsAt={resolved?.event_end ?? resolved?.pinned_until}
-            dpSize={30}
+            dpSize={36}
           >
             {communityImage ? (
               <Image
@@ -1333,9 +1333,9 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   headerAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
@@ -1344,7 +1344,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerAvatarText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Geist_600SemiBold',
   },
   headerTitleRow: {
