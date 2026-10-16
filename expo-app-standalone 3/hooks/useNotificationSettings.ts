@@ -2,9 +2,11 @@
  * Loads and saves the member's notification preferences.
  *
  * Every toggle writes optimistically and rolls back on failure, because a
- * switch that waits for a round trip before moving reads as broken. Community
- * mutes are saved as a whole list, matching the API — the server then applies
- * the list rather than diffing against whatever the client last believed.
+ * switch that waits for a round trip before moving reads as broken.
+ *
+ * Per-community mutes do not live here: they belong to each community's chat
+ * header (the bell), which writes `notifications_muted` on the membership —
+ * the same field the server's push fan-out gates on.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,14 +15,12 @@ import {
   NotificationPreferences,
   deviceTimeZone,
   fetchNotificationSettings,
-  saveMutedCommunityIds,
   saveNotificationPreferences,
 } from '@/lib/notificationSettings';
 import { setAppBadgeCountAsync } from '@/lib/push';
 
 export function useNotificationSettings() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
-  const [mutedCommunityIds, setMutedIds] = useState<string[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,6 @@ export function useNotificationSettings() {
       const settings = await fetchNotificationSettings();
       if (!mountedRef.current) return;
       setPreferences(settings.preferences);
-      setMutedIds(settings.mutedCommunityIds);
       setUnreadCount(settings.unreadCount);
       setError(null);
     } catch (e) {
@@ -81,30 +80,6 @@ export function useNotificationSettings() {
     [updatePreferences],
   );
 
-  const setCommunityMuted = useCallback(
-    async (communityId: string, muted: boolean) => {
-      const previous = mutedCommunityIds;
-      const next = muted
-        ? [...new Set([...previous, communityId])]
-        : previous.filter((id) => id !== communityId);
-
-      setMutedIds(next);
-      setSaving(true);
-      try {
-        await saveMutedCommunityIds(next);
-        setError(null);
-      } catch (e) {
-        if (mountedRef.current) {
-          setMutedIds(previous);
-          setError(e instanceof Error ? e.message : 'Could not save that change.');
-        }
-      } finally {
-        if (mountedRef.current) setSaving(false);
-      }
-    },
-    [mutedCommunityIds],
-  );
-
   /** Pushes the server's unread total onto the app icon. */
   const syncBadge = useCallback(async () => {
     await setAppBadgeCountAsync(unreadCount);
@@ -112,7 +87,6 @@ export function useNotificationSettings() {
 
   return {
     preferences,
-    mutedCommunityIds,
     unreadCount,
     isLoading,
     saving,
@@ -120,7 +94,6 @@ export function useNotificationSettings() {
     reload: load,
     updatePreferences,
     updateQuietHours,
-    setCommunityMuted,
     syncBadge,
   };
 }

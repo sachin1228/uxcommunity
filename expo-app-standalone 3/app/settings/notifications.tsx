@@ -1,12 +1,15 @@
 /**
  * Notifications settings.
  *
- * Three decisions live here, in the order a member actually makes them:
- * whether chat pushes arrive at all, when they are allowed to make a noise
- * (sound + quiet hours), and which communities are exempt from either. The
- * fourth section is diagnostics — a device that is not receiving
- * notifications should be able to say why, instead of leaving a member to
- * guess between permission, channel and FCM problems.
+ * Two decisions live here, in the order a member actually makes them: whether
+ * chat pushes arrive at all, and when they are allowed to make a noise (sound
+ * + quiet hours). The third section is diagnostics — a device that is not
+ * receiving notifications should be able to say why, instead of leaving a
+ * member to guess between permission, channel and FCM problems.
+ *
+ * Per-community muting deliberately does NOT live here: it belongs to the
+ * community itself (the chat header's bell), so the list stays a preference
+ * sheet and a mute is always one tap away from the chat it silences.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -26,7 +29,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useNotificationSettings } from '@/hooks/useNotificationSettings';
-import { getCommunities, Community } from '@/lib/communities';
 import { deviceTimeZone } from '@/lib/notificationSettings';
 import {
   PushDiagnostics,
@@ -60,17 +62,14 @@ export default function NotificationSettingsScreen() {
 
   const {
     preferences,
-    mutedCommunityIds,
     unreadCount,
     isLoading,
     error,
     reload,
     updatePreferences,
     updateQuietHours,
-    setCommunityMuted,
   } = useNotificationSettings();
 
-  const [communities, setCommunities] = useState<Community[]>([]);
   const [diagnostics, setDiagnostics] = useState<PushDiagnostics | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
@@ -79,14 +78,6 @@ export default function NotificationSettingsScreen() {
   /** Which quiet-hours boundary the time sheet is editing, if any. */
   const [editingTime, setEditingTime] = useState<'start' | 'end' | null>(null);
   const [retryingRegistration, setRetryingRegistration] = useState(false);
-
-  useEffect(() => {
-    getCommunities()
-      .then((list) => setCommunities(list))
-      .catch(() => {
-        /* the mute list is optional context, not the point of the screen */
-      });
-  }, []);
 
   const refreshDiagnostics = useCallback(async () => {
     setDiagnostics(await getPushDiagnostics());
@@ -134,8 +125,6 @@ export default function NotificationSettingsScreen() {
     setServerResult(result);
     setServerTesting(false);
   }, []);
-
-  const mutedSet = useMemo(() => new Set(mutedCommunityIds), [mutedCommunityIds]);
 
   const summary = useMemo(() => {
     if (!preferences.chatPushEnabled) return 'Chat notifications are off';
@@ -266,43 +255,6 @@ export default function NotificationSettingsScreen() {
                 </Row>
               </>
             ) : null}
-          </Section>
-
-          <Section
-            title="Communities"
-            colors={colors}
-            footer="Muted communities never notify you. Unread messages still show in the app and still count toward the badge."
-          >
-            {communities.length === 0 ? (
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                You are not in any communities yet.
-              </Text>
-            ) : (
-              communities.map((community, index) => (
-                <React.Fragment key={community.id}>
-                  {index > 0 ? <Divider colors={colors} /> : null}
-                  <Row
-                    colors={colors}
-                    label={community.name}
-                    description={
-                      mutedSet.has(community.id)
-                        ? `Muted${community.unread_count > 0 ? ` · ${community.unread_count} unread` : ''}`
-                        : community.unread_count > 0
-                          ? `${community.unread_count} unread`
-                          : 'Notifications on'
-                    }
-                  >
-                    <Switch
-                      value={!mutedSet.has(community.id)}
-                      onValueChange={(enabled) =>
-                        void setCommunityMuted(community.id, !enabled)
-                      }
-                      trackColor={{ true: colors.primary, false: colors.border }}
-                    />
-                  </Row>
-                </React.Fragment>
-              ))
-            )}
           </Section>
 
           <Section
@@ -846,11 +798,6 @@ const styles = StyleSheet.create({
   rowDescription: { fontSize: 12, fontFamily: 'Geist_400Regular', lineHeight: 17 },
   rowControl: { alignItems: 'flex-end' },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 14 },
-  emptyText: {
-    fontSize: 13,
-    fontFamily: 'Geist_400Regular',
-    padding: 14,
-  },
   segmented: {
     flexDirection: 'row',
     borderRadius: 10,

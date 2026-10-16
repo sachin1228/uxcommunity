@@ -2,10 +2,15 @@
  * Notification settings API.
  *
  * One round trip carries everything the settings screen and the badge need:
- * the member's preferences, which communities they muted, and the total unread
- * count. The server owns the defaults, so a member who has never opened the
- * screen still gets a complete object back rather than a partial one the app
- * would have to fill in itself.
+ * the member's preferences, the communities they have muted, and the total
+ * unread count. The server owns the defaults, so a member who has never
+ * opened the screen still gets a complete object back rather than a partial
+ * one the app would have to fill in itself.
+ *
+ * The muted list is READ-only here: it seeds the foreground handler's
+ * suppression view (setMutedCommunities). Muting itself belongs to each
+ * community's chat header bell, which writes the membership's
+ * `notifications_muted` directly.
  */
 
 import { apiFetch } from './api';
@@ -69,11 +74,6 @@ export async function saveNotificationPreferences(
   patch: Partial<NotificationPreferences>,
 ): Promise<void> {
   await apiFetch('/api/push/settings', { method: 'PATCH', body: patch });
-}
-
-export async function saveMutedCommunityIds(ids: string[]): Promise<void> {
-  await apiFetch('/api/push/settings', { method: 'PATCH', body: { mutedCommunityIds: ids } });
-  await setMutedCommunities(ids);
 }
 
 /**
