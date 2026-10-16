@@ -15,6 +15,7 @@ import {
   createAuthorCache,
   firstLine,
   fmtEventSchedule,
+  isMissingRouteError,
   mergeChatTimeline,
   prettyUrl,
   splitBody,
@@ -45,6 +46,18 @@ test('withArticle picks the article like the web header line', () => {
   assert.equal(withArticle('showcase'), 'a showcase');
   assert.equal(withArticle('resource'), 'a resource');
   assert.equal(withArticle('event'), 'an event');
+});
+
+test('only a 404 reads as a server that lacks the route', () => {
+  const missing = Object.assign(new Error('HTTP 404'), { status: 404 });
+  assert.equal(isMissingRouteError(missing), true);
+
+  // Everything else is a real failure — never a fallback trigger.
+  assert.equal(isMissingRouteError(Object.assign(new Error('HTTP 401'), { status: 401 })), false);
+  assert.equal(isMissingRouteError(Object.assign(new Error('HTTP 500'), { status: 500 })), false);
+  assert.equal(isMissingRouteError(new Error('Network request failed')), false);
+  assert.equal(isMissingRouteError(null), false);
+  assert.equal(isMissingRouteError(undefined), false);
 });
 
 // ─── Text helpers ─────────────────────────────────────────────────────────

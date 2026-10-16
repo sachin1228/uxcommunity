@@ -1,6 +1,10 @@
 import { apiFetch, apiFormUpload } from './api';
 import type { MentionCandidate, MessageMention, Reaction } from './chat';
-import type { ChatContentEvent, ChatContentKind } from './chatContentEvents';
+import {
+  isMissingRouteError,
+  type ChatContentEvent,
+  type ChatContentKind,
+} from './chatContentEvents';
 
 export type { Reaction };
 
@@ -213,17 +217,44 @@ export async function getContentLatest(communityId: string): Promise<CommunityCo
 }
 
 /**
+ * Latched when the deployed server answers 404 for the content-events route.
+ * A mobile app routinely runs against a server older than the web code — the
+ * route ships with this feature, so every deployment that predates it lacks
+ * it — and the first 404 switches this session onto the fallback instead of
+ * re-probing on every fetch. Same shape as the web client's
+ * messagePageCompoundCursor tracker: an observed server limitation is
+ * remembered until the process that saw it ends.
+ */
+let contentEventsRouteMissing = false;
+
+/**
  * The community's first page of threads / showcase posts / resources / events
  * with author info, card reactions, RSVP and comment counts — the data the
- * chat timeline's permanent "created a …" cards render. The web client gets
- * the same rows bundled into its /bootstrap request; the mobile chat has no
- * bootstrap, so it reads them (and re-reads them after reconnects) here.
+ * chat timeline's permanent "created a …" cards render.
+ *
+ * Reads the dedicated content-events endpoint; on a server that predates it
+ * (404), falls back to the /bootstrap request the web client already makes,
+ * whose "content-events" section carries the same rows. The fallback is
+ * transient: once the endpoint is deployed the first request succeeds, and
+ * the probe result resets with the next app start.
  */
 export async function getChatContentEvents(communityId: string): Promise<ChatContentEvent[]> {
-  const { data } = await apiFetch<{ events?: ChatContentEvent[] }>(
-    `/api/communities/${communityId}/content-events`
+  if (!contentEventsRouteMissing) {
+    try {
+      const { data } = await apiFetch<{ events?: ChatContentEvent[] }>(
+        `/api/communities/${communityId}/content-events`
+      );
+      return data.events ?? [];
+    } catch (error) {
+      if (!isMissingRouteError(error)) throw error;
+      contentEventsRouteMissing = true;
+    }
+  }
+
+  const { data } = await apiFetch<{ 'content-events'?: { events?: ChatContentEvent[] } }>(
+    `/api/communities/${communityId}/bootstrap`
   );
-  return data.events ?? [];
+  return data['content-events']?.events ?? [];
 }
 
 /**

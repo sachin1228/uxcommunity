@@ -91,6 +91,21 @@ export function withArticle(noun: string): string {
   return /^[aeiou]/i.test(noun) ? `an ${noun}` : `a ${noun}`;
 }
 
+/**
+ * True when a failed fetch means the deployed server does not know the
+ * content-events route yet — an unmatched path answers 404. Only that status
+ * may switch a caller onto its fallback; every other failure (offline, 401,
+ * 5xx) is a real error and must surface. The api client attaches the HTTP
+ * status to the Error it throws for exactly this check.
+ */
+export function isMissingRouteError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { status?: unknown }).status === 404
+  );
+}
+
 /** The nav tab a kind lives under, and back — the two spellings of the same area. */
 const KIND_BY_TAB: Record<ChatContentTab, ChatContentKind> = {
   threads: 'thread',
