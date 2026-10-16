@@ -17,9 +17,11 @@ import {
 } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { useChatContentEvents } from '@/hooks/useChatContentEvents';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
 import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { ContentNotificationCard } from '@/components/chat/ContentNotificationCard';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -37,6 +39,7 @@ import {
   leaveCommunity,
   setCommunityMute,
   setMessageReaction,
+  setContentEventReaction,
   deleteMessage,
   getCommunities,
   type Community,
@@ -52,6 +55,7 @@ import {
   type MessageMention,
   type ReactionIntent,
 } from '@/lib/chat';
+import { mergeChatTimeline, tabForChatContentKind, type ChatContentEvent } from '@/lib/chatContentEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
@@ -62,12 +66,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import type { CommunityTab, ContentKind } from '@/lib/communityContent';
 
-/** FlatList row: a day divider, the unread marker, the retention notice, or a message. */
+/** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
 type ChatRow =
   | { kind: 'date'; key: string; label: string }
   | { kind: 'unread'; key: string }
   | { kind: 'notice'; key: string }
-  | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean };
+  | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean }
+  | { kind: 'content'; key: string; event: ChatContentEvent };
 
 export default function CommunityChat() {
   const {
@@ -186,6 +191,14 @@ export default function CommunityChat() {
     softDeleteMessage,
   } = useChatMessages(id);
 
+  // The chat timeline's permanent "created a …" cards (threads / showcase /
+  // resources / events) — history window + realtime + local mirror.
+  const {
+    events: contentEvents,
+    ready: contentEventsReady,
+    applyContentReactions,
+  } = useChatContentEvents(id);
+
   const { typingUsers, onInputChange, stopTyping } = useTypingPresence(id);
 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -193,6 +206,12 @@ export default function CommunityChat() {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState<number | null>(null);
+  /**
+   * An item a chat card asked to open — handed to its tab, which mounts with
+   * it and opens the detail, then reports back so it is not re-opened on the
+   * next mount.
+   */
+  const [openTarget, setOpenTarget] = useState<{ tab: CommunityTab; id: string } | null>(null);
 
   /** The header bell's mute dropdown state. */
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
@@ -381,7 +400,11 @@ export default function CommunityChat() {
     if (firstUnread) setFirstUnreadId(firstUnread.id);
   }, [messages, lastReadAt, initialUnreadCount, user?.id, readStateKnown]);
 
-  // ── Rows: day dividers + unread marker interleaved with messages ─────────
+  // ── Rows: day dividers + unread marker interleaved with the timeline ─────
+  // Messages and "created a …" cards merge into one ascending timeline (the
+  // same merge the web MessageList builds), so a card sits among the messages
+  // of its moment. A card also breaks the "same author" run — the message
+  // after one starts a fresh bubble group, exactly like the web list.
   const rows = useMemo<ChatRow[]>(() => {
     const out: ChatRow[] = [];
     let currentDate: string | null = null;
@@ -389,8 +412,8 @@ export default function CommunityChat() {
     let groupIndex = 0;
     let unreadPlaced = false;
 
-    for (const msg of messages) {
-      const day = fmtDate(msg.created_at);
+    for (const item of mergeChatTimeline(messages, contentEvents)) {
+      const day = fmtDate(item.created_at);
       if (day !== currentDate) {
         // While older history may still exist above, the first group's pill
         // would "float" upward on every prepend — the web app hides it until
@@ -404,6 +427,13 @@ export default function CommunityChat() {
         groupIndex += 1;
       }
 
+      if (item.kind === 'content') {
+        prevAuthorId = null;
+        out.push({ kind: 'content', key: `content-${item.event.id}`, event: item.event });
+        continue;
+      }
+
+      const msg = item.message;
       if (!unreadPlaced && firstUnreadId && msg.id === firstUnreadId) {
         out.push({ kind: 'unread', key: `unread-${msg.id}` });
         unreadPlaced = true;
@@ -426,7 +456,7 @@ export default function CommunityChat() {
       out.unshift({ kind: 'notice', key: 'notice' });
     }
     return out;
-  }, [messages, hasMore, firstUnreadId]);
+  }, [messages, contentEvents, hasMore, firstUnreadId]);
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
@@ -580,6 +610,57 @@ export default function CommunityChat() {
     [rows],
   );
 
+  /**
+   * A "created a …" card was tapped: its item lives on its own tab, so switch
+   * there and hand the id over — CommunityContentView opens the detail once
+   * its page has loaded (the mobile equivalent of the web card's link).
+   */
+  const handleContentOpen = useCallback((event: ChatContentEvent) => {
+    setEmojiPanelOpen(false);
+    const tab = tabForChatContentKind(event.kind);
+    setOpenTarget({ tab, id: event.id });
+    setActiveTab(tab);
+  }, []);
+
+  /**
+   * Card reactions — the same desired-state flow as message reactions: the
+   * tap paints instantly, the server's grouped reactions are the final word,
+   * and a failure rolls the pills back. The desired state is tracked in a ref
+   * as well as on screen so two taps in the same tick read each other.
+   */
+  const contentReactionIntentRef = useRef(new Map<string, ReactionIntent>());
+
+  const handleContentReaction = useCallback(
+    async (event: ChatContentEvent, emoji: string) => {
+      const currentUser = user?.id ?? '';
+      if (!currentUser) return;
+
+      const previousReactions = event.reactions ?? [];
+      const previous =
+        contentReactionIntentRef.current.get(event.id) ??
+        myReactionEmoji(previousReactions, currentUser);
+      const desired = nextReactionIntent(previous, emoji);
+      hapticToggle(desired !== null);
+
+      contentReactionIntentRef.current.set(event.id, desired);
+      applyContentReactions(
+        event.id,
+        event.kind,
+        projectOwnReaction(previousReactions, desired, currentUser),
+      );
+
+      try {
+        const { reactions } = await setContentEventReaction(id, event.id, event.kind, desired);
+        applyContentReactions(event.id, event.kind, reactions);
+        contentReactionIntentRef.current.set(event.id, myReactionEmoji(reactions, currentUser));
+      } catch {
+        contentReactionIntentRef.current.delete(event.id);
+        applyContentReactions(event.id, event.kind, previousReactions);
+      }
+    },
+    [id, applyContentReactions, user?.id],
+  );
+
   // ── Lightbox: every image in the loaded timeline ─────────────────────────
   const lightboxImages = useMemo<LightboxImage[]>(
     () =>
@@ -649,6 +730,18 @@ export default function CommunityChat() {
         return <DisappearingNotice />;
       }
 
+      if (item.kind === 'content') {
+        return (
+          <ContentNotificationCard
+            event={item.event}
+            isOwn={item.event.user_id === user?.id}
+            currentUserId={user?.id ?? ''}
+            onOpen={handleContentOpen}
+            onReaction={handleContentReaction}
+          />
+        );
+      }
+
       return (
         <MessageBubble
           message={item.msg}
@@ -672,6 +765,8 @@ export default function CommunityChat() {
       handleCancel,
       handleRetry,
       handleReplyPress,
+      handleContentOpen,
+      handleContentReaction,
       colors,
       initialUnreadCount,
     ],
@@ -763,23 +858,29 @@ export default function CommunityChat() {
             ) : null
           }
           ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <DisappearingNotice />
-              {communityImage ? (
-                <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
-              ) : (
-                <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceRaised }]} />
-              )}
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Welcome to{' '}
-                <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
-                  {communityName}
+            // The welcome copy waits for the content-event history too, so a
+            // community whose only activity is a thread or a showcase post
+            // never flashes "Be the first to say something" while the cards
+            // are still in flight (web MessageList parity).
+            contentEventsReady ? (
+              <View style={styles.emptyWrap}>
+                <DisappearingNotice />
+                {communityImage ? (
+                  <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
+                ) : (
+                  <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceRaised }]} />
+                )}
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  Welcome to{' '}
+                  <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                    {communityName}
+                  </Text>
+                  !
+                  {'\n'}
+                  <Text style={styles.emptySubtext}>Be the first to say something.</Text>
                 </Text>
-                !
-                {'\n'}
-                <Text style={styles.emptySubtext}>Be the first to say something.</Text>
-              </Text>
-            </View>
+              </View>
+            ) : null
           }
         />
       )}
@@ -992,6 +1093,8 @@ export default function CommunityChat() {
           communityId={id}
           kind={activeTab as ContentKind}
           currentUserId={user?.id ?? ''}
+          openContentId={openTarget && openTarget.tab === activeTab ? openTarget.id : null}
+          onOpenConsumed={() => setOpenTarget(null)}
         />
       )}
 

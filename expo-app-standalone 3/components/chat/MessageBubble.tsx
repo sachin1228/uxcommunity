@@ -50,7 +50,11 @@ const EMOJI_MESSAGE_SIZE = 48;
 // Avatar
 // ---------------------------------------------------------------------------
 
-function Avatar({
+/**
+ * The 28px sender avatar (image or initials tile). Exported for the chat's
+ * content cards, which wear the same avatar in their left column.
+ */
+export function Avatar({
   name,
   avatarUrl,
   colors,

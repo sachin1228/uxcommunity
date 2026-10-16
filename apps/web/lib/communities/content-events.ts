@@ -74,6 +74,23 @@ function metaFor(kind: ContentEventKind, row: Record<string, unknown>): ContentE
 }
 
 /**
+ * Which content areas the chat timeline should show "created a …" cards for:
+ * exactly the areas the community's nav shows (showcase reads as on unless the
+ * flag says otherwise). Takes the raw community row, since one caller reads it
+ * through the read model and the other through the bootstrap's bundled copy.
+ */
+export function contentAreaLimits(community: Record<string, unknown> | null | undefined) {
+  const tabs = (community?.enabled_tabs as string[] | null | undefined) ?? null;
+  const enabled = (area: string) => tabs === null || tabs.includes(area);
+  return {
+    threads: enabled("threads"),
+    showcase: community?.showcase_enabled !== false,
+    events: enabled("events"),
+    resources: enabled("resources"),
+  };
+}
+
+/**
  * Loads the first page of the community's threads / showcase posts / resources
  * / events with author display info merged in — the data the chat timeline's
  * permanent "John created a …" notification cards are rendered from. The
@@ -81,7 +98,7 @@ function metaFor(kind: ContentEventKind, row: Record<string, unknown>): ContentE
  * window (50 per list) that messages already use applies per kind.
  *
  * Only kinds a member can actually reach are included — callers pass the
- * community's enabled tabs / showcase flag (see areas.ts).
+ * community's enabled tabs / showcase flag (see contentAreaLimits).
  */
 export async function loadCommunityContentEvents(
   communityId: string,

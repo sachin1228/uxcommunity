@@ -1,5 +1,6 @@
 import { apiFetch, apiFormUpload } from './api';
 import type { MentionCandidate, MessageMention, Reaction } from './chat';
+import type { ChatContentEvent, ChatContentKind } from './chatContentEvents';
 
 export type { Reaction };
 
@@ -211,6 +212,42 @@ export async function getContentLatest(communityId: string): Promise<CommunityCo
   };
 }
 
+/**
+ * The community's first page of threads / showcase posts / resources / events
+ * with author info, card reactions, RSVP and comment counts — the data the
+ * chat timeline's permanent "created a …" cards render. The web client gets
+ * the same rows bundled into its /bootstrap request; the mobile chat has no
+ * bootstrap, so it reads them (and re-reads them after reconnects) here.
+ */
+export async function getChatContentEvents(communityId: string): Promise<ChatContentEvent[]> {
+  const { data } = await apiFetch<{ events?: ChatContentEvent[] }>(
+    `/api/communities/${communityId}/content-events`
+  );
+  return data.events ?? [];
+}
+
+/**
+ * Set (or clear, with `null`) the signed-in member's reaction on a chat
+ * timeline content card. The same explicit desired-state contract as
+ * setMessageReaction — the endpoint answers with the authoritative grouped
+ * reactions for the item.
+ */
+export async function setContentEventReaction(
+  communityId: string,
+  contentId: string,
+  kind: ChatContentKind,
+  desiredEmoji: string | null
+): Promise<{ reactions: Reaction[]; currentUserEmoji: string | null }> {
+  const { data } = await apiFetch<{
+    reactions?: Reaction[];
+    currentUserEmoji?: string | null;
+  }>(`/api/communities/${communityId}/content-events/${contentId}/reactions`, {
+    method: 'POST',
+    body: { kind, desiredEmoji },
+  });
+  return { reactions: data.reactions ?? [], currentUserEmoji: data.currentUserEmoji ?? desiredEmoji };
+}
+
 /** The durations the mute menu offers, plus "off" to unmute. */
 export type CommunityMuteDuration = '8h' | '1w' | 'always' | 'off';
 
@@ -346,6 +383,28 @@ export async function editMessage(
     { method: 'PATCH', body: { content } }
   );
   return { edited_at: data.message?.edited_at ?? data.edited_at ?? new Date().toISOString() };
+}
+
+/**
+ * One member's display info, resolved lazily from the lightweight member
+ * endpoint for realtime rows that carry only a user_id — the community list's
+ * sender names resolve through the same route, and the chat's "created a …"
+ * cards resolve their live authors through it. Null when the member cannot be
+ * resolved (deleted user, offline), so callers decide the fallback label.
+ */
+export async function getMemberBrief(
+  communityId: string,
+  userId: string
+): Promise<{ name: string; avatar_url: string | null } | null> {
+  try {
+    const { data } = await apiFetch<{ name?: string; avatar_url?: string | null }>(
+      `/api/communities/${communityId}/members/${userId}`
+    );
+    if (!data?.name) return null;
+    return { name: data.name, avatar_url: data.avatar_url ?? null };
+  } catch {
+    return null;
+  }
 }
 
 /**
