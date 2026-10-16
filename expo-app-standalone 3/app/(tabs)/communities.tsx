@@ -20,7 +20,7 @@ import { Community } from '@/lib/communities';
 export default function CommunitiesScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { communities, isLoading, error, reload, markCommunityRead, getTypingLabel } =
+  const { communities, isLoading, error, nowMs, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
 
   const handleCommunityPress = useCallback(
@@ -55,10 +55,11 @@ export default function CommunitiesScreen() {
       <CommunityRow
         community={item}
         typingLabel={getTypingLabel(item.id)}
+        nowMs={nowMs}
         onPress={() => handleCommunityPress(item)}
       />
     ),
-    [getTypingLabel, handleCommunityPress]
+    [getTypingLabel, handleCommunityPress, nowMs]
   );
 
   return (

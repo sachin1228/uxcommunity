@@ -25,13 +25,23 @@ import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
+import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
+import { CommunityActionsSheet, type CommunityConfirmAction } from '@/components/community/CommunityActionsSheet';
+import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
+import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import {
+  archiveCommunity,
+  leaveCommunity,
+  setCommunityMute,
   setMessageReaction,
   deleteMessage,
   getCommunities,
   type Community,
+  type CommunityMuteDuration,
   type Message,
 } from '@/lib/communities';
+import { isCommunityMuted } from '@/lib/communityMute';
 import {
   fmtDate,
   myReactionEmoji,
@@ -50,10 +60,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import type { CommunityTab, ContentKind } from '@/lib/communityContent';
 
-/** FlatList row: a day divider, the unread marker, or a message. */
+/** FlatList row: a day divider, the unread marker, the retention notice, or a message. */
 type ChatRow =
   | { kind: 'date'; key: string; label: string }
   | { kind: 'unread'; key: string }
+  | { kind: 'notice'; key: string }
   | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean };
 
 export default function CommunityChat() {
@@ -86,27 +97,27 @@ export default function CommunityChat() {
    *  the chat scrolls, a tab changes, or the screen loses the composer. */
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   /**
-   * A push notification can only carry the community id, so when the route
-   * arrives without its display params the community is resolved from the
-   * signed-in member's list.
+   * Every open resolves the community from the signed-in member's list — not
+   * just push deep-links, where the route can only carry the id. The header's
+   * bell menu, name badges and event tile read the live community object
+   * (mute state, event dates), while the route params only carry the display
+   * snapshot taken when the list row was tapped.
    */
   const [resolved, setResolved] = useState<Community | null>(null);
-  const needsResolution = !name;
 
   useEffect(() => {
-    if (!needsResolution) return;
     let cancelled = false;
     getCommunities()
       .then((list) => {
         if (!cancelled) setResolved(list.find((c) => c.id === id) ?? null);
       })
       .catch(() => {
-        /* the header falls back to a generic title */
+        /* the header falls back to the params' snapshot */
       });
     return () => {
       cancelled = true;
     };
-  }, [id, needsResolution]);
+  }, [id]);
 
   const enabledTabs = new Set(
     (enabledTabsParam
@@ -169,8 +180,163 @@ export default function CommunityChat() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
-  const [copiedNotice, setCopiedNotice] = useState(false);
   const [imageIndex, setImageIndex] = useState<number | null>(null);
+
+  /** The header bell's mute dropdown state. */
+  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
+  /** The header ⋯ options (Delete chat / Exit community). */
+  const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
+
+  /**
+   * The screen's toast — Web-parity notices like "Chat muted" (with Undo),
+   * "Chat unmuted" and the copy confirmation. One at a time; it dismisses
+   * itself unless the action is taken first.
+   */
+  const [toast, setToast] = useState<{
+    message: string;
+    icon?: 'check';
+    actionLabel?: string;
+    onAction?: () => Promise<void> | void;
+  } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissToast = useCallback(() => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    setToast(null);
+  }, []);
+  const showToast = useCallback(
+    (next: NonNullable<typeof toast>) => {
+      setToast(next);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => {
+        toastTimer.current = null;
+        setToast(null);
+      }, 4000);
+    },
+    [],
+  );
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  // Timed mutes lapse on their own without the row being rewritten, so the
+  // state is computed from the deadline against the clock, never from the
+  // column's presence (see isCommunityMuted).
+  const muted = isCommunityMuted(resolved);
+
+  // The second line of the muted sheet: when the mute lapses, or that it
+  // never does — the same label formatting as the web dropdown (region date,
+  // fixed en-US 12-hour clock). Computed here but rendered only while the
+  // sheet is open, so no render formats it before a click.
+  const muteStateLabel = (() => {
+    if (!muted) return null;
+    if (resolved?.notifications_muted) return 'Muted';
+    const until = resolved?.notifications_muted_until;
+    if (!until) return null;
+    const deadline = new Date(until);
+    if (!Number.isFinite(deadline.getTime())) return null;
+    const date = deadline.toLocaleDateString();
+    const time = deadline.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `Muted until ${date} at ${time}`;
+  })();
+
+  /**
+   * Save the caller's mute for this community and confirm with a toast —
+   * "Chat muted" with an Undo that mutes back off, "Chat unmuted" as a plain
+   * notice (web parity). Returns whether the save landed; `reportFailure` is
+   * off for the undo path, where the toast's own failure handling owns it.
+   */
+  const applyMute = useCallback(
+    async (
+      duration: CommunityMuteDuration,
+      { reportFailure = true }: { reportFailure?: boolean } = {},
+    ): Promise<boolean> => {
+      if (muteBusy) return false;
+      setMuteBusy(true);
+      try {
+        const state = await setCommunityMute(id, duration);
+        // Patch the screen's own copy and the list's row — the crossed bell
+        // must be there the moment the user is back.
+        setResolved((prev) => (prev ? { ...prev, ...state } : prev));
+        communityStore.notifyCommunityChanged({ communityId: id, patch: state });
+        if (duration === 'off') {
+          showToast({ message: 'Chat unmuted' });
+        } else {
+          showToast({
+            message: 'Chat muted',
+            actionLabel: 'Undo',
+            onAction: async () => {
+              // A failed undo rejects so the failure path fires (web UndoToast).
+              if (!(await applyMute('off', { reportFailure: false }))) {
+                throw new Error('undo failed');
+              }
+            },
+          });
+        }
+        setMuteSheetOpen(false);
+        return true;
+      } catch {
+        if (reportFailure) {
+          showToast({ message: "Couldn't update notifications. Try again." });
+        }
+        return false;
+      } finally {
+        setMuteBusy(false);
+      }
+    },
+    // The undo closure references applyMute itself — the reference binds to
+    // this instance at call time, exactly like the web handler's recursion.
+    [id, muteBusy, showToast],
+  );
+
+  /**
+   * "Delete chat" (archive, the caller's list only) and "Exit community"
+   * (leave, the membership) — the web ⋯ menu's two actions, with the same
+   * confirm copy. Rejects on failure so the sheet stays up; the toast says
+   * what happened.
+   */
+  const handleCommunityAction = useCallback(
+    async (action: CommunityConfirmAction) => {
+      if (action === 'delete') {
+        try {
+          await archiveCommunity(id);
+        } catch {
+          showToast({ message: "Couldn't delete the chat. Try again." });
+          throw new Error('archive failed');
+        }
+        // Archived rows are hidden from the list and reappear when a new
+        // message arrives — the realtime handler un-archives them.
+        communityStore.notifyCommunityChanged({ communityId: id, patch: { is_archived: true } });
+      } else {
+        try {
+          await leaveCommunity(id);
+        } catch {
+          showToast({ message: "Couldn't exit the community. Try again." });
+          throw new Error('leave failed');
+        }
+        // The membership is gone; drop the row and free the active marker so
+        // the list does not keep treating this community as open.
+        communityStore.notifyCommunityChanged({ communityId: id, patch: 'remove' });
+        communityStore.activeCommunityId = null;
+      }
+      setActionsSheetOpen(false);
+      // Back to the communities list, like the web dialog's push to the
+      // dashboard (a deep-linked screen has no back stack — replace instead).
+      if (router.canGoBack()) router.back();
+      else router.replace('/communities');
+    },
+    [id, router, showToast],
+  );
+
+  const handleToastAction = useCallback(() => {
+    const action = toast?.onAction;
+    if (!action) return;
+    dismissToast();
+    Promise.resolve(action()).catch(() => {
+      showToast({ message: "Couldn't undo that" });
+    });
+  }, [toast, dismissToast, showToast]);
 
   const ownerId = ownerParam ?? resolved?.owner_id;
   const isOwnCommunity = !!ownerId && !!user?.id && ownerId === user.id;
@@ -234,6 +400,14 @@ export default function CommunityChat() {
         isSameAuthor: prevAuthorId === msg.user_id,
       });
       prevAuthorId = msg.user_id;
+    }
+
+    // The disappearing-messages notice opens the history, above the first
+    // date pill — only once the true start of it is loaded, so a notice
+    // rendered while older pages may still exist cannot float down with every
+    // prepend (web MessageList parity).
+    if (!hasMore && out.length > 0) {
+      out.unshift({ kind: 'notice', key: 'notice' });
     }
     return out;
   }, [messages, hasMore, firstUnreadId]);
@@ -361,9 +535,8 @@ export default function CommunityChat() {
   );
 
   const handleCopy = useCallback(() => {
-    setCopiedNotice(true);
-    setTimeout(() => setCopiedNotice(false), 1400);
-  }, []);
+    showToast({ message: 'Copied', icon: 'check' });
+  }, [showToast]);
 
   const handleSaveEdit = useCallback(
     async (messageId: string, content: string) => {
@@ -456,6 +629,10 @@ export default function CommunityChat() {
         );
       }
 
+      if (item.kind === 'notice') {
+        return <DisappearingNotice />;
+      }
+
       return (
         <MessageBubble
           message={item.msg}
@@ -497,10 +674,19 @@ export default function CommunityChat() {
 
   const chatContent = (
     <View style={styles.flex}>
-      {copiedNotice && (
+      {toast && (
         <View style={[styles.toast, { backgroundColor: colors.foreground }]}>
-          <Feather name="check" size={13} color={colors.background} />
-          <Text style={[styles.toastText, { color: colors.background }]}>Copied</Text>
+          {toast.icon === 'check' && (
+            <Feather name="check" size={13} color={colors.background} />
+          )}
+          <Text style={[styles.toastText, { color: colors.background }]}>{toast.message}</Text>
+          {toast.actionLabel && (
+            <Pressable onPress={handleToastAction} hitSlop={8} accessibilityRole="button" accessibilityLabel={toast.actionLabel}>
+              <Text style={[styles.toastAction, { color: colors.background }]}>
+                {toast.actionLabel}
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -562,6 +748,7 @@ export default function CommunityChat() {
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
+              <DisappearingNotice />
               {communityImage ? (
                 <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
               ) : (
@@ -638,28 +825,88 @@ export default function CommunityChat() {
         </Pressable>
 
         <View style={styles.headerCenter}>
-          {communityImage ? (
-            <Image
-              source={{ uri: communityImage }}
-              style={[styles.headerAvatar, { borderColor: colors.border }]}
+          {/* An event's group chat wears its date here too — and says LIVE
+              while the event is under way (web header parity). */}
+          <DpWithEventDate
+            date={resolved?.event_date}
+            endsAt={resolved?.event_end ?? resolved?.pinned_until}
+            dpSize={30}
+          >
+            {communityImage ? (
+              <Image
+                source={{ uri: communityImage }}
+                style={[styles.headerAvatar, { borderColor: colors.border }]}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.headerAvatar,
+                  styles.headerAvatarFallback,
+                  { backgroundColor: colors.surfaceRaised },
+                ]}
+              >
+                <Text style={[styles.headerAvatarText, { color: colors.mutedForeground }]}>
+                  {communityName.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </DpWithEventDate>
+          <View style={styles.headerTitleRow}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+              {communityName}
+            </Text>
+            <CommunityNameBadges
+              type={resolved?.type}
+              isPrivate={resolved?.is_private}
+              size={12}
             />
-          ) : (
-            <View
-              style={[
-                styles.headerAvatar,
-                styles.headerAvatarFallback,
-                { backgroundColor: colors.surfaceRaised },
-              ]}
-            >
-              <Text style={[styles.headerAvatarText, { color: colors.mutedForeground }]}>
-                {communityName.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-            {communityName}
-          </Text>
+          </View>
         </View>
+
+        {/* Notifications — its own control beside the ⋯ button rather than an
+            item inside it, like the web header: plain bell while notifications
+            are on, crossed bell while muted; the sheet carries the durations /
+            the off switch. */}
+        <Pressable
+          onPress={() => setMuteSheetOpen(true)}
+          disabled={muteBusy}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={muted ? 'Unmute notifications' : 'Mute notifications'}
+          style={({ pressed }) => [
+            styles.headerIconBtn,
+            {
+              backgroundColor: pressed ? colors.surfaceRaised : 'transparent',
+              opacity: muteBusy ? 0.5 : 1,
+            },
+          ]}
+        >
+          <Feather
+            name={muted ? 'bell-off' : 'bell'}
+            size={18}
+            strokeWidth={2.5}
+            color={colors.mutedForeground}
+          />
+        </Pressable>
+
+        {/* Community options — Delete chat / Exit community. */}
+        <Pressable
+          onPress={() => setActionsSheetOpen(true)}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Community options"
+          style={({ pressed }) => [
+            styles.headerIconBtn,
+            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
+          ]}
+        >
+          <Feather
+            name="more-horizontal"
+            size={18}
+            strokeWidth={2.5}
+            color={colors.mutedForeground}
+          />
+        </Pressable>
       </View>
 
       <View
@@ -758,6 +1005,27 @@ export default function CommunityChat() {
         }}
         onSave={handleSaveEdit}
       />
+
+      {/* Header bell menu — mute durations / unmute */}
+      <CommunityMuteSheet
+        open={muteSheetOpen}
+        muted={muted}
+        muteStateLabel={muteStateLabel}
+        busy={muteBusy}
+        onChoose={(duration) => {
+          void applyMute(duration);
+        }}
+        onClose={() => {
+          if (!muteBusy) setMuteSheetOpen(false);
+        }}
+      />
+
+      {/* Header ⋯ menu — Delete chat / Exit community */}
+      <CommunityActionsSheet
+        open={actionsSheetOpen}
+        onClose={() => setActionsSheetOpen(false)}
+        onConfirm={handleCommunityAction}
+      />
     </View>
   );
 }
@@ -822,10 +1090,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Geist_600SemiBold',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   headerTitle: {
     fontSize: 17,
     fontFamily: 'Geist_600SemiBold',
     flexShrink: 1,
+  },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   center: {
     flex: 1,
@@ -934,4 +1217,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   toastText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  toastAction: {
+    fontSize: 12,
+    fontFamily: 'Geist_700Bold',
+    textDecorationLine: 'underline',
+    marginLeft: 2,
+  },
 });

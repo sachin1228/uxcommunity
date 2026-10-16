@@ -54,6 +54,15 @@ export interface Community {
   is_archived: boolean;
   last_message: LastMessage | null;
   lastReaction: LastReaction | null;
+  /** An event group chat's own event date — its DP wears it as a badge. */
+  event_date?: string | null;
+  /** Its event's end while still ahead — what makes the badge say LIVE. */
+  pinned_until?: string | null;
+  /** That deadline whether ahead or past — what makes the badge say ENDED. */
+  event_end?: string | null;
+  /** The caller's own mute state — absent on pre-migration rows (not muted). */
+  notifications_muted?: boolean | null;
+  notifications_muted_until?: string | null;
 }
 
 export interface MessageUser {
@@ -173,6 +182,57 @@ export async function setMessageReaction(
 
 export async function markRead(communityId: string): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/read`, { method: 'PATCH' });
+}
+
+/** The durations the mute menu offers, plus "off" to unmute. */
+export type CommunityMuteDuration = '8h' | '1w' | 'always' | 'off';
+
+/**
+ * Set the caller's own notification mute for one community — the same
+ * endpoint the web chat header's bell menu posts to. Answers with the
+ * resulting state so callers can patch without recomputing what the server
+ * decided.
+ */
+export async function setCommunityMute(
+  communityId: string,
+  duration: CommunityMuteDuration
+): Promise<{ notifications_muted: boolean; notifications_muted_until: string | null }> {
+  const { data } = await apiFetch<{
+    notifications_muted?: boolean;
+    notifications_muted_until?: string | null;
+  }>(`/api/communities/${communityId}/mute`, { method: 'POST', body: { duration } });
+  return {
+    notifications_muted: Boolean(data.notifications_muted),
+    notifications_muted_until: data.notifications_muted_until ?? null,
+  };
+}
+
+/**
+ * "Delete chat" — archives the community for the caller only (the web ⋯
+ * menu's first action). Other members are unaffected, and the row reappears
+ * when a new message arrives.
+ */
+export async function archiveCommunity(communityId: string): Promise<void> {
+  await apiFetch(`/api/communities/${communityId}/archive`, { method: 'POST' });
+}
+
+/**
+ * "Exit community" — removes the caller's membership (the web ⋯ menu's
+ * second action). When they were the owner, the server transfers ownership to
+ * the earliest-joined member, or hard-deletes the community if they were the
+ * last member; both outcomes answer with the same success shape.
+ */
+export async function leaveCommunity(
+  communityId: string
+): Promise<{ ownershipTransferred: boolean; communityDeleted: boolean }> {
+  const { data } = await apiFetch<{
+    community_deleted?: boolean;
+    ownership_transferred?: boolean;
+  }>(`/api/communities/${communityId}/members`, { method: 'DELETE' });
+  return {
+    ownershipTransferred: Boolean(data.ownership_transferred),
+    communityDeleted: Boolean(data.community_deleted),
+  };
 }
 
 export async function deleteMessage(
