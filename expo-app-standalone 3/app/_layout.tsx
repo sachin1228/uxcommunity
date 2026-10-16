@@ -79,10 +79,6 @@ export default function RootLayout() {
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
                   <Stack.Screen
-                    name="profile"
-                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
-                  />
-                  <Stack.Screen
                     name="settings/index"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />

@@ -31,6 +31,7 @@ import {
   setContentAction,
 } from '@/lib/communityContent';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { formatEventDate } from '@/lib/eventDate';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
 
@@ -310,6 +311,9 @@ export function ContentCard({
     .filter((attachment) => attachment.type.startsWith('image/'));
   const previewImage = useResourcePreview(resource?.url);
   const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
+  // Every event card says when — the web card's first row — and a bad
+  // timestamp costs the row rather than printing "Invalid Date".
+  const eventDateLabel = event ? formatEventDate(event.event_date) : null;
   const isOwner = item.user_id === currentUserId;
 
   // The body text each kind puts on its card, mirroring the web cards: a thread
@@ -373,11 +377,14 @@ export function ContentCard({
         {images.length ? <MediaGrid images={images} /> : null}
 
         {event ? (
-          <View style={styles.eventMeta}>
-            <Feather name={event.is_online ? 'video' : 'map-pin'} size={15} color={colors.accent} />
-            <Text style={[styles.eventMetaText, { color: colors.foregroundMuted }]}>
-              {event.is_online ? 'Online event' : event.location || 'Location to be announced'}
-            </Text>
+          <View style={styles.eventMetaStack}>
+            {eventDateLabel ? <DetailRow icon="calendar" text={eventDateLabel} /> : null}
+            <View style={styles.eventMeta}>
+              <Feather name={event.is_online ? 'video' : 'map-pin'} size={15} color={colors.accent} />
+              <Text style={[styles.eventMetaText, { color: colors.foregroundMuted }]}>
+                {event.is_online ? 'Online event' : event.location || 'Location to be announced'}
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -911,6 +918,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 21 },
   description: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
   eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  eventMetaStack: { gap: 6 },
   eventMetaText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 13 },
   linkButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   linkText: { flex: 1, fontFamily: 'Geist_500Medium', fontSize: 13 },
