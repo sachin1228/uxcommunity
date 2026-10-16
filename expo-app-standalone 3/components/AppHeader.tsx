@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccountMenuSheet } from '@/components/AccountMenuSheet';
 import { BrandLogo } from '@/components/BrandLogo';
@@ -12,7 +10,6 @@ import { resolveProfilePictureUri } from '@/lib/profilePicture';
 export function AppHeader() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,25 +38,11 @@ export function AppHeader() {
         <Text style={[styles.logo, { color: colors.foreground }]}>uxcommunity</Text>
       </View>
 
+      {/* The avatar is the account menu's trigger — the touch version of the
+          web topbar's profile dropdown (identity, View profile, Settings,
+          Sign out). Notifications live in Settings; the header carries no
+          duplicate shortcut. */}
       <View style={styles.actions}>
-        <Pressable
-          accessibilityLabel="Notification settings"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => router.push('/settings/notifications')}
-          style={({ pressed }) => [
-            styles.iconButton,
-            // The header sits on the page background, so the pressed state has
-            // to lift onto the raised surface to be visible at all.
-            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
-          ]}
-        >
-          <Feather name="bell" size={22} color={colors.mutedForeground} />
-        </Pressable>
-
-        {/* The avatar is the account menu's trigger — the touch version of the
-            web topbar's profile dropdown (identity, View profile, Settings,
-            Sign out). */}
         <Pressable
           accessibilityLabel="Profile menu"
           accessibilityRole="button"
@@ -115,13 +98,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   avatarButton: {
     width: 34,
