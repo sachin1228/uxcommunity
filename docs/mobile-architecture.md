@@ -43,6 +43,11 @@ Provider order matters: the push hook reads the signed-in member from
 | `app/(tabs)/` | Main app: `index` (Home), `communities`, `explore`, `jobs` |
 | `app/(auth)/login.tsx` | Login |
 | `app/community/[id].tsx` | Single community chat (slide-in) |
+| `app/notifications.tsx` | Notifications inbox (bell badge's destination) |
+| `app/saved.tsx` | Saved posts (`/api/profile/feed?scope=saved`) |
+| `app/messages/index.tsx`, `app/messages/[id].tsx` | DM list + thread |
+| `app/jobs/[id].tsx` | Job posting detail + apply |
+| `app/settings/index.tsx` | Settings hub + sign out |
 | `app/settings/notifications.tsx` | Notification settings + push diagnostics |
 | `app/+not-found.tsx` | 404 fallback |
 
@@ -145,7 +150,7 @@ User-scoped rooms already share the single `user:${userId}` socket.
 ```
 hook (useChatMessages, useTypingPresence, …)
   └─ realtimeClient.on(room, topic, handler)   → refcount++
-       └─ WebSocket  →  wss://rt.uxcommunity.in/ws?room=<room>&token=<jwt>
+       └─ WebSocket  →  wss://rt.uxcommunity.in/ws?room=<room>
 ```
 
 - `on(room, topic, handler)` increments a per-topic refcount and subscribes on
@@ -154,8 +159,11 @@ hook (useChatMessages, useTypingPresence, …)
 - A room is torn down only when topic refs, `subscribe()` refs **and** presence
   handlers are all empty — otherwise one screen's cleanup kills a socket the
   community list still depends on.
-- Auth: the session JWT goes in the `token` query parameter, because React
-  Native's WebSocket API cannot send custom headers.
+- Auth: the session JWT travels as a `Cookie: uxcommunity_session=…` handshake
+  **header** — React Native's `WebSocket` constructor accepts request headers
+  as its third argument (`lib/realtime.ts`), so the credential never rides the
+  query string (where proxies and access logs capture it). The server reads
+  the same cookie it reads for browsers.
 
 ### Liveness — the mobile-specific part
 

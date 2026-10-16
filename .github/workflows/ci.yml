@@ -72,10 +72,14 @@ jobs:
       - name: Run mobile realtime tests
         run: npm run test:mobile-realtime
 
-      # Blocking. Same reason as above: the bounded sender-name cache lives in
-      # the mobile app, which the web glob cannot see.
+      # Blocking. Same reason as above: the pure mobile suites live in the
+      # mobile app, which the web glob cannot see. They cover the bounded
+      # sender-name cache, event timezones, and the parity modules added with
+      # the mobile-parity branch (notifications, jobs rules, explore filters,
+      # home-feed scopes, DM lifecycle). No React Native imports, so they run
+      # on the runner as-is.
       - name: Run mobile lib tests
-        run: npm run test:mobile-cache
+        run: npm run test:mobile-lib
 
   comments:
     name: Comment audit

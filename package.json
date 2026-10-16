@@ -115,7 +115,8 @@
     "test:k6-realtime": "tsx --test k6/lib/realtime-fanout.test.mjs",
     "test:mobile-explore": "tsx --test \"expo-app-standalone 3/lib/explore.test.ts\"",
     "test:mobile-home-scope": "tsx --test \"expo-app-standalone 3/lib/homeFeedScopes.test.ts\"",
-    "test:mobile-dm": "tsx --test \"expo-app-standalone 3/lib/dm.test.ts\""
+    "test:mobile-dm": "tsx --test \"expo-app-standalone 3/lib/dm.test.ts\"",
+    "test:mobile-lib": "tsx --test \"expo-app-standalone 3/lib/notifications.test.ts\" \"expo-app-standalone 3/lib/jobs.test.ts\" \"expo-app-standalone 3/lib/explore.test.ts\" \"expo-app-standalone 3/lib/homeFeedScopes.test.ts\" \"expo-app-standalone 3/lib/dm.test.ts\" \"expo-app-standalone 3/lib/nameCache.test.ts\" \"expo-app-standalone 3/lib/eventTimezone.test.ts\""
   },
   "engines": {
     "node": ">=22.0.0",
