@@ -20,7 +20,6 @@ import {
   prettyUrl,
   splitBody,
   tabForChatContentKind,
-  viewerZoneLabel,
   withArticle,
   DEFAULT_AUTHOR_CACHE_MAX_ENTRIES,
 } from './chatContentEvents';
@@ -89,15 +88,6 @@ test('fmtEventSchedule renders the web shape (day, date · local time)', () => {
   const out = fmtEventSchedule('2026-10-17T12:15:00.000Z');
   assert.match(out, /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · \d{1,2}:\d{2} (AM|PM)$/);
   assert.equal(fmtEventSchedule('nonsense'), '');
-});
-
-test('viewerZoneLabel formats the viewer offset like the web label', () => {
-  const iso = '2026-10-17T12:15:00.000Z';
-  assert.equal(viewerZoneLabel(iso, 330), 'UTC+5:30');
-  assert.equal(viewerZoneLabel(iso, -240), 'UTC-4:00');
-  assert.equal(viewerZoneLabel(iso, 0), 'UTC');
-  // An unreadable timestamp still names a zone (the current one), never blank.
-  assert.equal(viewerZoneLabel('nonsense', 330), 'UTC+5:30');
 });
 
 // ─── Created item → card event ────────────────────────────────────────────

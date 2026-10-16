@@ -15,7 +15,6 @@ import {
   fmtEventSchedule,
   prettyUrl,
   splitBody,
-  viewerZoneLabel,
   withArticle,
   type ChatContentEvent,
 } from '@/lib/chatContentEvents';
@@ -188,11 +187,7 @@ export function ContentNotificationCard({
       split.subtitle ??
       (event.kind === 'showcase' && meta?.description ? firstLine(meta.description, 80) : null);
   } else if (event.kind === 'event') {
-    // The chat card is often the first place a member meets an event, so the
-    // time it shows names the zone it was read in (web event-display parity).
-    subtitle = meta?.event_date
-      ? `${fmtEventSchedule(meta.event_date)} (${viewerZoneLabel(meta.event_date)})`
-      : null;
+    subtitle = meta?.event_date ? fmtEventSchedule(meta.event_date) : null;
   } else if (event.kind === 'resource') {
     subtitle = meta?.url ? prettyUrl(meta.url) : null;
   }
@@ -217,14 +212,14 @@ export function ContentNotificationCard({
   const textColor = isOwn ? ownText : colors.foreground;
   const mutedColor = isOwn ? ownText : colors.foregroundMuted;
   const mutedOpacity = isOwn ? 0.8 : 1;
-  // A fixed 80% of the row's usable width. Unlike the web card (a shrink-to-
+  // A fixed 85% of the row's usable width. Unlike the web card (a shrink-to-
   // fit block whose text gives it a natural width), an RN row with a flex:1 /
   // minWidth:0 text column collapses that column to nothing when the bubble
   // sizes itself to content — the event title truncated to two characters and
   // the thread card lost its text column entirely. The explicit width gives
   // the column real room and keeps every card the same, scannable size.
   const rowAvailableWidth = screenWidth - 32 - (isOwn ? 0 : 36);
-  const bubbleWidth = Math.min(Math.floor(rowAvailableWidth * 0.8), 420);
+  const bubbleWidth = Math.min(Math.floor(rowAvailableWidth * 0.85), 420);
 
   // Own bubble: translucent media card on the blue; other: the raised surface.
   const cardBg = isOwn ? 'rgba(0, 0, 0, 0.20)' : colors.isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)';

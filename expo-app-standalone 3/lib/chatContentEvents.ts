@@ -18,7 +18,6 @@
  * unified card always — the state the web converges to.
  */
 
-import { deviceOffsetMinutes, formatOffset } from './eventTimezone';
 import type { Reaction } from './chat';
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -175,19 +174,6 @@ export function fmtEventSchedule(iso: string): string {
   });
   const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return `${day} · ${time}`;
-}
-
-/**
- * The zone an instant lands in for this viewer — "UTC+5:30". Web renders the
- * abbreviation too ("EDT · UTC-4:00") when the runtime names one; the device
- * offset is the part both clients share, and a GMT-style name is the offset
- * under another label anyway. `offsetMinutes` is for tests, exactly like the
- * offset parameter pattern the web event-time module uses.
- */
-export function viewerZoneLabel(iso: string, offsetMinutes?: number): string {
-  const date = new Date(iso);
-  const at = Number.isNaN(date.getTime()) ? new Date() : date;
-  return formatOffset(offsetMinutes ?? deviceOffsetMinutes(at));
 }
 
 // ─── Created item → card event (port of the web metaFor switch) ───────────
