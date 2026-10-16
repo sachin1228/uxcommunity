@@ -35,6 +35,8 @@ import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
+import { useOnlinePresence } from '@/hooks/useOnlinePresence';
+import { ContentIcon } from '@/components/chat/ContentIcons';
 import {
   archiveCommunity,
   leaveCommunity,
@@ -175,6 +177,15 @@ export default function CommunityChat() {
     currentUserId: user?.id ?? '',
     activeTab,
     anchorAt: lastReadAt,
+  });
+
+  // The header's second line — "3 members • 1 online" (web ChatHeader parity).
+  // The member count comes from the resolved community row; the online count
+  // is the chat room's presence broadcast.
+  const memberCount = resolved?.member_count ?? null;
+  const { onlineCount } = useOnlinePresence({
+    communityId: id,
+    currentUserId: user?.id ?? '',
   });
 
   // Track this as the active community so useCommunities won't increment
@@ -1031,15 +1042,43 @@ export default function CommunityChat() {
               </View>
             )}
           </DpWithEventDate>
-          <View style={styles.headerTitleRow}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-              {communityName}
-            </Text>
-            <CommunityNameBadges
-              type={resolved?.type}
-              isPrivate={resolved?.is_private}
-              size={12}
-            />
+          <View style={styles.headerTitles}>
+            <View style={styles.headerTitleRow}>
+              <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+                {communityName}
+              </Text>
+              <CommunityNameBadges
+                type={resolved?.type}
+                isPrivate={resolved?.is_private}
+                size={12}
+              />
+            </View>
+            {/* The web header's second line — how many members the room has,
+                and (once anyone is connected) how many are online now. Shown
+                only once the resolved row carries the count, so the line never
+                renders a placeholder number. */}
+            {memberCount !== null && (
+              <View style={styles.headerMetaRow}>
+                <View style={styles.headerMetaItem}>
+                  <ContentIcon name="users" size={10} color={colors.mutedForeground} />
+                  <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
+                    {memberCount} member{memberCount === 1 ? '' : 's'}
+                  </Text>
+                </View>
+                {onlineCount > 0 && (
+                  <View
+                    style={styles.headerMetaItem}
+                    accessible
+                    accessibilityLabel={`${onlineCount} online`}
+                  >
+                    <View style={styles.onlineDot} />
+                    <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
+                      {onlineCount} online
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
@@ -1314,6 +1353,22 @@ const styles = StyleSheet.create({
     gap: 5,
     flexShrink: 1,
     minWidth: 0,
+  },
+  headerTitles: { flexShrink: 1, minWidth: 0 },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  headerMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerMetaText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    // The web dot's green-500, kept literal like the tab dot's red-500.
+    backgroundColor: '#22C55E',
   },
   headerTitle: {
     fontSize: 17,
