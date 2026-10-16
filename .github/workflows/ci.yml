@@ -77,6 +77,12 @@ jobs:
       - name: Run mobile lib tests
         run: npm run test:mobile-cache
 
+      # Blocking. Same reason again: the chat content-card helpers live in the
+      # mobile app. The card's text is ported from the web byte-for-byte, so
+      # drift here is a real cross-client regression.
+      - name: Run mobile chat content tests
+        run: npm run test:mobile-chat-content
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest

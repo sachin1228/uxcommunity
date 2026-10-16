@@ -18,7 +18,10 @@ import {
   Message,
   Reaction,
 } from '@/lib/communities';
+import { scheduleMarkRead } from '@/lib/readManager';
+import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
 import { pickOptimisticMatch } from '@/lib/chat';
+import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
   createCatchUpScheduler,
   latestMessageCursor,
@@ -61,10 +64,15 @@ export function useChatMessages(communityId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const msgs = await getMessages(communityId);
-      setMessages(msgs);
-      setHasMore(msgs.length === 50);
-      await markRead(communityId);
+      // The shared bootstrap: one request at chat open, reused while fresh
+      // (see lib/communityBootstrap.ts). Pagination and catch-up below keep
+      // using the cheap cursor-based messages endpoint.
+      const bootstrap = await fetchCommunityBootstrap(communityId);
+      setMessages(bootstrap.messages);
+      setHasMore(bootstrap.messages.length === 50);
+      // Opening the chat is a user action — its mark-read bypasses the
+      // realtime cooldown so the badge always clears (see lib/readManager).
+      scheduleMarkRead(communityId, { bypassCooldown: true, patch: markRead });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load messages');
     } finally {
@@ -108,6 +116,8 @@ export function useChatMessages(communityId: string) {
       if (communityIdRef.current !== targetCommunityId) return;
       if (missed.length === 0) return;
       setMessages((prev) => mergeCaughtUpMessages(prev, missed));
+      // Whatever arrived while the socket was down is on screen now.
+      scheduleMarkRead(targetCommunityId, { patch: markRead });
     });
   }, [communityId]);
   useEffect(() => () => catchUp.cancel(), [catchUp]);
@@ -185,6 +195,9 @@ export function useChatMessages(communityId: string) {
           created_at: string;
           reply_to_id: string | null;
           reply_sender_name?: string | null;
+          reply_to_content_id?: string | null;
+          reply_content_kind?: string | null;
+          reply_content_title?: string | null;
           image_url: string | null;
           edited_at?: string | null;
           mentions?: Message['mentions'];
@@ -248,6 +261,16 @@ export function useChatMessages(communityId: string) {
             users,
             reactions: [],
             reply_to: replyTo,
+            // Replies anchored to a "created a …" card carry the kind + title
+            // straight from the broadcast payload (web useRealtimeChat parity).
+            reply_to_content:
+              row.reply_to_content_id && row.reply_content_kind
+                ? {
+                    id: row.reply_to_content_id,
+                    kind: row.reply_content_kind as ChatContentKind,
+                    title: row.reply_content_title ?? '',
+                  }
+                : null,
             status: 'sent',
           };
 
@@ -256,7 +279,9 @@ export function useChatMessages(communityId: string) {
           );
         });
         if (row.user_id !== user.id) {
-          markRead(communityId).catch(() => {});
+          // Debounced + cooldown-gated (lib/readManager): a busy room must not
+          // PATCH /read once per incoming message.
+          scheduleMarkRead(communityId, { patch: markRead });
         }
       }),
     );

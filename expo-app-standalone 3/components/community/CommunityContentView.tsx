@@ -11,13 +11,29 @@ import {
   contentLabel,
   deleteCommunityContent,
 } from '@/lib/communityContent';
+import { chatContentEventFromCreated, chatContentKindForTab } from '@/lib/chatContentEvents';
+import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { CommentsSheet } from './CommentsSheet';
 import { CommunityContentEditor } from './CommunityContentEditor';
 import { ContentCard, ContentDetail, useContentActions } from './contentView';
 
-interface Props { communityId: string; kind: ContentKind; currentUserId: string }
+interface Props {
+  communityId: string;
+  kind: ContentKind;
+  currentUserId: string;
+  /** A card tapped in the chat — open this item's detail once the page loads. */
+  openContentId?: string | null;
+  /** The open request has been honoured (or proved stale) — clear it. */
+  onOpenConsumed?: () => void;
+}
 
-export function CommunityContentView({ communityId, kind, currentUserId }: Props) {
+export function CommunityContentView({
+  communityId,
+  kind,
+  currentUserId,
+  openContentId = null,
+  onOpenConsumed,
+}: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -38,11 +54,34 @@ export function CommunityContentView({ communityId, kind, currentUserId }: Props
     resetActions();
   }, [query.dataUpdatedAt, query.isFetchedAfterMount, resetActions]);
 
+  // A card tapped in the chat arrives as openContentId; once this tab's page
+  // has loaded, honour it (or give up quietly — the user is on the right tab
+  // either way) and clear the request.
+  useEffect(() => {
+    if (!openContentId || !query.isFetched) return;
+    const target = items.find((entry) => entry.id === openContentId);
+    if (target) setSelected(target);
+    onOpenConsumed?.();
+  }, [openContentId, query.isFetched, items, onOpenConsumed]);
+
   const replace = (item: CommunityContent) => {
+    const existing = queryClient.getQueryData<CommunityContent[]>(
+      communityContentKey(communityId, kind),
+    ) ?? [];
+    const wasNew = !existing.some((entry) => entry.id === item.id);
     queryClient.setQueryData<CommunityContent[]>(communityContentKey(communityId, kind), (old = []) => {
       const exists = old.some((entry) => entry.id === item.id);
       return exists ? old.map((entry) => entry.id === item.id ? item : entry) : [item, ...old];
     });
+    // The chat timeline's permanent "You created a …" card lands in the same
+    // frame — the realtime echo follows and dedupes by id (see the mirror).
+    if (wasNew) {
+      notifyContentEvent({
+        kind: 'insert',
+        communityId,
+        event: chatContentEventFromCreated(kind, item),
+      });
+    }
     setSelected((current) => current?.id === item.id ? item : current);
   };
 
@@ -62,6 +101,14 @@ export function CommunityContentView({ communityId, kind, currentUserId }: Props
                 communityContentKey(communityId, kind),
                 (old = []) => old.filter((entry) => entry.id !== item.id),
               );
+              // Its "created a …" card leaves the chat timeline in the same
+              // frame — the realtime content-delete echo follows.
+              notifyContentEvent({
+                kind: 'delete',
+                communityId,
+                id: item.id,
+                contentKind: chatContentKindForTab(kind),
+              });
               setSelected(null);
             } catch (e) {
               Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');

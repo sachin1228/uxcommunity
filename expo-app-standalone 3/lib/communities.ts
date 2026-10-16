@@ -1,5 +1,6 @@
 import { apiFetch, apiFormUpload } from './api';
 import type { MentionCandidate, MessageMention, Reaction } from './chat';
+import type { ChatContentKind } from './chatContentEvents';
 
 export type { Reaction };
 
@@ -79,6 +80,13 @@ export interface ReplyPreview {
   user_id?: string | null;
 }
 
+/** The "created a …" card a message replies to (the RPC's reply_to_content). */
+export interface ContentReplyPreview {
+  id: string;
+  kind: ChatContentKind;
+  title: string;
+}
+
 export interface Message {
   id: string;
   content: string | null;
@@ -94,6 +102,8 @@ export interface Message {
   users: MessageUser | null;
   reactions: Reaction[];
   reply_to: ReplyPreview | null;
+  /** Set when this message replies to a "created a …" card instead. */
+  reply_to_content?: ContentReplyPreview | null;
   /** Client-only — not stored on the server. */
   status?: 'sending' | 'sent' | 'failed';
 }
@@ -142,6 +152,12 @@ export async function sendMessage(
   payload: {
     content?: string;
     reply_to_id?: string;
+    /**
+     * A content-anchored reply (a "created a …" card). Mutually exclusive
+     * with `reply_to_id` — the server ignores it when a message anchor is
+     * set, because a content id would never validate as a message id.
+     */
+    reply_to_content?: { id: string; kind: ChatContentKind };
     image_url?: string;
     /** Members picked from the composer's @-autocomplete. */
     mentions?: MessageMention[];
@@ -211,6 +227,28 @@ export async function getContentLatest(communityId: string): Promise<CommunityCo
   };
 }
 
+/**
+ * Set (or clear, with `null`) the signed-in member's reaction on a chat
+ * timeline content card. The same explicit desired-state contract as
+ * setMessageReaction — the endpoint answers with the authoritative grouped
+ * reactions for the item.
+ */
+export async function setContentEventReaction(
+  communityId: string,
+  contentId: string,
+  kind: ChatContentKind,
+  desiredEmoji: string | null
+): Promise<{ reactions: Reaction[]; currentUserEmoji: string | null }> {
+  const { data } = await apiFetch<{
+    reactions?: Reaction[];
+    currentUserEmoji?: string | null;
+  }>(`/api/communities/${communityId}/content-events/${contentId}/reactions`, {
+    method: 'POST',
+    body: { kind, desiredEmoji },
+  });
+  return { reactions: data.reactions ?? [], currentUserEmoji: data.currentUserEmoji ?? desiredEmoji };
+}
+
 /** The durations the mute menu offers, plus "off" to unmute. */
 export type CommunityMuteDuration = '8h' | '1w' | 'always' | 'off';
 
@@ -260,6 +298,47 @@ export async function leaveCommunity(
     ownershipTransferred: Boolean(data.ownership_transferred),
     communityDeleted: Boolean(data.community_deleted),
   };
+}
+
+/** The community row the info screen's About section renders (web read model). */
+export interface CommunityDetailRow {
+  id: string;
+  name: string;
+  type: string;
+  description: string | null;
+  created_at: string | null;
+  image_url: string | null;
+  is_private?: boolean | null;
+  reference_name?: string | null;
+  member_count?: number | null;
+}
+
+/**
+ * The community detail the web client reads for its chat info machinery —
+ * description, created date, type and reference name for the About section.
+ * Answers `{ community, members, ... }`; the member list on the info screen
+ * uses the paged roster below instead, whose rows carry designations.
+ */
+export async function getCommunityDetail(communityId: string): Promise<CommunityDetailRow | null> {
+  const { data } = await apiFetch<{ community?: CommunityDetailRow }>(
+    `/api/communities/${communityId}`
+  );
+  return data.community ?? null;
+}
+
+/** One numbered rule on the community info screen (web community_rules row). */
+export interface CommunityRule {
+  id: string;
+  rule_text: string;
+  order_index: number;
+}
+
+/** The community's rules, in display order (the web right sidebar's Rules). */
+export async function getCommunityRules(communityId: string): Promise<CommunityRule[]> {
+  const { data } = await apiFetch<{ rules?: CommunityRule[] }>(
+    `/api/communities/${communityId}/rules`
+  );
+  return data.rules ?? [];
 }
 
 /** The community the create flow just made. */
@@ -346,6 +425,28 @@ export async function editMessage(
     { method: 'PATCH', body: { content } }
   );
   return { edited_at: data.message?.edited_at ?? data.edited_at ?? new Date().toISOString() };
+}
+
+/**
+ * One member's display info, resolved lazily from the lightweight member
+ * endpoint for realtime rows that carry only a user_id — the community list's
+ * sender names resolve through the same route, and the chat's "created a …"
+ * cards resolve their live authors through it. Null when the member cannot be
+ * resolved (deleted user, offline), so callers decide the fallback label.
+ */
+export async function getMemberBrief(
+  communityId: string,
+  userId: string
+): Promise<{ name: string; avatar_url: string | null } | null> {
+  try {
+    const { data } = await apiFetch<{ name?: string; avatar_url?: string | null }>(
+      `/api/communities/${communityId}/members/${userId}`
+    );
+    if (!data?.name) return null;
+    return { name: data.name, avatar_url: data.avatar_url ?? null };
+  } catch {
+    return null;
+  }
 }
 
 /**

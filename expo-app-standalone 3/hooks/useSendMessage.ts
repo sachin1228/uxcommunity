@@ -14,11 +14,12 @@ import { useCallback, useRef, useState } from 'react';
 import { Message, editMessage, uploadChatImage, sendMessage } from '@/lib/communities';
 import { PendingImage } from '@/components/chat/ChatInput';
 import type { MessageMention } from '@/lib/chat';
+import type { ReplyDraft } from '@/lib/chatContentEvents';
 
 type RetryPayload = {
   text: string;
   pendingImage: PendingImage | null;
-  replyTo: Message | null;
+  replyTo: ReplyDraft | null;
   mentions: MessageMention[];
 };
 
@@ -74,11 +75,17 @@ export function useSendMessage({
       tempId: string,
       text: string,
       pendingImage: PendingImage | null,
-      replyTo: Message | null,
+      replyTo: ReplyDraft | null,
       mentions: MessageMention[]
     ) => {
       // Persist so retry can reconstruct the payload
       retryData.current.set(tempId, { text, pendingImage, replyTo, mentions });
+
+      // A content-anchored reply carries the card preview instead of a message
+      // quote; the anchors are mutually exclusive (see the send payload below).
+      const replyToContent = replyTo?.content_kind
+        ? { id: replyTo.id, kind: replyTo.content_kind, title: replyTo.content }
+        : null;
 
       // Insert optimistic bubble immediately
       const optimistic: Message = {
@@ -86,21 +93,23 @@ export function useSendMessage({
         content: text || null,
         created_at: new Date().toISOString(),
         user_id: currentUser.id,
-        reply_to_id: replyTo?.id ?? null,
+        reply_to_id: replyToContent ? null : replyTo?.id ?? null,
         users: {
           name: currentUser.name,
           avatar_url: currentUser.avatar_url,
           designation: null,
         },
         reactions: [],
-        reply_to: replyTo
-          ? {
-              id: replyTo.id,
-              content: replyTo.content,
-              user_name: replyTo.users?.name ?? 'Unknown',
-              user_id: replyTo.user_id,
-            }
-          : null,
+        reply_to:
+          replyTo && !replyToContent
+            ? {
+                id: replyTo.id,
+                content: replyTo.content,
+                user_name: replyTo.user_name,
+                user_id: replyTo.user_id,
+              }
+            : null,
+        reply_to_content: replyToContent,
         image_url: pendingImage?.uri ?? null,
         deleted_at: null,
         mentions,
@@ -134,7 +143,14 @@ export function useSendMessage({
           communityId,
           {
             content: text || undefined,
-            reply_to_id: replyTo?.id,
+            // Message replies and content replies are mutually exclusive: a
+            // content reply's id is a thread/showcase/resource/event id, not a
+            // message id — sending it as reply_to_id would make the API try
+            // (and fail) to validate it as a message and drop the anchor.
+            reply_to_id: replyToContent ? undefined : replyTo?.id,
+            reply_to_content: replyToContent
+              ? { id: replyToContent.id, kind: replyToContent.kind }
+              : undefined,
             image_url: imageUrl,
             mentions: mentions.length ? mentions : undefined,
           },
@@ -149,6 +165,7 @@ export function useSendMessage({
             ...msg,
             users: msg.users ?? opt?.users ?? null,
             reply_to: msg.reply_to ?? opt?.reply_to ?? null,
+            reply_to_content: msg.reply_to_content ?? opt?.reply_to_content ?? null,
             image_url: msg.image_url ?? opt?.image_url ?? null,
             mentions: msg.mentions ?? opt?.mentions ?? null,
             status: 'sent',
@@ -196,7 +213,7 @@ export function useSendMessage({
     (
       text: string,
       pendingImage: PendingImage | undefined,
-      replyTo: Message | null,
+      replyTo: ReplyDraft | null,
       mentions: MessageMention[] = [],
     ) => {
       if (!text.trim() && !pendingImage) return;

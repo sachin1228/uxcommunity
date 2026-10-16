@@ -1,7 +1,6 @@
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Fragment, memo, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -10,10 +9,12 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { CHAT_CONTENT_KIND_THEME } from '@/lib/chatContentEvents';
 import {
   COLLAPSED_LINES,
   fmtTime,
@@ -40,6 +41,8 @@ interface Props {
   onRetry?: (tempId: string) => void;
   /** Jumps the list to the message this one replies to. */
   onReplyPress?: (messageId: string) => void;
+  /** Jumps the list to the "created a …" card this one replies to. */
+  onContentReplyPress?: (contentId: string) => void;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -50,7 +53,11 @@ const EMOJI_MESSAGE_SIZE = 48;
 // Avatar
 // ---------------------------------------------------------------------------
 
-function Avatar({
+/**
+ * The 28px sender avatar (image or initials tile). Exported for the chat's
+ * content cards, which wear the same avatar in their left column.
+ */
+export function Avatar({
   name,
   avatarUrl,
   colors,
@@ -197,6 +204,59 @@ function ReplyBubble({
   );
 }
 
+/**
+ * Reply quote for a "created a …" notification card (thread / showcase /
+ * resource / event) — the web ContentReplyBubble: same chip as a message
+ * reply, but the first line wears the kind's label so the anchor is obvious,
+ * and tapping jumps to the card.
+ */
+function ContentReplyQuote({
+  reply,
+  isOwn,
+  colors,
+  onPress,
+}: {
+  reply: NonNullable<Message['reply_to_content']>;
+  isOwn: boolean;
+  colors: Palette;
+  onPress?: () => void;
+}) {
+  const ownText = colors.chatOwnBubbleForeground;
+  const label = CHAT_CONTENT_KIND_THEME[reply.kind].label;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={[
+        styles.replyBubble,
+        {
+          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
+          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
+        },
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.contentReplyLabel,
+          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        numberOfLines={2}
+        style={[
+          styles.replyContent,
+          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.7 : 1 },
+        ]}
+      >
+        {reply.title || label}
+      </Text>
+    </Pressable>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Rich message text: mentions + links + emoji enlargement + "Read more"
 // ---------------------------------------------------------------------------
@@ -302,23 +362,10 @@ function BubbleImage({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  // The frame's aspect, measured from the loaded image itself (expo-image's
+  // onLoad carries the source dimensions) — the old Image.getSize round trip
+  // is gone; until it lands, the 4:3 fallback holds the layout.
   const [ratio, setRatio] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Image.getSize(
-      uri,
-      (w, h) => {
-        if (!cancelled && w > 0 && h > 0) setRatio(w / h);
-      },
-      () => {
-        /* keep the 4:3 fallback */
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [uri]);
 
   const aspect = ratio ?? 4 / 3;
   let width = MEDIA_MAX_WIDTH;
@@ -344,7 +391,12 @@ function BubbleImage({
       <Image
         source={{ uri }}
         style={{ width: '100%', height: '100%', opacity: dimmed ? 0.5 : 1 }}
-        resizeMode="cover"
+        contentFit="cover"
+        onLoad={({ source }) => {
+          const w = source?.width ?? 0;
+          const h = source?.height ?? 0;
+          if (w > 0 && h > 0) setRatio(w / h);
+        }}
       />
       {standalone && showStatus && (
         <View style={[styles.mediaTimeOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
@@ -407,7 +459,13 @@ function TimeRow({
         {fmtTime(message.created_at)}
       </Text>
       {isOwn && status === 'sending' && (
-        <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
+        // The spinner sits in the check mark's exact 11pt slot (scaled to fit):
+        // an ActivityIndicator's unscaled box is ~20pt and a transform does
+        // not shrink layout, so without the slot the row widened while
+        // sending and snapped back when the double check appeared.
+        <View style={styles.statusSlot}>
+          <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
+        </View>
       )}
       {isOwn && (status === 'sent' || !status) && (
         <CheckCheckIcon size={11} color={timeColor} opacity={0.7} />
@@ -423,7 +481,13 @@ function TimeRow({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function MessageBubble({
+/**
+ * Memoized like the web MessageBubble: chat-screen state changes that do not
+ * touch this message — the typing indicator ticking, presence, the emoji
+ * panel — must not re-render every visible bubble. All props are stable
+ * between such changes (message objects only change when the row does).
+ */
+export const MessageBubble = memo(function MessageBubble({
   message,
   isOwn,
   isSameAuthor,
@@ -434,6 +498,7 @@ export function MessageBubble({
   onCancel,
   onRetry,
   onReplyPress,
+  onContentReplyPress,
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
@@ -442,11 +507,12 @@ export function MessageBubble({
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
   const reactions = message.reactions ?? [];
   const replyTo = message.reply_to ?? null;
+  const replyToContent = message.reply_to_content ?? null;
   const imageUrl = message.image_url ?? null;
   const failed = message.status === 'failed';
   const uploading = message.status === 'sending' && !!imageUrl;
   const isDeleted = !!message.deleted_at;
-  const imageOnly = !!imageUrl && !message.content && !replyTo;
+  const imageOnly = !!imageUrl && !message.content && !replyTo && !replyToContent;
   const isFirstInGroup = !isSameAuthor;
   const showHeader = !isSameAuthor;
 
@@ -454,7 +520,12 @@ export function MessageBubble({
 
   // Big bubble-free emoji when the whole message is 1–3 emoji glyphs.
   const isEmojiMsg =
-    !isDeleted && !imageUrl && !replyTo && !!message.content && isEmojiOnly(message.content);
+    !isDeleted &&
+    !imageUrl &&
+    !replyTo &&
+    !replyToContent &&
+    !!message.content &&
+    isEmojiOnly(message.content);
 
   const ownBubbleColor = failed ? colors.chatFailedBubble : colors.chatOwnBubble;
   const bubbleBg = isOwn ? ownBubbleColor : colors.surfaceRaised;
@@ -590,6 +661,19 @@ export function MessageBubble({
                       />
                     )}
 
+                    {!replyTo && replyToContent && (
+                      <ContentReplyQuote
+                        reply={replyToContent}
+                        isOwn={isOwn}
+                        colors={colors}
+                        onPress={
+                          onContentReplyPress
+                            ? () => onContentReplyPress(replyToContent.id)
+                            : undefined
+                        }
+                      />
+                    )}
+
                     {imageUrl && (
                       <BubbleImage
                         uri={imageUrl}
@@ -656,7 +740,7 @@ export function MessageBubble({
       </View>
     </View>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -724,6 +808,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
+  contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },
   replyContent: { fontSize: 11, lineHeight: 15 },
 
   // ── media ───────────────────────────────────────────────────────────────
@@ -752,7 +837,9 @@ const styles = StyleSheet.create({
   },
   timeRowOnMedia: { paddingRight: 4, paddingBottom: 2 },
   timeText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
-  tinySpinner: { transform: [{ scale: 0.6 }], marginLeft: -2 },
+  /** The check mark's exact box — the sending spinner renders inside it. */
+  statusSlot: { width: 11, height: 11, alignItems: 'center', justifyContent: 'center' },
+  tinySpinner: { transform: [{ scale: 0.55 }] },
 
   // ── own-message overlays ────────────────────────────────────────────────
   statusOverlay: {

@@ -17,9 +17,12 @@ import {
 } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { useChatContentEvents } from '@/hooks/useChatContentEvents';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
 import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { ContentNotificationCard } from '@/components/chat/ContentNotificationCard';
+import { ContentActionsSheet } from '@/components/chat/ContentActionsSheet';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
@@ -32,11 +35,14 @@ import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
+import { useOnlinePresence } from '@/hooks/useOnlinePresence';
+import { ContentIcon } from '@/components/chat/ContentIcons';
 import {
   archiveCommunity,
   leaveCommunity,
   setCommunityMute,
   setMessageReaction,
+  setContentEventReaction,
   deleteMessage,
   getCommunities,
   type Community,
@@ -52,6 +58,13 @@ import {
   type MessageMention,
   type ReactionIntent,
 } from '@/lib/chat';
+import {
+  mergeChatTimeline,
+  replyDraftFromContent,
+  tabForChatContentKind,
+  type ChatContentEvent,
+  type ReplyDraft,
+} from '@/lib/chatContentEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
@@ -60,14 +73,16 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
+import { CommunityInfoView } from '@/components/community/CommunityInfoView';
 import type { CommunityTab, ContentKind } from '@/lib/communityContent';
 
-/** FlatList row: a day divider, the unread marker, the retention notice, or a message. */
+/** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
 type ChatRow =
   | { kind: 'date'; key: string; label: string }
   | { kind: 'unread'; key: string }
   | { kind: 'notice'; key: string }
-  | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean };
+  | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean }
+  | { kind: 'content'; key: string; event: ChatContentEvent };
 
 export default function CommunityChat() {
   const {
@@ -98,6 +113,8 @@ export default function CommunityChat() {
   /** Inline emoji panel below the composer (WhatsApp-style) — closed when
    *  the chat scrolls, a tab changes, or the screen loses the composer. */
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  /** The WhatsApp-style community info screen behind the header title. */
+  const [infoOpen, setInfoOpen] = useState(false);
   /**
    * Every open resolves the community from the signed-in member's list — not
    * just push deep-links, where the route can only carry the id. The header's
@@ -165,6 +182,15 @@ export default function CommunityChat() {
     anchorAt: lastReadAt,
   });
 
+  // The header's second line — "3 members • 1 online" (web ChatHeader parity).
+  // The member count comes from the resolved community row; the online count
+  // is the chat room's presence broadcast.
+  const memberCount = resolved?.member_count ?? null;
+  const { onlineCount } = useOnlinePresence({
+    communityId: id,
+    currentUserId: user?.id ?? '',
+  });
+
   // Track this as the active community so useCommunities won't increment
   // unread_count for incoming messages while we're looking at this chat.
   useEffect(() => {
@@ -186,13 +212,33 @@ export default function CommunityChat() {
     softDeleteMessage,
   } = useChatMessages(id);
 
+  // The chat timeline's permanent "created a …" cards (threads / showcase /
+  // resources / events) — history window + realtime + local mirror.
+  const {
+    events: contentEvents,
+    ready: contentEventsReady,
+    applyContentReactions,
+  } = useChatContentEvents(id);
+
   const { typingUsers, onInputChange, stopTyping } = useTypingPresence(id);
 
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  /**
+   * The composer's reply draft — a message or a "created a …" card (see
+   * ReplyDraft). ReplyDraft.content_kind set means the card anchor.
+   */
+  const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  /** The "created a …" card a long-press opened the actions sheet for. */
+  const [selectedContent, setSelectedContent] = useState<ChatContentEvent | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState<number | null>(null);
+  /**
+   * An item a chat card asked to open — handed to its tab, which mounts with
+   * it and opens the detail, then reports back so it is not re-opened on the
+   * next mount.
+   */
+  const [openTarget, setOpenTarget] = useState<{ tab: CommunityTab; id: string } | null>(null);
 
   /** The header bell's mute dropdown state. */
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
@@ -381,7 +427,11 @@ export default function CommunityChat() {
     if (firstUnread) setFirstUnreadId(firstUnread.id);
   }, [messages, lastReadAt, initialUnreadCount, user?.id, readStateKnown]);
 
-  // ── Rows: day dividers + unread marker interleaved with messages ─────────
+  // ── Rows: day dividers + unread marker interleaved with the timeline ─────
+  // Messages and "created a …" cards merge into one ascending timeline (the
+  // same merge the web MessageList builds), so a card sits among the messages
+  // of its moment. A card also breaks the "same author" run — the message
+  // after one starts a fresh bubble group, exactly like the web list.
   const rows = useMemo<ChatRow[]>(() => {
     const out: ChatRow[] = [];
     let currentDate: string | null = null;
@@ -389,8 +439,8 @@ export default function CommunityChat() {
     let groupIndex = 0;
     let unreadPlaced = false;
 
-    for (const msg of messages) {
-      const day = fmtDate(msg.created_at);
+    for (const item of mergeChatTimeline(messages, contentEvents)) {
+      const day = fmtDate(item.created_at);
       if (day !== currentDate) {
         // While older history may still exist above, the first group's pill
         // would "float" upward on every prepend — the web app hides it until
@@ -404,6 +454,13 @@ export default function CommunityChat() {
         groupIndex += 1;
       }
 
+      if (item.kind === 'content') {
+        prevAuthorId = null;
+        out.push({ kind: 'content', key: `content-${item.event.id}`, event: item.event });
+        continue;
+      }
+
+      const msg = item.message;
       if (!unreadPlaced && firstUnreadId && msg.id === firstUnreadId) {
         out.push({ kind: 'unread', key: `unread-${msg.id}` });
         unreadPlaced = true;
@@ -426,7 +483,7 @@ export default function CommunityChat() {
       out.unshift({ kind: 'notice', key: 'notice' });
     }
     return out;
-  }, [messages, hasMore, firstUnreadId]);
+  }, [messages, contentEvents, hasMore, firstUnreadId]);
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
@@ -566,6 +623,36 @@ export default function CommunityChat() {
     setSelectedMessage(msg);
   }, []);
 
+  /**
+   * Long-press on a "created a …" card — the touch equivalent of the web
+   * card's hover actions (reaction picker + reply).
+   */
+  const handleContentLongPress = useCallback((event: ChatContentEvent) => {
+    setSelectedContent(event);
+  }, []);
+
+  /**
+   * The sheet's Reply row: seed the composer with the card as the anchor —
+   * the web handleContentReply contract (headline first line, kind-labeled
+   * chip in the composer).
+   */
+  const handleContentReply = useCallback((event: ChatContentEvent) => {
+    setReplyTo(replyDraftFromContent(event));
+  }, []);
+
+  /**
+   * The sheet's Reply row for a message: the composer draft keys off the flat
+   * fields (web handleReply parity — image-only messages quote "📷 Image").
+   */
+  const handleMessageReply = useCallback((msg: Message) => {
+    setReplyTo({
+      id: msg.id,
+      content: msg.content || (msg.image_url ? '📷 Image' : ''),
+      user_name: msg.users?.name ?? 'Unknown',
+      user_id: msg.user_id,
+    });
+  }, []);
+
   /** Jumps the list to the message a reply quotes (web parity). */
   const handleReplyPress = useCallback(
     (messageId: string) => {
@@ -578,6 +665,73 @@ export default function CommunityChat() {
       }
     },
     [rows],
+  );
+
+  /** Jumps the list to the "created a …" card a reply quotes (web parity). */
+  const handleContentChipPress = useCallback(
+    (contentId: string) => {
+      const index = rows.findIndex(
+        (row) => row.kind === 'content' && row.event.id === contentId,
+      );
+      if (index < 0) return;
+      try {
+        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch {
+        listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
+      }
+    },
+    [rows],
+  );
+
+  /**
+   * A "created a …" card was tapped: its item lives on its own tab, so switch
+   * there and hand the id over — CommunityContentView opens the detail once
+   * its page has loaded (the mobile equivalent of the web card's link).
+   */
+  const handleContentOpen = useCallback((event: ChatContentEvent) => {
+    setEmojiPanelOpen(false);
+    const tab = tabForChatContentKind(event.kind);
+    setOpenTarget({ tab, id: event.id });
+    setActiveTab(tab);
+  }, []);
+
+  /**
+   * Card reactions — the same desired-state flow as message reactions: the
+   * tap paints instantly, the server's grouped reactions are the final word,
+   * and a failure rolls the pills back. The desired state is tracked in a ref
+   * as well as on screen so two taps in the same tick read each other.
+   */
+  const contentReactionIntentRef = useRef(new Map<string, ReactionIntent>());
+
+  const handleContentReaction = useCallback(
+    async (event: ChatContentEvent, emoji: string) => {
+      const currentUser = user?.id ?? '';
+      if (!currentUser) return;
+
+      const previousReactions = event.reactions ?? [];
+      const previous =
+        contentReactionIntentRef.current.get(event.id) ??
+        myReactionEmoji(previousReactions, currentUser);
+      const desired = nextReactionIntent(previous, emoji);
+      hapticToggle(desired !== null);
+
+      contentReactionIntentRef.current.set(event.id, desired);
+      applyContentReactions(
+        event.id,
+        event.kind,
+        projectOwnReaction(previousReactions, desired, currentUser),
+      );
+
+      try {
+        const { reactions } = await setContentEventReaction(id, event.id, event.kind, desired);
+        applyContentReactions(event.id, event.kind, reactions);
+        contentReactionIntentRef.current.set(event.id, myReactionEmoji(reactions, currentUser));
+      } catch {
+        contentReactionIntentRef.current.delete(event.id);
+        applyContentReactions(event.id, event.kind, previousReactions);
+      }
+    },
+    [id, applyContentReactions, user?.id],
   );
 
   // ── Lightbox: every image in the loaded timeline ─────────────────────────
@@ -649,6 +803,19 @@ export default function CommunityChat() {
         return <DisappearingNotice />;
       }
 
+      if (item.kind === 'content') {
+        return (
+          <ContentNotificationCard
+            event={item.event}
+            isOwn={item.event.user_id === user?.id}
+            currentUserId={user?.id ?? ''}
+            onOpen={handleContentOpen}
+            onLongPress={handleContentLongPress}
+            onReaction={handleContentReaction}
+          />
+        );
+      }
+
       return (
         <MessageBubble
           message={item.msg}
@@ -661,6 +828,7 @@ export default function CommunityChat() {
           onCancel={handleCancel}
           onRetry={handleRetry}
           onReplyPress={handleReplyPress}
+          onContentReplyPress={handleContentChipPress}
         />
       );
     },
@@ -672,6 +840,10 @@ export default function CommunityChat() {
       handleCancel,
       handleRetry,
       handleReplyPress,
+      handleContentChipPress,
+      handleContentOpen,
+      handleContentLongPress,
+      handleContentReaction,
       colors,
       initialUnreadCount,
     ],
@@ -763,23 +935,29 @@ export default function CommunityChat() {
             ) : null
           }
           ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <DisappearingNotice />
-              {communityImage ? (
-                <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
-              ) : (
-                <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceRaised }]} />
-              )}
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Welcome to{' '}
-                <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
-                  {communityName}
+            // The welcome copy waits for the content-event history too, so a
+            // community whose only activity is a thread or a showcase post
+            // never flashes "Be the first to say something" while the cards
+            // are still in flight (web MessageList parity).
+            contentEventsReady ? (
+              <View style={styles.emptyWrap}>
+                <DisappearingNotice />
+                {communityImage ? (
+                  <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
+                ) : (
+                  <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceRaised }]} />
+                )}
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  Welcome to{' '}
+                  <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                    {communityName}
+                  </Text>
+                  !
+                  {'\n'}
+                  <Text style={styles.emptySubtext}>Be the first to say something.</Text>
                 </Text>
-                !
-                {'\n'}
-                <Text style={styles.emptySubtext}>Be the first to say something.</Text>
-              </Text>
-            </View>
+              </View>
+            ) : null
           }
         />
       )}
@@ -837,16 +1015,23 @@ export default function CommunityChat() {
         ]}
       >
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-          <Feather name="arrow-left" size={26} color={colors.foreground} />
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
 
-        <View style={styles.headerCenter}>
+        {/* Tapping the title area opens the community info screen, like
+            WhatsApp's contact info (web parity: the right sidebar there). */}
+        <Pressable
+          onPress={() => setInfoOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${communityName} info`}
+          style={styles.headerCenter}
+        >
           {/* An event's group chat wears its date here too — and says LIVE
               while the event is under way (web header parity). */}
           <DpWithEventDate
             date={resolved?.event_date}
             endsAt={resolved?.event_end ?? resolved?.pinned_until}
-            dpSize={30}
+            dpSize={40}
           >
             {communityImage ? (
               <Image
@@ -867,17 +1052,45 @@ export default function CommunityChat() {
               </View>
             )}
           </DpWithEventDate>
-          <View style={styles.headerTitleRow}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-              {communityName}
-            </Text>
-            <CommunityNameBadges
-              type={resolved?.type}
-              isPrivate={resolved?.is_private}
-              size={12}
-            />
+          <View style={styles.headerTitles}>
+            <View style={styles.headerTitleRow}>
+              <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+                {communityName}
+              </Text>
+              <CommunityNameBadges
+                type={resolved?.type}
+                isPrivate={resolved?.is_private}
+                size={12}
+              />
+            </View>
+            {/* The web header's second line — how many members the room has,
+                and (once anyone is connected) how many are online now. Shown
+                only once the resolved row carries the count, so the line never
+                renders a placeholder number. */}
+            {memberCount !== null && (
+              <View style={styles.headerMetaRow}>
+                <View style={styles.headerMetaItem}>
+                  <ContentIcon name="users" size={10} color={colors.mutedForeground} />
+                  <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
+                    {memberCount} member{memberCount === 1 ? '' : 's'}
+                  </Text>
+                </View>
+                {onlineCount > 0 && (
+                  <View
+                    style={styles.headerMetaItem}
+                    accessible
+                    accessibilityLabel={`${onlineCount} online`}
+                  >
+                    <View style={styles.onlineDot} />
+                    <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
+                      {onlineCount} online
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
-        </View>
+        </Pressable>
 
         {/* Notifications — its own control beside the ⋯ button rather than an
             item inside it, like the web header: plain bell while notifications
@@ -992,6 +1205,8 @@ export default function CommunityChat() {
           communityId={id}
           kind={activeTab as ContentKind}
           currentUserId={user?.id ?? ''}
+          openContentId={openTarget && openTarget.tab === activeTab ? openTarget.id : null}
+          onOpenConsumed={() => setOpenTarget(null)}
         />
       )}
 
@@ -1012,13 +1227,32 @@ export default function CommunityChat() {
         canModerate={isOwnCommunity}
         onClose={() => setSelectedMessage(null)}
         onReact={handleReaction}
-        onReply={(msg) => setReplyTo(msg)}
+        onReply={handleMessageReply}
         onCopy={handleCopy}
         onEdit={(msg) => {
           clearEditError();
           setEditingMessage(msg);
         }}
         onDelete={handleDelete}
+      />
+
+      {/* Long-press action sheet for a "created a …" card — reactions + reply
+          (the touch form of the web card's hover actions) */}
+      <ContentActionsSheet
+        event={selectedContent}
+        currentUserId={user?.id ?? ''}
+        onClose={() => setSelectedContent(null)}
+        onReact={handleContentReaction}
+        onReply={handleContentReply}
+      />
+
+      {/* Community info — WhatsApp-style, opened from the header title (the
+          web right sidebar's content: members, about, rules) */}
+      <CommunityInfoView
+        visible={infoOpen}
+        community={resolved}
+        onlineCount={onlineCount}
+        onClose={() => setInfoOpen(false)}
       />
 
       {/* Edit composer */}
@@ -1118,9 +1352,9 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   headerAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
@@ -1129,7 +1363,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerAvatarText: {
-    fontSize: 12,
+    fontSize: 16,
     fontFamily: 'Geist_600SemiBold',
   },
   headerTitleRow: {
@@ -1138,6 +1372,22 @@ const styles = StyleSheet.create({
     gap: 5,
     flexShrink: 1,
     minWidth: 0,
+  },
+  headerTitles: { flexShrink: 1, minWidth: 0 },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  headerMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerMetaText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    // The web dot's green-500, kept literal like the tab dot's red-500.
+    backgroundColor: '#22C55E',
   },
   headerTitle: {
     fontSize: 17,
