@@ -476,3 +476,24 @@ export function pickOptimisticMatch<T extends OptimisticLike>(
     inFlight.find((m) => (m.content ?? '') === (incoming.content ?? '')) ?? inFlight[0] ?? null
   );
 }
+
+/**
+ * Timeline order: ascending created_at, with optimistic (`temp-`) rows pinned
+ * last — the same rule as the web list (apps/web/lib/communities/messages.ts).
+ *
+ * A temp row's created_at is the sending device's clock, and that clock can
+ * sit behind the server's (emulators drift, phones are manually set): sorting
+ * it into place drops the bubble the user just sent into the middle of the
+ * pile until its echo re-stamps it. A just-sent bubble is the newest row on
+ * screen by definition, so it stays at the bottom until the real row replaces
+ * it — failed sends included, since retry lives at the bottom too.
+ */
+export function compareChatTimeline(
+  a: { id: string; created_at: string },
+  b: { id: string; created_at: string },
+): number {
+  const aTemp = a.id.startsWith('temp-');
+  const bTemp = b.id.startsWith('temp-');
+  if (aTemp !== bTemp) return aTemp ? 1 : -1;
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}

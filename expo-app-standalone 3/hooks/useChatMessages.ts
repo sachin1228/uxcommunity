@@ -20,7 +20,7 @@ import {
 } from '@/lib/communities';
 import { scheduleMarkRead } from '@/lib/readManager';
 import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
-import { pickOptimisticMatch } from '@/lib/chat';
+import { pickOptimisticMatch, compareChatTimeline } from '@/lib/chat';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
   createCatchUpScheduler,
@@ -274,9 +274,10 @@ export function useChatMessages(communityId: string) {
             status: 'sent',
           };
 
-          return [...withoutTemp, incoming].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-          );
+          // Optimistic rows pin last (compareChatTimeline): an echo from the
+          // other member can land while one of our sends is still in flight,
+          // and its device-clock stamp must not sort it into the pile either.
+          return [...withoutTemp, incoming].sort(compareChatTimeline);
         });
         if (row.user_id !== user.id) {
           // Debounced + cooldown-gated (lib/readManager): a busy room must not
