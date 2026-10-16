@@ -1,8 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { Community } from '@/lib/communities';
+import { isCommunityMuted } from '@/lib/communityMute';
+import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 
 // ---------------------------------------------------------------------------
 // Member count formatting — mirrors web's fmtCount (1.2k / 3M)
@@ -21,6 +25,8 @@ function fmtCount(n: number): string {
 interface Props {
   community: Community;
   typingLabel: string | null;
+  /** The list's slow clock — pin and mute marks lapse against it (see useCommunities). */
+  nowMs: number;
   onPress: () => void;
 }
 
@@ -59,6 +65,28 @@ function TypingDots({ color }: { color: string }) {
         />
       ))}
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pin mark — the web row's Pin glyph (lucide), drawn with Svg (Feather has no pin)
+// ---------------------------------------------------------------------------
+
+function PinIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <Path d="M12 17v5" />
+      <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
+    </Svg>
   );
 }
 
@@ -162,7 +190,7 @@ function previewText(
 // CommunityRow
 // ---------------------------------------------------------------------------
 
-export function CommunityRow({ community, typingLabel, onPress }: Props) {
+export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) {
   const colors = useColors();
 
   const lastTime =
@@ -174,6 +202,9 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
   const { text, prefix } = previewText(community, typingLabel);
 
   const hasUnread = community.unread_count > 0;
+  // Timed mutes lapse on their own without the row being rewritten, so the
+  // mark is computed from the deadline against the list's clock.
+  const isMuted = isCommunityMuted(community, nowMs);
 
   return (
     <Pressable
@@ -186,24 +217,33 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
       ]}
       onPress={onPress}
     >
-      {/* Avatar — start aligned */}
+      {/* Avatar — start aligned. An event's group chat wears its event date
+          as a calendar tile over the same face everywhere (web parity). */}
       <View style={styles.avatarWrap}>
-        {community.image_url ? (
-          <Image
-            source={{ uri: community.image_url }}
-            style={[
-              styles.avatarBase,
-              { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
-            ]}
-          />
-        ) : (
-          <Initials name={community.name} colors={colors} />
-        )}
+        <DpWithEventDate
+          date={community.event_date}
+          endsAt={community.event_end ?? community.pinned_until}
+          dpSize={48}
+        >
+          {community.image_url ? (
+            <Image
+              source={{ uri: community.image_url }}
+              style={[
+                styles.avatarBase,
+                { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
+              ]}
+            />
+          ) : (
+            <Initials name={community.name} colors={colors} />
+          )}
+        </DpWithEventDate>
       </View>
 
       {/* Body */}
       <View style={styles.body}>
-        {/* Name + time */}
+        {/* Name + badges + time — the name line carries the verified seal
+            and the globe/lock ("Electro ✓ 🔒", "Electro 🌐"), exactly like
+            the web sidebar. */}
         <View style={styles.topRow}>
           <View style={styles.nameGroup}>
             <Text
@@ -216,15 +256,11 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
             >
               {community.name}
             </Text>
-            {community.is_private && (
-              <Feather
-                name="lock"
-                size={11}
-                color={colors.mutedForeground}
-                style={styles.lockIcon}
-                accessibilityLabel="Private community"
-              />
-            )}
+            <CommunityNameBadges
+              type={community.type}
+              isPrivate={community.is_private}
+              size={12}
+            />
           </View>
           <Text style={[styles.time, { color: colors.foregroundSoft }]}>
             {formatTime(lastTime)}
@@ -269,6 +305,32 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
                 `${prefix}: ${text}`
               ) : text}
             </Text>
+          )}
+
+          {/* Muted — the crossed bell rides the preview line ahead of the
+              count. Notifications are off; unread messages still count. */}
+          {isMuted && (
+            <Feather
+              name="bell-off"
+              size={14}
+              strokeWidth={2.5}
+              color={colors.mutedForeground}
+              style={styles.previewMark}
+              accessibilityLabel="Notifications muted"
+            />
+          )}
+
+          {/* An event's chat stays pinned to the top of the list until its
+              event date; the mark says why it's up there. It follows the
+              mute bell and hands the row to the count. */}
+          {community.pinned_until && (
+            <View
+              accessible
+              accessibilityLabel="Pinned until the event"
+              style={styles.previewMark}
+            >
+              <PinIcon size={14} color={colors.mutedForeground} />
+            </View>
           )}
 
           {/* Unread badge */}
@@ -333,8 +395,12 @@ const styles = StyleSheet.create({
   nameBold: {
     fontFamily: 'Geist_600SemiBold',
   },
-  lockIcon: {
-    marginTop: 1,
+  previewMark: {
+    // The preview line is an items-center row, so the marks center against it
+    // (web parity: the bell and pin ride the text's top edge there because its
+    // line is items-start; here they self-center, like the app's other rows).
+    alignSelf: 'center',
+    flexShrink: 0,
   },
   time: {
     fontSize: 13,

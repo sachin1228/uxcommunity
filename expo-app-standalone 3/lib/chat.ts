@@ -21,6 +21,14 @@ export const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
 /** Number of lines shown before a long message collapses behind "Read more". */
 export const COLLAPSED_LINES = 5;
 
+/**
+ * The community chat retention window — the same 15 days the server-side
+ * sweep deletes by (web `lib/communities/message-retention.ts`). The chat's
+ * system notice prints this number, so the promise cannot drift from the
+ * enforcement.
+ */
+export const CHAT_MESSAGE_RETENTION_DAYS = 15;
+
 // Locale shared with the community list timestamps so the same message never
 // reads differently in the chat and in the sidebar.
 const TIME_LOCALE = 'en-US';

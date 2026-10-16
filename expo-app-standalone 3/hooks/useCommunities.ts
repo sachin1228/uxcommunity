@@ -29,6 +29,7 @@ import { selectLiveCommunityIds } from '@/lib/realtimeWindow';
 import { createNameCache } from '@/lib/nameCache';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
+import { bubbleToTop, expiredPinIds, sortByLastActivity } from '@/lib/sidebarOrder';
 import { apiFetch } from '@/lib/api';
 import { setAppBadgeCountAsync } from '@/lib/push';
 import { syncBadgeFromServer } from '@/lib/notificationSettings';
@@ -50,22 +51,6 @@ const TYPING_EXPIRY_MS = 3500;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Sort by last_message.created_at DESC, falling back to joined_at. */
-function sortByLastActivity(list: Community[]): Community[] {
-  return [...list].sort((a, b) => {
-    const ta = a.last_message?.created_at ?? a.joined_at ?? '';
-    const tb = b.last_message?.created_at ?? b.joined_at ?? '';
-    return tb > ta ? 1 : -1;
-  });
-}
-
-/** Move one community to position 0, preserving relative order of others. */
-function bubbleToTop(list: Community[], communityId: string): Community[] {
-  const idx = list.findIndex((c) => c.id === communityId);
-  if (idx <= 0) return list;
-  return [list[idx], ...list.slice(0, idx), ...list.slice(idx + 1)];
-}
-
 /** Build reaction snippet text — mirrors web's reactionPreview(). */
 function reactionSnippet(content: string | null | undefined, hasImage: boolean): string {
   if (content) {
@@ -86,6 +71,12 @@ export function useCommunities() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
+  /**
+   * The list's slow clock. Pin deadlines and timed mutes both lapse on their
+   * own without a fetch; the marks (pin, crossed bell) and the pinned-first
+   * order must come down with them, so the rows re-read this as it moves.
+   */
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const unsubscribesRef = useRef<Array<() => void>>([]);
   const typingTimers   = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -531,6 +522,50 @@ export function useCommunities() {
     return () => sub.remove();
   }, [listCatchUp]);
 
+  // The list's slow clock (see nowMs): a pin whose deadline has passed stops
+  // pinning above more recently active communities and hands its mark back,
+  // and lapsing timed mutes lose their crossed bell — all on this tick rather
+  // than waiting for the next server round trip.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setNowMs(now);
+      setCommunities((prev) => {
+        const expired = expiredPinIds(prev, now);
+        if (expired.length === 0) return prev;
+        const expiredSet = new Set(expired);
+        return sortByLastActivity(
+          prev.map((c) => (expiredSet.has(c.id) ? { ...c, pinned_until: null } : c)),
+        );
+      });
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // The chat screen and the create flow patch the list through the shared
+  // store — muting, "Delete chat" (archive), "Exit community" (remove) and a
+  // brand-new community (refresh) all happen elsewhere, and the list must
+  // show it the moment the user is back, without waiting for a refetch.
+  useEffect(
+    () =>
+      communityStore.subscribeCommunityChanges((change) => {
+        if (change.kind === 'refresh') {
+          void load();
+          return;
+        }
+        if (change.kind === 'remove') {
+          setCommunities((prev) => prev.filter((c) => c.id !== change.communityId));
+          return;
+        }
+        setCommunities((prev) =>
+          sortByLastActivity(
+            prev.map((c) => (c.id === change.communityId ? { ...c, ...change.patch } : c)),
+          ),
+        );
+      }),
+    [load],
+  );
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   /**
@@ -584,6 +619,8 @@ export function useCommunities() {
     communities: communities.filter((c) => !c.is_archived),
     isLoading,
     error,
+    /** The slow clock the rows read for pin/mute marks (see nowMs). */
+    nowMs,
     reload: load,
     markCommunityRead,
     clearActiveCommunity,

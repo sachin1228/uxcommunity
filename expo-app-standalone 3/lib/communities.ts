@@ -54,6 +54,15 @@ export interface Community {
   is_archived: boolean;
   last_message: LastMessage | null;
   lastReaction: LastReaction | null;
+  /** An event group chat's own event date — its DP wears it as a badge. */
+  event_date?: string | null;
+  /** Its event's end while still ahead — what makes the badge say LIVE. */
+  pinned_until?: string | null;
+  /** That deadline whether ahead or past — what makes the badge say ENDED. */
+  event_end?: string | null;
+  /** The caller's own mute state — absent on pre-migration rows (not muted). */
+  notifications_muted?: boolean | null;
+  notifications_muted_until?: string | null;
 }
 
 export interface MessageUser {
@@ -173,6 +182,141 @@ export async function setMessageReaction(
 
 export async function markRead(communityId: string): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/read`, { method: 'PATCH' });
+}
+
+/** The newest created_at per content area — the tab dots' server baseline. */
+export interface CommunityContentLatest {
+  thread: string | null;
+  showcase: string | null;
+  resource: string | null;
+  event: string | null;
+}
+
+/**
+ * The newest item per content area (threads / showcase / resources / events),
+ * as the server computes it. The chat header's per-tab dots compare these
+ * against the member's per-tab watermarks (see hooks/useCommunityTabDots) —
+ * the same contract as the web's `/content-latest` baseline.
+ */
+export async function getContentLatest(communityId: string): Promise<CommunityContentLatest> {
+  const { data } = await apiFetch<{ latest?: Partial<CommunityContentLatest> }>(
+    `/api/communities/${communityId}/content-latest`
+  );
+  const latest = data.latest ?? {};
+  return {
+    thread: latest.thread ?? null,
+    showcase: latest.showcase ?? null,
+    resource: latest.resource ?? null,
+    event: latest.event ?? null,
+  };
+}
+
+/** The durations the mute menu offers, plus "off" to unmute. */
+export type CommunityMuteDuration = '8h' | '1w' | 'always' | 'off';
+
+/**
+ * Set the caller's own notification mute for one community — the same
+ * endpoint the web chat header's bell menu posts to. Answers with the
+ * resulting state so callers can patch without recomputing what the server
+ * decided.
+ */
+export async function setCommunityMute(
+  communityId: string,
+  duration: CommunityMuteDuration
+): Promise<{ notifications_muted: boolean; notifications_muted_until: string | null }> {
+  const { data } = await apiFetch<{
+    notifications_muted?: boolean;
+    notifications_muted_until?: string | null;
+  }>(`/api/communities/${communityId}/mute`, { method: 'POST', body: { duration } });
+  return {
+    notifications_muted: Boolean(data.notifications_muted),
+    notifications_muted_until: data.notifications_muted_until ?? null,
+  };
+}
+
+/**
+ * "Delete chat" — archives the community for the caller only (the web ⋯
+ * menu's first action). Other members are unaffected, and the row reappears
+ * when a new message arrives.
+ */
+export async function archiveCommunity(communityId: string): Promise<void> {
+  await apiFetch(`/api/communities/${communityId}/archive`, { method: 'POST' });
+}
+
+/**
+ * "Exit community" — removes the caller's membership (the web ⋯ menu's
+ * second action). When they were the owner, the server transfers ownership to
+ * the earliest-joined member, or hard-deletes the community if they were the
+ * last member; both outcomes answer with the same success shape.
+ */
+export async function leaveCommunity(
+  communityId: string
+): Promise<{ ownershipTransferred: boolean; communityDeleted: boolean }> {
+  const { data } = await apiFetch<{
+    community_deleted?: boolean;
+    ownership_transferred?: boolean;
+  }>(`/api/communities/${communityId}/members`, { method: 'DELETE' });
+  return {
+    ownershipTransferred: Boolean(data.ownership_transferred),
+    communityDeleted: Boolean(data.community_deleted),
+  };
+}
+
+/** The community the create flow just made. */
+export interface CreatedCommunity {
+  id: string;
+  name: string;
+  type: string;
+  image_url: string | null;
+  is_private: boolean;
+  enabled_tabs: string[];
+  member_count: number;
+  invite_url: string;
+}
+
+export interface CreateCommunityInput {
+  name: string;
+  isPrivate: boolean;
+  description: string;
+  /** Tab areas to enable (the create form's areas, showcase excluded). */
+  tabs: string[];
+  /** Showcase has its own column rather than living in `enabled_tabs`. */
+  showcase: boolean;
+  rules: string[];
+  /** A prepared (WebP, ≤2560px) image from the picker; optional. */
+  image?: { uri: string; name: string; type: string } | null;
+}
+
+/**
+ * Create a community — the web CreateCommunityModal's multipart contract.
+ * The creator joins as owner server-side; creation caps (own communities,
+ * total joins) answer 429 with a human message, which apiFormUpload surfaces
+ * as the thrown Error's message.
+ */
+export async function createCommunity(input: CreateCommunityInput): Promise<CreatedCommunity> {
+  const formData = new FormData();
+  formData.append('name', input.name);
+  formData.append('privacy', input.isPrivate ? 'private' : 'public');
+  formData.append('description', input.description);
+  formData.append('tabs', JSON.stringify(input.tabs));
+  formData.append('showcase', input.showcase ? 'true' : 'false');
+  formData.append('rules', JSON.stringify(input.rules));
+  if (input.image) {
+    formData.append('image', {
+      uri: input.image.uri,
+      type: normaliseMimeType(input.image.type),
+      name: input.image.name,
+    } as unknown as Blob);
+  }
+
+  const { data } = await apiFormUpload<{ community?: CreatedCommunity; error?: string }>(
+    '/api/communities',
+    formData
+  );
+  if (!data.community) {
+    throw new Error(data.error ?? 'Failed to create community.');
+  }
+  return data.community;
 }
 
 export async function deleteMessage(
