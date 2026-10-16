@@ -15,12 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
   getCommunityDetail,
-  getCommunityMembers,
   getCommunityRules,
   type Community,
   type CommunityDetailRow,
   type CommunityRule,
 } from '@/lib/communities';
+import { loadCommunityRoster } from '@/lib/communityRoster';
 import { Avatar } from '@/components/chat/MessageBubble';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import type { MentionCandidate } from '@/lib/chat';
@@ -79,6 +79,14 @@ function fmtCreatedAt(iso?: string | null): string {
   });
 }
 
+// Module-level memos so reopening the screen inside the windows costs no
+// Worker invocations — the same freshness rules the web panel applies
+// (metaCache's 5-minute staleness; the rules endpoint's 60-second cache).
+const DETAIL_STALE_MS = 5 * 60_000;
+const RULES_STALE_MS = 60_000;
+const detailCache = new Map<string, { fetchedAt: number; row: CommunityDetailRow | null }>();
+const rulesCache = new Map<string, { fetchedAt: number; rules: CommunityRule[] }>();
+
 export function CommunityInfoView({
   visible,
   community,
@@ -93,33 +101,48 @@ export function CommunityInfoView({
   const [members, setMembers] = useState<MentionCandidate[] | null>(null);
   const [rules, setRules] = useState<CommunityRule[] | null>(null);
 
-  // Fetch once per open; a fetch is one small read per endpoint, so no cache.
+  // Fill from cache when fresh; otherwise fetch and remember. Only the roster
+  // shows a spinner — detail and rules land quietly into their sections.
   useEffect(() => {
     if (!visible || !communityId) return;
     let cancelled = false;
-    setDetail(null);
-    setMembers(null);
-    setRules(null);
 
-    getCommunityDetail(communityId)
-      .then((row) => {
-        if (!cancelled) setDetail(row);
-      })
-      .catch(() => {});
-    getCommunityMembers(communityId)
+    const freshDetail = detailCache.get(communityId);
+    if (freshDetail && Date.now() - freshDetail.fetchedAt < DETAIL_STALE_MS) {
+      setDetail(freshDetail.row);
+    } else {
+      setDetail(null);
+      getCommunityDetail(communityId)
+        .then((row) => {
+          detailCache.set(communityId, { fetchedAt: Date.now(), row });
+          if (!cancelled) setDetail(row);
+        })
+        .catch(() => {});
+    }
+
+    setMembers(null);
+    loadCommunityRoster(communityId)
       .then((list) => {
         if (!cancelled) setMembers(list);
       })
       .catch(() => {
         if (!cancelled) setMembers([]);
       });
-    getCommunityRules(communityId)
-      .then((list) => {
-        if (!cancelled) setRules(list);
-      })
-      .catch(() => {
-        if (!cancelled) setRules([]);
-      });
+
+    const freshRules = rulesCache.get(communityId);
+    if (freshRules && Date.now() - freshRules.fetchedAt < RULES_STALE_MS) {
+      setRules(freshRules.rules);
+    } else {
+      setRules(null);
+      getCommunityRules(communityId)
+        .then((list) => {
+          rulesCache.set(communityId, { fetchedAt: Date.now(), rules: list });
+          if (!cancelled) setRules(list);
+        })
+        .catch(() => {
+          if (!cancelled) setRules([]);
+        });
+    }
 
     return () => {
       cancelled = true;

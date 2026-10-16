@@ -16,9 +16,10 @@
  *
  * The `/content-latest` baseline exists because mobile's content views only
  * fetch when their tab is opened — an item created while the member was away
- * must still raise its dot the moment they open the community. The web keeps
- * these live off realtime content events; mobile has no such stream, so a
- * slow poll (plus every tab switch and every foreground) stands in.
+ * must still raise its dot the moment they open the community. The chat's
+ * content-event stream (useChatContentEvents) feeds the timeline, not these
+ * watermarks, so a slow poll (plus every tab switch and every foreground)
+ * stands in — one tiny four-limit-1 read a minute.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';

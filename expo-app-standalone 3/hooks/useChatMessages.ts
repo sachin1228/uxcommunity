@@ -18,6 +18,7 @@ import {
   Message,
   Reaction,
 } from '@/lib/communities';
+import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
 import { pickOptimisticMatch } from '@/lib/chat';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
@@ -62,9 +63,12 @@ export function useChatMessages(communityId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const msgs = await getMessages(communityId);
-      setMessages(msgs);
-      setHasMore(msgs.length === 50);
+      // The shared bootstrap: one request at chat open, reused while fresh
+      // (see lib/communityBootstrap.ts). Pagination and catch-up below keep
+      // using the cheap cursor-based messages endpoint.
+      const bootstrap = await fetchCommunityBootstrap(communityId);
+      setMessages(bootstrap.messages);
+      setHasMore(bootstrap.messages.length === 50);
       await markRead(communityId);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load messages');

@@ -6,10 +6,13 @@
  * token, while `community_messages.mentions` stores `{ user_id, name }[]` for
  * the members actually *picked* from the list. Typing `@Name` by hand never
  * registers a mention, and deleting an inserted one drops it.
+ *
+ * The roster itself comes from the shared lib/communityRoster.ts cache — the
+ * community info screen's member list reads the same fetch.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getCommunityMembers } from '@/lib/communities';
+import { loadCommunityRoster } from '@/lib/communityRoster';
 import {
   detectMentionTrigger,
   resolveMentionsFromText,
@@ -19,37 +22,6 @@ import {
 
 /** Max rows shown at once — matches the web popover. */
 const MAX_OPTIONS = 30;
-
-interface RosterEntry {
-  members: MentionCandidate[];
-  fetchedAt: number;
-}
-
-// Module-level roster cache, shared across chat visits.
-const rosterCache = new Map<string, RosterEntry>();
-const inflightRoster = new Map<string, Promise<MentionCandidate[]>>();
-
-/** Loads (and caches) a community's member roster so the picker is instant. */
-async function loadRoster(communityId: string): Promise<MentionCandidate[]> {
-  const cached = rosterCache.get(communityId);
-  if (cached) return cached.members;
-
-  const inflight = inflightRoster.get(communityId);
-  if (inflight) return inflight;
-
-  const promise = getCommunityMembers(communityId)
-    .then((members) => {
-      rosterCache.set(communityId, { members, fetchedAt: Date.now() });
-      return members;
-    })
-    .catch(() => [] as MentionCandidate[])
-    .finally(() => {
-      inflightRoster.delete(communityId);
-    });
-
-  inflightRoster.set(communityId, promise);
-  return promise;
-}
 
 interface MentionContext {
   start: number;
@@ -73,7 +45,7 @@ export function useMemberMentions({
   scopeRef.current = { communityId, currentUserId };
 
   const ensureRoster = useCallback(async () => {
-    const members = await loadRoster(communityId);
+    const members = await loadCommunityRoster(communityId);
     const scope = scopeRef.current;
     if (scope.communityId !== communityId || scope.currentUserId !== currentUserId) return;
     setRoster(members);

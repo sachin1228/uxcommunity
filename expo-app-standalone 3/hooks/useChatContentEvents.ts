@@ -1,24 +1,27 @@
 /**
- * The community chat's "created a …" content cards: the history window plus
+ * The community chat's "created a …" content cards: the window plus
  * everything that keeps it live. Mirror of the web's useContentTimeline +
  * the content-event half of useRealtimeChat:
  *
- * - Initial load: GET /api/communities/:id/content-events (the four kinds'
- *   first page, enriched with authors, reactions, RSVP and comment counts).
+ * - History: the shared /bootstrap read (lib/communityBootstrap.ts), the same
+ *   request the messages hook uses — so opening the chat costs exactly one
+ *   Worker invocation for both sections, and re-entering inside the web's
+ *   15-minute freshness window costs none. There is deliberately NO refetch
+ *   on reconnects or foregrounds: web never refetches the window either —
+ *   realtime keeps it live, and a card missed while the socket was down
+ *   arrives with the next bootstrap (the messages hook's cursor catch-up is
+ *   what covers that same gap for messages).
  * - Realtime: the chat room's content-insert / content-delete / content-comment
  *   / content-reaction-* topics, so a card is as permanent and as current as a
  *   message — not a session-only bubble.
- * - Gap recovery: a dropped socket misses publishes with no cursor to ask
- *   for, so reconnects and foregrounds re-read the window (debounced).
  * - Local mirror: creates/deletes from the mounted tabs land in the same
  *   frame via lib/contentEventMirror.ts, ahead of the realtime echo.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
-import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
-import { getChatContentEvents, getMemberBrief } from '@/lib/communities';
+import { getMemberBrief } from '@/lib/communities';
+import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
 import { applyReactionDelete, applyReactionInsert, type Reaction } from '@/lib/chat';
 import {
   createAuthorCache,
@@ -65,13 +68,16 @@ export function useChatContentEvents(communityId: string) {
 
   const load = useCallback(async () => {
     try {
-      const rows = await getChatContentEvents(communityId);
+      // The shared bootstrap (see lib/communityBootstrap.ts) — the same
+      // request the messages hook reads, so the two sections come from one
+      // Worker invocation.
+      const bootstrap = await fetchCommunityBootstrap(communityId);
       // The user switched communities while the page was in flight.
       if (communityIdRef.current !== communityId) return;
-      for (const row of rows) {
+      for (const row of bootstrap.contentEvents) {
         if (row.users) authors.current.set(row.user_id, row.users);
       }
-      setEvents(rows);
+      setEvents(bootstrap.contentEvents);
     } catch {
       // Keep whatever is on screen; realtime and the next open reconcile.
     } finally {
@@ -82,13 +88,6 @@ export function useChatContentEvents(communityId: string) {
   useEffect(() => {
     load();
   }, [load]);
-
-  /**
-   * Debounced single-flight re-read for reconnects and foregrounds — the same
-   * scheduler the tabs use for realtime gaps (see hooks/useCommunityContent).
-   */
-  const gapRefetch = useMemo(() => createCatchUpScheduler(load, { debounceMs: 500 }), [load]);
-  useEffect(() => () => gapRefetch.cancel(), [gapRefetch]);
 
   // Live creates/deletes from the mounted tabs, mirrored ahead of realtime.
   useEffect(() => {
@@ -271,23 +270,11 @@ export function useChatContentEvents(communityId: string) {
       }),
     );
 
-    // Whatever was published before this socket came up is gone; re-read the
-    // window instead of waiting for the next card to arrive.
-    unsubscribes.push(
-      realtimeClient.onRoomStatus(room, (connected) => {
-        if (connected) gapRefetch.schedule();
-      }),
-    );
-    const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') gapRefetch.schedule();
-    });
-
     return () => {
-      appStateSub.remove();
       unsubscribes.forEach((unsub) => unsub());
       unsubRoom();
     };
-  }, [communityId, user?.id, user?.name, user?.avatar_url, gapRefetch]);
+  }, [communityId, user?.id, user?.name, user?.avatar_url]);
 
   /** Paint the server-confirmed (or optimistically projected) pill state. */
   const applyContentReactions = useCallback(

@@ -7,7 +7,7 @@ import {
   loadCommunityReadModel,
   type ReadResult,
 } from "@/lib/communities/read-models";
-import { loadCommunityContentEvents, contentAreaLimits } from "@/lib/communities/content-events";
+import { loadCommunityContentEvents } from "@/lib/communities/content-events";
 import { NO_COMMUNITY_PERMISSIONS, hasAnyCommunityPermission } from "@/lib/communities/permissions";
 type Params = { params: Promise<{ id: string }> };
 type Section = "community" | "messages" | "content-events" | "rules";
@@ -19,6 +19,22 @@ type Section = "community" | "messages" | "content-events" | "rules";
  * the client falls back to the individual endpoint.
  */
 const CRITICAL = new Set<Section>(["community", "messages"]);
+
+/**
+ * Which content areas the chat timeline should show "created a …" cards for:
+ * exactly the areas the community's nav shows (showcase reads as on unless the
+ * flag says otherwise).
+ */
+function contentAreaLimits(community: Record<string, unknown> | undefined) {
+  const tabs = (community?.enabled_tabs as string[] | null | undefined) ?? null;
+  const enabled = (area: string) => tabs === null || tabs.includes(area);
+  return {
+    threads: enabled("threads"),
+    showcase: community?.showcase_enabled !== false,
+    events: enabled("events"),
+    resources: enabled("resources"),
+  };
+}
 
 async function readSection(
   name: Section,
