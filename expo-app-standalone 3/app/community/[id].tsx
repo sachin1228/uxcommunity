@@ -73,6 +73,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
+import { CommunityInfoView } from '@/components/community/CommunityInfoView';
 import type { CommunityTab, ContentKind } from '@/lib/communityContent';
 
 /** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
@@ -112,6 +113,8 @@ export default function CommunityChat() {
   /** Inline emoji panel below the composer (WhatsApp-style) — closed when
    *  the chat scrolls, a tab changes, or the screen loses the composer. */
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  /** The WhatsApp-style community info screen behind the header title. */
+  const [infoOpen, setInfoOpen] = useState(false);
   /**
    * Every open resolves the community from the signed-in member's list — not
    * just push deep-links, where the route can only carry the id. The header's
@@ -1015,7 +1018,14 @@ export default function CommunityChat() {
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
 
-        <View style={styles.headerCenter}>
+        {/* Tapping the title area opens the community info screen, like
+            WhatsApp's contact info (web parity: the right sidebar there). */}
+        <Pressable
+          onPress={() => setInfoOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${communityName} info`}
+          style={styles.headerCenter}
+        >
           {/* An event's group chat wears its date here too — and says LIVE
               while the event is under way (web header parity). */}
           <DpWithEventDate
@@ -1080,7 +1090,7 @@ export default function CommunityChat() {
               </View>
             )}
           </View>
-        </View>
+        </Pressable>
 
         {/* Notifications — its own control beside the ⋯ button rather than an
             item inside it, like the web header: plain bell while notifications
@@ -1234,6 +1244,15 @@ export default function CommunityChat() {
         onClose={() => setSelectedContent(null)}
         onReact={handleContentReaction}
         onReply={handleContentReply}
+      />
+
+      {/* Community info — WhatsApp-style, opened from the header title (the
+          web right sidebar's content: members, about, rules) */}
+      <CommunityInfoView
+        visible={infoOpen}
+        community={resolved}
+        onlineCount={onlineCount}
+        onClose={() => setInfoOpen(false)}
       />
 
       {/* Edit composer */}

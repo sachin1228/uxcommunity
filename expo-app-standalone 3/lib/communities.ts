@@ -345,6 +345,47 @@ export async function leaveCommunity(
   };
 }
 
+/** The community row the info screen's About section renders (web read model). */
+export interface CommunityDetailRow {
+  id: string;
+  name: string;
+  type: string;
+  description: string | null;
+  created_at: string | null;
+  image_url: string | null;
+  is_private?: boolean | null;
+  reference_name?: string | null;
+  member_count?: number | null;
+}
+
+/**
+ * The community detail the web client reads for its chat info machinery —
+ * description, created date, type and reference name for the About section.
+ * Answers `{ community, members, ... }`; the member list on the info screen
+ * uses the paged roster below instead, whose rows carry designations.
+ */
+export async function getCommunityDetail(communityId: string): Promise<CommunityDetailRow | null> {
+  const { data } = await apiFetch<{ community?: CommunityDetailRow }>(
+    `/api/communities/${communityId}`
+  );
+  return data.community ?? null;
+}
+
+/** One numbered rule on the community info screen (web community_rules row). */
+export interface CommunityRule {
+  id: string;
+  rule_text: string;
+  order_index: number;
+}
+
+/** The community's rules, in display order (the web right sidebar's Rules). */
+export async function getCommunityRules(communityId: string): Promise<CommunityRule[]> {
+  const { data } = await apiFetch<{ rules?: CommunityRule[] }>(
+    `/api/communities/${communityId}/rules`
+  );
+  return data.rules ?? [];
+}
+
 /** The community the create flow just made. */
 export interface CreatedCommunity {
   id: string;
