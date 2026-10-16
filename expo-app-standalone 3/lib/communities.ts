@@ -262,6 +262,63 @@ export async function leaveCommunity(
   };
 }
 
+/** The community the create flow just made. */
+export interface CreatedCommunity {
+  id: string;
+  name: string;
+  type: string;
+  image_url: string | null;
+  is_private: boolean;
+  enabled_tabs: string[];
+  member_count: number;
+  invite_url: string;
+}
+
+export interface CreateCommunityInput {
+  name: string;
+  isPrivate: boolean;
+  description: string;
+  /** Tab areas to enable (the create form's areas, showcase excluded). */
+  tabs: string[];
+  /** Showcase has its own column rather than living in `enabled_tabs`. */
+  showcase: boolean;
+  rules: string[];
+  /** A prepared (WebP, ≤2560px) image from the picker; optional. */
+  image?: { uri: string; name: string; type: string } | null;
+}
+
+/**
+ * Create a community — the web CreateCommunityModal's multipart contract.
+ * The creator joins as owner server-side; creation caps (own communities,
+ * total joins) answer 429 with a human message, which apiFormUpload surfaces
+ * as the thrown Error's message.
+ */
+export async function createCommunity(input: CreateCommunityInput): Promise<CreatedCommunity> {
+  const formData = new FormData();
+  formData.append('name', input.name);
+  formData.append('privacy', input.isPrivate ? 'private' : 'public');
+  formData.append('description', input.description);
+  formData.append('tabs', JSON.stringify(input.tabs));
+  formData.append('showcase', input.showcase ? 'true' : 'false');
+  formData.append('rules', JSON.stringify(input.rules));
+  if (input.image) {
+    formData.append('image', {
+      uri: input.image.uri,
+      type: normaliseMimeType(input.image.type),
+      name: input.image.name,
+    } as unknown as Blob);
+  }
+
+  const { data } = await apiFormUpload<{ community?: CreatedCommunity; error?: string }>(
+    '/api/communities',
+    formData
+  );
+  if (!data.community) {
+    throw new Error(data.error ?? 'Failed to create community.');
+  }
+  return data.community;
+}
+
 export async function deleteMessage(
   communityId: string,
   messageId: string

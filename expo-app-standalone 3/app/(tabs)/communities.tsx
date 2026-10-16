@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -22,6 +23,18 @@ export default function CommunitiesScreen() {
   const router = useRouter();
   const { communities, isLoading, error, nowMs, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
+  const [query, setQuery] = useState('');
+
+  /**
+   * The joined list filtered by name — the same rule the web browse page
+   * searches by (case-insensitive substring of the name), applied locally:
+   * the list is already in hand, and a round trip would only add latency.
+   */
+  const visible = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return communities;
+    return communities.filter((c) => c.name.toLowerCase().includes(term));
+  }, [communities, query]);
 
   const handleCommunityPress = useCallback(
     (community: Community) => {
@@ -67,6 +80,56 @@ export default function CommunitiesScreen() {
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
+      {/* Search + create — the list's two verbs, on one line under the app
+          header. Search filters the joined list locally; the + opens the
+          create-community flow (the web sidebar's "Your Community" plus). */}
+      <View style={styles.searchRow}>
+        <View
+          style={[
+            styles.searchField,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Feather name="search" size={15} color={colors.mutedForeground} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search communities…"
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            accessibilityLabel="Search communities"
+            style={[styles.searchInput, { color: colors.foreground }]}
+          />
+          {query.length > 0 && (
+            <Pressable
+              onPress={() => setQuery('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        </View>
+        <Pressable
+          onPress={() => router.push('/create-community')}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel="Create community"
+          style={({ pressed }) => [
+            styles.createBtn,
+            {
+              backgroundColor: pressed ? colors.border : colors.surfaceRaised,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Feather name="plus" size={18} color={colors.foreground} />
+        </Pressable>
+      </View>
+
       {isLoading && (
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
@@ -87,17 +150,25 @@ export default function CommunitiesScreen() {
           <Feather name="users" size={40} color={colors.mutedForeground} />
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No communities yet</Text>
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            You haven&apos;t joined any communities.
+            You haven&apos;t joined any communities. Create one with the + above.
           </Text>
         </View>
       )}
 
       {!isLoading && !error && communities.length > 0 && (
         <FlatList
-          data={communities}
+          data={visible}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <View style={styles.noResults}>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                No communities found
+              </Text>
+            </View>
+          }
           refreshControl={
             <RefreshControl
               refreshing={false}
@@ -114,6 +185,42 @@ export default function CommunitiesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  searchField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Geist_400Regular',
+    paddingVertical: 0,
+  },
+  createBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResults: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
   center: {
     flex: 1,
     alignItems: 'center',

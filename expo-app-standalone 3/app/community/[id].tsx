@@ -271,7 +271,7 @@ export default function CommunityChat() {
         // Patch the screen's own copy and the list's row — the crossed bell
         // must be there the moment the user is back.
         setResolved((prev) => (prev ? { ...prev, ...state } : prev));
-        communityStore.notifyCommunityChanged({ communityId: id, patch: state });
+        communityStore.notifyCommunityChanged({ kind: 'patch', communityId: id, patch: state });
         if (duration === 'off') {
           showToast({ message: 'Chat unmuted' });
         } else {
@@ -319,7 +319,11 @@ export default function CommunityChat() {
         }
         // Archived rows are hidden from the list and reappear when a new
         // message arrives — the realtime handler un-archives them.
-        communityStore.notifyCommunityChanged({ communityId: id, patch: { is_archived: true } });
+        communityStore.notifyCommunityChanged({
+          kind: 'patch',
+          communityId: id,
+          patch: { is_archived: true },
+        });
       } else {
         try {
           await leaveCommunity(id);
@@ -329,7 +333,7 @@ export default function CommunityChat() {
         }
         // The membership is gone; drop the row and free the active marker so
         // the list does not keep treating this community as open.
-        communityStore.notifyCommunityChanged({ communityId: id, patch: 'remove' });
+        communityStore.notifyCommunityChanged({ kind: 'remove', communityId: id });
         communityStore.activeCommunityId = null;
       }
       setActionsSheetOpen(false);

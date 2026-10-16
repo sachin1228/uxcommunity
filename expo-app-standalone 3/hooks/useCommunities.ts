@@ -542,20 +542,28 @@ export function useCommunities() {
     return () => clearInterval(timer);
   }, []);
 
-  // The chat screen patches the list through the shared store — muting,
-  // "Delete chat" (archive) and "Exit community" (remove) all happen there,
-  // and the row must show it the moment the user is back, without a refetch.
+  // The chat screen and the create flow patch the list through the shared
+  // store — muting, "Delete chat" (archive), "Exit community" (remove) and a
+  // brand-new community (refresh) all happen elsewhere, and the list must
+  // show it the moment the user is back, without waiting for a refetch.
   useEffect(
     () =>
-      communityStore.subscribeCommunityChanges(({ communityId, patch }) => {
-        setCommunities((prev) => {
-          if (patch === 'remove') return prev.filter((c) => c.id !== communityId);
-          return sortByLastActivity(
-            prev.map((c) => (c.id === communityId ? { ...c, ...patch } : c)),
-          );
-        });
+      communityStore.subscribeCommunityChanges((change) => {
+        if (change.kind === 'refresh') {
+          void load();
+          return;
+        }
+        if (change.kind === 'remove') {
+          setCommunities((prev) => prev.filter((c) => c.id !== change.communityId));
+          return;
+        }
+        setCommunities((prev) =>
+          sortByLastActivity(
+            prev.map((c) => (c.id === change.communityId ? { ...c, ...change.patch } : c)),
+          ),
+        );
       }),
-    [],
+    [load],
   );
 
   // ── Actions ────────────────────────────────────────────────────────────────
