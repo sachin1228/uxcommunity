@@ -145,6 +145,18 @@ const singularKey: Record<ContentKind, string> = {
   resources: 'resource',
 };
 
+/**
+ * Whether a URL segment (or any string) names a content kind — the names are
+ * the app's tab keys, so a notification's web href can be walked into a tab.
+ * `responseKey` is exhaustive by type, which keeps this list honest; own
+ * properties only, since `in` would answer true for "toString".
+ */
+export function isContentKind(value: unknown): value is ContentKind {
+  return (
+    typeof value === 'string' && Object.prototype.hasOwnProperty.call(responseKey, value)
+  );
+}
+
 /** Human label for a kind — used in headers, empty states and the editor. */
 export function contentLabel(kind: ContentKind): string {
   switch (kind) {

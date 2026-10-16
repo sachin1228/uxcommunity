@@ -10,7 +10,16 @@ import { useColors } from '@/hooks/useColors';
  * screen established: a back arrow, the page title and a one-line subtitle,
  * on the page background with a hairline rule below.
  */
-export function ScreenHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+export function ScreenHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  /** An optional trailing control — the notifications page's "Mark all read". */
+  action?: React.ReactNode;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -41,6 +50,7 @@ export function ScreenHeader({ title, subtitle }: { title: string; subtitle?: st
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
         ) : null}
       </View>
+      {action}
     </View>
   );
 }
