@@ -24,7 +24,7 @@
  * rules are unit-tested without React Native (`lib/realtimeCatchUp.test.ts`).
  */
 
-import type { OptimisticLike } from './chat';
+import { compareChatTimeline, type OptimisticLike } from './chat';
 
 /** Default settle time for a burst of reconnect triggers. */
 export const CATCH_UP_DEBOUNCE_MS = 300;
@@ -156,7 +156,9 @@ function confirmedBubble<T extends CaughtUpMessage>(
  * one-message-never-twice rule the realtime echo path uses. Unmatched
  * optimistic rows are kept: dropping them would blank a send whose POST has not
  * resolved yet, even though the server page does not include it yet (the web
- * client drops every temp row here, which is what this avoids).
+ * client drops every temp row here, which is what this avoids) — and they pin
+ * below the page's rows until their echo confirms them (compareChatTimeline:
+ * their client stamp may lag the server's).
  *
  * Returns the input array unchanged when nothing was added, so callers can hand
  * the result straight to `setState` without forcing a re-render.
@@ -184,7 +186,5 @@ export function mergeCaughtUpMessages<T extends CaughtUpMessage>(
     additions.push(row);
   }
 
-  return [...remaining, ...additions].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
+  return [...remaining, ...additions].sort(compareChatTimeline);
 }

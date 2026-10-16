@@ -197,6 +197,22 @@ test('mergeChatTimeline is a no-op for empty sides', () => {
   assert.equal(mergeChatTimeline([], []).length, 0);
 });
 
+test('an optimistic bubble stays last even when the device clock lags the server', () => {
+  // The pending bubble's created_at is the sending device's clock; on an
+  // emulator (or any drifted device) it can sit behind the server-stamped
+  // rows already on screen. It must not drop into the pile above them.
+  const messages = [
+    { id: 'm1', created_at: '2026-10-16T11:28:00.000Z' },
+    { id: 'temp-1-abc', created_at: '2026-10-16T11:27:00.000Z' },
+  ];
+  const events: Array<{ id: string; created_at: string }> = [];
+  const merged = mergeChatTimeline(messages, events);
+  assert.deepEqual(
+    merged.map((item) => (item.kind === 'message' ? item.message.id : item.event.id)),
+    ['m1', 'temp-1-abc'],
+  );
+});
+
 // ─── Author cache ─────────────────────────────────────────────────────────
 
 test('author cache is bounded and evicts the coldest entry', () => {

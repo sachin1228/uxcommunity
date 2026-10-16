@@ -247,6 +247,26 @@ test('a send whose POST has not resolved yet is never dropped by a catch-up', ()
   assert.equal(merged[2].status, 'sending');
 });
 
+test('an in-flight bubble stays last even when the page carries newer server stamps', () => {
+  // The sending device's clock can lag the server's (emulator drift, manual
+  // clocks): the bubble is stamped 10:06 locally while the server has already
+  // committed rows stamped 10:07. It must not sort above them — a just-sent
+  // bubble is the newest row on screen until its echo confirms it.
+  const pending = row('temp-4-ghi', '2026-09-27T10:06:00Z', {
+    id: 'temp-4-ghi',
+    content: 'drifted clock',
+    status: 'sending',
+  });
+  const current = [row('m1', '2026-09-27T10:00:00Z'), pending];
+  const merged = mergeCaughtUpMessages(current, [row('m2', '2026-09-27T10:07:00Z')]);
+
+  assert.deepEqual(
+    merged.map((message) => message.id),
+    ['m1', 'm2', 'temp-4-ghi'],
+    'the pending bubble pins below the page rows',
+  );
+});
+
 test('an image-only send is confirmed by a content-less page row', () => {
   // Image messages carry no text on either side, so the both-empty case is the
   // one the echo path's fallback matcher exists for — the merge must handle it

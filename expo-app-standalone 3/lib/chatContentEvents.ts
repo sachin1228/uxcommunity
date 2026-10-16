@@ -18,7 +18,7 @@
  * unified card always — the state the web converges to.
  */
 
-import type { Reaction } from './chat';
+import { compareChatTimeline, type Reaction } from './chat';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -310,7 +310,9 @@ export type ChatTimelineItem<M, E> =
  * Sort is by created_at with messages first on a tie (they are pushed first
  * and Array.prototype.sort is stable) — the exact ordering the web
  * MessageList merge produces, so a card can never hop past a message that
- * shares its timestamp.
+ * shares its timestamp. Optimistic (`temp-`) rows pin last regardless of
+ * their client stamp (see compareChatTimeline) — a just-sent bubble must
+ * never drop into the pile above it.
  */
 export function mergeChatTimeline<
   M extends { id: string; created_at: string },
@@ -328,8 +330,11 @@ export function mergeChatTimeline<
       event,
     })),
   ];
-  return items.sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  return items.sort((a, b) =>
+    compareChatTimeline(
+      a.kind === 'message' ? a.message : a.event,
+      b.kind === 'message' ? b.message : b.event,
+    ),
   );
 }
 
