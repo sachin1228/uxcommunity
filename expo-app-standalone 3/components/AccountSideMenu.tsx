@@ -14,8 +14,9 @@ import { useColors } from '@/hooks/useColors';
 
 /**
  * The account menu as a side menu — the Profile header's hamburger slides it
- * in from the right edge: full height, roughly half the screen wide, with a
- * scrim behind it that closes it on tap (the usual hamburger drawer).
+ * in from the right edge: full height, roughly half the screen wide, in the
+ * page's own black with quietly rounded left corners, and a scrim behind it
+ * that closes it on tap (the usual hamburger drawer).
  *
  * The rows are the shared AccountMenuContent — Settings and Sign out — so they
  * match the avatar's bottom sheet row for row.
@@ -83,7 +84,9 @@ export function AccountSideMenu({ open, onClose }: Props) {
             styles.panel,
             {
               width: panelWidth,
-              backgroundColor: colors.card,
+              // The page's own black rather than a raised surface — the panel
+              // reads as the page sliding over, not a card on top of it.
+              backgroundColor: colors.background,
               borderLeftColor: colors.border,
               // Starts below the status bar (and the Dynamic Island) like any
               // other sidebar — the top inset is the panel's top edge, not
@@ -118,6 +121,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     borderLeftWidth: StyleSheet.hairlineWidth,
+    // A little rounding along the leading edge, so the panel reads as a
+    // sheet rather than a second screen split down the middle.
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
     overflow: 'hidden',
     shadowOpacity: 0.35,
     shadowRadius: 24,
