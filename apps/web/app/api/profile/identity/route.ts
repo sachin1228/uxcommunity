@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import { profileIdentityUpdateSchema } from "@/lib/validations";
+
+/**
+ * GET /api/profile/identity
+ *
+ * The identity editor's reader, shared by the web Edit Profile modal's page
+ * data and the mobile app's identity screen: the current values, the option
+ * lists, the per-slot cooldown locks and the member's current official group
+ * per dimension. Same payload as the profile page hands the modal.
+ */
+export async function GET() {
+  let session: Awaited<ReturnType<typeof requireSession>>;
+  try {
+    session = await requireSession("user");
+  } catch (e) {
+    return e as Response;
+  }
+
+  const identity = await loadProfileIdentity(session.userId!);
+  return NextResponse.json(identity, { headers: { "Cache-Control": "no-store" } });
+}
 
 /**
  * PATCH /api/profile/identity

@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccountMenuSheet } from '@/components/AccountMenuSheet';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -14,6 +15,7 @@ export function AppHeader() {
   const router = useRouter();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
   const initials = user?.name
     ? user.name
@@ -55,21 +57,37 @@ export function AppHeader() {
           <Feather name="bell" size={22} color={colors.mutedForeground} />
         </Pressable>
 
-        {avatarUrl ? (
-          <Image
-            accessibilityLabel={`${user?.name ?? 'User'} profile photo`}
-            source={{ uri: avatarUrl }}
-            style={[styles.avatar, styles.avatarImage]}
-            onError={() => setAvatarError(true)}
-          />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
-              {initials}
-            </Text>
-          </View>
-        )}
+        {/* The avatar is the account menu's trigger — the touch version of the
+            web topbar's profile dropdown (identity, View profile, Settings,
+            Sign out). */}
+        <Pressable
+          accessibilityLabel="Profile menu"
+          accessibilityRole="button"
+          hitSlop={6}
+          onPress={() => setMenuOpen(true)}
+          style={({ pressed }) => [
+            styles.avatarButton,
+            { borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
+          ]}
+        >
+          {avatarUrl ? (
+            <Image
+              accessibilityLabel={`${user?.name ?? 'User'} profile photo`}
+              source={{ uri: avatarUrl }}
+              style={[styles.avatarImage]}
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
+                {initials}
+              </Text>
+            </View>
+          )}
+        </Pressable>
       </View>
+
+      <AccountMenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -105,15 +123,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatar: {
+  avatarButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     resizeMode: 'cover',
+  },
+  avatarFallback: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarText: {
     fontSize: 13,
