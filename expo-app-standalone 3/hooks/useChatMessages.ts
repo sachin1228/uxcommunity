@@ -1,12 +1,19 @@
 /**
  * Loads and keeps messages live for a single community chat.
- * - Initial load: last 50 messages via GET /api/communities/:id/messages
+ * - Initial load: the shared bootstrap page (GET /api/communities/:id/bootstrap,
+ *   reused inside its freshness window — see lib/communityBootstrap.ts)
  * - Pagination: older messages via ?before=<ISO>
  * - Realtime: Cloudflare Durable Object WebSocket (message, message-edit,
  *   message-delete, reaction-insert/update/delete)
- * - Catch-up: after a reconnect or a return to the foreground, the socket may
- *   have missed publishes, so the hook asks the API for everything after its
- *   newest real message (?after=<ISO>) and merges it without duplicates.
+ * - Catch-up: every open (and every reconnect / return to the foreground) the
+ *   hook asks the API for everything after its newest real message
+ *   (?after=<ISO>) and merges it without duplicates. The open is the important
+ *   one: the communities list keeps this room's socket alive, so re-entering
+ *   the chat fires no status event — and a re-entry inside the bootstrap
+ *   cache's window would otherwise paint the fetch-time snapshot.
+ * - While open, the screen's window is folded back into that cache
+ *   (patchCachedBootstrapMessages) so the next open starts from what the user
+ *   just saw, not from the snapshot.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -19,7 +26,10 @@ import {
   Reaction,
 } from '@/lib/communities';
 import { scheduleMarkRead } from '@/lib/readManager';
-import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
+import {
+  fetchCommunityBootstrap,
+  patchCachedBootstrapMessages,
+} from '@/lib/communityBootstrap';
 import { pickOptimisticMatch, compareChatTimeline } from '@/lib/chat';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
@@ -60,25 +70,14 @@ export function useChatMessages(communityId: string) {
     communityIdRef.current = communityId;
   }, [communityId]);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // The shared bootstrap: one request at chat open, reused while fresh
-      // (see lib/communityBootstrap.ts). Pagination and catch-up below keep
-      // using the cheap cursor-based messages endpoint.
-      const bootstrap = await fetchCommunityBootstrap(communityId);
-      setMessages(bootstrap.messages);
-      setHasMore(bootstrap.messages.length === 50);
-      // Opening the chat is a user action — its mark-read bypasses the
-      // realtime cooldown so the badge always clears (see lib/readManager).
-      scheduleMarkRead(communityId, { bypassCooldown: true, patch: markRead });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load messages');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [communityId]);
+  /**
+   * The community whose rows the on-screen window belongs to. Seeded with the
+   * mount id so realtime rows that land during the first fetch survive the
+   * load merge; on a switch without a remount it keeps pointing at the
+   * outgoing community until the new page lands, so one community's rows can
+   * never merge into — or be cached as — another's.
+   */
+  const windowCommunityRef = useRef(communityId);
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore || messages.length === 0) return;
@@ -97,11 +96,13 @@ export function useChatMessages(communityId: string) {
   }, [communityId, messages, isLoadingMore, hasMore]);
 
   /**
-   * Catch up on anything published while the socket was down.
+   * Catch up on anything this client is missing: published while the socket
+   * was down, or since the loaded snapshot (`load()` schedules one on every
+   * open, because an already-live socket fires no status event).
    *
-   * Debounced and single-flight: the reconnect signal, the foreground probe and
-   * the heartbeat recycle routinely fire within a second of each other, and one
-   * `?after=` page is enough to cover all three.
+   * Debounced and single-flight: the reconnect signal, the load, the foreground
+   * probe and the heartbeat recycle routinely fire within a second of each
+   * other, and one `?after=` page is enough to cover all of them.
    */
   const catchUp = useMemo(() => {
     const targetCommunityId = communityId;
@@ -121,6 +122,45 @@ export function useChatMessages(communityId: string) {
     });
   }, [communityId]);
   useEffect(() => () => catchUp.cancel(), [catchUp]);
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // The shared bootstrap: one request at chat open, reused while fresh
+      // (see lib/communityBootstrap.ts). Pagination and catch-up below keep
+      // using the cheap cursor-based messages endpoint.
+      const bootstrap = await fetchCommunityBootstrap(communityId);
+      // The user switched communities while the request was in flight — those
+      // rows belong to the community that was on screen, not this one.
+      if (communityIdRef.current !== communityId) return;
+      // Merge, never replace: realtime rows that landed while the request was
+      // in flight — and the window a previous visit folded into the cache
+      // (the patch effect below) — are newer than the fetched snapshot and
+      // must survive it.
+      const sameWindow = windowCommunityRef.current === communityId;
+      windowCommunityRef.current = communityId;
+      setMessages((prev) =>
+        mergeCaughtUpMessages(sameWindow ? prev : [], bootstrap.messages)
+      );
+      // The window may hold more than the fresh page (the cache was patched,
+      // or the user paginated back earlier), so `>=` keeps history reachable.
+      setHasMore(bootstrap.messages.length >= 50);
+      // Opening the chat is a user action — its mark-read bypasses the
+      // realtime cooldown so the badge always clears (see lib/readManager).
+      scheduleMarkRead(communityId, { bypassCooldown: true, patch: markRead });
+      // Close the gap between the snapshot and now on EVERY open, exactly like
+      // the web chat's mount catch-up: this room's socket is often already
+      // connected (the communities list keeps the live window's sockets
+      // open), so mounting fires no status event and nothing else would ask
+      // for what was published since the snapshot.
+      catchUp.schedule();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load messages');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [communityId, catchUp]);
 
   /** Optimistically append a sent message. */
   const appendMessage = useCallback((msg: Message) => {
@@ -159,6 +199,26 @@ export function useChatMessages(communityId: string) {
   const patchMessage = useCallback((messageId: string, patch: Partial<Message>) => {
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m)));
   }, []);
+
+  /**
+   * Keep the shared bootstrap cache's message window current with what is on
+   * screen — the mobile counterpart of the web chat's live msgCache. Leaving
+   * and re-entering inside the cache's 15-minute freshness window then paints
+   * the rows the user just saw (their own sends included) instead of the
+   * fetch-time snapshot; without this they vanished on re-entry until some
+   * later reconnect happened to catch up.
+   *
+   * Optimistic rows are never persisted — a resurrected "sending" bubble could
+   * never resolve — and an empty window is never written, because the
+   * bootstrap module deliberately refuses to serve one from cache (it would
+   * only force the refetch this write exists to avoid).
+   */
+  useEffect(() => {
+    if (windowCommunityRef.current !== communityId) return;
+    const rows = messages.filter((message) => !message.id.startsWith('temp-'));
+    if (rows.length === 0) return;
+    patchCachedBootstrapMessages(communityId, rows);
+  }, [communityId, messages]);
 
   // Realtime subscription via Cloudflare singleton
   useEffect(() => {

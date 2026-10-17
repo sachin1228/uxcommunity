@@ -15,7 +15,9 @@
  *     • a settled response stays fresh for COMMUNITY_BOOTSTRAP_STALE_MS —
  *       re-entering the chat inside the window issues NO request at all. The
  *       messages hook's cursor catch-up (?after) is what keeps the window
- *       correct in between, exactly like web; realtime keeps it live.
+ *       correct in between, exactly like web; realtime keeps it live, and
+ *       patchCachedBootstrapMessages below keeps the CACHED window itself
+ *       current while the chat is open.
  *
  *   Freshness matters to the server, not just the phone: every avoided
  *   refetch is a Worker invocation that is no longer paying for the four
@@ -79,4 +81,40 @@ export function fetchCommunityBootstrap(communityId: string): Promise<CommunityB
 
   inflight.set(communityId, request);
   return request;
+}
+
+/**
+ * Fold the open chat's newest window back into the cached bootstrap entry.
+ *
+ * WHY THIS EXISTS
+ *   A settled bootstrap response is reused for 15 minutes, and on a phone the
+ *   cache entry is the ONLY message store that survives leaving the chat —
+ *   the hook's state dies with its screen. Without this, re-entering inside
+ *   the window re-rendered the fetch-time snapshot, so every message that
+ *   arrived after that fetch (the user's own sends included) vanished until
+ *   the next socket reconnect happened to run a catch-up. That is exactly the
+ *   bug chat re-entry kept showing: "I sent it, it's on the web, it's gone
+ *   from the phone".
+ *
+ *   The messages hook writes its current window here on every change (real
+ *   rows only — a persisted "sending" bubble could never resolve), so the
+ *   next open inside the window paints the rows the user just saw, and the
+ *   mount catch-up only has to cover what arrived while the chat was closed.
+ *
+ *   Only existing entries are patched: the other sections stay tied to their
+ *   own fetch, the freshness clock is deliberately NOT extended (this is the
+ *   same entry, only its message window is newer), and an unknown community
+ *   must not gain a messages-only entry that pretends its content events were
+ *   fetched.
+ */
+export function patchCachedBootstrapMessages(
+  communityId: string,
+  messages: Message[],
+): void {
+  const cached = cache.get(communityId);
+  if (!cached) return;
+  cache.set(communityId, {
+    fetchedAt: cached.fetchedAt,
+    data: { ...cached.data, messages },
+  });
 }
