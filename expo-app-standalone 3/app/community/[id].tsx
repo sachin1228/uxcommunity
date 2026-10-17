@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import {
   KeyboardAvoidingView as KeyboardControllerAvoidingView,
   KeyboardEvents,
@@ -84,6 +85,13 @@ type ChatRow =
   | { kind: 'notice'; key: string }
   | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean }
   | { kind: 'content'; key: string; event: ChatContentEvent };
+
+/**
+ * Web parity (useScrollAndUnread): being within this many pixels of the end
+ * counts as "at the bottom". The jump pill appears beyond it, and a send
+ * landing anywhere inside it never lights the pill.
+ */
+const JUMP_PILL_THRESHOLD = 80;
 
 export default function CommunityChat() {
   const {
@@ -456,14 +464,29 @@ export default function CommunityChat() {
   const listRef = useRef<FlatList<ChatRow>>(null);
 
   /**
-   * atBottom — whether the newest message is on screen. Updated by
-   * onViewableItemsChanged, which is far more reliable than scroll-offset
-   * arithmetic (no timing race, no threshold guessing). The ref feeds the
-   * keyboard handler; the state drives the "jump to latest" button.
+   * atBottom — whether the reader is within JUMP_PILL_THRESHOLD px of the
+   * newest row. Web parity: useScrollAndUnread flips the pill on distance
+   * from the bottom (> 80px), not on "is the last row visible". Viewability
+   * flipped false for the whole duration of every send's animated
+   * scroll-to-end — the pill flashed above the composer on each message sent
+   * — and stayed there whenever the newest bubble settled a few px below the
+   * fold. A distance threshold cannot flicker mid-flight.
+   *
+   * pinToBottomRef — a deliberate jump (send, keyboard open, pill tap) is in
+   * flight. The row that motivates the jump enters the layout *after*
+   * scrollToEnd measured the old content, so the first jump stops short; the
+   * content-size handler below replays it once the new row exists (web: the
+   * rAF pin in useSendMessage).
+   *
+   * userDraggingRef — the follow scroll below must never fight a finger that
+   * is already moving the list.
    */
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
-  const lastMessageIdRef = useRef<string | null>(null);
+  const pinToBottomRef = useRef(false);
+  const userDraggingRef = useRef(false);
+  /** Once the initial anchor is committed, content changes may steer the list. */
+  const initialPositionResolvedRef = useRef(false);
 
   // ── Unread marker: latched once, from the first loaded page ──────────────
   const unreadLatchedRef = useRef(false);
@@ -554,11 +577,6 @@ export default function CommunityChat() {
     return out;
   }, [messages, contentEvents, hasMore, firstUnreadId]);
 
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    lastMessageIdRef.current = lastMessage?.id ?? null;
-  }, [messages]);
-
   // ── Initial position: the unread divider when one exists, newest otherwise
   // (the web's useScrollAndUnread anchor). One-shot: later messages never
   // re-position the reader.
@@ -569,6 +587,7 @@ export default function CommunityChat() {
     initialScrollDoneRef.current = true;
 
     if (rows.length === 0) {
+      initialPositionResolvedRef.current = true;
       setInitialPositionResolved(true);
       return;
     }
@@ -577,6 +596,10 @@ export default function CommunityChat() {
       if (firstUnreadId) {
         const index = rows.findIndex((row) => row.kind === 'unread');
         if (index >= 0) {
+          // The anchor is the unread boundary, not the bottom: no pin may
+          // survive it and snap the reader back down on the next layout pass.
+          pinToBottomRef.current = false;
+          atBottomRef.current = false;
           listRef.current?.scrollToIndex({
             index,
             animated: false,
@@ -589,7 +612,10 @@ export default function CommunityChat() {
         listRef.current?.scrollToEnd({ animated: false });
       }
       // One more frame lets the native scroll commit before the list paints.
-      requestAnimationFrame(() => setInitialPositionResolved(true));
+      requestAnimationFrame(() => {
+        initialPositionResolvedRef.current = true;
+        setInitialPositionResolved(true);
+      });
     });
   }, [
     initialPositionReady,
@@ -600,31 +626,68 @@ export default function CommunityChat() {
     error,
   ]);
 
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 10 });
-  const handleViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: ChatRow }> }) => {
-      const lastId = lastMessageIdRef.current;
-      if (!lastId) return;
-      const next = viewableItems.some(
-        (vi) => vi.item.kind === 'message' && vi.item.msg.id === lastId,
-      );
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const distanceFromEnd =
+        contentSize.height - contentOffset.y - layoutMeasurement.height;
+      const next = distanceFromEnd <= JUMP_PILL_THRESHOLD;
       atBottomRef.current = next;
+      // Arrived (or never left): an in-flight pin has nothing left to do.
+      if (next) pinToBottomRef.current = false;
       // Only re-render when the answer actually flips.
       setAtBottom((prev) => (prev === next ? prev : next));
     },
+    [],
   );
 
+  /**
+   * The newest row's height enters the content size *after* scrollToEnd has
+   * measured the old content, so a send's jump stops on the previous end and
+   * the optimistic bubble settles below the fold (the web solves this with a
+   * rAF pin in useSendMessage, once the bubble is committed and laid out).
+   *
+   * - a pin is in flight → snap to the true end so the row cannot sit below
+   *   the composer. This is also the keyboard case: the keyboard avoiding
+   *   view shrinks the list under the content, sliding the newest rows behind
+   *   the composer until the list is re-pinned.
+   * - no pin, reader at the bottom → follow incoming content (web realtime
+   *   follow) so a new message slides into view instead of quietly growing an
+   *   off-screen gap.
+   */
+  const handleContentSizeChange = useCallback(() => {
+    if (!initialPositionResolvedRef.current) return;
+    if (pinToBottomRef.current) {
+      listRef.current?.scrollToEnd({ animated: false });
+      return;
+    }
+    if (atBottomRef.current && !userDraggingRef.current) {
+      listRef.current?.scrollToEnd({ animated: true });
+    }
+  }, []);
+
+  /** Keyboard / emoji-panel resizes shrink the list body under the content. */
+  const handleListLayout = useCallback(() => {
+    if (!initialPositionResolvedRef.current) return;
+    if (pinToBottomRef.current || atBottomRef.current) {
+      listRef.current?.scrollToEnd({ animated: false });
+    }
+  }, []);
+
   const scrollToLatest = useCallback((animated = true) => {
+    pinToBottomRef.current = true;
     listRef.current?.scrollToEnd({ animated });
   }, []);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
+    // Both platforms: the keyboard avoiding view shrinks the list under the
+    // content, which slides the newest row behind the composer. Only jump
+    // when the last message was already in view — a reader scrolled up to
+    // old messages stays where they are.
     const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
-      // Only jump to the bottom when the last message is already visible.
-      // If the user has scrolled up to read old messages, leave them there.
-      if (atBottomRef.current) scrollToLatest(true);
+      if (atBottomRef.current && initialPositionResolvedRef.current) {
+        scrollToLatest(true);
+      }
     });
 
     return () => subscription.remove();
@@ -1012,11 +1075,24 @@ export default function CommunityChat() {
           style={{ opacity: initialPositionResolved ? 1 : 0 }}
           contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
           // Reading old messages means the user is done picking emoji —
-          // close the inline panel so it doesn't eat half the screen.
-          onScrollBeginDrag={() => setEmojiPanelOpen(false)}
+          // close the inline panel so it doesn't eat half the screen. A drag
+          // also takes the list over from any in-flight jump or follow.
+          onScrollBeginDrag={() => {
+            setEmojiPanelOpen(false);
+            userDraggingRef.current = true;
+            pinToBottomRef.current = false;
+          }}
+          onScrollEndDrag={() => {
+            userDraggingRef.current = false;
+          }}
+          onMomentumScrollEnd={() => {
+            userDraggingRef.current = false;
+          }}
+          onScroll={handleScroll}
+          scrollEventThrottle={32}
+          onContentSizeChange={handleContentSizeChange}
+          onLayout={handleListLayout}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          onViewableItemsChanged={handleViewableItemsChanged.current}
-          viewabilityConfig={viewabilityConfig.current}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
           onScrollToIndexFailed={(info) => {
@@ -1075,7 +1151,11 @@ export default function CommunityChat() {
       <View
         style={styles.footer}
         onLayout={() => {
-          if (atBottomRef.current) scrollToLatest(false);
+          // The footer grows/shrinks (reply banner, typing indicator, emoji
+          // panel) and the list above it resizes with it. A reader parked at
+          // the bottom stays parked; no pin — a mount-time footer layout must
+          // not override the unread anchor that is still settling.
+          if (atBottomRef.current) listRef.current?.scrollToEnd({ animated: false });
         }}
       >
         {/* Scroll-to-bottom button — floats just above the footer edge */}
