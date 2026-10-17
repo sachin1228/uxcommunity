@@ -639,18 +639,26 @@ export default function CommunityChat() {
   );
 
   const scrollToLatest = useCallback((animated = true) => {
+    if (!animated) {
+      // An instant jump is authoritative: the reader is at the bottom from
+      // this commit on, so the list prop below can step MVCP aside before
+      // the new row mounts (a smooth glide instead lets scroll events drive
+      // the pill, exactly like the web's scrollIntoView on the pill).
+      atBottomRef.current = true;
+      setAtBottom(true);
+    }
     listRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
 
   /**
-   * Follow the newest message while the reader is parked at the bottom.
-   *
-   * An appended row already lands at the visual bottom of the inverted list;
-   * the explicit re-pin covers the two cases the list cannot: a row inserted
-   * while a scroll animation is in flight, and the temp → real id swap
-   * re-anchoring the viewport under `maintainVisibleContentPosition`. 40ms is
-   * the DM thread's beat — it lets the row's layout commit before the offset
-   * is pinned back to the new end.
+   * Follow the newest message while the reader is parked at the bottom — the
+   * web's realtime follow (useScrollAndUnread Effect 3: smooth scroll to the
+   * bottom anchor). Appended rows already land at the visual bottom of the
+   * inverted list, so this is a no-op at offset 0; it closes the gap when the
+   * reader was a few px up (≤ JUMP_PILL_THRESHOLD), when a row arrives while
+   * a scroll animation is in flight, and when the temp → real id swap
+   * re-anchors the viewport. 40ms is the DM thread's beat — it lets the row's
+   * layout commit before the offset is steered to the new end.
    */
   useEffect(() => {
     const lastId = messages[messages.length - 1]?.id ?? null;
@@ -1050,7 +1058,17 @@ export default function CommunityChat() {
           onScrollBeginDrag={() => setEmojiPanelOpen(false)}
           onScroll={handleScroll}
           scrollEventThrottle={32}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          // Web parity: the DOM list has no "keep the old anchor" behavior — a
+          // new row at the bottom simply is the bottom. On the native list
+          // that behavior is `maintainVisibleContentPosition`, and left on at
+          // the bottom it re-anchors the previous row: the send/echo lands
+          // just below the fold ("cut for a second") until a follow scroll
+          // brings it back. Keep it for what it is for — holding the reading
+          // position steady while scrolled up — and step it aside at the
+          // bottom, where offset 0 keeps the new row in view by itself.
+          maintainVisibleContentPosition={
+            atBottom ? undefined : { minIndexForVisible: 0 }
+          }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
           onScrollToIndexFailed={(info) => {
