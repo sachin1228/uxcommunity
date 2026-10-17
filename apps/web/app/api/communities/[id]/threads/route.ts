@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
@@ -15,7 +16,7 @@ import {
 } from "@/lib/communities/thread-body";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityThreads } from "@/lib/communities/read-models";
-import { contentEventPayload } from "@/lib/communities/content-events";
+import { COMMUNITY_CONTENT_EVENTS_TAG, contentEventPayload } from "@/lib/communities/content-events";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const PAGE_SIZE = 50;
@@ -188,5 +189,9 @@ export async function POST(
   ]);
 
   const enriched = (await withAuthorAndLikes(db, [inserted as Record<string, unknown>], userId))[0];
+  // The cached content-events page feeds the timeline's "created a thread"
+  // card; a new thread must land on the next open, not a window later.
+  revalidateTag(COMMUNITY_CONTENT_EVENTS_TAG, { expire: 0 });
+
   return NextResponse.json({ thread: enriched }, { status: 201 });
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { ContentEventKind } from "./cache";
 import type { ContentEventMeta } from "./content-notifications";
@@ -83,7 +84,7 @@ function metaFor(kind: ContentEventKind, row: Record<string, unknown>): ContentE
  * Only kinds a member can actually reach are included — callers pass the
  * community's enabled tabs / showcase flag (see areas.ts).
  */
-export async function loadCommunityContentEvents(
+async function loadCommunityContentEventsUncached(
   communityId: string,
   limits: { threads: boolean; showcase: boolean; events: boolean; resources: boolean },
   perKind = 50,
@@ -239,4 +240,36 @@ export function contentDeletedPayload(
   kind: ContentEventKind,
 ): Record<string, unknown> {
   return { id, community_id: communityId, kind };
+}
+
+/**
+ * Revalidation tag for the cached content-events read. Content CREATION is the
+ * one event that must land in the timeline immediately — the chat renders the
+ * "John created a …" card as soon as its author posts — so the create routes
+ * call `revalidateTag(COMMUNITY_CONTENT_EVENTS_TAG)`. Edits and deletions of
+ * an existing card are rare and ride the window below out.
+ */
+export const COMMUNITY_CONTENT_EVENTS_TAG = "community-content-events";
+
+/**
+ * The content-events page is the chat timeline's permanent not-a-message half:
+ * every open reads it (the bootstrap runs it as its deferred section, right
+ * behind the messages) and it is viewer-agnostic — authors, avatars and the
+ * comment/RSVP counts depend only on the content rows, never on who is
+ * looking. Keyed per (community, tab-limits, page size) and served from the
+ * Next data cache (R2-backed on the deployed Worker) for two minutes, or until
+ * a create revalidates the tag above.
+ */
+const loadCommunityContentEventsCached = unstable_cache(
+  loadCommunityContentEventsUncached,
+  ["community-content-events"],
+  { revalidate: 120, tags: [COMMUNITY_CONTENT_EVENTS_TAG] },
+);
+
+export function loadCommunityContentEvents(
+  communityId: string,
+  limits: { threads: boolean; showcase: boolean; events: boolean; resources: boolean },
+  perKind = 50,
+): Promise<ContentEventRow[]> {
+  return loadCommunityContentEventsCached(communityId, limits, perKind);
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
@@ -6,6 +7,7 @@ import { communityHref, deferNotification, joinRequestAcceptedNotice } from "@/l
 import { deferJoinRequestAcceptedPush } from "@/lib/push/membership";
 import { creationLimitFromError } from "@/lib/creation-limits";
 import { loadJoinSlots, memberCapMessage } from "@/lib/communities/join-slots";
+import { COMMUNITY_META_TAG, COMMUNITY_REQUESTS_TAG } from "@/lib/communities/read-models";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/accept
@@ -104,6 +106,11 @@ export async function POST(
     communityId,
     communityName,
   });
+
+  // New member (member_count, roles) and one fewer pending request: repaint
+  // every cached read model and the admins' cached list on the next read.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
+  revalidateTag(COMMUNITY_REQUESTS_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }

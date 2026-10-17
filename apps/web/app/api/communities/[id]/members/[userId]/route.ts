@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import {
@@ -12,6 +13,7 @@ import {
   applyCommunityPermissionPatch,
 } from "@/lib/communities/permissions";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
+import { COMMUNITY_MESSAGES_TAG, COMMUNITY_META_TAG } from "@/lib/communities/read-models";
 
 /**
  * GET /api/communities/[id]/members/[userId]
@@ -159,6 +161,12 @@ export async function DELETE(
     details: { member_name: targetUser?.name ?? null },
   });
 
+  // Membership and member_count changed: repaint read models for everyone, and
+  // clear the removed viewer's cached message pages so they can't keep reading
+  // a room they were just removed from.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
+  revalidateTag(COMMUNITY_MESSAGES_TAG, { expire: 0 });
+
   return NextResponse.json({ success: true });
 }
 
@@ -256,6 +264,9 @@ export async function PATCH(
       details: { member_name: targetUser?.name ?? null },
     });
 
+    // Role/grants changed: repaint the cached read models on the next open.
+    revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
+
     return NextResponse.json({ member: { user_id: targetUserId, role: "member", permissions: null } });
   }
 
@@ -312,6 +323,9 @@ export async function PATCH(
     targetUserId,
     details: { member_name: targetUser?.name ?? null, permissions },
   });
+
+  // Role/grants changed: repaint the cached read models on the next open.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
 
   return NextResponse.json({
     member: { user_id: targetUserId, role: "moderator", permissions },

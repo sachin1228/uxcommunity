@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
@@ -7,7 +8,7 @@ import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
-import { contentEventPayload } from "@/lib/communities/content-events";
+import { COMMUNITY_CONTENT_EVENTS_TAG, contentEventPayload } from "@/lib/communities/content-events";
 import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
 import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import {
@@ -285,6 +286,9 @@ export async function POST(
   }
 
   const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
+  // The cached content-events page feeds the timeline's "created an event"
+  // card; a new event must land on the next open, not a window later.
+  revalidateTag(COMMUNITY_CONTENT_EVENTS_TAG, { expire: 0 });
   return NextResponse.json(
     { event: enriched, chat_community_id: chatCommunityId },
     { status: 201 },

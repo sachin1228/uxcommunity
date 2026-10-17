@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
+import { COMMUNITY_REQUESTS_TAG } from "@/lib/communities/read-models";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/decline
@@ -48,6 +50,9 @@ export async function POST(
     targetUserId: request.user_id,
     details: { member_name: targetUser?.name ?? null },
   });
+
+  // One fewer pending request: admins' cached list and badge repaint next read.
+  revalidateTag(COMMUNITY_REQUESTS_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }

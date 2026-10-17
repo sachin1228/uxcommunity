@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityShowcasePage } from "@/lib/communities/read-models";
-import { contentEventPayload } from "@/lib/communities/content-events";
+import { COMMUNITY_CONTENT_EVENTS_TAG, contentEventPayload } from "@/lib/communities/content-events";
 import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
@@ -88,5 +89,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       data: contentEventPayload(data as Record<string, unknown>, "showcase"),
     },
   ]);
+  // The cached content-events page feeds the timeline's "shared their work"
+  // card; a new post must land on the next open, not a window later.
+  revalidateTag(COMMUNITY_CONTENT_EVENTS_TAG, { expire: 0 });
+
   return NextResponse.json({ post: (await enrich(db, [data], userId))[0] }, { status: 201 });
 }

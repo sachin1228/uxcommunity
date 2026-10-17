@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { loadCommunityMessagePage } from "@/lib/communities/read-models";
+import { COMMUNITY_MESSAGES_TAG, loadCommunityMessagePage } from "@/lib/communities/read-models";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { contentTableFor } from "@/lib/communities/content-tables";
 import { createServerTimer } from "@/lib/server-timing";
@@ -259,6 +260,10 @@ export async function POST(
     console.error("[POST message] insert error:", insertErr);
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
+
+  // The default message page is cached per (community, viewer) for a minute;
+  // a new message must repaint the next open from live data, so clear it.
+  revalidateTag(COMMUNITY_MESSAGES_TAG, { expire: 0 });
 
   // ── Realtime publish after the response is sent ─────────────────────────
   // Publish ONE event to the community chat room. Connected clients receive it

@@ -1,10 +1,12 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_ENABLED_TABS } from "./areas";
 import { resolveCommunityDp } from "./dp";
 import { canStoreMuteUntil, canStoreShowcaseFlag } from "./showcase-flag";
 import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
+import { COMMUNITY_META_TAG } from "./read-models";
 import type { CachedMeta } from "./cache";
 
 /**
@@ -31,6 +33,51 @@ import type { CachedMeta } from "./cache";
  * client-side /bootstrap fetch instead.
  */
 export async function fetchCommunityMetaSSR(
+  communityId: string,
+  userId: string,
+): Promise<SSRCommunityMeta | null> {
+  try {
+    return await fetchCommunityMetaSSRCached(communityId, userId);
+  } catch (error) {
+    if (error instanceof MetaUnavailableError) return null;
+    // A cache-layer fault must never sink the first paint: live read instead.
+    return fetchCommunityMetaSSRUncached(communityId, userId);
+  }
+}
+
+/**
+ * Sentinel for "no membership / no community" — thrown so unstable_cache does
+ * not STORE the null. A cached null would keep a recipe-joined member out of
+ * their own community for the rest of the window (the join routes revalidate
+ * the tag, but never tell a lie in the first place).
+ */
+class MetaUnavailableError extends Error {}
+
+/**
+ * The SSR meta snapshot is the chat page's server render input, so it sits on
+ * the click's critical path; every open re-read it with three queries plus a
+ * DP resolution. It is cacheable at the same scope as the read model — keyed
+ * per (community, user) and invalidated by the same membership/community
+ * writes through COMMUNITY_META_TAG — for five minutes.
+ *
+ * Staleness note: `lastReadAt` rides along and can be up to a window old. The
+ * client uses it only as the tab-dot anchor for the open in flight, and a
+ * stale-old anchor errs toward showing a dot once more rather than hiding new
+ * content; the read marker advances client-side on the same open. The mutation
+ * itself (the /read route) must NOT revalidate this tag — every open updates
+ * it, so a tag purge there would defeat the whole cache.
+ */
+const fetchCommunityMetaSSRCached = unstable_cache(
+  async (communityId: string, userId: string): Promise<SSRCommunityMeta> => {
+    const meta = await fetchCommunityMetaSSRUncached(communityId, userId);
+    if (!meta) throw new MetaUnavailableError("Community unavailable.");
+    return meta;
+  },
+  ["community-meta-ssr"],
+  { revalidate: 300, tags: [COMMUNITY_META_TAG] },
+);
+
+async function fetchCommunityMetaSSRUncached(
   communityId: string,
   userId: string,
 ): Promise<SSRCommunityMeta | null> {

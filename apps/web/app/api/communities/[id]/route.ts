@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { MASTER_IMAGE_LOOKUPS } from "@/lib/r2-cleanup";
-import { loadCommunityReadModel } from "@/lib/communities/read-models";
+import { COMMUNITY_META_TAG, COMMUNITY_RULES_TAG, loadCommunityReadModel } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
 import type { Database } from "@/lib/supabase/database.types";
@@ -256,6 +257,12 @@ export async function PATCH(
       details: { changed },
     });
   }
+
+  // Settings (name, DP, tabs) feed every cached read model and the SSR header
+  // snapshot, so a save must be visible on the next open, not a window later.
+  // Rule edits also replace the cached rules list.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
+  if (changed.includes("rules")) revalidateTag(COMMUNITY_RULES_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true, ...(imageUrlResult !== undefined ? { image_url: imageUrlResult } : {}) });
 }

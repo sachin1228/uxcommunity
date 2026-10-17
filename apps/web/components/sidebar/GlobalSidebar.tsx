@@ -63,12 +63,13 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
     [userId, prefetch],
   );
 
-  // Warm the top of the list once the dashboard is idle: the first rows are
+  // Warm the top of the list once the dashboard settles: the first rows are
   // the ones a member opens most, and prefetching them means the click lands
-  // on a warm RSC + API cache even before the pointer arrives (the hover
-  // prefetch above then costs nothing). Deliberately capped at two and
-  // staggered behind the page's own requests; the currently open community is
-  // skipped, and hovering covers everything else.
+  // on a warm RSC + API/server cache even before the pointer arrives (the
+  // hover prefetch above then costs nothing). Deliberately capped at two and
+  // staggered behind the page's own requests — but kept EARLY: a click can
+  // arrive well before true idle, so the first row is warmed at the latest
+  // 800 ms after the list renders and the second rides 350 ms behind it.
   const topCommunityKey = sorted.slice(0, 2).map((c) => c.id).join(",");
   useEffect(() => {
     const ids = topCommunityKey
@@ -83,7 +84,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
         timers.push(
           window.setTimeout(() => {
             if (!cancelled) prefetchCommunity(communityId);
-          }, index * 600),
+          }, index * 350),
         );
       });
     };
@@ -91,14 +92,14 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
     // requestIdleCallback is not implemented by every browser (Safari); a
     // plain timeout keeps the same "after the page settles" intent there.
     if (typeof window.requestIdleCallback === "function") {
-      const idle = window.requestIdleCallback(run, { timeout: 2_500 });
+      const idle = window.requestIdleCallback(run, { timeout: 800 });
       return () => {
         cancelled = true;
         for (const timer of timers) window.clearTimeout(timer);
         window.cancelIdleCallback(idle);
       };
     }
-    const idle = window.setTimeout(run, 1_500);
+    const idle = window.setTimeout(run, 600);
     return () => {
       cancelled = true;
       for (const timer of timers) window.clearTimeout(timer);

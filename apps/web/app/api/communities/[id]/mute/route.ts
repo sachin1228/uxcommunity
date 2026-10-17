@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { canStoreMuteUntil } from "@/lib/communities/showcase-flag";
+import { COMMUNITY_META_TAG } from "@/lib/communities/read-models";
 
 /**
  * POST /api/communities/[id]/mute
@@ -101,6 +103,10 @@ export async function POST(
     console.error("[community-mute] update failed", error);
     return NextResponse.json({ error: "Failed to save notification settings." }, { status: 500 });
   }
+
+  // The header's menu label reads mute state from the cached read model/SSR
+  // snapshot; a mute save must flip it on the next open, not a window later.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
 
   return NextResponse.json({
     ok: true,

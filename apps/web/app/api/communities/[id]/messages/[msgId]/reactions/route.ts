@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { COMMUNITY_MESSAGES_TAG } from "@/lib/communities/read-models";
 import type { MessageReaction } from "@/lib/communities/cache";
 import { publishChatEvent } from "@/lib/realtime/server";
 
@@ -152,6 +154,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const reactions: MessageReaction[] = Object.entries(reactionMap).map(
     ([emoji, user_ids]) => ({ emoji, user_ids })
   );
+
+  // Cached pages carry the count groups; repaint them on the next open.
+  revalidateTag(COMMUNITY_MESSAGES_TAG, { expire: 0 });
 
   return NextResponse.json({ reactions, currentUserEmoji: desiredEmoji });
 }

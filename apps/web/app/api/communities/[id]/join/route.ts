@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { SUGGESTED_COMMUNITIES_TAG } from "@/lib/home/home-rail-cache";
+import { COMMUNITY_META_TAG, COMMUNITY_REQUESTS_TAG } from "@/lib/communities/read-models";
 import { canJoinEventChat } from "@/lib/communities/event-chat";
 import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
 import { joinAnswersPayload } from "@/lib/communities/event-join-questions";
@@ -213,6 +214,8 @@ export async function POST(
 
     // The community can no longer be suggested to this member as a one-tap join.
     revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
+    // The pending list admins read (and its badge) gained a row.
+    revalidateTag(COMMUNITY_REQUESTS_TAG, { expire: 0 });
 
     return NextResponse.json({ status: "requested", communityId });
   }
@@ -243,6 +246,8 @@ export async function POST(
   // Drop the cached suggestion lists so the homepage rail (and any other
   // surface reading them) stops offering a community this member just joined.
   revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
+  // Membership and member_count changed for every cached read model.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }
@@ -271,6 +276,9 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to withdraw request." }, { status: 500 });
   }
+
+  // The pending request is gone: admins' cached list and badge must repaint.
+  revalidateTag(COMMUNITY_REQUESTS_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }
