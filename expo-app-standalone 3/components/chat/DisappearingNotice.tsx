@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   pill: {
     maxWidth: '85%',
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 6,
     paddingVertical: 6,
     shadowColor: '#000',
     shadowOpacity: 0.25,
