@@ -19,6 +19,8 @@
  * - Background reconciliation on AppState 'active': max(server, local) unread
  * - Live sockets are bounded to the most recently active window, so a member of
  *   100 communities does not carry 100 WebSockets (`lib/realtimeWindow.ts`)
+ * - Rows past that window catch up on a slow beat while the list is on screen
+ *   — the mobile counterpart of the web sidebar's poll (`catchUpList`)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -159,6 +161,15 @@ export function useCommunities() {
     [reconcile],
   );
   useEffect(() => () => listCatchUp.cancel(), [listCatchUp]);
+
+  /**
+   * The same catch-up as a callable, for the communities screen: a row past
+   * the live socket window has no socket to move it, so the screen schedules
+   * one when the list regains focus and beats on it while the list is on
+   * screen. Debounced and single-flight, so a focus landing next to a
+   * reconnect still costs one request, not two.
+   */
+  const catchUpList = useCallback(() => listCatchUp.schedule(), [listCatchUp]);
 
   // ── Typing flush helper ────────────────────────────────────────────────────
   const flushTyping = useCallback(() => {
@@ -490,8 +501,8 @@ export function useCommunities() {
    *
    * Nothing the user is looking at depends on this window: the open chat
    * subscribes its own room from `useChatMessages`, and everything past the
-   * window is caught up by the reconcile above (foreground, reconnect, and
-   * pull-to-refresh on the list).
+   * window is caught up by the reconcile above — foreground, reconnect,
+   * pull-to-refresh, and the focused list's own beat (see `catchUpList`).
    */
   const liveCommunityIds = useMemo(
     () => selectLiveCommunityIds(communities.map((c) => c.id)),
@@ -622,6 +633,8 @@ export function useCommunities() {
     /** The slow clock the rows read for pin/mute marks (see nowMs). */
     nowMs,
     reload: load,
+    /** Silent, debounced server reconcile — the focused list's wake-up call. */
+    catchUpList,
     markCommunityRead,
     clearActiveCommunity,
     getTypingLabel,

@@ -22,6 +22,9 @@
  *     instead of one request plus local `ws.send()`s — a fan-out cost the
  *     realtime worker was specifically hardened to avoid.
  *
+ * The surface-by-surface map — who hibernates, what moves them, at what
+ * cadence — lives in `docs/community-hibernation.md`.
+ *
  * So the socket count is bounded by keeping a live socket only for the
  * communities that earn one: the most recently active window. A socket is not
  * free on a phone — a heartbeat every 25 s, a reconnect on every network change,
@@ -44,6 +47,21 @@
  * the budget the app is willing to spend on background badges.
  */
 export const COMMUNITY_REALTIME_LIMIT = 10;
+
+/**
+ * How often the focused community list re-reads the server when it holds
+ * communities past the live window.
+ *
+ * Hibernated rows have no socket, so they only move when a reconcile runs —
+ * and a list that is merely being looked at produces none of the triggers
+ * otherwise available (foreground, reconnect, pull-to-refresh). This is the
+ * slow beat for that case, the mobile counterpart of the web sidebar's poll
+ * (`SIDEBAR_STALE_MS`, also 60 s, applied while it is over its window). The
+ * screen runs it only while the list is focused and the app foregrounded, and
+ * each tick collapses into the same debounced, single-flight reconcile as
+ * every other trigger (`useCommunities`).
+ */
+export const HIBERNATED_LIST_REFRESH_MS = 60_000;
 
 /**
  * The communities that keep a live socket.

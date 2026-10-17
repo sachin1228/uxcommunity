@@ -18,6 +18,7 @@ import test from 'node:test';
 
 import {
   COMMUNITY_REALTIME_LIMIT,
+  HIBERNATED_LIST_REFRESH_MS,
   selectLiveCommunityIds,
 } from './realtimeWindow';
 
@@ -87,4 +88,11 @@ test('a custom limit is honoured, so the budget can be tuned without touching th
 
 test('an empty list keeps zero sockets', () => {
   assert.deepEqual(selectLiveCommunityIds([]), []);
+});
+
+test('the hibernated-list beat is the same minute the web sidebar polls at', () => {
+  // A row outside the window may be up to one beat stale while the list is on
+  // screen; the number is pinned so the two clients cannot drift apart on how
+  // fresh a hibernated community is allowed to be.
+  assert.equal(HIBERNATED_LIST_REFRESH_MS, 60_000);
 });
