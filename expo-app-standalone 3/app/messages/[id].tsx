@@ -179,6 +179,8 @@ export default function DmThreadScreen() {
   const [initialUnread, setInitialUnread] = useState<{ id: string; count: number } | null>(
     null,
   );
+  /** The list stays hidden until the anchor scroll is committed (no top flash). */
+  const [initialPositionResolved, setInitialPositionResolved] = useState(false);
 
   const loadingMoreRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -801,9 +803,13 @@ export default function DmThreadScreen() {
   // otherwise (the web's useDmScrollAndUnread anchor). One-shot — later
   // messages never move the reader.
   useEffect(() => {
-    if (loading || initialScrollDoneRef.current) return;
+    if (loading || error || initialScrollDoneRef.current) return;
     initialScrollDoneRef.current = true;
-    if (messages.length === 0) return;
+
+    if (messages.length === 0) {
+      setInitialPositionResolved(true);
+      return;
+    }
 
     requestAnimationFrame(() => {
       if (initialUnread) {
@@ -814,12 +820,16 @@ export default function DmThreadScreen() {
             animated: false,
             viewPosition: 0.15,
           });
-          return;
+        } else {
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
         }
+      } else {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
       }
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      // One more frame lets the native scroll commit before the list paints.
+      requestAnimationFrame(() => setInitialPositionResolved(true));
     });
-  }, [loading, initialUnread, messages.length, rows]);
+  }, [loading, error, initialUnread, messages.length, rows]);
 
   // ── Images / lightbox ─────────────────────────────────────────────────────
   const lightboxImages = useMemo<LightboxImage[]>(
@@ -1001,6 +1011,7 @@ export default function DmThreadScreen() {
               inverted
               data={rows}
               keyExtractor={(row) => row.key}
+              style={{ opacity: initialPositionResolved ? 1 : 0 }}
               contentContainerStyle={styles.list}
               keyboardDismissMode="on-drag"
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}

@@ -469,17 +469,32 @@ export default function CommunityChat() {
   const unreadLatchedRef = useRef(false);
   /** The first open waits for the unread latch before choosing its anchor. */
   const [initialPositionReady, setInitialPositionReady] = useState(false);
+  /** The list stays hidden until the anchor scroll is committed (no top flash). */
+  const [initialPositionResolved, setInitialPositionResolved] = useState(false);
   const initialScrollDoneRef = useRef(false);
   useEffect(() => {
-    if (unreadLatchedRef.current || messages.length === 0 || !readStateKnown) return;
+    if (unreadLatchedRef.current || !readStateKnown || isLoading) return;
     unreadLatchedRef.current = true;
     setInitialPositionReady(true);
+    if (messages.length === 0) return;
     if (!lastReadAt || initialUnreadCount <= 0) return;
     const firstUnread = messages.find(
       (m) => m.created_at > lastReadAt && m.user_id !== user?.id,
     );
     if (firstUnread) setFirstUnreadId(firstUnread.id);
-  }, [messages, lastReadAt, initialUnreadCount, user?.id, readStateKnown]);
+  }, [messages, isLoading, lastReadAt, initialUnreadCount, user?.id, readStateKnown]);
+
+  // Deep links whose community lookup never lands must not hold the list
+  // hidden forever: after a short grace, anchor at the bottom as if read.
+  useEffect(() => {
+    if (unreadLatchedRef.current || readStateKnown || isLoading) return undefined;
+    const timer = setTimeout(() => {
+      if (unreadLatchedRef.current) return;
+      unreadLatchedRef.current = true;
+      setInitialPositionReady(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [readStateKnown, isLoading]);
 
   // ── Rows: day dividers + unread marker interleaved with the timeline ─────
   // Messages and "created a …" cards merge into one ascending timeline (the
@@ -548,9 +563,15 @@ export default function CommunityChat() {
   // (the web's useScrollAndUnread anchor). One-shot: later messages never
   // re-position the reader.
   useEffect(() => {
+    if (error) return;
     if (!initialPositionReady || isLoading || !contentEventsReady) return;
     if (initialScrollDoneRef.current) return;
     initialScrollDoneRef.current = true;
+
+    if (rows.length === 0) {
+      setInitialPositionResolved(true);
+      return;
+    }
 
     requestAnimationFrame(() => {
       if (firstUnreadId) {
@@ -561,12 +582,23 @@ export default function CommunityChat() {
             animated: false,
             viewPosition: 0.15,
           });
-          return;
+        } else {
+          listRef.current?.scrollToEnd({ animated: false });
         }
+      } else {
+        listRef.current?.scrollToEnd({ animated: false });
       }
-      listRef.current?.scrollToEnd({ animated: false });
+      // One more frame lets the native scroll commit before the list paints.
+      requestAnimationFrame(() => setInitialPositionResolved(true));
     });
-  }, [initialPositionReady, isLoading, contentEventsReady, firstUnreadId, rows]);
+  }, [
+    initialPositionReady,
+    isLoading,
+    contentEventsReady,
+    firstUnreadId,
+    rows,
+    error,
+  ]);
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 10 });
   const handleViewableItemsChanged = useRef(
@@ -977,6 +1009,7 @@ export default function CommunityChat() {
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          style={{ opacity: initialPositionResolved ? 1 : 0 }}
           contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
           // Reading old messages means the user is done picking emoji —
           // close the inline panel so it doesn't eat half the screen.
