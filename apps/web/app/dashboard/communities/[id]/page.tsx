@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchCommunityMetaSSR } from "@/lib/communities/server";
+import { loadCommunityMessagePage } from "@/lib/communities/read-models";
+import type { CachedMessage } from "@/lib/communities/cache";
 import { loadCommunityPreview } from "@/lib/communities/preview";
 import { loadEventChatGate } from "@/lib/communities/event-chat";
 import { CommunityChat } from "@/components/communities/CommunityChat";
@@ -24,11 +26,22 @@ export default async function CommunityPage({ params, searchParams }: Props) {
     tab === "showcase" || tab === "threads" || tab === "events" || tab === "resources" || tab === "members" ? tab : "chat";
   const userId = (session as { userId: string }).userId;
 
-  // Lightweight server snapshot: community read model + top members only, so
-  // the header and info panel paint immediately. Messages and tab sections
-  // hydrate client-side (cached + realtime with the Lottie loader while the
-  // first message page loads) — navigation never blocks on the full read model.
-  const ssrData = await fetchCommunityMetaSSR(id, userId).catch(() => null);
+  // Server snapshot in two parallel reads: the community read model the
+  // header paints from, and the first message page the chat paints from.
+  // Messages ride the RSC payload as `initialMessages`, so the chat no longer
+  // waits on the client's /bootstrap fetch for its first paint — that fetch
+  // (and the full bootstrap in particular) used to gate the first messages
+  // behind seconds of sequential DB waves on a cold open. Secondary sections
+  // (member details, tab collections, rules) still hydrate client-side from
+  // the cached /bootstrap fetch. A message page that fails — or a non-member —
+  // simply falls back to that same client-side path.
+  const [ssrData, ssrMessagePage] = await Promise.all([
+    fetchCommunityMetaSSR(id, userId).catch(() => null),
+    loadCommunityMessagePage(id, userId).catch(() => null),
+  ]);
+  const initialMessages = ssrMessagePage?.ok
+    ? (ssrMessagePage.data.messages as CachedMessage[])
+    : undefined;
 
   // An event's group chat is joined on confirmation — the read model and the
   // message routes both refuse non-members, so a non-member gets the event and
@@ -92,6 +105,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
       currentUserId={userId}
       currentUserName={ssrData?.currentUserName ?? "Someone"}
       initialMeta={ssrData?.meta}
+      initialMessages={initialMessages}
       initialLastReadAt={ssrData?.lastReadAt}
       initialTab={initialTab}
     />

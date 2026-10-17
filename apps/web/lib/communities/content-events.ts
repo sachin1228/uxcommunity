@@ -141,7 +141,21 @@ export async function loadCommunityContentEvents(
 
   const authorIds = [...new Set(rows.map((row) => row.user_id).filter((id): id is string => typeof id === "string"))];
   const contentIds = rows.map((row) => row.id as string);
-  const [{ data: users }, { data: profiles }, { data: reactionRows }] = await Promise.all([
+  // RSVPs change independently of the event row, so the embedded count goes
+  // stale — refresh it for the events on this page. Comment counts are
+  // computed per page the same way: they tell members how much discussion
+  // each card has. Both — plus authors, avatars and reactions — depend only
+  // on the content rows above, so they ride ONE wave; the counts used to wait
+  // for the author queries first, paying an extra full round trip on every
+  // bootstrap for row ids that were already known.
+  const eventRows = rows.filter((row) => row.kind === "event");
+  const [
+    { data: users },
+    { data: profiles },
+    { data: reactionRows },
+    rsvpCounts,
+    commentCounts,
+  ] = await Promise.all([
     db.from("users").select("id, name").in("id", authorIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
     contentIds.length
@@ -149,23 +163,15 @@ export async function loadCommunityContentEvents(
           data: Array<{ content_id: string; emoji: string; user_id: string }> | null;
         }>)
       : Promise.resolve({ data: [] as Array<{ content_id: string; emoji: string; user_id: string }> | null }),
-  ]);
-
-  const nameMap = Object.fromEntries((users ?? []).map((u) => [(u as { id: string }).id, (u as { name: string }).name]));
-  const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [(p as { user_id: string }).user_id, (p as { avatar_url: string | null }).avatar_url]));
-
-  // RSVPs change independently of the event row, so the embedded count goes
-  // stale — refresh it for the events on this page in one query. Comment
-  // counts are computed per page the same way: they tell members how much
-  // discussion each card has.
-  const eventRows = rows.filter((row) => row.kind === "event");
-  const [rsvpCounts, commentCounts] = await Promise.all([
     loadRsvpCounts(db, eventRows.map((row) => row.id as string)),
     loadCommentCounts(
       db,
       rows.map((row) => ({ id: row.id as string, kind: row.kind as ContentEventKind })),
     ),
   ]);
+
+  const nameMap = Object.fromEntries((users ?? []).map((u) => [(u as { id: string }).id, (u as { name: string }).name]));
+  const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [(p as { user_id: string }).user_id, (p as { avatar_url: string | null }).avatar_url]));
 
   // Group content reactions per item — the chat cards render them like
   // message-reaction pills.

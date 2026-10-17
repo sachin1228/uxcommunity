@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { COMMUNITY_RULES_TAG } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 // ── GET /api/admin/communities/[id]/rules ────────────────────────────────────
@@ -57,6 +59,10 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: "Failed to create rule." }, { status: 500 });
+
+  // The chat bootstrap and /rules read community rules through the Next data
+  // cache (see loadCommunityRules); a write has to clear it.
+  revalidateTag(COMMUNITY_RULES_TAG, { expire: 0 });
 
   void publishRealtimeBatch([
     { room: realtimeRooms.rules(id), topic: "rule", data: { event: "INSERT", rule: data } },
