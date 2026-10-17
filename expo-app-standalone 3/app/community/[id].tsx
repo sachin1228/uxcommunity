@@ -11,10 +11,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import {
-  KeyboardAvoidingView as KeyboardControllerAvoidingView,
-  KeyboardEvents,
-} from 'react-native-keyboard-controller';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { KeyboardAvoidingView as KeyboardControllerAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useChatContentEvents } from '@/hooks/useChatContentEvents';
@@ -84,6 +82,14 @@ type ChatRow =
   | { kind: 'notice'; key: string }
   | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean }
   | { kind: 'content'; key: string; event: ChatContentEvent };
+
+/**
+ * Web parity (useScrollAndUnread): being within this many pixels of the newest
+ * row counts as "at the bottom" — for the inverted list, the scroll offset
+ * itself. The jump pill appears beyond it, and a send landing anywhere inside
+ * it never lights the pill.
+ */
+const JUMP_PILL_THRESHOLD = 80;
 
 export default function CommunityChat() {
   const {
@@ -456,13 +462,27 @@ export default function CommunityChat() {
   const listRef = useRef<FlatList<ChatRow>>(null);
 
   /**
-   * atBottom — whether the newest message is on screen. Updated by
-   * onViewableItemsChanged, which is far more reliable than scroll-offset
-   * arithmetic (no timing race, no threshold guessing). The ref feeds the
-   * keyboard handler; the state drives the "jump to latest" button.
+   * Inverted list (DM thread parity): data[0] is the newest row and native
+   * offset 0 is the visual bottom, so a newly appended row lands at the
+   * composer's edge the moment it is laid out — scrollToEnd measured the old
+   * content, so the first jump stopped short and the optimistic bubble
+   * settled below the fold. scrollToOffset(0) has no such race: its target is
+   * absolute, not dependent on a row that has not been measured yet.
+   *
+   * atBottom — whether the reader is within JUMP_PILL_THRESHOLD px of the
+   * newest row — for the inverted list, that distance *is* the offset. Web
+   * parity: useScrollAndUnread flips the pill on distance from the bottom
+   * (> 80px), not on "is the last row visible". Viewability flipped false for
+   * the whole duration of every send's animated scroll — the pill flashed
+   * above the composer on each message sent — and stayed there whenever the
+   * newest bubble settled a few px below the fold. A distance threshold
+   * cannot flicker mid-flight.
    */
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
+  /** Once the initial anchor is committed, content changes may steer the list. */
+  const initialPositionResolvedRef = useRef(false);
+  /** The last message id seen — tells an append apart from edits/retention. */
   const lastMessageIdRef = useRef<string | null>(null);
 
   // ── Unread marker: latched once, from the first loaded page ──────────────
@@ -551,13 +571,12 @@ export default function CommunityChat() {
     if (!hasMore && out.length > 0) {
       out.unshift({ kind: 'notice', key: 'notice' });
     }
-    return out;
+    // The list is inverted; newest must sit at the bottom. Offset 0 is the
+    // visual bottom, so an appended row lands at the composer's edge the
+    // moment it is laid out — no scrollToEnd measurement racing the row's
+    // layout (DM thread parity).
+    return out.reverse();
   }, [messages, contentEvents, hasMore, firstUnreadId]);
-
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    lastMessageIdRef.current = lastMessage?.id ?? null;
-  }, [messages]);
 
   // ── Initial position: the unread divider when one exists, newest otherwise
   // (the web's useScrollAndUnread anchor). One-shot: later messages never
@@ -569,6 +588,7 @@ export default function CommunityChat() {
     initialScrollDoneRef.current = true;
 
     if (rows.length === 0) {
+      initialPositionResolvedRef.current = true;
       setInitialPositionResolved(true);
       return;
     }
@@ -580,16 +600,22 @@ export default function CommunityChat() {
           listRef.current?.scrollToIndex({
             index,
             animated: false,
-            viewPosition: 0.15,
+            // Inverted list: viewPosition runs from the visual bottom, so
+            // 0.85 parks the divider near the top — where the web's
+            // useScrollAndUnread anchor puts it (80px down, unread below).
+            viewPosition: 0.85,
           });
         } else {
-          listRef.current?.scrollToEnd({ animated: false });
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
         }
       } else {
-        listRef.current?.scrollToEnd({ animated: false });
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
       }
       // One more frame lets the native scroll commit before the list paints.
-      requestAnimationFrame(() => setInitialPositionResolved(true));
+      requestAnimationFrame(() => {
+        initialPositionResolvedRef.current = true;
+        setInitialPositionResolved(true);
+      });
     });
   }, [
     initialPositionReady,
@@ -600,35 +626,50 @@ export default function CommunityChat() {
     error,
   ]);
 
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 10 });
-  const handleViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: ChatRow }> }) => {
-      const lastId = lastMessageIdRef.current;
-      if (!lastId) return;
-      const next = viewableItems.some(
-        (vi) => vi.item.kind === 'message' && vi.item.msg.id === lastId,
-      );
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // The list is inverted: offset 0 is the newest row, so the offset is
+      // itself the distance from the bottom edge the pill cares about.
+      const next = event.nativeEvent.contentOffset.y <= JUMP_PILL_THRESHOLD;
       atBottomRef.current = next;
       // Only re-render when the answer actually flips.
       setAtBottom((prev) => (prev === next ? prev : next));
     },
+    [],
   );
 
   const scrollToLatest = useCallback((animated = true) => {
-    listRef.current?.scrollToEnd({ animated });
+    if (!animated) {
+      // An instant jump is authoritative: the reader is at the bottom from
+      // this commit on, so the list prop below can step MVCP aside before
+      // the new row mounts (a smooth glide instead lets scroll events drive
+      // the pill, exactly like the web's scrollIntoView on the pill).
+      atBottomRef.current = true;
+      setAtBottom(true);
+    }
+    listRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
 
+  /**
+   * Follow the newest message while the reader is parked at the bottom — the
+   * web's realtime follow (useScrollAndUnread Effect 3: smooth scroll to the
+   * bottom anchor). Appended rows already land at the visual bottom of the
+   * inverted list, so this is a no-op at offset 0; it closes the gap when the
+   * reader was a few px up (≤ JUMP_PILL_THRESHOLD), when a row arrives while
+   * a scroll animation is in flight, and when the temp → real id swap
+   * re-anchors the viewport. 40ms is the DM thread's beat — it lets the row's
+   * layout commit before the offset is steered to the new end.
+   */
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
-    const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
-      // Only jump to the bottom when the last message is already visible.
-      // If the user has scrolled up to read old messages, leave them there.
-      if (atBottomRef.current) scrollToLatest(true);
-    });
-
-    return () => subscription.remove();
-  }, [scrollToLatest]);
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    if (!lastId || lastId === lastMessageIdRef.current) return undefined;
+    const isFirstPage = lastMessageIdRef.current === null;
+    lastMessageIdRef.current = lastId;
+    if (isFirstPage || !initialPositionResolvedRef.current) return undefined;
+    if (!atBottomRef.current) return undefined;
+    const timer = setTimeout(() => scrollToLatest(true), 40);
+    return () => clearTimeout(timer);
+  }, [messages, scrollToLatest]);
 
   const {
     handleSend: _handleSend,
@@ -1006,17 +1047,28 @@ export default function CommunityChat() {
       {!isLoading && (
         <FlatList
           ref={listRef}
+          inverted
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           style={{ opacity: initialPositionResolved ? 1 : 0 }}
-          contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
+          contentContainerStyle={[styles.messagesList, { paddingTop: 8 }]}
           // Reading old messages means the user is done picking emoji —
           // close the inline panel so it doesn't eat half the screen.
           onScrollBeginDrag={() => setEmojiPanelOpen(false)}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          onViewableItemsChanged={handleViewableItemsChanged.current}
-          viewabilityConfig={viewabilityConfig.current}
+          onScroll={handleScroll}
+          scrollEventThrottle={32}
+          // Web parity: the DOM list has no "keep the old anchor" behavior — a
+          // new row at the bottom simply is the bottom. On the native list
+          // that behavior is `maintainVisibleContentPosition`, and left on at
+          // the bottom it re-anchors the previous row: the send/echo lands
+          // just below the fold ("cut for a second") until a follow scroll
+          // brings it back. Keep it for what it is for — holding the reading
+          // position steady while scrolled up — and step it aside at the
+          // bottom, where offset 0 keeps the new row in view by itself.
+          maintainVisibleContentPosition={
+            atBottom ? undefined : { minIndexForVisible: 0 }
+          }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
           onScrollToIndexFailed={(info) => {
@@ -1038,7 +1090,9 @@ export default function CommunityChat() {
               }
             }, 120);
           }}
-          ListHeaderComponent={
+          // Inverted: older history sits at the visual top — the tail of the
+          // list — so the pagination spinner is a footer (DM thread parity).
+          ListFooterComponent={
             isLoadingMore ? (
               <View style={styles.loadMoreSpinner}>
                 <ActivityIndicator size="small" color={colors.accent} />
@@ -1072,12 +1126,10 @@ export default function CommunityChat() {
         />
       )}
 
-      <View
-        style={styles.footer}
-        onLayout={() => {
-          if (atBottomRef.current) scrollToLatest(false);
-        }}
-      >
+      {/* The footer grows/shrinks (reply banner, typing indicator, emoji
+          panel) and the list above it resizes with it; an inverted list keeps
+          offset 0 parked at the bottom edge through any such resize. */}
+      <View style={styles.footer}>
         {/* Scroll-to-bottom button — floats just above the footer edge */}
         {!atBottom && !isLoading && (
           <Pressable
@@ -1547,7 +1599,9 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flexGrow: 1,
-    paddingTop: 4,
+    // Inverted: paddingTop sits below the newest bubble, paddingBottom above
+    // the oldest — the reverse of the non-inverted list this replaces.
+    paddingBottom: 4,
   },
   dateDivider: {
     alignItems: 'center',

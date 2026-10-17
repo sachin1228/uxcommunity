@@ -120,7 +120,11 @@ export function useSendMessage({
         if (prev.some((m) => m.id === tempId)) return prev;
         return [...prev, optimistic];
       });
-      scrollToLatest(true);
+      // Web parity: the send jump is instant (`scrollTop = max`, no smooth —
+      // useSendMessage) and absolute, so the optimistic row lands at the
+      // bottom without waiting for its height to be measured. A send from up
+      // in history teleports down, exactly like the web.
+      scrollToLatest(false);
 
       // Abort controller for this send
       const ctrl = new AbortController();
