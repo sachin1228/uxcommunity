@@ -22,6 +22,30 @@ const CONTENT_TABS: ReadonlyArray<readonly [ContentTab, ContentEventKind]> = [
   ["events", "event"],
 ];
 
+/**
+ * Both fetches below support the nav dots — they are not chat data. Firing
+ * them on mount put two requests in the same second as the message fetch, so
+ * they are scheduled for idle time instead, and their answers are remembered
+ * for a minute: switching back and forth between communities renders the dots
+ * instantly from memory while the chat pays nothing.
+ */
+const DOT_CACHE_TTL_MS = 60_000;
+const latestCache = new Map<string, { at: number; latest: LatestMap }>();
+const requestsCache = new Map<string, { at: number; count: number }>();
+
+/** Run `task` when the browser is idle, but never later than the timeout. */
+function onIdle(task: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(task, { timeout: 2_000 });
+    return () => window.cancelIdleCallback(handle);
+  }
+  // requestIdleCallback is not implemented everywhere (Safari); a short
+  // timeout keeps the same "after the chat's own requests" intent.
+  const handle = window.setTimeout(task, 1_200);
+  return () => window.clearTimeout(handle);
+}
+
 type LatestKind = ContentEventKind | "activity";
 type LatestMap = Partial<Record<LatestKind, string | null>>;
 
@@ -103,13 +127,28 @@ export function useCommunityTabDots({
 
   // The fresh per-kind baseline. Community-keyed: a switch to another
   // community must not compare against the previous one's timestamps, so
-  // `latestReady` stays false until this community's own fetch settles.
+  // `latestReady` stays false until this community's own fetch settles. A
+  // recent answer is reused as-is — dots tolerate a delayed raise (the live
+  // timeline window covers anything newer), never a fetch on the open path.
   useEffect(() => {
+    const cached = latestCache.get(communityId);
+    if (cached && Date.now() - cached.at < DOT_CACHE_TTL_MS) {
+      // Deferred one microtask: the state update comes from a callback rather
+      // than a cascading synchronous render inside the effect body
+      // (react-hooks/set-state-in-effect), and the dots still land in the
+      // same frame.
+      queueMicrotask(() => setFetched({ communityId, latest: cached.latest }));
+      return;
+    }
     let cancelled = false;
-    void fetchLatest().then((latest) => {
-      if (!cancelled) setFetched({ communityId, latest });
+    const stop = onIdle(() => {
+      void fetchLatest().then((latest) => {
+        if (cancelled) return;
+        latestCache.set(communityId, { at: Date.now(), latest });
+        setFetched({ communityId, latest });
+      });
     });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; stop(); };
   }, [communityId, fetchLatest]);
 
   // Opening the Activity tab re-reads the baseline: an audit row that landed
@@ -118,24 +157,37 @@ export function useCommunityTabDots({
     if (activeTab !== "activity" || !canSeeActivity) return;
     let cancelled = false;
     void fetchLatest().then((latest) => {
-      if (!cancelled) setFetched({ communityId, latest });
+      if (cancelled) return;
+      latestCache.set(communityId, { at: Date.now(), latest });
+      setFetched({ communityId, latest });
     });
     return () => { cancelled = true; };
   }, [activeTab, canSeeActivity, communityId, fetchLatest]);
 
   // Pending join requests (manager of a private community only — the same gate
   // MembersView applies). A failure leaves the count unknown, which shows no
-  // dot rather than a wrong one.
+  // dot rather than a wrong one. Same idle deferral + memory cache as above.
   useEffect(() => {
     if (!canSeeRequests) return;
+    const cached = requestsCache.get(communityId);
+    if (cached && Date.now() - cached.at < DOT_CACHE_TTL_MS) {
+      // Same one-microtask deferral as the baseline effect above.
+      queueMicrotask(() => setRequests({ communityId, count: cached.count }));
+      return;
+    }
     let cancelled = false;
-    fetch(`/api/communities/${communityId}/requests`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { requests?: unknown[] } | null) => {
-        if (!cancelled && data) setRequests({ communityId, count: data.requests?.length ?? 0 });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const stop = onIdle(() => {
+      fetch(`/api/communities/${communityId}/requests`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { requests?: unknown[] } | null) => {
+          if (cancelled || !data) return;
+          const count = data.requests?.length ?? 0;
+          requestsCache.set(communityId, { at: Date.now(), count });
+          setRequests({ communityId, count });
+        })
+        .catch(() => {});
+    });
+    return () => { cancelled = true; stop(); };
   }, [communityId, canSeeRequests]);
 
   const advance = useCallback(

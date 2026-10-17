@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { COMMUNITY_MESSAGES_TAG } from "@/lib/communities/read-models";
 
 /**
  * POST /api/communities/[id]/archive
@@ -44,5 +46,10 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: "Failed to delete community." }, { status: 500 });
   }
+
+  // history_cleared_at moved forward: this viewer's cached message page would
+  // otherwise serve the pre-clear history on the next open.
+  revalidateTag(COMMUNITY_MESSAGES_TAG, { expire: 0 });
+
   return NextResponse.json({ success: true });
 }

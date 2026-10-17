@@ -29,7 +29,7 @@ import {
   invalidateOnLeave,
   metaCache,
 } from "@/lib/communities/cache";
-import { invalidateRequest } from "@/lib/request-cache";
+import { invalidateCommunityBootstrapCache, invalidateRequest } from "@/lib/request-cache";
 import { showUndoToast } from "@/lib/undo-toast";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
@@ -332,13 +332,13 @@ export function EventCard({
     const roomId = ((await response.json().catch(() => null)) as { chat_community_id?: string | null } | null)
       ?.chat_community_id ?? null;
     invalidateCommunitiesList();
-    invalidateRequest(`/api/communities/${communityId}/bootstrap`);
+    invalidateCommunityBootstrapCache(communityId);
     invalidateRequest(`/api/communities/${communityId}/event`);
     if (roomId) {
       // The room's meta is read through its bootstrap (which carries the
       // event fields) and its members keep their own copy in metaCache.
       metaCache.delete(roomId);
-      invalidateRequest(`/api/communities/${roomId}/bootstrap`);
+      invalidateCommunityBootstrapCache(roomId);
       invalidateRequest(`/api/communities/${roomId}/event`);
     }
     onDeleted(event.id);

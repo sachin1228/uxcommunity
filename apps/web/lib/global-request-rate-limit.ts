@@ -11,13 +11,81 @@ export const GLOBAL_REQUEST_LIMITS = {
 } as const;
 
 /**
+ * The Cloudflare native rate-limiting binding (wrangler `[[ratelimits]]`,
+ * GLOBAL_REQUEST_BURST_LIMITER). Its counters are cached on the same machine
+ * the Worker runs in, so `limit()` adds no network hop — where the Upstash
+ * fallback pays a cross-region HTTPS round trip on every request. The binding
+ * is per-location (see the Cloudflare docs): for the burst window that is the
+ * intent — it stops a refresh/navigation storm at the colo the storm is
+ * coming from — while the sustained quota below keeps counting across
+ * locations in Upstash.
+ */
+type BurstLimiterBinding = {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+};
+
+/**
+ * `undefined` = not looked up yet, `null` = looked up and unavailable (local
+ * dev, or a deployment without the binding). Latched so the lookup cost and
+ * the one-off warning are paid at most once per worker isolate.
+ */
+let burstBinding: BurstLimiterBinding | null | undefined;
+
+async function getBurstBinding(): Promise<BurstLimiterBinding | null> {
+  if (burstBinding !== undefined) return burstBinding;
+  try {
+    // Dynamic + subpath import: the middleware bundle only pulls in this
+    // tiny module (never the whole builder package). `getCloudflareContext`
+    // throws outside a Worker request (next dev), which is the fallback path.
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare/cloudflare-context");
+    const env = getCloudflareContext().env as Record<string, unknown>;
+    burstBinding =
+      (env.GLOBAL_REQUEST_BURST_LIMITER as BurstLimiterBinding | undefined) ?? null;
+  } catch {
+    burstBinding = null;
+  }
+  if (!burstBinding) {
+    console.warn(
+      "[rate-limit] GLOBAL_REQUEST_BURST_LIMITER binding unavailable — burst window falls back to Upstash (one Redis round trip per request).",
+    );
+  }
+  return burstBinding;
+}
+
+/**
+ * The burst window, on the native binding when deployed on Cloudflare and on
+ * Upstash everywhere else. `remaining`/`resetAt` are approximate on the
+ * binding path (the API returns only success), so headers stay conservative —
+ * same contract as the cached sustained verdict below.
+ */
+async function checkBurstLimit(key: string): Promise<RateLimitResult> {
+  const binding = await getBurstBinding();
+  if (binding) {
+    const resetAt = Date.now() + GLOBAL_REQUEST_LIMITS.burst.windowS * 1_000;
+    try {
+      const { success } = await binding.limit({ key: `global-request:burst:${key}` });
+      return success
+        ? { success: true, remaining: -1, resetAt }
+        : { success: false, remaining: 0, resetAt };
+    } catch (err) {
+      console.error("[rate-limit] burst binding failed, falling back to Upstash:", err);
+    }
+  }
+  return rateLimit(
+    `global-request:burst:${key}`,
+    GLOBAL_REQUEST_LIMITS.burst.limit,
+    GLOBAL_REQUEST_LIMITS.burst.windowS
+  );
+}
+
+/**
  * The middleware runs on EVERY page and API request, and each Upstash round
- * trip is paid in request latency. Both windows stay enforced, but only the
- * burst window (the one that actually stops refresh/navigation storms) is
- * checked on every request. The coarse sustained quota's "allowed" verdict is
+ * trip is paid in request latency. On Cloudflare the burst window is counted
+ * by the native binding above (no round trip at all); everywhere else it
+ * falls back to Upstash. The coarse sustained quota's "allowed" verdict is
  * cached per worker for a couple of seconds, so a typical request costs ONE
- * Redis round trip instead of two while a flood still trips the burst limiter
- * immediately and the sustained limiter at most ~2s late per worker.
+ * Redis round trip instead of two — and none at all when the burst binding is
+ * present while the sustained verdict is cached.
  */
 const SUSTAINED_VERDICT_TTL_MS = 2_000;
 const SUSTAINED_VERDICT_MAX_ENTRIES = 5_000;
@@ -79,12 +147,9 @@ export function getGlobalRequestKey(
 export async function checkGlobalRequestRateLimit(
   key: string
 ): Promise<GlobalRequestRateLimitResult> {
-  // Burst window: strict, checked on every request.
-  const burst = await rateLimit(
-    `global-request:burst:${key}`,
-    GLOBAL_REQUEST_LIMITS.burst.limit,
-    GLOBAL_REQUEST_LIMITS.burst.windowS
-  );
+  // Burst window: strict, checked on every request (native binding on
+  // Cloudflare, Upstash elsewhere — see checkBurstLimit).
+  const burst = await checkBurstLimit(key);
   if (!burst.success) {
     sustainedVerdicts.delete(key);
     return {

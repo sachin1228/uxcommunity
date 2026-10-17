@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityPermissions, resolveCommunityRole } from "./manager-role";
@@ -48,8 +49,70 @@ export type ReadResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: number; error: string };
 
+/**
+ * Thrown by the cached read variants when the live read fails (missing
+ * membership, database fault). unstable_cache does not store thrown errors, so
+ * mapping failures through an exception keeps a transient 403/500 from being
+ * replayed for the length of a cache window — the wrappers below convert it
+ * back to the exact ReadResult the uncached path would have returned.
+ */
+class CommunityReadError extends Error {
+  constructor(
+    readonly status: number,
+    readonly publicMessage: string,
+  ) {
+    super(publicMessage);
+    this.name = "CommunityReadError";
+  }
+}
+
+/**
+ * Revalidation tag for every viewer-scoped community read model — the
+ * bootstrap's community section and the chat page's SSR meta snapshot. Writes
+ * that change what it contains (join/leave/accept/decline/kick, role, mute
+ * state, community edits) call `revalidateTag(COMMUNITY_META_TAG)`; those are
+ * all rare, so one tag for every community is enough bookkeeping.
+ */
+export const COMMUNITY_META_TAG = "community-meta";
+
+/**
+ * The community read model is read on every chat open (the bootstrap's
+ * community section hydrates the header, permissions and member faces) and
+ * written only when membership, roles, mute state or the community row itself
+ * change. So it is served from the Next data cache (R2-backed on the deployed
+ * Worker) for five minutes, or until one of those writes clears the tag above.
+ *
+ * Keyed per (community, user): the payload carries viewer-scoped fields (role,
+ * permissions, mute state, the owner's invite token) and must never be shared
+ * across users.
+ */
+const loadCommunityReadModelCached = unstable_cache(
+  async (communityId: string, userId: string): Promise<{ data: Record<string, unknown> }> => {
+    const result = await readCommunityReadModel(communityId, userId);
+    if (!result.ok) throw new CommunityReadError(result.status, result.error);
+    return { data: result.data };
+  },
+  ["community-read-model"],
+  { revalidate: 300, tags: [COMMUNITY_META_TAG] },
+);
 
 export const loadCommunityReadModel = cache(async function loadCommunityReadModel(
+  communityId: string,
+  userId: string,
+): Promise<ReadResult<Record<string, unknown>>> {
+  try {
+    return { ok: true, data: (await loadCommunityReadModelCached(communityId, userId)).data };
+  } catch (error) {
+    if (error instanceof CommunityReadError) {
+      return { ok: false, status: error.status, error: error.publicMessage };
+    }
+    // A cache-layer fault must never sink the read: fall back to the live read.
+    return readCommunityReadModel(communityId, userId);
+  }
+});
+
+/** Live (uncached) read model — the cache wrapper above owns revalidation. */
+async function readCommunityReadModel(
   communityId: string,
   userId: string,
 ): Promise<ReadResult<Record<string, unknown>>> {
@@ -57,7 +120,14 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   // The membership's mute state feeds the header's Mute notifications menu.
   // The timed column is selected only once its migration is applied; each
   // branch keeps a single string literal (see the note below).
-  const muteUntilSupported = await canStoreMuteUntil(db);
+  //
+  // The capability probes are memoized per server process, but a cold worker
+  // isolate pays each one as a query — running them together keeps a cold
+  // start at ONE extra wave instead of two.
+  const [muteUntilSupported, showcaseSupported] = await Promise.all([
+    canStoreMuteUntil(db),
+    canStoreShowcaseFlag(db),
+  ]);
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
     (muteUntilSupported
       ? db
@@ -72,7 +142,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     // list matters here. Each branch keeps its column list a single string
     // literal: the query builder parses that literal into a row type, and a
     // union of column lists collapses into a parse error.
-    (await canStoreShowcaseFlag(db)
+    (showcaseSupported
       ? db
           .from("communities")
           .select(
@@ -94,22 +164,29 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   // Resolve the caller's community role + effective permissions (owners hold
   // every capability; platform-appointed admins and owner-appointed moderators
   // hold their configured grants).
-  // An event group chat's DP wears its event's date, and says LIVE while the
-  // event is under way (see DpWithEventDate), so the header knows both the day
-  // the room is for and the deadline it stops being live at. Read only for
-  // event rooms, one wave later, and best-effort — an environment without the
-  // event-chat migration loses the badge, never the read model. The cast
-  // matches the repo-wide untyped supabase-js baseline used by the lines below.
   const communityType = (community as unknown as { type?: string | null }).type;
-  const eventRoom = communityType === EVENT_CHAT_COMMUNITY_TYPE
-    ? await loadEventRoomMeta(db, communityId).catch(() => null)
-    : null;
-
   const currentUserRole = resolveCommunityRole(community.owner_id, membership.role, userId);
-  const currentUserPermissions = await loadCommunityPermissions(db, communityId, userId, currentUserRole);
-
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows }] = await Promise.all([
+
+  // Everything below needs only the membership + community rows above, so it
+  // all rides on ONE wave: permissions, the event room's badge data (event
+  // rooms only, best-effort — an environment without the event-chat migration
+  // loses the badge, never the read model), the DP resolution, the master-data
+  // label maps and the top members. This used to be THREE sequential waves
+  // (event room → permissions → the rest), each paying the full
+  // worker→database round trip — the read model's dominant cost.
+  const [
+    eventRoom,
+    currentUserPermissions,
+    dp,
+    masterNameMap,
+    experienceLevelNameMap,
+    { data: memberRows },
+  ] = await Promise.all([
+    communityType === EVENT_CHAT_COMMUNITY_TYPE
+      ? loadEventRoomMeta(db, communityId).catch(() => null)
+      : Promise.resolve(null),
+    loadCommunityPermissions(db, communityId, userId, currentUserRole),
     resolveCommunityDp({
       type: community.type,
       reference_id: community.reference_id,
@@ -173,7 +250,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
       current_user_permissions: currentUserPermissions,
     },
   };
-});
+}
 
 async function enrichAuthoredRows(
   rows: Array<Record<string, unknown>>,
@@ -368,16 +445,43 @@ export async function loadCommunityEvents(
   return { ok: true, data: { events, nextCursor } };
 }
 
+/**
+ * Revalidation tag for the cached community-rules read. Admin rule writes
+ * (create/update/delete) call `revalidateTag(COMMUNITY_RULES_TAG)`; rules
+ * edits are rare, so one tag for every community is enough bookkeeping —
+ * a write just clears all cached rule lists.
+ */
+export const COMMUNITY_RULES_TAG = "community-rules";
+
+/**
+ * Community rules are read on every chat open (the bootstrap bundles them
+ * into the read model response) and change only when an admin edits them, so
+ * the read is served from the Next data cache — R2-backed on the deployed
+ * Worker (see open-next.config.ts) — for five minutes, or until an admin
+ * write revalidates the tag above.
+ */
+const loadCommunityRulesCached = unstable_cache(
+  async (communityId: string): Promise<{ rules: unknown[] }> => {
+    const { data, error } = await createServiceClient()
+      .from("community_rules")
+      .select("id, rule_text, order_index")
+      .eq("community_id", communityId)
+      .order("order_index", { ascending: true });
+    if (error) throw new Error("Failed to load rules.");
+    return { rules: data ?? [] };
+  },
+  ["community-rules"],
+  { revalidate: 300, tags: [COMMUNITY_RULES_TAG] },
+);
+
 export async function loadCommunityRules(
   communityId: string,
 ): Promise<ReadResult<{ rules: unknown[] }>> {
-  const { data, error } = await createServiceClient()
-    .from("community_rules")
-    .select("id, rule_text, order_index")
-    .eq("community_id", communityId)
-    .order("order_index", { ascending: true });
-  if (error) return { ok: false, status: 500, error: "Failed to load rules." };
-  return { ok: true, data: { rules: data ?? [] } };
+  try {
+    return { ok: true, data: await loadCommunityRulesCached(communityId) };
+  } catch {
+    return { ok: false, status: 500, error: "Failed to load rules." };
+  }
 }
 
 /** A cursor id half must be a uuid before it reaches the RPC's uuid argument. */
@@ -395,7 +499,7 @@ const UUID_CURSOR_PATTERN =
  * and both halves travel together so the order is total and paging can never
  * skip or loop.
  */
-export async function loadCommunityMessagePage(
+async function readCommunityMessagePage(
   communityId: string,
   userId: string,
   cursors: {
@@ -529,4 +633,73 @@ export async function loadCommunityMessagePage(
       ...(contentReactions ? { content_reactions: contentReactions } : {}),
     },
   };
+}
+
+/**
+ * Revalidation tag for every cached community message page. Message writes
+ * (send/edit/delete), reaction toggles and history clears call
+ * `revalidateTag(COMMUNITY_MESSAGES_TAG)` so the next open repaints from the
+ * live page — the purge is one cache operation, and the reads it forces are
+ * the same reads the app always did.
+ */
+export const COMMUNITY_MESSAGES_TAG = "community-messages";
+
+/**
+ * Revalidation tag for a community's pending join-request list (see the
+ * /requests route — admins read it, joins/accepts/declines write it). Rare
+ * writes, so one tag covers every community.
+ */
+export const COMMUNITY_REQUESTS_TAG = "community-requests";
+
+/**
+ * The community message page is read on every chat open — the chat page's
+ * server render and the bootstrap's messages section call this exact default
+ * shape — so it is served from the Next data cache (R2-backed on the deployed
+ * Worker) for five minutes, or until a write revalidates the tag above.
+ *
+ * Only the DEFAULT page is cached. Cursor pages (?before= / ?after=) and
+ * content-reaction pages stay live: they are incremental reads whose whole
+ * point is freshness (the client's catch-up deliberately bypasses its own
+ * cache for ?after= for the same reason).
+ */
+const loadCommunityMessagePageCached = unstable_cache(
+  async (communityId: string, userId: string) => {
+    const result = await readCommunityMessagePage(communityId, userId, {}, []);
+    if (!result.ok) throw new CommunityReadError(result.status, result.error);
+    return result.data;
+  },
+  ["community-message-page"],
+  { revalidate: 300, tags: [COMMUNITY_MESSAGES_TAG] },
+);
+
+export async function loadCommunityMessagePage(
+  communityId: string,
+  userId: string,
+  cursors: {
+    before?: string | null;
+    after?: string | null;
+    /** Id half of the `before` cursor; omitted degrades to timestamp-only. */
+    beforeId?: string | null;
+    /** Id half of the `after` cursor; omitted degrades to timestamp-only. */
+    afterId?: string | null;
+  } = {},
+  /** Content-item ids ("created a …" cards) whose reactions ride along. */
+  contentIds: string[] = [],
+): Promise<ReadResult<{ messages: unknown[]; content_reactions?: unknown }>> {
+  const isDefaultPage =
+    !cursors.before &&
+    !cursors.after &&
+    !cursors.beforeId &&
+    !cursors.afterId &&
+    contentIds.length === 0;
+  if (!isDefaultPage) return readCommunityMessagePage(communityId, userId, cursors, contentIds);
+  try {
+    return { ok: true, data: await loadCommunityMessagePageCached(communityId, userId) };
+  } catch (error) {
+    if (error instanceof CommunityReadError) {
+      return { ok: false, status: error.status, error: error.publicMessage };
+    }
+    // A cache-layer fault must never sink the chat: fall back to the live read.
+    return readCommunityMessagePage(communityId, userId, cursors, contentIds);
+  }
 }

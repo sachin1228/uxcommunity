@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { estimateJsonBytes } from "@/lib/server-timing";
-import { createServiceClient } from "@/lib/supabase/service";
 import {
   loadCommunityMessagePage,
   loadCommunityReadModel,
+  loadCommunityRules,
   type ReadResult,
 } from "@/lib/communities/read-models";
 import { loadCommunityContentEvents } from "@/lib/communities/content-events";
 import { NO_COMMUNITY_PERMISSIONS, hasAnyCommunityPermission } from "@/lib/communities/permissions";
 type Params = { params: Promise<{ id: string }> };
 type Section = "community" | "messages" | "content-events" | "rules";
+
+const ALL_SECTIONS: Section[] = ["community", "messages", "content-events", "rules"];
 
 /**
  * Sections that gate the whole response. Rules are a cheap extra bundled so
@@ -19,6 +21,29 @@ type Section = "community" | "messages" | "content-events" | "rules";
  * the client falls back to the individual endpoint.
  */
 const CRITICAL = new Set<Section>(["community", "messages"]);
+
+/**
+ * Optional `sections` filter ("community,messages,rules").
+ *
+ * The client's critical-path request asks for the fast sections only; the
+ * slow content-events producer is fetched on its own right after (see the
+ * deferred request in lib/request-cache.ts), so the timeline cards no longer
+ * delay the read model / message page / rules. Absent or empty means every
+ * section: older clients (the Expo app) keep the previous single-request
+ * behavior, and so does a plain curl.
+ *
+ * Returns null for a request that names only unknown sections — a client bug
+ * should not silently come back as "everything".
+ */
+function parseSections(request: NextRequest): Set<Section> | null {
+  const raw = request.nextUrl.searchParams.get("sections");
+  if (raw === null) return new Set(ALL_SECTIONS);
+  const wanted = raw
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name): name is Section => (ALL_SECTIONS as string[]).includes(name));
+  return wanted.length ? new Set(wanted) : null;
+}
 
 /**
  * Which content areas the chat timeline should show "created a …" cards for:
@@ -50,7 +75,7 @@ function unwrapReadResult<T>(result: ReadResult<T>): T {
   return result.data;
 }
 
-export async function GET(_request: NextRequest, context: Params) {
+export async function GET(request: NextRequest, context: Params) {
   const startedAt = performance.now();
   let session;
   try {
@@ -62,11 +87,26 @@ export async function GET(_request: NextRequest, context: Params) {
   const authDuration = performance.now() - startedAt;
   const { id: communityId } = await context.params;
   const userId = session.userId!;
-  const db = createServiceClient();
-  const operations: Array<[Section, () => Promise<unknown>]> = [
-    ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
-    ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
-    [
+  const wanted = parseSections(request);
+  if (!wanted) {
+    return NextResponse.json({ error: "Invalid sections." }, { status: 400 });
+  }
+
+  const operations: Array<[Section, () => Promise<unknown>]> = [];
+  if (wanted.has("community")) {
+    operations.push([
+      "community",
+      async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId)),
+    ]);
+  }
+  if (wanted.has("messages")) {
+    operations.push([
+      "messages",
+      async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId)),
+    ]);
+  }
+  if (wanted.has("content-events")) {
+    operations.push([
       "content-events",
       async () => {
         const readModel = await loadCommunityReadModel(communityId, userId);
@@ -77,20 +117,18 @@ export async function GET(_request: NextRequest, context: Params) {
         );
         return { events };
       },
-    ],
-    // Cheap rules are bundled into the same request so the info panel never
-    // needs its own network round trip. The shape matches the standalone
-    // /rules endpoint, so the hydrated request-cache entries are interchangeable.
-    ["rules", async () => {
-      const { data, error } = await db
-        .from("community_rules")
-        .select("id, rule_text, order_index")
-        .eq("community_id", communityId)
-        .order("order_index", { ascending: true });
-      if (error) throw new Error("Failed to load rules.");
-      return { rules: data ?? [] };
-    }],
-  ];
+    ]);
+  }
+  // Rules are bundled into the same request so the info panel never needs its
+  // own network round trip. The shape matches the standalone /rules endpoint,
+  // and the shared loader is backed by the Next data cache (invalidated on
+  // admin rule writes — see loadCommunityRules in read-models.ts).
+  if (wanted.has("rules")) {
+    operations.push([
+      "rules",
+      async () => unwrapReadResult(await loadCommunityRules(communityId)),
+    ]);
+  }
 
   const settled = await Promise.allSettled(
     operations.map(([name, operation]) => readSection(name, operation)),

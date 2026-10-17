@@ -12,7 +12,7 @@ import {
   type CachedThreadEvent,
   type MessageReaction,
 } from "@/lib/communities/cache";
-import { fetchAndHydrateCommunityBootstrap, initRequestCache } from "@/lib/request-cache";
+import { fetchAndHydrateCommunityBootstrap, fetchDeferredCommunityContentEvents, initRequestCache } from "@/lib/request-cache";
 import type { CommunityThread } from "@/lib/communities/models/threads";
 
 type ContentReactionRow = { content_id: string; kind: string; reactions: MessageReaction[] };
@@ -133,6 +133,23 @@ export function useContentTimeline({
     });
     initRequestCache(currentUserId);
 
+    // The history cards live in the DEFERRED bootstrap section (the fast
+    // bootstrap request no longer carries content events — see
+    // lib/request-cache.ts). fetchAndHydrateCommunityBootstrap fires that
+    // request alongside the fast one, so this read dedupes onto the same
+    // in-flight fetch and never pays a second round trip. Seeding the cards
+    // is still gated on it, exactly as the bootstrap response used to gate
+    // them: `contentEventsReady` releases the timeline's empty state.
+    const loadContentEventHistory = () =>
+      fetchDeferredCommunityContentEvents(communityId, currentUserId)
+        .then((events) => {
+          if (!cancelled && events) setContentEvents(events);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setContentEventsReady(true);
+        });
+
     // A server-rendered snapshot is authoritative for this navigation. Seed
     // the shared client caches and avoid immediately requesting the same page
     // data again after hydration.
@@ -142,11 +159,9 @@ export function useContentTimeline({
       msgCache.set(communityId, initialMessages);
       msgFetchedAt.set(communityId, fetchedAt);
       queueMicrotask(() => {
-        if (!cancelled) {
-          setThreadsReady(true);
-          setContentEventsReady(true);
-        }
+        if (!cancelled) setThreadsReady(true);
       });
+      void loadContentEventHistory();
       return () => { cancelled = true; };
     }
 
@@ -158,7 +173,6 @@ export function useContentTimeline({
           members: CachedMeta["members"];
         };
         const messageData = data.messages as { messages: CachedMessage[] };
-        const contentData = data["content-events"] as { events?: CachedContentEvent[] } | undefined;
         const fetchedAt = Date.now();
 
         metaCache.set(communityId, {
@@ -168,15 +182,13 @@ export function useContentTimeline({
         });
         msgCache.set(communityId, messageData.messages ?? []);
         msgFetchedAt.set(communityId, fetchedAt);
-        if (contentData) setContentEvents(contentData.events ?? []);
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) {
-          setThreadsReady(true);
-          setContentEventsReady(true);
-        }
+        if (!cancelled) setThreadsReady(true);
       });
+
+    void loadContentEventHistory();
 
     return () => { cancelled = true; };
   }, [communityId, currentUserId, initialMessages, initialMeta]);

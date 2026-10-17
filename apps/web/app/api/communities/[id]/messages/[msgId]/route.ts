@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
+import { COMMUNITY_MESSAGES_TAG } from "@/lib/communities/read-models";
 import { publishChatEvent } from "@/lib/realtime/server";
 import { canEditMessage } from "@/lib/communities/message-edit";
 
@@ -76,6 +78,9 @@ export async function PATCH(
       console.error("[PATCH message] realtime publish error:", err);
     }
   });
+
+  // Edited text must not wait out the cached page's window on the next open.
+  revalidateTag(COMMUNITY_MESSAGES_TAG, { expire: 0 });
 
   return NextResponse.json({ id: msgId, content, edited_at: editedAt });
 }
@@ -188,6 +193,9 @@ export async function DELETE(
       console.error("[DELETE message] realtime publish error:", err);
     }
   });
+
+  // A deleted message must not survive in the cached page.
+  revalidateTag(COMMUNITY_MESSAGES_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }

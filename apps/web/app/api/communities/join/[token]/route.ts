@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { CREATION_LIMIT_MESSAGES, creationLimitFromError } from "@/lib/creation-limits";
 import { isCapFull, joinCapMessage, loadJoinSlots } from "@/lib/communities/join-slots";
+import { COMMUNITY_META_TAG, COMMUNITY_REQUESTS_TAG } from "@/lib/communities/read-models";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -107,6 +109,7 @@ export async function POST(
       console.error("[community-join] join request failed:", reqErr);
       return NextResponse.json({ error: "Failed to submit join request." }, { status: 500 });
     }
+    revalidateTag(COMMUNITY_REQUESTS_TAG, { expire: 0 });
     return NextResponse.json({ status: "requested", communityId: community.id });
   }
 
@@ -131,5 +134,6 @@ export async function POST(
     return NextResponse.json({ error: "Failed to join community." }, { status: 500 });
   }
 
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
   return NextResponse.json({ status: "joined", communityId: community.id });
 }

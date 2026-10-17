@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { randomUUID } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
+import { COMMUNITY_META_TAG } from "@/lib/communities/read-models";
 
 /**
  * POST /api/communities/[id]/invite/regenerate
@@ -51,6 +53,10 @@ export async function POST(
     actorRole: managerActorRole(managerStatus),
     action: "invite_link_regenerated",
   });
+
+  // The cached read model carries the owner's invite_token; a regeneration
+  // must not let any surface serve the old link for the rest of the window.
+  revalidateTag(COMMUNITY_META_TAG, { expire: 0 });
 
   function slugify(value: string): string {
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "community";
