@@ -467,9 +467,13 @@ export default function CommunityChat() {
 
   // ── Unread marker: latched once, from the first loaded page ──────────────
   const unreadLatchedRef = useRef(false);
+  /** The first open waits for the unread latch before choosing its anchor. */
+  const [initialPositionReady, setInitialPositionReady] = useState(false);
+  const initialScrollDoneRef = useRef(false);
   useEffect(() => {
     if (unreadLatchedRef.current || messages.length === 0 || !readStateKnown) return;
     unreadLatchedRef.current = true;
+    setInitialPositionReady(true);
     if (!lastReadAt || initialUnreadCount <= 0) return;
     const firstUnread = messages.find(
       (m) => m.created_at > lastReadAt && m.user_id !== user?.id,
@@ -539,6 +543,30 @@ export default function CommunityChat() {
     const lastMessage = messages[messages.length - 1];
     lastMessageIdRef.current = lastMessage?.id ?? null;
   }, [messages]);
+
+  // ── Initial position: the unread divider when one exists, newest otherwise
+  // (the web's useScrollAndUnread anchor). One-shot: later messages never
+  // re-position the reader.
+  useEffect(() => {
+    if (!initialPositionReady || isLoading || !contentEventsReady) return;
+    if (initialScrollDoneRef.current) return;
+    initialScrollDoneRef.current = true;
+
+    requestAnimationFrame(() => {
+      if (firstUnreadId) {
+        const index = rows.findIndex((row) => row.kind === 'unread');
+        if (index >= 0) {
+          listRef.current?.scrollToIndex({
+            index,
+            animated: false,
+            viewPosition: 0.15,
+          });
+          return;
+        }
+      }
+      listRef.current?.scrollToEnd({ animated: false });
+    });
+  }, [initialPositionReady, isLoading, contentEventsReady, firstUnreadId, rows]);
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 10 });
   const handleViewableItemsChanged = useRef(

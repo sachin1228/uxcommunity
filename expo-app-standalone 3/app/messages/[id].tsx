@@ -184,6 +184,7 @@ export default function DmThreadScreen() {
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedRef = useRef<string | null>(null);
   const lastMarkCallRef = useRef(0);
+  const initialScrollDoneRef = useRef(false);
   const atBottomRef = useRef(true);
   const listRef = useRef<FlatList<ThreadRow>>(null);
   const rowsRef = useRef<ThreadRow[]>([]);
@@ -795,6 +796,30 @@ export default function DmThreadScreen() {
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
+
+  // ── Initial position: the unread divider when there is one, newest
+  // otherwise (the web's useDmScrollAndUnread anchor). One-shot — later
+  // messages never move the reader.
+  useEffect(() => {
+    if (loading || initialScrollDoneRef.current) return;
+    initialScrollDoneRef.current = true;
+    if (messages.length === 0) return;
+
+    requestAnimationFrame(() => {
+      if (initialUnread) {
+        const index = rows.findIndex((row) => row.kind === 'unread');
+        if (index >= 0) {
+          listRef.current?.scrollToIndex({
+            index,
+            animated: false,
+            viewPosition: 0.15,
+          });
+          return;
+        }
+      }
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+  }, [loading, initialUnread, messages.length, rows]);
 
   // ── Images / lightbox ─────────────────────────────────────────────────────
   const lightboxImages = useMemo<LightboxImage[]>(
