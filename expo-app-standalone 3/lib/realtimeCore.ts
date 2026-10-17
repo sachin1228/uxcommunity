@@ -186,7 +186,7 @@ export function isCommunityRoom(room: string): boolean {
  * User-scoped room prefixes — keep in sync with the server's
  * `USER_ROOM_PREFIXES` (`apps/realtime/src/room-routing.ts`).
  */
-export const USER_ROOM_PREFIXES = ['notifications:', 'profile:'] as const;
+export const USER_ROOM_PREFIXES = ['notifications:', 'profile:', 'dm:'] as const;
 
 /**
  * The member a user-scoped room belongs to, or null for a community room.
@@ -224,6 +224,7 @@ export const realtimeRooms = {
   showcase: (postId: string) => `showcase:${postId}`,
   rules: (communityId: string) => `rules:${communityId}`,
   notifications: (userId: string) => `notifications:${userId}`,
+  dm: (userId: string) => `dm:${userId}`,
 } as const;
 
 interface RoomState {

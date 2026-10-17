@@ -79,6 +79,18 @@ export default function RootLayout() {
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
                   <Stack.Screen
+                    name="messages/index"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="messages/[id]"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="member/[id]"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
                     name="settings/notifications"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
