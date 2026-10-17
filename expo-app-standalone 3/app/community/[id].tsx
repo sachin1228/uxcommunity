@@ -45,6 +45,7 @@ import {
   setContentEventReaction,
   deleteMessage,
   getCommunities,
+  getCommunityDetail,
   type Community,
   type CommunityMuteDuration,
   type Message,
@@ -94,6 +95,7 @@ export default function CommunityChat() {
     owner: ownerParam,
     unread: unreadParam,
     read: readParam,
+    members,
     contentKind,
     contentId,
   } = useLocalSearchParams<{
@@ -105,6 +107,7 @@ export default function CommunityChat() {
     owner?: string;
     unread?: string;
     read?: string;
+    members?: string;
     contentKind?: string;
     contentId?: string;
   }>();
@@ -127,16 +130,40 @@ export default function CommunityChat() {
    * snapshot taken when the list row was tapped.
    */
   const [resolved, setResolved] = useState<Community | null>(null);
+  /** Detail-route fallback for the header count when the list lacks the row. */
+  const [detailMemberCount, setDetailMemberCount] = useState<number | null>(null);
+  const [memberCountLoading, setMemberCountLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setMemberCountLoading(true);
+
+    const fillCount = async (row: Community | null) => {
+      if (cancelled || row?.member_count != null) return;
+      try {
+        const detail = await getCommunityDetail(id);
+        if (!cancelled && detail?.member_count != null) {
+          setDetailMemberCount(detail.member_count);
+        }
+      } catch {
+        /* no count available — the line renders what it knows */
+      }
+    };
+
     getCommunities()
-      .then((list) => {
-        if (!cancelled) setResolved(list.find((c) => c.id === id) ?? null);
+      .then(async (list) => {
+        const row = list.find((c) => c.id === id) ?? null;
+        if (!cancelled) setResolved(row);
+        await fillCount(row);
       })
-      .catch(() => {
-        /* the header falls back to the params' snapshot */
+      .catch(async () => {
+        /* deep links still get their counts from the detail route */
+        await fillCount(null);
+      })
+      .finally(() => {
+        if (!cancelled) setMemberCountLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -187,9 +214,15 @@ export default function CommunityChat() {
   });
 
   // The header's second line — "3 members • 1 online" (web ChatHeader parity).
-  // The member count comes from the resolved community row; the online count
-  // is the chat room's presence broadcast.
-  const memberCount = resolved?.member_count ?? null;
+  // The live row wins, the list's route snapshot paints instantly, and the
+  // detail route fills deep links that were not opened from the list.
+  const routeMemberCount = (() => {
+    if (!members) return null;
+    const parsed = Number(members);
+    return Number.isFinite(parsed) ? parsed : null;
+  })();
+  const memberCount =
+    resolved?.member_count ?? routeMemberCount ?? detailMemberCount;
   const { onlineCount } = useOnlinePresence({
     communityId: id,
     currentUserId: user?.id ?? '',
@@ -1081,31 +1114,42 @@ export default function CommunityChat() {
               />
             </View>
             {/* The web header's second line — how many members the room has,
-                and (once anyone is connected) how many are online now. Shown
-                only once the resolved row carries the count, so the line never
-                renders a placeholder number. */}
-            {memberCount !== null && (
-              <View style={styles.headerMetaRow}>
+                and (once anyone is connected) how many are online now. The
+                count paints from the list snapshot first; a skeleton holds
+                the line while a deep link resolves it, so it never snaps in
+                a beat after the header. */}
+            <View style={styles.headerMetaRow}>
+              {memberCount !== null ? (
                 <View style={styles.headerMetaItem}>
                   <ContentIcon name="users" size={10} color={colors.mutedForeground} />
                   <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
                     {memberCount} member{memberCount === 1 ? '' : 's'}
                   </Text>
                 </View>
-                {onlineCount > 0 && (
-                  <View
-                    style={styles.headerMetaItem}
-                    accessible
-                    accessibilityLabel={`${onlineCount} online`}
-                  >
-                    <View style={styles.onlineDot} />
-                    <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
-                      {onlineCount} online
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
+              ) : memberCountLoading ? (
+                // The line holds its place while the count resolves, instead
+                // of snapping into existence a beat after the header paints.
+                <View
+                  accessibilityLabel="Loading member count"
+                  style={[
+                    styles.headerMetaSkeleton,
+                    { backgroundColor: colors.surfaceRaised },
+                  ]}
+                />
+              ) : null}
+              {onlineCount > 0 && (
+                <View
+                  style={styles.headerMetaItem}
+                  accessible
+                  accessibilityLabel={`${onlineCount} online`}
+                >
+                  <View style={styles.onlineDot} />
+                  <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
+                    {onlineCount} online
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         </Pressable>
 
@@ -1399,6 +1443,12 @@ const styles = StyleSheet.create({
   },
   headerMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerMetaText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
+  headerMetaSkeleton: {
+    width: 76,
+    height: 10,
+    borderRadius: 5,
+    opacity: 0.7,
+  },
   onlineDot: {
     width: 6,
     height: 6,
