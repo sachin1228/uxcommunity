@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Pressable,
   RefreshControl,
@@ -10,20 +11,82 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityRow } from '@/components/communities/CommunityRow';
 import { useColors } from '@/hooks/useColors';
 import { useCommunities } from '@/hooks/useCommunities';
 import { Community } from '@/lib/communities';
+import {
+  COMMUNITY_REALTIME_LIMIT,
+  HIBERNATED_LIST_REFRESH_MS,
+} from '@/lib/realtimeWindow';
+
+/**
+ * How long the list must have been away before regaining focus earns an
+ * immediate catch-up. Short hops — a glance at another tab, a chat pushed and
+ * popped — are not real absences and must not cost a request each: the same
+ * rule the web's useHiddenCatchUp applies to hidden tabs.
+ */
+const FOCUS_CATCH_UP_MIN_AWAY_MS = 5_000;
 
 export default function CommunitiesScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { communities, isLoading, error, nowMs, reload, markCommunityRead, getTypingLabel } =
-    useCommunities();
+  const {
+    communities,
+    isLoading,
+    error,
+    nowMs,
+    reload,
+    markCommunityRead,
+    getTypingLabel,
+    catchUpList,
+  } = useCommunities();
   const [query, setQuery] = useState('');
+
+  /**
+   * Hibernated rows: communities past the live socket window
+   * (`lib/realtimeWindow.ts`) hold no socket, so the list is the only surface
+   * that moves their preview, unread count and position — and a list that is
+   * merely being looked at produces none of the triggers that would otherwise
+   * reconcile it (foreground, reconnect, pull-to-refresh). While this screen
+   * is focused and at least one such row exists, catch up on a real return and
+   * then on a slow beat: the mobile counterpart of the web sidebar's poll
+   * while it is over its window.
+   *
+   * The beat stops when the tab blurs, and a tick that finds the app
+   * backgrounded is dropped, because a foreground return has its own catch-up
+   * (useCommunities). The first focus of a session is the mount load already
+   * in flight; a return shorter than FOCUS_CATCH_UP_MIN_AWAY_MS skips the
+   * immediate catch-up because the rows are only seconds old.
+   */
+  const blurredAtRef = useRef<number | null>(null);
+  const overRealtimeLimit = communities.length > COMMUNITY_REALTIME_LIMIT;
+  useFocusEffect(
+    useCallback(() => {
+      const blurredAt = blurredAtRef.current;
+      if (
+        overRealtimeLimit &&
+        blurredAt !== null &&
+        Date.now() - blurredAt >= FOCUS_CATCH_UP_MIN_AWAY_MS
+      ) {
+        catchUpList();
+      }
+
+      const timer = overRealtimeLimit
+        ? setInterval(() => {
+            if (AppState.currentState === 'active') catchUpList();
+          }, HIBERNATED_LIST_REFRESH_MS)
+        : null;
+
+      return () => {
+        blurredAtRef.current = Date.now();
+        if (timer !== null) clearInterval(timer);
+      };
+    }, [overRealtimeLimit, catchUpList]),
+  );
 
   /**
    * The joined list filtered by name — the same rule the web browse page

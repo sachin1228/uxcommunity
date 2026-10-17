@@ -135,9 +135,11 @@ current server, and this PR does not pretend otherwise:
 So the honest guarantee is **bounded**, not multiplexed: a 100-community member
 opens exactly as many community sockets as a 10-community member. What is
 outside the window is still kept current — the list reconcile in
-`useCommunities` runs on foreground, on reconnect and on pull-to-refresh — and a
-screen the user actually opens subscribes its own room regardless of the window
-(`useChatMessages` for the open chat, `useCommunityContent` for its tabs).
+`useCommunities` runs on foreground, on reconnect, on pull-to-refresh, and on a
+slow beat while the list itself is on screen — and a screen the user actually
+opens subscribes its own room regardless of the window (`useChatMessages` for
+the open chat, `useCommunityContent` for its tabs). The full map — window
+sizes, wake-up triggers, timings — is in `community-hibernation.md`.
 User-scoped rooms already share the single `user:${userId}` socket.
 
 ### Room + topic model
