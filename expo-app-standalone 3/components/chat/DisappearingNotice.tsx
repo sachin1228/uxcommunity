@@ -45,11 +45,11 @@ export function DisappearingNotice() {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   pill: {
-    maxWidth: '85%',
+    alignSelf: 'stretch',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
