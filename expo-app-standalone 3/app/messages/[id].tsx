@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView as RNKeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -23,6 +23,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import {
+  KeyboardAvoidingView as KeyboardControllerAvoidingView,
+  KeyboardEvents,
+} from 'react-native-keyboard-controller';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -156,6 +160,8 @@ export default function DmThreadScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Measured for the iOS keyboard offset — the KAV starts below the header. */
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<DmMessage | null>(null);
@@ -271,6 +277,17 @@ export default function DmThreadScreen() {
   const scrollToLatest = useCallback((animated = true) => {
     listRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
+
+  // Android's keyboard-controller resizes the screen; jump to the newest
+  // message when it opens, exactly like the community chat (iOS is handled by
+  // the KAV offset below).
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
+      if (atBottomRef.current) scrollToLatest(true);
+    });
+    return () => subscription.remove();
+  }, [scrollToLatest]);
 
   const {
     handleSend,
@@ -886,6 +903,7 @@ export default function DmThreadScreen() {
 
       {/* Header — peer identity (opens their profile) + the ⋯ safety menu. */}
       <View
+        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
         style={[
           styles.header,
           {
@@ -950,11 +968,9 @@ export default function DmThreadScreen() {
           </Pressable>
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.flex}>
+        <>
+          <ThreadKeyboardView headerHeight={headerHeight}>
+            <View style={styles.flex}>
             <FlatList
               ref={listRef}
               inverted
@@ -1088,7 +1104,7 @@ export default function DmThreadScreen() {
               {
                 borderTopColor: colors.border,
                 backgroundColor: colors.background,
-                paddingBottom: emojiPanelOpen ? 0 : insets.bottom + 6,
+                paddingBottom: emojiPanelOpen ? 0 : 6,
               },
             ]}
           >
@@ -1209,7 +1225,11 @@ export default function DmThreadScreen() {
               </>
             )}
           </View>
-        </KeyboardAvoidingView>
+          </ThreadKeyboardView>
+          {/* The home-indicator strip below the composer, outside the KAV —
+              the community chat lays it out the same way. */}
+          <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+        </>
       )}
 
       {toast ? (
@@ -1283,6 +1303,37 @@ export default function DmThreadScreen() {
         onClose={() => setReportOpen(false)}
       />
     </View>
+  );
+}
+
+/**
+ * Keyboard avoidance, wired exactly like the community chat: iOS uses the RN
+ * KAV with the header's measured height as its offset (the KAV starts below
+ * the header); Android uses keyboard-controller's height wrapper, since the
+ * screen is resized rather than padded.
+ */
+function ThreadKeyboardView({
+  headerHeight,
+  children,
+}: {
+  headerHeight: number;
+  children: React.ReactNode;
+}) {
+  if (Platform.OS === 'android') {
+    return (
+      <KeyboardControllerAvoidingView style={styles.flex} behavior="height">
+        {children}
+      </KeyboardControllerAvoidingView>
+    );
+  }
+  return (
+    <RNKeyboardAvoidingView
+      style={styles.flex}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
+    >
+      {children}
+    </RNKeyboardAvoidingView>
   );
 }
 
