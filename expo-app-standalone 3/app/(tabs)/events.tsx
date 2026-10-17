@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   pageTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 20, letterSpacing: -0.3 },
   pageSubtitle: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
   tabsShell: { marginTop: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  tabs: { minWidth: '100%', justifyContent: 'center', paddingHorizontal: 12 },
+  tabs: { minWidth: '100%', justifyContent: 'flex-start', paddingHorizontal: 16 },
   tab: {
     minWidth: 118,
     height: 46,

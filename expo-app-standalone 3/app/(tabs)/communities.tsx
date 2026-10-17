@@ -56,8 +56,11 @@ export default function CommunitiesScreen() {
       const readParam = community.last_read_at
         ? `&read=${encodeURIComponent(community.last_read_at)}`
         : '';
+      // The count rides along so the chat header's second line paints from the
+      // first frame, before its own community lookup returns.
+      const membersParam = `&members=${community.member_count ?? ''}`;
       router.push(
-        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${showcaseParam}${ownerParam}${unreadParam}${readParam}`
+        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${showcaseParam}${ownerParam}${unreadParam}${readParam}${membersParam}`
       );
     },
     [router, markCommunityRead]
@@ -164,8 +167,12 @@ export default function CommunitiesScreen() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.noResults}>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+              <Feather name="search" size={26} color={colors.foregroundSubtle} />
+              <Text style={[styles.emptyTitle, { color: colors.foregroundMuted }]}>
                 No communities found
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.foregroundSubtle }]}>
+                Try a different name.
               </Text>
             </View>
           }
@@ -219,7 +226,9 @@ const styles = StyleSheet.create({
   },
   noResults: {
     alignItems: 'center',
+    gap: 8,
     paddingVertical: 48,
+    paddingHorizontal: 32,
   },
   center: {
     flex: 1,

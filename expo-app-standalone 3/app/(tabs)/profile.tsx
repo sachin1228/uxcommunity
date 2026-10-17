@@ -304,7 +304,10 @@ export default function ProfileScreen() {
 
       <ProfileHero
         name={profile?.user?.name ?? user?.name ?? ''}
-        avatarUrl={body?.avatar_url ?? null}
+        // The session already carries the member's picture, so the hero shows
+        // the real DP from the first frame instead of a flash of initials
+        // while GET /api/profile is in flight.
+        avatarUrl={body?.avatar_url ?? user?.avatar_url ?? null}
         city={body?.cities?.name ?? null}
         roleLabel={profile?.roleLabel ?? null}
         bio={body?.bio ?? ''}

@@ -179,11 +179,14 @@ export default function DmThreadScreen() {
   const [initialUnread, setInitialUnread] = useState<{ id: string; count: number } | null>(
     null,
   );
+  /** The list stays hidden until the anchor scroll is committed (no top flash). */
+  const [initialPositionResolved, setInitialPositionResolved] = useState(false);
 
   const loadingMoreRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedRef = useRef<string | null>(null);
   const lastMarkCallRef = useRef(0);
+  const initialScrollDoneRef = useRef(false);
   const atBottomRef = useRef(true);
   const listRef = useRef<FlatList<ThreadRow>>(null);
   const rowsRef = useRef<ThreadRow[]>([]);
@@ -796,6 +799,38 @@ export default function DmThreadScreen() {
     rowsRef.current = rows;
   }, [rows]);
 
+  // ── Initial position: the unread divider when there is one, newest
+  // otherwise (the web's useDmScrollAndUnread anchor). One-shot — later
+  // messages never move the reader.
+  useEffect(() => {
+    if (loading || error || initialScrollDoneRef.current) return;
+    initialScrollDoneRef.current = true;
+
+    if (messages.length === 0) {
+      setInitialPositionResolved(true);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (initialUnread) {
+        const index = rows.findIndex((row) => row.kind === 'unread');
+        if (index >= 0) {
+          listRef.current?.scrollToIndex({
+            index,
+            animated: false,
+            viewPosition: 0.15,
+          });
+        } else {
+          listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        }
+      } else {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }
+      // One more frame lets the native scroll commit before the list paints.
+      requestAnimationFrame(() => setInitialPositionResolved(true));
+    });
+  }, [loading, error, initialUnread, messages.length, rows]);
+
   // ── Images / lightbox ─────────────────────────────────────────────────────
   const lightboxImages = useMemo<LightboxImage[]>(
     () =>
@@ -976,6 +1011,7 @@ export default function DmThreadScreen() {
               inverted
               data={rows}
               keyExtractor={(row) => row.key}
+              style={{ opacity: initialPositionResolved ? 1 : 0 }}
               contentContainerStyle={styles.list}
               keyboardDismissMode="on-drag"
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
