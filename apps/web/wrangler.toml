@@ -6,6 +6,38 @@ compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
+# Run the Worker near Supabase, the backend it talks to most.
+#
+# A community open fires 5–7 sequential PostgREST round trips (read model,
+# message page, rules, content events), and every wave paid the full
+# colo → Supabase-region round trip: measured at 300–450ms per wave from a
+# European colo, which is the bulk of the 2.4–3.4s bootstrap. Smart Placement
+# moves fetch-handler execution to the location closest to the upstream that
+# receives the most subrequests (cloudflare docs: "Placement"), which is
+# Supabase here. Static assets are always served from the request's own
+# location, so page loads do not regress.
+[placement]
+mode = "smart"
+
+# Burst protection for every page/API request, counted in-location.
+#
+# global-request-rate-limit.ts keeps the burst window (50 requests / 10s) on
+# this binding when it exists: the counters live on the same machine as the
+# Worker, so the check adds no network hop — where the Upstash REST limiter it
+# falls back to pays a cross-region HTTPS round trip on EVERY page and API
+# request. The sustained window (300/60s) stays on Upstash because it must
+# count across locations. `period` must be 10 or 60 (Workers Rate Limiting
+# API), which is why the burst window is exactly 10s.
+# namespace_id must be unique per Cloudflare account; 1201 is reserved for
+# this Worker's global burst limiter.
+[[ratelimits]]
+name = "GLOBAL_REQUEST_BURST_LIMITER"
+namespace_id = "1201"
+
+  [ratelimits.simple]
+  limit = 50
+  period = 10
+
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
 # Lets the worker self-fetch for `next start` / SSR internals.

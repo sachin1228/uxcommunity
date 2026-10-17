@@ -1,6 +1,10 @@
 import type { CachedContentEvent, CachedMessage, CachedMeta } from "@/lib/communities/cache";
 import type { SSRCommunitySections } from "@/lib/communities/server";
-import { setCachedRequest, type CommunityBootstrap } from "@/lib/request-cache";
+import {
+  COMMUNITY_BOOTSTRAP_FAST_SECTIONS,
+  setCachedRequest,
+  type CommunityBootstrap,
+} from "@/lib/request-cache";
 
 /**
  * Seed every first-page endpoint of a community from its SSR snapshot so tab
@@ -39,7 +43,9 @@ export function seedCommunityRequestCache({
   // message page, mirror it into the bootstrap cache entry as well. Otherwise
   // every downstream bootstrap-backed read (chat data, info panel, tab views)
   // fires a fresh network GET /bootstrap even though the page already seeded
-  // everything it needs.
+  // everything it needs. The key is the FAST one: that is what
+  // fetchAndHydrateCommunityBootstrap reads (content events arrive through
+  // their own deferred entry — see lib/request-cache.ts).
   if (meta && messages) {
     const bootstrap: CommunityBootstrap = {
       community: {
@@ -51,6 +57,10 @@ export function seedCommunityRequestCache({
       unreadCount: 0,
       failures: [],
     };
-    setCachedRequest(`${base}/bootstrap`, bootstrap, currentUserId);
+    setCachedRequest(
+      `${base}/bootstrap?sections=${COMMUNITY_BOOTSTRAP_FAST_SECTIONS}`,
+      bootstrap,
+      currentUserId,
+    );
   }
 }

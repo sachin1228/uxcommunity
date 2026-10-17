@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { COMMUNITY_RULES_TAG } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -41,6 +43,10 @@ export async function PUT(
 
   if (error) return NextResponse.json({ error: "Failed to update rule." }, { status: 500 });
 
+  // The chat bootstrap and /rules read community rules through the Next data
+  // cache (see loadCommunityRules); a write has to clear it.
+  revalidateTag(COMMUNITY_RULES_TAG, { expire: 0 });
+
   void publishRealtimeBatch([
     { room: realtimeRooms.rules(id), topic: "rule", data: { event: "UPDATE", rule: data } },
   ]);
@@ -73,6 +79,10 @@ export async function DELETE(
     .eq("community_id", id);
 
   if (error) return NextResponse.json({ error: "Failed to delete rule." }, { status: 500 });
+
+  // The chat bootstrap and /rules read community rules through the Next data
+  // cache (see loadCommunityRules); a write has to clear it.
+  revalidateTag(COMMUNITY_RULES_TAG, { expire: 0 });
 
   if (existing) {
     void publishRealtimeBatch([

@@ -38,7 +38,12 @@ export async function fetchCommunityMetaSSR(
 
   // The membership's mute state paints the header's menu label; the timed
   // column is read only once its migration is applied (see read-models.ts).
-  const muteUntilSupported = await canStoreMuteUntil(db);
+  // Both capability probes are memoized per process but cost a query on a
+  // cold isolate, so they ride one wave together.
+  const [muteUntilSupported, showcaseSupported] = await Promise.all([
+    canStoreMuteUntil(db),
+    canStoreShowcaseFlag(db),
+  ]);
   const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
     (muteUntilSupported
       ? db
@@ -51,7 +56,7 @@ export async function fetchCommunityMetaSSR(
     // showcase_enabled is read only once the showcase-toggle migration has
     // added the column, so the first paint works before it is applied. Each
     // branch keeps a single string literal (see read-models.ts).
-    (await canStoreShowcaseFlag(db)
+    (showcaseSupported
       ? db
           .from("communities")
           .select(
@@ -74,17 +79,22 @@ export async function fetchCommunityMetaSSR(
   // pin deadline comes with it, so a room that is on right now already reads
   // LIVE before the client fetches anything. (The cast matches this file's
   // untyped supabase-js baseline.)
-  const eventRoom = (community as any).type === EVENT_CHAT_COMMUNITY_TYPE
-    ? await loadEventRoomMeta(db, communityId).catch(() => null)
-    : null;
-
-  // The DP the API and sidebar serve: the master row's image when the
-  // community is master-backed (a cached lookup — see dp.ts).
-  const dp = await resolveCommunityDp({
-    type: community.type,
-    reference_id: (community as any).reference_id ?? null,
-    image_url: (community as any).image_url ?? null,
-  });
+  //
+  // Both the event badge and the DP need only the community row above, so
+  // they ride ONE wave together — the DP resolution is a cached master-data
+  // lookup, and the event meta is an extra query only for event rooms.
+  const [eventRoom, dp] = await Promise.all([
+    (community as any).type === EVENT_CHAT_COMMUNITY_TYPE
+      ? loadEventRoomMeta(db, communityId).catch(() => null)
+      : Promise.resolve(null),
+    // The DP the API and sidebar serve: the master row's image when the
+    // community is master-backed (a cached lookup — see dp.ts).
+    resolveCommunityDp({
+      type: community.type,
+      reference_id: (community as any).reference_id ?? null,
+      image_url: (community as any).image_url ?? null,
+    }),
+  ]);
 
   const meta: CachedMeta = {
     community: {

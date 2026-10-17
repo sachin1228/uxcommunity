@@ -1,3 +1,5 @@
+import type { CachedContentEvent } from "@/lib/communities/cache"
+
 type CacheEntry<T> = {
   value: T
   fetchedAt: number
@@ -224,16 +226,26 @@ export type CommunityBootstrap = {
   failures?: Array<{ section: string; message: string }>
 }
 
-export async function fetchAndHydrateCommunityBootstrap(
+/**
+ * The bootstrap sections that gate the chat's first paint.
+ *
+ * Content events (the "John created a …" timeline cards) are the slowest
+ * bootstrap section — the route re-reads the community read model for it,
+ * then walks its own query waves — and they are permanent history cards, not
+ * first-paint data. Keeping them out of the fast request lets the read model,
+ * the message page and rules hydrate a section-of-work earlier; the deferred
+ * request below fills the same client caches right after, so the timeline
+ * still seeds from history. The route keeps serving every section when
+ * `sections` is absent, which older clients (the Expo app) rely on.
+ */
+export const COMMUNITY_BOOTSTRAP_FAST_SECTIONS = "community,messages,rules";
+
+function hydrateCommunityBootstrap(
+  data: CommunityBootstrap,
   communityId: string,
   userId: string,
-): Promise<CommunityBootstrap> {
-  const base = `/api/communities/${communityId}`
-  const data = await fetchJsonCached<CommunityBootstrap>(
-    `${base}/bootstrap`,
-    { staleMs: COMMUNITY_BOOTSTRAP_STALE_MS },
-    userId,
-  )
+) {
+  const base = `/api/communities/${communityId}`;
   const sections: Array<[string, unknown]> = [
     [base, data.community],
     [`${base}/messages`, data.messages],
@@ -250,7 +262,68 @@ export async function fetchAndHydrateCommunityBootstrap(
   for (const [url, value] of sections) {
     if (value !== undefined) setCachedRequest(url, value, userId)
   }
+}
+
+export async function fetchAndHydrateCommunityBootstrap(
+  communityId: string,
+  userId: string,
+): Promise<CommunityBootstrap> {
+  const base = `/api/communities/${communityId}`
+  const data = await fetchJsonCached<CommunityBootstrap>(
+    `${base}/bootstrap?sections=${COMMUNITY_BOOTSTRAP_FAST_SECTIONS}`,
+    { staleMs: COMMUNITY_BOOTSTRAP_STALE_MS },
+    userId,
+  )
+  hydrateCommunityBootstrap(data, communityId, userId)
+  // Fire-and-forget. Whoever renders the content-event cards awaits
+  // fetchDeferredCommunityContentEvents — the dedupe in fetchJsonCached makes
+  // that the same request, settled once.
+  void fetchDeferredCommunityContentEvents(communityId, userId).catch(() => {})
   return data
+}
+
+/**
+ * The slow bootstrap section, fetched off the first-paint path: the route
+ * runs only the content-events producer (`sections=content-events`), and the
+ * result lands on the same per-section cache entry the timeline reads plus
+ * the fast bootstrap entry, so a later rehydration of the community sees it.
+ * Same 15-minute window as the rest of the bootstrap: realtime keeps the
+ * cards current once the community is open.
+ */
+export async function fetchDeferredCommunityContentEvents(
+  communityId: string,
+  userId: string,
+): Promise<CachedContentEvent[] | undefined> {
+  const base = `/api/communities/${communityId}`
+  const data = await fetchJsonCached<{ "content-events"?: { events?: CachedContentEvent[] } }>(
+    `${base}/bootstrap?sections=content-events`,
+    { staleMs: COMMUNITY_BOOTSTRAP_STALE_MS },
+    userId,
+  )
+  const events = data?.["content-events"]?.events
+  if (events) {
+    setCachedRequest(`${base}/content-events`, { events }, userId)
+    patchCachedRequest<CommunityBootstrap>(
+      `${base}/bootstrap?sections=${COMMUNITY_BOOTSTRAP_FAST_SECTIONS}`,
+      (current) => ({ ...current, "content-events": { events } }),
+      userId,
+    )
+  }
+  return events
+}
+
+/**
+ * Drop every client copy of a community's bootstrap data — the fast entry,
+ * the deferred content-events entry, and the legacy plain URL. Used when a
+ * server-side fact the read model carries changes outside the community's own
+ * flows (e.g. an event deletion rewrites the room's date fields).
+ */
+export function invalidateCommunityBootstrapCache(communityId: string, userId?: string) {
+  const base = `/api/communities/${communityId}`
+  invalidateRequest(`${base}/bootstrap`, userId)
+  invalidateRequest(`${base}/bootstrap?sections=${COMMUNITY_BOOTSTRAP_FAST_SECTIONS}`, userId)
+  invalidateRequest(`${base}/bootstrap?sections=content-events`, userId)
+  invalidateRequest(`${base}/content-events`, userId)
 }
 
 export function subscribeToRequest(url: string, listener: () => void, userId?: string) {

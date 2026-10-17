@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityPermissions, resolveCommunityRole } from "./manager-role";
@@ -57,7 +58,14 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   // The membership's mute state feeds the header's Mute notifications menu.
   // The timed column is selected only once its migration is applied; each
   // branch keeps a single string literal (see the note below).
-  const muteUntilSupported = await canStoreMuteUntil(db);
+  //
+  // The capability probes are memoized per server process, but a cold worker
+  // isolate pays each one as a query — running them together keeps a cold
+  // start at ONE extra wave instead of two.
+  const [muteUntilSupported, showcaseSupported] = await Promise.all([
+    canStoreMuteUntil(db),
+    canStoreShowcaseFlag(db),
+  ]);
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
     (muteUntilSupported
       ? db
@@ -72,7 +80,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     // list matters here. Each branch keeps its column list a single string
     // literal: the query builder parses that literal into a row type, and a
     // union of column lists collapses into a parse error.
-    (await canStoreShowcaseFlag(db)
+    (showcaseSupported
       ? db
           .from("communities")
           .select(
@@ -94,22 +102,29 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   // Resolve the caller's community role + effective permissions (owners hold
   // every capability; platform-appointed admins and owner-appointed moderators
   // hold their configured grants).
-  // An event group chat's DP wears its event's date, and says LIVE while the
-  // event is under way (see DpWithEventDate), so the header knows both the day
-  // the room is for and the deadline it stops being live at. Read only for
-  // event rooms, one wave later, and best-effort — an environment without the
-  // event-chat migration loses the badge, never the read model. The cast
-  // matches the repo-wide untyped supabase-js baseline used by the lines below.
   const communityType = (community as unknown as { type?: string | null }).type;
-  const eventRoom = communityType === EVENT_CHAT_COMMUNITY_TYPE
-    ? await loadEventRoomMeta(db, communityId).catch(() => null)
-    : null;
-
   const currentUserRole = resolveCommunityRole(community.owner_id, membership.role, userId);
-  const currentUserPermissions = await loadCommunityPermissions(db, communityId, userId, currentUserRole);
-
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows }] = await Promise.all([
+
+  // Everything below needs only the membership + community rows above, so it
+  // all rides on ONE wave: permissions, the event room's badge data (event
+  // rooms only, best-effort — an environment without the event-chat migration
+  // loses the badge, never the read model), the DP resolution, the master-data
+  // label maps and the top members. This used to be THREE sequential waves
+  // (event room → permissions → the rest), each paying the full
+  // worker→database round trip — the read model's dominant cost.
+  const [
+    eventRoom,
+    currentUserPermissions,
+    dp,
+    masterNameMap,
+    experienceLevelNameMap,
+    { data: memberRows },
+  ] = await Promise.all([
+    communityType === EVENT_CHAT_COMMUNITY_TYPE
+      ? loadEventRoomMeta(db, communityId).catch(() => null)
+      : Promise.resolve(null),
+    loadCommunityPermissions(db, communityId, userId, currentUserRole),
     resolveCommunityDp({
       type: community.type,
       reference_id: community.reference_id,
@@ -368,16 +383,43 @@ export async function loadCommunityEvents(
   return { ok: true, data: { events, nextCursor } };
 }
 
+/**
+ * Revalidation tag for the cached community-rules read. Admin rule writes
+ * (create/update/delete) call `revalidateTag(COMMUNITY_RULES_TAG)`; rules
+ * edits are rare, so one tag for every community is enough bookkeeping —
+ * a write just clears all cached rule lists.
+ */
+export const COMMUNITY_RULES_TAG = "community-rules";
+
+/**
+ * Community rules are read on every chat open (the bootstrap bundles them
+ * into the read model response) and change only when an admin edits them, so
+ * the read is served from the Next data cache — R2-backed on the deployed
+ * Worker (see open-next.config.ts) — for five minutes, or until an admin
+ * write revalidates the tag above.
+ */
+const loadCommunityRulesCached = unstable_cache(
+  async (communityId: string): Promise<{ rules: unknown[] }> => {
+    const { data, error } = await createServiceClient()
+      .from("community_rules")
+      .select("id, rule_text, order_index")
+      .eq("community_id", communityId)
+      .order("order_index", { ascending: true });
+    if (error) throw new Error("Failed to load rules.");
+    return { rules: data ?? [] };
+  },
+  ["community-rules"],
+  { revalidate: 300, tags: [COMMUNITY_RULES_TAG] },
+);
+
 export async function loadCommunityRules(
   communityId: string,
 ): Promise<ReadResult<{ rules: unknown[] }>> {
-  const { data, error } = await createServiceClient()
-    .from("community_rules")
-    .select("id, rule_text, order_index")
-    .eq("community_id", communityId)
-    .order("order_index", { ascending: true });
-  if (error) return { ok: false, status: 500, error: "Failed to load rules." };
-  return { ok: true, data: { rules: data ?? [] } };
+  try {
+    return { ok: true, data: await loadCommunityRulesCached(communityId) };
+  } catch {
+    return { ok: false, status: 500, error: "Failed to load rules." };
+  }
 }
 
 /** A cursor id half must be a uuid before it reaches the RPC's uuid argument. */

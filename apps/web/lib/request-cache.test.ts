@@ -4,10 +4,13 @@ import test, { afterEach } from "node:test"
 import {
   canonicalRequestKey,
   clearRequestCache,
+  COMMUNITY_BOOTSTRAP_FAST_SECTIONS,
   fetchAndHydrateCommunityBootstrap,
+  fetchDeferredCommunityContentEvents,
   fetchJsonCached,
   getCachedRequest,
   initRequestCache,
+  invalidateCommunityBootstrapCache,
   invalidateRequest,
   patchCachedRequest,
   setCachedRequest,
@@ -15,6 +18,8 @@ import {
 } from "./request-cache"
 
 const originalFetch = globalThis.fetch
+const FAST_BOOTSTRAP = `/api/communities/community-a/bootstrap?sections=${COMMUNITY_BOOTSTRAP_FAST_SECTIONS}`
+const DEFERRED_BOOTSTRAP = "/api/communities/community-a/bootstrap?sections=content-events"
 
 afterEach(() => {
   clearRequestCache()
@@ -61,8 +66,10 @@ test("deduplicates concurrent GET requests", async () => {
 
 test("deduplicates concurrent optional-section fallback requests", async () => {
   let calls = 0
-  globalThis.fetch = (async () => {
+  const urls: string[] = []
+  globalThis.fetch = (async (input) => {
     calls += 1
+    urls.push(String(input))
     await new Promise((resolve) => setTimeout(resolve, 10))
     return new Response(JSON.stringify({ value: calls }), {
       status: 200,
@@ -76,7 +83,9 @@ test("deduplicates concurrent optional-section fallback requests", async () => {
     fetchJsonCached("/api/communities/community-a/events", {}, "user-a"),
   ])
 
-  assert.equal(calls, 2)
+  // Fast bootstrap + its deferred content-events sibling + one section
+  // fallback (the bootstrap never carries threads/events/…).
+  assert.deepEqual(urls, [FAST_BOOTSTRAP, DEFERRED_BOOTSTRAP, "/api/communities/community-a/events"])
 })
 
 test("deduplicates stale revalidation", async () => {
@@ -207,25 +216,31 @@ test("reuses SSR-seeded community metadata and messages", async () => {
 test("hydrates every supplied community bootstrap section into canonical user keys", async () => {
   const calls: string[] = []
   globalThis.fetch = (async (input) => {
-    calls.push(String(input))
-    return new Response(JSON.stringify({
-      community: { community: { id: "community-a" }, members: [] },
-      messages: { messages: [{ id: "message-a" }] },
-      permissions: { role: "member", can_manage: false },
-      unreadCount: 2,
-      threads: { threads: [{ id: "thread-a" }] },
-      events: { events: [{ id: "event-a" }] },
-      resources: { resources: [{ id: "resource-a" }] },
-      showcase: { posts: [{ id: "showcase-a" }], nextCursor: null },
-      members: { members: [{ user_id: "member-a" }], has_more: false },
-      rules: { rules: [{ id: "rule-a" }] },
-    }), {
+    const url = String(input)
+    calls.push(url)
+    const body = url === DEFERRED_BOOTSTRAP
+      ? { "content-events": { events: [{ id: "content-a" }] } }
+      : {
+          community: { community: { id: "community-a" }, members: [] },
+          messages: { messages: [{ id: "message-a" }] },
+          permissions: { role: "member", can_manage: false },
+          unreadCount: 2,
+          threads: { threads: [{ id: "thread-a" }] },
+          events: { events: [{ id: "event-a" }] },
+          resources: { resources: [{ id: "resource-a" }] },
+          showcase: { posts: [{ id: "showcase-a" }], nextCursor: null },
+          members: { members: [{ user_id: "member-a" }], has_more: false },
+          rules: { rules: [{ id: "rule-a" }] },
+        }
+    return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })
   }) as typeof fetch
 
   await fetchAndHydrateCommunityBootstrap("community-a", "user-a")
+  // The slow section rides its own request; flush it before asserting.
+  await fetchDeferredCommunityContentEvents("community-a", "user-a")
 
   const urls = [
     "/api/communities/community-a",
@@ -241,13 +256,20 @@ test("hydrates every supplied community bootstrap section into canonical user ke
   ]
   await Promise.all(urls.map((url) => fetchJsonCached(url, {}, "user-a")))
 
-  assert.deepEqual(calls, ["/api/communities/community-a/bootstrap"])
+  assert.deepEqual(calls, [FAST_BOOTSTRAP, DEFERRED_BOOTSTRAP])
   assert.equal(
     getCachedRequest<{ members: Array<{ user_id: string }> }>(
       "/api/communities/community-a/members?page=0",
       "user-a",
     )?.members[0]?.user_id,
     "member-a",
+  )
+  assert.equal(
+    getCachedRequest<{ events: Array<{ id: string }> }>(
+      "/api/communities/community-a/content-events",
+      "user-a",
+    )?.events[0]?.id,
+    "content-a",
   )
   assert.equal(getCachedRequest(urls[4], "user-b"), undefined)
 })
@@ -292,7 +314,7 @@ test("coordinates concurrent bootstrap-backed reads through one bootstrap reques
   )
 
   assert.equal(values.length, urls.length)
-  assert.deepEqual(calls, [`${base}/bootstrap`])
+  assert.deepEqual(calls, [FAST_BOOTSTRAP, DEFERRED_BOOTSTRAP])
 })
 
 test("falls back once when an optional bootstrap section is absent", async () => {
@@ -300,7 +322,7 @@ test("falls back once when an optional bootstrap section is absent", async () =>
   globalThis.fetch = (async (input) => {
     const url = String(input)
     calls.push(url)
-    const body = url.endsWith("/bootstrap")
+    const body = url.includes("/bootstrap")
       ? {
           community: { community: { id: "community-a" }, members: [] },
           messages: { messages: [] },
@@ -322,7 +344,8 @@ test("falls back once when an optional bootstrap section is absent", async () =>
 
   assert.equal(value.threads[0]?.id, "thread-fallback")
   assert.deepEqual(calls, [
-    "/api/communities/community-a/bootstrap",
+    FAST_BOOTSTRAP,
+    DEFERRED_BOOTSTRAP,
     "/api/communities/community-a/threads",
   ])
 })
@@ -359,7 +382,72 @@ test("hydrates a secondary community collection from bootstrap", async () => {
     fetchJsonCached("/api/communities/community-a/threads", {}, "user-a"),
   ])
 
-  assert.deepEqual(calls, ["/api/communities/community-a/bootstrap"])
+  assert.deepEqual(calls, [FAST_BOOTSTRAP, DEFERRED_BOOTSTRAP])
+})
+
+test("serves the slow content-events section from the deferred request", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    calls.push(url)
+    const body = url === DEFERRED_BOOTSTRAP
+      ? { "content-events": { events: [{ id: "content-a" }] } }
+      : {
+          community: { community: { id: "community-a" }, members: [] },
+          messages: { messages: [] },
+          rules: { rules: [{ id: "rule-a" }] },
+        }
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  await fetchAndHydrateCommunityBootstrap("community-a", "user-a")
+  const events = await fetchDeferredCommunityContentEvents("community-a", "user-a")
+
+  assert.deepEqual(calls, [FAST_BOOTSTRAP, DEFERRED_BOOTSTRAP])
+  assert.equal(events?.[0]?.id, "content-a")
+  assert.equal(
+    getCachedRequest<{ events: Array<{ id: string }> }>(
+      "/api/communities/community-a/content-events",
+      "user-a",
+    )?.events[0]?.id,
+    "content-a",
+  )
+  // The fast bootstrap entry learns the section too, so a later rehydration
+  // does not read an absent content-events section.
+  assert.equal(
+    getCachedRequest<{ "content-events"?: { events?: Array<{ id: string }> } }>(
+      FAST_BOOTSTRAP,
+      "user-a",
+    )?.["content-events"]?.events?.[0]?.id,
+    "content-a",
+  )
+})
+
+test("invalidateCommunityBootstrapCache drops every bootstrap cache flavor", async () => {
+  globalThis.fetch = (async () => new Response(
+    JSON.stringify({}),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  )) as typeof fetch
+
+  const urls = [
+    "/api/communities/community-a/bootstrap",
+    FAST_BOOTSTRAP,
+    DEFERRED_BOOTSTRAP,
+    "/api/communities/community-a/content-events",
+    "/api/communities/community-a/rules",
+  ]
+  for (const url of urls) setCachedRequest(url, { value: url }, "user-a")
+
+  invalidateCommunityBootstrapCache("community-a", "user-a")
+
+  for (const url of urls.slice(0, 4)) {
+    assert.equal(getCachedRequest(url, "user-a"), undefined, `expected ${url} dropped`)
+  }
+  // Only the bootstrap flavors are dropped — other sections keep their entry.
+  assert.notEqual(getCachedRequest("/api/communities/community-a/rules", "user-a"), undefined)
 })
 
 test("patches and invalidates only the requested user key", async () => {
