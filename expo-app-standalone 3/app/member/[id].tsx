@@ -229,6 +229,7 @@ export default function MemberProfileScreen() {
           id: conversation.id,
           name: conversation.peer.name,
           avatar: conversation.peer.avatar_url ?? '',
+          peerId: conversation.peer.id,
         },
       });
     } catch (e) {

@@ -12,6 +12,7 @@ import {
   dmTimestampLabel,
   isIncomingRequest,
   isOutgoingRequest,
+  isUnstartedRequest,
   newestMessageAt,
   requestHintForPeer,
   unreadPillLabel,
@@ -79,6 +80,18 @@ test('composer state follows the web precedence: blocked, incoming, outgoing, re
 
 test('the one-message hint names the peer', () => {
   assert.ok(requestHintForPeer('Ada').includes('Ada'));
+});
+
+test('an unstarted pending request is the pre-send hint state', () => {
+  assert.equal(
+    isUnstartedRequest(conversation({ request_state: 'pending', requested_by: null })),
+    true,
+  );
+  assert.equal(
+    isUnstartedRequest(conversation({ request_state: 'pending', requested_by: PEER })),
+    false,
+  );
+  assert.equal(isUnstartedRequest(conversation()), false);
 });
 
 // ---------------------------------------------------------------------------

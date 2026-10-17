@@ -2,8 +2,27 @@
  * Direct messages REST calls — the same endpoints the web thread uses.
  */
 
-import { apiFetch } from './api';
-import type { DmConversation, DmMessage, DmRequestState } from './dm';
+import { apiFetch, apiFormUpload } from './api';
+import type { DmConversation, DmMessage, DmRequestState, DmReaction } from './dm';
+import { DM_MESSAGE_PAGE_SIZE } from './dm';
+
+/** The server's message rows omit `designation` — the chat bubble expects it. */
+type RawDmMessage = Omit<DmMessage, 'users'> & {
+  users?: { name: string; avatar_url: string | null; designation?: string | null } | null;
+};
+
+function normalizeMessage(raw: RawDmMessage): DmMessage {
+  return {
+    ...raw,
+    users: raw.users
+      ? {
+          name: raw.users.name,
+          avatar_url: raw.users.avatar_url,
+          designation: raw.users.designation ?? null,
+        }
+      : null,
+  };
+}
 
 export async function getDmConversations(): Promise<DmConversation[]> {
   const { data } = await apiFetch<{ conversations?: DmConversation[] }>(
@@ -46,11 +65,32 @@ export async function getDmMessages(
     params.set('before_id', before.id);
   }
   const query = params.toString();
-  const { data } = await apiFetch<{ messages?: DmMessage[] }>(
+  const { data } = await apiFetch<{ messages?: RawDmMessage[] }>(
     `/api/dm/conversations/${conversationId}/messages${query ? `?${query}` : ''}`,
   );
-  const messages = data?.messages ?? [];
-  return { messages, hasMore: messages.length >= 50 };
+  const messages = (data?.messages ?? []).map(normalizeMessage);
+  return { messages, hasMore: messages.length >= DM_MESSAGE_PAGE_SIZE };
+}
+
+/** Messages strictly newer than the cursor — the reconnect/foreground catch-up. */
+export async function getDmMessagesAfter(
+  conversationId: string,
+  after: { createdAt: string; id: string },
+): Promise<DmMessage[]> {
+  const params = new URLSearchParams({
+    after: after.createdAt,
+    after_id: after.id,
+  });
+  const { data } = await apiFetch<{ messages?: RawDmMessage[] }>(
+    `/api/dm/conversations/${conversationId}/messages?${params.toString()}`,
+  );
+  return (data?.messages ?? []).map(normalizeMessage);
+}
+
+export interface DmSendInput {
+  content: string;
+  imageUrl?: string | null;
+  replyToId?: string | null;
 }
 
 export interface DmSendResult {
@@ -67,17 +107,22 @@ export interface DmSendResult {
  */
 export async function sendDmMessage(
   conversationId: string,
-  content: string,
+  input: DmSendInput,
   clientNonce: string,
 ): Promise<DmSendResult> {
   const { data, status } = await apiFetch<{
-    message?: DmMessage;
+    message?: RawDmMessage;
     request_state?: DmRequestState;
     requested_by?: string | null;
     duplicate?: boolean;
   }>(`/api/dm/conversations/${conversationId}/messages`, {
     method: 'POST',
-    body: { content, client_nonce: clientNonce },
+    body: {
+      content: input.content,
+      image_url: input.imageUrl ?? null,
+      reply_to_id: input.replyToId ?? null,
+      client_nonce: clientNonce,
+    },
   });
 
   if (!data?.message) {
@@ -87,7 +132,7 @@ export async function sendDmMessage(
   }
 
   return {
-    message: data.message,
+    message: normalizeMessage(data.message),
     requestState: data.request_state ?? 'accepted',
     requestedBy: data.requested_by ?? null,
     duplicate: Boolean(data.duplicate),
@@ -119,9 +164,123 @@ export async function getDmUnread(): Promise<number> {
   return data?.count ?? 0;
 }
 
+// ---------------------------------------------------------------------------
+// Message actions
+// ---------------------------------------------------------------------------
+
+/** Edit an owned text message (15-minute window, enforced by the server). */
+export async function editDmMessage(
+  messageId: string,
+  content: string,
+): Promise<{ content: string; edited_at: string | null }> {
+  const { data } = await apiFetch<{ content?: string; edited_at?: string | null }>(
+    `/api/dm/messages/${messageId}`,
+    { method: 'PATCH', body: { content } },
+  );
+  return {
+    content: data.content ?? content,
+    edited_at: data.edited_at ?? new Date().toISOString(),
+  };
+}
+
+/** Soft-delete an owned message for both participants. */
+export async function deleteDmMessage(messageId: string): Promise<void> {
+  await apiFetch(`/api/dm/messages/${messageId}`, { method: 'DELETE' });
+}
+
+/**
+ * One reaction per member per message. The API takes the explicit desired
+ * emoji (null clears it) and returns the authoritative grouped reactions.
+ */
+export async function setDmMessageReaction(
+  messageId: string,
+  desiredEmoji: string | null,
+): Promise<{ reactions: DmReaction[]; currentUserEmoji: string | null }> {
+  const { data } = await apiFetch<{
+    reactions?: DmReaction[];
+    currentUserEmoji?: string | null;
+  }>(`/api/dm/messages/${messageId}/reactions`, {
+    method: 'POST',
+    body: { desiredEmoji },
+  });
+  return {
+    reactions: data.reactions ?? [],
+    currentUserEmoji: data.currentUserEmoji ?? desiredEmoji,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Typing
+// ---------------------------------------------------------------------------
+
+/** Relay one typing pulse; a lost pulse is invisible (the next keystroke sends another). */
+export async function sendDmTyping(conversationId: string, typing: boolean): Promise<void> {
+  await apiFetch(`/api/dm/conversations/${conversationId}/typing`, {
+    method: 'POST',
+    body: { typing },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Images
+// ---------------------------------------------------------------------------
+
+/** Upload a prepared image into the conversation's DM namespace. */
+export async function uploadDmImage(
+  conversationId: string,
+  image: { uri: string; mimeType: string; name: string },
+  signal?: AbortSignal,
+): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: image.uri,
+    type: image.mimeType,
+    name: image.name,
+  } as unknown as Blob);
+
+  const { data } = await apiFormUpload<{ url?: string; error?: string }>(
+    `/api/dm/conversations/${conversationId}/upload`,
+    formData,
+    signal,
+  );
+  if (!data.url) {
+    throw new Error(data.error ?? 'Image could not be uploaded. Please try a different image.');
+  }
+  return data.url;
+}
+
+/** Release an upload whose send was abandoned (no message row references it). */
+export async function deleteDmUpload(conversationId: string, url: string): Promise<void> {
+  await apiFetch(`/api/dm/conversations/${conversationId}/upload`, {
+    method: 'DELETE',
+    body: { url },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Safety
+// ---------------------------------------------------------------------------
+
+/** Block a member — idempotent; the DB trigger refuses both sides' new sends. */
+export async function blockUser(userId: string): Promise<void> {
+  await apiFetch('/api/dm/blocks', { method: 'POST', body: { user_id: userId } });
+}
+
 /** Lift a block the member placed (idempotent). */
 export async function unblockUser(userId: string): Promise<void> {
   await apiFetch(`/api/dm/blocks?user_id=${encodeURIComponent(userId)}`, {
     method: 'DELETE',
+  });
+}
+
+/** Report the member on the other side of a conversation (admin queue). */
+export async function reportDmConversation(
+  conversationId: string,
+  reason: string,
+  details: string,
+): Promise<void> {
+  await apiFetch('/api/dm/reports', {
+    method: 'POST',
+    body: { conversation_id: conversationId, reason, details: details.trim() },
   });
 }

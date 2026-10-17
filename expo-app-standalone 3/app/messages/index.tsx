@@ -25,6 +25,7 @@ import { DmChatIcon } from '@/components/DmChatIcon';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useDmTyping } from '@/hooks/useDmTyping';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { getDmConversations } from '@/lib/dmApi';
 import {
@@ -43,6 +44,7 @@ export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const { typingByConversation } = useDmTyping(null);
 
   const [conversations, setConversations] = useState<DmConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,11 @@ export default function MessagesScreen() {
     const unsubscribers = [
       realtimeClient.on(room, 'dm-message', schedule),
       realtimeClient.on(room, 'dm-request-update', schedule),
+      realtimeClient.on(room, 'dm-message-edit', schedule),
+      realtimeClient.on(room, 'dm-message-delete', schedule),
+      realtimeClient.on(room, 'dm-reaction-insert', schedule),
+      realtimeClient.on(room, 'dm-reaction-update', schedule),
+      realtimeClient.on(room, 'dm-reaction-delete', schedule),
     ];
 
     return () => {
@@ -126,6 +133,7 @@ export default function MessagesScreen() {
           id: conversation.id,
           name: conversation.peer.name,
           avatar: conversation.peer.avatar_url ?? '',
+          peerId: conversation.peer.id,
         },
       });
     },
@@ -213,6 +221,7 @@ export default function MessagesScreen() {
             <ConversationRow
               conversation={item}
               userId={userId ?? ''}
+              typingLabel={typingByConversation.get(item.id) ?? null}
               onPress={() => openThread(item)}
             />
           )}
@@ -238,10 +247,12 @@ export default function MessagesScreen() {
 function ConversationRow({
   conversation,
   userId,
+  typingLabel,
   onPress,
 }: {
   conversation: DmConversation;
   userId: string;
+  typingLabel: string | null;
   onPress: () => void;
 }) {
   const colors = useColors();
@@ -288,16 +299,18 @@ function ConversationRow({
             style={[
               styles.preview,
               {
-                color: incoming
+                color: typingLabel
                   ? colors.accent
-                  : preview.muted
-                    ? colors.foregroundSubtle
-                    : colors.mutedForeground,
+                  : incoming
+                    ? colors.accent
+                    : preview.muted
+                      ? colors.foregroundSubtle
+                      : colors.mutedForeground,
               },
             ]}
             numberOfLines={1}
           >
-            {preview.text}
+            {typingLabel ?? preview.text}
           </Text>
           {conversation.unread_count > 0 && (
             <View style={[styles.unreadPill, { backgroundColor: colors.chatUnreadPill }]}>

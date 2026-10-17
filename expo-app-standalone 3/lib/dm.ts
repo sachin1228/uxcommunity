@@ -58,7 +58,7 @@ export interface DmReplyPreview {
   id: string;
   content: string | null;
   user_name: string;
-  user_id: string | null;
+  user_id?: string | null;
 }
 
 export interface DmReaction {
@@ -75,15 +75,16 @@ export interface DmMessage {
   reply_to_id: string | null;
   image_url: string | null;
   deleted_at: string | null;
-  edited_at: string | null;
-  users: { name: string; avatar_url: string | null } | null;
+  edited_at?: string | null;
+  users: { name: string; avatar_url: string | null; designation: string | null } | null;
   reactions: DmReaction[];
   reply_to: DmReplyPreview | null;
+  /** Client-only — optimistic bubbles carry their send state like the chat's. */
+  status?: 'sending' | 'sent' | 'failed';
 }
 
 /** Matches the server's DM_MESSAGE_PAGE_SIZE. */
 export const DM_MESSAGE_PAGE_SIZE = 50;
-export const DM_MAX_CONTENT_CHARS = 2000;
 
 // ---------------------------------------------------------------------------
 // Request lifecycle
@@ -107,6 +108,16 @@ export function isOutgoingRequest(
   viewerId: string,
 ): boolean {
   return conversation.request_state === 'pending' && conversation.requested_by === viewerId;
+}
+
+/**
+ * True before anyone has sent the first message: the next send becomes the
+ * request, so the composer carries the one-message hint.
+ */
+export function isUnstartedRequest(
+  conversation: Pick<DmConversation, 'request_state' | 'requested_by'>,
+): boolean {
+  return conversation.request_state === 'pending' && conversation.requested_by === null;
 }
 
 /** The composer state the thread footer renders, in web precedence order. */

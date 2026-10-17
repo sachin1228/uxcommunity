@@ -1,67 +1,132 @@
 /**
- * DM thread — the mobile rendering of the web /dashboard/messages pane.
+ * DM thread — the mobile rendering of the web /dashboard/messages pane, built
+ * on the SAME chat primitives as a community room: MessageBubble, the
+ * long-press action sheet (reactions, reply, copy, edit, delete), the edit
+ * modal, the image lightbox and the typing indicator. Only the community-only
+ * timeline devices (tabs, content cards, watermark) are absent.
  *
- * Own messages on the right (chat bubble tokens), the peer's on the left;
- * optimistic sends are confirmed by id (the realtime echo can arrive first);
- * every send carries a client nonce so a retry can never duplicate. The
- * footer follows the same state machine as the web: blocked bar, Accept/
- * Reject for an incoming request, the one-message hint for an outgoing one,
- * a declined notice, else the composer. Reading marks the newest displayed
- * message (throttled), which clears the header badge.
+ * The footer is the web thread's state machine: blocked, incoming request,
+ * outgoing request, rejected, else the composer. A brand-new conversation is
+ * synthesized from the route's peer (the server keeps empty conversations out
+ * of the list) so the one-message request hint is shown before the first send.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EditMessageModal } from '@/components/chat/EditMessageModal';
+import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
+import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
+import { MessageBubble } from '@/components/chat/MessageBubble';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { DmComposer } from '@/components/dm/DmComposer';
+import { DmReportModal } from '@/components/dm/DmReportModal';
+import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
-import { realtimeClient, realtimeRooms } from '@/lib/realtime';
+import { useDmSend } from '@/hooks/useDmSend';
+import { useDmTyping } from '@/hooks/useDmTyping';
 import {
   answerDmRequest,
+  blockUser,
   getDmConversations,
   getDmMessages,
+  getDmMessagesAfter,
   markDmRead,
-  sendDmMessage,
+  setDmMessageReaction,
   unblockUser,
 } from '@/lib/dmApi';
 import {
-  DM_MAX_CONTENT_CHARS,
   dmComposerState,
+  isUnstartedRequest,
   newestMessageAt,
   requestHintForPeer,
-  uuidV4,
   type DmConversation,
   type DmMessage,
 } from '@/lib/dm';
+import type { ReplyDraft } from '@/lib/chatContentEvents';
+import {
+  applyReactionDelete,
+  applyReactionInsert,
+  fmtDate,
+  myReactionEmoji,
+  nextReactionIntent,
+  projectOwnReaction,
+  type ReactionIntent,
+} from '@/lib/chat';
+import { hapticSelection, hapticToggle } from '@/lib/haptics';
+import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 
 const MARK_READ_THROTTLE_MS = 2_000;
+const CATCH_UP_DEBOUNCE_MS = 600;
 
 interface RealtimeDmPayload {
   id: string;
   conversation_id: string;
   user_id: string;
-  sender_name?: string;
+  sender_name?: string | null;
   sender_avatar_url?: string | null;
-  content?: string;
+  content?: string | null;
   created_at: string;
   reply_to_id?: string | null;
   reply_sender_name?: string | null;
   image_url?: string | null;
+  edited_at?: string | null;
+}
+
+type ThreadRow =
+  | { kind: 'date'; key: string; label: string }
+  | { kind: 'unread'; key: string; count: number }
+  | { kind: 'message'; key: string; msg: DmMessage; isSameAuthor: boolean };
+
+function sortMessages(messages: DmMessage[]): DmMessage[] {
+  return [...messages].sort((a, b) => {
+    const at = Date.parse(a.created_at);
+    const bt = Date.parse(b.created_at);
+    if (at !== bt) return at - bt;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/** The realtime row, shaped like a history row (the bubble contract). */
+function messageFromRealtime(payload: RealtimeDmPayload): DmMessage {
+  return {
+    id: payload.id,
+    content: payload.content ?? null,
+    created_at: payload.created_at,
+    user_id: payload.user_id,
+    reply_to_id: payload.reply_to_id ?? null,
+    image_url: payload.image_url ?? null,
+    deleted_at: null,
+    edited_at: null,
+    users: payload.sender_name
+      ? { name: payload.sender_name, avatar_url: payload.sender_avatar_url ?? null, designation: null }
+      : null,
+    reactions: [],
+    reply_to: payload.reply_to_id
+      ? {
+          id: payload.reply_to_id,
+          content: null,
+          user_name: payload.reply_sender_name ?? '',
+          user_id: null,
+        }
+      : null,
+    status: 'sent',
+  };
 }
 
 export default function DmThreadScreen() {
@@ -70,28 +135,93 @@ export default function DmThreadScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const params = useLocalSearchParams<{ id: string; name?: string; avatar?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    name?: string;
+    avatar?: string;
+    peerId?: string;
+  }>();
   const conversationId = params.id;
   const peerName = params.name ?? 'Member';
+  const peerId = params.peerId ?? null;
 
   const [conversation, setConversation] = useState<DmConversation | null>(null);
-  /** Oldest first, like the server orders a page. */
   const [messages, setMessages] = useState<DmMessage[]>([]);
+  const messagesRef = useRef<DmMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [answering, setAnswering] = useState(false);
 
-  /** temp message id → client nonce, to confirm the bubble on the response. */
-  const pendingNoncesRef = useRef(new Map<string, string>());
+  const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<DmMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<DmMessage | null>(null);
+  const [imageIndex, setImageIndex] = useState<number | null>(null);
+  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
+  const [answering, setAnswering] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The first-open unread marker — latched once, never recomputed on sends. */
+  const [initialUnread, setInitialUnread] = useState<{ id: string; count: number } | null>(
+    null,
+  );
+
   const loadingMoreRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedRef = useRef<string | null>(null);
   const lastMarkCallRef = useRef(0);
+  const atBottomRef = useRef(true);
+  const listRef = useRef<FlatList<ThreadRow>>(null);
+  const rowsRef = useRef<ThreadRow[]>([]);
+  const reactionIntentRef = useRef(new Map<string, ReactionIntent>());
+  const catchUpDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { typingUsers, notifyTyping } = useDmTyping(conversationId ?? null);
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
+      setToast(null);
+    }, 2_500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // ── Load: first page + the conversation row (or a synthesized empty one) ──
+  const synthesizeConversation = useCallback(
+    (): DmConversation | null => {
+      if (!peerId) return null;
+      return {
+        id: conversationId,
+        peer: { id: peerId, name: peerName, avatar_url: params.avatar || null },
+        last_message: null,
+        unread_count: 0,
+        my_last_read_at: null,
+        last_message_at: null,
+        last_reaction: null,
+        // A conversation kept out of the list has no message yet: the next
+        // message becomes the request.
+        request_state: 'pending',
+        requested_by: null,
+        blocked_by_me: false,
+      };
+    },
+    [conversationId, params.avatar, peerId, peerName],
+  );
 
   const load = useCallback(async () => {
     if (!conversationId) return;
@@ -102,15 +232,30 @@ export default function DmThreadScreen() {
         getDmMessages(conversationId),
         getDmConversations().catch(() => [] as DmConversation[]),
       ]);
+      const found =
+        conversations.find((row) => row.id === conversationId) ?? synthesizeConversation();
       setMessages(page.messages);
       setHasMore(page.hasMore);
-      setConversation(conversations.find((row) => row.id === conversationId) ?? null);
+      setConversation(found);
+
+      // Snapshot the unread boundary before this open marks everything read.
+      setInitialUnread(null);
+      if (found && found.unread_count > 0) {
+        const firstUnread = page.messages.find(
+          (message) =>
+            message.user_id === found.peer.id &&
+            (!found.my_last_read_at || message.created_at > found.my_last_read_at),
+        );
+        if (firstUnread) {
+          setInitialUnread({ id: firstUnread.id, count: found.unread_count });
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load this conversation.');
     } finally {
       setLoading(false);
     }
-  }, [conversationId]);
+  }, [conversationId, synthesizeConversation]);
 
   useEffect(() => {
     void load();
@@ -122,11 +267,48 @@ export default function DmThreadScreen() {
     return () => setDmActiveConversation(null);
   }, [conversationId]);
 
-  // ── Read marking: the newest displayed message, throttled ────────────────
+  // ── Send / edit / delete ──────────────────────────────────────────────────
+  const scrollToLatest = useCallback((animated = true) => {
+    listRef.current?.scrollToOffset({ offset: 0, animated });
+  }, []);
+
+  const {
+    handleSend,
+    handleCancel,
+    handleRetry,
+    handleEdit,
+    handleDelete,
+    sending,
+    sendError,
+    editSaving,
+    editError,
+    clearEditError,
+  } = useDmSend({
+    conversationId: conversationId ?? null,
+    currentUser: {
+      id: userId ?? '',
+      name: user?.name ?? 'You',
+      avatar_url: user?.avatar_url ?? null,
+    },
+    setMessages,
+    scrollToLatest,
+    stopTyping: () => notifyTyping(false),
+    onConversationState: (state, requestedBy) => {
+      setConversation((current) =>
+        current
+          ? { ...current, request_state: state, requested_by: requestedBy }
+          : current,
+      );
+    },
+  });
+
+  // ── Read marking: newest real (non-temp) message, throttled ──────────────
   const markReadNow = useCallback(
     (force = false) => {
       if (!conversationId) return;
-      const newest = newestMessageAt(messages);
+      const newest = newestMessageAt(
+        messages.filter((message) => !message.id.startsWith('temp-')),
+      );
       if (!newest) return;
       if (lastMarkedRef.current === newest) return;
 
@@ -162,7 +344,58 @@ export default function DmThreadScreen() {
     };
   }, []);
 
-  // ── Realtime: dm-message / dm-request-update / edits / deletes ───────────
+  // ── Catch-up after a reconnect (missed events are recovered via ?after=) ──
+  const catchUp = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      const conversations = await getDmConversations().catch(() => [] as DmConversation[]);
+      const found = conversations.find((row) => row.id === conversationId);
+      if (found) setConversation(found);
+
+      const current = messagesRef.current;
+      const newestReal = [...current]
+        .reverse()
+        .find((message) => !message.id.startsWith('temp-'));
+
+      if (!newestReal) {
+        const page = await getDmMessages(conversationId);
+        setMessages((existing) => {
+          const seen = new Set(existing.map((message) => message.id));
+          return sortMessages([
+            ...existing,
+            ...page.messages.filter((message) => !seen.has(message.id)),
+          ]);
+        });
+        return;
+      }
+
+      const newer = await getDmMessagesAfter(conversationId, {
+        createdAt: newestReal.created_at,
+        id: newestReal.id,
+      });
+      if (newer.length === 0) return;
+      setMessages((existing) => {
+        const seen = new Set(existing.map((message) => message.id));
+        return sortMessages([
+          ...existing,
+          ...newer.filter((message) => !seen.has(message.id)),
+        ]);
+      });
+      if (atBottomRef.current) setTimeout(() => scrollToLatest(true), 40);
+    } catch {
+      /* the next reconnect or open retries */
+    }
+  }, [conversationId, scrollToLatest]);
+
+  const scheduleCatchUp = useCallback(() => {
+    if (catchUpDebounceRef.current) clearTimeout(catchUpDebounceRef.current);
+    catchUpDebounceRef.current = setTimeout(() => {
+      catchUpDebounceRef.current = null;
+      void catchUp();
+    }, CATCH_UP_DEBOUNCE_MS);
+  }, [catchUp]);
+
+  // ── Realtime: messages, requests, edits, deletes, reactions ───────────────
   useEffect(() => {
     if (!userId || !conversationId) return;
 
@@ -176,45 +409,40 @@ export default function DmThreadScreen() {
       realtimeClient.on(room, 'dm-message', (data) => {
         const payload = data as RealtimeDmPayload | null;
         if (!payload?.id || payload.conversation_id !== conversationId) return;
+        const incoming = messageFromRealtime(payload);
+
         setMessages((current) => {
           if (current.some((message) => message.id === payload.id)) return current;
 
-          const incoming: DmMessage = {
-            id: payload.id,
-            content: payload.content ?? null,
-            created_at: payload.created_at,
-            user_id: payload.user_id,
-            reply_to_id: payload.reply_to_id ?? null,
-            image_url: payload.image_url ?? null,
-            deleted_at: null,
-            edited_at: null,
-            users: payload.sender_name
-              ? { name: payload.sender_name, avatar_url: payload.sender_avatar_url ?? null }
-              : null,
-            reactions: [],
-            reply_to: payload.reply_to_id
-              ? {
-                  id: payload.reply_to_id,
-                  content: null,
-                  user_name: payload.reply_sender_name ?? '',
-                  user_id: null,
-                }
-              : null,
-          };
-
-          // The echo confirms our own optimistic bubble (matched by sender and
-          // content within the pending window) — drop the temp copy.
+          // The echo confirms one of our optimistic bubbles (or replaced it).
           if (payload.user_id === userId) {
-            for (const [tempId] of pendingNoncesRef.current) {
-              const temp = current.find((message) => message.id === tempId);
-              if (temp && temp.content === (payload.content ?? null)) {
-                pendingNoncesRef.current.delete(tempId);
-                return [...current.filter((message) => message.id !== tempId), incoming];
-              }
+            const temp = current.find(
+              (message) =>
+                message.id.startsWith('temp-') &&
+                message.user_id === userId &&
+                message.status !== 'failed' &&
+                (message.content ?? '') === (incoming.content ?? '') &&
+                Boolean(message.image_url) === Boolean(incoming.image_url),
+            );
+            if (temp) {
+              return sortMessages(
+                current.map((message) =>
+                  message.id === temp.id
+                    ? {
+                        ...incoming,
+                        users: incoming.users ?? message.users,
+                        reply_to: incoming.reply_to ?? message.reply_to,
+                        status: 'sent' as const,
+                      }
+                    : message,
+                ),
+              );
             }
           }
-          return [...current, incoming];
+
+          return sortMessages([...current, incoming]);
         });
+        if (atBottomRef.current) setTimeout(() => scrollToLatest(true), 40);
       }),
     );
 
@@ -251,7 +479,7 @@ export default function DmThreadScreen() {
               ? {
                   ...message,
                   content: payload.content ?? message.content,
-                  edited_at: new Date().toISOString(),
+                  edited_at: payload.edited_at ?? new Date().toISOString(),
                 }
               : message,
           ),
@@ -273,6 +501,7 @@ export default function DmThreadScreen() {
                   reply_to_id: null,
                   reply_to: null,
                   deleted_at: new Date().toISOString(),
+                  reactions: [],
                 }
               : message,
           ),
@@ -280,11 +509,122 @@ export default function DmThreadScreen() {
       }),
     );
 
+    unsubscribes.push(
+      realtimeClient.on(room, 'dm-reaction-insert', (data) => {
+        const payload = data as {
+          conversation_id?: string;
+          message_id?: string;
+          user_id?: string;
+          emoji?: string;
+        } | null;
+        if (
+          !payload?.conversation_id ||
+          payload.conversation_id !== conversationId ||
+          !payload.message_id ||
+          !payload.user_id ||
+          !payload.emoji
+        ) {
+          return;
+        }
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === payload.message_id
+              ? {
+                  ...message,
+                  reactions: applyReactionInsert(
+                    message.reactions ?? [],
+                    payload.emoji!,
+                    payload.user_id!,
+                  ),
+                }
+              : message,
+          ),
+        );
+      }),
+    );
+
+    unsubscribes.push(
+      realtimeClient.on(room, 'dm-reaction-update', (data) => {
+        const payload = data as {
+          old?: { conversation_id?: string; message_id?: string; user_id?: string; emoji?: string };
+          new?: { conversation_id?: string; message_id?: string; user_id?: string; emoji?: string };
+        } | null;
+        const next = payload?.new;
+        const previous = payload?.old;
+        if (
+          !next?.conversation_id ||
+          next.conversation_id !== conversationId ||
+          !next.message_id ||
+          !next.user_id ||
+          !next.emoji
+        ) {
+          return;
+        }
+        setMessages((current) =>
+          current.map((message) => {
+            if (message.id !== next.message_id) return message;
+            const removed =
+              previous?.emoji && previous.user_id
+                ? applyReactionDelete(message.reactions ?? [], previous.emoji, previous.user_id)
+                : message.reactions ?? [];
+            return {
+              ...message,
+              reactions: applyReactionInsert(removed, next.emoji!, next.user_id!),
+            };
+          }),
+        );
+      }),
+    );
+
+    unsubscribes.push(
+      realtimeClient.on(room, 'dm-reaction-delete', (data) => {
+        const payload = data as {
+          conversation_id?: string;
+          message_id?: string;
+          user_id?: string;
+          emoji?: string;
+        } | null;
+        if (
+          !payload?.conversation_id ||
+          payload.conversation_id !== conversationId ||
+          !payload.message_id ||
+          !payload.user_id ||
+          !payload.emoji
+        ) {
+          return;
+        }
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === payload.message_id
+              ? {
+                  ...message,
+                  reactions: applyReactionDelete(
+                    message.reactions ?? [],
+                    payload.emoji!,
+                    payload.user_id!,
+                  ),
+                }
+              : message,
+          ),
+        );
+      }),
+    );
+
+    const unsubscribeStatus = realtimeClient.onRoomStatus(room, (connected) => {
+      if (connected) scheduleCatchUp();
+    });
+
     return () => {
       unsubscribes.forEach((unsubscribe) => unsubscribe());
+      unsubscribeStatus();
+      if (catchUpDebounceRef.current) {
+        clearTimeout(catchUpDebounceRef.current);
+        catchUpDebounceRef.current = null;
+      }
     };
-  }, [userId, user?.name, conversationId]);
+  }, [userId, user?.name, conversationId, scheduleCatchUp, scrollToLatest]);
 
+  // ── Pagination (older pages) ──────────────────────────────────────────────
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMore || messages.length === 0 || !conversationId) return;
     loadingMoreRef.current = true;
@@ -297,7 +637,10 @@ export default function DmThreadScreen() {
       });
       setMessages((current) => {
         const seen = new Set(current.map((message) => message.id));
-        return [...page.messages.filter((message) => !seen.has(message.id)), ...current];
+        return [
+          ...page.messages.filter((message) => !seen.has(message.id)),
+          ...current,
+        ];
       });
       setHasMore(page.hasMore);
     } catch {
@@ -308,60 +651,158 @@ export default function DmThreadScreen() {
     }
   }, [conversationId, hasMore, messages]);
 
-  // ── Sending ───────────────────────────────────────────────────────────────
-  const send = useCallback(async () => {
-    const content = draft.trim();
-    if (!content || sending || !conversationId || !userId) return;
+  // ── Reactions (optimistic, server-confirmed) ──────────────────────────────
+  const handleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      const currentUser = user?.id ?? '';
+      const target = messagesRef.current.find((message) => message.id === messageId);
+      if (!target || !currentUser || target.id.startsWith('temp-')) return;
 
-    const nonce = uuidV4();
-    const tempId = `temp:${nonce}`;
-    pendingNoncesRef.current.set(tempId, nonce);
+      const previousReactions = target.reactions ?? [];
+      const previous =
+        reactionIntentRef.current.get(messageId) ??
+        myReactionEmoji(previousReactions, currentUser);
+      const desired = nextReactionIntent(previous, emoji);
+      hapticToggle(desired !== null);
 
-    const optimistic: DmMessage = {
-      id: tempId,
-      content,
-      created_at: new Date().toISOString(),
-      user_id: userId,
-      reply_to_id: null,
-      image_url: null,
-      deleted_at: null,
-      edited_at: null,
-      users: null,
-      reactions: [],
-      reply_to: null,
-    };
-
-    setMessages((current) => [...current, optimistic]);
-    setDraft('');
-    setSendError(null);
-    setSending(true);
-    try {
-      const result = await sendDmMessage(conversationId, content, nonce);
-      pendingNoncesRef.current.delete(tempId);
-      setMessages((current) => {
-        const echoAlready = current.some((message) => message.id === result.message.id);
-        const withoutTemp = current.filter((message) => message.id !== tempId);
-        return echoAlready ? withoutTemp : [...withoutTemp, result.message];
-      });
-      setConversation((current) =>
-        current
-          ? {
-              ...current,
-              request_state: result.requestState,
-              requested_by: result.requestedBy,
-            }
-          : current,
+      reactionIntentRef.current.set(messageId, desired);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                reactions: projectOwnReaction(
+                  message.reactions ?? [],
+                  desired,
+                  currentUser,
+                ),
+              }
+            : message,
+        ),
       );
-    } catch (e) {
-      pendingNoncesRef.current.delete(tempId);
-      setMessages((current) => current.filter((message) => message.id !== tempId));
-      setDraft(content); // hand the text back so nothing is lost
-      setSendError(e instanceof Error ? e.message : 'The message could not be sent.');
-    } finally {
-      setSending(false);
-    }
-  }, [conversationId, draft, sending, userId]);
 
+      try {
+        const { reactions } = await setDmMessageReaction(messageId, desired);
+        reactionIntentRef.current.set(messageId, myReactionEmoji(reactions, currentUser));
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === messageId ? { ...message, reactions } : message,
+          ),
+        );
+      } catch {
+        reactionIntentRef.current.delete(messageId);
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === messageId
+              ? { ...message, reactions: previousReactions }
+              : message,
+          ),
+        );
+      }
+    },
+    [user?.id],
+  );
+
+  // ── Actions from the long-press sheet ─────────────────────────────────────
+  const handleReply = useCallback((message: DmMessage) => {
+    if (message.id.startsWith('temp-')) return;
+    setReplyTo({
+      id: message.id,
+      content: message.content || (message.image_url ? '📷 Image' : ''),
+      user_name: message.users?.name ?? 'Unknown',
+      user_id: message.user_id,
+    });
+  }, []);
+
+  const handleCopy = useCallback(() => {
+    showToast('Copied');
+  }, [showToast]);
+
+  const handleSaveEdit = useCallback(
+    async (messageId: string, content: string) => {
+      if (!editingMessage || editingMessage.id !== messageId) return;
+      const ok = await handleEdit(editingMessage, content);
+      if (ok) setEditingMessage(null);
+    },
+    [editingMessage, handleEdit],
+  );
+
+  // ── Reply jump ────────────────────────────────────────────────────────────
+  const handleReplyPress = useCallback(
+    (messageId: string) => {
+      const index = rowsRef.current.findIndex(
+        (row) => row.kind === 'message' && row.msg.id === messageId,
+      );
+      if (index < 0) return;
+      try {
+        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch {
+        listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
+      }
+    },
+    [],
+  );
+
+  // ── Rows: day dividers interleaved with the timeline ─────────────────────
+  const rows = useMemo<ThreadRow[]>(() => {
+    const out: ThreadRow[] = [];
+    let currentDay: string | null = null;
+    let previousUser: string | null = null;
+
+    for (const message of messages) {
+      const day = fmtDate(message.created_at);
+      if (day !== currentDay) {
+        out.push({ kind: 'date', key: `date-${day}-${out.length}`, label: day });
+        currentDay = day;
+        previousUser = null;
+      }
+      if (initialUnread && message.id === initialUnread.id) {
+        out.push({
+          kind: 'unread',
+          key: `unread-${message.id}`,
+          count: initialUnread.count,
+        });
+      }
+      out.push({
+        kind: 'message',
+        key: message.id,
+        msg: message,
+        isSameAuthor: previousUser === message.user_id,
+      });
+      previousUser = message.user_id;
+    }
+
+    // The list is inverted; newest must sit at the bottom.
+    return out.reverse();
+  }, [messages, initialUnread]);
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
+  // ── Images / lightbox ─────────────────────────────────────────────────────
+  const lightboxImages = useMemo<LightboxImage[]>(
+    () =>
+      messages
+        .filter((message) => !!message.image_url && !message.deleted_at)
+        .map((message) => ({
+          url: message.image_url as string,
+          content: message.content,
+          user_name: message.users?.name ?? null,
+          avatar_url: message.users?.avatar_url ?? null,
+          created_at: message.created_at,
+        })),
+    [messages],
+  );
+
+  const handleImagePress = useCallback(
+    (url: string) => {
+      const index = lightboxImages.findIndex((image) => image.url === url);
+      setImageIndex(index < 0 ? 0 : index);
+    },
+    [lightboxImages],
+  );
+
+  // ── Request answers + safety actions ──────────────────────────────────────
   const answer = useCallback(
     async (action: 'accept' | 'reject') => {
       if (!conversationId || answering) return;
@@ -374,24 +815,57 @@ export default function DmThreadScreen() {
             : current,
         );
       } catch (e) {
-        setSendError(e instanceof Error ? e.message : 'The answer could not be saved.');
+        showToast(e instanceof Error ? e.message : 'The answer could not be saved.');
       } finally {
         setAnswering(false);
       }
     },
-    [answering, conversationId],
+    [answering, conversationId, showToast],
   );
 
-  const liftBlock = useCallback(async () => {
-    if (!conversation?.peer.id) return;
+  const handleBlock = useCallback(async () => {
+    const target = conversation?.peer.id ?? peerId;
+    if (!target || actionBusy) return;
+    setMenuOpen(false);
+    setActionBusy(true);
     try {
-      await unblockUser(conversation.peer.id);
-      setConversation((current) => (current ? { ...current, blocked_by_me: false } : current));
-    } catch {
-      setSendError('The block could not be removed. Please try again.');
+      await blockUser(target);
+      setConversation((current) =>
+        current ? { ...current, blocked_by_me: true } : current,
+      );
+      showToast('Member blocked');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not block this member.');
+    } finally {
+      setActionBusy(false);
     }
-  }, [conversation?.peer.id]);
+  }, [actionBusy, conversation?.peer.id, peerId, showToast]);
 
+  const handleUnblock = useCallback(async () => {
+    const target = conversation?.peer.id ?? peerId;
+    if (!target || actionBusy) return;
+    setMenuOpen(false);
+    setActionBusy(true);
+    try {
+      await unblockUser(target);
+      setConversation((current) =>
+        current ? { ...current, blocked_by_me: false } : current,
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not unblock this member.');
+    } finally {
+      setActionBusy(false);
+    }
+  }, [actionBusy, conversation?.peer.id, peerId, showToast]);
+
+  const openPeerProfile = useCallback(() => {
+    const target = conversation?.peer.id ?? peerId;
+    if (!target) return;
+    hapticSelection();
+    router.push({ pathname: '/member/[id]', params: { id: target } });
+  }, [conversation?.peer.id, peerId, router]);
+
+  // ── Composer state ────────────────────────────────────────────────────────
   const composerState = useMemo(
     () =>
       conversation && userId
@@ -399,14 +873,18 @@ export default function DmThreadScreen() {
         : ({ kind: 'ready' } as const),
     [conversation, userId],
   );
+  const unstarted = conversation ? isUnstartedRequest(conversation) : false;
+  const displayPeerName = conversation?.peer.name ?? peerName;
+  const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);
 
-  /** Newest first for the inverted list. */
-  const rendered = useMemo(() => [...messages].reverse(), [messages]);
+  const rejectedByMe =
+    conversation?.request_state === 'rejected' && conversation.requested_by !== userId;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
+      {/* Header — peer identity (opens their profile) + the ⋯ safety menu. */}
       <View
         style={[
           styles.header,
@@ -422,14 +900,38 @@ export default function DmThreadScreen() {
           accessibilityLabel="Back"
           hitSlop={10}
           onPress={() => router.back()}
-          style={styles.backButton}
+          style={styles.headerIcon}
         >
           <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-          {conversation?.peer.name ?? peerName}
-        </Text>
-        <View style={styles.headerSpacer} />
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${displayPeerName} profile`}
+          onPress={openPeerProfile}
+          style={({ pressed }) => [
+            styles.headerPeer,
+            { opacity: pressed ? 0.75 : 1 },
+          ]}
+        >
+          <PersonAvatar name={displayPeerName} url={displayPeerAvatar} size={36} />
+          <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+            {displayPeerName}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Conversation options"
+          hitSlop={8}
+          onPress={() => {
+            hapticSelection();
+            setMenuOpen(true);
+          }}
+          style={styles.headerIcon}
+        >
+          <Feather name="more-vertical" size={20} color={colors.mutedForeground} />
+        </Pressable>
       </View>
 
       {loading ? (
@@ -452,252 +954,421 @@ export default function DmThreadScreen() {
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <FlatList
-            inverted
-            data={rendered}
-            keyExtractor={(message) => message.id}
-            renderItem={({ item }) => (
-              <MessageBubble message={item} isOwn={item.user_id === userId} />
-            )}
-            contentContainerStyle={styles.list}
-            onEndReached={() => void loadMore()}
-            onEndReachedThreshold={0.3}
-            ListEmptyComponent={
-              <View style={styles.emptyThread}>
-                <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>
-                  No messages yet
-                </Text>
-                <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                  Say hi to {conversation?.peer.name ?? peerName}.
-                </Text>
-              </View>
-            }
-            ListFooterComponent={
-              loadingMore ? (
-                <View style={styles.moreSpinner}>
-                  <ActivityIndicator size="small" color={colors.foregroundMuted} />
+          <View style={styles.flex}>
+            <FlatList
+              ref={listRef}
+              inverted
+              data={rows}
+              keyExtractor={(row) => row.key}
+              contentContainerStyle={styles.list}
+              keyboardDismissMode="on-drag"
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              onScroll={(event) => {
+                const next = event.nativeEvent.contentOffset.y <= 24;
+                atBottomRef.current = next;
+                setAtBottom((current) => (current === next ? current : next));
+              }}
+              scrollEventThrottle={32}
+              onScrollBeginDrag={() => setEmojiPanelOpen(false)}
+              onEndReached={() => void loadMore()}
+              onEndReachedThreshold={0.3}
+              onScrollToIndexFailed={(info) => {
+                listRef.current?.scrollToOffset({
+                  offset: Math.max(0, info.averageItemLength * info.index),
+                  animated: true,
+                });
+                setTimeout(() => {
+                  try {
+                    listRef.current?.scrollToIndex({
+                      index: info.index,
+                      animated: true,
+                      viewPosition: 0.5,
+                    });
+                  } catch {
+                    /* the member can scroll */
+                  }
+                }, 120);
+              }}
+              renderItem={({ item }) => {
+                if (item.kind === 'date') {
+                  return (
+                    <View style={styles.dateDivider}>
+                      <Text
+                        style={[
+                          styles.datePill,
+                          {
+                            color: colors.mutedForeground,
+                            backgroundColor: colors.surfaceRaised,
+                          },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+                  );
+                }
+                if (item.kind === 'unread') {
+                  return (
+                    <View style={styles.unreadDivider}>
+                      <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+                      <Text
+                        style={[
+                          styles.unreadPill,
+                          {
+                            color: colors.mutedForeground,
+                            backgroundColor: colors.surfaceRaised,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
+                        {item.count} unread message{item.count === 1 ? '' : 's'}
+                      </Text>
+                      <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+                    </View>
+                  );
+                }
+                return (
+                  <MessageBubble
+                    message={item.msg}
+                    isOwn={item.msg.user_id === userId}
+                    isSameAuthor={item.isSameAuthor}
+                    currentUserId={userId ?? ''}
+                    onLongPress={setSelectedMessage}
+                    onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
+                    onImagePress={handleImagePress}
+                    onCancel={handleCancel}
+                    onRetry={handleRetry}
+                    onReplyPress={handleReplyPress}
+                  />
+                );
+              }}
+              ListFooterComponent={
+                loadingMore ? (
+                  <View style={styles.moreSpinner}>
+                    <ActivityIndicator size="small" color={colors.foregroundMuted} />
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyThread}>
+                  <PersonAvatar
+                    name={displayPeerName}
+                    url={displayPeerAvatar}
+                    size={48}
+                  />
+                  <Text style={[styles.stateBody, { color: colors.foregroundMuted }]}>
+                    Say hi to{' '}
+                    <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                      {displayPeerName}
+                    </Text>
+                    .
+                  </Text>
                 </View>
-              ) : null
-            }
-          />
+              }
+            />
 
-          {sendError ? (
-            <Text style={[styles.sendError, { color: colors.destructive }]}>{sendError}</Text>
-          ) : null}
-
-          {composerState.kind === 'blocked' ? (
-            <FooterBar>
-              <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                You blocked {conversation?.peer.name ?? peerName}. They can&apos;t send you
-                messages.
-              </Text>
-              <Pressable accessibilityRole="button" onPress={() => void liftBlock()}>
-                <Text style={[styles.footerAction, { color: colors.accent }]}>Unblock</Text>
-              </Pressable>
-            </FooterBar>
-          ) : composerState.kind === 'incoming-request' ? (
-            <FooterBar>
-              <View style={styles.requestInfo}>
-                <Text style={[styles.footerText, { color: colors.foreground }]}>
-                  {conversation?.peer.name ?? peerName} wants to message you
-                </Text>
-                <Text style={[styles.footerHint, { color: colors.mutedForeground }]}>
-                  Accept to chat, or decline to close this conversation.
-                </Text>
-              </View>
-              <View style={styles.requestActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={answering}
-                  onPress={() => void answer('reject')}
-                  style={[styles.requestButton, { borderColor: colors.borderStrong }]}
-                >
-                  <Text style={[styles.requestButtonText, { color: colors.foreground }]}>
-                    Decline
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={answering}
-                  onPress={() => void answer('accept')}
-                  style={[
-                    styles.requestButton,
-                    { borderColor: colors.accent, backgroundColor: colors.accent },
-                  ]}
-                >
-                  <Text style={[styles.requestButtonText, { color: colors.accentForeground }]}>
-                    Accept
-                  </Text>
-                </Pressable>
-              </View>
-            </FooterBar>
-          ) : composerState.kind === 'outgoing-request' ? (
-            <FooterBar>
-              <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                {requestHintForPeer(conversation?.peer.name ?? peerName)}
-              </Text>
-            </FooterBar>
-          ) : composerState.kind === 'rejected' ? (
-            <FooterBar>
-              <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                Your message request was declined — you can&apos;t send more messages here.
-              </Text>
-            </FooterBar>
-          ) : (
-            <View
-              style={[
-                styles.composer,
-                {
-                  borderTopColor: colors.border,
-                  paddingBottom: insets.bottom + 8,
-                  backgroundColor: colors.background,
-                },
-              ]}
-            >
-              <TextInput
-                value={draft}
-                onChangeText={(text) => setDraft(text.slice(0, DM_MAX_CONTENT_CHARS))}
-                placeholder="Message"
-                placeholderTextColor={colors.foregroundSubtle}
-                multiline
-                style={[
-                  styles.input,
-                  {
-                    color: colors.foreground,
-                    backgroundColor: colors.input,
-                    borderColor: colors.inputBorder,
-                  },
-                ]}
-              />
+            {!atBottom && !loading ? (
               <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Send"
-                disabled={!draft.trim() || sending}
-                onPress={() => void send()}
+                onPress={() => scrollToLatest(true)}
+                accessibilityLabel="Scroll to latest message"
+                hitSlop={6}
                 style={[
-                  styles.sendButton,
-                  { backgroundColor: colors.chatOwnBubble },
-                  (!draft.trim() || sending) && { opacity: 0.5 },
+                  styles.jumpButton,
+                  { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
                 ]}
               >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Feather name="arrow-up" size={18} color="#FFFFFF" />
-                )}
+                <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
               </Pressable>
-            </View>
-          )}
-        </KeyboardAvoidingView>
-      )}
-    </View>
-  );
-}
-
-function FooterBar({ children }: { children: React.ReactNode }) {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  return (
-    <View
-      style={[
-        styles.footerBar,
-        {
-          borderTopColor: colors.border,
-          backgroundColor: colors.background,
-          paddingBottom: insets.bottom + 12,
-        },
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
-
-function MessageBubble({ message, isOwn }: { message: DmMessage; isOwn: boolean }) {
-  const colors = useColors();
-  const [imageFailed, setImageFailed] = useState(false);
-
-  if (message.deleted_at) {
-    return (
-      <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
-        <View
-          style={[
-            styles.bubble,
-            isOwn ? styles.bubbleOwn : styles.bubbleOther,
-            { backgroundColor: colors.surfaceRaised },
-          ]}
-        >
-          <Text style={[styles.bubbleText, { color: colors.foregroundSubtle, fontStyle: 'italic' }]}>
-            This message was deleted
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  const isPending = message.id.startsWith('temp:');
-
-  return (
-    <View style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
-      <View
-        style={[
-          styles.bubble,
-          isOwn
-            ? { backgroundColor: colors.chatOwnBubble, borderBottomRightRadius: 4 }
-            : { backgroundColor: colors.surfaceRaised, borderBottomLeftRadius: 4 },
-          isPending && { opacity: 0.7 },
-        ]}
-      >
-        {message.reply_to ? (
-          <View
-            style={[
-              styles.replyPreview,
-              { borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther },
-            ]}
-          >
-            <Text
-              style={[styles.replyName, { color: isOwn ? '#FFFFFF' : colors.foreground }]}
-              numberOfLines={1}
-            >
-              {message.reply_to.user_name}
-            </Text>
-            {message.reply_to.content ? (
-              <Text
-                style={[styles.replyText, { color: isOwn ? '#FFFFFF' : colors.mutedForeground }]}
-                numberOfLines={1}
-              >
-                {message.reply_to.content}
-              </Text>
             ) : null}
           </View>
-        ) : null}
 
-        {message.image_url && !imageFailed ? (
-          <Image
-            source={{ uri: message.image_url }}
-            style={styles.bubbleImage}
-            resizeMode="contain"
-            onError={() => setImageFailed(true)}
-          />
-        ) : null}
+          <View
+            style={[
+              styles.footer,
+              {
+                borderTopColor: colors.border,
+                backgroundColor: colors.background,
+                paddingBottom: emojiPanelOpen ? 0 : insets.bottom + 6,
+              },
+            ]}
+          >
+            <TypingIndicator users={typingUsers} />
 
-        {message.content ? (
-          <Text style={[styles.bubbleText, { color: isOwn ? '#FFFFFF' : colors.foreground }]}>
-            {message.content}
-          </Text>
-        ) : null}
-
-        {message.reactions.length > 0 ? (
-          <View style={styles.reactionsRow}>
-            {message.reactions.map((reaction) => (
-              <Text key={reaction.emoji} style={styles.reactionChip}>
-                {reaction.emoji} {reaction.user_ids.length}
-              </Text>
-            ))}
+            {composerState.kind === 'blocked' ? (
+              <View style={styles.footerBar}>
+                <Feather name="slash" size={15} color={colors.destructive} />
+                <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+                  You blocked{' '}
+                  <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                    {displayPeerName}
+                  </Text>
+                  . They can&apos;t send you messages.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={actionBusy}
+                  onPress={() => void handleUnblock()}
+                  style={({ pressed }) => [
+                    styles.footerChip,
+                    { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text style={[styles.footerChipText, { color: colors.foreground }]}>
+                    {actionBusy ? 'Unblocking…' : 'Unblock'}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : composerState.kind === 'incoming-request' ? (
+              <View style={styles.footerBar}>
+                <View style={styles.footerCopy}>
+                  <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                      {displayPeerName}
+                    </Text>{' '}
+                    wants to message you. Accept to reply — or reject to close this request.
+                  </Text>
+                </View>
+                <View style={styles.footerActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={answering}
+                    onPress={() => void answer('reject')}
+                    style={({ pressed }) => [
+                      styles.footerChip,
+                      { borderColor: colors.borderStrong, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Text style={[styles.footerChipText, { color: colors.foreground }]}>
+                      Reject
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={answering}
+                    onPress={() => void answer('accept')}
+                    style={({ pressed }) => [
+                      styles.footerChip,
+                      {
+                        borderColor: colors.accent,
+                        backgroundColor: colors.accent,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.footerChipText, { color: colors.accentForeground }]}
+                    >
+                      Accept
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : composerState.kind === 'outgoing-request' ? (
+              <View style={styles.footerInfo}>
+                <Feather name="clock" size={15} color={colors.foregroundMuted} />
+                <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+                  Message request sent —{' '}
+                  <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                    {displayPeerName}
+                  </Text>{' '}
+                  needs to accept before you can send more.
+                </Text>
+              </View>
+            ) : composerState.kind === 'rejected' ? (
+              <View style={styles.footerInfo}>
+                <Feather name="x-circle" size={15} color={colors.foregroundMuted} />
+                <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+                  {rejectedByMe
+                    ? 'You rejected this message request.'
+                    : "Your message request was declined — you can't send more messages here."}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {unstarted ? (
+                  <View style={styles.preSendHint}>
+                    <Feather name="info" size={12} color={colors.foregroundMuted} />
+                    <Text style={[styles.preSendText, { color: colors.foregroundMuted }]}>
+                      {requestHintForPeer(displayPeerName)}
+                    </Text>
+                  </View>
+                ) : null}
+                <DmComposer
+                  replyTo={replyTo}
+                  onCancelReply={() => setReplyTo(null)}
+                  onSend={(text, pendingImage) => {
+                    handleSend(text, pendingImage, replyTo);
+                    setReplyTo(null);
+                  }}
+                  onTypingChange={(text) => notifyTyping(text.length > 0)}
+                  disabled={unstarted && sending}
+                  error={sendError}
+                  emojiPanelOpen={emojiPanelOpen}
+                  onEmojiPanelOpenChange={setEmojiPanelOpen}
+                />
+              </>
+            )}
           </View>
-        ) : null}
-      </View>
+        </KeyboardAvoidingView>
+      )}
+
+      {toast ? (
+        <View
+          pointerEvents="none"
+          style={[styles.toast, { backgroundColor: colors.foreground }]}
+        >
+          <Text style={[styles.toastText, { color: colors.background }]}>{toast}</Text>
+        </View>
+      ) : null}
+
+      {/* Long-press actions — reactions, reply, copy, edit, delete */}
+      <MessageActionsSheet
+        message={selectedMessage}
+        currentUserId={userId ?? ''}
+        canModerate={false}
+        onClose={() => setSelectedMessage(null)}
+        onReact={(messageId, emoji) => void handleReaction(messageId, emoji)}
+        onReply={handleReply}
+        onCopy={handleCopy}
+        onEdit={(message) => {
+          if (message.id.startsWith('temp-')) return;
+          clearEditError();
+          setEditingMessage(message);
+        }}
+        onDelete={(messageId) => {
+          const message = messagesRef.current.find((row) => row.id === messageId);
+          if (message) void handleDelete(message);
+        }}
+      />
+
+      <EditMessageModal
+        message={editingMessage}
+        isSaving={editSaving}
+        error={editError}
+        onClose={() => {
+          clearEditError();
+          setEditingMessage(null);
+        }}
+        onSave={(messageId, content) => void handleSaveEdit(messageId, content)}
+      />
+
+      {imageIndex !== null && lightboxImages.length > 0 ? (
+        <ImageViewer
+          images={lightboxImages}
+          index={Math.min(imageIndex, lightboxImages.length - 1)}
+          onClose={() => setImageIndex(null)}
+          onNavigate={setImageIndex}
+        />
+      ) : null}
+
+      <ThreadOptionsSheet
+        visible={menuOpen}
+        blockedByMe={conversation?.blocked_by_me ?? false}
+        busy={actionBusy}
+        onClose={() => setMenuOpen(false)}
+        onReport={() => {
+          setMenuOpen(false);
+          // Let the sheet finish dismissing before the report modal presents —
+          // iOS refuses a second presentation mid-dismissal.
+          setTimeout(() => setReportOpen(true), 240);
+        }}
+        onBlock={() => void handleBlock()}
+        onUnblock={() => void handleUnblock()}
+      />
+
+      <DmReportModal
+        visible={reportOpen}
+        conversationId={conversationId}
+        peerName={displayPeerName}
+        onClose={() => setReportOpen(false)}
+      />
     </View>
+  );
+}
+
+/** Header ⋯ menu — Report, plus Block or Unblock depending on the state. */
+function ThreadOptionsSheet({
+  visible,
+  blockedByMe,
+  busy,
+  onClose,
+  onReport,
+  onBlock,
+  onUnblock,
+}: {
+  visible: boolean;
+  blockedByMe: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onReport: () => void;
+  onBlock: () => void;
+  onUnblock: () => void;
+}) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              paddingBottom: Math.max(insets.bottom, 12),
+            },
+          ]}
+          onPress={(event) => event.stopPropagation()}
+        >
+          <Pressable
+            onPress={onReport}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.sheetRow,
+              pressed && { backgroundColor: colors.surfaceRaised },
+            ]}
+          >
+            <Feather name="flag" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.sheetLabel, { color: colors.foreground }]}>Report</Text>
+          </Pressable>
+          {blockedByMe ? (
+            <Pressable
+              onPress={onUnblock}
+              disabled={busy}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.sheetRow,
+                pressed && { backgroundColor: colors.surfaceRaised },
+              ]}
+            >
+              <Feather name="shield-off" size={16} color={colors.mutedForeground} />
+              <Text style={[styles.sheetLabel, { color: colors.foreground }]}>
+                {busy ? 'Unblocking…' : 'Unblock user'}
+              </Text>
+            </Pressable>
+          ) : (
+            <>
+              <View style={[styles.sheetDivider, { backgroundColor: colors.border }]} />
+              <Pressable
+                onPress={onBlock}
+                disabled={busy}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.sheetRow,
+                  pressed && { backgroundColor: colors.destructive + '14' },
+                ]}
+              >
+                <Feather name="slash" size={16} color={colors.destructive} />
+                <Text style={[styles.sheetLabel, { color: colors.destructive }]}>
+                  {busy ? 'Blocking…' : 'Block user'}
+                </Text>
+              </Pressable>
+            </>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -707,14 +1378,30 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backButton: { padding: 2 },
-  headerTitle: { flex: 1, fontFamily: 'Geist_600SemiBold', fontSize: 17, textAlign: 'center' },
-  headerSpacer: { width: 26 },
+  headerIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPeer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+    paddingVertical: 2,
+  },
+  headerTitle: {
+    fontFamily: 'Geist_600SemiBold',
+    fontSize: 16,
+    flexShrink: 1,
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -725,91 +1412,131 @@ const styles = StyleSheet.create({
   stateTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16, textAlign: 'center' },
   stateBody: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   retry: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  list: { padding: 12, gap: 6, flexGrow: 1 },
+  list: { paddingVertical: 12, flexGrow: 1 },
+  dateDivider: { alignItems: 'center', paddingVertical: 10 },
+  datePill: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 11,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  unreadDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+  },
+  unreadLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  unreadPill: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 10.5,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  moreSpinner: { paddingVertical: 16, alignItems: 'center' },
   emptyThread: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 32,
-    // The list is inverted, so the empty state would render mirrored.
-    transform: [{ scaleY: -1 }],
   },
-  moreSpinner: { paddingVertical: 16, alignItems: 'center' },
-  bubbleRow: { flexDirection: 'row' },
-  bubbleRowOwn: { justifyContent: 'flex-end' },
-  bubbleRowOther: { justifyContent: 'flex-start' },
-  bubble: {
-    maxWidth: '78%',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
+  jumpButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  bubbleOwn: { borderBottomRightRadius: 4 },
-  bubbleOther: { borderBottomLeftRadius: 4 },
-  bubbleText: { fontFamily: 'Geist_400Regular', fontSize: 14.5, lineHeight: 20 },
-  bubbleImage: { width: 220, height: 220, borderRadius: 10, marginBottom: 2 },
-  replyPreview: {
-    borderLeftWidth: 2,
-    paddingLeft: 7,
-    marginBottom: 2,
-    opacity: 0.9,
-  },
-  replyName: { fontFamily: 'Geist_600SemiBold', fontSize: 12 },
-  replyText: { fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 1 },
-  reactionsRow: { flexDirection: 'row', gap: 4, marginTop: 2 },
-  reactionChip: { fontSize: 12, color: '#FFFFFF' },
-  sendError: {
-    fontFamily: 'Geist_400Regular',
-    fontSize: 12.5,
-    paddingHorizontal: 16,
-    paddingBottom: 6,
+  footer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   footerBar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    flexWrap: 'wrap',
   },
-  footerText: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19, flex: 1 },
-  footerHint: { fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 },
-  footerAction: { fontFamily: 'Geist_600SemiBold', fontSize: 13.5 },
-  requestInfo: { gap: 2 },
-  requestActions: { flexDirection: 'row', gap: 10 },
-  requestButton: {
-    flex: 1,
-    height: 42,
-    borderRadius: 10,
+  footerCopy: { flex: 1, minWidth: 160 },
+  footerText: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 12.5,
+    lineHeight: 18,
+    flexShrink: 1,
+  },
+  footerActions: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
+  footerChip: {
+    borderRadius: 9,
     borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  requestButtonText: { fontFamily: 'Geist_600SemiBold', fontSize: 13.5 },
-  composer: {
+  footerChipText: { fontFamily: 'Geist_600SemiBold', fontSize: 12.5 },
+  footerInfo: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
+    alignItems: 'flex-start',
+    gap: 9,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  preSendHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+  },
+  preSendText: { fontFamily: 'Geist_400Regular', fontSize: 11, lineHeight: 15, flex: 1 },
+  toast: {
+    position: 'absolute',
+    top: 96,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 30,
+  },
+  toastText: { fontFamily: 'Geist_500Medium', fontSize: 12.5 },
+  sheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  sheet: {
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingTop: 8,
   },
-  input: {
-    flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingTop: 9,
-    paddingBottom: 9,
-    maxHeight: 120,
-    fontFamily: 'Geist_400Regular',
-    fontSize: 14.5,
-  },
-  sendButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  sheetRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
   },
+  sheetLabel: { fontFamily: 'Geist_500Medium', fontSize: 14.5 },
+  sheetDivider: { height: StyleSheet.hairlineWidth, marginVertical: 2 },
 });
