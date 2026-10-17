@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   pill: {
-    maxWidth: '85%',
+    maxWidth: '70%',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 6,
