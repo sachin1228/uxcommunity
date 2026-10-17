@@ -49,9 +49,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   pill: {
-    alignSelf: 'stretch',
+    maxWidth: '85%',
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     shadowColor: '#000',
     shadowOpacity: 0.25,
