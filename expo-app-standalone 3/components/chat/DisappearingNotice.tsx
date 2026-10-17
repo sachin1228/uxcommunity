@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     gap: 6,
     maxWidth: '85%',
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   icon: {
-    marginTop: 0,
+    marginTop: 1,
   },
   text: {
     flexShrink: 1,
