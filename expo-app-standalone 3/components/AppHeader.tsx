@@ -4,18 +4,19 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/BrandLogo';
+import { DmChatIcon } from '@/components/DmChatIcon';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useDmUnread } from '@/hooks/useDmUnread';
 import { useNotifications } from '@/hooks/useNotifications';
 
 /**
- * The workspace header — the brand on the left, the notifications bell on the
- * right.
+ * The workspace header — the brand on the left, the notifications bell and the
+ * Messages entry on the right.
  *
- * The bell replaced the avatar menu once Profile became a tab of its own: the
- * account menu (Settings, Sign out) now lives behind the hamburger on that
- * tab's header, so this one carries what the web topbar carries — the bell and
- * its "new since you last looked" badge (hooks/useNotifications).
+ * The DM icon mirrors the web topbar's button (right of the bell here, per the
+ * mobile layout) and carries the same badge rule: the number of conversations
+ * with unread peer messages, never a message sum.
  */
 export function AppHeader() {
   const colors = useColors();
@@ -23,6 +24,7 @@ export function AppHeader() {
   const router = useRouter();
   const { user } = useAuth();
   const { unseenCount } = useNotifications(user?.id);
+  const dmUnread = useDmUnread();
 
   // null while the seen watermark is still loading — no number to show yet.
   const badge = unseenCount ?? 0;
@@ -51,7 +53,7 @@ export function AppHeader() {
           accessibilityRole="button"
           hitSlop={6}
           onPress={() => router.push('/notifications')}
-          style={({ pressed }) => [styles.bellButton, { opacity: pressed ? 0.8 : 1 }]}
+          style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.8 : 1 }]}
         >
           <Feather name="bell" size={21} color={colors.foreground} />
           {badge > 0 ? (
@@ -62,6 +64,28 @@ export function AppHeader() {
               ]}
             >
               <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel={
+            dmUnread > 0 ? `Messages, ${dmUnread} unread conversations` : 'Messages'
+          }
+          accessibilityRole="button"
+          hitSlop={6}
+          onPress={() => router.push('/messages')}
+          style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.8 : 1 }]}
+        >
+          <DmChatIcon size={20} color={colors.foreground} />
+          {dmUnread > 0 ? (
+            <View
+              style={[
+                styles.badge,
+                { backgroundColor: colors.destructive, borderColor: colors.background },
+              ]}
+            >
+              <Text style={styles.badgeText}>{dmUnread > 99 ? '99+' : dmUnread}</Text>
             </View>
           ) : null}
         </Pressable>
@@ -94,7 +118,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  bellButton: {
+  iconButton: {
     width: 34,
     height: 34,
     alignItems: 'center',

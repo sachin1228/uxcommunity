@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -23,6 +24,7 @@ import {
 import { loadCommunityRoster } from '@/lib/communityRoster';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { useAuth } from '@/context/AuthContext';
 import type { MentionCandidate } from '@/lib/chat';
 
 /**
@@ -95,6 +97,8 @@ export function CommunityInfoView({
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user } = useAuth();
   const communityId = community?.id ?? '';
 
   const [detail, setDetail] = useState<CommunityDetailRow | null>(null);
@@ -246,13 +250,26 @@ export function CommunityInfoView({
               <ActivityIndicator color={colors.accent} style={styles.membersSpinner} />
             ) : (
               members.map((member) => (
-                <View
+                <Pressable
                   key={member.user_id}
-                  style={styles.memberRow}
-                  accessible
+                  onPress={() => {
+                    onClose();
+                    if (member.user_id === user?.id) {
+                      router.push('/profile');
+                      return;
+                    }
+                    router.push({ pathname: '/member/[id]', params: { id: member.user_id } });
+                  }}
+                  accessibilityRole="button"
                   accessibilityLabel={
-                    member.designation ? `${member.name}, ${member.designation}` : member.name
+                    member.designation
+                      ? `${member.name}, ${member.designation}. Open profile`
+                      : `${member.name}. Open profile`
                   }
+                  style={({ pressed }) => [
+                    styles.memberRow,
+                    pressed && { backgroundColor: colors.surfaceRaised },
+                  ]}
                 >
                   <PersonAvatar
                     name={member.name}
@@ -272,7 +289,8 @@ export function CommunityInfoView({
                       </Text>
                     )}
                   </View>
-                </View>
+                  <Feather name="chevron-right" size={16} color={colors.foregroundSubtle} />
+                </Pressable>
               ))
             )}
           </View>

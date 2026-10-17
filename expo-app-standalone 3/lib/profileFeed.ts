@@ -16,6 +16,11 @@ export const PROFILE_FEED_SCOPES = ['all', 'thread', 'showcase', 'resource', 'ev
 
 export type ProfileFeedScope = (typeof PROFILE_FEED_SCOPES)[number];
 
+/** A member's tabs — the owner-only `saved` list is never offered there. */
+export const MEMBER_FEED_SCOPES = ['all', 'thread', 'showcase', 'resource', 'event'] as const;
+
+export type MemberFeedScope = (typeof MEMBER_FEED_SCOPES)[number];
+
 export interface ProfileFeedPage {
   items: FeedItem[];
   hasMore: boolean;
@@ -24,8 +29,11 @@ export interface ProfileFeedPage {
 export async function getProfileFeed(
   scope: ProfileFeedScope,
   before?: string,
+  /** A member's id — reads what they authored that the viewer may see. */
+  memberId?: string,
 ): Promise<ProfileFeedPage> {
   const params = new URLSearchParams({ scope });
+  if (memberId) params.set('user', memberId);
   if (before) params.set('before', before);
   const { data } = await apiFetch<{ items?: unknown[] }>(`/api/profile/feed?${params.toString()}`);
   const items = (data.items ?? []) as FeedItem[];

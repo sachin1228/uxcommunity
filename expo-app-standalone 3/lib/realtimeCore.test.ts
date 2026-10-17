@@ -686,6 +686,7 @@ test('user-scoped rooms multiplex over user:${userId} — the key the server pub
 
   const unsubNotifications = client.on(realtimeRooms.notifications(ALICE.id), 'insert', () => {});
   const unsubProfile = client.on(`profile:${ALICE.id}`, 'thread', () => {});
+  const unsubDm = client.on(realtimeRooms.dm(ALICE.id), 'dm-message', () => {});
 
   assert.deepEqual(
     connectionKeys(client),
@@ -703,6 +704,7 @@ test('user-scoped rooms multiplex over user:${userId} — the key the server pub
 
   unsubNotifications();
   unsubProfile();
+  unsubDm();
   client.destroy();
 });
 
@@ -748,6 +750,7 @@ test('isCommunityRoom separates community sockets from the user socket', () => {
   assert.equal(isCommunityRoom('thread-comments:t1'), true);
   assert.equal(isCommunityRoom(`user:${ALICE.id}`), false);
   assert.equal(isCommunityRoom('notifications:' + ALICE.id), false);
+  assert.equal(isCommunityRoom('dm:' + ALICE.id), false);
 });
 
 // ══════════════════════════════════════════════════════════════════════════

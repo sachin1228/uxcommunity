@@ -74,6 +74,47 @@ export async function getOwnProfile(): Promise<OwnProfile> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Another member's profile (read-only, the DM entry point)
+// ---------------------------------------------------------------------------
+
+export interface MemberProfileUser {
+  id: string;
+  name: string | null;
+  created_at: string;
+}
+
+export interface MemberProfile {
+  user: MemberProfileUser | null;
+  profile: ProfileRow | null;
+  roleLabel: string | null;
+  company: ProfileCompany | null;
+  /** The viewer blocked this member — identity shows, activity does not. */
+  blockedByMe: boolean;
+  /** This member blocked the viewer — nothing of the profile renders. */
+  blockedViewer: boolean;
+}
+
+export async function getMemberProfile(userId: string): Promise<MemberProfile> {
+  const { data } = await apiFetch<{
+    user?: MemberProfileUser | null;
+    profile?: ProfileRow | null;
+    roleLabel?: string | null;
+    company?: ProfileCompany | null;
+    blockedByMe?: boolean;
+    blockedViewer?: boolean;
+  }>(`/api/profile/${encodeURIComponent(userId)}`);
+
+  return {
+    user: data.user ?? null,
+    profile: data.profile ?? null,
+    roleLabel: data.roleLabel ?? null,
+    company: data.company ?? null,
+    blockedByMe: Boolean(data.blockedByMe),
+    blockedViewer: Boolean(data.blockedViewer),
+  };
+}
+
 /** Save one of the hero's outside links. A trimmed "" clears it (stored as null). */
 export async function saveProfileLink(
   field: 'linkedin_url' | 'portfolio_url',
