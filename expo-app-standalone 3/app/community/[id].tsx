@@ -1052,7 +1052,6 @@ export default function CommunityChat() {
             // are still in flight (web MessageList parity).
             contentEventsReady ? (
               <View style={styles.emptyWrap}>
-                <DisappearingNotice />
                 {communityImage ? (
                   <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
                 ) : (
