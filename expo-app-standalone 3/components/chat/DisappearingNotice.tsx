@@ -63,7 +63,8 @@ const styles = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     maxWidth: '85%',
     borderRadius: 8,
@@ -76,12 +77,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   icon: {
-    marginTop: 1,
+    marginTop: 0,
   },
   text: {
     flexShrink: 1,
     fontSize: 11,
     lineHeight: 15,
     fontFamily: 'Geist_400Regular',
+    textAlign: 'center',
   },
 });
