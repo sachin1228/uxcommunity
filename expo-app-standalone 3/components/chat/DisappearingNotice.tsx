@@ -1,33 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Line } from 'react-native-svg';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { CHAT_MESSAGE_RETENTION_DAYS } from '@/lib/chat';
-
-/** The web notice's Timer glyph (lucide), drawn with Svg — Feather has none. */
-function TimerIcon({ size, color }: { size: number; color: string }) {
-  return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Line x1="10" x2="14" y1="2" y2="2" />
-      <Line x1="12" x2="15" y1="14" y2="11" />
-      <Circle cx="12" cy="14" r="8" />
-    </Svg>
-  );
-}
 
 /**
  * The disappearing-messages notice at the start of a community chat — a port
  * of the web `DisappearingNotice`: WhatsApp's system-message shape, centered,
  * muted, with no author and no timestamp. A policy note, not a message.
+ *
+ * The timer rides inline in the text, exactly like WhatsApp's system notice:
+ * it sits two spaces before the first word and the paragraph stays centered,
+ * instead of a separate icon column opening a gap before the text.
  *
  * Rendered only once the true start of the history is loaded (and above the
  * empty state of a fresh room), so it can never float mid-stream while older
@@ -43,10 +27,13 @@ export function DisappearingNotice() {
         accessible
         style={[styles.pill, { backgroundColor: colors.surfaceRaised }]}
       >
-        <View style={styles.icon}>
-          <TimerIcon size={12} color={colors.mutedForeground} />
-        </View>
         <Text style={[styles.text, { color: colors.mutedForeground }]}>
+          <MaterialCommunityIcons
+            name="timer-outline"
+            size={12}
+            color={colors.mutedForeground}
+          />
+          {'  '}
           All messages will disappear from this chat for everyone after{' '}
           {CHAT_MESSAGE_RETENTION_DAYS} days.
         </Text>
@@ -62,10 +49,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   pill: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    gap: 6,
     maxWidth: '85%',
     borderRadius: 8,
     paddingHorizontal: 12,
@@ -76,14 +59,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
-  icon: {
-    marginTop: 1,
-  },
   text: {
-    flexShrink: 1,
     fontSize: 11,
     lineHeight: 15,
     fontFamily: 'Geist_400Regular',
-    textAlign: 'left',
+    textAlign: 'center',
   },
 });
