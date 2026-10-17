@@ -84,6 +84,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     fontFamily: 'Geist_400Regular',
-    textAlign: 'center',
+    textAlign: 'left',
   },
 });
