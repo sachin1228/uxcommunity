@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -26,8 +26,10 @@ import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { CommunityContent } from '@/lib/communityContent';
+import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
+import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
 
@@ -195,6 +197,42 @@ export default function ProfileScreen() {
       setLoadingMore(false);
     }
   }, [feedLoading, hasMore, items, loadingMore]);
+
+  // Poll tallies for the threads in this feed. Only communities with a visible
+  // poll are subscribed — a feed of plain posts opens no sockets.
+  const applyPollUpdate = actions.applyPollUpdate;
+  const pollCommunityIds = useMemo(() => feedPollCommunityIds(items), [items]);
+
+  const handlePollEvent = useCallback(
+    (event: ThreadPollEvent) => {
+      const me = user?.id ?? '';
+      setItems((current) => applyPollEventToFeed(current, event, me));
+      setSelected((current) => {
+        if (!current || current.id !== event.threadId) return current;
+        return applyPollEventToFeed([current], event, me)[0] ?? current;
+      });
+      // An optimistic local vote keeps its choice while the tallies move; an
+      // event from this member on another device replaces it.
+      applyPollUpdate(event.threadId, {
+        counts: event.counts,
+        userVote: event.userVote,
+        undoUsed: event.undoUsed,
+        mine: event.userId !== null && event.userId === me,
+      });
+    },
+    [applyPollUpdate, user?.id],
+  );
+
+  // A reconnected room missed events while it was down; settle from the API.
+  const handlePollGap = useCallback(() => {
+    void loadFeed(scopeRef.current, 'refresh');
+  }, [loadFeed]);
+
+  useThreadPollRealtime({
+    communityIds: pollCommunityIds,
+    onEvent: handlePollEvent,
+    onGap: handlePollGap,
+  });
 
   const handleScopeChange = useCallback(
     (next: ProfileFeedScope) => {

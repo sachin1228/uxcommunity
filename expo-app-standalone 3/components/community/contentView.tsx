@@ -133,6 +133,15 @@ export interface ContentActionsApi {
   undoPoll: (item: CommunityContent) => Promise<void>;
   /** Drop a thread's local poll state after an edit replaces the row. */
   resetPoll: (itemId: string) => void;
+  /**
+   * Fold a realtime poll event into an existing local vote. "mine" events
+   * come from this member on another device, so their vote replaces ours;
+   * another member's vote only refreshes the tallies.
+   */
+  applyPollUpdate: (
+    itemId: string,
+    update: { counts: number[]; userVote: number | null; undoUsed: boolean; mine: boolean },
+  ) => void;
 }
 
 function pollKey(itemId: string) {
@@ -371,6 +380,29 @@ export function useContentActions(): ContentActionsApi {
     [pollOverrides],
   );
 
+  const applyPollUpdate = useCallback(
+    (
+      itemId: string,
+      update: { counts: number[]; userVote: number | null; undoUsed: boolean; mine: boolean },
+    ) => {
+      const key = pollKey(itemId);
+      setPollOverrides((state) => {
+        const current = state[key];
+        // No local vote to preserve — the patched row carries the new tallies.
+        if (!current) return state;
+        return {
+          ...state,
+          [key]: {
+            counts: update.counts,
+            userVote: update.mine ? update.userVote : current.userVote,
+            undoUsed: update.mine ? update.undoUsed : current.undoUsed,
+          },
+        };
+      });
+    },
+    [],
+  );
+
   const resetPoll = useCallback((itemId: string) => {
     setPollOverrides((state) => {
       const key = pollKey(itemId);
@@ -400,6 +432,7 @@ export function useContentActions(): ContentActionsApi {
     votePoll,
     undoPoll,
     resetPoll,
+    applyPollUpdate,
   };
 }
 

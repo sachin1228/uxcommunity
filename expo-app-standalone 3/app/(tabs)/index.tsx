@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,7 +17,9 @@ import { useAuth } from '@/context/AuthContext';
 import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContent } from '@/lib/communityContent';
+import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, getHomeFeed, type FeedItem } from '@/lib/homeFeed';
+import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 
 /**
  * Home — the cross-community feed.
@@ -67,6 +69,42 @@ export default function HomeTab() {
   useEffect(() => {
     void load('initial');
   }, [load]);
+
+  // Poll tallies for the threads in this mixed feed. Only communities with a
+  // visible poll are subscribed — a feed of plain posts opens no sockets.
+  const applyPollUpdate = actions.applyPollUpdate;
+  const pollCommunityIds = useMemo(() => feedPollCommunityIds(items), [items]);
+
+  const handlePollEvent = useCallback(
+    (event: ThreadPollEvent) => {
+      const me = user?.id ?? '';
+      setItems((current) => applyPollEventToFeed(current, event, me));
+      setSelected((current) => {
+        if (!current || current.id !== event.threadId) return current;
+        return applyPollEventToFeed([current], event, me)[0] ?? current;
+      });
+      // An optimistic local vote keeps its choice while the tallies move; an
+      // event from this member on another device replaces it.
+      applyPollUpdate(event.threadId, {
+        counts: event.counts,
+        userVote: event.userVote,
+        undoUsed: event.undoUsed,
+        mine: event.userId !== null && event.userId === me,
+      });
+    },
+    [applyPollUpdate, user?.id],
+  );
+
+  // A reconnected room missed events while it was down; settle from the API.
+  const handlePollGap = useCallback(() => {
+    void load('refresh');
+  }, [load]);
+
+  useThreadPollRealtime({
+    communityIds: pollCommunityIds,
+    onEvent: handlePollEvent,
+    onGap: handlePollGap,
+  });
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || items.length === 0) return;
