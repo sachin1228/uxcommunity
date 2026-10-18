@@ -147,8 +147,10 @@ export function EmojiPicker({
 
 const styles = StyleSheet.create({
   /** The animated space the panel occupies — it starts at zero height while the
-   *  keyboard still owns the strip, hence the clipping. */
-  clip: { overflow: 'hidden' },
+   *  keyboard still owns the strip, hence the clipping. The space is a little
+   *  taller than the panel (it carries the gap above it, so a shut panel adds
+   *  nothing under the composer); the panel sits at its bottom edge. */
+  clip: { overflow: 'hidden', justifyContent: 'flex-end' },
   panel: {
     height: 320,
     borderTopWidth: StyleSheet.hairlineWidth,

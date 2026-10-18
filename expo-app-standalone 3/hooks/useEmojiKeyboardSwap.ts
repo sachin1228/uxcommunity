@@ -27,6 +27,19 @@ const MIN_PANEL_HEIGHT = 160;
 export const COMPOSER_BOTTOM_INSET = 8;
 
 /**
+ * The design gap between the composer and the panel (dp) — the same 6 the
+ * composer's own stack uses between its rows.
+ *
+ * It is part of the panel's *animated space* rather than a fixed margin: the
+ * panel stays mounted at zero height while the keyboard is up (so opening it
+ * can never race the IME), and a fixed gap on a zero-height panel would put
+ * dead space under the composer — the keyboard strip would read 8 + 6 dp wide
+ * instead of the intended 8. Folding it into the space keeps it with the panel:
+ * no panel, no gap.
+ */
+export const PANEL_GAP = 6;
+
+/**
  * How long a touch on the field waits for the IME before the panel steps aside
  * on its own. `keyboardWillShow` lands within a frame or two of the tap, so the
  * timer only ever fires when the tap failed to raise the keyboard at all —
@@ -46,7 +59,7 @@ const PANEL_TRANSITION_MS = 200;
  * reserves whatever the IME takes. So the panel is not given a fixed height
  * that appears and disappears — its *space* is the IME's complement:
  *
- *     panelHeight = (1 - keyboardProgress) * keyboardHeight
+ *     space = (1 - keyboardProgress) * (panelHeight + PANEL_GAP)
  *
  * While the IME is anywhere on its way up or down, that expression is a smooth
  * function of the keyboard's own animation, so the two always add up to exactly
@@ -103,8 +116,11 @@ export function useEmojiKeyboardSwap(
    */
   const insets = useSafeAreaInsets();
   const measured = keyboardHeight || DEFAULT_PANEL_HEIGHT;
+  // The composer keeps its bottom inset while the panel is shut and trades it
+  // for the panel when it opens, so the panel's own box is short by exactly
+  // that inset minus the gap it carries inside its space (see PANEL_GAP).
   const panelHeight = Math.max(
-    measured - insets.bottom + COMPOSER_BOTTOM_INSET,
+    measured - insets.bottom + COMPOSER_BOTTOM_INSET - PANEL_GAP,
     MIN_PANEL_HEIGHT,
   );
 
@@ -191,12 +207,12 @@ export function useEmojiKeyboardSwap(
     );
   }, [open, panelMounted, ownFraction, progress, tracking]);
 
-  /** The panel's reserved height, animated. */
+  /** The space the panel occupies — its box plus the gap above it, animated. */
   const panelStyle = useAnimatedStyle(
     () => ({
       height:
         Math.max(0, tracking.value === 1 ? 1 - progress.value : ownFraction.value) *
-        panelHeight,
+        (panelHeight + PANEL_GAP),
     }),
     [panelHeight, ownFraction, progress, tracking],
   );
