@@ -3,14 +3,13 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
@@ -103,14 +102,6 @@ export function ChatInput({
   const nearLimit = text.length >= MAX_MESSAGE_CHARS - 50;
   const linkPreviewUrl = text.trim() ? extractFirstUrl(text) : null;
 
-  // Opening the panel must not cost the caret: the field keeps focus (and its
-  // selection) under the panel so picking an emoji inserts it where the user
-  // was typing. Android hides the IME without blurring via
-  // showSoftInputOnFocus; the focus call below re-establishes the caret.
-  useEffect(() => {
-    if (pickerOpen) inputRef.current?.focus();
-  }, [pickerOpen]);
-
   // The quote wears the replied author's chat name color — same deterministic
   // palette as the sender names inside bubbles. Quoting your own message stays
   // neutral, matching the sent bubble.
@@ -140,11 +131,12 @@ export function ChatInput({
     selectionRef.current = { start: 0, end: 0 };
   }
 
-  /** Emoji button — opens the inline panel below the composer while keeping
-   *  the caret in the field (keyboard hidden on Android, panel above it on
-   *  iOS); tapping the field again places the caret without closing the
-   *  panel. A second tap on the button closes the panel and brings the
-   *  keyboard back. */
+  /**
+   * Emoji button — the panel and the keyboard take turns in the same space,
+   * the way WhatsApp does it. Opening the panel dismisses the IME; the button
+   * then wears a keyboard glyph, and tapping it (or the field) brings the IME
+   * back and puts the panel away.
+   */
   function togglePicker() {
     if (pickerOpen) {
       setPickerOpen(false);
@@ -152,8 +144,17 @@ export function ChatInput({
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setPickerOpen(true);
-      if (Platform.OS === 'android') Keyboard.dismiss();
+      Keyboard.dismiss();
     }
+  }
+
+  /** Tapping the field is a request for the keyboard, so the panel yields. */
+  function handleFocus() {
+    if (!pickerOpen) return;
+    setPickerOpen(false);
+    // Android: the IME was suppressed while the panel was open, so focus the
+    // field once more after showSoftInputOnFocus flips back on.
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function handlePickMention(candidate: Parameters<typeof pickMention>[0]) {
@@ -298,17 +299,21 @@ export function ChatInput({
               onPress={togglePicker}
               disabled={disabled}
               hitSlop={6}
-              accessibilityLabel="Open emoji picker"
+              accessibilityLabel={pickerOpen ? 'Show keyboard' : 'Open emoji picker'}
               style={({ pressed }) => [
                 styles.pillBtn,
                 { opacity: pressed ? 0.5 : 1 },
               ]}
             >
-              <Feather
-                name="smile"
-                size={19}
-                color={pickerOpen ? colors.accent : colors.mutedForeground}
-              />
+              {pickerOpen ? (
+                <MaterialCommunityIcons
+                  name="keyboard-outline"
+                  size={20}
+                  color={colors.accent}
+                />
+              ) : (
+                <Feather name="smile" size={19} color={colors.mutedForeground} />
+              )}
             </Pressable>
 
             <TextInput
@@ -323,10 +328,11 @@ export function ChatInput({
                 if (pickerOpen) setPickerOpen(false);
                 handleChangeText(v);
               }}
-              // Android: keeps the caret alive while the panel replaces the
-              // keyboard — the field stays focused without the IME. iOS has
-              // no equivalent, so its keyboard stays up next to the panel.
+              // Android: the IME stays suppressed while the panel owns the
+              // bottom of the screen. (iOS has no equivalent; the panel closes
+              // the keyboard with Keyboard.dismiss instead.)
               showSoftInputOnFocus={!pickerOpen}
+              onFocus={handleFocus}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;
                 onComposerActivity(text, e.nativeEvent.selection.end);

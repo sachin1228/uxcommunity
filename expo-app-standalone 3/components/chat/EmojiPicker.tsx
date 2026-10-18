@@ -8,11 +8,12 @@ import { useColors } from '@/hooks/useColors';
  * `EmojiGifPicker` tab, reduced to emoji.
  *
  * Unlike a modal, the panel renders inline directly below the composer
- * (WhatsApp-style): the input stays visible and focused above it, the panel
- * runs edge-to-edge to the bottom of the screen, and the parent decides when
- * it closes (tapping the input again, sending, or scrolling the chat).
- * Tapping an emoji inserts it at the caret and keeps the panel open so
- * several can be picked in a row (same behaviour as the web composer).
+ * (WhatsApp-style). It takes the keyboard's place rather than sharing the
+ * screen with it: the composer dismisses the IME when the panel opens, and
+ * the emoji button becomes a keyboard button to bring it back. The parent
+ * decides when the panel closes (tapping the field, the keyboard button,
+ * sending, or scrolling the chat), and tapping an emoji inserts it at the
+ * caret while keeping the panel open for several picks in a row.
  */
 
 const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [

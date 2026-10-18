@@ -1,16 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Keyboard,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
@@ -66,11 +65,6 @@ export function DmComposer({
   const overLimit = text.length > MAX_MESSAGE_CHARS;
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
 
-  // Same caret-preserving panel as the community composer: focus stays in the
-  // field under the panel, the IME is suppressed on Android.
-  useEffect(() => {
-    if (emojiPanelOpen) inputRef.current?.focus();
-  }, [emojiPanelOpen]);
 
   function handleChangeText(value: string) {
     setText(value);
@@ -87,6 +81,11 @@ export function DmComposer({
     selectionRef.current = { start: 0, end: 0 };
   }
 
+  /**
+   * The panel and the keyboard take turns in the same space, WhatsApp-style:
+   * opening the panel dismisses the IME, and the button becomes a keyboard
+   * glyph that brings it back.
+   */
   function togglePicker() {
     if (emojiPanelOpen) {
       onEmojiPanelOpenChange(false);
@@ -94,8 +93,15 @@ export function DmComposer({
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       onEmojiPanelOpenChange(true);
-      if (Platform.OS === 'android') Keyboard.dismiss();
+      Keyboard.dismiss();
     }
+  }
+
+  /** Tapping the field is a request for the keyboard, so the panel yields. */
+  function handleFocus() {
+    if (!emojiPanelOpen) return;
+    onEmojiPanelOpenChange(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function insertEmoji(emoji: string) {
@@ -184,14 +190,18 @@ export function DmComposer({
               onPress={togglePicker}
               disabled={disabled}
               hitSlop={6}
-              accessibilityLabel="Open emoji picker"
+              accessibilityLabel={emojiPanelOpen ? 'Show keyboard' : 'Open emoji picker'}
               style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
             >
-              <Feather
-                name="smile"
-                size={19}
-                color={emojiPanelOpen ? colors.accent : colors.mutedForeground}
-              />
+              {emojiPanelOpen ? (
+                <MaterialCommunityIcons
+                  name="keyboard-outline"
+                  size={20}
+                  color={colors.accent}
+                />
+              ) : (
+                <Feather name="smile" size={19} color={colors.mutedForeground} />
+              )}
             </Pressable>
 
             <TextInput
@@ -205,6 +215,7 @@ export function DmComposer({
                 handleChangeText(value);
               }}
               showSoftInputOnFocus={!emojiPanelOpen}
+              onFocus={handleFocus}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;
               }}
