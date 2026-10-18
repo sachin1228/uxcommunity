@@ -956,7 +956,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
+    // The avatar gutter is tighter than the right edge (own bubbles keep the
+    // original 16pt), so incoming rows start 6pt closer to the screen edge.
+    paddingLeft: 10,
+    paddingRight: 16,
     gap: 8,
   },
   rowFirst: { marginTop: 12 },
@@ -967,8 +970,8 @@ const styles = StyleSheet.create({
   contentCol: { flexShrink: 1, minWidth: 0 },
 
   swipeReplyCue: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center' },
-  // The bubble's origin: row padding (16) + avatar column (28) + gap (8).
-  swipeReplyCueOther: { left: 52 },
+  // The bubble's origin: left padding (10) + avatar column (28) + gap (8).
+  swipeReplyCueOther: { left: 46 },
   swipeReplyCueOwn: { right: 16 },
 
   bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },

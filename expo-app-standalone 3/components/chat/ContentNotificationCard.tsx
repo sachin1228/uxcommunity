@@ -395,7 +395,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'flex-end',
-    paddingHorizontal: 16,
+    // Matches message rows: tighter avatar gutter on the left, original right
+    // edge for own cards.
+    paddingLeft: 10,
+    paddingRight: 16,
     gap: 8,
     marginTop: 12,
   },
