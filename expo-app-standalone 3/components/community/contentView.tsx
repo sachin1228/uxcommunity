@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -36,6 +37,7 @@ import {
   voteOnThreadPoll,
 } from '@/lib/communityContent';
 import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
+import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
 import { CommentSection } from './CommentSection';
 import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
@@ -625,7 +627,17 @@ export function ContentCard({
             onUndo={() => actions.undoPoll(item)}
           />
         ) : null}
-        {images.length ? <MediaGrid images={images} onDoubleTap={likeFromDoubleTap} /> : null}
+        {images.length ? (
+          <MediaCarousel
+            images={images}
+            owner={{
+              name: author?.name ?? null,
+              avatarUrl: author?.avatar_url ?? null,
+              createdAt: item.created_at,
+            }}
+            onDoubleTap={likeFromDoubleTap}
+          />
+        ) : null}
 
         {event ? (
           <View style={styles.eventMetaStack}>
@@ -914,7 +926,16 @@ export function ContentDetail({
               onUndo={() => actions.undoPoll(item)}
             />
           ) : null}
-          {images.length ? <MediaGrid images={images} /> : null}
+          {images.length ? (
+            <MediaCarousel
+              images={images}
+              owner={{
+                name: author?.name ?? null,
+                avatarUrl: author?.avatar_url ?? null,
+                createdAt: item.created_at,
+              }}
+            />
+          ) : null}
 
           {files.map((file) => (
             <Pressable
@@ -1147,20 +1168,39 @@ export function CollapsibleBody({
   );
 }
 
-export function MediaGrid({
+/**
+ * A thread's images, at the bottom of its body.
+ *
+ * One image keeps its natural aspect ratio; several become a swipeable
+ * carousel with a counter, rather than a cropped tile grid. Tapping opens the
+ * app's own lightbox — the same one the community chat uses — never the
+ * system browser, so images stay inside the app.
+ */
+export function MediaCarousel({
   images,
-  /** Double tap on a photo: like the post instead of opening the image. */
+  owner,
+  /** Double tap on a photo: like the post instead of opening the viewer. */
   onDoubleTap,
 }: {
   images: Array<{ url: string }>;
+  /** The poster — the lightbox header's name, avatar and date, as in chat. */
+  owner: { name: string | null; avatarUrl: string | null; createdAt: string };
   onDoubleTap?: () => void;
 }) {
   const colors = useColors();
+  const { width: screenWidth } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [index, setIndex] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const single = images.length === 1;
   // The web shows a single image at its natural aspect ratio (capped at 480px
   // tall, never cropped); measuring it keeps tall screenshots from being
   // center-cropped into a fixed 220px band.
   const aspectRatio = useImageAspectRatio(single ? images[0]?.url : undefined);
+  // One page per image. Before the first layout pass the container's width is
+  // unknown, so start from the screen width less the usual card gutter.
+  const pageWidth = containerWidth || Math.max(1, screenWidth - 40);
+  const pageHeight = Math.min(420, pageWidth);
 
   // Opening a photo waits out the double-tap window, so a second tap can like
   // the post instead — the gesture has to work over the photo, not just the
@@ -1174,7 +1214,7 @@ export function MediaGrid({
     [],
   );
 
-  const handleImagePress = (url: string) => {
+  const handleImagePress = (imageIndex: number) => {
     const now = Date.now();
     if (now - lastTapAt.current <= DOUBLE_TAP_MS) {
       lastTapAt.current = 0;
@@ -1189,40 +1229,82 @@ export function MediaGrid({
     if (openTimer.current) clearTimeout(openTimer.current);
     openTimer.current = setTimeout(() => {
       openTimer.current = null;
-      Linking.openURL(url);
+      setViewerIndex(imageIndex);
     }, DOUBLE_TAP_MS);
   };
 
-  return (
-    <View style={styles.imageGrid}>
-      {images.slice(0, 4).map((image, index) => (
+  const lightboxImages: LightboxImage[] = images.map((image) => ({
+    url: image.url,
+    content: null,
+    user_name: owner.name,
+    avatar_url: owner.avatarUrl,
+    created_at: owner.createdAt,
+  }));
+
+  const viewer =
+    viewerIndex !== null && lightboxImages.length > 0 ? (
+      <ImageViewer
+        images={lightboxImages}
+        index={Math.min(viewerIndex, lightboxImages.length - 1)}
+        onClose={() => setViewerIndex(null)}
+        onNavigate={setViewerIndex}
+      />
+    ) : null;
+
+  if (single) {
+    return (
+      <>
         <Pressable
-          key={image.url}
-          onPress={() => handleImagePress(image.url)}
-          style={
-            single
-              ? [
-                  styles.imageSingle,
-                  aspectRatio ? { aspectRatio } : styles.imageSingleFallback,
-                  { borderColor: colors.border },
-                ]
-              : styles.imageCell
-          }
+          onPress={() => handleImagePress(0)}
+          style={[
+            styles.imageSingle,
+            aspectRatio ? { aspectRatio } : styles.imageSingleFallback,
+            { borderColor: colors.border },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Open image"
         >
-          <Image
-            source={{ uri: image.url }}
-            style={styles.threadImage}
-            resizeMode={single ? 'contain' : 'cover'}
-          />
-          {index === 3 && images.length > 4 ? (
-            <View style={styles.moreImages}>
-              <Text style={styles.moreImagesText}>+{images.length - 4}</Text>
-            </View>
-          ) : null}
+          <Image source={{ uri: images[0].url }} style={styles.threadImage} resizeMode="contain" />
         </Pressable>
-      ))}
+        {viewer}
+      </>
+    );
+  }
+
+  return (
+    <View style={[styles.carousel, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        // Measured on the viewport itself, inside the border, so a page is
+        // exactly one screenful and paging never drifts.
+        onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+        onMomentumScrollEnd={(event) => {
+          setIndex(Math.round(event.nativeEvent.contentOffset.x / Math.max(1, pageWidth)));
+        }}
+      >
+        {images.map((image, imageIndex) => (
+          <Pressable
+            key={`${image.url}-${imageIndex}`}
+            onPress={() => handleImagePress(imageIndex)}
+            style={{ width: pageWidth, height: pageHeight }}
+            accessibilityRole="button"
+            accessibilityLabel={`Open image ${imageIndex + 1} of ${images.length}`}
+          >
+            <Image source={{ uri: image.url }} style={styles.threadImage} resizeMode="cover" />
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <View style={styles.carouselCounter} pointerEvents="none">
+        <Text style={styles.carouselCounterText}>
+          {Math.min(index + 1, images.length)}/{images.length}
+        </Text>
+      </View>
+
+      {viewer}
     </View>
   );
 }
@@ -1281,7 +1363,7 @@ function Action({ icon, label, active, activeColor = 'accent', compact = false, 
 
 /**
  * Natural aspect ratio of a remote image, or null while it is unknown.
- * Used by `MediaGrid` so a single attachment is never cropped.
+ * Used by `MediaCarousel` so a single attachment is never cropped.
  */
 function useImageAspectRatio(url?: string): number | null {
   const [ratio, setRatio] = useState<number | null>(null);
@@ -1380,7 +1462,26 @@ const styles = StyleSheet.create({
   actionText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   actionTextCompact: { fontSize: 12 },
 
-  imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, borderRadius: 12, overflow: 'hidden' },
+  carousel: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  carouselCounter: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  carouselCounterText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'Geist_600SemiBold',
+  },
   imageSingle: {
     width: '100%',
     maxHeight: 480,
@@ -1389,15 +1490,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   imageSingleFallback: { height: 220 },
-  imageCell: { width: '49.5%', height: 130 },
   threadImage: { width: '100%', height: '100%' },
-  moreImages: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moreImagesText: { color: '#FFFFFF', fontFamily: 'Geist_600SemiBold', fontSize: 22 },
 
   detailRoot: { flex: 1 },
   detailHeader: {
