@@ -238,13 +238,14 @@ export function useCommunities() {
             // blank/"Someone" sender and then rewrites itself.
             if (row.sender_name) resolvedNames.current.set(row.user_id, row.sender_name);
             const knownName = resolvedNames.current.get(row.user_id) ?? null;
-            // Replying to your own message reads like a fresh message. The
-            // event carries both names, so decide now — resolving the parent
-            // later made the preview flash "You: replied:" first.
+            // A reply to the sender's own message reads like a fresh message
+            // for every viewer, not just the author. The event carries both
+            // names, so decide now — resolving the parent later made the
+            // preview flash "replied:" first.
             const repliedToSelf =
-              isOwn &&
               !!row.reply_to_id &&
               !!row.reply_sender_name &&
+              !!row.sender_name &&
               row.reply_sender_name === row.sender_name;
 
             const newMsg: LastMessage = {
@@ -296,7 +297,7 @@ export function useCommunities() {
                 .then(({ data }) => {
                   if (!data?.user_name) return;
                   const firstName = data.user_name.split(' ')[0];
-                  const replyToSelf = isOwn && !!data.user_id && data.user_id === row.user_id;
+                  const replyToSelf = !!data.user_id && data.user_id === row.user_id;
                   setCommunities((prev) =>
                     prev.map((c) => {
                       if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;

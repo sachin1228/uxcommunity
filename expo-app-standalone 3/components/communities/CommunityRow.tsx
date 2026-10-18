@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { Community } from '@/lib/communities';
+import { formatLastMessagePreview } from '@/lib/communityPreview';
 import { isCommunityMuted } from '@/lib/communityMute';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
@@ -159,34 +160,7 @@ function previewText(
   // Last message — mirrors web formatPreview() priority exactly:
   // deleted → image-only → reply → plain content
   if (community.last_message) {
-    const { content, user, is_own, is_reply, reply_to_user, is_deleted, has_image } =
-      community.last_message;
-    const sender = is_own ? 'You' : user.name ? user.name.split(' ')[0] : '';
-
-    if (is_deleted) {
-      return { prefix: sender, text: 'Message deleted' };
-    }
-
-    if (has_image && !content) {
-      return { prefix: sender, text: '📷 Photo' };
-    }
-
-    // Replying to your own message reads like a fresh message — no "replied to".
-    const repliedToSelf =
-      is_own &&
-      !!reply_to_user &&
-      (user.name?.split(' ')[0] ?? '').toLowerCase() === reply_to_user.toLowerCase();
-
-    if (is_reply && !repliedToSelf) {
-      return {
-        prefix: sender,
-        text: reply_to_user
-          ? `replied to ${reply_to_user}: ${content ?? ''}`
-          : `replied: ${content ?? ''}`,
-      };
-    }
-
-    return { prefix: sender, text: content ?? '' };
+    return formatLastMessagePreview(community.last_message);
   }
 
   return { text: 'No messages yet' };
@@ -268,13 +242,13 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
               size={12}
             />
           </View>
-          <Text style={[styles.time, { color: colors.foregroundSoft }]}>
+          <Text style={[styles.time, { color: colors.foregroundMuted }]}>
             {formatTime(lastTime)}
           </Text>
         </View>
 
         {/* Member count + city reference name */}
-        <Text style={[styles.memberCount, { color: colors.foregroundSoft }]} numberOfLines={1}>
+        <Text style={[styles.memberCount, { color: colors.foregroundMuted }]} numberOfLines={1}>
           {community.member_count === 1
             ? '1 member'
             : `${fmtCount(community.member_count)} members`}
@@ -297,18 +271,14 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
             </View>
           ) : (
             <Text
-              style={[
-                styles.preview,
-                {
-                  color: hasUnread ? colors.foreground : colors.foregroundSoft,
-                  fontFamily: hasUnread ? 'Geist_500Medium' : 'Geist_400Regular',
-                },
-              ]}
+              style={[styles.preview, { color: colors.foregroundMuted }]}
               numberOfLines={1}
             >
               {prefix ? (
-                // Can't use JSX inside a Text string template, so compose manually
-                `${prefix}: ${text}`
+                <>
+                  <Text style={styles.previewPrefix}>{`${prefix}: `}</Text>
+                  {text}
+                </>
               ) : text}
             </Text>
           )}
@@ -410,7 +380,7 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 13,
-    fontFamily: 'Geist_400Regular',
+    fontFamily: 'Geist_500Medium',
   },
   memberCount: {
     fontSize: 12,
@@ -430,7 +400,11 @@ const styles = StyleSheet.create({
   },
   preview: {
     fontSize: 14,
+    fontFamily: 'Geist_400Regular',
     flex: 1,
+  },
+  previewPrefix: {
+    fontFamily: 'Geist_500Medium',
   },
   badge: {
     minWidth: 20,

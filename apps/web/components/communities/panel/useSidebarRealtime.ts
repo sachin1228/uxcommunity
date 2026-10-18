@@ -194,13 +194,14 @@ export function useSidebarRealtime({
           if (!joinedCommunityIds.has(row.community_id)) return;
           const isOwn = row.user_id === userId;
           const isActive = row.community_id === activeCommunityIdRef.current;
-          // Replying to your own message reads like a fresh message. The event
-          // carries both names, so decide now — fetching the parent later made
-          // the preview flash "You: replied:" first.
+          // A reply to the sender's own message reads like a fresh message for
+          // every viewer, not just the author. The event carries both names,
+          // so decide now — fetching the parent later made the preview flash
+          // "replied:" first.
           const repliedToSelf =
-            isOwn &&
             !!row.reply_to_id &&
             !!row.reply_sender_name &&
+            !!row.sender_name &&
             row.reply_sender_name === row.sender_name;
           // Published with the message (see the messages POST route), so the
           // sidebar's "@" mark grows in the same frame as the unread badge.
@@ -252,10 +253,10 @@ export function useSidebarRealtime({
               .then((parent: { user_name?: string; user_id?: string } | null) => {
                 if (!parent?.user_name) return;
                 const firstName = parent.user_name.split(" ")[0];
-                // A reply to your own message keeps the plain preview: the
-                // sender's cached name here can belong to the previous row,
-                // so compare ids instead of names.
-                const repliedToSelf = isOwn && !!parent.user_id && parent.user_id === row.user_id;
+                // A reply to the sender's own message keeps the plain
+                // preview for every viewer: the cached sender name here can
+                // belong to the previous row, so compare ids, not names.
+                const repliedToSelf = !!parent.user_id && parent.user_id === row.user_id;
                 writeCommunities((current) => applyUpdate(current, commId, (c) => {
                   if (c.last_message?.created_at !== msgAt) return c;
                   return {

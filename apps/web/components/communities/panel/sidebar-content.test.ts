@@ -112,6 +112,16 @@ test("replying to your own message previews like a normal message", () => {
   );
 });
 
+test("another member's reply to their own message previews like a normal message", () => {
+  // Every viewer sees "john: hi", not "john: replied to john: hi".
+  assert.deepEqual(
+    formatMessagePreview(
+      message({ is_own: false, is_reply: true, reply_to_user: "john" }),
+    ),
+    { prefix: "john", text: "hi" },
+  );
+});
+
 test("an own reply to someone else still names them", () => {
   assert.deepEqual(
     formatMessagePreview(
