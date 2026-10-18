@@ -311,7 +311,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                     </Text>
                   </View>
                 )}
-                <Text numberOfLines={1} style={[styles.title, { color: textColor }]}>
+                <Text numberOfLines={2} style={[styles.title, { color: textColor }]}>
                   {title || theme.label}
                 </Text>
                 {subtitle && (

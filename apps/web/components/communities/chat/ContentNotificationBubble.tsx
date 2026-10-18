@@ -299,7 +299,7 @@ export function ContentNotificationBubble({
             <div className="flex-1 min-w-0 py-1.5 pr-1">
               <Eyebrow event={event} isMe={isMe} />
               <p
-                className={`font-body text-sm font-semibold line-clamp-1 leading-snug mt-0.5 ${
+                className={`font-body text-sm font-semibold line-clamp-2 leading-snug mt-0.5 ${
                   isMe ? "text-accent-foreground" : "text-foreground"
                 }`}
               >
