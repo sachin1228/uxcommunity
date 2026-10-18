@@ -1192,15 +1192,20 @@ export function MediaCarousel({
   const [containerWidth, setContainerWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const stripRef = useRef<ScrollView>(null);
   const single = images.length === 1;
-  // The web shows a single image at its natural aspect ratio (capped at 480px
-  // tall, never cropped); measuring it keeps tall screenshots from being
-  // center-cropped into a fixed 220px band.
-  const aspectRatio = useImageAspectRatio(single ? images[0]?.url : undefined);
+  // The web's thread media keeps every image at its natural aspect ratio,
+  // capped at 480px tall and never cropped. A carousel takes its height from
+  // the first image — the web's invisible sizing anchor — so the card adopts
+  // the same shape a single image would and the slides letterbox inside it,
+  // just as `object-contain` does there.
+  const anchorRatio = useImageAspectRatio(images[0]?.url);
   // One page per image. Before the first layout pass the container's width is
   // unknown, so start from the screen width less the usual card gutter.
   const pageWidth = containerWidth || Math.max(1, screenWidth - 40);
-  const pageHeight = Math.min(420, pageWidth);
+  const pageHeight = anchorRatio
+    ? Math.min(480, pageWidth / anchorRatio)
+    : Math.round((pageWidth * 9) / 16);
 
   // Opening a photo waits out the double-tap window, so a second tap can like
   // the post instead — the gesture has to work over the photo, not just the
@@ -1213,6 +1218,12 @@ export function MediaCarousel({
     },
     [],
   );
+
+  /** Dots jump between slides, like the web control's buttons. */
+  const scrollToPage = (page: number) => {
+    setIndex(page);
+    stripRef.current?.scrollTo({ x: page * pageWidth, animated: true });
+  };
 
   const handleImagePress = (imageIndex: number) => {
     const now = Date.now();
@@ -1258,7 +1269,7 @@ export function MediaCarousel({
           onPress={() => handleImagePress(0)}
           style={[
             styles.imageSingle,
-            aspectRatio ? { aspectRatio } : styles.imageSingleFallback,
+            anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
             { borderColor: colors.border },
           ]}
           accessibilityRole="button"
@@ -1274,6 +1285,7 @@ export function MediaCarousel({
   return (
     <View style={[styles.carousel, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}>
       <ScrollView
+        ref={stripRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -1293,15 +1305,38 @@ export function MediaCarousel({
             accessibilityRole="button"
             accessibilityLabel={`Open image ${imageIndex + 1} of ${images.length}`}
           >
-            <Image source={{ uri: image.url }} style={styles.threadImage} resizeMode="cover" />
+            {/* Contain, not cover: the web never crops a thread image. */}
+            <Image source={{ uri: image.url }} style={styles.threadImage} resizeMode="contain" />
           </Pressable>
         ))}
       </ScrollView>
 
-      <View style={styles.carouselCounter} pointerEvents="none">
-        <Text style={styles.carouselCounterText}>
-          {Math.min(index + 1, images.length)}/{images.length}
-        </Text>
+      {/* Carousel dots — the web's pill of clickable dots, centred at the
+          bottom edge of the viewport. */}
+      <View style={styles.carouselDotsRow} pointerEvents="box-none">
+        <View style={styles.carouselDots}>
+          {images.map((image, dotIndex) => {
+            const active = dotIndex === index;
+            return (
+              <Pressable
+                key={`${image.url}-dot-${dotIndex}`}
+                onPress={() => scrollToPage(dotIndex)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to image ${dotIndex + 1} of ${images.length}`}
+                accessibilityState={{ selected: active }}
+                style={styles.carouselDotButton}
+              >
+                <View
+                  style={[
+                    styles.carouselDot,
+                    { backgroundColor: active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)' },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {viewer}
@@ -1468,19 +1503,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  carouselCounter: {
+  // Centred along the bottom edge, over the photo — the web's dot pill.
+  carouselDotsRow: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    left: 0,
+    right: 0,
+    bottom: 10,
+    alignItems: 'center',
+    zIndex: 2,
   },
-  carouselCounterText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontFamily: 'Geist_600SemiBold',
+  carouselDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  carouselDotButton: {
+    width: 12,
+    height: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   imageSingle: {
     width: '100%',
