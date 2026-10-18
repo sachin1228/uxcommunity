@@ -18,6 +18,7 @@ import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import type { PendingImage } from '@/components/chat/ChatInput';
+import { useEmojiKeyboardSwap } from '@/hooks/useEmojiKeyboardSwap';
 
 /**
  * The DM composer — the community ChatInput without the community-only pieces
@@ -62,6 +63,9 @@ export function DmComposer({
   /** Caret/selection as last reported by the field — emoji insert here. */
   const selectionRef = useRef({ start: 0, end: 0 });
 
+  // The panel yields to the keyboard in one motion (see the hook).
+  const emojiSwap = useEmojiKeyboardSwap(emojiPanelOpen, onEmojiPanelOpenChange);
+
   const overLimit = text.length > MAX_MESSAGE_CHARS;
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
 
@@ -88,20 +92,14 @@ export function DmComposer({
    */
   function togglePicker() {
     if (emojiPanelOpen) {
-      onEmojiPanelOpenChange(false);
-      // The field is blurred while the panel is open, so this always starts a
-      // fresh focus — which is what raises the IME.
+      // Ask for the keyboard first; the panel goes when the IME reports in, so
+      // the two trade places in one motion rather than in two steps.
+      emojiSwap.startHandoff();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       onEmojiPanelOpenChange(true);
       Keyboard.dismiss();
     }
-  }
-
-  /** Tapping the field is a request for the keyboard, so the panel yields. */
-  function handleFocus() {
-    if (!emojiPanelOpen) return;
-    onEmojiPanelOpenChange(false);
   }
 
   function insertEmoji(emoji: string) {
@@ -217,7 +215,7 @@ export function DmComposer({
               // The panel dismisses the IME rather than suppressing it, so a
               // tap always focuses the field and raises the keyboard in the
               // same gesture.
-              onFocus={handleFocus}
+              onPressIn={emojiSwap.startHandoff}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;
               }}
@@ -281,7 +279,9 @@ export function DmComposer({
         </Pressable>
       </View>
 
-      {emojiPanelOpen && <EmojiPicker onSelect={insertEmoji} />}
+      {emojiPanelOpen && (
+        <EmojiPicker onSelect={insertEmoji} keyboardHeight={emojiSwap.keyboardHeight} />
+      )}
     </View>
   );
 }

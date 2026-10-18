@@ -15,6 +15,7 @@ import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
+import { useEmojiKeyboardSwap } from '@/hooks/useEmojiKeyboardSwap';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from './EmojiPicker';
@@ -85,6 +86,8 @@ export function ChatInput({
   // the footer and closes it on scroll/tab change); this is just a shorthand.
   const pickerOpen = emojiPanelOpen;
   const setPickerOpen = (open: boolean) => onEmojiPanelOpenChange?.(open);
+  // The panel yields to the keyboard in one motion (see the hook).
+  const emojiSwap = useEmojiKeyboardSwap(pickerOpen, setPickerOpen);
 
   const {
     mentionOpen,
@@ -139,20 +142,14 @@ export function ChatInput({
    */
   function togglePicker() {
     if (pickerOpen) {
-      setPickerOpen(false);
-      // The field is blurred while the panel is open, so this always starts a
-      // fresh focus — which is what raises the IME.
+      // Ask for the keyboard first; the panel goes when the IME reports in, so
+      // the two trade places in one motion rather than in two steps.
+      emojiSwap.startHandoff();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setPickerOpen(true);
       Keyboard.dismiss();
     }
-  }
-
-  /** Tapping the field is a request for the keyboard, so the panel yields. */
-  function handleFocus() {
-    if (!pickerOpen) return;
-    setPickerOpen(false);
   }
 
   function handlePickMention(candidate: Parameters<typeof pickMention>[0]) {
@@ -329,7 +326,7 @@ export function ChatInput({
               // The panel dismisses the IME rather than suppressing it, so the
               // field stays plain: a tap focuses it and the keyboard comes up
               // in the same gesture, replacing the panel.
-              onFocus={handleFocus}
+              onPressIn={emojiSwap.startHandoff}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;
                 onComposerActivity(text, e.nativeEvent.selection.end);
@@ -396,7 +393,9 @@ export function ChatInput({
         </Pressable>
       </View>
 
-      {pickerOpen && <EmojiPicker onSelect={insertEmoji} />}
+      {pickerOpen && (
+        <EmojiPicker onSelect={insertEmoji} keyboardHeight={emojiSwap.keyboardHeight} />
+      )}
     </View>
   );
 }

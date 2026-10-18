@@ -60,9 +60,13 @@ interface Props {
   /** Called with the tapped emoji. The chat screen mounts the panel without
    *  a handler (ChatInput wires the insertion), so it is optional. */
   onSelect?: (emoji: string) => void;
+  /** The height the IME last took up on this screen. The panel claims exactly
+   *  that much, so swapping one for the other moves nothing above it; the
+   *  320dp default covers the very first open, before the IME has been seen. */
+  keyboardHeight?: number;
 }
 
-export function EmojiPicker({ onSelect }: Props) {
+export function EmojiPicker({ onSelect, keyboardHeight = 0 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -71,6 +75,7 @@ export function EmojiPicker({ onSelect }: Props) {
       style={[
         styles.panel,
         {
+          height: keyboardHeight || styles.panel.height,
           backgroundColor: colors.background,
           borderTopColor: colors.border,
           paddingBottom: insets.bottom,
