@@ -227,10 +227,22 @@ export function useSidebarRealtime({
           if (row.reply_to_id) {
             const commId = row.community_id; const msgAt = row.created_at; const replyId = row.reply_to_id;
             fetch(`/api/communities/${commId}/messages/${replyId}`).then((r) => (r.ok ? r.json() : null))
-              .then((parent: { user_name?: string } | null) => {
+              .then((parent: { user_name?: string; user_id?: string } | null) => {
                 if (!parent?.user_name) return;
                 const firstName = parent.user_name.split(" ")[0];
-                writeCommunities((current) => applyUpdate(current, commId, (c) => { if (c.last_message?.created_at !== msgAt) return c; return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } }; }));
+                // A reply to your own message keeps the plain preview: the
+                // sender's cached name here can belong to the previous row,
+                // so compare ids instead of names.
+                const repliedToSelf = isOwn && !!parent.user_id && parent.user_id === row.user_id;
+                writeCommunities((current) => applyUpdate(current, commId, (c) => {
+                  if (c.last_message?.created_at !== msgAt) return c;
+                  return {
+                    ...c,
+                    last_message: repliedToSelf
+                      ? { ...c.last_message!, is_reply: false, reply_to_user: null }
+                      : { ...c.last_message!, reply_to_user: firstName },
+                  };
+                }));
               }).catch(() => {});
           }
         }),

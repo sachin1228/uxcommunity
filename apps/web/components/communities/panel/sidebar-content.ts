@@ -53,7 +53,12 @@ export function formatMessagePreview(
       : "Someone";
   if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
   if (msg.has_image && !msg.content) return { prefix: sender, text: "Photo", media: "image" };
-  if (msg.is_reply) {
+  // Replying to your own message reads like a fresh message — no "replied to".
+  const repliedToSelf =
+    !!msg.is_own &&
+    !!msg.reply_to_user &&
+    (msg.user?.name ?? "").split(" ")[0].toLowerCase() === msg.reply_to_user.toLowerCase();
+  if (msg.is_reply && !repliedToSelf) {
     const to = msg.reply_to_user ?? null;
     if (!to && msg.reply_to_content_kind) {
       const kind = msg.reply_to_content_kind;
