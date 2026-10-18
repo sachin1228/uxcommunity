@@ -9,8 +9,8 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+  type TextLayoutEvent,
+} from 'react-native';import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
@@ -23,6 +23,7 @@ import {
   isEmojiOnly,
   splitContentForRender,
   userNameColor,
+  type ContentRun,
 } from '@/lib/chat';
 import { MessageBubbleTail } from './MessageBubbleTail';
 import { CheckCheckIcon } from './CheckCheckIcon';
@@ -249,20 +250,47 @@ function ContentReplyQuote({
 // Rich message text: mentions + links + emoji enlargement + "Read more"
 // ---------------------------------------------------------------------------
 
+/** Inline suffix that ends the collapsed text, matching the web composer. */
+const READ_MORE_SUFFIX = '\u2060… Read more';
+
+/**
+ * Collapse phases: measure the uncapped text in a clipped offscreen copy,
+ * then re-fit the cut until the suffix lands on the last allowed line.
+ * `ready` with `cut: null` means the message fits and never shows the link.
+ */
+type TruncationPhase =
+  | { kind: 'measuring-full' }
+  | { kind: 'measuring-candidate'; cut: number }
+  | { kind: 'ready'; cut: number | null };
+
 function RichContent({
   content,
   mentions,
   isOwn,
   colors,
+  collapsed,
+  onTruncatedChange,
 }: {
   content: string;
   mentions: Message['mentions'];
   isOwn: boolean;
   colors: Palette;
+  collapsed: boolean;
+  /** Reports whether the collapsed text hides content (drives bubble taps). */
+  onTruncatedChange: (truncated: boolean) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(true);
-  const [truncated, setTruncated] = useState(false);
+  const [phase, setPhase] = useState<TruncationPhase>({ kind: 'measuring-full' });
   const runs = useMemo(() => splitContentForRender(content, mentions), [content, mentions]);
+  const plain = useMemo(() => runs.map((run) => run.text).join(''), [runs]);
+
+  // New content starts a fresh measurement; an expanded message never
+  // measures. Resetting during render (not in an effect) keeps a layout event
+  // that fired before passive effects from being clobbered.
+  const measuredContent = useRef(content);
+  if (measuredContent.current !== content) {
+    measuredContent.current = content;
+    setPhase({ kind: 'measuring-full' });
+  }
 
   const textColor = isOwn ? colors.chatOwnBubbleForeground : colors.foreground;
   const mentionColor = isOwn ? colors.chatMentionOwn : colors.chatMention;
@@ -274,62 +302,146 @@ function RichContent({
     });
   }, []);
 
+  /** Runs, cut at a character offset when the message is collapsing. */
+  function renderRuns(runsToRender: ContentRun[], cut?: number) {
+    let remaining = cut ?? Number.POSITIVE_INFINITY;
+    return runsToRender.map((run, i) => {
+      if (remaining <= 0) return null;
+      const text = remaining >= run.text.length ? run.text : run.text.slice(0, remaining);
+      remaining -= text.length;
+      if (run.kind === 'mention') {
+        return (
+          <Text key={i} style={[styles.mentionText, { color: mentionColor }]}>
+            {text}
+          </Text>
+        );
+      }
+      if (run.kind === 'url') {
+        return (
+          <Text
+            key={i}
+            style={{ color: linkColor, textDecorationLine: 'underline' }}
+            onPress={() => openUrl(run.url)}
+          >
+            {text}
+          </Text>
+        );
+      }
+      return <Fragment key={i}>{text}</Fragment>;
+    });
+  }
+
+  /** Estimate the suffix's width in characters of the measured line. */
+  function suffixCharEstimate(lastLine: { text: string; width: number } | undefined) {
+    const avgChar =
+      lastLine && lastLine.text.length > 0 ? lastLine.width / lastLine.text.length : 8;
+    return {
+      avgChar,
+      chars: Math.ceil(82 / Math.max(avgChar, 1)) + 2,
+    };
+  }
+
+  function trimToWordBoundary(from: number) {
+    let cut = Math.max(0, from);
+    while (cut > 0 && !/\s/.test(plain[cut - 1] ?? '')) cut--;
+    return cut;
+  }
+
+  /**
+   * Inline "… Read more" (web parity). RN can't append content after its
+   * native clamp, so the uncapped layout is measured offscreen, the end of
+   * the last allowed line is located in the plain text, and characters are
+   * trimmed until the suffix fits on that line. The visible bubble keeps its
+   * clamp the whole time, so the list never remeasures a cell.
+   */
+  function finishReady(cut: number | null) {
+    setPhase({ kind: 'ready', cut });
+    onTruncatedChange(cut !== null);
+  }
+
+  function handleMeasureLayout(event: TextLayoutEvent) {
+    const lines = event.nativeEvent.lines;
+    if (phase.kind === 'measuring-full') {
+      if (lines.length <= COLLAPSED_LINES) {
+        finishReady(null);
+        return;
+      }
+      let cursor = 0;
+      for (let i = 0; i < COLLAPSED_LINES; i++) {
+        const lineText = lines[i]?.text ?? '';
+        if (!lineText) {
+          cursor = Math.min(plain.length, cursor + 1);
+          continue;
+        }
+        const found = plain.indexOf(lineText, cursor);
+        cursor = found === -1
+          ? Math.min(plain.length, cursor + lineText.length)
+          : Math.min(plain.length, found + lineText.length);
+      }
+      const { chars } = suffixCharEstimate(lines[COLLAPSED_LINES - 1]);
+      setPhase({ kind: 'measuring-candidate', cut: trimToWordBoundary(cursor - chars) });
+      return;
+    }
+    if (phase.kind !== 'measuring-candidate') return;
+    const fits =
+      lines.length <= COLLAPSED_LINES &&
+      (lines[COLLAPSED_LINES - 1]?.text ?? '').trimEnd().endsWith('Read more');
+    if (fits) {
+      finishReady(phase.cut);
+      return;
+    }
+    // The suffix wrapped: trim roughly its measured width in characters of
+    // the candidate's last line, then retry.
+    const lastLine = lines[COLLAPSED_LINES - 1];
+    const overflowLine = lines[COLLAPSED_LINES];
+    const { avgChar, chars } = suffixCharEstimate(lastLine);
+    const overflowChars = overflowLine
+      ? Math.max(1, Math.ceil(overflowLine.width / Math.max(avgChar, 1)))
+      : Math.max(1, Math.ceil(chars / 2));
+    const nextCut = trimToWordBoundary(phase.cut - overflowChars - 1);
+    if (nextCut === phase.cut) {
+      finishReady(phase.cut);
+    } else {
+      setPhase({ kind: 'measuring-candidate', cut: nextCut });
+    }
+  }
+
+  const cut = phase.kind === 'ready' ? phase.cut : null;
+  const showReadMore = collapsed && cut !== null;
+
   return (
     <View>
       <Text
         style={[styles.content, { color: textColor }]}
         numberOfLines={collapsed ? COLLAPSED_LINES : undefined}
-        onTextLayout={(e) => {
-          if (!collapsed) return;
-          const lineCount = e.nativeEvent.lines.length;
-          setTruncated(lineCount >= COLLAPSED_LINES);
-        }}
       >
-        {runs.map((run, i) => {
-          if (run.kind === 'mention') {
-            return (
-              <Text key={i} style={[styles.mentionText, { color: mentionColor }]}>
-                {run.text}
-              </Text>
-            );
-          }
-          if (run.kind === 'url') {
-            return (
-              <Text
-                key={i}
-                style={{ color: linkColor, textDecorationLine: 'underline' }}
-                onPress={() => openUrl(run.url)}
-              >
-                {run.text}
-              </Text>
-            );
-          }
-          return <Fragment key={i}>{run.text}</Fragment>;
-        })}
-      </Text>
-      {/* The affordance must sit outside the clamped Text — appended inside it,
-          it was itself clipped by numberOfLines and never visible. Same pattern
-          as CollapsibleBody in the community feed. */}
-      {truncated && collapsed && (
-        <Pressable
-          onPress={(event) => {
-            event.stopPropagation();
-            hapticSelection();
-            setCollapsed(false);
-          }}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="Read more"
-        >
+        {collapsed && cut !== null ? renderRuns(runs, cut) : renderRuns(runs)}
+        {showReadMore && (
           <Text
             style={[
               styles.readMore,
               { color: isOwn ? colors.chatOwnBubbleForeground : colors.mutedForeground },
             ]}
+            suppressHighlighting
           >
-            Read more
+            {READ_MORE_SUFFIX}
           </Text>
-        </Pressable>
+        )}
+      </Text>
+      {collapsed && phase.kind !== 'ready' && (
+        <View
+          style={styles.measureLayer}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text style={[styles.content, { color: textColor }]} onTextLayout={handleMeasureLayout}>
+            {phase.kind === 'measuring-candidate' ? renderRuns(runs, phase.cut) : renderRuns(runs)}
+            {phase.kind === 'measuring-candidate' && (
+              <Text style={styles.readMore}>{READ_MORE_SUFFIX}</Text>
+            )}
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -505,6 +617,9 @@ export const MessageBubble = memo(function MessageBubble({
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
+  /** Long-message collapse is owned here so a bubble tap can expand it too. */
+  const [textExpanded, setTextExpanded] = useState(false);
+  const [textTruncated, setTextTruncated] = useState(false);
 
   // Row focus flash — the web row's translucent blue, faded like its
   // `transition-colors` rather than popping on and off.
@@ -612,10 +727,18 @@ export const MessageBubble = memo(function MessageBubble({
   const textColor = isOwn ? ownText : colors.foreground;
 
   const handlePress = useCallback(() => {
-    if (!isOwn || !failed) return;
-    hapticSelection();
-    onRetry?.(message.id);
-  }, [isOwn, failed, onRetry, message.id]);
+    if (isOwn && failed) {
+      hapticSelection();
+      onRetry?.(message.id);
+      return;
+    }
+    // The collapsed text's "Read more" lives inside this Pressable, so its
+    // taps land here — expand the whole message.
+    if (!isDeleted && textTruncated && !textExpanded) {
+      hapticSelection();
+      setTextExpanded(true);
+    }
+  }, [isDeleted, isOwn, failed, onRetry, message.id, textExpanded, textTruncated]);
 
   const handleLongPress = useCallback(() => {
     if (isDeleted) return;
@@ -831,6 +954,8 @@ export const MessageBubble = memo(function MessageBubble({
                           mentions={message.mentions}
                           isOwn={isOwn}
                           colors={colors}
+                          collapsed={!textExpanded}
+                          onTruncatedChange={setTextTruncated}
                         />
                       </View>
                     )}
@@ -937,8 +1062,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_400Regular',
   },
   mentionText: { fontFamily: 'Geist_600SemiBold' },
-  readMore: { fontSize: 15, fontFamily: 'Geist_500Medium' },
+  readMore: { fontSize: 15, lineHeight: 22, fontFamily: 'Geist_500Medium' },
   contentOnMedia: { paddingLeft: 4, paddingRight: 4 },
+  /** Offscreen measuring copy: absolute and zero-height so it never affects
+   *  the cell's layout or paints over neighbouring bubbles. */
+  measureLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 0,
+    overflow: 'hidden',
+    opacity: 0,
+  },
 
   // ── reply quote ─────────────────────────────────────────────────────────
   replyBubble: {
