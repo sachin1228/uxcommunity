@@ -126,25 +126,26 @@ function ReplyBubble({
   reply,
   isOwn,
   colors,
-  currentUserId,
   onPress,
 }: {
   reply: NonNullable<Message['reply_to']>;
   isOwn: boolean;
   colors: Palette;
-  currentUserId: string;
   onPress?: () => void;
 }) {
-  // Reply names get the same per-user color as sender names when the author's
-  // id is known — except a quote of your own message stays neutral white.
-  // History-built previews omit the id and fall back to neutral too.
+  // The quote wears the quoted author's chat color — including when you quote
+  // yourself. Previews that predate the author id keep the neutral fallback.
   const ownText = colors.chatOwnBubbleForeground;
-  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
-  const nameColor = reply.user_id && !quotedSelf
+  const nameColor = reply.user_id
     ? userNameColor(reply.user_id, colors)
     : isOwn
       ? ownText
       : colors.mutedForeground;
+  const barColor = reply.user_id
+    ? nameColor
+    : isOwn
+      ? colors.chatReplyBorderOwn
+      : colors.chatReplyBorderOther;
 
   return (
     <Pressable
@@ -156,18 +157,7 @@ function ReplyBubble({
       ]}
     >
       {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
-      <View
-        style={[
-          styles.replyBar,
-          {
-            backgroundColor: reply.user_id && !quotedSelf
-              ? nameColor
-              : isOwn
-                ? colors.chatReplyBorderOwn
-                : colors.chatReplyBorderOther,
-          },
-        ]}
-      />
+      <View style={[styles.replyBar, { backgroundColor: barColor }]} />
       <View style={styles.replyBody}>
         <Text
           numberOfLines={1}
@@ -871,7 +861,6 @@ export const MessageBubble = memo(function MessageBubble({
                         reply={replyTo}
                         isOwn={isOwn}
                         colors={colors}
-                        currentUserId={currentUserId}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
                       />
                     )}

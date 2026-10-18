@@ -28,8 +28,8 @@ export interface ReplyPreview {
   id: string;
   content: string;
   user_name: string;
-  /** Parent author's id when known — drives the reply-name color. History
-   * rows built by the SQL RPC omit it (the RPC only embeds the name). */
+  /** Parent author's id when known — drives the reply-name color. Only old
+   * cached rows omit it; live events and the page RPC both carry it. */
   user_id?: string | null;
   /** Set when the reply anchors to a content item (a "created a …" card)
    * instead of a chat message — `id` is then the content item's id. */

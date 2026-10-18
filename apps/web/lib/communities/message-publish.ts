@@ -64,9 +64,11 @@ export async function announceNewChatMessage(
   const { communityId, inserted, senderName, senderAvatarUrl } = input;
   const db = createServiceClient();
 
-  // The reply bubble shows who was replied to; the event carries the name so a
-  // receiving client does not have to fetch it.
+  // The reply bubble shows who was replied to; the event carries the author's
+  // id and name so a receiving client does not have to fetch either — the id
+  // is what lets the quote wear that author's chat color immediately.
   let replySenderName: string | null = null;
+  let replySenderId: string | null = null;
   if (inserted.reply_to_id) {
     const { data: parentRow } = await db
       .from("community_messages")
@@ -75,6 +77,7 @@ export async function announceNewChatMessage(
       .maybeSingle();
     const parentId = (parentRow as { user_id?: string } | null)?.user_id ?? null;
     if (parentId) {
+      replySenderId = parentId;
       const { data: parentUser } = await db
         .from("users")
         .select("name")
@@ -97,6 +100,7 @@ export async function announceNewChatMessage(
       created_at: inserted.created_at,
       reply_to_id: inserted.reply_to_id ?? null,
       reply_sender_name: replySenderName,
+      reply_sender_id: replySenderId,
       // Content-anchored replies carry their own preview fields.
       reply_to_content_id: inserted.reply_to_content_id ?? null,
       reply_content_kind: input.replyContentKind,

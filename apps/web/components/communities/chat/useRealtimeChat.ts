@@ -117,6 +117,7 @@ export function useRealtimeChat({
           sender_name?: string | null;
           sender_avatar_url?: string | null;
           reply_sender_name?: string | null;
+          reply_sender_id?: string | null;
         };
 
         if (initialScrollDoneRef.current) {
@@ -181,7 +182,7 @@ export function useRealtimeChat({
                   id: newRow.reply_to_id,
                   content: "",
                   user_name: newRow.reply_sender_name,
-                  user_id: null,
+                  user_id: newRow.reply_sender_id ?? null,
                 };
               }
             }

@@ -76,7 +76,7 @@ export interface ReplyPreview {
   id: string;
   content: string | null;
   user_name: string;
-  /** Present on live payloads; older history-built previews omit it. */
+  /** Present on live payloads and history pages; only old cached rows omit it. */
   user_id?: string | null;
 }
 

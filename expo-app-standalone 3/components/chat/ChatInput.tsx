@@ -109,14 +109,10 @@ export function ChatInput({
   const linkPreviewUrl = text.trim() ? extractFirstUrl(text) : null;
 
   // The quote wears the replied author's chat name color — same deterministic
-  // palette as the sender names inside bubbles. Quoting your own message stays
-  // neutral, matching the sent bubble.
-  const quotedSelf = !!replyTo?.user_id && replyTo.user_id === currentUserId;
+  // palette as the sender names inside bubbles, including your own message.
   const replyColor = !replyTo
     ? colors.accent
-    : quotedSelf
-      ? colors.foreground
-      : userNameColor(replyTo.user_id, colors);
+    : userNameColor(replyTo.user_id, colors);
 
   function handleChangeText(val: string) {
     setText(val);
@@ -236,7 +232,7 @@ export function ChatInput({
                   { backgroundColor: colors.background },
                 ]}
               >
-                <View style={[styles.replyBar, { backgroundColor: quotedSelf ? colors.mutedForeground : replyColor }]} />
+                <View style={[styles.replyBar, { backgroundColor: replyColor }]} />
                 <View style={styles.replyInfo}>
                   <Text numberOfLines={1} style={[styles.replyName, { color: replyColor }]}>
                     {replyTo.content_kind
