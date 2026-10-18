@@ -89,7 +89,8 @@ export function DmComposer({
   function togglePicker() {
     if (emojiPanelOpen) {
       onEmojiPanelOpenChange(false);
-      // After the re-render clears showSoftInputOnFocus, focus reopens the IME.
+      // The field is blurred while the panel is open, so this always starts a
+      // fresh focus — which is what raises the IME.
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       onEmojiPanelOpenChange(true);
@@ -101,7 +102,6 @@ export function DmComposer({
   function handleFocus() {
     if (!emojiPanelOpen) return;
     onEmojiPanelOpenChange(false);
-    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function insertEmoji(emoji: string) {
@@ -214,7 +214,9 @@ export function DmComposer({
                 if (emojiPanelOpen) onEmojiPanelOpenChange(false);
                 handleChangeText(value);
               }}
-              showSoftInputOnFocus={!emojiPanelOpen}
+              // The panel dismisses the IME rather than suppressing it, so a
+              // tap always focuses the field and raises the keyboard in the
+              // same gesture.
               onFocus={handleFocus}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;

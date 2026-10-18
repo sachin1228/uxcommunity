@@ -140,7 +140,8 @@ export function ChatInput({
   function togglePicker() {
     if (pickerOpen) {
       setPickerOpen(false);
-      // After the re-render clears showSoftInputOnFocus, focus reopens the IME.
+      // The field is blurred while the panel is open, so this always starts a
+      // fresh focus — which is what raises the IME.
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setPickerOpen(true);
@@ -152,9 +153,6 @@ export function ChatInput({
   function handleFocus() {
     if (!pickerOpen) return;
     setPickerOpen(false);
-    // Android: the IME was suppressed while the panel was open, so focus the
-    // field once more after showSoftInputOnFocus flips back on.
-    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function handlePickMention(candidate: Parameters<typeof pickMention>[0]) {
@@ -328,10 +326,9 @@ export function ChatInput({
                 if (pickerOpen) setPickerOpen(false);
                 handleChangeText(v);
               }}
-              // Android: the IME stays suppressed while the panel owns the
-              // bottom of the screen. (iOS has no equivalent; the panel closes
-              // the keyboard with Keyboard.dismiss instead.)
-              showSoftInputOnFocus={!pickerOpen}
+              // The panel dismisses the IME rather than suppressing it, so the
+              // field stays plain: a tap focuses it and the keyboard comes up
+              // in the same gesture, replacing the panel.
               onFocus={handleFocus}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;
