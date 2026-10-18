@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Keyboard,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -59,9 +60,17 @@ export function DmComposer({
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const inputRef = useRef<TextInput>(null);
+  /** Caret/selection as last reported by the field — emoji insert here. */
+  const selectionRef = useRef({ start: 0, end: 0 });
 
   const overLimit = text.length > MAX_MESSAGE_CHARS;
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
+
+  // Same caret-preserving panel as the community composer: focus stays in the
+  // field under the panel, the IME is suppressed on Android.
+  useEffect(() => {
+    if (emojiPanelOpen) inputRef.current?.focus();
+  }, [emojiPanelOpen]);
 
   function handleChangeText(value: string) {
     setText(value);
@@ -75,22 +84,29 @@ export function DmComposer({
     setPendingImage(null);
     onEmojiPanelOpenChange(false);
     onTypingChange('');
+    selectionRef.current = { start: 0, end: 0 };
   }
 
   function togglePicker() {
     if (emojiPanelOpen) {
       onEmojiPanelOpenChange(false);
-      inputRef.current?.focus();
+      // After the re-render clears showSoftInputOnFocus, focus reopens the IME.
+      requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       onEmojiPanelOpenChange(true);
-      Keyboard.dismiss();
+      if (Platform.OS === 'android') Keyboard.dismiss();
     }
   }
 
   function insertEmoji(emoji: string) {
-    const next = text + emoji;
+    const from = Math.min(selectionRef.current.start, text.length);
+    const to = Math.min(Math.max(selectionRef.current.end, from), text.length);
+    const next = text.slice(0, from) + emoji + text.slice(to);
+    const caret = from + emoji.length;
+    selectionRef.current = { start: caret, end: caret };
     setText(next);
     onTypingChange(next);
+    requestAnimationFrame(() => inputRef.current?.setSelection(caret, caret));
   }
 
   async function handlePickImage() {
@@ -188,8 +204,9 @@ export function DmComposer({
                 if (emojiPanelOpen) onEmojiPanelOpenChange(false);
                 handleChangeText(value);
               }}
-              onFocus={() => {
-                if (emojiPanelOpen) onEmojiPanelOpenChange(false);
+              showSoftInputOnFocus={!emojiPanelOpen}
+              onSelectionChange={(e) => {
+                selectionRef.current = e.nativeEvent.selection;
               }}
               multiline
               textAlignVertical="center"

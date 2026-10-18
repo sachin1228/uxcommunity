@@ -171,7 +171,13 @@ function previewText(
       return { prefix: sender, text: '📷 Photo' };
     }
 
-    if (is_reply) {
+    // Replying to your own message reads like a fresh message — no "replied to".
+    const repliedToSelf =
+      is_own &&
+      !!reply_to_user &&
+      (user.name?.split(' ')[0] ?? '').toLowerCase() === reply_to_user.toLowerCase();
+
+    if (is_reply && !repliedToSelf) {
       return {
         prefix: sender,
         text: reply_to_user

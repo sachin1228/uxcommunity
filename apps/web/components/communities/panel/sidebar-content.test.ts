@@ -103,6 +103,24 @@ test("a reply previews the person it answers", () => {
   );
 });
 
+test("replying to your own message previews like a normal message", () => {
+  assert.deepEqual(
+    formatMessagePreview(
+      message({ is_own: true, is_reply: true, reply_to_user: "john" }),
+    ),
+    { prefix: "You", text: "hi" },
+  );
+});
+
+test("an own reply to someone else still names them", () => {
+  assert.deepEqual(
+    formatMessagePreview(
+      message({ is_own: true, is_reply: true, reply_to_user: "sachin" }),
+    ),
+    { prefix: "You", text: "replied to sachin: hi" },
+  );
+});
+
 test("a reply anchored to a content card names the kind, not a person", () => {
   for (const [kind, article] of [
     ["thread", "a"],

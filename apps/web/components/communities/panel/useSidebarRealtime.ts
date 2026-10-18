@@ -139,18 +139,17 @@ export function useSidebarRealtime({
       return { text: "a message", media: null };
     }
 
-    function applyReaction(row: ReactionRow, message?: ReactionMessage | null) {
+    function applyReaction(row: ReactionRow, message: ReactionMessage | null, reactorFirstName: string | null) {
       const isOwn = row.user_id === userId;
       writeCommunities((current) =>
         applyUpdate(current, row.community_id, (c) => {
           if (c.lastReaction?.createdAt && row.created_at && c.lastReaction.createdAt > row.created_at) return c;
-          const fallbackMessage = c.last_message?.id === row.message_id ? c.last_message : null;
-          const preview = reactionPreview(row, message ?? (fallbackMessage ? { content: fallbackMessage.content, image_url: fallbackMessage.has_image ? "present" : null } : null));
+          const preview = reactionPreview(row, message);
           return {
             ...c,
             lastReaction: {
               messageId: row.message_id, createdAt: row.created_at, emoji: row.emoji,
-              firstName: isOwn ? "You" : (resolvedNames.get(row.user_id)?.split(" ")[0] ?? "Someone"),
+              firstName: isOwn ? "You" : reactorFirstName ?? "Someone",
               isOwn,
               messagePreview: preview.text,
               messagePreviewMedia: preview.media,
@@ -160,16 +159,27 @@ export function useSidebarRealtime({
       );
     }
 
-    function fetchAndApplyReaction(row: ReactionRow) {
+    /**
+     * Resolve everything the preview needs *before* painting it — applying the
+     * reaction first and patching in the name/snippet afterwards made the row
+     * flash "Someone reacted … a message" and then rewrite itself.
+     */
+    async function fetchAndApplyReaction(row: ReactionRow) {
+      const isOwn = row.user_id === userId;
       const community = sidebarStore.data?.communities.find((item) => item.id === row.community_id);
       const fallbackMessage = community?.last_message?.id === row.message_id
         ? { content: community.last_message.content, image_url: community.last_message.has_image ? "present" : null }
         : null;
-      if (fallbackMessage) { applyReaction(row, fallbackMessage); return; }
-      fetch(`/api/communities/${row.community_id}/messages/${row.message_id}`)
-        .then((res) => (res.ok ? (res.json() as Promise<ReactionMessage>) : null))
-        .then((message) => { if (message) applyReaction(row, message); })
-        .catch(() => {});
+      const [message, name] = await Promise.all([
+        fallbackMessage
+          ? Promise.resolve(fallbackMessage)
+          : fetch(`/api/communities/${row.community_id}/messages/${row.message_id}`)
+              .then((res) => (res.ok ? (res.json() as Promise<ReactionMessage>) : null))
+              .catch(() => null),
+        isOwn ? Promise.resolve(null) : resolveName(row.community_id, row.user_id),
+      ]);
+      if (!message) return;
+      applyReaction(row, message, name?.split(" ")[0] ?? null);
     }
 
     for (const community of subscribed) {
@@ -180,14 +190,25 @@ export function useSidebarRealtime({
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "message", (data) => {
-          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; reply_to_content_id?: string | null; reply_content_kind?: SidebarLastContent["kind"] | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
+          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; sender_name?: string | null; reply_to_id?: string | null; reply_sender_name?: string | null; reply_to_content_id?: string | null; reply_content_kind?: SidebarLastContent["kind"] | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
           if (!joinedCommunityIds.has(row.community_id)) return;
           const isOwn = row.user_id === userId;
           const isActive = row.community_id === activeCommunityIdRef.current;
+          // Replying to your own message reads like a fresh message. The event
+          // carries both names, so decide now — fetching the parent later made
+          // the preview flash "You: replied:" first.
+          const repliedToSelf =
+            isOwn &&
+            !!row.reply_to_id &&
+            !!row.reply_sender_name &&
+            row.reply_sender_name === row.sender_name;
           // Published with the message (see the messages POST route), so the
           // sidebar's "@" mark grows in the same frame as the unread badge.
           const mentionsMe = Array.isArray(row.mentions) && row.mentions.some((mention) => mention?.user_id === userId);
-          const knownName = resolvedNames.get(row.user_id) ?? null;
+          // The event ships the sender's name, so the preview never renders
+          // "Someone: …" and then rewrites itself when a profile fetch lands.
+          const knownName = resolvedNames.get(row.user_id) ?? row.sender_name ?? null;
+          if (row.sender_name && !resolvedNames.has(row.user_id)) resolvedNames.set(row.user_id, row.sender_name);
           if (!isOwn) {
             if (isActive) {
               scheduleMarkRead(row.community_id, { unreadCount: 1, lastMessageTimestamp: row.created_at, reason: "realtime message" });
@@ -199,7 +220,7 @@ export function useSidebarRealtime({
           writeCommunities((current) =>
             applyUpdate(current, row.community_id, (c) => ({
               ...c, is_archived: false, lastReaction: null,
-              last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!(row.reply_to_id || row.reply_to_content_id), reply_to_content_kind: row.reply_content_kind ?? null, is_deleted: false, reactions: [] },
+              last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!(row.reply_to_id || row.reply_to_content_id) && !repliedToSelf, reply_to_user: repliedToSelf ? null : row.reply_sender_name?.split(" ")[0] ?? null, reply_to_content_kind: row.reply_content_kind ?? null, is_deleted: false, reactions: [] },
               message_count: !isOwn && !isActive ? c.message_count + 1 : c.message_count,
               mention_count: mentionsMe && !isOwn && !isActive ? (c.mention_count ?? 0) + 1 : c.mention_count,
               // A new message is newer activity than any content preview.
@@ -224,13 +245,26 @@ export function useSidebarRealtime({
               writeCommunities((current) => applyUpdate(current, commId, (c) => { if (c.last_message?.created_at !== msgAt) return c; return { ...c, last_message: { ...c.last_message!, user: { name } } }; }));
             });
           }
-          if (row.reply_to_id) {
+          // Only needed when the event could not resolve the parent's name.
+          if (row.reply_to_id && !row.reply_sender_name) {
             const commId = row.community_id; const msgAt = row.created_at; const replyId = row.reply_to_id;
             fetch(`/api/communities/${commId}/messages/${replyId}`).then((r) => (r.ok ? r.json() : null))
-              .then((parent: { user_name?: string } | null) => {
+              .then((parent: { user_name?: string; user_id?: string } | null) => {
                 if (!parent?.user_name) return;
                 const firstName = parent.user_name.split(" ")[0];
-                writeCommunities((current) => applyUpdate(current, commId, (c) => { if (c.last_message?.created_at !== msgAt) return c; return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } }; }));
+                // A reply to your own message keeps the plain preview: the
+                // sender's cached name here can belong to the previous row,
+                // so compare ids instead of names.
+                const repliedToSelf = isOwn && !!parent.user_id && parent.user_id === row.user_id;
+                writeCommunities((current) => applyUpdate(current, commId, (c) => {
+                  if (c.last_message?.created_at !== msgAt) return c;
+                  return {
+                    ...c,
+                    last_message: repliedToSelf
+                      ? { ...c.last_message!, is_reply: false, reply_to_user: null }
+                      : { ...c.last_message!, reply_to_user: firstName },
+                  };
+                }));
               }).catch(() => {});
           }
         }),
@@ -268,34 +302,32 @@ export function useSidebarRealtime({
             }
           }
           const knownName = resolvedNames.get(insertUserId) ?? null;
-          writeCommunities((current) =>
-            applyUpdate(current, insertCommunityId, (c) => ({
-              ...c,
-              is_archived: false,
-              unread_content_count: !isOwn && !isActive ? (c.unread_content_count ?? 0) + 1 : c.unread_content_count ?? 0,
-              last_content: {
-                id: insertId,
-                kind: insertKind,
-                title: row.title ?? "",
-                created_at: insertCreatedAt,
-                isOwn,
-                firstName: isOwn ? "You" : knownName,
-              },
-            })),
-          );
-          if (!isOwn && !knownName && !resolvedNames.has(insertUserId)) {
-            const commId = insertCommunityId;
-            const createdAt = insertCreatedAt;
-            const uid = insertUserId;
-            resolveName(commId, uid).then((name) => {
-              if (!name) return;
-              writeCommunities((current) =>
-                applyUpdate(current, commId, (c) => {
-                  if (c.last_content?.created_at !== createdAt) return c;
-                  return { ...c, last_content: { ...c.last_content!, firstName: name } };
-                }),
-              );
+          const commitContent = (firstName: string | null) => {
+            writeCommunities((current) =>
+              applyUpdate(current, insertCommunityId, (c) => ({
+                ...c,
+                is_archived: false,
+                unread_content_count: !isOwn && !isActive ? (c.unread_content_count ?? 0) + 1 : c.unread_content_count ?? 0,
+                last_content: {
+                  id: insertId,
+                  kind: insertKind,
+                  title: row.title ?? "",
+                  created_at: insertCreatedAt,
+                  isOwn,
+                  firstName: isOwn ? "You" : firstName,
+                },
+              })),
+            );
+          };
+          if (!isOwn && !knownName) {
+            // Resolve before painting: "Someone created a thread" → "John
+            // created a thread" was a visible rewrite.
+            resolveName(insertCommunityId, insertUserId).then((name) => {
+              if (name) resolvedNames.set(insertUserId, name);
+              commitContent(name);
             });
+          } else {
+            commitContent(knownName);
           }
         }),
       );
@@ -362,17 +394,7 @@ export function useSidebarRealtime({
           const r = data as ReactionRow;
           if (!joinedCommunityIds.has(r.community_id)) return;
           if (r.user_id === userId && shouldSuppressReactionEcho(r.community_id, r.message_id, r.user_id)) return;
-          fetchAndApplyReaction(r);
-          if (r.user_id !== userId && !resolvedNames.has(r.user_id)) {
-            const msgId = r.message_id; const rEmoji = r.emoji; const uid = r.user_id; const createdAt = r.created_at;
-            resolveName(r.community_id, uid).then((name) => {
-              if (!name) return;
-              writeCommunities((current) => applyUpdate(current, r.community_id, (c) => {
-                if (!c.lastReaction || c.lastReaction.messageId !== msgId || c.lastReaction.emoji !== rEmoji || c.lastReaction.createdAt !== createdAt) return c;
-                return { ...c, lastReaction: { ...c.lastReaction, firstName: name.split(" ")[0] } };
-              }));
-            });
-          }
+          void fetchAndApplyReaction(r);
         }),
       );
 
@@ -381,7 +403,7 @@ export function useSidebarRealtime({
           const r = data as ReactionRow;
           if (!joinedCommunityIds.has(r.community_id)) return;
           if (r.user_id === userId && shouldSuppressReactionEcho(r.community_id, r.message_id, r.user_id)) return;
-          fetchAndApplyReaction(r);
+          void fetchAndApplyReaction(r);
         }),
       );
 
@@ -409,37 +431,32 @@ export function useSidebarRealtime({
         if (!joinedCommunityIds.has(row.community_id)) return;
         const isOwn = row.user_id === userId;
         if (isOwn && shouldSuppressReactionEcho(row.community_id, row.content_id, row.user_id)) return;
+        const preview = contentReactionPreview(row);
+        const commit = (firstName: string | null) => {
+          writeCommunities((current) =>
+            applyUpdate(current, row.community_id!, (c) => {
+              if (c.lastReaction?.createdAt && row.created_at && c.lastReaction.createdAt > row.created_at) return c;
+              return {
+                ...c,
+                lastReaction: {
+                  messageId: row.content_id!,
+                  createdAt: row.created_at,
+                  emoji: row.emoji!,
+                  firstName: isOwn ? "You" : firstName ?? "Someone",
+                  isOwn,
+                  contentKind: row.kind ?? null,
+                  messagePreview: preview,
+                },
+              };
+            }),
+          );
+        };
         const knownReactor = resolvedNames.get(row.user_id)?.split(" ")[0] ?? null;
-        writeCommunities((current) =>
-          applyUpdate(current, row.community_id!, (c) => {
-            if (c.lastReaction?.createdAt && row.created_at && c.lastReaction.createdAt > row.created_at) return c;
-            return {
-              ...c,
-              lastReaction: {
-                messageId: row.content_id!,
-                createdAt: row.created_at,
-                emoji: row.emoji!,
-                firstName: isOwn ? "You" : knownReactor ?? "Someone",
-                isOwn,
-                contentKind: row.kind ?? null,
-                messagePreview: contentReactionPreview(row),
-              },
-            };
-          }),
+        if (isOwn || knownReactor) { commit(knownReactor); return; }
+        // Resolve first so the row paints once with the real name.
+        resolveName(row.community_id, row.user_id).then((name) =>
+          commit(name?.split(" ")[0] ?? null),
         );
-        if (!isOwn && !knownReactor) {
-          const commId = row.community_id;
-          const uid = row.user_id;
-          const contentId = row.content_id;
-          const emoji = row.emoji;
-          resolveName(commId, uid).then((name) => {
-            if (!name) return;
-            writeCommunities((current) => applyUpdate(current, commId, (c) => {
-              if (!c.lastReaction || c.lastReaction.messageId !== contentId || c.lastReaction.emoji !== emoji) return c;
-              return { ...c, lastReaction: { ...c.lastReaction, firstName: name.split(" ")[0] } };
-            }));
-          });
-        }
       };
 
       unsubscribes.push(

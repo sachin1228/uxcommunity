@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useMemo, useState, useRef, useEffect } from "react";
+import { useId, useMemo, useState, useRef, useEffect } from "react";
 import TruncateMarkup from "react-truncate-markup";
 import type { MessageMention } from "@/lib/communities/cache";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
@@ -39,9 +39,11 @@ function renderTextWithEmoji(text: string, key: string | number): React.ReactNod
   }
   if (last < text.length) segments.push(text.slice(last));
 
-  // If no emoji was found just return the string (avoids wrapping in a Fragment).
+  // If no emoji was found just return the string (avoids wrapping in an extra element).
   if (segments.length === 1 && typeof segments[0] === "string") return segments[0];
-  return <Fragment key={key}>{segments}</Fragment>;
+  // Must be a real inline element, not a Fragment: react-truncate-markup clones
+  // every element while measuring and injects `style`, which Fragments reject.
+  return <span key={key}>{segments}</span>;
 }
 
 /**
@@ -94,7 +96,7 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
 }
 
 /** Number of lines shown before a long message collapses behind "Read more". */
-const COLLAPSED_LINES = 5;
+const COLLAPSED_LINES = 10;
 
 export function MessageContent({
   content,
