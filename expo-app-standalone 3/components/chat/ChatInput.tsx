@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   },
   /** WhatsApp's accent — a full-height square bar, clipped into the chip's
    *  corners by the overflow above (their exact DOM pattern). */
-  replyBar: { alignSelf: 'stretch', width: 4, flexShrink: 0 },
+  replyBar: { alignSelf: 'stretch', width: 3, flexShrink: 0 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2, paddingVertical: 6 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
