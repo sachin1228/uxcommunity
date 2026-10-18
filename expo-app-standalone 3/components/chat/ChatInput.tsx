@@ -402,13 +402,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
-    paddingLeft: 8,
+    paddingLeft: 0,
     paddingRight: 6,
     paddingVertical: 6,
     gap: 8,
   },
-  /** WhatsApp's short rounded rule — inset top and bottom, not edge-to-edge. */
-  replyBar: { alignSelf: 'stretch', width: 3, borderRadius: 2, marginVertical: 5 },
+  /** WhatsApp's short rounded rule — flush left, inset top and bottom. */
+  replyBar: { alignSelf: 'stretch', width: 3, borderRadius: 2, marginVertical: 8 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
