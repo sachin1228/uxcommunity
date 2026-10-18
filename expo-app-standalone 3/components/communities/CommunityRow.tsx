@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { Community } from '@/lib/communities';
+import { formatLastMessagePreview } from '@/lib/communityPreview';
 import { isCommunityMuted } from '@/lib/communityMute';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
@@ -159,34 +160,7 @@ function previewText(
   // Last message — mirrors web formatPreview() priority exactly:
   // deleted → image-only → reply → plain content
   if (community.last_message) {
-    const { content, user, is_own, is_reply, reply_to_user, is_deleted, has_image } =
-      community.last_message;
-    const sender = is_own ? 'You' : user.name ? user.name.split(' ')[0] : '';
-
-    if (is_deleted) {
-      return { prefix: sender, text: 'Message deleted' };
-    }
-
-    if (has_image && !content) {
-      return { prefix: sender, text: '📷 Photo' };
-    }
-
-    // Replying to your own message reads like a fresh message — no "replied to".
-    const repliedToSelf =
-      is_own &&
-      !!reply_to_user &&
-      (user.name?.split(' ')[0] ?? '').toLowerCase() === reply_to_user.toLowerCase();
-
-    if (is_reply && !repliedToSelf) {
-      return {
-        prefix: sender,
-        text: reply_to_user
-          ? `replied to ${reply_to_user}: ${content ?? ''}`
-          : `replied: ${content ?? ''}`,
-      };
-    }
-
-    return { prefix: sender, text: content ?? '' };
+    return formatLastMessagePreview(community.last_message);
   }
 
   return { text: 'No messages yet' };
