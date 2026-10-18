@@ -29,6 +29,7 @@ import {
   formatRelativeDate,
   getLinkPreviewImage,
   setContentAction,
+  threadBody,
 } from '@/lib/communityContent';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { formatEventDate } from '@/lib/eventDate';
@@ -317,10 +318,15 @@ export function ContentCard({
   const isOwner = item.user_id === currentUserId;
 
   // The body text each kind puts on its card, mirroring the web cards: a thread
-  // shows its title (which carries the whole post) collapsed behind "Read more",
-  // an event shows a 2-line title plus a collapsible description, a resource
-  // clamps its description to 3 lines, and a showcase title is never clamped.
-  const primaryBody = resource ? resource.description || resource.title : item.title;
+  // shows its body (the whole post lives in `title` on the web) collapsed behind
+  // "Read more", an event shows a 2-line title plus a collapsible description, a
+  // resource clamps its description to 3 lines, and a showcase title is never
+  // clamped.
+  const primaryBody = resource
+    ? resource.description || resource.title
+    : kind === 'threads' && thread
+      ? threadBody(thread)
+      : item.title;
   const secondaryBody = kind === 'events' ? item.description : null;
   const primaryLines =
     kind === 'threads' ? collapsedBodyLines(kind, item)
@@ -331,7 +337,7 @@ export function ContentCard({
   return (
     <Pressable
       onPress={() => onOpen(item)}
-      style={[styles.card, { backgroundColor: colors.surface, shadowColor: '#000' }]}
+      style={[styles.card, { backgroundColor: colors.backgroundSubtle, borderColor: colors.border }]}
       accessibilityRole="button"
       accessibilityLabel={`View ${contentLabel(kind)}: ${item.title}`}
     >
@@ -341,7 +347,7 @@ export function ContentCard({
         {/* Author meta — name and relative date on one line, the category as
             the muted second line, exactly like the web `PostAuthorMeta`. */}
         <View style={styles.authorRow}>
-          <PersonAvatar name={author?.name} url={author?.avatar_url} size={34} />
+          <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
           <View style={styles.authorCopy}>
             <View style={styles.authorLine}>
               <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
@@ -456,6 +462,7 @@ export function ContentActionRow({
       <Action
         icon="message-circle"
         label={String(commentCount)}
+        compact
         accessibilityLabel="Comments"
         onPress={() => {
           hapticSelection();
@@ -528,7 +535,6 @@ export function ContentDetail({
     .filter((attachment) => attachment.type.startsWith('image/'));
   const files = (thread?.attachments ?? []).filter((attachment) => !attachment.type.startsWith('image/'));
   const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
-  const description = thread ? threadDescription(thread.title, thread.description) : item.description;
   const isOwner = item.user_id === currentUserId;
 
   return (
@@ -555,7 +561,7 @@ export function ContentDetail({
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
 
           <View style={styles.authorRow}>
-            <PersonAvatar name={author?.name} url={author?.avatar_url} size={34} />
+            <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
             <View style={styles.authorCopy}>
               <View style={styles.authorLine}>
                 <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
@@ -571,9 +577,21 @@ export function ContentDetail({
             </View>
           </View>
 
-          <Text style={[styles.detailTitle, { color: colors.foreground }]}>{item.title}</Text>
-          {description ? (
-            <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>{description}</Text>
+          {/* Threads carry the whole post in the body, exactly like the web
+              card, so the detail uses the same compact type instead of the
+              large title the other kinds still use. */}
+          <Text
+            style={[
+              thread ? styles.detailThreadBody : styles.detailTitle,
+              { color: colors.foreground },
+            ]}
+          >
+            {thread ? threadBody(thread) : item.title}
+          </Text>
+          {!thread && item.description ? (
+            <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
+              {item.description}
+            </Text>
           ) : null}
           {images.length ? <MediaGrid images={images} /> : null}
 
@@ -793,17 +811,36 @@ export function CollapsibleBody({
 }
 
 export function MediaGrid({ images }: { images: Array<{ url: string }> }) {
+  const colors = useColors();
+  const single = images.length === 1;
+  // The web shows a single image at its natural aspect ratio (capped at 480px
+  // tall, never cropped); measuring it keeps tall screenshots from being
+  // center-cropped into a fixed 220px band.
+  const aspectRatio = useImageAspectRatio(single ? images[0]?.url : undefined);
+
   return (
     <View style={styles.imageGrid}>
       {images.slice(0, 4).map((image, index) => (
         <Pressable
           key={image.url}
           onPress={() => Linking.openURL(image.url)}
-          style={images.length === 1 ? styles.imageSingle : styles.imageCell}
+          style={
+            single
+              ? [
+                  styles.imageSingle,
+                  aspectRatio ? { aspectRatio } : styles.imageSingleFallback,
+                  { borderColor: colors.border },
+                ]
+              : styles.imageCell
+          }
           accessibilityRole="button"
           accessibilityLabel="Open image"
         >
-          <Image source={{ uri: image.url }} style={styles.threadImage} />
+          <Image
+            source={{ uri: image.url }}
+            style={styles.threadImage}
+            resizeMode={single ? 'contain' : 'cover'}
+          />
           {index === 3 && images.length > 4 ? (
             <View style={styles.moreImages}>
               <Text style={styles.moreImagesText}>+{images.length - 4}</Text>
@@ -825,11 +862,13 @@ function DetailRow({ icon, text }: { icon: React.ComponentProps<typeof Feather>[
   );
 }
 
-function Action({ icon, label, active, activeColor = 'accent', onPress, accessibilityLabel }: {
+function Action({ icon, label, active, activeColor = 'accent', compact = false, onPress, accessibilityLabel }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   active?: boolean;
   activeColor?: 'like' | 'accent';
+  /** The web renders the comment count one step smaller than the like count. */
+  compact?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 }) {
@@ -855,29 +894,45 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       ) : (
         <Feather name={icon} size={16} color={tint} />
       )}
-      <Text style={[styles.actionText, { color: tint }]}>{label}</Text>
+      <Text style={[styles.actionText, compact ? styles.actionTextCompact : null, { color: tint }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-function threadDescription(title: string, description: string | null) {
-  const body = description?.trim();
-  if (!body || body === title.trim()) return null;
-  if (body.startsWith(`${title.trim()}\n`)) return body.slice(title.trim().length).trim() || null;
-  return body;
+/**
+ * Natural aspect ratio of a remote image, or null while it is unknown.
+ * Used by `MediaGrid` so a single attachment is never cropped.
+ */
+function useImageAspectRatio(url?: string): number | null {
+  const [ratio, setRatio] = useState<number | null>(null);
+  useEffect(() => {
+    setRatio(null);
+    if (!url) return;
+    let active = true;
+    Image.getSize(
+      url,
+      (width, height) => {
+        if (active && width > 0 && height > 0) setRatio(width / height);
+      },
+      () => undefined,
+    );
+    return () => { active = false; };
+  }, [url]);
+  return ratio;
 }
 
 const styles = StyleSheet.create({
+  // Web thread card: rounded-xl border bg-background-subtle px-5 py-5 — a flat
+  // bordered card rather than a shadowed surface.
   card: {
-    borderRadius: 14,
+    borderRadius: 12,
+    borderWidth: 1,
     overflow: 'hidden',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
   },
   cover: { width: '100%', height: 170 },
-  cardBody: { padding: 14, gap: 11 },
+  cardBody: { padding: 20, gap: 12 },
 
   communityLabel: {
     flexShrink: 1,
@@ -891,13 +946,13 @@ const styles = StyleSheet.create({
   communityLabelAvatar: { width: 16, height: 16, borderRadius: 8 },
   communityLabelName: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 11 },
 
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   authorCopy: { flex: 1 },
   authorLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   author: { flexShrink: 1, fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   meta: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   secondaryLabel: { fontSize: 11, fontFamily: 'Geist_600SemiBold', marginTop: 1 },
-  readMore: { marginTop: 2, fontSize: 13, fontFamily: 'Geist_500Medium' },
+  readMore: { marginTop: 2, fontSize: 14, fontFamily: 'Geist_500Medium' },
 
   menuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   menuBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
@@ -915,7 +970,8 @@ const styles = StyleSheet.create({
   optionText: { fontFamily: 'Geist_500Medium', fontSize: 15 },
   optionDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 18 },
 
-  cardTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 21 },
+  // Web card body: font-display text-sm font-normal leading-snug.
+  cardTitle: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   description: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
   eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   eventMetaStack: { gap: 6 },
@@ -934,10 +990,20 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
+  // Web footer counts: font-body text-sm font-semibold; the comment count is
+  // one step smaller (text-xs).
+  actionText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
+  actionTextCompact: { fontSize: 12 },
 
   imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, borderRadius: 12, overflow: 'hidden' },
-  imageSingle: { width: '100%', height: 220 },
+  imageSingle: {
+    width: '100%',
+    maxHeight: 480,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  imageSingleFallback: { height: 220 },
   imageCell: { width: '49.5%', height: 130 },
   threadImage: { width: '100%', height: '100%' },
   moreImages: {
@@ -963,6 +1029,9 @@ const styles = StyleSheet.create({
   detailContent: { padding: 18, gap: 16 },
   detailCover: { width: '100%', height: 230, borderRadius: 14 },
   detailTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 25, lineHeight: 32 },
+  // The detail body for a thread reads like the web detail card: same
+  // text-sm / normal weight / leading-snug as the feed card.
+  detailThreadBody: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   detailDescription: { fontFamily: 'Geist_400Regular', fontSize: 16, lineHeight: 25 },
   detailPanel: { borderRadius: 14, padding: 14, gap: 12 },
   primaryLink: {

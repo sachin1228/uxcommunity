@@ -9,7 +9,8 @@ import { prepareImageForUpload } from '@/lib/prepareImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
-  CommunityContent, ContentKind, SHOWCASE_CATEGORY_OPTIONS, SHOWCASE_MEDIA_MAX,
+  CommunityContent, ContentKind, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS, SHOWCASE_MEDIA_MAX,
+  THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS, THREAD_IMAGE_MAX,
   ThreadAttachment, contentLabel, createCommunityContent,
   updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
@@ -36,10 +37,26 @@ interface Props {
 
 /** Category/detail chips per kind. Showcase categories are already labels. */
 const OPTIONS: Record<string, readonly string[]> = {
-  threads: ['question', 'discussion', 'idea', 'feedback', 'referral', 'collaboration'],
+  // The web composer and the API both accept only these four.
+  threads: THREAD_CATEGORY_OPTIONS.map((option) => option.value),
   resources: ['article', 'figma', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
   showcase: SHOWCASE_CATEGORY_OPTIONS.map((option) => option.value),
 };
+
+/** The icon beside each thread category — the web `CATEGORY_ICONS` set. */
+const THREAD_CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
+  question: 'help-circle',
+  discussion: 'message-circle',
+  idea: 'zap',
+  feedback: 'thumbs-up',
+};
+
+/** The display label for one chip, whichever kind is composing. */
+function optionLabel(kind: ContentKind, value: string): string {
+  if (kind === 'threads') return THREAD_CATEGORY_LABELS[value] ?? value;
+  if (kind === 'resources') return RESOURCE_TYPE_LABELS[value] ?? value;
+  return SHOWCASE_CATEGORY_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
 
 /** Kinds whose composer offers direct image uploads. */
 const UPLOAD_KINDS: ContentKind[] = ['threads', 'showcase'];
@@ -58,7 +75,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [deviceZone] = useState(() => deviceTimeZone());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState(DEFAULT_TYPE[kind] ?? 'question');
+  // Threads start with no category — the author has to pick one, as on the web.
+  const [type, setType] = useState<string | null>(DEFAULT_TYPE[kind] ?? null);
   const [tags, setTags] = useState('');
   const [url, setUrl] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -81,7 +99,11 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [error, setError] = useState<string | null>(null);
 
   const canUpload = UPLOAD_KINDS.includes(kind);
-  const mediaLimit = kind === 'showcase' ? SHOWCASE_MEDIA_MAX : 5;
+  const mediaLimit = kind === 'showcase'
+    ? SHOWCASE_MEDIA_MAX
+    : kind === 'threads'
+      ? THREAD_IMAGE_MAX
+      : 5;
 
   useEffect(() => {
     if (!visible) return;
@@ -95,7 +117,12 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setType(DEFAULT_TYPE[kind] ?? 'question');
 
     if (kind === 'threads') {
-      setType(item && 'category' in item ? item.category : 'question');
+      // A legacy mobile category (`referral` / `collaboration`) is not one the
+      // web or the API accepts, so it comes back as "nothing chosen yet".
+      const category = item && 'category' in item ? item.category : null;
+      setType(
+        THREAD_CATEGORY_OPTIONS.some((option) => option.value === category) ? category : null,
+      );
       setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
     } else if (kind === 'resources') {
       setType(item && 'resource_type' in item ? item.resource_type : 'article');
@@ -172,10 +199,12 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
     let body: Record<string, unknown>;
     if (kind === 'threads') {
-      if (!description.trim()) return setError('Write something before saving.');
-      const thread = bodyToThread(description);
+      if (!description.trim()) {
+        return setError(item ? 'Write something before saving.' : 'Write something before posting.');
+      }
+      if (!type) return setError('Pick a category for your thread.');
       body = {
-        ...thread,
+        ...bodyToThread(description),
         category: type,
         tags: cleanTags,
         attachments,
@@ -301,9 +330,24 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           <Pressable onPress={onClose} style={styles.iconButton} accessibilityLabel="Close editor">
             <Feather name="x" size={24} color={colors.foreground} />
           </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            {item ? 'Edit' : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'} {isShowcase ? '' : label}
-          </Text>
+          <View style={styles.headerCopy}>
+            <Text
+              style={[styles.title, { color: colors.foreground }]}
+              numberOfLines={1}
+            >
+              {item ? 'Edit' : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'} {isShowcase ? '' : label}
+            </Text>
+            {kind === 'threads' ? (
+              <Text
+                style={[styles.subtitle, { color: colors.foregroundMuted }]}
+                numberOfLines={1}
+              >
+                {item
+                  ? 'Update the content, images, or privacy of this thread'
+                  : 'Share your thoughts, ask a question, or start a discussion'}
+              </Text>
+            ) : null}
+          </View>
           <Pressable
             onPress={submit}
             disabled={saving || uploading}
@@ -314,7 +358,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               <ActivityIndicator color={colors.accentForeground} />
             ) : (
               <Text style={[styles.saveText, { color: colors.accentForeground }]}>
-                {isShowcase ? 'Share' : 'Save'}
+                {isShowcase ? 'Share' : item ? 'Save' : kind === 'threads' ? 'Post' : 'Save'}
               </Text>
             )}
           </Pressable>
@@ -333,7 +377,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 onChangeText={setTitle}
                 style={[inputStyle, styles.multiline]}
                 multiline
-                maxLength={2000}
+                maxLength={THREAD_BODY_MAX_LENGTH}
                 textAlignVertical="top"
                 placeholder="What did you make? Walk us through it…"
                 placeholderTextColor={colors.foregroundSubtle}
@@ -369,17 +413,32 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {!isShowcase ? (
-            <Field label={kind === 'threads' ? 'What do you want to talk about?' : 'Description'}>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                style={[inputStyle, styles.multiline]}
-                multiline
-                maxLength={kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000}
-                textAlignVertical="top"
-                placeholder={kind === 'threads' ? 'What do you want to talk about?' : 'Add helpful details'}
-                placeholderTextColor={colors.foregroundSubtle}
-              />
+            <Field label={kind === 'threads' ? null : 'Description'}>
+              <View>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  style={[
+                    inputStyle,
+                    styles.multiline,
+                    kind === 'threads' ? styles.threadBody : null,
+                  ]}
+                  multiline
+                  maxLength={
+                    kind === 'threads'
+                      ? THREAD_BODY_MAX_LENGTH
+                      : kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000
+                  }
+                  textAlignVertical="top"
+                  placeholder={kind === 'threads' ? 'What do you want to talk about?' : 'Add helpful details'}
+                  placeholderTextColor={colors.foregroundSubtle}
+                />
+                {kind === 'threads' ? (
+                  <Text style={[styles.counter, { color: colors.foregroundSubtle }]}>
+                    {description.length}/{THREAD_BODY_MAX_LENGTH}
+                  </Text>
+                ) : null}
+              </View>
             </Field>
           ) : null}
 
@@ -423,34 +482,44 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {choices.length ? (
-            <Field label={isShowcase ? 'Category *' : kind === 'threads' ? 'Category' : 'Type'}>
+            <Field label={isShowcase || kind === 'threads' ? 'Category *' : 'Type'}>
               <View style={styles.chips}>
-                {choices.map((choice) => (
-                  <Pressable
-                    key={choice}
-                    onPress={() => setType(choice)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: type === choice ? colors.accentSoft : colors.surfaceRaised,
-                      },
-                    ]}
-                  >
-                    <Text
+                {choices.map((choice) => {
+                  const active = type === choice;
+                  return (
+                    <Pressable
+                      key={choice}
+                      onPress={() => setType(choice)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                       style={[
-                        styles.chipText,
-                        { color: type === choice ? colors.foreground : colors.foregroundMuted },
+                        styles.chip,
+                        { backgroundColor: active ? colors.accentSoft : colors.surfaceRaised },
                       ]}
                     >
-                      {choice.replace(/_/g, ' ')}
-                    </Text>
-                  </Pressable>
-                ))}
+                      {kind === 'threads' ? (
+                        <Feather
+                          name={THREAD_CATEGORY_ICONS[choice] ?? 'message-circle'}
+                          size={14}
+                          color={active ? colors.foreground : colors.foregroundMuted}
+                        />
+                      ) : null}
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: active ? colors.foreground : colors.foregroundMuted },
+                        ]}
+                      >
+                        {optionLabel(kind, choice)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </Field>
           ) : null}
 
-          {kind !== 'events' && !isShowcase ? (
+          {kind !== 'events' && kind !== 'threads' && !isShowcase ? (
             <Field label="Tags (up to 3, comma separated)">
               <TextInput
                 value={tags}
@@ -463,7 +532,15 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {kind === 'threads' || isShowcase ? (
-            <Toggle label="Allow replies" value={allowReplies} onValueChange={setAllowReplies} colors={colors} />
+            <Toggle
+              label="Allow replies"
+              description={
+                kind === 'threads' ? 'Other members can reply to this thread.' : undefined
+              }
+              value={allowReplies}
+              onValueChange={setAllowReplies}
+              colors={colors}
+            />
           ) : null}
 
           {kind === 'events' ? (
@@ -536,7 +613,11 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
           <Toggle
             label="Share publicly"
-            description="Also show this post in the public community feed."
+            description={
+              kind === 'threads'
+                ? 'Visible to everyone, not just community members.'
+                : 'Also show this post in the public community feed.'
+            }
             value={isPublic}
             onValueChange={setIsPublic}
             colors={colors}
@@ -563,11 +644,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string | null; children: React.ReactNode }) {
   const colors = useColors();
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: colors.foregroundMuted }]}>{label}</Text>
+      {label ? (
+        <Text style={[styles.label, { color: colors.foregroundMuted }]}>{label}</Text>
+      ) : null}
       {children}
     </View>
   );
@@ -603,11 +686,14 @@ function Toggle({
   );
 }
 
+/**
+ * The typed body *is* the thread, exactly as on the web: the whole post is
+ * stored in `title` (no separate description), so the card and the web page
+ * show the same text.
+ */
 function bodyToThread(body: string) {
-  const trimmed = body.trim();
-  const firstLine = trimmed.split('\n')[0]?.trim() ?? '';
-  const title = (firstLine || trimmed).slice(0, 120) || 'Thread';
-  return { title, description: trimmed || title };
+  const title = body.trim().slice(0, THREAD_BODY_MAX_LENGTH);
+  return { title: title || 'Thread' };
 }
 
 function threadToBody(title: string, description: string | null) {
@@ -662,12 +748,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, fontFamily: 'Geist_600SemiBold', fontSize: 19 },
+  headerCopy: { flex: 1, minWidth: 0 },
+  title: { fontFamily: 'Geist_600SemiBold', fontSize: 19 },
+  subtitle: { fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 1 },
   save: { minWidth: 68, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   saveText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   form: { padding: 20, gap: 20 },
   field: { gap: 8 },
-  label: { fontFamily: 'Geist_500Medium', fontSize: 13 },
+  label: { fontFamily: 'Geist_500Medium', fontSize: 12 },
   input: {
     minHeight: 48,
     borderRadius: 12,
@@ -677,12 +765,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 124, paddingTop: 13 },
+  threadBody: { paddingBottom: 22 },
+  counter: {
+    position: 'absolute',
+    right: 10,
+    bottom: 6,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 11,
+  },
   zoneTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   zoneTriggerText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 15 },
   zoneHint: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
-  chipText: { fontFamily: 'Geist_500Medium', fontSize: 13, textTransform: 'capitalize' },
+  chip: {
+    minHeight: 32,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
   toggle: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   toggleCopy: { flex: 1, gap: 3 },
   toggleLabel: { fontFamily: 'Geist_500Medium', fontSize: 15 },

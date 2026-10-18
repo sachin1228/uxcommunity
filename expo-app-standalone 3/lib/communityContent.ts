@@ -173,8 +173,9 @@ export function contentAuthor(item: CommunityContent): Author | null {
 }
 
 /**
- * Thread categories with their display labels — the web `THREAD_CATEGORIES`
- * plus the two categories the mobile composer also offers.
+ * Thread categories with their display labels. Legacy rows may still carry
+ * `referral` / `collaboration` (an older mobile composer offered them), so the
+ * labels stay; the composer only offers the four the web and the API accept.
  */
 export const THREAD_CATEGORY_LABELS: Record<string, string> = {
   question: 'Question',
@@ -184,6 +185,20 @@ export const THREAD_CATEGORY_LABELS: Record<string, string> = {
   referral: 'Referral',
   collaboration: 'Collaboration',
 };
+
+/** The categories the composer offers — the web `THREAD_CATEGORIES`. */
+export const THREAD_CATEGORY_OPTIONS = [
+  { value: 'question', label: 'Question' },
+  { value: 'discussion', label: 'Discussion' },
+  { value: 'idea', label: 'Idea' },
+  { value: 'feedback', label: 'Feedback' },
+] as const;
+
+/** Max thread body (title) length — the web `THREAD_BODY_MAX_LENGTH`. */
+export const THREAD_BODY_MAX_LENGTH = 2000;
+
+/** Max images on one thread — the web `THREAD_IMAGE_MAX`. */
+export const THREAD_IMAGE_MAX = 4;
 
 /** Resource types with their display labels (web `RESOURCE_TYPES`). */
 export const RESOURCE_TYPE_LABELS: Record<string, string> = {
@@ -237,6 +252,24 @@ export function formatRelativeDate(value: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/**
+ * The full body of a thread.
+ *
+ * Web threads keep the whole post in `title`, so the card and the detail show
+ * exactly that. Threads created by an older mobile composer stored the first
+ * line in `title` and the whole post in `description`; those still render in
+ * full by preferring the description when it starts with the title.
+ */
+export function threadBody(thread: CommunityThread): string {
+  const title = thread.title?.trim() ?? '';
+  const description = thread.description?.trim() ?? '';
+  if (description && description !== title) {
+    if (!title) return thread.description ?? description;
+    return description.startsWith(title) ? description : `${title}\n\n${description}`;
+  }
+  return thread.title ?? '';
 }
 
 /**
