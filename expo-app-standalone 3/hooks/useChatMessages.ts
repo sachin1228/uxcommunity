@@ -86,7 +86,14 @@ export function useChatMessages(communityId: string) {
     setIsLoadingMore(true);
     try {
       const older = await getMessages(communityId, oldest);
-      setMessages((prev) => [...older, ...prev]);
+      // The `before` cursor is timestamp-only, so equal-timestamp rows are
+      // re-included by design (see the messages API) — dedupe against what is
+      // already on screen before prepending, or the FlatList sees duplicate keys.
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => m.id));
+        const fresh = older.filter((m) => !known.has(m.id));
+        return fresh.length > 0 ? [...fresh, ...prev] : prev;
+      });
       setHasMore(older.length === 50);
     } catch {
       // silent — user can scroll again
