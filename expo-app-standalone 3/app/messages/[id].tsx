@@ -738,10 +738,12 @@ export default function DmThreadScreen() {
     setReplyTo({
       id: message.id,
       content: message.content || (message.image_url ? '📷 Image' : ''),
-      user_name: message.users?.name ?? 'Unknown',
+      user_name:
+        message.users?.name ??
+        (message.user_id === user?.id ? user?.name ?? 'You' : 'Unknown'),
       user_id: message.user_id,
     });
-  }, []);
+  }, [user?.id, user?.name]);
 
   const handleCopy = useCallback(() => {
     showToast('Copied');

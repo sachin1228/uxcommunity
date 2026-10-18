@@ -818,10 +818,14 @@ export default function CommunityChat() {
     setReplyTo({
       id: msg.id,
       content: msg.content || (msg.image_url ? '📷 Image' : ''),
-      user_name: msg.users?.name ?? 'Unknown',
+      // Own rows can arrive without a hydrated author (e.g. a realtime echo
+      // cached before the profile landed) — the auth identity fills the gap.
+      user_name:
+        msg.users?.name ??
+        (msg.user_id === user?.id ? user?.name ?? 'You' : 'Unknown'),
       user_id: msg.user_id,
     });
-  }, []);
+  }, [user?.id, user?.name]);
 
   /** Jumps the list to the message a reply quotes (web parity). */
   const handleReplyPress = useCallback(
