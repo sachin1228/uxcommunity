@@ -1311,6 +1311,13 @@ export function MediaCarousel({
         ))}
       </ScrollView>
 
+      {/* Counter, top-right — the Instagram-style "1/3". */}
+      <View style={styles.carouselCounter} pointerEvents="none">
+        <Text style={styles.carouselCounterText}>
+          {Math.min(index + 1, images.length)}/{images.length}
+        </Text>
+      </View>
+
       {/* Carousel dots — the web's pill of clickable dots, centred at the
           bottom edge of the viewport. */}
       <View style={styles.carouselDotsRow} pointerEvents="box-none">
@@ -1502,6 +1509,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  carouselCounter: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  carouselCounterText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'Geist_600SemiBold',
   },
   // Centred along the bottom edge, over the photo — the web's dot pill.
   carouselDotsRow: {
