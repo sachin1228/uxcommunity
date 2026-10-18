@@ -275,51 +275,63 @@ function RichContent({
   }, []);
 
   return (
-    <Text
-      style={[styles.content, { color: textColor }]}
-      numberOfLines={collapsed ? COLLAPSED_LINES : undefined}
-      onTextLayout={(e) => {
-        const lineCount = e.nativeEvent.lines.length;
-        setTruncated(collapsed && lineCount >= COLLAPSED_LINES);
-      }}
-    >
-      {runs.map((run, i) => {
-        if (run.kind === 'mention') {
-          return (
-            <Text key={i} style={[styles.mentionText, { color: mentionColor }]}>
-              {run.text}
-            </Text>
-          );
-        }
-        if (run.kind === 'url') {
-          return (
-            <Text
-              key={i}
-              style={{ color: linkColor, textDecorationLine: 'underline' }}
-              onPress={() => openUrl(run.url)}
-            >
-              {run.text}
-            </Text>
-          );
-        }
-        return <Fragment key={i}>{run.text}</Fragment>;
-      })}
+    <View>
+      <Text
+        style={[styles.content, { color: textColor }]}
+        numberOfLines={collapsed ? COLLAPSED_LINES : undefined}
+        onTextLayout={(e) => {
+          if (!collapsed) return;
+          const lineCount = e.nativeEvent.lines.length;
+          setTruncated(lineCount >= COLLAPSED_LINES);
+        }}
+      >
+        {runs.map((run, i) => {
+          if (run.kind === 'mention') {
+            return (
+              <Text key={i} style={[styles.mentionText, { color: mentionColor }]}>
+                {run.text}
+              </Text>
+            );
+          }
+          if (run.kind === 'url') {
+            return (
+              <Text
+                key={i}
+                style={{ color: linkColor, textDecorationLine: 'underline' }}
+                onPress={() => openUrl(run.url)}
+              >
+                {run.text}
+              </Text>
+            );
+          }
+          return <Fragment key={i}>{run.text}</Fragment>;
+        })}
+      </Text>
+      {/* The affordance must sit outside the clamped Text — appended inside it,
+          it was itself clipped by numberOfLines and never visible. Same pattern
+          as CollapsibleBody in the community feed. */}
       {truncated && collapsed && (
-        <Text>
-          {'\u2060… '}
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation();
+            hapticSelection();
+            setCollapsed(false);
+          }}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Read more"
+        >
           <Text
             style={[
               styles.readMore,
               { color: isOwn ? colors.chatOwnBubbleForeground : colors.mutedForeground },
             ]}
-            onPress={() => setCollapsed(false)}
-            suppressHighlighting
           >
             Read more
           </Text>
-        </Text>
+        </Pressable>
       )}
-    </Text>
+    </View>
   );
 }
 
