@@ -2,10 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
-  KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { hapticError, hapticSelection, hapticSuccess, hapticToggle } from '@/lib/haptics';
 import {
@@ -38,12 +34,14 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 /**
  * The community comment section, ported from the web `CommentSection`.
  *
- * One modal serves every content type (threads, showcase, resources, events)
- * and mirrors the web design: a 36px circular avatar in a gutter with a
- * connector bracket dropping to a thread's replies, the author's name and
- * relative time on one line with a `···` options menu on the right, their
- * experience level under it, the body with `@mentions` painted blue, then one
- * flat muted action strip — emoji reaction picker, reaction chips, Reply.
+ * It renders inline — under the post on the detail page — rather than in a
+ * modal, exactly where the web puts it. One section serves every content type
+ * (threads, showcase, resources, events) and mirrors the web design: the
+ * composer first, then the sort control, then a 36px circular avatar in a
+ * gutter with a connector bracket dropping to a thread's replies, the author's
+ * name and relative time on one line with a `···` options menu on the right,
+ * their experience level under it, the body with `@mentions` painted blue, then
+ * one flat muted action strip — emoji reaction picker, reaction chips, Reply.
  */
 
 /** Matches the web `Avatar size="lg"`: one size for the whole thread. */
@@ -64,16 +62,13 @@ type OpenLayer =
   | null;
 
 interface Props {
-  visible: boolean;
   communityId: string;
   kind: CommentKind;
   /** The thread / post / resource / event the comments belong to. */
   targetId: string;
   currentUserId: string;
-  title?: string;
   /** Posts may close replies (`allow_replies === false`). */
   allowReplies?: boolean;
-  onClose: () => void;
   /** Reports the live comment total so the parent's counter stays correct. */
   onCountChange?: (total: number) => void;
 }
@@ -102,19 +97,15 @@ function replyMention(target: CommunityComment, currentUserId: string): string |
   return `@${name} `;
 }
 
-export function CommentsSheet({
-  visible,
+export function CommentSection({
   communityId,
   kind,
   targetId,
   currentUserId,
-  title,
   allowReplies = true,
-  onClose,
   onCountChange,
 }: Props) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,15 +138,10 @@ export function CommentsSheet({
     }
   }, [communityId, kind, targetId]);
 
+  // Load on mount, and again if the section is ever reused for another post.
   useEffect(() => {
-    if (!visible) return;
     void load();
-  }, [visible, load]);
-
-  // A fresh modal starts with nothing expanded.
-  useEffect(() => {
-    if (!visible) setLayer(null);
-  }, [visible]);
+  }, [load]);
 
   const handlePosted = useCallback((comment: CommunityComment) => {
     setComments((previous) => {
@@ -212,203 +198,156 @@ export function CommentsSheet({
   // — including multi-word names.
   const mentionNames = useMemo(() => commentParticipantNames(comments), [comments]);
 
-  const total = useMemo(() => commentTotal(comments), [comments]);
   const activeSortLabel =
     SORT_OPTIONS.find((option) => option.value === sort)?.label ?? 'Most recent';
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <View
-          style={[
-            styles.header,
-            { paddingTop: insets.top + 10, borderBottomColor: colors.borderSubtle },
-          ]}
-        >
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Comments</Text>
-          <View style={styles.headerCount}>
-            <Feather name="message-square" size={14} color={colors.foregroundMuted} />
-            <Text style={[styles.headerCountText, { color: colors.foregroundMuted }]}>{total}</Text>
-          </View>
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Close comments"
-            style={styles.headerClose}
-          >
-            <Feather name="x" size={22} color={colors.foreground} />
-          </Pressable>
-        </View>
-
-        {title ? (
-          <Text style={[styles.context, { color: colors.foregroundMuted }]} numberOfLines={1}>
-            {title}
+    <View style={styles.root}>
+      {/* Composer first, then the sort control, then the thread — the order the
+          web puts them in inside a post's comment section. */}
+      {allowReplies ? (
+        <CommentComposer
+          communityId={communityId}
+          kind={kind}
+          targetId={targetId}
+          maxLength={maxLength}
+          placeholder="Add comment"
+          submitLabel="Send"
+          onPosted={handlePosted}
+        />
+      ) : (
+        <View style={[styles.closed, { borderColor: colors.border }]}>
+          <Text style={[styles.closedText, { color: colors.foregroundSubtle }]}>
+            Replies are closed.
           </Text>
-        ) : null}
-
-        {/* Sort control: a select-style trigger on the left, in the comment
-            column, matching the web toolbar. */}
-        <View style={[styles.toolbar, { borderBottomColor: colors.borderSubtle }]}>
-          <Pressable
-            onPress={() => {
-              hapticSelection();
-              setLayer(layer?.type === 'sort' ? null : { type: 'sort' });
-            }}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`Sort comments, ${activeSortLabel}`}
-            accessibilityState={{ expanded: layer?.type === 'sort' }}
-            style={styles.sortTrigger}
-          >
-            {/* Feather has no single up/down sort glyph, so the web control's
-                `ArrowUpDown` is drawn as its two halves. */}
-            <View style={styles.sortGlyph}>
-              <Feather name="arrow-up" size={12} color={colors.foreground} />
-              <Feather name="arrow-down" size={12} color={colors.foreground} style={styles.sortGlyphHalf} />
-            </View>
-            <Text style={[styles.sortTriggerText, { color: colors.foreground }]}>
-              {activeSortLabel}
-            </Text>
-            <Feather
-              name={layer?.type === 'sort' ? 'chevron-up' : 'chevron-down'}
-              size={12}
-              color={colors.foreground}
-            />
-          </Pressable>
-
-          {layer?.type === 'sort' ? (
-            <View
-              style={[
-                styles.sortMenu,
-                { backgroundColor: colors.overlayElevated, borderColor: colors.border },
-              ]}
-            >
-              {SORT_OPTIONS.map((option) => {
-                const active = option.value === sort;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => {
-                      hapticSelection();
-                      setSort(option.value);
-                      setLayer(null);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    style={styles.sortMenuItem}
-                  >
-                    <Text
-                      style={[
-                        styles.sortMenuItemText,
-                        { color: active ? colors.accent : colors.foregroundMuted },
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                    {active ? <Feather name="check" size={13} color={colors.accent} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
         </View>
+      )}
 
-        {/* One tap anywhere else dismisses the open menu, like clicking off a
-            web popover. Rows and the toolbar sit above it. */}
-        {layer ? (
-          <Pressable
-            style={styles.dismissLayer}
-            onPress={() => setLayer(null)}
-            accessibilityLabel="Dismiss menu"
-          />
-        ) : null}
-
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={insets.top + 48}
+      <View style={[styles.toolbar, { borderBottomColor: colors.borderSubtle }]}>
+        <Pressable
+          onPress={() => {
+            hapticSelection();
+            setLayer(layer?.type === 'sort' ? null : { type: 'sort' });
+          }}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`Sort comments, ${activeSortLabel}`}
+          accessibilityState={{ expanded: layer?.type === 'sort' }}
+          style={styles.sortTrigger}
         >
-          {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          ) : error ? (
-            <View style={styles.center}>
-              <Feather name="wifi-off" size={26} color={colors.foregroundMuted} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                Couldn&apos;t load comments
-              </Text>
-              <Text style={[styles.emptyBody, { color: colors.foregroundMuted }]}>{error}</Text>
-              <Pressable onPress={load} accessibilityRole="button">
-                <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <FlatList
-              data={sorted}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.list}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <CommentRow
-                  comment={item}
-                  communityId={communityId}
-                  kind={kind}
-                  targetId={targetId}
-                  currentUserId={currentUserId}
-                  allowReplies={allowReplies}
-                  canReact={canReact}
-                  mentionNames={mentionNames}
-                  layer={layer}
-                  onLayerChange={setLayer}
-                  replyTarget={replyTarget}
-                  onReplyTargetChange={setReplyTarget}
-                  onDeleted={handleDeleted}
-                  onReplied={handlePosted}
-                  onReactionToggled={handleReactionToggled}
-                />
-              )}
-              ListEmptyComponent={
-                <View style={styles.center}>
-                  <Feather name="message-circle" size={28} color={colors.foregroundSubtle} />
-                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                    No comments yet
-                  </Text>
-                  <Text style={[styles.emptyBody, { color: colors.foregroundMuted }]}>
-                    Start the conversation — the first comment is the hardest.
-                  </Text>
-                </View>
-              }
-            />
-          )}
+          {/* Feather has no single up/down sort glyph, so the web control's
+              `ArrowUpDown` is drawn as its two halves. */}
+          <View style={styles.sortGlyph}>
+            <Feather name="arrow-up" size={12} color={colors.foreground} />
+            <Feather name="arrow-down" size={12} color={colors.foreground} style={styles.sortGlyphHalf} />
+          </View>
+          <Text style={[styles.sortTriggerText, { color: colors.foreground }]}>
+            {activeSortLabel}
+          </Text>
+          <Feather
+            name={layer?.type === 'sort' ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color={colors.foreground}
+          />
+        </Pressable>
 
-          {allowReplies ? (
-            <CommentComposer
+        {layer?.type === 'sort' ? (
+          <View
+            style={[
+              styles.sortMenu,
+              { backgroundColor: colors.overlayElevated, borderColor: colors.border },
+            ]}
+          >
+            {SORT_OPTIONS.map((option) => {
+              const active = option.value === sort;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => {
+                    hapticSelection();
+                    setSort(option.value);
+                    setLayer(null);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={styles.sortMenuItem}
+                >
+                  <Text
+                    style={[
+                      styles.sortMenuItemText,
+                      { color: active ? colors.accent : colors.foregroundMuted },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {active ? <Feather name="check" size={13} color={colors.accent} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+
+      {/* One tap anywhere else dismisses the open menu, like clicking off a
+          web popover. Rows and the toolbar sit above it. */}
+      {layer ? (
+        <Pressable
+          style={styles.dismissLayer}
+          onPress={() => setLayer(null)}
+          accessibilityLabel="Dismiss menu"
+        />
+      ) : null}
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      ) : error ? (
+        <View style={styles.center}>
+          <Feather name="wifi-off" size={26} color={colors.foregroundMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+            Couldn&apos;t load comments
+          </Text>
+          <Text style={[styles.emptyBody, { color: colors.foregroundMuted }]}>{error}</Text>
+          <Pressable onPress={load} accessibilityRole="button">
+            <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : sorted.length === 0 ? (
+        <View style={styles.center}>
+          <Feather name="message-circle" size={28} color={colors.foregroundSubtle} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+            No comments yet
+          </Text>
+          <Text style={[styles.emptyBody, { color: colors.foregroundMuted }]}>
+            Start the conversation — the first comment is the hardest.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.list}>
+          {sorted.map((item) => (
+            <CommentRow
+              key={item.id}
+              comment={item}
               communityId={communityId}
               kind={kind}
               targetId={targetId}
-              maxLength={maxLength}
-              placeholder="Add comment"
-              submitLabel="Send"
-              onPosted={handlePosted}
-              bottomInset={insets.bottom}
+              currentUserId={currentUserId}
+              allowReplies={allowReplies}
+              canReact={canReact}
+              mentionNames={mentionNames}
+              layer={layer}
+              onLayerChange={setLayer}
+              replyTarget={replyTarget}
+              onReplyTargetChange={setReplyTarget}
+              onDeleted={handleDeleted}
+              onReplied={handlePosted}
+              onReactionToggled={handleReactionToggled}
             />
-          ) : (
-            <View
-              style={[
-                styles.closed,
-                { borderTopColor: colors.borderSubtle, paddingBottom: insets.bottom + 12 },
-              ]}
-            >
-              <Text style={[styles.closedText, { color: colors.foregroundSubtle }]}>
-                Replies are closed.
-              </Text>
-            </View>
-          )}
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -946,29 +885,15 @@ function CommentRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Geist_600SemiBold' },
-  headerCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  headerCountText: { fontSize: 13, fontFamily: 'Geist_500Medium' },
-  headerClose: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-
-  context: { fontSize: 12, fontFamily: 'Geist_400Regular', paddingHorizontal: 16, paddingTop: 10 },
+  // Inline in the post's detail page: the page already supplies the gutter, so
+  // the section adds none of its own.
+  root: {},
 
   // Left-aligned, like the web toolbar: the sort control sits in the comment
   // column rather than floating against the right edge.
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
     paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     zIndex: 20,
@@ -986,7 +911,7 @@ const styles = StyleSheet.create({
   sortMenu: {
     position: 'absolute',
     top: '100%',
-    left: 16,
+    left: 0,
     minWidth: 168,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1010,7 +935,7 @@ const styles = StyleSheet.create({
 
   dismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
 
-  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, gap: 16, flexGrow: 1 },
+  list: { paddingTop: 16, gap: 16 },
   center: {
     flex: 1,
     minHeight: 220,
@@ -1156,9 +1081,7 @@ const styles = StyleSheet.create({
   replyComposer: { marginTop: 2 },
 
   composer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 4,
     gap: 6,
   },
   composerField: {
@@ -1193,8 +1116,10 @@ const styles = StyleSheet.create({
   composerCancelText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
 
   closed: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     alignItems: 'center',
   },
   closedText: { fontSize: 12, fontFamily: 'Geist_400Regular' },

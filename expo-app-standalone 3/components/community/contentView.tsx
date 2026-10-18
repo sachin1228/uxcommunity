@@ -33,6 +33,7 @@ import {
   voteOnThreadPoll,
 } from '@/lib/communityContent';
 import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
+import { CommentSection } from './CommentSection';
 import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { formatEventDate } from '@/lib/eventDate';
@@ -701,9 +702,9 @@ export function ContentDetail({
   communityName,
   visible,
   onClose,
-  onComments,
   onEdit,
   onDelete,
+  focusComments = false,
 }: {
   item: CommunityContent | null;
   kind: ContentKind;
@@ -712,7 +713,8 @@ export function ContentDetail({
   communityName?: string | null;
   visible: boolean;
   onClose: () => void;
-  onComments: (item: CommunityContent) => void;
+  /** Opened from a comment count: land on the discussion below the post. */
+  focusComments?: boolean;
   onEdit?: (item: CommunityContent) => void;
   onDelete?: (item: CommunityContent) => void;
 }) {
@@ -720,6 +722,28 @@ export function ContentDetail({
   const insets = useSafeAreaInsets();
   const resource = kind === 'resources' ? (item as CommunityResource | null) : null;
   const previewImage = useResourcePreview(resource?.url);
+  // The comment section lives at the bottom of the page, exactly as on the web
+  // detail: tapping the footer count scrolls to it rather than opening a sheet.
+  const scrollRef = useRef<ScrollView>(null);
+  // The section's offset inside the scroll content. Kept as state so the focus
+  // effect can follow it: remote images above the discussion resolve after the
+  // first layout and push it down, and the reader asked to land on it.
+  const [commentsY, setCommentsY] = useState(0);
+  const [commentsLaidOut, setCommentsLaidOut] = useState(false);
+  // Once the reader drags the page, the landing scroll stops following layout.
+  const readerScrolled = useRef(false);
+
+  useEffect(() => {
+    if (visible) return;
+    readerScrolled.current = false;
+    setCommentsLaidOut(false);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !focusComments || !commentsLaidOut || readerScrolled.current) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: false });
+  }, [visible, focusComments, commentsLaidOut, commentsY]);
+
   if (!item) return null;
 
   const thread = kind === 'threads' ? item as CommunityThread : null;
@@ -732,6 +756,15 @@ export function ContentDetail({
   const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
   const isOwner = item.user_id === currentUserId;
   const pollState = thread?.poll ? actions.pollState(item) : null;
+  // Events have no reply switch — their comment threads are always open.
+  const allowReplies =
+    kind === 'events'
+      ? true
+      : (item as { allow_replies?: boolean }).allow_replies !== false;
+
+  const scrollToComments = () => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: true });
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -753,7 +786,17 @@ export function ContentDetail({
           />
         </View>
 
-        <ScrollView contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 32 }]}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 32 }]}
+          keyboardShouldPersistTaps="handled"
+          // The comment composer sits inside this scroll view, so the keyboard
+          // must shorten it rather than cover the field being typed into.
+          automaticallyAdjustKeyboardInsets
+          onScrollBeginDrag={() => {
+            readerScrolled.current = true;
+          }}
+        >
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
 
           <View style={styles.authorRow}>
@@ -845,8 +888,24 @@ export function ContentDetail({
             kind={kind}
             actions={actions}
             commentCount={actions.commentCountFor(item)}
-            onComments={onComments}
+            onComments={scrollToComments}
           />
+
+          <View
+            onLayout={(event) => {
+              setCommentsY(event.nativeEvent.layout.y);
+              setCommentsLaidOut(true);
+            }}
+          >
+            <CommentSection
+              communityId={item.community_id}
+              kind={kind}
+              targetId={item.id}
+              currentUserId={currentUserId}
+              allowReplies={allowReplies}
+              onCountChange={(total) => actions.setCommentCount(item.id, total)}
+            />
+          </View>
         </ScrollView>
       </View>
     </Modal>

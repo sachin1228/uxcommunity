@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContent } from '@/lib/communityContent';
 import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
@@ -25,7 +24,7 @@ import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
  * Home — the cross-community feed.
  *
  * Renders the same cards as the community tabs (likes, saves, RSVPs and the
- * comment sheet all work identically), with a chip naming the community each
+ * comment thread all work identically), with a chip naming the community each
  * post came from. Posts are read-only here: editing and deleting stay on the
  * post's own community tab, where membership is known.
  */
@@ -42,7 +41,7 @@ export default function HomeTab() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
+  const [focusComments, setFocusComments] = useState(false);
 
   const resetActions = actions.reset;
 
@@ -124,9 +123,11 @@ export default function HomeTab() {
     }
   }, [hasMore, items, loadingMore]);
 
-  const openComments = useCallback((item: CommunityContent) => {
+  // Opening a post and tapping its comment count both land on the detail page,
+  // where the comments live under the post itself.
+  const openItem = useCallback((item: CommunityContent) => {
     const match = items.find((entry) => entry.id === item.id);
-    setCommentTarget(match ?? null);
+    setSelected(match ?? null);
   }, [items]);
 
   const renderItem = useCallback(
@@ -138,11 +139,17 @@ export default function HomeTab() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-        onComments={openComments}
+        onOpen={(entry) => {
+          setFocusComments(false);
+          openItem(entry);
+        }}
+        onComments={(entry) => {
+          setFocusComments(true);
+          openItem(entry);
+        }}
       />
     ),
-    [actions, items, openComments, user?.id],
+    [actions, items, openItem, user?.id],
   );
 
   return (
@@ -206,26 +213,8 @@ export default function HomeTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
+        focusComments={focusComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies={
-            feedItemKind(commentTarget) === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
 }

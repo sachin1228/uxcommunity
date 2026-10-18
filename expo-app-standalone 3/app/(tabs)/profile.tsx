@@ -20,7 +20,6 @@ import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { useAuth } from '@/context/AuthContext';
@@ -119,7 +118,7 @@ export default function ProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
+  const [focusComments, setFocusComments] = useState(false);
 
   // ── Hero edit flows ──
   const [avatarPick, setAvatarPick] = useState<PreparedImage | null>(null);
@@ -246,10 +245,12 @@ export default function ProfileScreen() {
     [loadFeed, scope],
   );
 
-  const openComments = useCallback(
+  // Opening a post and tapping its comment count both land on the detail page,
+  // where the comments live under the post itself.
+  const openItem = useCallback(
     (item: CommunityContent) => {
       const match = items.find((entry) => entry.id === item.id);
-      setCommentTarget(match ?? null);
+      setSelected(match ?? null);
     },
     [items],
   );
@@ -324,11 +325,17 @@ export default function ProfileScreen() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-        onComments={openComments}
+        onOpen={(entry) => {
+          setFocusComments(false);
+          openItem(entry);
+        }}
+        onComments={(entry) => {
+          setFocusComments(true);
+          openItem(entry);
+        }}
       />
     ),
-    [actions, items, openComments, user?.id],
+    [actions, items, openItem, user?.id],
   );
 
   const body = profile?.profile;
@@ -490,26 +497,8 @@ export default function ProfileScreen() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
+        focusComments={focusComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies={
-            feedItemKind(commentTarget) === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
 
       <AvatarPickerModal
         visible={avatarPick !== null}

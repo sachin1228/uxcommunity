@@ -14,7 +14,6 @@ import {
 } from '@/lib/communityContent';
 import { chatContentEventFromCreated, chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
-import { CommentsSheet } from './CommentsSheet';
 import { CommunityContentEditor } from './CommunityContentEditor';
 import { ContentCard, ContentDetail, useContentActions } from './contentView';
 
@@ -43,7 +42,6 @@ export function CommunityContentView({
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);
-  const [commentTarget, setCommentTarget] = useState<CommunityContent | null>(null);
 
   const items = query.data ?? [];
   const resetActions = actions.reset;
@@ -129,7 +127,10 @@ export function CommunityContentView({
     [communityId, kind, queryClient],
   );
 
-  const openComments = useCallback((item: CommunityContent) => setCommentTarget(item), []);
+  const [focusComments, setFocusComments] = useState(false);
+  // Opening a post and tapping its comment count both land on the detail page,
+  // where the comments live under the post itself.
+  const openItem = useCallback((item: CommunityContent) => setSelected(item), []);
 
   if (query.isLoading) return <Centered><ActivityIndicator color={colors.accent} /></Centered>;
 
@@ -161,8 +162,14 @@ export function CommunityContentView({
             kind={kind}
             currentUserId={currentUserId}
             actions={actions}
-            onOpen={setSelected}
-            onComments={openComments}
+            onOpen={(entry) => {
+              setFocusComments(false);
+              openItem(entry);
+            }}
+            onComments={(entry) => {
+              setFocusComments(true);
+              openItem(entry);
+            }}
             onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
             onDelete={remove}
           />
@@ -223,28 +230,10 @@ export function CommunityContentView({
         actions={actions}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
+        focusComments={focusComments}
         onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
         onDelete={remove}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={communityId}
-          kind={kind}
-          targetId={commentTarget.id}
-          currentUserId={currentUserId}
-          title={commentTarget.title}
-          allowReplies={
-            kind === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
 }

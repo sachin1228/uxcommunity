@@ -25,7 +25,6 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import {
   ContentCard,
   ContentDetail,
@@ -121,7 +120,7 @@ export default function MemberProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
+  const [focusComments, setFocusComments] = useState(false);
 
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
@@ -216,10 +215,6 @@ export default function MemberProfileScreen() {
         if (!current || current.id !== event.threadId) return current;
         return applyPollEventToFeed([current], event, me)[0] ?? current;
       });
-      setCommentTarget((current) => {
-        if (!current || current.id !== event.threadId) return current;
-        return applyPollEventToFeed([current], event, me)[0] ?? current;
-      });
       // An optimistic local vote keeps its choice while the tallies move; an
       // event from this member on another device replaces it.
       applyPollUpdate(event.threadId, {
@@ -255,10 +250,12 @@ export default function MemberProfileScreen() {
     [loadFeed, scope],
   );
 
-  const openComments = useCallback(
+  // Opening a post and tapping its comment count both land on the detail page,
+  // where the comments live under the post itself.
+  const openItem = useCallback(
     (item: CommunityContent) => {
       const match = items.find((entry) => entry.id === item.id);
-      setCommentTarget(match ?? null);
+      setSelected(match ?? null);
     },
     [items],
   );
@@ -307,11 +304,17 @@ export default function MemberProfileScreen() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-        onComments={openComments}
+        onOpen={(entry) => {
+          setFocusComments(false);
+          openItem(entry);
+        }}
+        onComments={(entry) => {
+          setFocusComments(true);
+          openItem(entry);
+        }}
       />
     ),
-    [actions, items, openComments, user?.id],
+    [actions, items, openItem, user?.id],
   );
 
   const body = member?.profile;
@@ -502,26 +505,8 @@ export default function MemberProfileScreen() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
+        focusComments={focusComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies={
-            feedItemKind(commentTarget) === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
 }

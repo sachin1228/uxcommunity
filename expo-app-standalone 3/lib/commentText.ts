@@ -4,7 +4,7 @@
  *
  * Comments, unlike chat messages, store no mention records: the only mentions
  * the app itself writes are the `@Name ` seeds the reply composer puts in front
- * of a reply (see `replyMention` in CommentsSheet). So highlighting takes two
+ * of a reply (see `replyMention` in CommentSection). So highlighting takes two
  * passes:
  *
  *  1. names we actually know — the authors participating in this comment
