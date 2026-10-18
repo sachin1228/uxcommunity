@@ -19,25 +19,20 @@ const DEFAULT_PANEL_HEIGHT = 320;
 const MIN_PANEL_HEIGHT = 160;
 
 /**
- * The composer's own bottom padding while the panel is shut (dp). It is part of
- * the panel's height so that the composer sits in exactly the same place with
- * the panel open as it does with the keyboard up: the keyboard state keeps that
- * padding, the panel state trades it for the panel.
- */
-export const COMPOSER_BOTTOM_INSET = 8;
-
-/**
- * The design gap between the composer and the panel (dp) — the same 6 the
- * composer's own stack uses between its rows.
+ * The strip between the composer and whatever edge sits under it — the
+ * keyboard, or the panel while it is open (dp). One value for both, so the pill
+ * is the same distance from either edge and the panel's top border lands
+ * exactly on the keyboard's top edge.
  *
- * It is part of the panel's *animated space* rather than a fixed margin: the
- * panel stays mounted at zero height while the keyboard is up (so opening it
- * can never race the IME), and a fixed gap on a zero-height panel would put
- * dead space under the composer — the keyboard strip would read 8 + 6 dp wide
+ * It is the composer's own bottom padding for the keyboard state, and part of
+ * the panel's *animated space* for the panel state rather than a fixed margin:
+ * the panel stays mounted at zero height while the keyboard is up (so opening
+ * it can never race the IME), and a fixed gap on a zero-height panel would put
+ * dead space under the composer — the keyboard strip would read 16 dp wide
  * instead of the intended 8. Folding it into the space keeps it with the panel:
  * no panel, no gap.
  */
-export const PANEL_GAP = 6;
+export const COMPOSER_BOTTOM_INSET = 8;
 
 /**
  * How long a touch on the field waits for the IME before the panel steps aside
@@ -59,7 +54,7 @@ const PANEL_TRANSITION_MS = 200;
  * reserves whatever the IME takes. So the panel is not given a fixed height
  * that appears and disappears — its *space* is the IME's complement:
  *
- *     space = (1 - keyboardProgress) * (panelHeight + PANEL_GAP)
+ *     space = (1 - keyboardProgress) * (panelHeight + COMPOSER_BOTTOM_INSET)
  *
  * While the IME is anywhere on its way up or down, that expression is a smooth
  * function of the keyboard's own animation, so the two always add up to exactly
@@ -116,13 +111,10 @@ export function useEmojiKeyboardSwap(
    */
   const insets = useSafeAreaInsets();
   const measured = keyboardHeight || DEFAULT_PANEL_HEIGHT;
-  // The composer keeps its bottom inset while the panel is shut and trades it
-  // for the panel when it opens, so the panel's own box is short by exactly
-  // that inset minus the gap it carries inside its space (see PANEL_GAP).
-  const panelHeight = Math.max(
-    measured - insets.bottom + COMPOSER_BOTTOM_INSET - PANEL_GAP,
-    MIN_PANEL_HEIGHT,
-  );
+  // The panel's own box: the keyboard's height less the safe-area strip the
+  // chat reserves below it. Its space adds the composer inset back on top, so
+  // the panel's top border sits exactly where the keyboard's top edge does.
+  const panelHeight = Math.max(measured - insets.bottom, MIN_PANEL_HEIGHT);
 
   useEffect(() => {
     const clearTimer = () => {
@@ -212,7 +204,7 @@ export function useEmojiKeyboardSwap(
     () => ({
       height:
         Math.max(0, tracking.value === 1 ? 1 - progress.value : ownFraction.value) *
-        (panelHeight + PANEL_GAP),
+        (panelHeight + COMPOSER_BOTTOM_INSET),
     }),
     [panelHeight, ownFraction, progress, tracking],
   );
