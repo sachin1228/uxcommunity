@@ -48,34 +48,46 @@ const EMOJI_MESSAGE_SIZE = 48;
 function ReplyBubble({
   reply,
   isMe,
+  currentUserId,
   onReplyClick,
 }: {
   reply: ReplyPreview;
   isMe: boolean;
+  currentUserId: string;
   onReplyClick: (replyId: string) => void;
 }) {
   // Reply names get the same per-user color as chat sender names — when the
-  // parent author's id is known (live replies, replies to own messages).
-  // History-built previews omit the id, so they fall back to neutral.
-  const nameColor = reply.user_id ? userColorVar(reply.user_id) : undefined;
+  // parent author's id is known. Quoting your own message stays neutral white;
+  // history-built previews omit the id and fall back to neutral too.
+  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
+  const nameColor = reply.user_id && !quotedSelf ? userColorVar(reply.user_id) : undefined;
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`mt-1 mb-1 px-2.5 py-1.5 rounded-md border-l-2 text-left max-w-full cursor-pointer
+      className={`flex mt-1 mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
         ${isMe
-          ? "bg-black/20 border-white/20 hover:bg-black/30"
-          : "bg-black/10 border-white/15 hover:bg-black/20"
+          ? "bg-black/20 hover:bg-black/30"
+          : "bg-black/10 hover:bg-black/20"
         } transition-colors`}
     >
-      <p
-        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
-        style={nameColor && !isMe ? { color: nameColor } : undefined}
-      >
-        {reply.user_name}
-      </p>
-      <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
-        {reply.content || "📷 Image"}
-      </p>
+      {/* WhatsApp's accent — full-height square bar, clipped into the corners.
+          Wears the replied author's chat color even inside own bubbles, like mobile. */}
+      <span
+        aria-hidden
+        className={`w-[4px] shrink-0 ${nameColor ? "" : isMe ? "bg-white/20" : "bg-white/15"}`}
+        style={nameColor ? { backgroundColor: nameColor } : undefined}
+      />
+      <div className="flex-1 min-w-0 py-1.5 pl-[10px]">
+        <p
+          className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? `text-accent-foreground${nameColor ? "" : " opacity-80"}` : "text-foreground-muted"}`}
+          style={nameColor ? { color: nameColor } : undefined}
+        >
+          {reply.user_name}
+        </p>
+        <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+          {reply.content || "📷 Image"}
+        </p>
+      </div>
     </div>
   );
 }
@@ -99,20 +111,26 @@ function ContentReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`mt-1 mb-1 px-2.5 py-1.5 rounded-md border-l-2 text-left max-w-full cursor-pointer
+      className={`flex mt-1 mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
         ${isMe
-          ? "bg-black/20 border-white/20 hover:bg-black/30"
-          : "bg-black/10 border-white/15 hover:bg-black/20"
+          ? "bg-black/20 hover:bg-black/30"
+          : "bg-black/10 hover:bg-black/20"
         } transition-colors`}
     >
-      <p
-        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
-      >
-        {label}
-      </p>
-      <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
-        {reply.title || label}
-      </p>
+      <span
+        aria-hidden
+        className={`w-[4px] shrink-0 ${isMe ? "bg-white/20" : "bg-white/15"}`}
+      />
+      <div className="flex-1 min-w-0 py-1.5 pl-[10px]">
+        <p
+          className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+        >
+          {label}
+        </p>
+        <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+          {reply.title || label}
+        </p>
+      </div>
     </div>
   );
 }
@@ -689,7 +707,14 @@ export const MessageBubble = memo(function MessageBubble({
                       className={imageUrl ? "mb-1 pl-1" : ""}
                     />
                   )}
-                  {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
+                  {replyTo && (
+                    <ReplyBubble
+                      reply={replyTo}
+                      isMe={isMe}
+                      currentUserId={currentUserId}
+                      onReplyClick={onReplyClick}
+                    />
+                  )}
                   {!replyTo && replyToContent && (
                     <ContentReplyBubble reply={replyToContent} isMe={isMe} onReplyClick={onReplyClick} />
                   )}

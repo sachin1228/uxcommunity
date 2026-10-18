@@ -65,7 +65,7 @@ import {
   type ReplyDraft,
 } from '@/lib/chatContentEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
-import { hapticToggle } from '@/lib/haptics';
+import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -139,6 +139,15 @@ export default function CommunityChat() {
   /** Detail-route fallback for the header count when the list lacks the row. */
   const [detailMemberCount, setDetailMemberCount] = useState<number | null>(null);
   const [memberCountLoading, setMemberCountLoading] = useState(true);
+  /** Row focus flash after a reply jump — cleared by its own timer. */
+  const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -774,6 +783,16 @@ export default function CommunityChat() {
     setSelectedMessage(msg);
   }, []);
 
+  /** A sender's avatar or name — opens their read-only member profile. */
+  const handleAuthorPress = useCallback(
+    (userId: string) => {
+      if (!userId || userId === user?.id) return;
+      hapticSelection();
+      router.push({ pathname: '/member/[id]', params: { id: userId } });
+    },
+    [router, user?.id],
+  );
+
   /**
    * Long-press on a "created a …" card — the touch equivalent of the web
    * card's hover actions (reaction picker + reply).
@@ -799,10 +818,14 @@ export default function CommunityChat() {
     setReplyTo({
       id: msg.id,
       content: msg.content || (msg.image_url ? '📷 Image' : ''),
-      user_name: msg.users?.name ?? 'Unknown',
+      // Own rows can arrive without a hydrated author (e.g. a realtime echo
+      // cached before the profile landed) — the auth identity fills the gap.
+      user_name:
+        msg.users?.name ??
+        (msg.user_id === user?.id ? user?.name ?? 'You' : 'Unknown'),
       user_id: msg.user_id,
     });
-  }, []);
+  }, [user?.id, user?.name]);
 
   /** Jumps the list to the message a reply quotes (web parity). */
   const handleReplyPress = useCallback(
@@ -814,6 +837,11 @@ export default function CommunityChat() {
       } catch {
         listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
       }
+      // Web flashMessage parity — tint the target row briefly so the land is
+      // obvious, not just the scroll.
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      setFlashMessageId(messageId);
+      flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1500);
     },
     [rows],
   );
@@ -975,11 +1003,14 @@ export default function CommunityChat() {
           currentUserId={user?.id ?? ''}
           onLongPress={handleLongPress}
           onReactionPress={handleReaction}
+          onAuthorPress={handleAuthorPress}
           onImagePress={handleImagePress}
           onCancel={handleCancel}
           onRetry={handleRetry}
           onReplyPress={handleReplyPress}
           onContentReplyPress={handleContentChipPress}
+          onSwipeReply={handleMessageReply}
+          highlighted={flashMessageId === item.msg.id}
         />
       );
     },
@@ -987,16 +1018,19 @@ export default function CommunityChat() {
       user?.id,
       handleLongPress,
       handleReaction,
+      handleAuthorPress,
       handleImagePress,
       handleCancel,
       handleRetry,
       handleReplyPress,
       handleContentChipPress,
+      handleMessageReply,
       handleContentOpen,
       handleContentLongPress,
       handleContentReaction,
       colors,
       initialUnreadCount,
+      flashMessageId,
     ],
   );
 

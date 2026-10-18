@@ -407,6 +407,7 @@ export function DmThread({
               error={error}
               placeholder={`Message ${peer.name}`}
               replyTo={replyTo}
+              currentUserId={currentUserId}
               pendingImagePreview={pendingImagePreview}
               linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
               onChange={onInputChange}

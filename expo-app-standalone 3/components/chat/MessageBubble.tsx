@@ -1,7 +1,9 @@
-import React, { Fragment, memo, useCallback, useMemo, useState } from 'react';
+import React, { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Linking,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -36,6 +38,8 @@ interface Props {
   currentUserId: string;
   onLongPress: (message: Message) => void;
   onReactionPress: (messageId: string, emoji: string) => void;
+  /** Opens the sender's read-only member profile (avatar / name tap). */
+  onAuthorPress?: (userId: string) => void;
   onImagePress?: (uri: string) => void;
   onCancel?: (tempId: string) => void;
   onRetry?: (tempId: string) => void;
@@ -43,11 +47,18 @@ interface Props {
   onReplyPress?: (messageId: string) => void;
   /** Jumps the list to the "created a …" card this one replies to. */
   onContentReplyPress?: (contentId: string) => void;
+  /** Swiping the bubble away from its edge starts a reply (WhatsApp-style). */
+  onSwipeReply?: (message: Message) => void;
+  /** Row focus flash after a reply jump (web parity) — fades a blue tint in/out. */
+  highlighted?: boolean;
 }
 
 type Palette = ReturnType<typeof useColors>;
 
 const EMOJI_MESSAGE_SIZE = 48;
+/** Max bubble travel during a reply swipe, and the release distance that fires it. */
+const SWIPE_TRAVEL = 80;
+const SWIPE_THRESHOLD = 56;
 
 // ---------------------------------------------------------------------------
 // Reaction pills — sit half-outside the bubble, WhatsApp-style
@@ -109,17 +120,21 @@ function ReplyBubble({
   reply,
   isOwn,
   colors,
+  currentUserId,
   onPress,
 }: {
   reply: NonNullable<Message['reply_to']>;
   isOwn: boolean;
   colors: Palette;
+  currentUserId: string;
   onPress?: () => void;
 }) {
   // Reply names get the same per-user color as sender names when the author's
-  // id is known; history-built previews omit it and fall back to neutral.
+  // id is known — except a quote of your own message stays neutral white.
+  // History-built previews omit the id and fall back to neutral too.
   const ownText = colors.chatOwnBubbleForeground;
-  const nameColor = reply.user_id
+  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
+  const nameColor = reply.user_id && !quotedSelf
     ? userNameColor(reply.user_id, colors)
     : isOwn
       ? ownText
@@ -131,27 +146,39 @@ function ReplyBubble({
       disabled={!onPress}
       style={[
         styles.replyBubble,
-        {
-          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
-          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
-        },
+        { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
-      <Text
-        numberOfLines={1}
-        style={[styles.replyName, { color: nameColor, opacity: isOwn ? 0.85 : 1 }]}
-      >
-        {reply.user_name}
-      </Text>
-      <Text
-        numberOfLines={2}
+      {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
+      <View
         style={[
-          styles.replyContent,
-          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          styles.replyBar,
+          {
+            backgroundColor: reply.user_id && !quotedSelf
+              ? nameColor
+              : isOwn
+                ? colors.chatReplyBorderOwn
+                : colors.chatReplyBorderOther,
+          },
         ]}
-      >
-        {reply.content || '📷 Image'}
-      </Text>
+      />
+      <View style={styles.replyBody}>
+        <Text
+          numberOfLines={1}
+          style={[styles.replyName, { color: nameColor }]}
+        >
+          {reply.user_name}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.replyContent,
+            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          ]}
+        >
+          {reply.content || '📷 Image'}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -181,30 +208,39 @@ function ContentReplyQuote({
       disabled={!onPress}
       style={[
         styles.replyBubble,
-        {
-          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
-          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
-        },
+        { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
-      <Text
-        numberOfLines={1}
+      <View
         style={[
-          styles.contentReplyLabel,
-          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          styles.replyBar,
+          {
+            backgroundColor: isOwn
+              ? colors.chatReplyBorderOwn
+              : colors.chatReplyBorderOther,
+          },
         ]}
-      >
-        {label}
-      </Text>
-      <Text
-        numberOfLines={2}
-        style={[
-          styles.replyContent,
-          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.7 : 1 },
-        ]}
-      >
-        {reply.title || label}
-      </Text>
+      />
+      <View style={styles.replyBody}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.contentReplyLabel,
+            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          ]}
+        >
+          {label}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.replyContent,
+            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.7 : 1 },
+          ]}
+        >
+          {reply.title || label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -446,14 +482,90 @@ export const MessageBubble = memo(function MessageBubble({
   currentUserId,
   onLongPress,
   onReactionPress,
+  onAuthorPress,
   onImagePress,
   onCancel,
   onRetry,
   onReplyPress,
   onContentReplyPress,
+  onSwipeReply,
+  highlighted = false,
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Row focus flash — the web row's translucent blue, faded like its
+  // `transition-colors` rather than popping on and off.
+  const flash = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(flash, {
+      toValue: highlighted ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [highlighted, flash]);
+  const flashStyle = {
+    backgroundColor: flash.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(0, 98, 209, 0)', 'rgba(0, 98, 209, 0.25)'],
+    }),
+  };
+
+  // Swipe-to-reply: the bubble slides away from the edge it's anchored to —
+  // right for other people's messages, left for your own — revealing a reply
+  // arrow, as WhatsApp does. Vertical-dominant drags stay with the list.
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const swipeProgress = useRef(new Animated.Value(0)).current;
+  const swipeCrossed = useRef(false);
+  const swipeEnabled = !message.deleted_at && !message.id.startsWith('temp-') && !!onSwipeReply;
+
+  const resetSwipe = useCallback(() => {
+    swipeCrossed.current = false;
+    Animated.spring(swipeX, {
+      toValue: 0,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 0,
+    }).start();
+    Animated.timing(swipeProgress, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [swipeProgress, swipeX]);
+
+  const swipePan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        // Capture claims the drag even while a child Pressable holds the touch.
+        onMoveShouldSetPanResponderCapture: (_, g) => {
+          if (!swipeEnabled) return false;
+          const outward = isOwn ? -g.dx : g.dx;
+          return outward > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+        },
+        onPanResponderMove: (_, g) => {
+          const outward = Math.max(0, isOwn ? -g.dx : g.dx);
+          const travel = Math.min(outward, SWIPE_TRAVEL);
+          swipeX.setValue(isOwn ? -travel : travel);
+          swipeProgress.setValue(Math.min(outward / SWIPE_THRESHOLD, 1));
+          const crossed = outward >= SWIPE_THRESHOLD;
+          if (crossed && !swipeCrossed.current) hapticSelection();
+          swipeCrossed.current = crossed;
+        },
+        onPanResponderRelease: (_, g) => {
+          const outward = Math.max(0, isOwn ? -g.dx : g.dx);
+          if (outward >= SWIPE_THRESHOLD) {
+            hapticImpact();
+            onSwipeReply?.(message);
+          }
+          resetSwipe();
+        },
+        onPanResponderTerminate: resetSwipe,
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [isOwn, message, onSwipeReply, resetSwipe, swipeEnabled, swipeProgress, swipeX],
+  );
 
   const sender = message.users;
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
@@ -501,25 +613,73 @@ export const MessageBubble = memo(function MessageBubble({
     onLongPress(message);
   }, [isDeleted, onLongPress, message]);
 
+  const handleAuthorPress = useCallback(() => {
+    onAuthorPress?.(message.user_id);
+  }, [onAuthorPress, message.user_id]);
+
   return (
-    <View
+    <Animated.View
       style={[
         styles.row,
         { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
         isFirstInGroup ? styles.rowFirst : styles.rowCompact,
+        flashStyle,
       ]}
     >
       {/* Avatar column — hidden for own messages (web parity) */}
       {!isOwn && (
         <View style={styles.avatarCol}>
           {showHeader && (
-            <PersonAvatar name={senderName} url={sender?.avatar_url ?? null} size={28} />
+            <Pressable
+              onPress={handleAuthorPress}
+              disabled={!onAuthorPress}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${senderName}'s profile`}
+            >
+              <PersonAvatar name={senderName} url={sender?.avatar_url ?? null} size={28} />
+            </Pressable>
           )}
         </View>
       )}
 
+      {/* Swipe cue, revealed from the edge the bubble slides away from */}
+      {swipeEnabled && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.swipeReplyCue,
+            isOwn ? styles.swipeReplyCueOwn : styles.swipeReplyCueOther,
+            {
+              opacity: swipeProgress,
+              transform: [
+                {
+                  scale: swipeProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons
+            name={isOwn ? 'arrow-redo' : 'arrow-undo'}
+            size={20}
+            color={colors.mutedForeground}
+          />
+        </Animated.View>
+      )}
+
       {/* Content column */}
-      <View style={[styles.contentCol, { maxWidth: bubbleMaxWidth }]}>
+      <Animated.View
+        {...swipePan.panHandlers}
+        style={[
+          styles.contentCol,
+          { maxWidth: bubbleMaxWidth },
+          { transform: [{ translateX: swipeX }] },
+        ]}
+      >
         {!isDeleted && isEmojiMsg ? (
           <View
             style={[
@@ -569,13 +729,23 @@ export const MessageBubble = memo(function MessageBubble({
                 {isFirstInGroup && <MessageBubbleTail side={isOwn ? 'right' : 'left'} color={tailColor} />}
 
                 {/* Sender name inside the bubble, WhatsApp-style. Own messages
-                    skip it, matching WhatsApp and the web app. */}
+                    skip it, matching WhatsApp and the web app. Tapping it (or
+                    the avatar) opens the sender's profile. */}
                 {!isOwn && showHeader && !isDeleted && (
-                  <Text
-                    style={[styles.senderName, { color: senderColor }, imageUrl ? styles.nameOnMedia : null]}
+                  <Pressable
+                    onPress={handleAuthorPress}
+                    disabled={!onAuthorPress}
+                    hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${senderName}'s profile`}
+                    style={styles.senderNamePressable}
                   >
-                    {senderName}
-                  </Text>
+                    <Text
+                      style={[styles.senderName, { color: senderColor }, imageUrl ? styles.nameOnMedia : null]}
+                    >
+                      {senderName}
+                    </Text>
+                  </Pressable>
                 )}
 
                 {isDeleted ? (
@@ -609,6 +779,7 @@ export const MessageBubble = memo(function MessageBubble({
                         reply={replyTo}
                         isOwn={isOwn}
                         colors={colors}
+                        currentUserId={currentUserId}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
                       />
                     )}
@@ -689,8 +860,8 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Reserve room for the pills that hang below the bubble */}
         {reactions.length > 0 && !isDeleted && <View style={styles.reactionSpacer} />}
-      </View>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
 });
 
@@ -711,6 +882,11 @@ const styles = StyleSheet.create({
   avatarCol: { width: 28, flexShrink: 0 },
 
   contentCol: { flexShrink: 1, minWidth: 0 },
+
+  swipeReplyCue: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center' },
+  // The bubble's origin: row padding (16) + avatar column (28) + gap (8).
+  swipeReplyCueOther: { left: 52 },
+  swipeReplyCueOwn: { right: 16 },
 
   bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bubbleRowOwn: { flexDirection: 'row-reverse' },
@@ -737,6 +913,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_600SemiBold',
     marginBottom: 2,
   },
+  /** Constrains the tap target to the name itself, not the bubble's width. */
+  senderNamePressable: { alignSelf: 'flex-start' },
   nameOnMedia: { marginBottom: 4, paddingLeft: 4 },
 
   content: {
@@ -750,13 +928,20 @@ const styles = StyleSheet.create({
 
   // ── reply quote ─────────────────────────────────────────────────────────
   replyBubble: {
-    borderLeftWidth: 2,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    flexDirection: 'row',
+    // Web's chip: rounded-md all around — the bar clipping into the left
+    // curve is what makes the bar-side corners read tighter.
+    borderRadius: 8,
+    paddingRight: 10,
     marginBottom: 4,
     maxWidth: '100%',
+    gap: 8,
+    overflow: 'hidden',
   },
+  /** WhatsApp's accent — a full-height square bar, clipped into the chip's
+   *  corners by the overflow above (their exact DOM pattern). */
+  replyBar: { width: 4, flexShrink: 0 },
+  replyBody: { flexShrink: 1, minWidth: 0, paddingVertical: 6 },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
   contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },
   replyContent: { fontSize: 11, lineHeight: 15 },

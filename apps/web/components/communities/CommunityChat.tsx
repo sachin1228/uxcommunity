@@ -1181,6 +1181,7 @@ export function CommunityChat({
                 error={error}
                 placeholder="Type a message…"
                 replyTo={replyTo}
+                currentUserId={currentUserId}
                 pendingImagePreview={pendingImagePreview}
                 linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
                 onChange={handleInputChange}

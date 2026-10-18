@@ -181,6 +181,15 @@ export default function DmThreadScreen() {
   );
   /** The list stays hidden until the anchor scroll is committed (no top flash). */
   const [initialPositionResolved, setInitialPositionResolved] = useState(false);
+  /** Row focus flash after a reply jump — cleared by its own timer. */
+  const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
 
   const loadingMoreRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -729,10 +738,12 @@ export default function DmThreadScreen() {
     setReplyTo({
       id: message.id,
       content: message.content || (message.image_url ? '📷 Image' : ''),
-      user_name: message.users?.name ?? 'Unknown',
+      user_name:
+        message.users?.name ??
+        (message.user_id === user?.id ? user?.name ?? 'You' : 'Unknown'),
       user_id: message.user_id,
     });
-  }, []);
+  }, [user?.id, user?.name]);
 
   const handleCopy = useCallback(() => {
     showToast('Copied');
@@ -759,6 +770,11 @@ export default function DmThreadScreen() {
       } catch {
         listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
       }
+      // Web flashMessage parity — tint the target row briefly so the land is
+      // obvious, not just the scroll.
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      setFlashMessageId(messageId);
+      flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1500);
     },
     [],
   );
@@ -1087,10 +1103,13 @@ export default function DmThreadScreen() {
                     currentUserId={userId ?? ''}
                     onLongPress={setSelectedMessage}
                     onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
+                    onAuthorPress={openPeerProfile}
                     onImagePress={handleImagePress}
                     onCancel={handleCancel}
                     onRetry={handleRetry}
                     onReplyPress={handleReplyPress}
+                    onSwipeReply={handleReply}
+                    highlighted={flashMessageId === item.msg.id}
                   />
                 );
               }}

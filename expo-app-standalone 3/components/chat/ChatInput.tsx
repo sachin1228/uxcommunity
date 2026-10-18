@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,7 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
-import { MAX_MESSAGE_CHARS, extractFirstUrl, type MessageMention } from '@/lib/chat';
+import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
 import * as ImagePicker from 'expo-image-picker';
@@ -73,6 +73,12 @@ export function ChatInput({
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const inputRef = useRef<TextInput>(null);
 
+  // Starting a reply (sheet, swipe, or chip tap) drops the caret straight into
+  // the composer so the keyboard opens on the action, as WhatsApp does.
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus();
+  }, [replyTo]);
+
   // The emoji panel is owned by the parent screen (it renders the panel below
   // the footer and closes it on scroll/tab change); this is just a shorthand.
   const pickerOpen = emojiPanelOpen;
@@ -93,6 +99,16 @@ export function ChatInput({
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
   const nearLimit = text.length >= MAX_MESSAGE_CHARS - 50;
   const linkPreviewUrl = text.trim() ? extractFirstUrl(text) : null;
+
+  // The quote wears the replied author's chat name color — same deterministic
+  // palette as the sender names inside bubbles. Quoting your own message stays
+  // neutral, matching the sent bubble.
+  const quotedSelf = !!replyTo?.user_id && replyTo.user_id === currentUserId;
+  const replyColor = !replyTo
+    ? colors.accent
+    : quotedSelf
+      ? colors.foreground
+      : userNameColor(replyTo.user_id, colors);
 
   function handleChangeText(val: string) {
     setText(val);
@@ -198,11 +214,12 @@ export function ChatInput({
             <View
               style={[
                 styles.replyBanner,
-                { backgroundColor: colors.background, borderLeftColor: colors.accent },
+                { backgroundColor: colors.background },
               ]}
             >
+              <View style={[styles.replyBar, { backgroundColor: quotedSelf ? colors.mutedForeground : replyColor }]} />
               <View style={styles.replyInfo}>
-                <Text numberOfLines={1} style={[styles.replyName, { color: colors.accent }]}>
+                <Text numberOfLines={1} style={[styles.replyName, { color: replyColor }]}>
                   {replyTo.content_kind
                     ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
                     : replyTo.user_name}
@@ -395,17 +412,20 @@ const styles = StyleSheet.create({
   replyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderLeftWidth: 2,
-    borderRadius: 6,
+    // Concentric with the pill: box radius (18) minus this banner's 6pt side
+    // inset — the inner corners trace the outer container's curve.
+    borderRadius: 12,
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
-    paddingLeft: 8,
     paddingRight: 6,
-    paddingVertical: 6,
     gap: 8,
+    overflow: 'hidden',
   },
-  replyInfo: { flex: 1, minWidth: 0, gap: 2 },
+  /** WhatsApp's accent — a full-height square bar, clipped into the chip's
+   *  corners by the overflow above (their exact DOM pattern). */
+  replyBar: { alignSelf: 'stretch', width: 3, flexShrink: 0 },
+  replyInfo: { flex: 1, minWidth: 0, gap: 2, paddingVertical: 6 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
 

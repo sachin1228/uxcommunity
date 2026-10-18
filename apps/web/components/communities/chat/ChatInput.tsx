@@ -4,6 +4,7 @@ import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "r
 import { createPortal } from "react-dom";
 import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
+import { userColorVar } from "@/lib/communities/user-color";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
 import { MentionSuggestions } from "./MentionSuggestions";
@@ -32,6 +33,8 @@ interface ChatInputProps {
   error: string | null;
   placeholder: string;
   replyTo: ReplyPreview | null;
+  /** The signed-in member — a quote of your own message stays neutral. */
+  currentUserId?: string;
   pendingImagePreview: string | null;
   /** First URL detected in the current input, or null. */
   linkPreviewUrl?: string | null;
@@ -154,7 +157,7 @@ function renderComposerOverlay(
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
-      input, sending, error, placeholder, replyTo,
+      input, sending, error, placeholder, replyTo, currentUserId,
       pendingImagePreview, linkPreviewUrl,
       onChange, onKeyDown, onSend, onCancelReply,
       onImageSelect, onImageRemove, onBlur,
@@ -177,6 +180,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Over the limit → hide the send button so the message can't be sent.
     const overLimit = input.length > MAX_MESSAGE_CHARS;
     const canSend = (!!input.trim() || !!pendingImagePreview) && !overLimit;
+
+    // The quote wears the replied author's chat name color — quoting your own
+    // message stays neutral, matching the sent bubble.
+    const quotedSelf = !!replyTo?.user_id && replyTo.user_id === currentUserId;
+    const replyColor = replyTo?.user_id && !quotedSelf ? userColorVar(replyTo.user_id) : null;
 
     // Mirror content for the visual overlay (plain text + emoji SVGs + blue
     // mention tokens). Color spans never change layout, so the overlay stays
@@ -367,9 +375,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
             {/* Reply preview inside the box */}
             {replyTo && (
-              <div className="flex items-center gap-2 mt-2 mb-1 mx-2 border-l-2 rounded-md border-accent bg-background">
-                <div className="flex-1 min-w-0 py-2 pl-2 rounded-sm">
-                  <p className="font-body text-[11px] font-semibold text-accent line-clamp-1 break-words">
+              <div className="flex items-center gap-2 mt-2 mb-1 mx-2 rounded-md bg-background overflow-hidden">
+                <span
+                  aria-hidden
+                  className={`w-[4px] shrink-0 self-stretch ${replyColor ? "" : quotedSelf ? "bg-foreground-muted" : "bg-accent"}`}
+                  style={replyColor ? { backgroundColor: replyColor } : undefined}
+                />
+                <div className="flex-1 min-w-0 py-2">
+                  <p
+                    className={`font-body text-[11px] font-semibold line-clamp-1 break-words ${replyColor ? "" : quotedSelf ? "text-foreground" : "text-accent"}`}
+                    style={replyColor ? { color: replyColor } : undefined}
+                  >
                     {replyTo.content_kind
                       ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
                       : replyTo.user_name}
