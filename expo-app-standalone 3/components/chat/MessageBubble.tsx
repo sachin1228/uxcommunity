@@ -155,7 +155,7 @@ function ReplyBubble({
       <View style={styles.replyBody}>
         <Text
           numberOfLines={1}
-          style={[styles.replyName, { color: nameColor, opacity: isOwn ? 0.85 : 1 }]}
+          style={[styles.replyName, { color: nameColor }]}
         >
           {reply.user_name}
         </Text>

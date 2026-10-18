@@ -76,7 +76,7 @@ function ReplyBubble({
       />
       <div className="flex-1 min-w-0 py-1.5 pl-[10px]">
         <p
-          className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+          className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? `text-accent-foreground${nameColor ? "" : " opacity-80"}` : "text-foreground-muted"}`}
           style={nameColor ? { color: nameColor } : undefined}
         >
           {reply.user_name}
