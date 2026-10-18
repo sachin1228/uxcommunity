@@ -24,6 +24,19 @@ import {
   wallClockToIso,
   zoneOffsetMinutes,
 } from '@/lib/eventTimezone';
+import {
+  POLL_MAX_OPTIONS,
+  POLL_MIN_OPTIONS,
+  POLL_OPTION_MAX_LENGTH,
+  POLL_QUESTION_MAX_LENGTH,
+  emptyPollDraft,
+  pollDraftFromPoll,
+  pollOptionLetter,
+  serializePollDraft,
+  validatePollDraft,
+  type ThreadPoll,
+  type ThreadPollDraft,
+} from '@/lib/communityPoll';
 import { TimeZonePickerSheet } from './TimeZonePickerSheet';
 
 interface Props {
@@ -75,6 +88,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [deviceZone] = useState(() => deviceTimeZone());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // Thread composers build either a plain post or a poll, exactly like the web.
+  const [tab, setTab] = useState<'post' | 'poll'>('post');
+  const [pollDraft, setPollDraft] = useState<ThreadPollDraft | null>(null);
   // Threads start with no category — the author has to pick one, as on the web.
   const [type, setType] = useState<string | null>(DEFAULT_TYPE[kind] ?? null);
   const [tags, setTags] = useState('');
@@ -115,6 +131,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setIsPublic(Boolean(item?.is_public));
     setAttachments(item && 'attachments' in item ? item.attachments : []);
     setType(DEFAULT_TYPE[kind] ?? 'question');
+    setTab('post');
+    setPollDraft(null);
 
     if (kind === 'threads') {
       // A legacy mobile category (`referral` / `collaboration`) is not one the
@@ -124,6 +142,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         THREAD_CATEGORY_OPTIONS.some((option) => option.value === category) ? category : null,
       );
       setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
+      // Editing keeps the thread's type, as on the web: a poll edits its poll,
+      // a post edits its text.
+      const poll = item && 'poll' in item ? item.poll : null;
+      if (poll) {
+        setTab('poll');
+        setPollDraft(pollDraftFromPoll(poll));
+      }
     } else if (kind === 'resources') {
       setType(item && 'resource_type' in item ? item.resource_type : 'article');
       setUrl(item && 'url' in item ? item.url : '');
@@ -189,6 +214,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     }
   };
 
+  /** Switch the composer between a text post and a poll. */
+  function selectTab(next: 'post' | 'poll') {
+    setTab(next);
+    // Seed the draft on first entry so the composer opens on the question.
+    if (next === 'poll') setPollDraft((current) => current ?? emptyPollDraft());
+  }
+
   const submit = async () => {
     const cleanTags = tags
       .split(',')
@@ -199,18 +231,39 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
     let body: Record<string, unknown>;
     if (kind === 'threads') {
-      if (!description.trim()) {
-        return setError(item ? 'Write something before saving.' : 'Write something before posting.');
+      let threadTitle: string;
+      let poll: ThreadPoll | null = null;
+
+      if (tab === 'poll') {
+        if (!pollDraft) return setError('Add a question for your poll.');
+        const invalid = validatePollDraft(pollDraft);
+        if (invalid) return setError(invalid);
+        const serialized = serializePollDraft(pollDraft);
+        const existingPoll = item && 'poll' in item ? item.poll : null;
+        // Polls created as standalone posts use the question as the thread
+        // text; keep any separate caption on older thread rows untouched.
+        const pollIsContent = Boolean(
+          item && existingPoll && item.title.trim() === existingPoll.question.trim(),
+        );
+        threadTitle = item && existingPoll && !pollIsContent ? item.title : serialized.question;
+        poll = serialized;
+      } else {
+        if (!description.trim()) {
+          return setError(item ? 'Write something before saving.' : 'Write something before posting.');
+        }
+        threadTitle = bodyToThread(description).title;
       }
+
       if (!type) return setError('Pick a category for your thread.');
       body = {
-        ...bodyToThread(description),
+        title: threadTitle,
         category: type,
         tags: cleanTags,
         attachments,
         links: extractLinks(description),
         allow_replies: allowReplies,
         is_public: isPublic,
+        poll,
       };
     } else if (kind === 'resources') {
       if (!title.trim()) return setError('Title is required.');
@@ -370,6 +423,12 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         >
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
 
+          {/* Create-only: a thread can be a post or a poll. Editing keeps the
+              thread's existing type, so no tabs are needed there. */}
+          {kind === 'threads' && !item ? (
+            <ComposerTabs value={tab} onChange={selectTab} colors={colors} />
+          ) : null}
+
           {isShowcase ? (
             <Field label="Title *">
               <TextInput
@@ -412,33 +471,42 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </Field>
           ) : null}
 
-          {!isShowcase ? (
-            <Field label={kind === 'threads' ? null : 'Description'}>
-              <View>
-                <TextInput
-                  value={description}
-                  onChangeText={setDescription}
-                  style={[
-                    inputStyle,
-                    styles.multiline,
-                    kind === 'threads' ? styles.threadBody : null,
-                  ]}
-                  multiline
-                  maxLength={
-                    kind === 'threads'
-                      ? THREAD_BODY_MAX_LENGTH
-                      : kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000
-                  }
-                  textAlignVertical="top"
-                  placeholder={kind === 'threads' ? 'What do you want to talk about?' : 'Add helpful details'}
-                  placeholderTextColor={colors.foregroundSubtle}
-                />
-                {kind === 'threads' ? (
+          {kind === 'threads' ? (
+            tab === 'poll' ? (
+              pollDraft ? (
+                <PollComposer value={pollDraft} onChange={setPollDraft} colors={colors} />
+              ) : null
+            ) : (
+              <Field label={null}>
+                <View>
+                  <TextInput
+                    value={description}
+                    onChangeText={setDescription}
+                    style={[inputStyle, styles.multiline, styles.threadBody]}
+                    multiline
+                    maxLength={THREAD_BODY_MAX_LENGTH}
+                    textAlignVertical="top"
+                    placeholder="What do you want to talk about?"
+                    placeholderTextColor={colors.foregroundSubtle}
+                  />
                   <Text style={[styles.counter, { color: colors.foregroundSubtle }]}>
                     {description.length}/{THREAD_BODY_MAX_LENGTH}
                   </Text>
-                ) : null}
-              </View>
+                </View>
+              </Field>
+            )
+          ) : !isShowcase ? (
+            <Field label="Description">
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                style={[inputStyle, styles.multiline]}
+                multiline
+                maxLength={kind === 'resources' ? 2000 : 5000}
+                textAlignVertical="top"
+                placeholder="Add helpful details"
+                placeholderTextColor={colors.foregroundSubtle}
+              />
             </Field>
           ) : null}
 
@@ -687,6 +755,196 @@ function Toggle({
 }
 
 /**
+ * The web composer's Post / Poll tabs, with the same underline treatment.
+ * `tab` decides what gets posted; the thread's other fields are shared.
+ */
+function ComposerTabs({
+  value,
+  onChange,
+  colors,
+}: {
+  value: 'post' | 'poll';
+  onChange: (value: 'post' | 'poll') => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const tabs: Array<{
+    value: 'post' | 'poll';
+    label: string;
+    icon: React.ComponentProps<typeof Feather>['name'];
+  }> = [
+    { value: 'post', label: 'Post', icon: 'edit-3' },
+    { value: 'poll', label: 'Poll', icon: 'bar-chart-2' },
+  ];
+
+  return (
+    <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
+      {tabs.map((entry) => {
+        const active = value === entry.value;
+        return (
+          <Pressable
+            key={entry.value}
+            onPress={() => onChange(entry.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
+          >
+            <Feather
+              name={entry.icon}
+              size={14}
+              color={active ? colors.foreground : colors.foregroundMuted}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                { color: active ? colors.foreground : colors.foregroundMuted },
+              ]}
+            >
+              {entry.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * The poll draft editor, ported from the web `PollComposer`: one question and
+ * 2–6 lettered options, with add/remove controls. Validation runs on submit so
+ * the composer never nags while the author is still typing.
+ */
+function PollComposer({
+  value,
+  onChange,
+  colors,
+}: {
+  value: ThreadPollDraft;
+  onChange: (draft: ThreadPollDraft) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { question, options } = value;
+  const filled = options.filter((option) => option.trim()).length;
+
+  function setQuestion(next: string) {
+    onChange({ ...value, question: next });
+  }
+
+  function setOption(index: number, text: string) {
+    onChange({
+      ...value,
+      options: options.map((option, i) => (i === index ? text : option)),
+    });
+  }
+
+  function addOption() {
+    if (options.length >= POLL_MAX_OPTIONS) return;
+    onChange({ ...value, options: [...options, ''] });
+  }
+
+  function removeOption(index: number) {
+    if (options.length <= POLL_MIN_OPTIONS) return;
+    onChange({ ...value, options: options.filter((_, i) => i !== index) });
+  }
+
+  return (
+    <View
+      style={[
+        styles.pollCard,
+        { borderColor: colors.border, backgroundColor: colors.background },
+      ]}
+    >
+      <View style={styles.pollHeader}>
+        <Feather name="bar-chart-2" size={13} color={colors.foregroundMuted} />
+        <Text style={[styles.pollHeaderText, { color: colors.foregroundMuted }]}>Poll</Text>
+      </View>
+
+      <Field label="Question">
+        <TextInput
+          value={question}
+          onChangeText={setQuestion}
+          maxLength={POLL_QUESTION_MAX_LENGTH}
+          placeholder="Ask something…"
+          placeholderTextColor={colors.foregroundSubtle}
+          style={inputStyleFor(colors)}
+        />
+      </Field>
+
+      <View style={styles.pollOptions}>
+        {options.map((option, index) => (
+          <View key={index} style={styles.pollOptionRow}>
+            <View
+              style={[
+                styles.pollOptionBadge,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={[styles.pollOptionBadgeText, { color: colors.foregroundSubtle }]}>
+                {pollOptionLetter(index)}
+              </Text>
+            </View>
+            <TextInput
+              value={option}
+              onChangeText={(text) => setOption(index, text)}
+              maxLength={POLL_OPTION_MAX_LENGTH}
+              placeholder={`Option ${index + 1}`}
+              placeholderTextColor={colors.foregroundSubtle}
+              style={[inputStyleFor(colors), styles.pollOptionInput]}
+            />
+            {options.length > POLL_MIN_OPTIONS ? (
+              <Pressable
+                onPress={() => removeOption(index)}
+                style={styles.pollRemove}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove option ${index + 1}`}
+              >
+                <Feather name="x" size={14} color={colors.foregroundSubtle} />
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
+      </View>
+
+      {options.length < POLL_MAX_OPTIONS ? (
+        <Pressable
+          onPress={addOption}
+          style={[styles.pollAdd, { borderColor: colors.border }]}
+          accessibilityRole="button"
+        >
+          <Feather name="plus" size={12} color={colors.foregroundMuted} />
+          <Text style={[styles.pollAddText, { color: colors.foregroundMuted }]}>Add option</Text>
+        </Pressable>
+      ) : (
+        <Text style={[styles.pollHint, { color: colors.foregroundSubtle }]}>
+          You can add up to {POLL_MAX_OPTIONS} options.
+        </Text>
+      )}
+
+      {filled < POLL_MIN_OPTIONS ? (
+        <Text style={[styles.pollHint, { color: colors.foregroundSubtle }]}>
+          Add at least {POLL_MIN_OPTIONS} options.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** The shared field skin, used outside the main form's closure. */
+function inputStyleFor(colors: ReturnType<typeof useColors>) {
+  return {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    fontFamily: 'Geist_400Regular' as const,
+    fontSize: 15,
+    color: colors.foreground,
+    backgroundColor: colors.inputBackground,
+    borderColor: colors.borderSubtle,
+  };
+}
+
+/**
  * The typed body *is* the thread, exactly as on the web: the whole post is
  * stored in `title` (no separate description), so the card and the web page
  * show the same text.
@@ -773,6 +1031,53 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_500Medium',
     fontSize: 11,
   },
+  tabs: { flexDirection: 'row', alignItems: 'center', gap: 4, borderBottomWidth: 1 },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    marginBottom: -1,
+  },
+  tabText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
+  pollCard: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 12 },
+  pollHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pollHeaderText: { fontFamily: 'Geist_600SemiBold', fontSize: 12 },
+  pollOptions: { gap: 8 },
+  pollOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pollOptionBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollOptionBadgeText: { fontFamily: 'Geist_600SemiBold', fontSize: 11 },
+  pollOptionInput: {
+    flex: 1,
+    height: 40,
+    minHeight: 40,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  pollRemove: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  pollAdd: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  pollAddText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
+  pollHint: { fontFamily: 'Geist_400Regular', fontSize: 11 },
   zoneTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   zoneTriggerText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 15 },
   zoneHint: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 },

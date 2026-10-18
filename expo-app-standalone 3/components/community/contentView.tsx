@@ -30,7 +30,10 @@ import {
   getLinkPreviewImage,
   setContentAction,
   threadBody,
+  voteOnThreadPoll,
 } from '@/lib/communityContent';
+import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
+import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { formatEventDate } from '@/lib/eventDate';
 import { PersonAvatar } from '@/components/PersonAvatar';
@@ -122,6 +125,29 @@ export interface ContentActionsApi {
   /** Alert surfaced from a failed write, for screens that render their own toast. */
   lastError: string | null;
   clearError: () => void;
+  /** The thread's poll with any local vote/undo override applied. */
+  pollState: (item: CommunityContent) => PollViewState | null;
+  /** Vote for one option (optimistic, reconciled with the server). */
+  votePoll: (item: CommunityContent, optionIndex: number) => Promise<void>;
+  /** Spend the viewer's one-time undo (optimistic). */
+  undoPoll: (item: CommunityContent) => Promise<void>;
+  /** Drop a thread's local poll state after an edit replaces the row. */
+  resetPoll: (itemId: string) => void;
+}
+
+function pollKey(itemId: string) {
+  return `${itemId}:poll`;
+}
+
+/** The poll state carried by the server row, before any local override. */
+function serverPollState(thread: CommunityThread): PollViewState | null {
+  const poll = thread.poll;
+  if (!poll || !Array.isArray(poll.options) || poll.options.length < 2) return null;
+  return {
+    counts: normalizePollCounts(poll, thread.poll_vote_counts),
+    userVote: typeof thread.poll_user_vote === 'number' ? thread.poll_user_vote : null,
+    undoUsed: thread.poll_undo_used === true,
+  };
 }
 
 /**
@@ -134,6 +160,7 @@ export interface ContentActionsApi {
  */
 export function useContentActions(): ContentActionsApi {
   const [overrides, setOverrides] = useState<Record<string, ActionOverride>>({});
+  const [pollOverrides, setPollOverrides] = useState<Record<string, PollViewState>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [lastError, setLastError] = useState<string | null>(null);
   const coalescersRef = useRef(new Map<string, BooleanIntentCoalescer>());
@@ -234,8 +261,129 @@ export function useContentActions(): ContentActionsApi {
     [],
   );
 
+  /**
+   * The poll as the card/detail should render it: a local optimistic vote (or
+   * undo) wins until the server row or a reset replaces it.
+   */
+  const pollState = useCallback(
+    (item: CommunityContent): PollViewState | null => {
+      const base = serverPollState(item as CommunityThread);
+      if (!base) return null;
+      return pollOverrides[pollKey(item.id)] ?? base;
+    },
+    [pollOverrides],
+  );
+
+  const votePoll = useCallback(
+    async (item: CommunityContent, optionIndex: number) => {
+      const thread = item as CommunityThread;
+      const poll = thread.poll;
+      if (!poll || !item.community_id) return;
+      const key = pollKey(item.id);
+      const current = pollOverrides[key] ?? serverPollState(thread);
+      if (!current || current.userVote !== null) return;
+      if (
+        !Number.isInteger(optionIndex) ||
+        optionIndex < 0 ||
+        optionIndex >= poll.options.length
+      ) {
+        return;
+      }
+
+      const previous = pollOverrides[key] ?? null;
+      setPollOverrides((state) => ({
+        ...state,
+        [key]: {
+          counts: current.counts.map((count, index) =>
+            index === optionIndex ? count + 1 : count,
+          ),
+          userVote: optionIndex,
+          undoUsed: current.undoUsed,
+        },
+      }));
+
+      try {
+        const result = await voteOnThreadPoll(item.community_id, item.id, optionIndex);
+        setPollOverrides((state) => ({
+          ...state,
+          [key]: {
+            counts: result.counts,
+            userVote: result.userVote,
+            undoUsed: result.undoUsed,
+          },
+        }));
+      } catch (error) {
+        // Back to the pre-vote row; the poll renders its own error.
+        setPollOverrides((state) => {
+          const next = { ...state };
+          if (previous) next[key] = previous;
+          else delete next[key];
+          return next;
+        });
+        throw error;
+      }
+    },
+    [pollOverrides],
+  );
+
+  const undoPoll = useCallback(
+    async (item: CommunityContent) => {
+      const thread = item as CommunityThread;
+      const poll = thread.poll;
+      if (!poll || !item.community_id) return;
+      const key = pollKey(item.id);
+      const current = pollOverrides[key] ?? serverPollState(thread);
+      if (!current || current.userVote === null || current.undoUsed) return;
+
+      const previous = pollOverrides[key] ?? null;
+      const votedFor = current.userVote;
+      setPollOverrides((state) => ({
+        ...state,
+        [key]: {
+          counts: current.counts.map((count, index) =>
+            index === votedFor ? Math.max(0, count - 1) : count,
+          ),
+          userVote: null,
+          undoUsed: true,
+        },
+      }));
+
+      try {
+        const result = await voteOnThreadPoll(item.community_id, item.id, null);
+        setPollOverrides((state) => ({
+          ...state,
+          [key]: {
+            counts: result.counts,
+            userVote: result.userVote,
+            undoUsed: result.undoUsed,
+          },
+        }));
+      } catch (error) {
+        setPollOverrides((state) => {
+          const next = { ...state };
+          if (previous) next[key] = previous;
+          else delete next[key];
+          return next;
+        });
+        throw error;
+      }
+    },
+    [pollOverrides],
+  );
+
+  const resetPoll = useCallback((itemId: string) => {
+    setPollOverrides((state) => {
+      const key = pollKey(itemId);
+      if (!(key in state)) return state;
+      const next = { ...state };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setOverrides({});
+    setPollOverrides({});
     setCommentCounts({});
   }, []);
 
@@ -248,6 +396,10 @@ export function useContentActions(): ContentActionsApi {
     reset,
     lastError,
     clearError: useCallback(() => setLastError(null), []),
+    pollState,
+    votePoll,
+    undoPoll,
+    resetPoll,
   };
 }
 
@@ -333,6 +485,7 @@ export function ContentCard({
       : kind === 'events' ? 2
         : kind === 'resources' ? 3
           : undefined;
+  const pollState = thread?.poll ? actions.pollState(item) : null;
 
   return (
     <Pressable
@@ -379,6 +532,15 @@ export function ContentCard({
         />
         {secondaryBody ? (
           <CollapsibleBody text={secondaryBody} textStyle={styles.description} collapsedLines={2} />
+        ) : null}
+        {thread?.poll && pollState ? (
+          <ThreadPollView
+            poll={thread.poll}
+            state={pollState}
+            hideQuestion={thread.poll.question.trim() === thread.title.trim()}
+            onVote={(optionIndex) => actions.votePoll(item, optionIndex)}
+            onUndo={() => actions.undoPoll(item)}
+          />
         ) : null}
         {images.length ? <MediaGrid images={images} /> : null}
 
@@ -536,6 +698,7 @@ export function ContentDetail({
   const files = (thread?.attachments ?? []).filter((attachment) => !attachment.type.startsWith('image/'));
   const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
   const isOwner = item.user_id === currentUserId;
+  const pollState = thread?.poll ? actions.pollState(item) : null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -592,6 +755,15 @@ export function ContentDetail({
             <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
               {item.description}
             </Text>
+          ) : null}
+          {thread?.poll && pollState ? (
+            <ThreadPollView
+              poll={thread.poll}
+              state={pollState}
+              hideQuestion={thread.poll.question.trim() === thread.title.trim()}
+              onVote={(optionIndex) => actions.votePoll(item, optionIndex)}
+              onUndo={() => actions.undoPoll(item)}
+            />
           ) : null}
           {images.length ? <MediaGrid images={images} /> : null}
 

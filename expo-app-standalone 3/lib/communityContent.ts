@@ -1,4 +1,7 @@
 import { apiFetch, apiFormUpload } from './api';
+import type { ThreadPoll } from './communityPoll';
+
+export type { ThreadPoll } from './communityPoll';
 
 /**
  * Community content client — threads, showcase posts, events and resources.
@@ -53,6 +56,14 @@ export interface CommunityThread extends BaseContent {
   comment_count: number;
   user_liked: boolean;
   user_saved: boolean;
+  /** The optional poll attached to the thread (null for a plain post). */
+  poll: ThreadPoll | null;
+  /** Vote totals aligned with `poll.options`, attached by the read models. */
+  poll_vote_counts?: number[];
+  /** The viewer's option index, or null when they have not voted. */
+  poll_user_vote?: number | null;
+  /** Whether the viewer has already spent their one-time vote undo. */
+  poll_undo_used?: boolean;
 }
 
 export interface CommunityEvent extends BaseContent {
@@ -381,6 +392,44 @@ export async function setContentAction(
   return {
     value: typeof confirmed === 'boolean' ? confirmed : desired,
     count: typeof count === 'number' ? count : undefined,
+  };
+}
+
+export interface PollVoteResult {
+  /** Server-confirmed totals, aligned with the poll's options. */
+  counts: number[];
+  /** The viewer's vote after the write (null after an undo). */
+  userVote: number | null;
+  undoUsed: boolean;
+}
+
+/**
+ * Vote on a thread poll, or undo the viewer's vote with `optionIndex = null`.
+ *
+ * The API is the same one the web card calls: one vote per member, a vote is
+ * final, and each member may undo exactly once before voting again.
+ */
+export async function voteOnThreadPoll(
+  communityId: string,
+  threadId: string,
+  optionIndex: number | null,
+): Promise<PollVoteResult> {
+  const { data } = await apiFetch<{
+    counts?: number[];
+    user_vote?: number | null;
+    undo_used?: boolean;
+  }>(`/api/communities/${communityId}/threads/${threadId}/poll`, {
+    method: 'POST',
+    body: optionIndex === null ? { action: 'undo' } : { option_index: optionIndex },
+  });
+
+  if (!Array.isArray(data.counts)) {
+    throw new Error('Failed to record your vote.');
+  }
+  return {
+    counts: data.counts,
+    userVote: typeof data.user_vote === 'number' ? data.user_vote : null,
+    undoUsed: data.undo_used === true,
   };
 }
 
