@@ -36,7 +36,16 @@ const ROOM_TOPICS: Partial<Record<ContentKind, { getRoom: (cid: string) => strin
 
 export function useCommunityContent<K extends ContentKind>(communityId: string, kind: K, enabled = true) {
   const queryClient = useQueryClient();
-  const queryKey = communityContentKey(communityId, kind);
+  // Memoized by its parts, not rebuilt per render: every realtime subscription
+  // below hangs off `invalidate`, and a fresh key array on each render would
+  // make that callback (and the scheduler and the effect around them) change
+  // identity every time — tearing the room's socket down and re-opening it on
+  // each render. That re-open fires the "connected" catch-up, which
+  // invalidates, which renders, which re-opens… a 2–3 s refresh loop.
+  const queryKey = useMemo(
+    () => communityContentKey(communityId, kind),
+    [communityId, kind]
+  );
   const invalidate = useCallback(
     () => queryClient.invalidateQueries({ queryKey }),
     [queryClient, queryKey]
