@@ -820,17 +820,15 @@ const styles = StyleSheet.create({
 
   // ── reply quote ─────────────────────────────────────────────────────────
   replyBubble: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
     borderRadius: 12,
+    paddingLeft: 13,
     paddingRight: 10,
     paddingVertical: 6,
     marginBottom: 4,
     maxWidth: '100%',
-    gap: 8,
   },
-  /** WhatsApp's short rounded rule — a separate bar, inset by the chip padding. */
-  replyBar: { width: 4, borderRadius: 2 },
+  /** WhatsApp's chunky pill — absolute, flush left, 3pt from each edge. */
+  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 5, borderRadius: 2.5 },
   replyBody: { flexShrink: 1, minWidth: 0 },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
   contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },

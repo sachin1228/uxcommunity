@@ -406,13 +406,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
-    paddingLeft: 0,
+    paddingLeft: 13,
     paddingRight: 6,
     paddingVertical: 6,
-    gap: 8,
   },
-  /** WhatsApp's rule — a separate bar spanning the chip's inner height. */
-  replyBar: { alignSelf: 'stretch', width: 4, borderRadius: 2 },
+  /** WhatsApp's chunky pill — absolute so it runs nearly the chip's full
+   *  height (3pt from each edge) independent of the text padding. */
+  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 5, borderRadius: 2.5 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
