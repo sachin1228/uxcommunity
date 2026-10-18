@@ -82,7 +82,6 @@ export default function EventsTab() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [focusComments, setFocusComments] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const resetActions = actions.reset;
@@ -168,8 +167,8 @@ export default function EventsTab() {
   const activeList = phase === 'upcoming' ? upcoming : past;
   const counts: Record<CityEventPhase, number> = { upcoming: upcoming.length, past: past.length };
 
-  // Opening an event and tapping its comment count both land on the detail
-  // page, where the comments live under the event itself.
+  // The comment count is the only route into an event's own page, where the
+  // comments live under the event itself.
   const openItem = useCallback(
     (item: CommunityContent) => {
       setSelected(items.find((entry) => entry.id === item.id) ?? null);
@@ -188,14 +187,7 @@ export default function EventsTab() {
           actions={actions}
           communityName={item.community_name}
           communityImage={item.community_image}
-          onOpen={(entry) => {
-            setFocusComments(false);
-            openItem(entry);
-          }}
-          onComments={(entry) => {
-            setFocusComments(true);
-            openItem(entry);
-          }}
+          onComments={openItem}
         />
       </View>
     ),
@@ -328,7 +320,6 @@ export default function EventsTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        focusComments={focusComments}
       />
     </View>
   );

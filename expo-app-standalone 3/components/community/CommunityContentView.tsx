@@ -127,9 +127,8 @@ export function CommunityContentView({
     [communityId, kind, queryClient],
   );
 
-  const [focusComments, setFocusComments] = useState(false);
-  // Opening a post and tapping its comment count both land on the detail page,
-  // where the comments live under the post itself.
+  // The comment count is the only route into a post's own page, where the
+  // comments live under the post itself.
   const openItem = useCallback((item: CommunityContent) => setSelected(item), []);
 
   if (query.isLoading) return <Centered><ActivityIndicator color={colors.accent} /></Centered>;
@@ -162,14 +161,7 @@ export function CommunityContentView({
             kind={kind}
             currentUserId={currentUserId}
             actions={actions}
-            onOpen={(entry) => {
-              setFocusComments(false);
-              openItem(entry);
-            }}
-            onComments={(entry) => {
-              setFocusComments(true);
-              openItem(entry);
-            }}
+            onComments={openItem}
             onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
             onDelete={remove}
           />
@@ -230,7 +222,6 @@ export function CommunityContentView({
         actions={actions}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        focusComments={focusComments}
         onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
         onDelete={remove}
       />

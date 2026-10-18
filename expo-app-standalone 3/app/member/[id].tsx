@@ -120,7 +120,6 @@ export default function MemberProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [focusComments, setFocusComments] = useState(false);
 
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
@@ -250,8 +249,8 @@ export default function MemberProfileScreen() {
     [loadFeed, scope],
   );
 
-  // Opening a post and tapping its comment count both land on the detail page,
-  // where the comments live under the post itself.
+  // The comment count is the only route into a post's own page, where the
+  // comments live under the post itself; the card body just double-tap likes.
   const openItem = useCallback(
     (item: CommunityContent) => {
       const match = items.find((entry) => entry.id === item.id);
@@ -304,14 +303,7 @@ export default function MemberProfileScreen() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => {
-          setFocusComments(false);
-          openItem(entry);
-        }}
-        onComments={(entry) => {
-          setFocusComments(true);
-          openItem(entry);
-        }}
+        onComments={openItem}
       />
     ),
     [actions, items, openItem, user?.id],
@@ -505,7 +497,6 @@ export default function MemberProfileScreen() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        focusComments={focusComments}
       />
     </View>
   );

@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
   Image,
   Linking,
   Modal,
@@ -91,6 +94,9 @@ export const FOOTER_ACTIONS_BY_KIND: Record<ContentKind, ActionDefinition[]> = {
   events: [LIKE, RSVP],
   resources: [RESOURCE_LIKE],
 };
+
+/** Instagram's window: a second tap inside this counts as a double tap. */
+const DOUBLE_TAP_MS = 300;
 
 /** The save-shaped row the ··· menu offers, per kind (null when there is none). */
 const MENU_ACTION_BY_KIND: Record<ContentKind, ActionDefinition | null> = {
@@ -470,7 +476,7 @@ export interface ContentCardProps {
   /** Feed cards show which community the post came from. */
   communityName?: string | null;
   communityImage?: string | null;
-  onOpen: (item: CommunityContent) => void;
+  /** The comment count — the only route into the post's own page. */
   onComments: (item: CommunityContent) => void;
   onEdit?: (item: CommunityContent) => void;
   onDelete?: (item: CommunityContent) => void;
@@ -483,7 +489,6 @@ export function ContentCard({
   actions,
   communityName,
   communityImage,
-  onOpen,
   onComments,
   onEdit,
   onDelete,
@@ -521,12 +526,56 @@ export function ContentCard({
           : undefined;
   const pollState = thread?.poll ? actions.pollState(item) : null;
 
+  // A double tap on the card likes it — Instagram's gesture. The footer heart
+  // is still the explicit control; this is the shortcut, and it only ever
+  // likes (a second double tap leaves an already-liked post alone).
+  const likeDefinition = FOOTER_ACTIONS_BY_KIND[kind].find((entry) => entry.activeColor === 'like');
+  const liked = likeDefinition ? actions.isActive(item, kind, likeDefinition.action) : false;
+  const burst = useRef(new Animated.Value(0)).current;
+  const lastTapAt = useRef(0);
+  const reduceMotion = useRef(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => { reduceMotion.current = enabled; })
+      .catch(() => { /* assume motion is fine */ });
+  }, []);
+
+  const likeFromDoubleTap = () => {
+    if (!likeDefinition) return;
+    if (!liked) {
+      hapticToggle(true);
+      actions.action(item, kind, likeDefinition.action);
+    }
+    if (reduceMotion.current) return;
+    burst.stopAnimation();
+    burst.setValue(0);
+    Animated.timing(burst, {
+      toValue: 1,
+      duration: 620,
+      easing: Easing.out(Easing.quad),
+      // Opacity and transform only — the burst never touches layout.
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCardPress = () => {
+    const now = Date.now();
+    if (now - lastTapAt.current > DOUBLE_TAP_MS) {
+      lastTapAt.current = now;
+      return;
+    }
+    lastTapAt.current = 0;
+    likeFromDoubleTap();
+  };
+
   return (
     <Pressable
-      onPress={() => onOpen(item)}
+      onPress={handleCardPress}
+      // The card is a gesture surface, not a single control: keep the inner
+      // buttons and links as the accessible units.
+      accessible={false}
       style={[styles.card, { backgroundColor: colors.backgroundSubtle, borderColor: colors.border }]}
-      accessibilityRole="button"
-      accessibilityLabel={`View ${contentLabel(kind)}: ${item.title}`}
     >
       {coverImage ? <Image source={{ uri: coverImage }} style={styles.cover} /> : null}
 
@@ -576,7 +625,7 @@ export function ContentCard({
             onUndo={() => actions.undoPoll(item)}
           />
         ) : null}
-        {images.length ? <MediaGrid images={images} /> : null}
+        {images.length ? <MediaGrid images={images} onDoubleTap={likeFromDoubleTap} /> : null}
 
         {event ? (
           <View style={styles.eventMetaStack}>
@@ -600,6 +649,33 @@ export function ContentCard({
           communityImage={communityImage}
         />
       </View>
+
+      {/* The double-tap burst: a filled heart that pops in over the card and
+          fades, never intercepting a touch. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.likeBurst,
+          {
+            opacity: burst.interpolate({
+              inputRange: [0, 0.15, 0.7, 1],
+              outputRange: [0, 1, 1, 0],
+              extrapolate: 'clamp',
+            }),
+            transform: [
+              {
+                scale: burst.interpolate({
+                  inputRange: [0, 0.35, 1],
+                  outputRange: [0.55, 1.08, 1],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <HeartIcon size={96} active />
+      </Animated.View>
     </Pressable>
   );
 }
@@ -704,7 +780,6 @@ export function ContentDetail({
   onClose,
   onEdit,
   onDelete,
-  focusComments = false,
 }: {
   item: CommunityContent | null;
   kind: ContentKind;
@@ -713,8 +788,6 @@ export function ContentDetail({
   communityName?: string | null;
   visible: boolean;
   onClose: () => void;
-  /** Opened from a comment count: land on the discussion below the post. */
-  focusComments?: boolean;
   onEdit?: (item: CommunityContent) => void;
   onDelete?: (item: CommunityContent) => void;
 }) {
@@ -725,9 +798,9 @@ export function ContentDetail({
   // The comment section lives at the bottom of the page, exactly as on the web
   // detail: tapping the footer count scrolls to it rather than opening a sheet.
   const scrollRef = useRef<ScrollView>(null);
-  // The section's offset inside the scroll content. Kept as state so the focus
-  // effect can follow it: remote images above the discussion resolve after the
-  // first layout and push it down, and the reader asked to land on it.
+  // The section's offset inside the scroll content. Kept as state so the
+  // landing scroll can follow it: remote images above the discussion resolve
+  // after the first layout and push it down.
   const [commentsY, setCommentsY] = useState(0);
   const [commentsLaidOut, setCommentsLaidOut] = useState(false);
   // Once the reader drags the page, the landing scroll stops following layout.
@@ -740,9 +813,9 @@ export function ContentDetail({
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || !focusComments || !commentsLaidOut || readerScrolled.current) return;
+    if (!visible || !commentsLaidOut || readerScrolled.current) return;
     scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: false });
-  }, [visible, focusComments, commentsLaidOut, commentsY]);
+  }, [visible, commentsLaidOut, commentsY]);
 
   if (!item) return null;
 
@@ -1074,7 +1147,14 @@ export function CollapsibleBody({
   );
 }
 
-export function MediaGrid({ images }: { images: Array<{ url: string }> }) {
+export function MediaGrid({
+  images,
+  /** Double tap on a photo: like the post instead of opening the image. */
+  onDoubleTap,
+}: {
+  images: Array<{ url: string }>;
+  onDoubleTap?: () => void;
+}) {
   const colors = useColors();
   const single = images.length === 1;
   // The web shows a single image at its natural aspect ratio (capped at 480px
@@ -1082,12 +1162,43 @@ export function MediaGrid({ images }: { images: Array<{ url: string }> }) {
   // center-cropped into a fixed 220px band.
   const aspectRatio = useImageAspectRatio(single ? images[0]?.url : undefined);
 
+  // Opening a photo waits out the double-tap window, so a second tap can like
+  // the post instead — the gesture has to work over the photo, not just the
+  // margins around it.
+  const lastTapAt = useRef(0);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (openTimer.current) clearTimeout(openTimer.current);
+    },
+    [],
+  );
+
+  const handleImagePress = (url: string) => {
+    const now = Date.now();
+    if (now - lastTapAt.current <= DOUBLE_TAP_MS) {
+      lastTapAt.current = 0;
+      if (openTimer.current) {
+        clearTimeout(openTimer.current);
+        openTimer.current = null;
+      }
+      onDoubleTap?.();
+      return;
+    }
+    lastTapAt.current = now;
+    if (openTimer.current) clearTimeout(openTimer.current);
+    openTimer.current = setTimeout(() => {
+      openTimer.current = null;
+      Linking.openURL(url);
+    }, DOUBLE_TAP_MS);
+  };
+
   return (
     <View style={styles.imageGrid}>
       {images.slice(0, 4).map((image, index) => (
         <Pressable
           key={image.url}
-          onPress={() => Linking.openURL(image.url)}
+          onPress={() => handleImagePress(image.url)}
           style={
             single
               ? [
@@ -1197,6 +1308,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  likeBurst: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Above the photo grid it is drawn over.
+    zIndex: 1,
   },
   cover: { width: '100%', height: 170 },
   cardBody: { padding: 20, gap: 12 },
