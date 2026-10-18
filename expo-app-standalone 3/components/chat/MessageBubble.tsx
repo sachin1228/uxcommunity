@@ -135,7 +135,12 @@ function ReplyBubble({
         styles.replyBubble,
         {
           backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
-          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
+          // The rule wears the quoted author's name color when known.
+          borderLeftColor: reply.user_id
+            ? nameColor
+            : isOwn
+              ? colors.chatReplyBorderOwn
+              : colors.chatReplyBorderOther,
         },
       ]}
     >

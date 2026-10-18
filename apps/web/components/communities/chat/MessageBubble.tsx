@@ -66,6 +66,7 @@ function ReplyBubble({
           ? "bg-black/20 border-white/20 hover:bg-black/30"
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
+      style={nameColor && !isMe ? { borderLeftColor: nameColor } : undefined}
     >
       <p
         className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}

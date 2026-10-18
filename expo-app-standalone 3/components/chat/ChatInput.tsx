@@ -12,7 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
-import { MAX_MESSAGE_CHARS, extractFirstUrl, type MessageMention } from '@/lib/chat';
+import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
 import * as ImagePicker from 'expo-image-picker';
@@ -93,6 +93,10 @@ export function ChatInput({
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
   const nearLimit = text.length >= MAX_MESSAGE_CHARS - 50;
   const linkPreviewUrl = text.trim() ? extractFirstUrl(text) : null;
+
+  // The quote wears the replied author's chat name color — same deterministic
+  // palette as the sender names inside bubbles.
+  const replyColor = replyTo ? userNameColor(replyTo.user_id, colors) : colors.accent;
 
   function handleChangeText(val: string) {
     setText(val);
@@ -201,9 +205,9 @@ export function ChatInput({
                 { backgroundColor: colors.background },
               ]}
             >
-              <View style={[styles.replyBar, { backgroundColor: colors.accent }]} />
+              <View style={[styles.replyBar, { backgroundColor: replyColor }]} />
               <View style={styles.replyInfo}>
-                <Text numberOfLines={1} style={[styles.replyName, { color: colors.accent }]}>
+                <Text numberOfLines={1} style={[styles.replyName, { color: replyColor }]}>
                   {replyTo.content_kind
                     ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
                     : replyTo.user_name}

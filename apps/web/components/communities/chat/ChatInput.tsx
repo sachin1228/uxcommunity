@@ -4,6 +4,7 @@ import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "r
 import { createPortal } from "react-dom";
 import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
+import { userColorVar } from "@/lib/communities/user-color";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
 import { MentionSuggestions } from "./MentionSuggestions";
@@ -177,6 +178,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Over the limit → hide the send button so the message can't be sent.
     const overLimit = input.length > MAX_MESSAGE_CHARS;
     const canSend = (!!input.trim() || !!pendingImagePreview) && !overLimit;
+
+    // The quote wears the replied author's chat name color — same deterministic
+    // palette as the sender names inside bubbles.
+    const replyColor = replyTo?.user_id ? userColorVar(replyTo.user_id) : null;
 
     // Mirror content for the visual overlay (plain text + emoji SVGs + blue
     // mention tokens). Color spans never change layout, so the overlay stays
@@ -367,9 +372,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
             {/* Reply preview inside the box */}
             {replyTo && (
-              <div className="flex items-center gap-2 mt-2 mb-1 mx-2 border-l-2 rounded-md border-accent bg-background">
+              <div
+                className="flex items-center gap-2 mt-2 mb-1 mx-2 border-l-2 rounded-md border-accent bg-background"
+                style={replyColor ? { borderLeftColor: replyColor } : undefined}
+              >
                 <div className="flex-1 min-w-0 py-2 pl-2 rounded-sm">
-                  <p className="font-body text-[11px] font-semibold text-accent line-clamp-1 break-words">
+                  <p
+                    className="font-body text-[11px] font-semibold text-accent line-clamp-1 break-words"
+                    style={replyColor ? { color: replyColor } : undefined}
+                  >
                     {replyTo.content_kind
                       ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
                       : replyTo.user_name}
