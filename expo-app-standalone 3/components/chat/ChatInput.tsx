@@ -15,7 +15,10 @@ import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
-import { useEmojiKeyboardSwap } from '@/hooks/useEmojiKeyboardSwap';
+import {
+  COMPOSER_BOTTOM_INSET,
+  useEmojiKeyboardSwap,
+} from '@/hooks/useEmojiKeyboardSwap';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from './EmojiPicker';
@@ -207,8 +210,10 @@ export function ChatInput({
       style={[
         styles.root,
         // While the emoji panel is open it runs edge-to-edge to the screen
-        // bottom, so the composer must not add its own bottom padding.
-        { paddingBottom: pickerOpen ? 0 : 8 },
+        // bottom, so the composer must not add its own bottom padding. (The
+        // panel's height carries this same value so the composer sits in the
+        // same place either way — see COMPOSER_BOTTOM_INSET.)
+        { paddingBottom: pickerOpen ? 0 : COMPOSER_BOTTOM_INSET },
       ]}
     >
       {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
@@ -393,8 +398,15 @@ export function ChatInput({
         </Pressable>
       </View>
 
-      {pickerOpen && (
-        <EmojiPicker onSelect={insertEmoji} keyboardHeight={emojiSwap.keyboardHeight} />
+      {/* Mounted past `pickerOpen` on purpose: while it trades places with the
+          keyboard the panel is still on screen, holding a shrinking space. */}
+      {emojiSwap.panelMounted && (
+        <EmojiPicker
+          onSelect={insertEmoji}
+          height={emojiSwap.panelHeight}
+          animatedStyle={emojiSwap.panelStyle}
+          showContent={pickerOpen}
+        />
       )}
     </View>
   );

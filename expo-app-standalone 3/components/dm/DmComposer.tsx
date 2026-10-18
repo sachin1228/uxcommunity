@@ -18,7 +18,10 @@ import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import type { PendingImage } from '@/components/chat/ChatInput';
-import { useEmojiKeyboardSwap } from '@/hooks/useEmojiKeyboardSwap';
+import {
+  COMPOSER_BOTTOM_INSET,
+  useEmojiKeyboardSwap,
+} from '@/hooks/useEmojiKeyboardSwap';
 
 /**
  * The DM composer — the community ChatInput without the community-only pieces
@@ -133,8 +136,11 @@ export function DmComposer({
     }
   }
 
+  // The panel's height carries this same bottom inset, so the composer sits in
+  // the same place whether the panel is open or shut — see
+  // COMPOSER_BOTTOM_INSET.
   return (
-    <View style={[styles.root, { paddingBottom: emojiPanelOpen ? 0 : 8 }]}>
+    <View style={[styles.root, { paddingBottom: emojiPanelOpen ? 0 : COMPOSER_BOTTOM_INSET }]}>
       {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
       <View style={styles.composerRow}>
@@ -279,8 +285,15 @@ export function DmComposer({
         </Pressable>
       </View>
 
-      {emojiPanelOpen && (
-        <EmojiPicker onSelect={insertEmoji} keyboardHeight={emojiSwap.keyboardHeight} />
+      {/* Mounted past `emojiPanelOpen` on purpose: while it trades places with
+          the keyboard the panel is still on screen, holding a shrinking space. */}
+      {emojiSwap.panelMounted && (
+        <EmojiPicker
+          onSelect={insertEmoji}
+          height={emojiSwap.panelHeight}
+          animatedStyle={emojiSwap.panelStyle}
+          showContent={emojiPanelOpen}
+        />
       )}
     </View>
   );

@@ -1,14 +1,13 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-  Animated,
-  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { type AnimatedStyle } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
 
 /**
@@ -22,6 +21,12 @@ import { useColors } from '@/hooks/useColors';
  * decides when the panel closes (tapping the field, the keyboard button,
  * sending, or scrolling the chat), and tapping an emoji inserts it at the
  * caret while keeping the panel open for several picks in a row.
+ *
+ * The panel itself is always this tall; what moves is the `animatedStyle`
+ * space around it, which the composer animates in step with the IME (see
+ * `useEmojiKeyboardSwap`). Growing that space clips the block from the bottom
+ * up, so the panel rises out of the edge the way the keyboard does — and the
+ * composer above it keeps still while the two trade places.
  */
 
 const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
@@ -68,85 +73,82 @@ interface Props {
   /** Called with the tapped emoji. The chat screen mounts the panel without
    *  a handler (ChatInput wires the insertion), so it is optional. */
   onSelect?: (emoji: string) => void;
-  /** The height the IME last took up on this screen. The panel claims exactly
-   *  that much, so swapping one for the other moves nothing above it; the
-   *  320dp default covers the very first open, before the IME has been seen. */
-  keyboardHeight?: number;
+  /** The panel's full height — the height the IME takes on this screen, so the
+   *  two are the same size when they trade places. */
+  height?: number;
+  /** The animated space around the panel (see `useEmojiKeyboardSwap`). */
+  animatedStyle?: AnimatedStyle<ViewStyle>;
+  /**
+   * Whether to render the emoji grid. The panel's space is mounted as soon as
+   * a keyboard appears (at zero height) so opening it can never race the IME,
+   * and the grid follows `open` — off while the panel is shut, so typing does
+   * not pay for a couple of hundred emoji cells that nobody can see.
+   */
+  showContent?: boolean;
 }
 
-export function EmojiPicker({ onSelect, keyboardHeight = 0 }: Props) {
+export function EmojiPicker({
+  onSelect,
+  height = styles.panel.height,
+  animatedStyle,
+  showContent = true,
+}: Props) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const height = keyboardHeight || styles.panel.height;
-
-  // The panel rises out of the bottom edge instead of popping into it, the way
-  // the keyboard does on its way up — the two should read as the same motion.
-  // Transform only, so it runs on the UI thread.
-  const rise = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.timing(rise, {
-      toValue: 0,
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [rise]);
 
   return (
-    <Animated.View
-      style={[
-        styles.panel,
-        {
-          height,
-          backgroundColor: colors.background,
-          borderTopColor: colors.border,
-          paddingBottom: insets.bottom,
-          transform: [
-            {
-              translateY: rise.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, height],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      {/* Drag handle — decorative, like the WhatsApp sticker drawer */}
-      <View style={[styles.handle, { backgroundColor: colors.border }]} />
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <Animated.View style={[styles.clip, animatedStyle]}>
+      {/* The space below the chat already stops at the safe area — the screen
+          renders a spacer under it — so the panel needs no bottom padding of
+          its own. */}
+      <View
+        style={[
+          styles.panel,
+          { height, backgroundColor: colors.background, borderTopColor: colors.border },
+        ]}
       >
-        {EMOJI_SECTIONS.map((section) => (
-          <View key={section.title}>
-            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-              {section.title}
-            </Text>
-            <View style={styles.grid}>
-              {section.emoji.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  onPress={() => onSelect?.(emoji)}
-                  style={({ pressed }) => [
-                    styles.emojiCell,
-                    { backgroundColor: pressed ? colors.subtle : 'transparent' },
-                  ]}
-                >
-                  <Text style={styles.emoji}>{emoji}</Text>
-                </Pressable>
+        {showContent && (
+          <>
+            {/* Drag handle — decorative, like the WhatsApp sticker drawer */}
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {EMOJI_SECTIONS.map((section) => (
+                <View key={section.title}>
+                  <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+                    {section.title}
+                  </Text>
+                  <View style={styles.grid}>
+                    {section.emoji.map((emoji) => (
+                      <Pressable
+                        key={emoji}
+                        onPress={() => onSelect?.(emoji)}
+                        style={({ pressed }) => [
+                          styles.emojiCell,
+                          { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                        ]}
+                      >
+                        <Text style={styles.emoji}>{emoji}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
               ))}
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+            </ScrollView>
+          </>
+        )}
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  /** The animated space the panel occupies — it starts at zero height while the
+   *  keyboard still owns the strip, hence the clipping. */
+  clip: { overflow: 'hidden' },
   panel: {
     height: 320,
     borderTopWidth: StyleSheet.hairlineWidth,
