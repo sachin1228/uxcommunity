@@ -108,9 +108,10 @@ export function EmojiPicker({
       >
         {showContent && (
           <>
-            {/* Drag handle — decorative, like the WhatsApp sticker drawer */}
-            <View style={[styles.handle, { backgroundColor: colors.border }]} />
-
+            {/* No drag handle: the panel is not a sheet — it takes the
+                keyboard's place and starts where the keyboard starts, so a
+                handle would push the first row of emoji down out of step with
+                the first row of keys. */}
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
@@ -155,14 +156,6 @@ const styles = StyleSheet.create({
     height: 320,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  handle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 8,
-    marginBottom: 4,
-  },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
   sectionTitle: {
@@ -170,8 +163,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_600SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginTop: 12,
-    marginBottom: 6,
+    // Tight, so the first emoji row lands on the keyboard's own first row
+    // instead of a header's worth of black below the composer.
+    marginTop: 8,
+    marginBottom: 4,
     marginLeft: 4,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
