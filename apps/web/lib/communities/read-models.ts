@@ -19,6 +19,11 @@ import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
 import { loadEventRoomMeta } from "./event-chat";
 import { isCommunityMember } from "./membership";
 import { logEvent } from "@/lib/observability/log";
+import {
+  applyReplyAuthorIds,
+  missingReplyAuthorIds,
+  type ReplyPreviewCarrier,
+} from "./reply-preview-authors";
 // One shared experience-level label cleaner — see ./comment-authors.ts.
 import { cleanDesignation } from "./comment-authors";
 
@@ -522,6 +527,35 @@ export async function loadCommunityMessagePage(
     delete message.reply_to_content_id;
     return message;
   });
+
+  // A quote wears the quoted author's colour, which needs their id. The page
+  // RPC only carries it once 20261019100000 is applied; on a database still on
+  // the older function (or a page cached before it) recover the id from the
+  // page's own rows, then from one batched read for quotes whose parent falls
+  // outside the page. Without this the same quoted person renders grey in one
+  // bubble and coloured in the next.
+  const carriers = messages as unknown as ReplyPreviewCarrier[];
+  const missingReplyAuthors = missingReplyAuthorIds(carriers);
+  if (missingReplyAuthors.length) {
+    const authorIds = new Map<string, string>();
+    for (const message of messages) {
+      if (typeof message.id === "string" && typeof message.user_id === "string") {
+        authorIds.set(message.id, message.user_id);
+      }
+    }
+    const unresolved = missingReplyAuthors.filter((id) => !authorIds.has(id));
+    if (unresolved.length) {
+      const { data: parents } = await db
+        .from("community_messages")
+        .select("id, user_id")
+        .in("id", unresolved);
+      for (const parent of parents ?? []) {
+        if (parent.id && parent.user_id) authorIds.set(parent.id, parent.user_id);
+      }
+    }
+    applyReplyAuthorIds(carriers, authorIds);
+  }
+
   return {
     ok: true,
     data: {

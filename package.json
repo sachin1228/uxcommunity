@@ -43,6 +43,7 @@
     "test:mentions": "tsx --test apps/web/lib/communities/mentions.test.ts",
     "test:comment-text": "tsx --test apps/web/lib/communities/comment-text.test.ts",
     "test:preview-text": "tsx --test apps/web/lib/communities/preview-text.test.ts",
+    "test:reply-preview-authors": "tsx --test apps/web/lib/communities/reply-preview-authors.test.ts",
     "test:comment-tree": "tsx --test apps/web/lib/communities/comment-tree.test.ts",
     "test:user-color": "tsx --test apps/web/lib/communities/user-color.test.ts",
     "test:r2-lifecycle": "tsx --test apps/web/lib/r2-lifecycle.test.ts",
