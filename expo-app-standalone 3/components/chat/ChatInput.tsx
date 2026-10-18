@@ -396,7 +396,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderLeftWidth: 2,
-    borderRadius: 6,
+    // Concentric with the pill: box radius (18) minus this banner's 6pt side
+    // inset — the inner corners trace the outer container's curve.
+    borderRadius: 12,
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
