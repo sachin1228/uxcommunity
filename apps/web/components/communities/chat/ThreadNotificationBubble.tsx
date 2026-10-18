@@ -23,7 +23,6 @@ import type { CachedThreadEvent } from "@/lib/communities/cache";
 import { THREAD_CATEGORIES } from "@/lib/communities/models/threads";
 import {
   CONTENT_TILE,
-  KIND_THEME,
   firstLine,
 } from "@/lib/communities/content-notifications";
 
@@ -87,7 +86,6 @@ export function ThreadNotificationBubble({
   const label   = categoryLabel(event.category);
   const href    = `/dashboard/communities/${communityId}/threads/${event.id}`;
   const CatIcon = CATEGORY_ICON[event.category] ?? HelpCircle;
-  const theme   = KIND_THEME.thread;
   // Discussion on the thread's own page — the count, updating live as comments
   // arrive (same footer as the other three kinds).
   const commentCount = Math.max(0, event.meta?.comment_count ?? 0);
@@ -207,17 +205,9 @@ export function ThreadNotificationBubble({
                 )}
               </div>
 
-              {/* Text */}
+              {/* Text — no kind eyebrow: the header already says "created a
+                  thread", so a second "THREAD" label is redundant. */}
               <div className="flex-1 min-w-0 py-1.5 pr-1">
-                <span
-                  className={`flex items-center gap-1.5 font-body text-[10px] font-bold tracking-[0.08em] uppercase ${
-                    isMe ? "text-accent-foreground" : ""
-                  }`}
-                  style={{ color: isMe ? undefined : theme.accent }}
-                >
-                  <MessageCircle size={12} strokeWidth={2.5} />
-                  Thread
-                </span>
                 <p
                   className={`font-body text-sm font-semibold line-clamp-1 leading-snug mt-0.5 ${
                     isMe ? "text-accent-foreground" : "text-foreground"

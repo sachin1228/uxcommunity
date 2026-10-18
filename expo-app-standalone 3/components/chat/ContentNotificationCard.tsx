@@ -314,14 +314,18 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 )}
               </View>
 
-              {/* Text column */}
+              {/* Text column — a thread card skips the kind eyebrow: the header
+                  already says "created a thread". Other kinds keep theirs (a
+                  resource's type is more specific than the header's noun). */}
               <View style={styles.textCol}>
-                <View style={styles.eyebrowRow}>
-                  <ContentIcon name={KIND_ICON[event.kind]} size={12} color={isOwn ? ownText : theme.accent} />
-                  <Text style={[styles.eyebrow, { color: isOwn ? ownText : theme.accent }]}>
-                    {eyebrowLabel}
-                  </Text>
-                </View>
+                {event.kind !== 'thread' && (
+                  <View style={styles.eyebrowRow}>
+                    <ContentIcon name={KIND_ICON[event.kind]} size={12} color={isOwn ? ownText : theme.accent} />
+                    <Text style={[styles.eyebrow, { color: isOwn ? ownText : theme.accent }]}>
+                      {eyebrowLabel}
+                    </Text>
+                  </View>
+                )}
                 <Text numberOfLines={1} style={[styles.title, { color: textColor }]}>
                   {title || theme.label}
                 </Text>
