@@ -242,7 +242,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
               size={12}
             />
           </View>
-          <Text style={[styles.time, { color: colors.foregroundSoft }]}>
+          <Text style={[styles.time, { color: colors.foregroundMuted }]}>
             {formatTime(lastTime)}
           </Text>
         </View>
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 13,
-    fontFamily: 'Geist_400Regular',
+    fontFamily: 'Geist_500Medium',
   },
   memberCount: {
     fontSize: 12,
