@@ -48,16 +48,19 @@ const EMOJI_MESSAGE_SIZE = 48;
 function ReplyBubble({
   reply,
   isMe,
+  currentUserId,
   onReplyClick,
 }: {
   reply: ReplyPreview;
   isMe: boolean;
+  currentUserId: string;
   onReplyClick: (replyId: string) => void;
 }) {
   // Reply names get the same per-user color as chat sender names — when the
-  // parent author's id is known (live replies, replies to own messages).
-  // History-built previews omit the id, so they fall back to neutral.
-  const nameColor = reply.user_id ? userColorVar(reply.user_id) : undefined;
+  // parent author's id is known. Quoting your own message stays neutral white;
+  // history-built previews omit the id and fall back to neutral too.
+  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
+  const nameColor = reply.user_id && !quotedSelf ? userColorVar(reply.user_id) : undefined;
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
@@ -704,7 +707,14 @@ export const MessageBubble = memo(function MessageBubble({
                       className={imageUrl ? "mb-1 pl-1" : ""}
                     />
                   )}
-                  {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
+                  {replyTo && (
+                    <ReplyBubble
+                      reply={replyTo}
+                      isMe={isMe}
+                      currentUserId={currentUserId}
+                      onReplyClick={onReplyClick}
+                    />
+                  )}
                   {!replyTo && replyToContent && (
                     <ContentReplyBubble reply={replyToContent} isMe={isMe} onReplyClick={onReplyClick} />
                   )}

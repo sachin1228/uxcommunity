@@ -120,17 +120,21 @@ function ReplyBubble({
   reply,
   isOwn,
   colors,
+  currentUserId,
   onPress,
 }: {
   reply: NonNullable<Message['reply_to']>;
   isOwn: boolean;
   colors: Palette;
+  currentUserId: string;
   onPress?: () => void;
 }) {
   // Reply names get the same per-user color as sender names when the author's
-  // id is known; history-built previews omit it and fall back to neutral.
+  // id is known — except a quote of your own message stays neutral white.
+  // History-built previews omit the id and fall back to neutral too.
   const ownText = colors.chatOwnBubbleForeground;
-  const nameColor = reply.user_id
+  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
+  const nameColor = reply.user_id && !quotedSelf
     ? userNameColor(reply.user_id, colors)
     : isOwn
       ? ownText
@@ -150,7 +154,7 @@ function ReplyBubble({
         style={[
           styles.replyBar,
           {
-            backgroundColor: reply.user_id
+            backgroundColor: reply.user_id && !quotedSelf
               ? nameColor
               : isOwn
                 ? colors.chatReplyBorderOwn
@@ -775,6 +779,7 @@ export const MessageBubble = memo(function MessageBubble({
                         reply={replyTo}
                         isOwn={isOwn}
                         colors={colors}
+                        currentUserId={currentUserId}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
                       />
                     )}
