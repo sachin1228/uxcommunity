@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -92,38 +92,25 @@ export function CommunityContentView({
     setSelected((current) => current?.id === item.id ? merged : current);
   };
 
+  // The options sheet confirms first, in its own styled panel; rejecting here
+  // hands the failure back to it so it can stay open with the reason.
   const remove = useCallback(
-    (item: CommunityContent) => Alert.alert(
-      `Delete ${contentLabel(kind).toLowerCase()}?`,
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCommunityContent(communityId, kind, item.id);
-              queryClient.setQueryData<CommunityContent[]>(
-                communityContentKey(communityId, kind),
-                (old = []) => old.filter((entry) => entry.id !== item.id),
-              );
-              // Its "created a …" card leaves the chat timeline in the same
-              // frame — the realtime content-delete echo follows.
-              notifyContentEvent({
-                kind: 'delete',
-                communityId,
-                id: item.id,
-                contentKind: chatContentKindForTab(kind),
-              });
-              setSelected(null);
-            } catch (e) {
-              Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');
-            }
-          },
-        },
-      ],
-    ),
+    async (item: CommunityContent) => {
+      await deleteCommunityContent(communityId, kind, item.id);
+      queryClient.setQueryData<CommunityContent[]>(
+        communityContentKey(communityId, kind),
+        (old = []) => old.filter((entry) => entry.id !== item.id),
+      );
+      // Its "created a …" card leaves the chat timeline in the same frame —
+      // the realtime content-delete echo follows.
+      notifyContentEvent({
+        kind: 'delete',
+        communityId,
+        id: item.id,
+        contentKind: chatContentKindForTab(kind),
+      });
+      setSelected(null);
+    },
     [communityId, kind, queryClient],
   );
 

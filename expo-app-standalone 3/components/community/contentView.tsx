@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Animated,
   Easing,
   Image,
@@ -481,7 +482,8 @@ export interface ContentCardProps {
   /** The comment count — the only route into the post's own page. */
   onComments: (item: CommunityContent) => void;
   onEdit?: (item: CommunityContent) => void;
-  onDelete?: (item: CommunityContent) => void;
+  /** Rejects when the server refuses, so the confirm can stay open. */
+  onDelete?: (item: CommunityContent) => Promise<void> | void;
 }
 
 export function ContentCard({
@@ -801,7 +803,7 @@ export function ContentDetail({
   visible: boolean;
   onClose: () => void;
   onEdit?: (item: CommunityContent) => void;
-  onDelete?: (item: CommunityContent) => void;
+  onDelete?: (item: CommunityContent) => Promise<void> | void;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -1030,12 +1032,42 @@ export function ContentOptionsMenu({
   actions: ContentActionsApi;
   isOwner: boolean;
   onEdit?: (item: CommunityContent) => void;
-  onDelete?: (item: CommunityContent) => void;
+  /** Rejects when the server refuses, so the confirm can stay open. */
+  onDelete?: (item: CommunityContent) => Promise<void> | void;
 }) {
   const colors = useColors();
   const [visible, setVisible] = useState(false);
+  // Delete asks first, in-sheet — the same confirm vocabulary as the message
+  // and chat-actions sheets, instead of the system alert.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const saveAction = MENU_ACTION_BY_KIND[kind];
   const saved = saveAction ? actions.isActive(item, kind, saveAction.action) : false;
+  const noun = contentLabel(kind).toLowerCase();
+
+  const close = () => {
+    if (deleting) return;
+    setVisible(false);
+    setConfirmingDelete(false);
+    setDeleteError(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!onDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete(item);
+      setDeleting(false);
+      setVisible(false);
+      setConfirmingDelete(false);
+    } catch (e) {
+      // Stay open with the reason, so the user can retry or back out.
+      setDeleting(false);
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete. Please try again.');
+    }
+  };
 
   return (
     <>
@@ -1053,10 +1085,67 @@ export function ContentOptionsMenu({
         <Feather name="more-vertical" size={21} color={colors.foregroundSubtle} />
       </Pressable>
 
-      <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setVisible(false)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setVisible(false)} accessibilityLabel="Close post options">
+      <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
+        <Pressable style={styles.menuBackdrop} onPress={close} accessibilityLabel="Close post options">
           <View style={[styles.optionsSheet, { backgroundColor: colors.overlayElevated, shadowColor: '#000' }]}>
-            {saveAction ? (
+            {confirmingDelete ? (
+              <View>
+                <View style={[styles.confirmHeader, { borderBottomColor: colors.borderSubtle }]}>
+                  <Text style={[styles.confirmTitle, { color: colors.foreground }]}>
+                    Delete {noun}?
+                  </Text>
+                  <Text style={[styles.confirmBody, { color: colors.foregroundMuted }]}>
+                    This cannot be undone.
+                  </Text>
+                  {deleteError ? (
+                    <Text style={[styles.confirmError, { color: colors.destructive }]}>
+                      {deleteError}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => {
+                    hapticSelection();
+                    void confirmDelete();
+                  }}
+                  disabled={deleting}
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: deleting }}
+                  style={({ pressed }) => [
+                    styles.confirmAction,
+                    {
+                      backgroundColor: pressed ? colors.destructive + '1A' : 'transparent',
+                      opacity: deleting ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  {deleting ? <ActivityIndicator size="small" color={colors.destructive} /> : null}
+                  <Text style={[styles.confirmActionText, { color: colors.destructive }]}>
+                    {deleting ? 'Deleting…' : `Delete ${noun}`}
+                  </Text>
+                </Pressable>
+                <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
+                <Pressable
+                  onPress={() => {
+                    hapticSelection();
+                    setConfirmingDelete(false);
+                    setDeleteError(null);
+                  }}
+                  disabled={deleting}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.confirmAction,
+                    { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                  ]}
+                >
+                  <Text style={[styles.confirmActionText, { color: colors.foregroundMuted }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {!confirmingDelete && saveAction ? (
               <Pressable
                 onPress={() => {
                   hapticToggle(!saved);
@@ -1078,13 +1167,13 @@ export function ContentOptionsMenu({
               </Pressable>
             ) : null}
 
-            {isOwner && onEdit && onDelete ? (
+            {!confirmingDelete && isOwner && onEdit && onDelete ? (
               <>
                 <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable
                   onPress={() => {
                     hapticSelection();
-                    setVisible(false);
+                    close();
                     onEdit(item);
                   }}
                   style={styles.optionRow}
@@ -1096,8 +1185,7 @@ export function ContentOptionsMenu({
                 <Pressable
                   onPress={() => {
                     hapticSelection();
-                    setVisible(false);
-                    onDelete(item);
+                    setConfirmingDelete(true);
                   }}
                   style={styles.optionRow}
                   accessibilityRole="button"
@@ -1478,6 +1566,40 @@ const styles = StyleSheet.create({
   optionRow: { minHeight: 52, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 14 },
   optionText: { fontFamily: 'Geist_500Medium', fontSize: 15 },
   optionDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 18 },
+
+  // In-sheet delete confirm — the same shape as the message and chat-actions
+  // sheets: centred title and reason, then a destructive action and Cancel.
+  confirmHeader: {
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+  },
+  confirmTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16 },
+  confirmBody: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  confirmError: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 17,
+  },
+  confirmAction: {
+    minHeight: 52,
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  confirmActionText: { fontFamily: 'Geist_600SemiBold', fontSize: 15 },
 
   // Web card body: font-display text-sm font-normal leading-snug.
   cardTitle: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
