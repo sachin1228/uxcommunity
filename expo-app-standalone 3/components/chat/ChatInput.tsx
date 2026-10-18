@@ -407,8 +407,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 8,
   },
-  /** WhatsApp's short rounded rule — flush left, inset top and bottom. */
-  replyBar: { alignSelf: 'stretch', width: 3, borderRadius: 2, marginVertical: 8 },
+  /** WhatsApp's rule — flush left, running the chip's full height with
+   * rounded ends, so it finishes into the container's corners. */
+  replyBar: { alignSelf: 'stretch', width: 3, borderRadius: 2 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
