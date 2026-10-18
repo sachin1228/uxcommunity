@@ -619,6 +619,9 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <Animated.View
+      // The whole row is the swipe surface: the avatar column and the empty
+      // half beside a short bubble belong to the row, not the content column.
+      {...swipePan.panHandlers}
       style={[
         styles.row,
         { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
@@ -673,7 +676,6 @@ export const MessageBubble = memo(function MessageBubble({
 
       {/* Content column */}
       <Animated.View
-        {...swipePan.panHandlers}
         style={[
           styles.contentCol,
           { maxWidth: bubbleMaxWidth },
