@@ -406,14 +406,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
-    paddingLeft: 13,
     paddingRight: 6,
-    paddingVertical: 6,
+    gap: 8,
+    overflow: 'hidden',
   },
-  /** WhatsApp's chunky pill — absolute so it runs nearly the chip's full
-   *  height (3pt from each edge) independent of the text padding. */
-  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 4.5, borderRadius: 2.25 },
-  replyInfo: { flex: 1, minWidth: 0, gap: 2 },
+  /** WhatsApp's accent — a full-height square bar, clipped into the chip's
+   *  corners by the overflow above (their exact DOM pattern). */
+  replyBar: { alignSelf: 'stretch', width: 4, flexShrink: 0 },
+  replyInfo: { flex: 1, minWidth: 0, gap: 2, paddingVertical: 6 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
 

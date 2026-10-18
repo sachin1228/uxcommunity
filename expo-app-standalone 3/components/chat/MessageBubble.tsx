@@ -820,16 +820,18 @@ const styles = StyleSheet.create({
 
   // ── reply quote ─────────────────────────────────────────────────────────
   replyBubble: {
+    flexDirection: 'row',
     borderRadius: 12,
-    paddingLeft: 13,
     paddingRight: 10,
-    paddingVertical: 6,
     marginBottom: 4,
     maxWidth: '100%',
+    gap: 8,
+    overflow: 'hidden',
   },
-  /** WhatsApp's chunky pill — absolute, flush left, 3pt from each edge. */
-  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 4.5, borderRadius: 2.25 },
-  replyBody: { flexShrink: 1, minWidth: 0 },
+  /** WhatsApp's accent — a full-height square bar, clipped into the chip's
+   *  corners by the overflow above (their exact DOM pattern). */
+  replyBar: { width: 4, flexShrink: 0 },
+  replyBody: { flexShrink: 1, minWidth: 0, paddingVertical: 6 },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
   contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },
   replyContent: { fontSize: 11, lineHeight: 15 },

@@ -61,29 +61,31 @@ function ReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md text-left max-w-full cursor-pointer
+      className={`flex mt-1 mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
         ${isMe
           ? "bg-black/20 hover:bg-black/30"
           : "bg-black/10 hover:bg-black/20"
         } transition-colors`}
     >
-      {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
+      {/* WhatsApp's accent — full-height square bar, clipped into the corners. */}
       <span
         aria-hidden
-        className={`absolute left-0 top-[3px] bottom-[3px] w-[4.5px] rounded-full ${
+        className={`w-[4px] shrink-0 ${
           nameColor && !isMe ? "" : isMe ? "bg-white/20" : "bg-white/15"
         }`}
         style={nameColor && !isMe ? { backgroundColor: nameColor } : undefined}
       />
-      <p
-        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
-        style={nameColor && !isMe ? { color: nameColor } : undefined}
-      >
-        {reply.user_name}
-      </p>
-      <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
-        {reply.content || "📷 Image"}
-      </p>
+      <div className="flex-1 min-w-0 py-1.5 pl-[10px]">
+        <p
+          className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+          style={nameColor && !isMe ? { color: nameColor } : undefined}
+        >
+          {reply.user_name}
+        </p>
+        <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+          {reply.content || "📷 Image"}
+        </p>
+      </div>
     </div>
   );
 }
@@ -107,7 +109,7 @@ function ContentReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md text-left max-w-full cursor-pointer
+      className={`flex mt-1 mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
         ${isMe
           ? "bg-black/20 hover:bg-black/30"
           : "bg-black/10 hover:bg-black/20"
@@ -115,18 +117,18 @@ function ContentReplyBubble({
     >
       <span
         aria-hidden
-        className={`absolute left-0 top-[3px] bottom-[3px] w-[4.5px] rounded-full ${
-          isMe ? "bg-white/20" : "bg-white/15"
-        }`}
+        className={`w-[4px] shrink-0 ${isMe ? "bg-white/20" : "bg-white/15"}`}
       />
-      <p
-        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
-      >
-        {label}
-      </p>
-      <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
-        {reply.title || label}
-      </p>
+      <div className="flex-1 min-w-0 py-1.5 pl-[10px]">
+        <p
+          className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+        >
+          {label}
+        </p>
+        <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+          {reply.title || label}
+        </p>
+      </div>
     </div>
   );
 }
