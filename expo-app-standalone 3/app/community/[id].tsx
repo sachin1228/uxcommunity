@@ -72,6 +72,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
+import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
 import { isContentKind, type CommunityTab, type ContentKind } from '@/lib/communityContent';
 
@@ -291,13 +292,19 @@ export default function CommunityChat() {
    * next mount.
    */
   const [openTarget, setOpenTarget] = useState<{ tab: CommunityTab; id: string } | null>(null);
+  /**
+   * A chat card's post, opened over the chat itself. Kept apart from
+   * `openTarget`: that hand-off exists to *switch* to a tab, which is exactly
+   * what tapping a card in the chat should not do.
+   */
+  const [chatDetail, setChatDetail] = useState<{ kind: ContentKind; id: string } | null>(null);
 
   /**
    * A notification's link, walked in: the item it is about lives on its own
-   * tab, so open that tab with it already selected — the same hand-off
-   * handleContentOpen performs for a tapped "created a …" card. The route
-   * parser (lib/notifications) has vetted the kind, but a hand-written deep
-   * link has not, so it is checked again here.
+   * tab, so open that tab with it already selected. (A "created a …" card in
+   * the chat does not come through here — it opens the page over the chat.)
+   * The route parser (lib/notifications) has vetted the kind, but a
+   * hand-written deep link has not, so it is checked again here.
    */
   useEffect(() => {
     if (!isContentKind(contentKind) || !contentId) return;
@@ -863,15 +870,14 @@ export default function CommunityChat() {
   );
 
   /**
-   * A "created a …" card was tapped: its item lives on its own tab, so switch
-   * there and hand the id over — CommunityContentView opens the detail once
-   * its page has loaded (the mobile equivalent of the web card's link).
+   * A "created a …" card was tapped: open the post itself over the chat (the
+   * mobile equivalent of the web card's link). The page's tab is only where
+   * the post happens to live — tapping a link to one post is not a request to
+   * browse that tab, so the active tab stays where it is.
    */
   const handleContentOpen = useCallback((event: ChatContentEvent) => {
     setEmojiPanelOpen(false);
-    const tab = tabForChatContentKind(event.kind);
-    setOpenTarget({ tab, id: event.id });
-    setActiveTab(tab);
+    setChatDetail({ kind: tabForChatContentKind(event.kind), id: event.id });
   }, []);
 
   /**
@@ -1455,6 +1461,19 @@ export default function CommunityChat() {
         onReact={handleContentReaction}
         onReply={handleContentReply}
       />
+
+      {/* A post opened from a "created a …" card in the chat — the page sits
+          over the chat instead of switching tabs behind it. */}
+      {chatDetail && (
+        <ContentDetailOverlay
+          communityId={id}
+          communityName={communityName}
+          kind={chatDetail.kind}
+          contentId={chatDetail.id}
+          currentUserId={user?.id ?? ''}
+          onClose={() => setChatDetail(null)}
+        />
+      )}
 
       {/* Community info — WhatsApp-style, opened from the header title (the
           web right sidebar's content: members, about, rules) */}
