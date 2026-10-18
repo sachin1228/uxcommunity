@@ -139,6 +139,15 @@ export default function CommunityChat() {
   /** Detail-route fallback for the header count when the list lacks the row. */
   const [detailMemberCount, setDetailMemberCount] = useState<number | null>(null);
   const [memberCountLoading, setMemberCountLoading] = useState(true);
+  /** Row focus flash after a reply jump — cleared by its own timer. */
+  const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -824,6 +833,11 @@ export default function CommunityChat() {
       } catch {
         listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
       }
+      // Web flashMessage parity — tint the target row briefly so the land is
+      // obvious, not just the scroll.
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      setFlashMessageId(messageId);
+      flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1500);
     },
     [rows],
   );
@@ -991,6 +1005,7 @@ export default function CommunityChat() {
           onRetry={handleRetry}
           onReplyPress={handleReplyPress}
           onContentReplyPress={handleContentChipPress}
+          highlighted={flashMessageId === item.msg.id}
         />
       );
     },
@@ -1009,6 +1024,7 @@ export default function CommunityChat() {
       handleContentReaction,
       colors,
       initialUnreadCount,
+      flashMessageId,
     ],
   );
 

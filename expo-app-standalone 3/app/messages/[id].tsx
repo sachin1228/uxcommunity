@@ -181,6 +181,15 @@ export default function DmThreadScreen() {
   );
   /** The list stays hidden until the anchor scroll is committed (no top flash). */
   const [initialPositionResolved, setInitialPositionResolved] = useState(false);
+  /** Row focus flash after a reply jump — cleared by its own timer. */
+  const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
 
   const loadingMoreRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -759,6 +768,11 @@ export default function DmThreadScreen() {
       } catch {
         listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
       }
+      // Web flashMessage parity — tint the target row briefly so the land is
+      // obvious, not just the scroll.
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      setFlashMessageId(messageId);
+      flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1500);
     },
     [],
   );
@@ -1092,6 +1106,7 @@ export default function DmThreadScreen() {
                     onCancel={handleCancel}
                     onRetry={handleRetry}
                     onReplyPress={handleReplyPress}
+                    highlighted={flashMessageId === item.msg.id}
                   />
                 );
               }}

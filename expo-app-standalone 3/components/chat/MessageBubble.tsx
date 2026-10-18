@@ -1,6 +1,7 @@
-import React, { Fragment, memo, useCallback, useMemo, useState } from 'react';
+import React, { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Linking,
   Pressable,
   StyleSheet,
@@ -45,6 +46,8 @@ interface Props {
   onReplyPress?: (messageId: string) => void;
   /** Jumps the list to the "created a …" card this one replies to. */
   onContentReplyPress?: (contentId: string) => void;
+  /** Row focus flash after a reply jump (web parity) — fades a blue tint in/out. */
+  highlighted?: boolean;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -475,9 +478,27 @@ export const MessageBubble = memo(function MessageBubble({
   onRetry,
   onReplyPress,
   onContentReplyPress,
+  highlighted = false,
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Row focus flash — the web row's translucent blue, faded like its
+  // `transition-colors` rather than popping on and off.
+  const flash = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(flash, {
+      toValue: highlighted ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [highlighted, flash]);
+  const flashStyle = {
+    backgroundColor: flash.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(0, 98, 209, 0)', 'rgba(0, 98, 209, 0.25)'],
+    }),
+  };
 
   const sender = message.users;
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
@@ -530,11 +551,12 @@ export const MessageBubble = memo(function MessageBubble({
   }, [onAuthorPress, message.user_id]);
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.row,
         { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
         isFirstInGroup ? styles.rowFirst : styles.rowCompact,
+        flashStyle,
       ]}
     >
       {/* Avatar column — hidden for own messages (web parity) */}
@@ -736,7 +758,7 @@ export const MessageBubble = memo(function MessageBubble({
         {/* Reserve room for the pills that hang below the bubble */}
         {reactions.length > 0 && !isDeleted && <View style={styles.reactionSpacer} />}
       </View>
-    </View>
+    </Animated.View>
   );
 });
 
