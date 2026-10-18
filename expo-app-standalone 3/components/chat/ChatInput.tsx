@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -72,6 +73,8 @@ export function ChatInput({
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const inputRef = useRef<TextInput>(null);
+  /** Caret/selection as last reported by the field — emoji insert here. */
+  const selectionRef = useRef({ start: 0, end: 0 });
 
   // Starting a reply (sheet, swipe, or chip tap) drops the caret straight into
   // the composer so the keyboard opens on the action, as WhatsApp does.
@@ -100,6 +103,14 @@ export function ChatInput({
   const nearLimit = text.length >= MAX_MESSAGE_CHARS - 50;
   const linkPreviewUrl = text.trim() ? extractFirstUrl(text) : null;
 
+  // Opening the panel must not cost the caret: the field keeps focus (and its
+  // selection) under the panel so picking an emoji inserts it where the user
+  // was typing. Android hides the IME without blurring via
+  // showSoftInputOnFocus; the focus call below re-establishes the caret.
+  useEffect(() => {
+    if (pickerOpen) inputRef.current?.focus();
+  }, [pickerOpen]);
+
   // The quote wears the replied author's chat name color — same deterministic
   // palette as the sender names inside bubbles. Quoting your own message stays
   // neutral, matching the sent bubble.
@@ -126,18 +137,22 @@ export function ChatInput({
     setPickerOpen(false);
     onTypingChange('');
     resetMentions();
+    selectionRef.current = { start: 0, end: 0 };
   }
 
-  /** Emoji button — opens the inline panel below the composer (dismissing
-   *  the keyboard so the input stays visible above it, WhatsApp-style); a
-   *  second tap closes the panel and puts the caret back in the input. */
+  /** Emoji button — opens the inline panel below the composer while keeping
+   *  the caret in the field (keyboard hidden on Android, panel above it on
+   *  iOS); tapping the field again places the caret without closing the
+   *  panel. A second tap on the button closes the panel and brings the
+   *  keyboard back. */
   function togglePicker() {
     if (pickerOpen) {
       setPickerOpen(false);
-      inputRef.current?.focus();
+      // After the re-render clears showSoftInputOnFocus, focus reopens the IME.
+      requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setPickerOpen(true);
-      Keyboard.dismiss();
+      if (Platform.OS === 'android') Keyboard.dismiss();
     }
   }
 
@@ -154,11 +169,17 @@ export function ChatInput({
   }
 
   function insertEmoji(emoji: string) {
-    // Deliberately not handleChangeText — picking an emoji must not close
-    // the panel, so several emoji can be added in a row.
-    setText(text + emoji);
-    onTypingChange(text + emoji);
-    onComposerActivity(text + emoji, (text + emoji).length);
+    // Insert at the caret (not the end) so emoji can be placed between
+    // sentences; the panel stays open for several picks in a row.
+    const from = Math.min(selectionRef.current.start, text.length);
+    const to = Math.min(Math.max(selectionRef.current.end, from), text.length);
+    const next = text.slice(0, from) + emoji + text.slice(to);
+    const caret = from + emoji.length;
+    selectionRef.current = { start: caret, end: caret };
+    setText(next);
+    onTypingChange(next);
+    onComposerActivity(next, caret);
+    requestAnimationFrame(() => inputRef.current?.setSelection(caret, caret));
   }
 
   async function handlePickImage() {
@@ -302,12 +323,14 @@ export function ChatInput({
                 if (pickerOpen) setPickerOpen(false);
                 handleChangeText(v);
               }}
-              onFocus={() => {
-                // Tapping the field directly also swaps the panel for the
-                // keyboard, like WhatsApp.
-                if (pickerOpen) setPickerOpen(false);
+              // Android: keeps the caret alive while the panel replaces the
+              // keyboard — the field stays focused without the IME. iOS has
+              // no equivalent, so its keyboard stays up next to the panel.
+              showSoftInputOnFocus={!pickerOpen}
+              onSelectionChange={(e) => {
+                selectionRef.current = e.nativeEvent.selection;
+                onComposerActivity(text, e.nativeEvent.selection.end);
               }}
-              onSelectionChange={(e) => onComposerActivity(text, e.nativeEvent.selection.end)}
               multiline
               returnKeyType="default"
               editable={!disabled}
