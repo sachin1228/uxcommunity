@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Keyboard, Platform, type KeyboardEvent } from 'react-native';
+import { KeyboardEvents } from 'react-native-keyboard-controller';
 
 /**
  * How long a touch on the field waits for the IME before the panel steps aside
@@ -14,13 +14,24 @@ const HANDOFF_TIMEOUT_MS = 400;
  * Makes the composer's emoji panel and the keyboard trade places in a single
  * move, the way WhatsApp does it.
  *
- * The chat screen pads its content by the keyboard's height, and the panel
- * claims that same space. So if the panel closes at the very moment the IME
- * reports in, the 320-odd dp the panel gave up is the 320-odd dp the keyboard
- * inset takes — the composer above them does not move. Collapsing the panel
- * earlier (on touch-down, or on focus) leaves a gap where neither occupies the
- * bottom: the composer drops, then rides back up with the keyboard, which reads
- * as the flicker this hook exists to remove.
+ * The chat screen reserves the keyboard's height while the IME is up, and the
+ * panel claims that same height. So if the panel goes at the instant the IME
+ * starts to rise, the space it gives up is the space the IME takes in the same
+ * frames — the composer above them does not move, and the two never share the
+ * screen.
+ *
+ * Both halves of that matter, and both depend on *which* event is used:
+ *
+ *  - Closing earlier (on touch-down, before the IME even starts) drops the
+ *    composer to the bottom and brings it back up with the keyboard — a visible
+ *    dip.
+ *  - Closing later (`keyboardDidShow`, the only will-event React Native's own
+ *    `Keyboard` module has on Android) leaves the panel on screen for the whole
+ *    IME animation — the flash of "both panels".
+ *
+ * `react-native-keyboard-controller` announces `keyboardWillShow` on both
+ * platforms by watching the IME inset animation itself, which is exactly the
+ * frame this needs. It is available because `KeyboardProvider` wraps the app.
  *
  * @param open    whether the panel is currently open
  * @param setOpen closes (or opens) it
@@ -45,16 +56,13 @@ export function useEmojiKeyboardSwap(
       }
     };
 
-    const subscription = Keyboard.addListener(
-      // iOS announces the IME before it animates, which is when the panel has
-      // to go; Android only reports once it is up.
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (event: KeyboardEvent) => {
-        heightRef.current = event.endCoordinates.height;
-        clearTimer();
-        if (openRef.current) setOpenRef.current(false);
-      },
-    );
+    const subscription = KeyboardEvents.addListener('keyboardWillShow', (event) => {
+      heightRef.current = event.height;
+      clearTimer();
+      // The IME is on its way up: the panel yields the space it was holding so
+      // the two hand over without either the composer or the list moving.
+      if (openRef.current) setOpenRef.current(false);
+    });
 
     return () => {
       clearTimer();
@@ -66,9 +74,10 @@ export function useEmojiKeyboardSwap(
    * The user asked for the keyboard (touched the field, or tapped the keyboard
    * glyph) while the panel is open. The panel is *not* collapsed here — it
    * waits for the IME's own announcement a few milliseconds later, so the swap
-   * is one continuous motion instead of a collapse followed by a rise.
+   * is one continuous motion. This only arms the fallback for a tap that never
+   * raises the keyboard.
    *
-   * Callers still focus the field themselves; this only arms the fallback.
+   * Callers still focus the field themselves.
    */
   const startHandoff = () => {
     if (!openRef.current) return;

@@ -1,5 +1,13 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
@@ -69,16 +77,38 @@ interface Props {
 export function EmojiPicker({ onSelect, keyboardHeight = 0 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const height = keyboardHeight || styles.panel.height;
+
+  // The panel rises out of the bottom edge instead of popping into it, the way
+  // the keyboard does on its way up — the two should read as the same motion.
+  // Transform only, so it runs on the UI thread.
+  const rise = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.timing(rise, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [rise]);
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.panel,
         {
-          height: keyboardHeight || styles.panel.height,
+          height,
           backgroundColor: colors.background,
           borderTopColor: colors.border,
           paddingBottom: insets.bottom,
+          transform: [
+            {
+              translateY: rise.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, height],
+              }),
+            },
+          ],
         },
       ]}
     >
@@ -112,7 +142,7 @@ export function EmojiPicker({ onSelect, keyboardHeight = 0 }: Props) {
           </View>
         ))}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 
