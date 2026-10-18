@@ -226,13 +226,23 @@ export function useCommunities() {
               content: string | null;
               created_at: string;
               user_id: string;
+              sender_name?: string | null;
               reply_to_id?: string | null;
+              reply_sender_name?: string | null;
               image_url?: string | null;
             };
 
             const isOwn   = row.user_id === user?.id;
             const isActive = communityStore.activeCommunityId === cid;
             const knownName = resolvedNames.current.get(row.user_id) ?? null;
+            // Replying to your own message reads like a fresh message. The
+            // event carries both names, so decide now — resolving the parent
+            // later made the preview flash "You: replied:" first.
+            const repliedToSelf =
+              isOwn &&
+              !!row.reply_to_id &&
+              !!row.reply_sender_name &&
+              row.reply_sender_name === row.sender_name;
 
             const newMsg: LastMessage = {
               id:           row.id,
@@ -240,8 +250,8 @@ export function useCommunities() {
               created_at:   row.created_at,
               user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
               is_own:       isOwn,
-              is_reply:     !!row.reply_to_id,
-              reply_to_user: null,
+              is_reply:     !!row.reply_to_id && !repliedToSelf,
+              reply_to_user: repliedToSelf ? null : row.reply_sender_name?.split(' ')[0] ?? null,
               has_image:    !row.content && !!row.image_url,
               is_deleted:   false,
             };
@@ -275,18 +285,26 @@ export function useCommunities() {
               });
             }
 
-            // Async: resolve reply_to_user for reply messages
-            if (row.reply_to_id) {
+            // Fallback only when the event could not resolve the parent name.
+            if (row.reply_to_id && !row.reply_sender_name) {
               const msgAt   = row.created_at;
               const replyId = row.reply_to_id;
-              apiFetch<{ user_name?: string }>(`/api/communities/${cid}/messages/${replyId}`)
+              apiFetch<{ user_name?: string; user_id?: string }>(`/api/communities/${cid}/messages/${replyId}`)
                 .then(({ data }) => {
                   if (!data?.user_name) return;
                   const firstName = data.user_name.split(' ')[0];
+                  const replyToSelf = isOwn && !!data.user_id && data.user_id === row.user_id;
                   setCommunities((prev) =>
                     prev.map((c) => {
                       if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
-                      return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } };
+                      return {
+                        ...c,
+                        last_message: {
+                          ...c.last_message!,
+                          is_reply: !replyToSelf,
+                          reply_to_user: replyToSelf ? null : firstName,
+                        },
+                      };
                     })
                   );
                 })

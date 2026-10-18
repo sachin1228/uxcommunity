@@ -180,10 +180,18 @@ export function useSidebarRealtime({
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "message", (data) => {
-          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; reply_to_content_id?: string | null; reply_content_kind?: SidebarLastContent["kind"] | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
+          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; sender_name?: string | null; reply_to_id?: string | null; reply_sender_name?: string | null; reply_to_content_id?: string | null; reply_content_kind?: SidebarLastContent["kind"] | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
           if (!joinedCommunityIds.has(row.community_id)) return;
           const isOwn = row.user_id === userId;
           const isActive = row.community_id === activeCommunityIdRef.current;
+          // Replying to your own message reads like a fresh message. The event
+          // carries both names, so decide now — fetching the parent later made
+          // the preview flash "You: replied:" first.
+          const repliedToSelf =
+            isOwn &&
+            !!row.reply_to_id &&
+            !!row.reply_sender_name &&
+            row.reply_sender_name === row.sender_name;
           // Published with the message (see the messages POST route), so the
           // sidebar's "@" mark grows in the same frame as the unread badge.
           const mentionsMe = Array.isArray(row.mentions) && row.mentions.some((mention) => mention?.user_id === userId);
@@ -199,7 +207,7 @@ export function useSidebarRealtime({
           writeCommunities((current) =>
             applyUpdate(current, row.community_id, (c) => ({
               ...c, is_archived: false, lastReaction: null,
-              last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!(row.reply_to_id || row.reply_to_content_id), reply_to_content_kind: row.reply_content_kind ?? null, is_deleted: false, reactions: [] },
+              last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!(row.reply_to_id || row.reply_to_content_id) && !repliedToSelf, reply_to_user: repliedToSelf ? null : row.reply_sender_name?.split(" ")[0] ?? null, reply_to_content_kind: row.reply_content_kind ?? null, is_deleted: false, reactions: [] },
               message_count: !isOwn && !isActive ? c.message_count + 1 : c.message_count,
               mention_count: mentionsMe && !isOwn && !isActive ? (c.mention_count ?? 0) + 1 : c.mention_count,
               // A new message is newer activity than any content preview.
@@ -224,7 +232,8 @@ export function useSidebarRealtime({
               writeCommunities((current) => applyUpdate(current, commId, (c) => { if (c.last_message?.created_at !== msgAt) return c; return { ...c, last_message: { ...c.last_message!, user: { name } } }; }));
             });
           }
-          if (row.reply_to_id) {
+          // Only needed when the event could not resolve the parent's name.
+          if (row.reply_to_id && !row.reply_sender_name) {
             const commId = row.community_id; const msgAt = row.created_at; const replyId = row.reply_to_id;
             fetch(`/api/communities/${commId}/messages/${replyId}`).then((r) => (r.ok ? r.json() : null))
               .then((parent: { user_name?: string; user_id?: string } | null) => {
