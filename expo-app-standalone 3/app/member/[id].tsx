@@ -10,7 +10,7 @@
  * and no feed.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,7 +25,6 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import {
   ContentCard,
   ContentDetail,
@@ -38,7 +37,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import type { CommunityContent } from '@/lib/communityContent';
 import { createDmConversation, unblockUser } from '@/lib/dmApi';
+import {
+  applyPollEventToFeed,
+  feedPollCommunityIds,
+  type ThreadPollEvent,
+} from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
+import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 import {
   getProfileFeed,
   type MemberFeedScope,
@@ -115,7 +120,6 @@ export default function MemberProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
 
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
@@ -197,6 +201,42 @@ export default function MemberProfileScreen() {
     }
   }, [feedLoading, hasMore, items, loadingMore, memberId]);
 
+  // Poll tallies for the threads in this member's feed. Only communities with a
+  // visible poll are subscribed — a feed of plain posts opens no sockets.
+  const applyPollUpdate = actions.applyPollUpdate;
+  const pollCommunityIds = useMemo(() => feedPollCommunityIds(items), [items]);
+
+  const handlePollEvent = useCallback(
+    (event: ThreadPollEvent) => {
+      const me = user?.id ?? '';
+      setItems((current) => applyPollEventToFeed(current, event, me));
+      setSelected((current) => {
+        if (!current || current.id !== event.threadId) return current;
+        return applyPollEventToFeed([current], event, me)[0] ?? current;
+      });
+      // An optimistic local vote keeps its choice while the tallies move; an
+      // event from this member on another device replaces it.
+      applyPollUpdate(event.threadId, {
+        counts: event.counts,
+        userVote: event.userVote,
+        undoUsed: event.undoUsed,
+        mine: event.userId !== null && event.userId === me,
+      });
+    },
+    [applyPollUpdate, user?.id],
+  );
+
+  // A reconnected room missed events while it was down; settle from the API.
+  const handlePollGap = useCallback(() => {
+    void loadFeed(scopeRef.current, 'refresh');
+  }, [loadFeed]);
+
+  useThreadPollRealtime({
+    communityIds: pollCommunityIds,
+    onEvent: handlePollEvent,
+    onGap: handlePollGap,
+  });
+
   const handleScopeChange = useCallback(
     (next: MemberFeedScope) => {
       if (next === scope) return;
@@ -209,10 +249,12 @@ export default function MemberProfileScreen() {
     [loadFeed, scope],
   );
 
-  const openComments = useCallback(
+  // The comment count is the only route into a post's own page, where the
+  // comments live under the post itself; the card body just double-tap likes.
+  const openItem = useCallback(
     (item: CommunityContent) => {
       const match = items.find((entry) => entry.id === item.id);
-      setCommentTarget(match ?? null);
+      setSelected(match ?? null);
     },
     [items],
   );
@@ -261,11 +303,10 @@ export default function MemberProfileScreen() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-        onComments={openComments}
+        onComments={openItem}
       />
     ),
-    [actions, items, openComments, user?.id],
+    [actions, items, openItem, user?.id],
   );
 
   const body = member?.profile;
@@ -456,26 +497,7 @@ export default function MemberProfileScreen() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies={
-            feedItemKind(commentTarget) === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
 }

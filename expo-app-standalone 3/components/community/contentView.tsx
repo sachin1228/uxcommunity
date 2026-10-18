@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   Linking,
   Modal,
@@ -7,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -29,7 +34,13 @@ import {
   formatRelativeDate,
   getLinkPreviewImage,
   setContentAction,
+  threadBody,
+  voteOnThreadPoll,
 } from '@/lib/communityContent';
+import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
+import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
+import { CommentSection } from './CommentSection';
+import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { formatEventDate } from '@/lib/eventDate';
 import { PersonAvatar } from '@/components/PersonAvatar';
@@ -87,6 +98,9 @@ export const FOOTER_ACTIONS_BY_KIND: Record<ContentKind, ActionDefinition[]> = {
   resources: [RESOURCE_LIKE],
 };
 
+/** Instagram's window: a second tap inside this counts as a double tap. */
+const DOUBLE_TAP_MS = 300;
+
 /** The save-shaped row the ··· menu offers, per kind (null when there is none). */
 const MENU_ACTION_BY_KIND: Record<ContentKind, ActionDefinition | null> = {
   threads: SAVE,
@@ -121,6 +135,38 @@ export interface ContentActionsApi {
   /** Alert surfaced from a failed write, for screens that render their own toast. */
   lastError: string | null;
   clearError: () => void;
+  /** The thread's poll with any local vote/undo override applied. */
+  pollState: (item: CommunityContent) => PollViewState | null;
+  /** Vote for one option (optimistic, reconciled with the server). */
+  votePoll: (item: CommunityContent, optionIndex: number) => Promise<void>;
+  /** Spend the viewer's one-time undo (optimistic). */
+  undoPoll: (item: CommunityContent) => Promise<void>;
+  /** Drop a thread's local poll state after an edit replaces the row. */
+  resetPoll: (itemId: string) => void;
+  /**
+   * Fold a realtime poll event into an existing local vote. "mine" events
+   * come from this member on another device, so their vote replaces ours;
+   * another member's vote only refreshes the tallies.
+   */
+  applyPollUpdate: (
+    itemId: string,
+    update: { counts: number[]; userVote: number | null; undoUsed: boolean; mine: boolean },
+  ) => void;
+}
+
+function pollKey(itemId: string) {
+  return `${itemId}:poll`;
+}
+
+/** The poll state carried by the server row, before any local override. */
+function serverPollState(thread: CommunityThread): PollViewState | null {
+  const poll = thread.poll;
+  if (!poll || !Array.isArray(poll.options) || poll.options.length < 2) return null;
+  return {
+    counts: normalizePollCounts(poll, thread.poll_vote_counts),
+    userVote: typeof thread.poll_user_vote === 'number' ? thread.poll_user_vote : null,
+    undoUsed: thread.poll_undo_used === true,
+  };
 }
 
 /**
@@ -133,6 +179,7 @@ export interface ContentActionsApi {
  */
 export function useContentActions(): ContentActionsApi {
   const [overrides, setOverrides] = useState<Record<string, ActionOverride>>({});
+  const [pollOverrides, setPollOverrides] = useState<Record<string, PollViewState>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [lastError, setLastError] = useState<string | null>(null);
   const coalescersRef = useRef(new Map<string, BooleanIntentCoalescer>());
@@ -233,8 +280,152 @@ export function useContentActions(): ContentActionsApi {
     [],
   );
 
+  /**
+   * The poll as the card/detail should render it: a local optimistic vote (or
+   * undo) wins until the server row or a reset replaces it.
+   */
+  const pollState = useCallback(
+    (item: CommunityContent): PollViewState | null => {
+      const base = serverPollState(item as CommunityThread);
+      if (!base) return null;
+      return pollOverrides[pollKey(item.id)] ?? base;
+    },
+    [pollOverrides],
+  );
+
+  const votePoll = useCallback(
+    async (item: CommunityContent, optionIndex: number) => {
+      const thread = item as CommunityThread;
+      const poll = thread.poll;
+      if (!poll || !item.community_id) return;
+      const key = pollKey(item.id);
+      const current = pollOverrides[key] ?? serverPollState(thread);
+      if (!current || current.userVote !== null) return;
+      if (
+        !Number.isInteger(optionIndex) ||
+        optionIndex < 0 ||
+        optionIndex >= poll.options.length
+      ) {
+        return;
+      }
+
+      const previous = pollOverrides[key] ?? null;
+      setPollOverrides((state) => ({
+        ...state,
+        [key]: {
+          counts: current.counts.map((count, index) =>
+            index === optionIndex ? count + 1 : count,
+          ),
+          userVote: optionIndex,
+          undoUsed: current.undoUsed,
+        },
+      }));
+
+      try {
+        const result = await voteOnThreadPoll(item.community_id, item.id, optionIndex);
+        setPollOverrides((state) => ({
+          ...state,
+          [key]: {
+            counts: result.counts,
+            userVote: result.userVote,
+            undoUsed: result.undoUsed,
+          },
+        }));
+      } catch (error) {
+        // Back to the pre-vote row; the poll renders its own error.
+        setPollOverrides((state) => {
+          const next = { ...state };
+          if (previous) next[key] = previous;
+          else delete next[key];
+          return next;
+        });
+        throw error;
+      }
+    },
+    [pollOverrides],
+  );
+
+  const undoPoll = useCallback(
+    async (item: CommunityContent) => {
+      const thread = item as CommunityThread;
+      const poll = thread.poll;
+      if (!poll || !item.community_id) return;
+      const key = pollKey(item.id);
+      const current = pollOverrides[key] ?? serverPollState(thread);
+      if (!current || current.userVote === null || current.undoUsed) return;
+
+      const previous = pollOverrides[key] ?? null;
+      const votedFor = current.userVote;
+      setPollOverrides((state) => ({
+        ...state,
+        [key]: {
+          counts: current.counts.map((count, index) =>
+            index === votedFor ? Math.max(0, count - 1) : count,
+          ),
+          userVote: null,
+          undoUsed: true,
+        },
+      }));
+
+      try {
+        const result = await voteOnThreadPoll(item.community_id, item.id, null);
+        setPollOverrides((state) => ({
+          ...state,
+          [key]: {
+            counts: result.counts,
+            userVote: result.userVote,
+            undoUsed: result.undoUsed,
+          },
+        }));
+      } catch (error) {
+        setPollOverrides((state) => {
+          const next = { ...state };
+          if (previous) next[key] = previous;
+          else delete next[key];
+          return next;
+        });
+        throw error;
+      }
+    },
+    [pollOverrides],
+  );
+
+  const applyPollUpdate = useCallback(
+    (
+      itemId: string,
+      update: { counts: number[]; userVote: number | null; undoUsed: boolean; mine: boolean },
+    ) => {
+      const key = pollKey(itemId);
+      setPollOverrides((state) => {
+        const current = state[key];
+        // No local vote to preserve — the patched row carries the new tallies.
+        if (!current) return state;
+        return {
+          ...state,
+          [key]: {
+            counts: update.counts,
+            userVote: update.mine ? update.userVote : current.userVote,
+            undoUsed: update.mine ? update.undoUsed : current.undoUsed,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const resetPoll = useCallback((itemId: string) => {
+    setPollOverrides((state) => {
+      const key = pollKey(itemId);
+      if (!(key in state)) return state;
+      const next = { ...state };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setOverrides({});
+    setPollOverrides({});
     setCommentCounts({});
   }, []);
 
@@ -247,6 +438,11 @@ export function useContentActions(): ContentActionsApi {
     reset,
     lastError,
     clearError: useCallback(() => setLastError(null), []),
+    pollState,
+    votePoll,
+    undoPoll,
+    resetPoll,
+    applyPollUpdate,
   };
 }
 
@@ -283,10 +479,11 @@ export interface ContentCardProps {
   /** Feed cards show which community the post came from. */
   communityName?: string | null;
   communityImage?: string | null;
-  onOpen: (item: CommunityContent) => void;
+  /** The comment count — the only route into the post's own page. */
   onComments: (item: CommunityContent) => void;
   onEdit?: (item: CommunityContent) => void;
-  onDelete?: (item: CommunityContent) => void;
+  /** Rejects when the server refuses, so the confirm can stay open. */
+  onDelete?: (item: CommunityContent) => Promise<void> | void;
 }
 
 export function ContentCard({
@@ -296,7 +493,6 @@ export function ContentCard({
   actions,
   communityName,
   communityImage,
-  onOpen,
   onComments,
   onEdit,
   onDelete,
@@ -317,23 +513,73 @@ export function ContentCard({
   const isOwner = item.user_id === currentUserId;
 
   // The body text each kind puts on its card, mirroring the web cards: a thread
-  // shows its title (which carries the whole post) collapsed behind "Read more",
-  // an event shows a 2-line title plus a collapsible description, a resource
-  // clamps its description to 3 lines, and a showcase title is never clamped.
-  const primaryBody = resource ? resource.description || resource.title : item.title;
+  // shows its body (the whole post lives in `title` on the web) collapsed behind
+  // "Read more", an event shows a 2-line title plus a collapsible description, a
+  // resource clamps its description to 3 lines, and a showcase title is never
+  // clamped.
+  const primaryBody = resource
+    ? resource.description || resource.title
+    : kind === 'threads' && thread
+      ? threadBody(thread)
+      : item.title;
   const secondaryBody = kind === 'events' ? item.description : null;
   const primaryLines =
     kind === 'threads' ? collapsedBodyLines(kind, item)
       : kind === 'events' ? 2
         : kind === 'resources' ? 3
           : undefined;
+  const pollState = thread?.poll ? actions.pollState(item) : null;
+
+  // A double tap on the card likes it — Instagram's gesture. The footer heart
+  // is still the explicit control; this is the shortcut, and it only ever
+  // likes (a second double tap leaves an already-liked post alone).
+  const likeDefinition = FOOTER_ACTIONS_BY_KIND[kind].find((entry) => entry.activeColor === 'like');
+  const liked = likeDefinition ? actions.isActive(item, kind, likeDefinition.action) : false;
+  const burst = useRef(new Animated.Value(0)).current;
+  const lastTapAt = useRef(0);
+  const reduceMotion = useRef(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => { reduceMotion.current = enabled; })
+      .catch(() => { /* assume motion is fine */ });
+  }, []);
+
+  const likeFromDoubleTap = () => {
+    if (!likeDefinition) return;
+    if (!liked) {
+      hapticToggle(true);
+      actions.action(item, kind, likeDefinition.action);
+    }
+    if (reduceMotion.current) return;
+    burst.stopAnimation();
+    burst.setValue(0);
+    Animated.timing(burst, {
+      toValue: 1,
+      duration: 620,
+      easing: Easing.out(Easing.quad),
+      // Opacity and transform only — the burst never touches layout.
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCardPress = () => {
+    const now = Date.now();
+    if (now - lastTapAt.current > DOUBLE_TAP_MS) {
+      lastTapAt.current = now;
+      return;
+    }
+    lastTapAt.current = 0;
+    likeFromDoubleTap();
+  };
 
   return (
     <Pressable
-      onPress={() => onOpen(item)}
-      style={[styles.card, { backgroundColor: colors.surface, shadowColor: '#000' }]}
-      accessibilityRole="button"
-      accessibilityLabel={`View ${contentLabel(kind)}: ${item.title}`}
+      onPress={handleCardPress}
+      // The card is a gesture surface, not a single control: keep the inner
+      // buttons and links as the accessible units.
+      accessible={false}
+      style={[styles.card, { backgroundColor: colors.backgroundSubtle, borderColor: colors.border }]}
     >
       {coverImage ? <Image source={{ uri: coverImage }} style={styles.cover} /> : null}
 
@@ -341,7 +587,7 @@ export function ContentCard({
         {/* Author meta — name and relative date on one line, the category as
             the muted second line, exactly like the web `PostAuthorMeta`. */}
         <View style={styles.authorRow}>
-          <PersonAvatar name={author?.name} url={author?.avatar_url} size={34} />
+          <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
           <View style={styles.authorCopy}>
             <View style={styles.authorLine}>
               <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
@@ -374,7 +620,26 @@ export function ContentCard({
         {secondaryBody ? (
           <CollapsibleBody text={secondaryBody} textStyle={styles.description} collapsedLines={2} />
         ) : null}
-        {images.length ? <MediaGrid images={images} /> : null}
+        {thread?.poll && pollState ? (
+          <ThreadPollView
+            poll={thread.poll}
+            state={pollState}
+            hideQuestion={thread.poll.question.trim() === thread.title.trim()}
+            onVote={(optionIndex) => actions.votePoll(item, optionIndex)}
+            onUndo={() => actions.undoPoll(item)}
+          />
+        ) : null}
+        {images.length ? (
+          <MediaCarousel
+            images={images}
+            owner={{
+              name: author?.name ?? null,
+              avatarUrl: author?.avatar_url ?? null,
+              createdAt: item.created_at,
+            }}
+            onDoubleTap={likeFromDoubleTap}
+          />
+        ) : null}
 
         {event ? (
           <View style={styles.eventMetaStack}>
@@ -398,6 +663,33 @@ export function ContentCard({
           communityImage={communityImage}
         />
       </View>
+
+      {/* The double-tap burst: a filled heart that pops in over the card and
+          fades, never intercepting a touch. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.likeBurst,
+          {
+            opacity: burst.interpolate({
+              inputRange: [0, 0.15, 0.7, 1],
+              outputRange: [0, 1, 1, 0],
+              extrapolate: 'clamp',
+            }),
+            transform: [
+              {
+                scale: burst.interpolate({
+                  inputRange: [0, 0.35, 1],
+                  outputRange: [0.55, 1.08, 1],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <HeartIcon size={96} active />
+      </Animated.View>
     </Pressable>
   );
 }
@@ -456,6 +748,7 @@ export function ContentActionRow({
       <Action
         icon="message-circle"
         label={String(commentCount)}
+        compact
         accessibilityLabel="Comments"
         onPress={() => {
           hapticSelection();
@@ -499,7 +792,6 @@ export function ContentDetail({
   communityName,
   visible,
   onClose,
-  onComments,
   onEdit,
   onDelete,
 }: {
@@ -510,14 +802,35 @@ export function ContentDetail({
   communityName?: string | null;
   visible: boolean;
   onClose: () => void;
-  onComments: (item: CommunityContent) => void;
   onEdit?: (item: CommunityContent) => void;
-  onDelete?: (item: CommunityContent) => void;
+  onDelete?: (item: CommunityContent) => Promise<void> | void;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const resource = kind === 'resources' ? (item as CommunityResource | null) : null;
   const previewImage = useResourcePreview(resource?.url);
+  // The comment section lives at the bottom of the page, exactly as on the web
+  // detail: tapping the footer count scrolls to it rather than opening a sheet.
+  const scrollRef = useRef<ScrollView>(null);
+  // The section's offset inside the scroll content. Kept as state so the
+  // landing scroll can follow it: remote images above the discussion resolve
+  // after the first layout and push it down.
+  const [commentsY, setCommentsY] = useState(0);
+  const [commentsLaidOut, setCommentsLaidOut] = useState(false);
+  // Once the reader drags the page, the landing scroll stops following layout.
+  const readerScrolled = useRef(false);
+
+  useEffect(() => {
+    if (visible) return;
+    readerScrolled.current = false;
+    setCommentsLaidOut(false);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !commentsLaidOut || readerScrolled.current) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: false });
+  }, [visible, commentsLaidOut, commentsY]);
+
   if (!item) return null;
 
   const thread = kind === 'threads' ? item as CommunityThread : null;
@@ -528,8 +841,17 @@ export function ContentDetail({
     .filter((attachment) => attachment.type.startsWith('image/'));
   const files = (thread?.attachments ?? []).filter((attachment) => !attachment.type.startsWith('image/'));
   const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
-  const description = thread ? threadDescription(thread.title, thread.description) : item.description;
   const isOwner = item.user_id === currentUserId;
+  const pollState = thread?.poll ? actions.pollState(item) : null;
+  // Events have no reply switch — their comment threads are always open.
+  const allowReplies =
+    kind === 'events'
+      ? true
+      : (item as { allow_replies?: boolean }).allow_replies !== false;
+
+  const scrollToComments = () => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: true });
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -551,11 +873,21 @@ export function ContentDetail({
           />
         </View>
 
-        <ScrollView contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 32 }]}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 32 }]}
+          keyboardShouldPersistTaps="handled"
+          // The comment composer sits inside this scroll view, so the keyboard
+          // must shorten it rather than cover the field being typed into.
+          automaticallyAdjustKeyboardInsets
+          onScrollBeginDrag={() => {
+            readerScrolled.current = true;
+          }}
+        >
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
 
           <View style={styles.authorRow}>
-            <PersonAvatar name={author?.name} url={author?.avatar_url} size={34} />
+            <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
             <View style={styles.authorCopy}>
               <View style={styles.authorLine}>
                 <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
@@ -571,11 +903,41 @@ export function ContentDetail({
             </View>
           </View>
 
-          <Text style={[styles.detailTitle, { color: colors.foreground }]}>{item.title}</Text>
-          {description ? (
-            <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>{description}</Text>
+          {/* Threads carry the whole post in the body, exactly like the web
+              card, so the detail uses the same compact type instead of the
+              large title the other kinds still use. */}
+          <Text
+            style={[
+              thread ? styles.detailThreadBody : styles.detailTitle,
+              { color: colors.foreground },
+            ]}
+          >
+            {thread ? threadBody(thread) : item.title}
+          </Text>
+          {!thread && item.description ? (
+            <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
+              {item.description}
+            </Text>
           ) : null}
-          {images.length ? <MediaGrid images={images} /> : null}
+          {thread?.poll && pollState ? (
+            <ThreadPollView
+              poll={thread.poll}
+              state={pollState}
+              hideQuestion={thread.poll.question.trim() === thread.title.trim()}
+              onVote={(optionIndex) => actions.votePoll(item, optionIndex)}
+              onUndo={() => actions.undoPoll(item)}
+            />
+          ) : null}
+          {images.length ? (
+            <MediaCarousel
+              images={images}
+              owner={{
+                name: author?.name ?? null,
+                avatarUrl: author?.avatar_url ?? null,
+                createdAt: item.created_at,
+              }}
+            />
+          ) : null}
 
           {files.map((file) => (
             <Pressable
@@ -622,8 +984,24 @@ export function ContentDetail({
             kind={kind}
             actions={actions}
             commentCount={actions.commentCountFor(item)}
-            onComments={onComments}
+            onComments={scrollToComments}
           />
+
+          <View
+            onLayout={(event) => {
+              setCommentsY(event.nativeEvent.layout.y);
+              setCommentsLaidOut(true);
+            }}
+          >
+            <CommentSection
+              communityId={item.community_id}
+              kind={kind}
+              targetId={item.id}
+              currentUserId={currentUserId}
+              allowReplies={allowReplies}
+              onCountChange={(total) => actions.setCommentCount(item.id, total)}
+            />
+          </View>
         </ScrollView>
       </View>
     </Modal>
@@ -654,12 +1032,42 @@ export function ContentOptionsMenu({
   actions: ContentActionsApi;
   isOwner: boolean;
   onEdit?: (item: CommunityContent) => void;
-  onDelete?: (item: CommunityContent) => void;
+  /** Rejects when the server refuses, so the confirm can stay open. */
+  onDelete?: (item: CommunityContent) => Promise<void> | void;
 }) {
   const colors = useColors();
   const [visible, setVisible] = useState(false);
+  // Delete asks first, in-sheet — the same confirm vocabulary as the message
+  // and chat-actions sheets, instead of the system alert.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const saveAction = MENU_ACTION_BY_KIND[kind];
   const saved = saveAction ? actions.isActive(item, kind, saveAction.action) : false;
+  const noun = contentLabel(kind).toLowerCase();
+
+  const close = () => {
+    if (deleting) return;
+    setVisible(false);
+    setConfirmingDelete(false);
+    setDeleteError(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!onDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete(item);
+      setDeleting(false);
+      setVisible(false);
+      setConfirmingDelete(false);
+    } catch (e) {
+      // Stay open with the reason, so the user can retry or back out.
+      setDeleting(false);
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete. Please try again.');
+    }
+  };
 
   return (
     <>
@@ -677,10 +1085,67 @@ export function ContentOptionsMenu({
         <Feather name="more-vertical" size={21} color={colors.foregroundSubtle} />
       </Pressable>
 
-      <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setVisible(false)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setVisible(false)} accessibilityLabel="Close post options">
+      <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
+        <Pressable style={styles.menuBackdrop} onPress={close} accessibilityLabel="Close post options">
           <View style={[styles.optionsSheet, { backgroundColor: colors.overlayElevated, shadowColor: '#000' }]}>
-            {saveAction ? (
+            {confirmingDelete ? (
+              <View>
+                <View style={[styles.confirmHeader, { borderBottomColor: colors.borderSubtle }]}>
+                  <Text style={[styles.confirmTitle, { color: colors.foreground }]}>
+                    Delete {noun}?
+                  </Text>
+                  <Text style={[styles.confirmBody, { color: colors.foregroundMuted }]}>
+                    This cannot be undone.
+                  </Text>
+                  {deleteError ? (
+                    <Text style={[styles.confirmError, { color: colors.destructive }]}>
+                      {deleteError}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => {
+                    hapticSelection();
+                    void confirmDelete();
+                  }}
+                  disabled={deleting}
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: deleting }}
+                  style={({ pressed }) => [
+                    styles.confirmAction,
+                    {
+                      backgroundColor: pressed ? colors.destructive + '1A' : 'transparent',
+                      opacity: deleting ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  {deleting ? <ActivityIndicator size="small" color={colors.destructive} /> : null}
+                  <Text style={[styles.confirmActionText, { color: colors.destructive }]}>
+                    {deleting ? 'Deleting…' : `Delete ${noun}`}
+                  </Text>
+                </Pressable>
+                <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
+                <Pressable
+                  onPress={() => {
+                    hapticSelection();
+                    setConfirmingDelete(false);
+                    setDeleteError(null);
+                  }}
+                  disabled={deleting}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.confirmAction,
+                    { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                  ]}
+                >
+                  <Text style={[styles.confirmActionText, { color: colors.foregroundMuted }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {!confirmingDelete && saveAction ? (
               <Pressable
                 onPress={() => {
                   hapticToggle(!saved);
@@ -702,13 +1167,13 @@ export function ContentOptionsMenu({
               </Pressable>
             ) : null}
 
-            {isOwner && onEdit && onDelete ? (
+            {!confirmingDelete && isOwner && onEdit && onDelete ? (
               <>
                 <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable
                   onPress={() => {
                     hapticSelection();
-                    setVisible(false);
+                    close();
                     onEdit(item);
                   }}
                   style={styles.optionRow}
@@ -720,8 +1185,7 @@ export function ContentOptionsMenu({
                 <Pressable
                   onPress={() => {
                     hapticSelection();
-                    setVisible(false);
-                    onDelete(item);
+                    setConfirmingDelete(true);
                   }}
                   style={styles.optionRow}
                   accessibilityRole="button"
@@ -792,25 +1256,185 @@ export function CollapsibleBody({
   );
 }
 
-export function MediaGrid({ images }: { images: Array<{ url: string }> }) {
-  return (
-    <View style={styles.imageGrid}>
-      {images.slice(0, 4).map((image, index) => (
+/**
+ * A thread's images, at the bottom of its body.
+ *
+ * One image keeps its natural aspect ratio; several become a swipeable
+ * carousel with a counter, rather than a cropped tile grid. Tapping opens the
+ * app's own lightbox — the same one the community chat uses — never the
+ * system browser, so images stay inside the app.
+ */
+export function MediaCarousel({
+  images,
+  owner,
+  /** Double tap on a photo: like the post instead of opening the viewer. */
+  onDoubleTap,
+}: {
+  images: Array<{ url: string }>;
+  /** The poster — the lightbox header's name, avatar and date, as in chat. */
+  owner: { name: string | null; avatarUrl: string | null; createdAt: string };
+  onDoubleTap?: () => void;
+}) {
+  const colors = useColors();
+  const { width: screenWidth } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [index, setIndex] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const stripRef = useRef<ScrollView>(null);
+  const single = images.length === 1;
+  // The web's thread media keeps every image at its natural aspect ratio,
+  // capped at 480px tall and never cropped. A carousel takes its height from
+  // the first image — the web's invisible sizing anchor — so the card adopts
+  // the same shape a single image would and the slides letterbox inside it,
+  // just as `object-contain` does there.
+  const anchorRatio = useImageAspectRatio(images[0]?.url);
+  // One page per image. Before the first layout pass the container's width is
+  // unknown, so start from the screen width less the usual card gutter.
+  const pageWidth = containerWidth || Math.max(1, screenWidth - 40);
+  const pageHeight = anchorRatio
+    ? Math.min(480, pageWidth / anchorRatio)
+    : Math.round((pageWidth * 9) / 16);
+
+  // Opening a photo waits out the double-tap window, so a second tap can like
+  // the post instead — the gesture has to work over the photo, not just the
+  // margins around it.
+  const lastTapAt = useRef(0);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (openTimer.current) clearTimeout(openTimer.current);
+    },
+    [],
+  );
+
+  /** Dots jump between slides, like the web control's buttons. */
+  const scrollToPage = (page: number) => {
+    setIndex(page);
+    stripRef.current?.scrollTo({ x: page * pageWidth, animated: true });
+  };
+
+  const handleImagePress = (imageIndex: number) => {
+    const now = Date.now();
+    if (now - lastTapAt.current <= DOUBLE_TAP_MS) {
+      lastTapAt.current = 0;
+      if (openTimer.current) {
+        clearTimeout(openTimer.current);
+        openTimer.current = null;
+      }
+      onDoubleTap?.();
+      return;
+    }
+    lastTapAt.current = now;
+    if (openTimer.current) clearTimeout(openTimer.current);
+    openTimer.current = setTimeout(() => {
+      openTimer.current = null;
+      setViewerIndex(imageIndex);
+    }, DOUBLE_TAP_MS);
+  };
+
+  const lightboxImages: LightboxImage[] = images.map((image) => ({
+    url: image.url,
+    content: null,
+    user_name: owner.name,
+    avatar_url: owner.avatarUrl,
+    created_at: owner.createdAt,
+  }));
+
+  const viewer =
+    viewerIndex !== null && lightboxImages.length > 0 ? (
+      <ImageViewer
+        images={lightboxImages}
+        index={Math.min(viewerIndex, lightboxImages.length - 1)}
+        onClose={() => setViewerIndex(null)}
+        onNavigate={setViewerIndex}
+      />
+    ) : null;
+
+  if (single) {
+    return (
+      <>
         <Pressable
-          key={image.url}
-          onPress={() => Linking.openURL(image.url)}
-          style={images.length === 1 ? styles.imageSingle : styles.imageCell}
+          onPress={() => handleImagePress(0)}
+          style={[
+            styles.imageSingle,
+            anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
+            { borderColor: colors.border },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Open image"
         >
-          <Image source={{ uri: image.url }} style={styles.threadImage} />
-          {index === 3 && images.length > 4 ? (
-            <View style={styles.moreImages}>
-              <Text style={styles.moreImagesText}>+{images.length - 4}</Text>
-            </View>
-          ) : null}
+          <Image source={{ uri: images[0].url }} style={styles.threadImage} resizeMode="contain" />
         </Pressable>
-      ))}
+        {viewer}
+      </>
+    );
+  }
+
+  return (
+    <View style={[styles.carousel, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}>
+      <ScrollView
+        ref={stripRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        // Measured on the viewport itself, inside the border, so a page is
+        // exactly one screenful and paging never drifts.
+        onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+        onMomentumScrollEnd={(event) => {
+          setIndex(Math.round(event.nativeEvent.contentOffset.x / Math.max(1, pageWidth)));
+        }}
+      >
+        {images.map((image, imageIndex) => (
+          <Pressable
+            key={`${image.url}-${imageIndex}`}
+            onPress={() => handleImagePress(imageIndex)}
+            style={{ width: pageWidth, height: pageHeight }}
+            accessibilityRole="button"
+            accessibilityLabel={`Open image ${imageIndex + 1} of ${images.length}`}
+          >
+            {/* Contain, not cover: the web never crops a thread image. */}
+            <Image source={{ uri: image.url }} style={styles.threadImage} resizeMode="contain" />
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Counter, top-right — the Instagram-style "1/3". */}
+      <View style={styles.carouselCounter} pointerEvents="none">
+        <Text style={styles.carouselCounterText}>
+          {Math.min(index + 1, images.length)}/{images.length}
+        </Text>
+      </View>
+
+      {/* Carousel dots — the web's pill of clickable dots, centred at the
+          bottom edge of the viewport. */}
+      <View style={styles.carouselDotsRow} pointerEvents="box-none">
+        <View style={styles.carouselDots}>
+          {images.map((image, dotIndex) => {
+            const active = dotIndex === index;
+            return (
+              <Pressable
+                key={`${image.url}-dot-${dotIndex}`}
+                onPress={() => scrollToPage(dotIndex)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to image ${dotIndex + 1} of ${images.length}`}
+                accessibilityState={{ selected: active }}
+                style={styles.carouselDotButton}
+              >
+                <View
+                  style={[
+                    styles.carouselDot,
+                    { backgroundColor: active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)' },
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {viewer}
     </View>
   );
 }
@@ -825,11 +1449,13 @@ function DetailRow({ icon, text }: { icon: React.ComponentProps<typeof Feather>[
   );
 }
 
-function Action({ icon, label, active, activeColor = 'accent', onPress, accessibilityLabel }: {
+function Action({ icon, label, active, activeColor = 'accent', compact = false, onPress, accessibilityLabel }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   active?: boolean;
   activeColor?: 'like' | 'accent';
+  /** The web renders the comment count one step smaller than the like count. */
+  compact?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 }) {
@@ -841,6 +1467,9 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       ? colors.like
       : colors.accent
     : colors.foregroundSubtle;
+  // The heart and the comment bubble lead the footer and read a step larger
+  // than the secondary actions (save, RSVP), which keep the web's 16px.
+  const iconSize = icon === 'heart' || icon === 'message-circle' ? 20 : 16;
   return (
     <Pressable
       onPress={(event) => { event.stopPropagation(); onPress(); }}
@@ -851,33 +1480,56 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       accessibilityState={{ selected: Boolean(active) }}
     >
       {icon === 'heart' ? (
-        <HeartIcon size={16} active={Boolean(active)} color={colors.foregroundSubtle} />
+        <HeartIcon size={iconSize} active={Boolean(active)} color={colors.foregroundSubtle} />
       ) : (
-        <Feather name={icon} size={16} color={tint} />
+        <Feather name={icon} size={iconSize} color={tint} />
       )}
-      <Text style={[styles.actionText, { color: tint }]}>{label}</Text>
+      <Text style={[styles.actionText, compact ? styles.actionTextCompact : null, { color: tint }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-function threadDescription(title: string, description: string | null) {
-  const body = description?.trim();
-  if (!body || body === title.trim()) return null;
-  if (body.startsWith(`${title.trim()}\n`)) return body.slice(title.trim().length).trim() || null;
-  return body;
+/**
+ * Natural aspect ratio of a remote image, or null while it is unknown.
+ * Used by `MediaCarousel` so a single attachment is never cropped.
+ */
+function useImageAspectRatio(url?: string): number | null {
+  const [ratio, setRatio] = useState<number | null>(null);
+  useEffect(() => {
+    setRatio(null);
+    if (!url) return;
+    let active = true;
+    Image.getSize(
+      url,
+      (width, height) => {
+        if (active && width > 0 && height > 0) setRatio(width / height);
+      },
+      () => undefined,
+    );
+    return () => { active = false; };
+  }, [url]);
+  return ratio;
 }
 
 const styles = StyleSheet.create({
+  // Web thread card: rounded-xl border bg-background-subtle px-5 py-5 — a flat
+  // bordered card rather than a shadowed surface.
   card: {
-    borderRadius: 14,
+    borderRadius: 12,
+    borderWidth: 1,
     overflow: 'hidden',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+  },
+  likeBurst: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Above the photo grid it is drawn over.
+    zIndex: 1,
   },
   cover: { width: '100%', height: 170 },
-  cardBody: { padding: 14, gap: 11 },
+  cardBody: { padding: 20, gap: 12 },
 
   communityLabel: {
     flexShrink: 1,
@@ -891,13 +1543,13 @@ const styles = StyleSheet.create({
   communityLabelAvatar: { width: 16, height: 16, borderRadius: 8 },
   communityLabelName: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 11 },
 
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   authorCopy: { flex: 1 },
   authorLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   author: { flexShrink: 1, fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   meta: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   secondaryLabel: { fontSize: 11, fontFamily: 'Geist_600SemiBold', marginTop: 1 },
-  readMore: { marginTop: 2, fontSize: 13, fontFamily: 'Geist_500Medium' },
+  readMore: { marginTop: 2, fontSize: 14, fontFamily: 'Geist_500Medium' },
 
   menuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   menuBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
@@ -915,7 +1567,42 @@ const styles = StyleSheet.create({
   optionText: { fontFamily: 'Geist_500Medium', fontSize: 15 },
   optionDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 18 },
 
-  cardTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 21 },
+  // In-sheet delete confirm — the same shape as the message and chat-actions
+  // sheets: centred title and reason, then a destructive action and Cancel.
+  confirmHeader: {
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+  },
+  confirmTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16 },
+  confirmBody: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  confirmError: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 17,
+  },
+  confirmAction: {
+    minHeight: 52,
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  confirmActionText: { fontFamily: 'Geist_600SemiBold', fontSize: 15 },
+
+  // Web card body: font-display text-sm font-normal leading-snug.
+  cardTitle: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   description: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
   eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   eventMetaStack: { gap: 6 },
@@ -934,19 +1621,69 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
+  // Web footer counts: font-body text-sm font-semibold; the comment count is
+  // one step smaller (text-xs).
+  actionText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
+  actionTextCompact: { fontSize: 12 },
 
-  imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, borderRadius: 12, overflow: 'hidden' },
-  imageSingle: { width: '100%', height: 220 },
-  imageCell: { width: '49.5%', height: 130 },
-  threadImage: { width: '100%', height: '100%' },
-  moreImages: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+  carousel: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  carouselCounter: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  carouselCounterText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: 'Geist_600SemiBold',
+  },
+  // Centred along the bottom edge, over the photo — the web's dot pill.
+  carouselDotsRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 10,
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  carouselDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  carouselDotButton: {
+    width: 12,
+    height: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  moreImagesText: { color: '#FFFFFF', fontFamily: 'Geist_600SemiBold', fontSize: 22 },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  imageSingle: {
+    width: '100%',
+    maxHeight: 480,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  imageSingleFallback: { height: 220 },
+  threadImage: { width: '100%', height: '100%' },
 
   detailRoot: { flex: 1 },
   detailHeader: {
@@ -963,6 +1700,9 @@ const styles = StyleSheet.create({
   detailContent: { padding: 18, gap: 16 },
   detailCover: { width: '100%', height: 230, borderRadius: 14 },
   detailTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 25, lineHeight: 32 },
+  // The detail body for a thread reads like the web detail card: same
+  // text-sm / normal weight / leading-snug as the feed card.
+  detailThreadBody: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   detailDescription: { fontFamily: 'Geist_400Regular', fontSize: 16, lineHeight: 25 },
   detailPanel: { borderRadius: 14, padding: 14, gap: 12 },
   primaryLink: {

@@ -3,19 +3,22 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
+import {
+  COMPOSER_BOTTOM_INSET,
+  useEmojiKeyboardSwap,
+} from '@/hooks/useEmojiKeyboardSwap';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from './EmojiPicker';
@@ -86,6 +89,8 @@ export function ChatInput({
   // the footer and closes it on scroll/tab change); this is just a shorthand.
   const pickerOpen = emojiPanelOpen;
   const setPickerOpen = (open: boolean) => onEmojiPanelOpenChange?.(open);
+  // The panel yields to the keyboard in one motion (see the hook).
+  const emojiSwap = useEmojiKeyboardSwap(pickerOpen, setPickerOpen);
 
   const {
     mentionOpen,
@@ -102,14 +107,6 @@ export function ChatInput({
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
   const nearLimit = text.length >= MAX_MESSAGE_CHARS - 50;
   const linkPreviewUrl = text.trim() ? extractFirstUrl(text) : null;
-
-  // Opening the panel must not cost the caret: the field keeps focus (and its
-  // selection) under the panel so picking an emoji inserts it where the user
-  // was typing. Android hides the IME without blurring via
-  // showSoftInputOnFocus; the focus call below re-establishes the caret.
-  useEffect(() => {
-    if (pickerOpen) inputRef.current?.focus();
-  }, [pickerOpen]);
 
   // The quote wears the replied author's chat name color — same deterministic
   // palette as the sender names inside bubbles. Quoting your own message stays
@@ -140,19 +137,21 @@ export function ChatInput({
     selectionRef.current = { start: 0, end: 0 };
   }
 
-  /** Emoji button — opens the inline panel below the composer while keeping
-   *  the caret in the field (keyboard hidden on Android, panel above it on
-   *  iOS); tapping the field again places the caret without closing the
-   *  panel. A second tap on the button closes the panel and brings the
-   *  keyboard back. */
+  /**
+   * Emoji button — the panel and the keyboard take turns in the same space,
+   * the way WhatsApp does it. Opening the panel dismisses the IME; the button
+   * then wears a keyboard glyph, and tapping it (or the field) brings the IME
+   * back and puts the panel away.
+   */
   function togglePicker() {
     if (pickerOpen) {
-      setPickerOpen(false);
-      // After the re-render clears showSoftInputOnFocus, focus reopens the IME.
+      // Ask for the keyboard first; the panel goes when the IME reports in, so
+      // the two trade places in one motion rather than in two steps.
+      emojiSwap.startHandoff();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setPickerOpen(true);
-      if (Platform.OS === 'android') Keyboard.dismiss();
+      Keyboard.dismiss();
     }
   }
 
@@ -207,193 +206,206 @@ export function ChatInput({
   }
 
   return (
-    <View
-      style={[
-        styles.root,
-        // While the emoji panel is open it runs edge-to-edge to the screen
-        // bottom, so the composer must not add its own bottom padding.
-        { paddingBottom: pickerOpen ? 0 : 8 },
-      ]}
-    >
-      {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
+    <View style={styles.root}>
+      {/* The panel is a sibling of this stack, not a child of it, on purpose:
+          it stays mounted at zero height while the keyboard is up, and a 6pt
+          gap around a zero-height panel would show up as extra dead space
+          under the composer. Its gap travels inside its animated space
+          instead (see useEmojiKeyboardSwap). */}
+      <View style={styles.stack}>
+        {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
-      {/* ── @-mention picker — floats above the composer while typing ── */}
-      {mentionOpen && (
-        <MentionSuggestions
-          options={mentionOptions}
-          query={mentionQuery}
-          onPick={handlePickMention}
-        />
-      )}
+        {/* ── @-mention picker — floats above the composer while typing ── */}
+        {mentionOpen && (
+          <MentionSuggestions
+            options={mentionOptions}
+            query={mentionQuery}
+            onPick={handlePickMention}
+          />
+        )}
 
-      {/* ── Composer row: the input pill with the send button as a sibling
-          circle outside it, WhatsApp-style ── */}
-      <View style={styles.composerRow}>
-        <View style={[styles.box, { backgroundColor: colors.surfaceRaised }]}>
-          {/* Reply quote inside the box */}
-          {replyTo && (
-            <View
-              style={[
-                styles.replyBanner,
-                { backgroundColor: colors.background },
-              ]}
-            >
-              <View style={[styles.replyBar, { backgroundColor: quotedSelf ? colors.mutedForeground : replyColor }]} />
-              <View style={styles.replyInfo}>
-                <Text numberOfLines={1} style={[styles.replyName, { color: replyColor }]}>
-                  {replyTo.content_kind
-                    ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
-                    : replyTo.user_name}
-                </Text>
-                <Text numberOfLines={2} style={[styles.replyText, { color: colors.mutedForeground }]}>
-                  {replyTo.content || '📷 Image'}
-                </Text>
-              </View>
-              <Pressable onPress={onCancelReply} hitSlop={8} accessibilityLabel="Cancel reply">
-                <Feather name="x" size={18} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
-          )}
-
-          {/* Pending image preview strip */}
-          {pendingImage && (
-            <View style={styles.imagePreviewRow}>
-              <Image
-                source={{ uri: pendingImage.uri }}
-                style={[styles.imageThumb, { borderColor: colors.border }]}
-                resizeMode="cover"
-              />
-              <Text numberOfLines={1} style={[styles.imageReady, { color: colors.mutedForeground }]}>
-                Image ready to send
-              </Text>
-              <Pressable
-                onPress={() => setPendingImage(null)}
-                hitSlop={8}
-                accessibilityLabel="Remove image"
-              >
-                <Feather name="x" size={14} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
-          )}
-
-          {/* Link hint — shown while composing when a URL is detected */}
-          {!!linkPreviewUrl && (
-            <View style={styles.linkRow}>
-              <Feather name="link" size={11} color={colors.mutedForeground} />
-              <Text numberOfLines={1} style={[styles.linkText, { color: colors.mutedForeground }]}>
-                {(() => {
-                  try {
-                    return new URL(linkPreviewUrl).hostname.replace(/^www\./, '');
-                  } catch {
-                    return linkPreviewUrl;
-                  }
-                })()}
-              </Text>
-            </View>
-          )}
-
-          {/* Input row */}
-          <View style={styles.boxInner}>
-            <Pressable
-              onPress={togglePicker}
-              disabled={disabled}
-              hitSlop={6}
-              accessibilityLabel="Open emoji picker"
-              style={({ pressed }) => [
-                styles.pillBtn,
-                { opacity: pressed ? 0.5 : 1 },
-              ]}
-            >
-              <Feather
-                name="smile"
-                size={19}
-                color={pickerOpen ? colors.accent : colors.mutedForeground}
-              />
-            </Pressable>
-
-            <TextInput
-              ref={inputRef}
-              style={[styles.textInput, { color: colors.foreground }]}
-              placeholder="Type a message…"
-              placeholderTextColor={colors.mutedForeground}
-              value={text}
-              onChangeText={(v) => {
-                // Typing means the user wants the keyboard back — close the
-                // emoji panel so keyboard and panel never fight for space.
-                if (pickerOpen) setPickerOpen(false);
-                handleChangeText(v);
-              }}
-              // Android: keeps the caret alive while the panel replaces the
-              // keyboard — the field stays focused without the IME. iOS has
-              // no equivalent, so its keyboard stays up next to the panel.
-              showSoftInputOnFocus={!pickerOpen}
-              onSelectionChange={(e) => {
-                selectionRef.current = e.nativeEvent.selection;
-                onComposerActivity(text, e.nativeEvent.selection.end);
-              }}
-              multiline
-              returnKeyType="default"
-              editable={!disabled}
-              textAlignVertical="center"
-            />
-
-            {nearLimit && (
-              <Text
+        {/* ── Composer row: the input pill with the send button as a sibling
+            circle outside it, WhatsApp-style ── */}
+        <View style={styles.composerRow}>
+          <View style={[styles.box, { backgroundColor: colors.surfaceRaised }]}>
+            {/* Reply quote inside the box */}
+            {replyTo && (
+              <View
                 style={[
-                  styles.counter,
-                  { color: overLimit ? colors.destructive : colors.mutedForeground },
+                  styles.replyBanner,
+                  { backgroundColor: colors.background },
                 ]}
               >
-                {text.length}/{MAX_MESSAGE_CHARS}
-              </Text>
+                <View style={[styles.replyBar, { backgroundColor: quotedSelf ? colors.mutedForeground : replyColor }]} />
+                <View style={styles.replyInfo}>
+                  <Text numberOfLines={1} style={[styles.replyName, { color: replyColor }]}>
+                    {replyTo.content_kind
+                      ? `Replying to ${replyTo.user_name}'s ${replyTo.content_kind}`
+                      : replyTo.user_name}
+                  </Text>
+                  <Text numberOfLines={2} style={[styles.replyText, { color: colors.mutedForeground }]}>
+                    {replyTo.content || '📷 Image'}
+                  </Text>
+                </View>
+                <Pressable onPress={onCancelReply} hitSlop={8} accessibilityLabel="Cancel reply">
+                  <Feather name="x" size={18} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
             )}
 
-            {/* Gallery button — at the very end of the row, WhatsApp-style */}
-            <Pressable
-              onPress={handlePickImage}
-              disabled={disabled}
-              hitSlop={6}
-              accessibilityLabel="Attach image"
-              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
-            >
-              <Feather
-                name="image"
-                size={19}
-                color={pendingImage ? colors.accent : colors.mutedForeground}
+            {/* Pending image preview strip */}
+            {pendingImage && (
+              <View style={styles.imagePreviewRow}>
+                <Image
+                  source={{ uri: pendingImage.uri }}
+                  style={[styles.imageThumb, { borderColor: colors.border }]}
+                  resizeMode="cover"
+                />
+                <Text numberOfLines={1} style={[styles.imageReady, { color: colors.mutedForeground }]}>
+                  Image ready to send
+                </Text>
+                <Pressable
+                  onPress={() => setPendingImage(null)}
+                  hitSlop={8}
+                  accessibilityLabel="Remove image"
+                >
+                  <Feather name="x" size={14} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+            )}
+
+            {/* Link hint — shown while composing when a URL is detected */}
+            {!!linkPreviewUrl && (
+              <View style={styles.linkRow}>
+                <Feather name="link" size={11} color={colors.mutedForeground} />
+                <Text numberOfLines={1} style={[styles.linkText, { color: colors.mutedForeground }]}>
+                  {(() => {
+                    try {
+                      return new URL(linkPreviewUrl).hostname.replace(/^www\./, '');
+                    } catch {
+                      return linkPreviewUrl;
+                    }
+                  })()}
+                </Text>
+              </View>
+            )}
+
+            {/* Input row */}
+            <View style={styles.boxInner}>
+              <Pressable
+                onPress={togglePicker}
+                disabled={disabled}
+                hitSlop={6}
+                accessibilityLabel={pickerOpen ? 'Show keyboard' : 'Open emoji picker'}
+                style={({ pressed }) => [
+                  styles.pillBtn,
+                  { opacity: pressed ? 0.5 : 1 },
+                ]}
+              >
+                {pickerOpen ? (
+                  <MaterialCommunityIcons
+                    name="keyboard-outline"
+                    size={20}
+                    color={colors.accent}
+                  />
+                ) : (
+                  <Feather name="smile" size={19} color={colors.mutedForeground} />
+                )}
+              </Pressable>
+
+              <TextInput
+                ref={inputRef}
+                style={[styles.textInput, { color: colors.foreground }]}
+                placeholder="Type a message…"
+                placeholderTextColor={colors.mutedForeground}
+                value={text}
+                onChangeText={(v) => {
+                  // Typing means the user wants the keyboard back — close the
+                  // emoji panel so keyboard and panel never fight for space.
+                  if (pickerOpen) setPickerOpen(false);
+                  handleChangeText(v);
+                }}
+                // The panel dismisses the IME rather than suppressing it, so the
+                // field stays plain: a tap focuses it and the keyboard comes up
+                // in the same gesture, replacing the panel.
+                onPressIn={emojiSwap.startHandoff}
+                onSelectionChange={(e) => {
+                  selectionRef.current = e.nativeEvent.selection;
+                  onComposerActivity(text, e.nativeEvent.selection.end);
+                }}
+                multiline
+                returnKeyType="default"
+                editable={!disabled}
+                textAlignVertical="center"
               />
-            </Pressable>
-          </View>
 
-              {overLimit && (
-              <Text style={[styles.limitError, { color: colors.destructive }]}>
-                Message is too long (max {MAX_MESSAGE_CHARS} characters) — remove{' '}
-                {text.length - MAX_MESSAGE_CHARS} to send.
-              </Text>
+              {nearLimit && (
+                <Text
+                  style={[
+                    styles.counter,
+                    { color: overLimit ? colors.destructive : colors.mutedForeground },
+                  ]}
+                >
+                  {text.length}/{MAX_MESSAGE_CHARS}
+                </Text>
+              )}
+
+              {/* Gallery button — at the very end of the row, WhatsApp-style */}
+              <Pressable
+                onPress={handlePickImage}
+                disabled={disabled}
+                hitSlop={6}
+                accessibilityLabel="Attach image"
+                style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+              >
+                <Feather
+                  name="image"
+                  size={19}
+                  color={pendingImage ? colors.accent : colors.mutedForeground}
+                />
+              </Pressable>
+            </View>
+
+                {overLimit && (
+                <Text style={[styles.limitError, { color: colors.destructive }]}>
+                  Message is too long (max {MAX_MESSAGE_CHARS} characters) — remove{' '}
+                  {text.length - MAX_MESSAGE_CHARS} to send.
+                </Text>
+              )}
+            </View>
+
+          <Pressable
+            onPress={handleSend}
+            disabled={!canSend}
+            hitSlop={4}
+            accessibilityLabel="Send"
+            style={({ pressed }) => [
+              styles.sendBtn,
+              {
+                backgroundColor: canSend ? colors.chatOwnBubble : colors.surfaceRaised,
+                opacity: pressed && canSend ? 0.85 : 1,
+              },
+            ]}
+          >
+            {disabled ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={20} />
             )}
-          </View>
-
-        <Pressable
-          onPress={handleSend}
-          disabled={!canSend}
-          hitSlop={4}
-          accessibilityLabel="Send"
-          style={({ pressed }) => [
-            styles.sendBtn,
-            {
-              backgroundColor: canSend ? colors.chatOwnBubble : colors.surfaceRaised,
-              opacity: pressed && canSend ? 0.85 : 1,
-            },
-          ]}
-        >
-          {disabled ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : (
-            <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={20} />
-          )}
-        </Pressable>
+          </Pressable>
+        </View>
       </View>
 
-      {pickerOpen && <EmojiPicker onSelect={insertEmoji} />}
+      {/* Mounted past `pickerOpen` on purpose: while it trades places with the
+          keyboard the panel is still on screen, holding a shrinking space. */}
+      {emojiSwap.panelMounted && (
+        <EmojiPicker
+          onSelect={insertEmoji}
+          height={emojiSwap.panelHeight}
+          animatedStyle={emojiSwap.panelStyle}
+          showContent={pickerOpen}
+        />
+      )}
     </View>
   );
 }
@@ -402,7 +414,16 @@ const styles = StyleSheet.create({
   root: {
     paddingHorizontal: 12,
     paddingTop: 2,
+  },
+
+/** Everything above the panel: reply/error/mention/composer rows. */
+  stack: {
     gap: 6,
+    // The 8 dp strip lives *between* the composer and whatever is under it
+    // (the panel, or nothing when the panel is shut), never below the panel —
+    // that keeps the pill the same distance from the panel as from the
+    // keyboard and puts the panel's top edge exactly on the keyboard's.
+    marginBottom: COMPOSER_BOTTOM_INSET,
   },
 
   box: {

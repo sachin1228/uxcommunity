@@ -20,7 +20,9 @@ export function communityContentKey(communityId: string, kind: ContentKind) {
 const ROOM_TOPICS: Partial<Record<ContentKind, { getRoom: (cid: string) => string; topics: string[] }>> = {
   threads: {
     getRoom: (cid) => realtimeRooms.threads(cid),
-    topics: ['thread', 'like', 'save'],
+    // `poll` lands after every vote/undo, so the row's tallies and the
+    // viewer's vote stay in step with the web tab.
+    topics: ['thread', 'like', 'save', 'poll'],
   },
   events: {
     getRoom: (cid) => realtimeRooms.events(cid),

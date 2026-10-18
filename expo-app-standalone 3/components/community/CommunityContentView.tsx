@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,13 +7,13 @@ import { useColors } from '@/hooks/useColors';
 import { useCommunityContent, communityContentKey } from '@/hooks/useCommunityContent';
 import {
   CommunityContent,
+  CommunityThread,
   ContentKind,
   contentLabel,
   deleteCommunityContent,
 } from '@/lib/communityContent';
 import { chatContentEventFromCreated, chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
-import { CommentsSheet } from './CommentsSheet';
 import { CommunityContentEditor } from './CommunityContentEditor';
 import { ContentCard, ContentDetail, useContentActions } from './contentView';
 
@@ -42,7 +42,6 @@ export function CommunityContentView({
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);
-  const [commentTarget, setCommentTarget] = useState<CommunityContent | null>(null);
 
   const items = query.data ?? [];
   const resetActions = actions.reset;
@@ -65,13 +64,21 @@ export function CommunityContentView({
   }, [openContentId, query.isFetched, items, onOpenConsumed]);
 
   const replace = (item: CommunityContent) => {
+    // An edit can change a poll's options, which resets its votes server-side;
+    // drop any optimistic poll state so the merged row is what renders.
+    actions.resetPoll(item.id);
     const existing = queryClient.getQueryData<CommunityContent[]>(
       communityContentKey(communityId, kind),
     ) ?? [];
-    const wasNew = !existing.some((entry) => entry.id === item.id);
+    const previous = existing.find((entry) => entry.id === item.id);
+    const wasNew = !previous;
+    // An edit response carries the poll but not its tallies. Keep the row's
+    // vote state when the options did not change; the API clears votes when
+    // they did, so a changed poll correctly starts from zero.
+    const merged = mergeThreadPoll(previous, item);
     queryClient.setQueryData<CommunityContent[]>(communityContentKey(communityId, kind), (old = []) => {
       const exists = old.some((entry) => entry.id === item.id);
-      return exists ? old.map((entry) => entry.id === item.id ? item : entry) : [item, ...old];
+      return exists ? old.map((entry) => entry.id === item.id ? merged : entry) : [merged, ...old];
     });
     // The chat timeline's permanent "You created a …" card lands in the same
     // frame — the realtime echo follows and dedupes by id (see the mirror).
@@ -82,45 +89,34 @@ export function CommunityContentView({
         event: chatContentEventFromCreated(kind, item),
       });
     }
-    setSelected((current) => current?.id === item.id ? item : current);
+    setSelected((current) => current?.id === item.id ? merged : current);
   };
 
+  // The options sheet confirms first, in its own styled panel; rejecting here
+  // hands the failure back to it so it can stay open with the reason.
   const remove = useCallback(
-    (item: CommunityContent) => Alert.alert(
-      `Delete ${contentLabel(kind).toLowerCase()}?`,
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCommunityContent(communityId, kind, item.id);
-              queryClient.setQueryData<CommunityContent[]>(
-                communityContentKey(communityId, kind),
-                (old = []) => old.filter((entry) => entry.id !== item.id),
-              );
-              // Its "created a …" card leaves the chat timeline in the same
-              // frame — the realtime content-delete echo follows.
-              notifyContentEvent({
-                kind: 'delete',
-                communityId,
-                id: item.id,
-                contentKind: chatContentKindForTab(kind),
-              });
-              setSelected(null);
-            } catch (e) {
-              Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');
-            }
-          },
-        },
-      ],
-    ),
+    async (item: CommunityContent) => {
+      await deleteCommunityContent(communityId, kind, item.id);
+      queryClient.setQueryData<CommunityContent[]>(
+        communityContentKey(communityId, kind),
+        (old = []) => old.filter((entry) => entry.id !== item.id),
+      );
+      // Its "created a …" card leaves the chat timeline in the same frame —
+      // the realtime content-delete echo follows.
+      notifyContentEvent({
+        kind: 'delete',
+        communityId,
+        id: item.id,
+        contentKind: chatContentKindForTab(kind),
+      });
+      setSelected(null);
+    },
     [communityId, kind, queryClient],
   );
 
-  const openComments = useCallback((item: CommunityContent) => setCommentTarget(item), []);
+  // The comment count is the only route into a post's own page, where the
+  // comments live under the post itself.
+  const openItem = useCallback((item: CommunityContent) => setSelected(item), []);
 
   if (query.isLoading) return <Centered><ActivityIndicator color={colors.accent} /></Centered>;
 
@@ -152,8 +148,7 @@ export function CommunityContentView({
             kind={kind}
             currentUserId={currentUserId}
             actions={actions}
-            onOpen={setSelected}
-            onComments={openComments}
+            onComments={openItem}
             onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
             onDelete={remove}
           />
@@ -214,30 +209,34 @@ export function CommunityContentView({
         actions={actions}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
         onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
         onDelete={remove}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={communityId}
-          kind={kind}
-          targetId={commentTarget.id}
-          currentUserId={currentUserId}
-          title={commentTarget.title}
-          allowReplies={
-            kind === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
+}
+
+/**
+ * Merge an edited thread's existing poll tallies into the server response.
+ * Non-thread kinds pass through untouched.
+ */
+function mergeThreadPoll(
+  previous: CommunityContent | undefined,
+  next: CommunityContent,
+): CommunityContent {
+  if (!previous) return next;
+  const previousThread = previous as CommunityThread;
+  const nextThread = next as CommunityThread;
+  if (!previousThread.poll || !nextThread.poll) return next;
+  const sameOptions =
+    JSON.stringify(previousThread.poll.options) === JSON.stringify(nextThread.poll.options);
+  if (!sameOptions) return next;
+  return {
+    ...next,
+    poll_vote_counts: previousThread.poll_vote_counts,
+    poll_user_vote: previousThread.poll_user_vote,
+    poll_undo_used: previousThread.poll_undo_used,
+  } as CommunityThread;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

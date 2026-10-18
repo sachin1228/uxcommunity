@@ -9,7 +9,8 @@ import { prepareImageForUpload } from '@/lib/prepareImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
-  CommunityContent, ContentKind, SHOWCASE_CATEGORY_OPTIONS, SHOWCASE_MEDIA_MAX,
+  CommunityContent, ContentKind, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS, SHOWCASE_MEDIA_MAX,
+  THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS, THREAD_IMAGE_MAX,
   ThreadAttachment, contentLabel, createCommunityContent,
   updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
@@ -23,6 +24,19 @@ import {
   wallClockToIso,
   zoneOffsetMinutes,
 } from '@/lib/eventTimezone';
+import {
+  POLL_MAX_OPTIONS,
+  POLL_MIN_OPTIONS,
+  POLL_OPTION_MAX_LENGTH,
+  POLL_QUESTION_MAX_LENGTH,
+  emptyPollDraft,
+  pollDraftFromPoll,
+  pollOptionLetter,
+  serializePollDraft,
+  validatePollDraft,
+  type ThreadPoll,
+  type ThreadPollDraft,
+} from '@/lib/communityPoll';
 import { TimeZonePickerSheet } from './TimeZonePickerSheet';
 
 interface Props {
@@ -36,10 +50,26 @@ interface Props {
 
 /** Category/detail chips per kind. Showcase categories are already labels. */
 const OPTIONS: Record<string, readonly string[]> = {
-  threads: ['question', 'discussion', 'idea', 'feedback', 'referral', 'collaboration'],
+  // The web composer and the API both accept only these four.
+  threads: THREAD_CATEGORY_OPTIONS.map((option) => option.value),
   resources: ['article', 'figma', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
   showcase: SHOWCASE_CATEGORY_OPTIONS.map((option) => option.value),
 };
+
+/** The icon beside each thread category — the web `CATEGORY_ICONS` set. */
+const THREAD_CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
+  question: 'help-circle',
+  discussion: 'message-circle',
+  idea: 'zap',
+  feedback: 'thumbs-up',
+};
+
+/** The display label for one chip, whichever kind is composing. */
+function optionLabel(kind: ContentKind, value: string): string {
+  if (kind === 'threads') return THREAD_CATEGORY_LABELS[value] ?? value;
+  if (kind === 'resources') return RESOURCE_TYPE_LABELS[value] ?? value;
+  return SHOWCASE_CATEGORY_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
 
 /** Kinds whose composer offers direct image uploads. */
 const UPLOAD_KINDS: ContentKind[] = ['threads', 'showcase'];
@@ -58,7 +88,11 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [deviceZone] = useState(() => deviceTimeZone());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState(DEFAULT_TYPE[kind] ?? 'question');
+  // Thread composers build either a plain post or a poll, exactly like the web.
+  const [tab, setTab] = useState<'post' | 'poll'>('post');
+  const [pollDraft, setPollDraft] = useState<ThreadPollDraft | null>(null);
+  // Threads start with no category — the author has to pick one, as on the web.
+  const [type, setType] = useState<string | null>(DEFAULT_TYPE[kind] ?? null);
   const [tags, setTags] = useState('');
   const [url, setUrl] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -81,7 +115,11 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [error, setError] = useState<string | null>(null);
 
   const canUpload = UPLOAD_KINDS.includes(kind);
-  const mediaLimit = kind === 'showcase' ? SHOWCASE_MEDIA_MAX : 5;
+  const mediaLimit = kind === 'showcase'
+    ? SHOWCASE_MEDIA_MAX
+    : kind === 'threads'
+      ? THREAD_IMAGE_MAX
+      : 5;
 
   useEffect(() => {
     if (!visible) return;
@@ -93,10 +131,24 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setIsPublic(Boolean(item?.is_public));
     setAttachments(item && 'attachments' in item ? item.attachments : []);
     setType(DEFAULT_TYPE[kind] ?? 'question');
+    setTab('post');
+    setPollDraft(null);
 
     if (kind === 'threads') {
-      setType(item && 'category' in item ? item.category : 'question');
+      // A legacy mobile category (`referral` / `collaboration`) is not one the
+      // web or the API accepts, so it comes back as "nothing chosen yet".
+      const category = item && 'category' in item ? item.category : null;
+      setType(
+        THREAD_CATEGORY_OPTIONS.some((option) => option.value === category) ? category : null,
+      );
       setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
+      // Editing keeps the thread's type, as on the web: a poll edits its poll,
+      // a post edits its text.
+      const poll = item && 'poll' in item ? item.poll : null;
+      if (poll) {
+        setTab('poll');
+        setPollDraft(pollDraftFromPoll(poll));
+      }
     } else if (kind === 'resources') {
       setType(item && 'resource_type' in item ? item.resource_type : 'article');
       setUrl(item && 'url' in item ? item.url : '');
@@ -162,6 +214,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     }
   };
 
+  /** Switch the composer between a text post and a poll. */
+  function selectTab(next: 'post' | 'poll') {
+    setTab(next);
+    // Seed the draft on first entry so the composer opens on the question.
+    if (next === 'poll') setPollDraft((current) => current ?? emptyPollDraft());
+  }
+
   const submit = async () => {
     const cleanTags = tags
       .split(',')
@@ -172,16 +231,39 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
     let body: Record<string, unknown>;
     if (kind === 'threads') {
-      if (!description.trim()) return setError('Write something before saving.');
-      const thread = bodyToThread(description);
+      let threadTitle: string;
+      let poll: ThreadPoll | null = null;
+
+      if (tab === 'poll') {
+        if (!pollDraft) return setError('Add a question for your poll.');
+        const invalid = validatePollDraft(pollDraft);
+        if (invalid) return setError(invalid);
+        const serialized = serializePollDraft(pollDraft);
+        const existingPoll = item && 'poll' in item ? item.poll : null;
+        // Polls created as standalone posts use the question as the thread
+        // text; keep any separate caption on older thread rows untouched.
+        const pollIsContent = Boolean(
+          item && existingPoll && item.title.trim() === existingPoll.question.trim(),
+        );
+        threadTitle = item && existingPoll && !pollIsContent ? item.title : serialized.question;
+        poll = serialized;
+      } else {
+        if (!description.trim()) {
+          return setError(item ? 'Write something before saving.' : 'Write something before posting.');
+        }
+        threadTitle = bodyToThread(description).title;
+      }
+
+      if (!type) return setError('Pick a category for your thread.');
       body = {
-        ...thread,
+        title: threadTitle,
         category: type,
         tags: cleanTags,
         attachments,
         links: extractLinks(description),
         allow_replies: allowReplies,
         is_public: isPublic,
+        poll,
       };
     } else if (kind === 'resources') {
       if (!title.trim()) return setError('Title is required.');
@@ -301,9 +383,24 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           <Pressable onPress={onClose} style={styles.iconButton} accessibilityLabel="Close editor">
             <Feather name="x" size={24} color={colors.foreground} />
           </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            {item ? 'Edit' : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'} {isShowcase ? '' : label}
-          </Text>
+          <View style={styles.headerCopy}>
+            <Text
+              style={[styles.title, { color: colors.foreground }]}
+              numberOfLines={1}
+            >
+              {item ? 'Edit' : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'} {isShowcase ? '' : label}
+            </Text>
+            {kind === 'threads' ? (
+              <Text
+                style={[styles.subtitle, { color: colors.foregroundMuted }]}
+                numberOfLines={1}
+              >
+                {item
+                  ? 'Update the content, images, or privacy of this thread'
+                  : 'Share your thoughts, ask a question, or start a discussion'}
+              </Text>
+            ) : null}
+          </View>
           <Pressable
             onPress={submit}
             disabled={saving || uploading}
@@ -314,7 +411,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               <ActivityIndicator color={colors.accentForeground} />
             ) : (
               <Text style={[styles.saveText, { color: colors.accentForeground }]}>
-                {isShowcase ? 'Share' : 'Save'}
+                {isShowcase ? 'Share' : item ? 'Save' : kind === 'threads' ? 'Post' : 'Save'}
               </Text>
             )}
           </Pressable>
@@ -326,6 +423,12 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         >
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
 
+          {/* Create-only: a thread can be a post or a poll. Editing keeps the
+              thread's existing type, so no tabs are needed there. */}
+          {kind === 'threads' && !item ? (
+            <ComposerTabs value={tab} onChange={selectTab} colors={colors} />
+          ) : null}
+
           {isShowcase ? (
             <Field label="Title *">
               <TextInput
@@ -333,7 +436,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 onChangeText={setTitle}
                 style={[inputStyle, styles.multiline]}
                 multiline
-                maxLength={2000}
+                maxLength={THREAD_BODY_MAX_LENGTH}
                 textAlignVertical="top"
                 placeholder="What did you make? Walk us through it…"
                 placeholderTextColor={colors.foregroundSubtle}
@@ -368,16 +471,40 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </Field>
           ) : null}
 
-          {!isShowcase ? (
-            <Field label={kind === 'threads' ? 'What do you want to talk about?' : 'Description'}>
+          {kind === 'threads' ? (
+            tab === 'poll' ? (
+              pollDraft ? (
+                <PollComposer value={pollDraft} onChange={setPollDraft} colors={colors} />
+              ) : null
+            ) : (
+              <Field label={null}>
+                <View>
+                  <TextInput
+                    value={description}
+                    onChangeText={setDescription}
+                    style={[inputStyle, styles.multiline, styles.threadBody]}
+                    multiline
+                    maxLength={THREAD_BODY_MAX_LENGTH}
+                    textAlignVertical="top"
+                    placeholder="What do you want to talk about?"
+                    placeholderTextColor={colors.foregroundSubtle}
+                  />
+                  <Text style={[styles.counter, { color: colors.foregroundSubtle }]}>
+                    {description.length}/{THREAD_BODY_MAX_LENGTH}
+                  </Text>
+                </View>
+              </Field>
+            )
+          ) : !isShowcase ? (
+            <Field label="Description">
               <TextInput
                 value={description}
                 onChangeText={setDescription}
                 style={[inputStyle, styles.multiline]}
                 multiline
-                maxLength={kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000}
+                maxLength={kind === 'resources' ? 2000 : 5000}
                 textAlignVertical="top"
-                placeholder={kind === 'threads' ? 'What do you want to talk about?' : 'Add helpful details'}
+                placeholder="Add helpful details"
                 placeholderTextColor={colors.foregroundSubtle}
               />
             </Field>
@@ -423,34 +550,44 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {choices.length ? (
-            <Field label={isShowcase ? 'Category *' : kind === 'threads' ? 'Category' : 'Type'}>
+            <Field label={isShowcase || kind === 'threads' ? 'Category *' : 'Type'}>
               <View style={styles.chips}>
-                {choices.map((choice) => (
-                  <Pressable
-                    key={choice}
-                    onPress={() => setType(choice)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: type === choice ? colors.accentSoft : colors.surfaceRaised,
-                      },
-                    ]}
-                  >
-                    <Text
+                {choices.map((choice) => {
+                  const active = type === choice;
+                  return (
+                    <Pressable
+                      key={choice}
+                      onPress={() => setType(choice)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                       style={[
-                        styles.chipText,
-                        { color: type === choice ? colors.foreground : colors.foregroundMuted },
+                        styles.chip,
+                        { backgroundColor: active ? colors.accentSoft : colors.surfaceRaised },
                       ]}
                     >
-                      {choice.replace(/_/g, ' ')}
-                    </Text>
-                  </Pressable>
-                ))}
+                      {kind === 'threads' ? (
+                        <Feather
+                          name={THREAD_CATEGORY_ICONS[choice] ?? 'message-circle'}
+                          size={14}
+                          color={active ? colors.foreground : colors.foregroundMuted}
+                        />
+                      ) : null}
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: active ? colors.foreground : colors.foregroundMuted },
+                        ]}
+                      >
+                        {optionLabel(kind, choice)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </Field>
           ) : null}
 
-          {kind !== 'events' && !isShowcase ? (
+          {kind !== 'events' && kind !== 'threads' && !isShowcase ? (
             <Field label="Tags (up to 3, comma separated)">
               <TextInput
                 value={tags}
@@ -463,7 +600,15 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {kind === 'threads' || isShowcase ? (
-            <Toggle label="Allow replies" value={allowReplies} onValueChange={setAllowReplies} colors={colors} />
+            <Toggle
+              label="Allow replies"
+              description={
+                kind === 'threads' ? 'Other members can reply to this thread.' : undefined
+              }
+              value={allowReplies}
+              onValueChange={setAllowReplies}
+              colors={colors}
+            />
           ) : null}
 
           {kind === 'events' ? (
@@ -536,7 +681,11 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
           <Toggle
             label="Share publicly"
-            description="Also show this post in the public community feed."
+            description={
+              kind === 'threads'
+                ? 'Visible to everyone, not just community members.'
+                : 'Also show this post in the public community feed.'
+            }
             value={isPublic}
             onValueChange={setIsPublic}
             colors={colors}
@@ -563,11 +712,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string | null; children: React.ReactNode }) {
   const colors = useColors();
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: colors.foregroundMuted }]}>{label}</Text>
+      {label ? (
+        <Text style={[styles.label, { color: colors.foregroundMuted }]}>{label}</Text>
+      ) : null}
       {children}
     </View>
   );
@@ -603,11 +754,204 @@ function Toggle({
   );
 }
 
+/**
+ * The web composer's Post / Poll tabs, with the same underline treatment.
+ * `tab` decides what gets posted; the thread's other fields are shared.
+ */
+function ComposerTabs({
+  value,
+  onChange,
+  colors,
+}: {
+  value: 'post' | 'poll';
+  onChange: (value: 'post' | 'poll') => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const tabs: Array<{
+    value: 'post' | 'poll';
+    label: string;
+    icon: React.ComponentProps<typeof Feather>['name'];
+  }> = [
+    { value: 'post', label: 'Post', icon: 'edit-3' },
+    { value: 'poll', label: 'Poll', icon: 'bar-chart-2' },
+  ];
+
+  return (
+    <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
+      {tabs.map((entry) => {
+        const active = value === entry.value;
+        return (
+          <Pressable
+            key={entry.value}
+            onPress={() => onChange(entry.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
+          >
+            <Feather
+              name={entry.icon}
+              size={14}
+              color={active ? colors.foreground : colors.foregroundMuted}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                { color: active ? colors.foreground : colors.foregroundMuted },
+              ]}
+            >
+              {entry.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * The poll draft editor, ported from the web `PollComposer`: one question and
+ * 2–6 lettered options, with add/remove controls. Validation runs on submit so
+ * the composer never nags while the author is still typing.
+ */
+function PollComposer({
+  value,
+  onChange,
+  colors,
+}: {
+  value: ThreadPollDraft;
+  onChange: (draft: ThreadPollDraft) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const { question, options } = value;
+  const filled = options.filter((option) => option.trim()).length;
+
+  function setQuestion(next: string) {
+    onChange({ ...value, question: next });
+  }
+
+  function setOption(index: number, text: string) {
+    onChange({
+      ...value,
+      options: options.map((option, i) => (i === index ? text : option)),
+    });
+  }
+
+  function addOption() {
+    if (options.length >= POLL_MAX_OPTIONS) return;
+    onChange({ ...value, options: [...options, ''] });
+  }
+
+  function removeOption(index: number) {
+    if (options.length <= POLL_MIN_OPTIONS) return;
+    onChange({ ...value, options: options.filter((_, i) => i !== index) });
+  }
+
+  return (
+    <View
+      style={[
+        styles.pollCard,
+        { borderColor: colors.border, backgroundColor: colors.background },
+      ]}
+    >
+      <View style={styles.pollHeader}>
+        <Feather name="bar-chart-2" size={13} color={colors.foregroundMuted} />
+        <Text style={[styles.pollHeaderText, { color: colors.foregroundMuted }]}>Poll</Text>
+      </View>
+
+      <Field label="Question">
+        <TextInput
+          value={question}
+          onChangeText={setQuestion}
+          maxLength={POLL_QUESTION_MAX_LENGTH}
+          placeholder="Ask something…"
+          placeholderTextColor={colors.foregroundSubtle}
+          style={inputStyleFor(colors)}
+        />
+      </Field>
+
+      <View style={styles.pollOptions}>
+        {options.map((option, index) => (
+          <View key={index} style={styles.pollOptionRow}>
+            <View
+              style={[
+                styles.pollOptionBadge,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={[styles.pollOptionBadgeText, { color: colors.foregroundSubtle }]}>
+                {pollOptionLetter(index)}
+              </Text>
+            </View>
+            <TextInput
+              value={option}
+              onChangeText={(text) => setOption(index, text)}
+              maxLength={POLL_OPTION_MAX_LENGTH}
+              placeholder={`Option ${index + 1}`}
+              placeholderTextColor={colors.foregroundSubtle}
+              style={[inputStyleFor(colors), styles.pollOptionInput]}
+            />
+            {options.length > POLL_MIN_OPTIONS ? (
+              <Pressable
+                onPress={() => removeOption(index)}
+                style={styles.pollRemove}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove option ${index + 1}`}
+              >
+                <Feather name="x" size={14} color={colors.foregroundSubtle} />
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
+      </View>
+
+      {options.length < POLL_MAX_OPTIONS ? (
+        <Pressable
+          onPress={addOption}
+          style={[styles.pollAdd, { borderColor: colors.border }]}
+          accessibilityRole="button"
+        >
+          <Feather name="plus" size={12} color={colors.foregroundMuted} />
+          <Text style={[styles.pollAddText, { color: colors.foregroundMuted }]}>Add option</Text>
+        </Pressable>
+      ) : (
+        <Text style={[styles.pollHint, { color: colors.foregroundSubtle }]}>
+          You can add up to {POLL_MAX_OPTIONS} options.
+        </Text>
+      )}
+
+      {filled < POLL_MIN_OPTIONS ? (
+        <Text style={[styles.pollHint, { color: colors.foregroundSubtle }]}>
+          Add at least {POLL_MIN_OPTIONS} options.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** The shared field skin, used outside the main form's closure. */
+function inputStyleFor(colors: ReturnType<typeof useColors>) {
+  return {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    fontFamily: 'Geist_400Regular' as const,
+    fontSize: 15,
+    color: colors.foreground,
+    backgroundColor: colors.inputBackground,
+    borderColor: colors.borderSubtle,
+  };
+}
+
+/**
+ * The typed body *is* the thread, exactly as on the web: the whole post is
+ * stored in `title` (no separate description), so the card and the web page
+ * show the same text.
+ */
 function bodyToThread(body: string) {
-  const trimmed = body.trim();
-  const firstLine = trimmed.split('\n')[0]?.trim() ?? '';
-  const title = (firstLine || trimmed).slice(0, 120) || 'Thread';
-  return { title, description: trimmed || title };
+  const title = body.trim().slice(0, THREAD_BODY_MAX_LENGTH);
+  return { title: title || 'Thread' };
 }
 
 function threadToBody(title: string, description: string | null) {
@@ -662,12 +1006,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, fontFamily: 'Geist_600SemiBold', fontSize: 19 },
+  headerCopy: { flex: 1, minWidth: 0 },
+  title: { fontFamily: 'Geist_600SemiBold', fontSize: 19 },
+  subtitle: { fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 1 },
   save: { minWidth: 68, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   saveText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   form: { padding: 20, gap: 20 },
   field: { gap: 8 },
-  label: { fontFamily: 'Geist_500Medium', fontSize: 13 },
+  label: { fontFamily: 'Geist_500Medium', fontSize: 12 },
   input: {
     minHeight: 48,
     borderRadius: 12,
@@ -677,12 +1023,74 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 124, paddingTop: 13 },
+  threadBody: { paddingBottom: 22 },
+  counter: {
+    position: 'absolute',
+    right: 10,
+    bottom: 6,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 11,
+  },
+  tabs: { flexDirection: 'row', alignItems: 'center', gap: 4, borderBottomWidth: 1 },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    marginBottom: -1,
+  },
+  tabText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
+  pollCard: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 12 },
+  pollHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pollHeaderText: { fontFamily: 'Geist_600SemiBold', fontSize: 12 },
+  pollOptions: { gap: 8 },
+  pollOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pollOptionBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollOptionBadgeText: { fontFamily: 'Geist_600SemiBold', fontSize: 11 },
+  pollOptionInput: {
+    flex: 1,
+    height: 40,
+    minHeight: 40,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  pollRemove: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  pollAdd: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  pollAddText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
+  pollHint: { fontFamily: 'Geist_400Regular', fontSize: 11 },
   zoneTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   zoneTriggerText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 15 },
   zoneHint: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
-  chipText: { fontFamily: 'Geist_500Medium', fontSize: 13, textTransform: 'capitalize' },
+  chip: {
+    minHeight: 32,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
   toggle: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   toggleCopy: { flex: 1, gap: 3 },
   toggleLabel: { fontFamily: 'Geist_500Medium', fontSize: 15 },

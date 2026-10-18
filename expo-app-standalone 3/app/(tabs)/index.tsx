@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,16 +14,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContent } from '@/lib/communityContent';
+import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, getHomeFeed, type FeedItem } from '@/lib/homeFeed';
+import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 
 /**
  * Home — the cross-community feed.
  *
  * Renders the same cards as the community tabs (likes, saves, RSVPs and the
- * comment sheet all work identically), with a chip naming the community each
+ * comment thread all work identically), with a chip naming the community each
  * post came from. Posts are read-only here: editing and deleting stay on the
  * post's own community tab, where membership is known.
  */
@@ -40,7 +41,6 @@ export default function HomeTab() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
 
   const resetActions = actions.reset;
 
@@ -68,6 +68,42 @@ export default function HomeTab() {
     void load('initial');
   }, [load]);
 
+  // Poll tallies for the threads in this mixed feed. Only communities with a
+  // visible poll are subscribed — a feed of plain posts opens no sockets.
+  const applyPollUpdate = actions.applyPollUpdate;
+  const pollCommunityIds = useMemo(() => feedPollCommunityIds(items), [items]);
+
+  const handlePollEvent = useCallback(
+    (event: ThreadPollEvent) => {
+      const me = user?.id ?? '';
+      setItems((current) => applyPollEventToFeed(current, event, me));
+      setSelected((current) => {
+        if (!current || current.id !== event.threadId) return current;
+        return applyPollEventToFeed([current], event, me)[0] ?? current;
+      });
+      // An optimistic local vote keeps its choice while the tallies move; an
+      // event from this member on another device replaces it.
+      applyPollUpdate(event.threadId, {
+        counts: event.counts,
+        userVote: event.userVote,
+        undoUsed: event.undoUsed,
+        mine: event.userId !== null && event.userId === me,
+      });
+    },
+    [applyPollUpdate, user?.id],
+  );
+
+  // A reconnected room missed events while it was down; settle from the API.
+  const handlePollGap = useCallback(() => {
+    void load('refresh');
+  }, [load]);
+
+  useThreadPollRealtime({
+    communityIds: pollCommunityIds,
+    onEvent: handlePollEvent,
+    onGap: handlePollGap,
+  });
+
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || items.length === 0) return;
     const last = items[items.length - 1];
@@ -86,9 +122,11 @@ export default function HomeTab() {
     }
   }, [hasMore, items, loadingMore]);
 
-  const openComments = useCallback((item: CommunityContent) => {
+  // The comment count is the only route into a post's own page, where the
+  // comments live under the post itself; the card body just double-tap likes.
+  const openItem = useCallback((item: CommunityContent) => {
     const match = items.find((entry) => entry.id === item.id);
-    setCommentTarget(match ?? null);
+    setSelected(match ?? null);
   }, [items]);
 
   const renderItem = useCallback(
@@ -100,11 +138,10 @@ export default function HomeTab() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-        onComments={openComments}
+        onComments={openItem}
       />
     ),
-    [actions, items, openComments, user?.id],
+    [actions, items, openItem, user?.id],
   );
 
   return (
@@ -168,26 +205,7 @@ export default function HomeTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies={
-            feedItemKind(commentTarget) === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
 }

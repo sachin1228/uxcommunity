@@ -1,4 +1,7 @@
 import { apiFetch, apiFormUpload } from './api';
+import type { ThreadPoll } from './communityPoll';
+
+export type { ThreadPoll } from './communityPoll';
 
 /**
  * Community content client — threads, showcase posts, events and resources.
@@ -53,6 +56,14 @@ export interface CommunityThread extends BaseContent {
   comment_count: number;
   user_liked: boolean;
   user_saved: boolean;
+  /** The optional poll attached to the thread (null for a plain post). */
+  poll: ThreadPoll | null;
+  /** Vote totals aligned with `poll.options`, attached by the read models. */
+  poll_vote_counts?: number[];
+  /** The viewer's option index, or null when they have not voted. */
+  poll_user_vote?: number | null;
+  /** Whether the viewer has already spent their one-time vote undo. */
+  poll_undo_used?: boolean;
 }
 
 export interface CommunityEvent extends BaseContent {
@@ -173,8 +184,9 @@ export function contentAuthor(item: CommunityContent): Author | null {
 }
 
 /**
- * Thread categories with their display labels — the web `THREAD_CATEGORIES`
- * plus the two categories the mobile composer also offers.
+ * Thread categories with their display labels. Legacy rows may still carry
+ * `referral` / `collaboration` (an older mobile composer offered them), so the
+ * labels stay; the composer only offers the four the web and the API accept.
  */
 export const THREAD_CATEGORY_LABELS: Record<string, string> = {
   question: 'Question',
@@ -184,6 +196,20 @@ export const THREAD_CATEGORY_LABELS: Record<string, string> = {
   referral: 'Referral',
   collaboration: 'Collaboration',
 };
+
+/** The categories the composer offers — the web `THREAD_CATEGORIES`. */
+export const THREAD_CATEGORY_OPTIONS = [
+  { value: 'question', label: 'Question' },
+  { value: 'discussion', label: 'Discussion' },
+  { value: 'idea', label: 'Idea' },
+  { value: 'feedback', label: 'Feedback' },
+] as const;
+
+/** Max thread body (title) length — the web `THREAD_BODY_MAX_LENGTH`. */
+export const THREAD_BODY_MAX_LENGTH = 2000;
+
+/** Max images on one thread — the web `THREAD_IMAGE_MAX`. */
+export const THREAD_IMAGE_MAX = 4;
 
 /** Resource types with their display labels (web `RESOURCE_TYPES`). */
 export const RESOURCE_TYPE_LABELS: Record<string, string> = {
@@ -237,6 +263,24 @@ export function formatRelativeDate(value: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/**
+ * The full body of a thread.
+ *
+ * Web threads keep the whole post in `title`, so the card and the detail show
+ * exactly that. Threads created by an older mobile composer stored the first
+ * line in `title` and the whole post in `description`; those still render in
+ * full by preferring the description when it starts with the title.
+ */
+export function threadBody(thread: CommunityThread): string {
+  const title = thread.title?.trim() ?? '';
+  const description = thread.description?.trim() ?? '';
+  if (description && description !== title) {
+    if (!title) return thread.description ?? description;
+    return description.startsWith(title) ? description : `${title}\n\n${description}`;
+  }
+  return thread.title ?? '';
 }
 
 /**
@@ -348,6 +392,44 @@ export async function setContentAction(
   return {
     value: typeof confirmed === 'boolean' ? confirmed : desired,
     count: typeof count === 'number' ? count : undefined,
+  };
+}
+
+export interface PollVoteResult {
+  /** Server-confirmed totals, aligned with the poll's options. */
+  counts: number[];
+  /** The viewer's vote after the write (null after an undo). */
+  userVote: number | null;
+  undoUsed: boolean;
+}
+
+/**
+ * Vote on a thread poll, or undo the viewer's vote with `optionIndex = null`.
+ *
+ * The API is the same one the web card calls: one vote per member, a vote is
+ * final, and each member may undo exactly once before voting again.
+ */
+export async function voteOnThreadPoll(
+  communityId: string,
+  threadId: string,
+  optionIndex: number | null,
+): Promise<PollVoteResult> {
+  const { data } = await apiFetch<{
+    counts?: number[];
+    user_vote?: number | null;
+    undo_used?: boolean;
+  }>(`/api/communities/${communityId}/threads/${threadId}/poll`, {
+    method: 'POST',
+    body: optionIndex === null ? { action: 'undo' } : { option_index: optionIndex },
+  });
+
+  if (!Array.isArray(data.counts)) {
+    throw new Error('Failed to record your vote.');
+  }
+  return {
+    counts: data.counts,
+    userVote: typeof data.user_vote === 'number' ? data.user_vote : null,
+    undoUsed: data.undo_used === true,
   };
 }
 

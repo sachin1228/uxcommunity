@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,14 +20,15 @@ import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { CommunityContent } from '@/lib/communityContent';
+import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
+import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
 
@@ -117,7 +118,6 @@ export default function ProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
 
   // ── Hero edit flows ──
   const [avatarPick, setAvatarPick] = useState<PreparedImage | null>(null);
@@ -196,6 +196,42 @@ export default function ProfileScreen() {
     }
   }, [feedLoading, hasMore, items, loadingMore]);
 
+  // Poll tallies for the threads in this feed. Only communities with a visible
+  // poll are subscribed — a feed of plain posts opens no sockets.
+  const applyPollUpdate = actions.applyPollUpdate;
+  const pollCommunityIds = useMemo(() => feedPollCommunityIds(items), [items]);
+
+  const handlePollEvent = useCallback(
+    (event: ThreadPollEvent) => {
+      const me = user?.id ?? '';
+      setItems((current) => applyPollEventToFeed(current, event, me));
+      setSelected((current) => {
+        if (!current || current.id !== event.threadId) return current;
+        return applyPollEventToFeed([current], event, me)[0] ?? current;
+      });
+      // An optimistic local vote keeps its choice while the tallies move; an
+      // event from this member on another device replaces it.
+      applyPollUpdate(event.threadId, {
+        counts: event.counts,
+        userVote: event.userVote,
+        undoUsed: event.undoUsed,
+        mine: event.userId !== null && event.userId === me,
+      });
+    },
+    [applyPollUpdate, user?.id],
+  );
+
+  // A reconnected room missed events while it was down; settle from the API.
+  const handlePollGap = useCallback(() => {
+    void loadFeed(scopeRef.current, 'refresh');
+  }, [loadFeed]);
+
+  useThreadPollRealtime({
+    communityIds: pollCommunityIds,
+    onEvent: handlePollEvent,
+    onGap: handlePollGap,
+  });
+
   const handleScopeChange = useCallback(
     (next: ProfileFeedScope) => {
       if (next === scope) return;
@@ -208,10 +244,12 @@ export default function ProfileScreen() {
     [loadFeed, scope],
   );
 
-  const openComments = useCallback(
+  // The comment count is the only route into a post's own page, where the
+  // comments live under the post itself; the card body just double-tap likes.
+  const openItem = useCallback(
     (item: CommunityContent) => {
       const match = items.find((entry) => entry.id === item.id);
-      setCommentTarget(match ?? null);
+      setSelected(match ?? null);
     },
     [items],
   );
@@ -286,11 +324,10 @@ export default function ProfileScreen() {
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
-        onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-        onComments={openComments}
+        onComments={openItem}
       />
     ),
-    [actions, items, openComments, user?.id],
+    [actions, items, openItem, user?.id],
   );
 
   const body = profile?.profile;
@@ -452,26 +489,7 @@ export default function ProfileScreen() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies={
-            feedItemKind(commentTarget) === 'events'
-              ? true
-              : (commentTarget as { allow_replies?: boolean }).allow_replies !== false
-          }
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
 
       <AvatarPickerModal
         visible={avatarPick !== null}

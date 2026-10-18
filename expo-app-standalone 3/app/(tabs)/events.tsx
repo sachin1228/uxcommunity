@@ -14,7 +14,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
-import { CommentsSheet } from '@/components/community/CommentsSheet';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -83,7 +82,6 @@ export default function EventsTab() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const [commentTarget, setCommentTarget] = useState<FeedItem | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   const resetActions = actions.reset;
@@ -169,9 +167,11 @@ export default function EventsTab() {
   const activeList = phase === 'upcoming' ? upcoming : past;
   const counts: Record<CityEventPhase, number> = { upcoming: upcoming.length, past: past.length };
 
-  const openComments = useCallback(
+  // The comment count is the only route into an event's own page, where the
+  // comments live under the event itself.
+  const openItem = useCallback(
     (item: CommunityContent) => {
-      setCommentTarget(items.find((entry) => entry.id === item.id) ?? null);
+      setSelected(items.find((entry) => entry.id === item.id) ?? null);
     },
     [items],
   );
@@ -187,12 +187,11 @@ export default function EventsTab() {
           actions={actions}
           communityName={item.community_name}
           communityImage={item.community_image}
-          onOpen={(entry) => setSelected(items.find((row) => row.id === entry.id) ?? null)}
-          onComments={openComments}
+          onComments={openItem}
         />
       </View>
     ),
-    [actions, items, now, openComments, user?.id],
+    [actions, items, now, openItem, user?.id],
   );
 
   const emptyState =
@@ -321,22 +320,7 @@ export default function EventsTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
-        onComments={openComments}
       />
-
-      {commentTarget ? (
-        <CommentsSheet
-          visible
-          communityId={commentTarget.community_id}
-          kind={feedItemKind(commentTarget)}
-          targetId={commentTarget.id}
-          currentUserId={user?.id ?? ''}
-          title={commentTarget.title}
-          allowReplies
-          onClose={() => setCommentTarget(null)}
-          onCountChange={(total) => actions.setCommentCount(commentTarget.id, total)}
-        />
-      ) : null}
     </View>
   );
 }
