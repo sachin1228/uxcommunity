@@ -127,11 +127,14 @@ function ReplyBubble({
   isOwn,
   colors,
   onPress,
+  topGap = false,
 }: {
   reply: NonNullable<Message['reply_to']>;
   isOwn: boolean;
   colors: Palette;
   onPress?: () => void;
+  /** Extra 2px above the quote when the sender name sits above it. */
+  topGap?: boolean;
 }) {
   // The quote wears the quoted author's chat color — including when you quote
   // yourself. Previews that predate the author id keep the neutral fallback.
@@ -153,6 +156,7 @@ function ReplyBubble({
       disabled={!onPress}
       style={[
         styles.replyBubble,
+        topGap && styles.replyBubbleTopGap,
         { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
@@ -190,11 +194,14 @@ function ContentReplyQuote({
   isOwn,
   colors,
   onPress,
+  topGap = false,
 }: {
   reply: NonNullable<Message['reply_to_content']>;
   isOwn: boolean;
   colors: Palette;
   onPress?: () => void;
+  /** Extra 2px above the quote when the sender name sits above it. */
+  topGap?: boolean;
 }) {
   const ownText = colors.chatOwnBubbleForeground;
   const label = CHAT_CONTENT_KIND_THEME[reply.kind].label;
@@ -204,6 +211,7 @@ function ContentReplyQuote({
       disabled={!onPress}
       style={[
         styles.replyBubble,
+        topGap && styles.replyBubbleTopGap,
         { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
@@ -862,6 +870,7 @@ export const MessageBubble = memo(function MessageBubble({
                         isOwn={isOwn}
                         colors={colors}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
+                        topGap={!isOwn && showHeader}
                       />
                     )}
 
@@ -875,6 +884,7 @@ export const MessageBubble = memo(function MessageBubble({
                             ? () => onContentReplyPress(replyToContent.id)
                             : undefined
                         }
+                        topGap={!isOwn && showHeader}
                       />
                     )}
 
@@ -1035,6 +1045,8 @@ const styles = StyleSheet.create({
     gap: 8,
     overflow: 'hidden',
   },
+  /** Extra breathing room under the sender-name header, first bubble only. */
+  replyBubbleTopGap: { marginTop: 2 },
   /** WhatsApp's accent — a full-height square bar, clipped into the chip's
    *  corners by the overflow above (their exact DOM pattern). */
   replyBar: { width: 4, flexShrink: 0 },
