@@ -399,6 +399,8 @@ const styles = StyleSheet.create({
     // Concentric with the pill: box radius (18) minus this banner's 6pt side
     // inset — the inner corners trace the outer container's curve.
     borderRadius: 12,
+    // Clips the flush accent rule to the rounded corners.
+    overflow: 'hidden',
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
