@@ -1063,7 +1063,7 @@ export default function CommunityChat() {
         </View>
       )}
 
-      {isLoading && (
+      {isLoading && messages.length === 0 && (
         <View style={styles.center}>
           {/* The UI accent, like every other loading state in the app — the
               own-bubble blue reads at ~3.5:1 against the chat background in the
@@ -1072,20 +1072,23 @@ export default function CommunityChat() {
         </View>
       )}
 
-      {!isLoading && error && (
+      {!isLoading && error && messages.length === 0 && (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
         </View>
       )}
 
-      {!isLoading && (
+      {(messages.length > 0 || (!isLoading && !error)) && (
         <FlatList
           ref={listRef}
           inverted
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          style={{ opacity: initialPositionResolved ? 1 : 0 }}
+          // A cached window is already the right thing to look at: show it at
+          // once and let the bootstrap anchor it when the network settles (the
+          // inverted list starts at offset 0 = the newest row).
+          style={{ opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }}
           contentContainerStyle={[styles.messagesList, { paddingTop: 8 }]}
           // Reading old messages means the user is done picking emoji —
           // close the inline panel so it doesn't eat half the screen.

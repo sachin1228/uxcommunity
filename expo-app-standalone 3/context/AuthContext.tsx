@@ -18,6 +18,7 @@ import React, {
   useState,
 } from 'react';
 import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth';
+import { chatCache } from '@/lib/chatCacheStore';
 import { resetRealtimeSession } from '@/lib/realtime';
 import { unregisterStoredPushTokenAsync } from '@/lib/push';
 
@@ -100,6 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // next person to sign in here keeps receiving the previous account's pushes.
     await unregisterStoredPushTokenAsync();
     await apiLogout();
+    // The cached windows are the member's messages — a shared device must not
+    // keep them after sign-out (the next account cannot read them anyway:
+    // keys are user-scoped, but they should not linger on disk).
+    await chatCache.clearAll();
     setUser(null);
   }, []);
 
