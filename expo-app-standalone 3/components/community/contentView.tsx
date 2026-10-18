@@ -1144,6 +1144,9 @@ function Action({ icon, label, active, activeColor = 'accent', compact = false, 
       ? colors.like
       : colors.accent
     : colors.foregroundSubtle;
+  // The heart and the comment bubble lead the footer and read a step larger
+  // than the secondary actions (save, RSVP), which keep the web's 16px.
+  const iconSize = icon === 'heart' || icon === 'message-circle' ? 20 : 16;
   return (
     <Pressable
       onPress={(event) => { event.stopPropagation(); onPress(); }}
@@ -1154,9 +1157,9 @@ function Action({ icon, label, active, activeColor = 'accent', compact = false, 
       accessibilityState={{ selected: Boolean(active) }}
     >
       {icon === 'heart' ? (
-        <HeartIcon size={16} active={Boolean(active)} color={colors.foregroundSubtle} />
+        <HeartIcon size={iconSize} active={Boolean(active)} color={colors.foregroundSubtle} />
       ) : (
-        <Feather name={icon} size={16} color={tint} />
+        <Feather name={icon} size={iconSize} color={tint} />
       )}
       <Text style={[styles.actionText, compact ? styles.actionTextCompact : null, { color: tint }]}>
         {label}
