@@ -1087,6 +1087,7 @@ export default function DmThreadScreen() {
                     currentUserId={userId ?? ''}
                     onLongPress={setSelectedMessage}
                     onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
+                    onAuthorPress={openPeerProfile}
                     onImagePress={handleImagePress}
                     onCancel={handleCancel}
                     onRetry={handleRetry}

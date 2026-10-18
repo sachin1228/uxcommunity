@@ -65,7 +65,7 @@ import {
   type ReplyDraft,
 } from '@/lib/chatContentEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
-import { hapticToggle } from '@/lib/haptics';
+import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -774,6 +774,16 @@ export default function CommunityChat() {
     setSelectedMessage(msg);
   }, []);
 
+  /** A sender's avatar or name — opens their read-only member profile. */
+  const handleAuthorPress = useCallback(
+    (userId: string) => {
+      if (!userId || userId === user?.id) return;
+      hapticSelection();
+      router.push({ pathname: '/member/[id]', params: { id: userId } });
+    },
+    [router, user?.id],
+  );
+
   /**
    * Long-press on a "created a …" card — the touch equivalent of the web
    * card's hover actions (reaction picker + reply).
@@ -975,6 +985,7 @@ export default function CommunityChat() {
           currentUserId={user?.id ?? ''}
           onLongPress={handleLongPress}
           onReactionPress={handleReaction}
+          onAuthorPress={handleAuthorPress}
           onImagePress={handleImagePress}
           onCancel={handleCancel}
           onRetry={handleRetry}
@@ -987,6 +998,7 @@ export default function CommunityChat() {
       user?.id,
       handleLongPress,
       handleReaction,
+      handleAuthorPress,
       handleImagePress,
       handleCancel,
       handleRetry,

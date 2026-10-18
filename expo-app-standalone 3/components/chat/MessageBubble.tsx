@@ -36,6 +36,8 @@ interface Props {
   currentUserId: string;
   onLongPress: (message: Message) => void;
   onReactionPress: (messageId: string, emoji: string) => void;
+  /** Opens the sender's read-only member profile (avatar / name tap). */
+  onAuthorPress?: (userId: string) => void;
   onImagePress?: (uri: string) => void;
   onCancel?: (tempId: string) => void;
   onRetry?: (tempId: string) => void;
@@ -446,6 +448,7 @@ export const MessageBubble = memo(function MessageBubble({
   currentUserId,
   onLongPress,
   onReactionPress,
+  onAuthorPress,
   onImagePress,
   onCancel,
   onRetry,
@@ -501,6 +504,10 @@ export const MessageBubble = memo(function MessageBubble({
     onLongPress(message);
   }, [isDeleted, onLongPress, message]);
 
+  const handleAuthorPress = useCallback(() => {
+    onAuthorPress?.(message.user_id);
+  }, [onAuthorPress, message.user_id]);
+
   return (
     <View
       style={[
@@ -513,7 +520,15 @@ export const MessageBubble = memo(function MessageBubble({
       {!isOwn && (
         <View style={styles.avatarCol}>
           {showHeader && (
-            <PersonAvatar name={senderName} url={sender?.avatar_url ?? null} size={28} />
+            <Pressable
+              onPress={handleAuthorPress}
+              disabled={!onAuthorPress}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${senderName}'s profile`}
+            >
+              <PersonAvatar name={senderName} url={sender?.avatar_url ?? null} size={28} />
+            </Pressable>
           )}
         </View>
       )}
@@ -569,13 +584,23 @@ export const MessageBubble = memo(function MessageBubble({
                 {isFirstInGroup && <MessageBubbleTail side={isOwn ? 'right' : 'left'} color={tailColor} />}
 
                 {/* Sender name inside the bubble, WhatsApp-style. Own messages
-                    skip it, matching WhatsApp and the web app. */}
+                    skip it, matching WhatsApp and the web app. Tapping it (or
+                    the avatar) opens the sender's profile. */}
                 {!isOwn && showHeader && !isDeleted && (
-                  <Text
-                    style={[styles.senderName, { color: senderColor }, imageUrl ? styles.nameOnMedia : null]}
+                  <Pressable
+                    onPress={handleAuthorPress}
+                    disabled={!onAuthorPress}
+                    hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${senderName}'s profile`}
+                    style={styles.senderNamePressable}
                   >
-                    {senderName}
-                  </Text>
+                    <Text
+                      style={[styles.senderName, { color: senderColor }, imageUrl ? styles.nameOnMedia : null]}
+                    >
+                      {senderName}
+                    </Text>
+                  </Pressable>
                 )}
 
                 {isDeleted ? (
@@ -737,6 +762,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_600SemiBold',
     marginBottom: 2,
   },
+  /** Constrains the tap target to the name itself, not the bubble's width. */
+  senderNamePressable: { alignSelf: 'flex-start' },
   nameOnMedia: { marginBottom: 4, paddingLeft: 4 },
 
   content: {
