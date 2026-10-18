@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -152,15 +152,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   const imageUrl = meta?.image_url ?? null;
   const posterUrl = imageUrl ? null : meta?.video_poster ?? null;
   const thumbUri = imageUrl ?? posterUrl;
-  // The thumb keeps the image's own aspect at the 64px column width — never a
-  // cover crop, so a poster reads whole (its height follows the ratio; the
-  // card's own min height floors the tile). The ratio comes from the loaded
-  // image itself (expo-image's onLoad carries the source dimensions).
-  const [thumbRatio, setThumbRatio] = useState<number | null>(null);
-  useEffect(() => {
-    setThumbRatio(null);
-  }, [thumbUri]);
-  const thumbHeight = thumbRatio ? Math.round(THUMB_WIDTH / thumbRatio) : THUMB_WIDTH;
   const TileIcon =
     event.kind === 'resource' && meta?.resource_type
       ? RESOURCE_TILE_ICON[meta.resource_type] ?? KIND_ICON.resource
@@ -282,22 +273,16 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 },
               ]}
             >
-              {/* Thumbnail — the image at its natural aspect (never cropped),
-                  or the shared solid-ink icon tile when there is none. */}
+              {/* Thumbnail — the image covers its square (cropped, never
+                  letterboxed), or the shared solid-ink icon tile when there
+                  is none. */}
               <View style={styles.thumb}>
                 {thumbUri ? (
-                  <View style={{ width: THUMB_WIDTH, height: thumbHeight }}>
+                  <>
                     <Image
                       source={{ uri: thumbUri }}
-                      // The box already carries the image's ratio; contain
-                      // guarantees the whole frame stays visible regardless.
-                      contentFit="contain"
+                      contentFit="cover"
                       style={styles.thumbImage}
-                      onLoad={({ source }) => {
-                        const w = source?.width ?? 0;
-                        const h = source?.height ?? 0;
-                        if (w > 0 && h > 0) setThumbRatio(w / h);
-                      }}
                     />
                     {posterUrl && (
                       <View style={styles.playOverlay}>
@@ -306,7 +291,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                         </View>
                       </View>
                     )}
-                  </View>
+                  </>
                 ) : (
                   <View style={[styles.tile, { backgroundColor: colors.foreground }]}>
                     <ContentIcon name={TileIcon} size={24} color={colors.background} />
@@ -439,7 +424,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbImage: { width: '100%', height: '100%' },
+  thumbImage: { ...StyleSheet.absoluteFillObject },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',

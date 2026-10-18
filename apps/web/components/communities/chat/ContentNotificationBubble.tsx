@@ -99,6 +99,10 @@ function withArticle(noun: string): string {
  * author's own blue bubble everything is white, matching the message text.
  */
 function Eyebrow({ event, isMe }: { event: CachedContentEvent; isMe: boolean }) {
+  // A thread's header already says "created a thread" — no second label.
+  // Threads normally render through ThreadNotificationBubble; this guard also
+  // covers a thread event that reaches the generic content card.
+  if (event.kind === "thread") return null;
   const theme = KIND_THEME[event.kind];
   const Icon = KIND_ICON[event.kind];
   const resourceLabel = resourceTypeLabel(event.meta?.resource_type);
