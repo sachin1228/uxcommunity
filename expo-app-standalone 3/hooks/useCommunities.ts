@@ -234,6 +234,9 @@ export function useCommunities() {
 
             const isOwn   = row.user_id === user?.id;
             const isActive = communityStore.activeCommunityId === cid;
+            // The event ships the sender's name, so the preview never paints a
+            // blank/"Someone" sender and then rewrites itself.
+            if (row.sender_name) resolvedNames.current.set(row.user_id, row.sender_name);
             const knownName = resolvedNames.current.get(row.user_id) ?? null;
             // Replying to your own message reads like a fresh message. The
             // event carries both names, so decide now — resolving the parent
@@ -356,60 +359,48 @@ export function useCommunities() {
               user_id: string; emoji: string; created_at?: string;
             };
             const isOwn     = r.user_id === user?.id;
-            const knownName = resolvedNames.current.get(r.user_id);
+            const knownName = resolvedNames.current.get(r.user_id) ?? null;
+            const lastMessage = communitiesRef.current.find((c) => c.id === cid)?.last_message;
+            const localSnippet =
+              lastMessage?.id === r.message_id
+                ? reactionSnippet(lastMessage.content, !!lastMessage.has_image)
+                : null;
 
-            setCommunities((prev) =>
-              prev.map((c) => {
-                if (c.id !== cid) return c;
-                if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
-                const fallback = c.last_message?.id === r.message_id ? c.last_message : null;
-                return {
-                  ...c,
-                  lastReaction: {
-                    messageId:    r.message_id,
-                    emoji:        r.emoji,
-                    createdAt:    r.created_at ?? new Date().toISOString(),
-                    firstName:    isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
-                    isOwn,
-                    messagePreview: reactionSnippet(fallback?.content, false),
-                  } as LastReaction,
-                };
-              })
-            );
+            // Resolve the name and the reacted message's snippet *before*
+            // painting: applying first made the row flash "Someone reacted …
+            // a message" and then rewrite both halves.
+            const namePromise = isOwn
+              ? Promise.resolve('You')
+              : knownName
+                ? Promise.resolve(knownName.split(' ')[0])
+                : resolveName(cid, r.user_id).then((name) => name?.split(' ')[0] ?? 'Someone');
+            const snippetPromise = localSnippet
+              ? Promise.resolve(localSnippet)
+              : apiFetch<{ content?: string | null; image_url?: string | null }>(
+                  `/api/communities/${cid}/messages/${r.message_id}`
+                )
+                  .then(({ data: msg }) => reactionSnippet(msg?.content, !!msg?.image_url))
+                  .catch(() => 'a message');
 
-            // Async: fetch message content for accurate snippet
-            apiFetch<{ content?: string | null; image_url?: string | null }>(
-              `/api/communities/${cid}/messages/${r.message_id}`
-            )
-              .then(({ data: msg }) => {
-                const preview = reactionSnippet(msg?.content, !!msg?.image_url);
-                const rAt = r.created_at;
-                setCommunities((prev) =>
-                  prev.map((c) => {
-                    if (c.id !== cid || !c.lastReaction) return c;
-                    if (c.lastReaction.messageId !== r.message_id || c.lastReaction.emoji !== r.emoji || c.lastReaction.createdAt !== rAt) return c;
-                    return { ...c, lastReaction: { ...c.lastReaction!, messagePreview: preview } };
-                  })
-                );
-              })
-              .catch(() => {});
-
-            // Async: resolve reactor name
-            if (!isOwn && !resolvedNames.current.has(r.user_id)) {
-              const msgId = r.message_id;
-              const rEmoji = r.emoji;
-              const rAt   = r.created_at;
-              resolveName(cid, r.user_id).then((name) => {
-                if (!name) return;
-                setCommunities((prev) =>
-                  prev.map((c) => {
-                    if (c.id !== cid || !c.lastReaction) return c;
-                    if (c.lastReaction.messageId !== msgId || c.lastReaction.emoji !== rEmoji || c.lastReaction.createdAt !== rAt) return c;
-                    return { ...c, lastReaction: { ...c.lastReaction!, firstName: name.split(' ')[0] } };
-                  })
-                );
-              });
-            }
+            Promise.all([namePromise, snippetPromise]).then(([firstName, messagePreview]) => {
+              setCommunities((prev) =>
+                prev.map((c) => {
+                  if (c.id !== cid) return c;
+                  if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
+                  return {
+                    ...c,
+                    lastReaction: {
+                      messageId:      r.message_id,
+                      emoji:          r.emoji,
+                      createdAt:      r.created_at ?? new Date().toISOString(),
+                      firstName,
+                      isOwn,
+                      messagePreview,
+                    } as LastReaction,
+                  };
+                })
+              );
+            });
           }),
         );
 
@@ -432,7 +423,9 @@ export function useCommunities() {
                     messageId:     r.message_id,
                     emoji:         r.emoji,
                     createdAt:     r.created_at ?? new Date().toISOString(),
-                    firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
+                    // Keep the name already on the row instead of regressing
+                    // to "Someone" while a profile name is unknown.
+                    firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? c.lastReaction?.firstName ?? 'Someone'),
                     isOwn,
                     messagePreview: c.lastReaction?.messagePreview ?? 'a message',
                   } as LastReaction,
