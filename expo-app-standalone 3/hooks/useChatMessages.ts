@@ -31,6 +31,7 @@ import {
   patchCachedBootstrapMessages,
 } from '@/lib/communityBootstrap';
 import { pickOptimisticMatch, compareChatTimeline } from '@/lib/chat';
+import { chatCache } from '@/lib/chatCacheStore';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
   createCatchUpScheduler,
@@ -78,6 +79,34 @@ export function useChatMessages(communityId: string) {
    * never merge into — or be cached as — another's.
    */
   const windowCommunityRef = useRef(communityId);
+
+  /**
+   * Cold start: paint the window the previous session ended on while the
+   * bootstrap request is in flight. The fetch below merges over it, and the
+   * mount catch-up closes the gap — the same "local store first, sync after"
+   * order messaging apps use.
+   */
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId) return undefined;
+    let active = true;
+    void chatCache.loadCommunityMessages(userId, communityId).then((cached) => {
+      if (!active || !cached || cached.length === 0) return;
+      // Plain id-dedupe: unlike the catch-up merge this must never "confirm" an
+      // in-flight optimistic bubble, or an old cached row with the same text
+      // would remove the message the member just sent.
+      setMessages((prev) => {
+        const known = new Set(prev.map((message) => message.id));
+        const fresh = cached.filter((message) => !known.has(message.id));
+        return fresh.length > 0
+          ? [...prev, ...fresh].sort(compareChatTimeline)
+          : prev;
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [communityId, user?.id]);
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore || messages.length === 0) return;
@@ -225,7 +254,11 @@ export function useChatMessages(communityId: string) {
     const rows = messages.filter((message) => !message.id.startsWith('temp-'));
     if (rows.length === 0) return;
     patchCachedBootstrapMessages(communityId, rows);
-  }, [communityId, messages]);
+    // Write-through to the persistent window: a process restart reads this
+    // back on mount, so everything the member just saw survives the kill.
+    const userId = user?.id;
+    if (userId) void chatCache.saveCommunityMessages(userId, communityId, rows);
+  }, [communityId, messages, user?.id]);
 
   // Realtime subscription via Cloudflare singleton
   useEffect(() => {

@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { getMemberBrief } from '@/lib/communities';
 import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
+import { chatCache } from '@/lib/chatCacheStore';
 import { applyReactionDelete, applyReactionInsert, type Reaction } from '@/lib/chat';
 import {
   createAuthorCache,
@@ -52,11 +53,48 @@ export function useChatContentEvents(communityId: string) {
   const [events, setEvents] = useState<ChatContentEvent[]>([]);
   /** True once the history fetch has settled — gates the empty-state copy. */
   const [ready, setReady] = useState(false);
+  /**
+   * True once the disk read has settled. Persistence waits for it: a failed
+   * fetch must not write an empty list over the cards still being read back.
+   */
+  const [cacheHydrated, setCacheHydrated] = useState(false);
 
   const communityIdRef = useRef(communityId);
   useEffect(() => {
     communityIdRef.current = communityId;
   }, [communityId]);
+  /** True once the bootstrap answered; the disk snapshot must not overwrite it. */
+  const networkSettledRef = useRef(false);
+  useEffect(() => {
+    networkSettledRef.current = false;
+    setCacheHydrated(false);
+  }, [communityId]);
+
+  // Cold start: paint the cards cached with the message window while the
+  // bootstrap request is in flight (see lib/chatCache.ts).
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId) return undefined;
+    let active = true;
+    void chatCache
+      .loadCommunityEvents(userId, communityId)
+      .then((cached) => {
+        if (!active || !cached || cached.length === 0) return;
+        if (networkSettledRef.current) return;
+        setEvents((prev) => {
+          const known = new Set(prev.map((event) => event.id));
+          const fresh = cached.filter((event) => !known.has(event.id));
+          return fresh.length > 0 ? [...prev, ...fresh].sort(byCreatedAt) : prev;
+        });
+        setReady(true);
+      })
+      .finally(() => {
+        if (active) setCacheHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [communityId, user?.id]);
 
   /**
    * Authors of live inserts, remembered from resolved rows — the payload
@@ -74,6 +112,9 @@ export function useChatContentEvents(communityId: string) {
       const bootstrap = await fetchCommunityBootstrap(communityId);
       // The user switched communities while the page was in flight.
       if (communityIdRef.current !== communityId) return;
+      // Only a successful answer is authoritative; a failed fetch must leave
+      // a still-pending disk read free to paint the cached cards.
+      networkSettledRef.current = true;
       for (const row of bootstrap.contentEvents) {
         if (row.users) authors.current.set(row.user_id, row.users);
       }
@@ -88,6 +129,18 @@ export function useChatContentEvents(communityId: string) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Write-through so the next cold start paints the same cards (and a card
+  // created/deleted while the chat was open is reflected immediately).
+  useEffect(() => {
+    if (!user?.id || !ready || !cacheHydrated) return;
+    // On an in-place community switch the previous render's events still sit
+    // in state for one commit — never file them under the new room's key.
+    if (events.some((event) => event.community_id && event.community_id !== communityId)) {
+      return;
+    }
+    void chatCache.saveCommunityEvents(user.id, communityId, events);
+  }, [cacheHydrated, communityId, events, ready, user?.id]);
 
   // Live creates/deletes from the mounted tabs, mirrored ahead of realtime.
   useEffect(() => {

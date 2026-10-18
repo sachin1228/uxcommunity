@@ -44,6 +44,7 @@ import { useColors } from '@/hooks/useColors';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
 import { useDmSend } from '@/hooks/useDmSend';
 import { useDmTyping } from '@/hooks/useDmTyping';
+import { chatCache } from '@/lib/chatCacheStore';
 import {
   answerDmRequest,
   blockUser,
@@ -156,6 +157,31 @@ export default function DmThreadScreen() {
     messagesRef.current = messages;
   }, [messages]);
 
+  // Cold start: paint the thread's last window from disk before the page
+  // request answers (see lib/chatCache.ts). The fetch below merges over it.
+  useEffect(() => {
+    if (!userId || !conversationId) return undefined;
+    let active = true;
+    void chatCache.loadDmMessages(userId, conversationId).then((cached) => {
+      if (!active || !cached || cached.length === 0) return;
+      setMessages((current) => {
+        const known = new Set(current.map((message) => message.id));
+        const fresh = cached.filter((message) => !known.has(message.id));
+        return fresh.length > 0 ? sortMessages([...current, ...fresh]) : current;
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [conversationId, userId]);
+
+  // Write-through: a relaunch reads this window back on mount, and edits /
+  // deletes / reactions applied while open are reflected in it.
+  useEffect(() => {
+    if (!userId || !conversationId || messages.length === 0) return;
+    void chatCache.saveDmMessages(userId, conversationId, messages);
+  }, [conversationId, messages, userId]);
+
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -252,7 +278,14 @@ export default function DmThreadScreen() {
       ]);
       const found =
         conversations.find((row) => row.id === conversationId) ?? synthesizeConversation();
-      setMessages(page.messages);
+      // Merge over the cached/hydrated window: the server page wins row by
+      // row (edits, deletes, reactions), while the older rows already on
+      // screen stay reachable above it.
+      setMessages((current) => {
+        const byId = new Map(current.map((message) => [message.id, message]));
+        for (const message of page.messages) byId.set(message.id, message);
+        return sortMessages([...byId.values()]);
+      });
       setHasMore(page.hasMore);
       setConversation(found);
 
@@ -941,6 +974,12 @@ export default function DmThreadScreen() {
         : ({ kind: 'ready' } as const),
     [conversation, userId],
   );
+  /**
+   * A cached thread paints before the conversation row lands, but the footer
+   * must not: request/block state is unknown until then, and the ready
+   * composer would let a reply bypass an unanswered message request.
+   */
+  const composerReady = !loading && !!conversation;
   const unstarted = conversation ? isUnstartedRequest(conversation) : false;
   const displayPeerName = conversation?.peer.name ?? peerName;
   const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);
@@ -1003,11 +1042,11 @@ export default function DmThreadScreen() {
         </Pressable>
       </View>
 
-      {loading ? (
+      {loading && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
-      ) : error ? (
+      ) : error && messages.length === 0 ? (
         <View style={styles.center}>
           <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
           <Text style={[styles.stateTitle, { color: colors.foreground }]}>
@@ -1027,7 +1066,9 @@ export default function DmThreadScreen() {
               inverted
               data={rows}
               keyExtractor={(row) => row.key}
-              style={{ opacity: initialPositionResolved ? 1 : 0 }}
+              // A cached window paints at once; the anchor runs when the page
+              // request settles and may move it to the unread divider.
+              style={{ opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }}
               contentContainerStyle={styles.list}
               keyboardDismissMode="on-drag"
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -1165,7 +1206,7 @@ export default function DmThreadScreen() {
           >
             <TypingIndicator users={typingUsers} />
 
-            {composerState.kind === 'blocked' ? (
+            {!composerReady ? null : composerState.kind === 'blocked' ? (
               <View style={styles.footerBar}>
                 <Feather name="slash" size={15} color={colors.destructive} />
                 <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
