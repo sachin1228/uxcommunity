@@ -198,9 +198,10 @@ export function ChatInput({
             <View
               style={[
                 styles.replyBanner,
-                { backgroundColor: colors.background, borderLeftColor: colors.accent },
+                { backgroundColor: colors.background },
               ]}
             >
+              <View style={[styles.replyBar, { backgroundColor: colors.accent }]} />
               <View style={styles.replyInfo}>
                 <Text numberOfLines={1} style={[styles.replyName, { color: colors.accent }]}>
                   {replyTo.content_kind
@@ -395,7 +396,6 @@ const styles = StyleSheet.create({
   replyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderLeftWidth: 2,
     // Concentric with the pill: box radius (18) minus this banner's 6pt side
     // inset — the inner corners trace the outer container's curve.
     borderRadius: 12,
@@ -407,6 +407,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 8,
   },
+  /** WhatsApp's short rounded rule — inset top and bottom, not edge-to-edge. */
+  replyBar: { alignSelf: 'stretch', width: 3, borderRadius: 2, marginVertical: 5 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },
