@@ -25,6 +25,11 @@ import {
   userNameColor,
   type ContentRun,
 } from '@/lib/chat';
+import {
+  READ_MORE_SUFFIX,
+  nextTruncationPhase,
+  type TruncationPhase,
+} from '@/lib/chatTruncation';
 import { MessageBubbleTail } from './MessageBubbleTail';
 import { CheckCheckIcon } from './CheckCheckIcon';
 
@@ -250,19 +255,6 @@ function ContentReplyQuote({
 // Rich message text: mentions + links + emoji enlargement + "Read more"
 // ---------------------------------------------------------------------------
 
-/** Inline suffix that ends the collapsed text, matching the web composer. */
-const READ_MORE_SUFFIX = '\u2060… Read more';
-
-/**
- * Collapse phases: measure the uncapped text in a clipped offscreen copy,
- * then re-fit the cut until the suffix lands on the last allowed line.
- * `ready` with `cut: null` means the message fits and never shows the link.
- */
-type TruncationPhase =
-  | { kind: 'measuring-full' }
-  | { kind: 'measuring-candidate'; cut: number }
-  | { kind: 'ready'; cut: number | null };
-
 function RichContent({
   content,
   mentions,
@@ -331,78 +323,25 @@ function RichContent({
     });
   }
 
-  /** Estimate the suffix's width in characters of the measured line. */
-  function suffixCharEstimate(lastLine: { text: string; width: number } | undefined) {
-    const avgChar =
-      lastLine && lastLine.text.length > 0 ? lastLine.width / lastLine.text.length : 8;
-    return {
-      avgChar,
-      chars: Math.ceil(82 / Math.max(avgChar, 1)) + 2,
-    };
-  }
-
-  function trimToWordBoundary(from: number) {
-    let cut = Math.max(0, from);
-    while (cut > 0 && !/\s/.test(plain[cut - 1] ?? '')) cut--;
-    return cut;
-  }
-
   /**
    * Inline "… Read more" (web parity). RN can't append content after its
-   * native clamp, so the uncapped layout is measured offscreen, the end of
-   * the last allowed line is located in the plain text, and characters are
-   * trimmed until the suffix fits on that line. The visible bubble keeps its
-   * clamp the whole time, so the list never remeasures a cell.
+   * native clamp, so the uncapped layout is measured offscreen and the cut is
+   * re-fitted until the body plus the suffix stays inside the clamp. A
+   * measurement that never converges fails open to the full message — the
+   * bubble must never collapse into just the affordance. The visible bubble
+   * keeps its clamp the whole time, so the list never remeasures a cell.
    */
-  function finishReady(cut: number | null) {
-    setPhase({ kind: 'ready', cut });
-    onTruncatedChange(cut !== null);
-  }
-
   function handleMeasureLayout(event: TextLayoutEvent) {
-    const lines = event.nativeEvent.lines;
-    if (phase.kind === 'measuring-full') {
-      if (lines.length <= COLLAPSED_LINES) {
-        finishReady(null);
-        return;
-      }
-      let cursor = 0;
-      for (let i = 0; i < COLLAPSED_LINES; i++) {
-        const lineText = lines[i]?.text ?? '';
-        if (!lineText) {
-          cursor = Math.min(plain.length, cursor + 1);
-          continue;
-        }
-        const found = plain.indexOf(lineText, cursor);
-        cursor = found === -1
-          ? Math.min(plain.length, cursor + lineText.length)
-          : Math.min(plain.length, found + lineText.length);
-      }
-      const { chars } = suffixCharEstimate(lines[COLLAPSED_LINES - 1]);
-      setPhase({ kind: 'measuring-candidate', cut: trimToWordBoundary(cursor - chars) });
-      return;
-    }
-    if (phase.kind !== 'measuring-candidate') return;
-    const fits =
-      lines.length <= COLLAPSED_LINES &&
-      (lines[COLLAPSED_LINES - 1]?.text ?? '').trimEnd().endsWith('Read more');
-    if (fits) {
-      finishReady(phase.cut);
-      return;
-    }
-    // The suffix wrapped: trim roughly its measured width in characters of
-    // the candidate's last line, then retry.
-    const lastLine = lines[COLLAPSED_LINES - 1];
-    const overflowLine = lines[COLLAPSED_LINES];
-    const { avgChar, chars } = suffixCharEstimate(lastLine);
-    const overflowChars = overflowLine
-      ? Math.max(1, Math.ceil(overflowLine.width / Math.max(avgChar, 1)))
-      : Math.max(1, Math.ceil(chars / 2));
-    const nextCut = trimToWordBoundary(phase.cut - overflowChars - 1);
-    if (nextCut === phase.cut) {
-      finishReady(phase.cut);
-    } else {
-      setPhase({ kind: 'measuring-candidate', cut: nextCut });
+    const next = nextTruncationPhase(
+      phase,
+      plain,
+      event.nativeEvent.lines,
+      COLLAPSED_LINES,
+    );
+    if (next.kind === 'ready' && phase.kind === 'ready') return;
+    setPhase(next);
+    if (next.kind === 'ready') {
+      onTruncatedChange(next.cut !== null);
     }
   }
 
@@ -620,6 +559,16 @@ export const MessageBubble = memo(function MessageBubble({
   /** Long-message collapse is owned here so a bubble tap can expand it too. */
   const [textExpanded, setTextExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
+  /** Collapsed width, captured before expanding so the tap cannot reflow the
+   *  bubble wider (the collapsed text and the full text wrap differently). */
+  const collapsedBubbleWidth = useRef<number | null>(null);
+  const [expandedBubbleWidth, setExpandedBubbleWidth] = useState<number | null>(null);
+
+  // A rotation changes the usable width — let the expanded bubble re-fit
+  // instead of keeping a width measured for the old screen.
+  useEffect(() => {
+    setExpandedBubbleWidth(null);
+  }, [screenWidth]);
 
   // Row focus flash — the web row's translucent blue, faded like its
   // `transition-colors` rather than popping on and off.
@@ -736,6 +685,7 @@ export const MessageBubble = memo(function MessageBubble({
     // taps land here — expand the whole message.
     if (!isDeleted && textTruncated && !textExpanded) {
       hapticSelection();
+      setExpandedBubbleWidth(collapsedBubbleWidth.current);
       setTextExpanded(true);
     }
   }, [isDeleted, isOwn, failed, onRetry, message.id, textExpanded, textTruncated]);
@@ -852,6 +802,10 @@ export const MessageBubble = memo(function MessageBubble({
                 onPress={handlePress}
                 onLongPress={handleLongPress}
                 delayLongPress={350}
+                onLayout={(event) => {
+                  const width = event.nativeEvent.layout.width;
+                  if (!textExpanded && width > 0) collapsedBubbleWidth.current = width;
+                }}
                 style={[
                   styles.bubble,
                   imageUrl ? styles.bubbleMedia : styles.bubbleText,
@@ -861,6 +815,7 @@ export const MessageBubble = memo(function MessageBubble({
                   },
                   isFirstInGroup &&
                     (isOwn ? styles.bubbleFirstOwn : styles.bubbleFirstOther),
+                  textExpanded && expandedBubbleWidth ? { width: expandedBubbleWidth } : null,
                 ]}
               >
                 {isFirstInGroup && <MessageBubbleTail side={isOwn ? 'right' : 'left'} color={tailColor} />}
