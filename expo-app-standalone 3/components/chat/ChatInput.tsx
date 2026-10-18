@@ -403,8 +403,6 @@ const styles = StyleSheet.create({
     // Concentric with the pill: box radius (18) minus this banner's 6pt side
     // inset — the inner corners trace the outer container's curve.
     borderRadius: 12,
-    // Clips the flush accent rule to the rounded corners.
-    overflow: 'hidden',
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
@@ -413,9 +411,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 8,
   },
-  /** WhatsApp's rule — flush left, running the chip's full height with
-   * rounded ends, so it finishes into the container's corners. */
-  replyBar: { alignSelf: 'stretch', width: 3, borderRadius: 2 },
+  /** WhatsApp's rule — a separate bar spanning the chip's inner height. */
+  replyBar: { alignSelf: 'stretch', width: 4, borderRadius: 2 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },

@@ -823,16 +823,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     borderRadius: 12,
-    // Clips the flush accent rule to the rounded corners.
-    overflow: 'hidden',
     paddingRight: 10,
     paddingVertical: 6,
     marginBottom: 4,
     maxWidth: '100%',
     gap: 8,
   },
-  /** WhatsApp's short rounded rule — flush left, inset by the chip padding. */
-  replyBar: { width: 3, borderRadius: 2 },
+  /** WhatsApp's short rounded rule — a separate bar, inset by the chip padding. */
+  replyBar: { width: 4, borderRadius: 2 },
   replyBody: { flexShrink: 1, minWidth: 0 },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
   contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },

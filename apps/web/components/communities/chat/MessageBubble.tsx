@@ -61,7 +61,7 @@ function ReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md overflow-hidden text-left max-w-full cursor-pointer
+      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md text-left max-w-full cursor-pointer
         ${isMe
           ? "bg-black/20 hover:bg-black/30"
           : "bg-black/10 hover:bg-black/20"
@@ -70,7 +70,7 @@ function ReplyBubble({
       {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
       <span
         aria-hidden
-        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full ${
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[4px] rounded-full ${
           nameColor && !isMe ? "" : isMe ? "bg-white/20" : "bg-white/15"
         }`}
         style={nameColor && !isMe ? { backgroundColor: nameColor } : undefined}
@@ -107,7 +107,7 @@ function ContentReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md overflow-hidden text-left max-w-full cursor-pointer
+      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md text-left max-w-full cursor-pointer
         ${isMe
           ? "bg-black/20 hover:bg-black/30"
           : "bg-black/10 hover:bg-black/20"
@@ -115,7 +115,7 @@ function ContentReplyBubble({
     >
       <span
         aria-hidden
-        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full ${
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[4px] rounded-full ${
           isMe ? "bg-white/20" : "bg-white/15"
         }`}
       />
