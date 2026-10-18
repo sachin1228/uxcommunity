@@ -70,7 +70,7 @@ function ReplyBubble({
       {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
       <span
         aria-hidden
-        className={`absolute left-0 top-[3px] bottom-[3px] w-[5px] rounded-full ${
+        className={`absolute left-0 top-[3px] bottom-[3px] w-[4.5px] rounded-full ${
           nameColor && !isMe ? "" : isMe ? "bg-white/20" : "bg-white/15"
         }`}
         style={nameColor && !isMe ? { backgroundColor: nameColor } : undefined}
@@ -115,7 +115,7 @@ function ContentReplyBubble({
     >
       <span
         aria-hidden
-        className={`absolute left-0 top-[3px] bottom-[3px] w-[5px] rounded-full ${
+        className={`absolute left-0 top-[3px] bottom-[3px] w-[4.5px] rounded-full ${
           isMe ? "bg-white/20" : "bg-white/15"
         }`}
       />

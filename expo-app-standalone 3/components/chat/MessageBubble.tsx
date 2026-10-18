@@ -828,7 +828,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   /** WhatsApp's chunky pill — absolute, flush left, 3pt from each edge. */
-  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 5, borderRadius: 2.5 },
+  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 4.5, borderRadius: 2.25 },
   replyBody: { flexShrink: 1, minWidth: 0 },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
   contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },

@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   },
   /** WhatsApp's chunky pill — absolute so it runs nearly the chip's full
    *  height (3pt from each edge) independent of the text padding. */
-  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 5, borderRadius: 2.5 },
+  replyBar: { position: 'absolute', left: 0, top: 3, bottom: 3, width: 4.5, borderRadius: 2.25 },
   replyInfo: { flex: 1, minWidth: 0, gap: 2 },
   replyName: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 11, fontFamily: 'Geist_400Regular' },

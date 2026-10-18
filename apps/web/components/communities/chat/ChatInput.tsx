@@ -375,7 +375,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               <div className="relative flex items-center gap-2 mt-2 mb-1 mx-2 rounded-md bg-background">
                 <span
                   aria-hidden
-                  className={`absolute left-0 top-[3px] bottom-[3px] w-[5px] rounded-full ${replyColor ? "" : "bg-accent"}`}
+                  className={`absolute left-0 top-[3px] bottom-[3px] w-[4.5px] rounded-full ${replyColor ? "" : "bg-accent"}`}
                   style={replyColor ? { backgroundColor: replyColor } : undefined}
                 />
                 <div className="flex-1 min-w-0 py-2 pl-[13px]">
