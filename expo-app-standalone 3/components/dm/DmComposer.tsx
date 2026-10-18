@@ -136,11 +136,11 @@ export function DmComposer({
     }
   }
 
-  // The panel's height carries this same bottom inset, so the composer sits in
-  // the same place whether the panel is open or shut — see
-  // COMPOSER_BOTTOM_INSET.
+  // The 8 dp inset is a margin under the composer row (see styles.composerRow),
+  // so it sits between the pill and the panel as well as between the pill and
+  // the keyboard — the same pixel either way.
   return (
-    <View style={[styles.root, { paddingBottom: emojiPanelOpen ? 0 : COMPOSER_BOTTOM_INSET }]}>
+    <View style={styles.root}>
       {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
       <View style={styles.composerRow}>
@@ -312,6 +312,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 8,
     paddingHorizontal: 12,
+    // Between the pill and the panel (or the keyboard when the panel is shut).
+    marginBottom: COMPOSER_BOTTOM_INSET,
   },
   box: {
     flex: 1,

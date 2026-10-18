@@ -100,12 +100,7 @@ export function EmojiPicker({
       {/* The space below the chat already stops at the safe area — the screen
           renders a spacer under it — so the panel needs no bottom padding of
           its own. */}
-      <View
-        style={[
-          styles.panel,
-          { height, backgroundColor: colors.background, borderTopColor: colors.border },
-        ]}
-      >
+      <View style={[styles.panel, { height, backgroundColor: colors.background }]}>
         {showContent && (
           <>
             {/* No drag handle: the panel is not a sheet — it takes the
@@ -148,14 +143,13 @@ export function EmojiPicker({
 
 const styles = StyleSheet.create({
   /** The animated space the panel occupies — it starts at zero height while the
-   *  keyboard still owns the strip, hence the clipping. The space is a little
-   *  taller than the panel (it carries the gap above it, so a shut panel adds
-   *  nothing under the composer); the panel sits at its bottom edge. */
-  clip: { overflow: 'hidden', justifyContent: 'flex-end' },
-  panel: {
-    height: 320,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
+   *  keyboard still owns the strip, hence the clipping. The space is exactly the
+   *  panel's height, and the composer's own bottom padding above it supplies the
+   *  gap, so a shut panel adds nothing under the composer. */
+  clip: { overflow: 'hidden' },
+  /** No top border: the panel is a continuation of the chat, not a sheet over
+   *  it — a hairline here would draw the one line the keyboard does not have. */
+  panel: { height: 320 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
   sectionTitle: {

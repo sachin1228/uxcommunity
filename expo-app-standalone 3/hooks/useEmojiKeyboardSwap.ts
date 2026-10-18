@@ -19,18 +19,24 @@ const DEFAULT_PANEL_HEIGHT = 320;
 const MIN_PANEL_HEIGHT = 160;
 
 /**
- * The strip between the composer and whatever edge sits under it — the
- * keyboard, or the panel while it is open (dp). One value for both, so the pill
- * is the same distance from either edge and the panel's top border lands
- * exactly on the keyboard's top edge.
+ * The IME's last measured height (dp), remembered across mounts. Without it a
+ * freshly opened chat would size its panel from DEFAULT_PANEL_HEIGHT until the
+ * keyboard reported in once — the one case where the panel could still resize
+ * under the user. The keyboard height is a property of the device, not of the
+ * screen that happened to open it.
+ */
+let lastMeasuredImeHeight = 0;
+
+/**
+ * The composer's own bottom padding, always (dp). It is the strip between the
+ * pill and whatever edge sits under it — the keyboard, or the panel while it
+ * is open — so both edges sit the same distance from the composer and the
+ * panel's top lands exactly on the keyboard's top edge.
  *
- * It is the composer's own bottom padding for the keyboard state, and part of
- * the panel's *animated space* for the panel state rather than a fixed margin:
- * the panel stays mounted at zero height while the keyboard is up (so opening
- * it can never race the IME), and a fixed gap on a zero-height panel would put
- * dead space under the composer — the keyboard strip would read 16 dp wide
- * instead of the intended 8. Folding it into the space keeps it with the panel:
- * no panel, no gap.
+ * Constant on purpose. Dropping it while the panel is open would buy nothing
+ * (the panel is laid out below it either way) and cost a frame: the padding
+ * would vanish a few milliseconds before the panel's space grew into its place,
+ * and the composer would dip by 8 dp for that frame.
  */
 export const COMPOSER_BOTTOM_INSET = 8;
 
@@ -54,7 +60,7 @@ const PANEL_TRANSITION_MS = 200;
  * reserves whatever the IME takes. So the panel is not given a fixed height
  * that appears and disappears — its *space* is the IME's complement:
  *
- *     space = (1 - keyboardProgress) * (panelHeight + COMPOSER_BOTTOM_INSET)
+ *     space = (1 - keyboardProgress) * panelHeight
  *
  * While the IME is anywhere on its way up or down, that expression is a smooth
  * function of the keyboard's own animation, so the two always add up to exactly
@@ -82,7 +88,7 @@ export function useEmojiKeyboardSwap(
   setOpen: (open: boolean) => void,
 ) {
   const { progress } = useReanimatedKeyboardAnimation();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(lastMeasuredImeHeight);
   /** Whether the panel should render at all — it outlives `open` while it
    *  hands its space over to (or takes it back from) the IME. */
   const [panelMounted, setPanelMounted] = useState(open);
@@ -111,9 +117,9 @@ export function useEmojiKeyboardSwap(
    */
   const insets = useSafeAreaInsets();
   const measured = keyboardHeight || DEFAULT_PANEL_HEIGHT;
-  // The panel's own box: the keyboard's height less the safe-area strip the
-  // chat reserves below it. Its space adds the composer inset back on top, so
-  // the panel's top border sits exactly where the keyboard's top edge does.
+  // The panel's box: the keyboard's height less the safe-area strip the chat
+  // reserves below it. The composer's constant padding above it then puts the
+  // panel's top edge exactly on the keyboard's top edge.
   const panelHeight = Math.max(measured - insets.bottom, MIN_PANEL_HEIGHT);
 
   useEffect(() => {
@@ -126,6 +132,7 @@ export function useEmojiKeyboardSwap(
 
     const onWillShow = (event: { height: number }) => {
       keyboardVisibleRef.current = true;
+      lastMeasuredImeHeight = event.height;
       setKeyboardHeight(event.height);
       clearTimer();
       // From this frame the panel mirrors the IME. At progress 0 the mirrored
@@ -199,12 +206,12 @@ export function useEmojiKeyboardSwap(
     );
   }, [open, panelMounted, ownFraction, progress, tracking]);
 
-  /** The space the panel occupies — its box plus the gap above it, animated. */
+  /** The space the panel occupies, animated — exactly the IME's complement. */
   const panelStyle = useAnimatedStyle(
     () => ({
       height:
         Math.max(0, tracking.value === 1 ? 1 - progress.value : ownFraction.value) *
-        (panelHeight + COMPOSER_BOTTOM_INSET),
+        panelHeight,
     }),
     [panelHeight, ownFraction, progress, tracking],
   );

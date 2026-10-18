@@ -206,16 +206,7 @@ export function ChatInput({
   }
 
   return (
-    <View
-      style={[
-        styles.root,
-        // While the emoji panel is open it runs edge-to-edge to the screen
-        // bottom, so the composer must not add its own bottom padding. (The
-        // panel's height carries this same value so the composer sits in the
-        // same place either way — see COMPOSER_BOTTOM_INSET.)
-        { paddingBottom: pickerOpen ? 0 : COMPOSER_BOTTOM_INSET },
-      ]}
-    >
+    <View style={styles.root}>
       {/* The panel is a sibling of this stack, not a child of it, on purpose:
           it stays mounted at zero height while the keyboard is up, and a 6pt
           gap around a zero-height panel would show up as extra dead space
@@ -425,8 +416,15 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
 
-  /** Everything above the panel: reply/error/mention/composer rows. */
-  stack: { gap: 6 },
+/** Everything above the panel: reply/error/mention/composer rows. */
+  stack: {
+    gap: 6,
+    // The 8 dp strip lives *between* the composer and whatever is under it
+    // (the panel, or nothing when the panel is shut), never below the panel —
+    // that keeps the pill the same distance from the panel as from the
+    // keyboard and puts the panel's top edge exactly on the keyboard's.
+    marginBottom: COMPOSER_BOTTOM_INSET,
+  },
 
   box: {
     flex: 1,
