@@ -248,7 +248,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
         </View>
 
         {/* Member count + city reference name */}
-        <Text style={[styles.memberCount, { color: colors.foregroundSoft }]} numberOfLines={1}>
+        <Text style={[styles.memberCount, { color: colors.foregroundMuted }]} numberOfLines={1}>
           {community.member_count === 1
             ? '1 member'
             : `${fmtCount(community.member_count)} members`}
@@ -271,18 +271,14 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
             </View>
           ) : (
             <Text
-              style={[
-                styles.preview,
-                {
-                  color: hasUnread ? colors.foreground : colors.foregroundSoft,
-                  fontFamily: hasUnread ? 'Geist_500Medium' : 'Geist_400Regular',
-                },
-              ]}
+              style={[styles.preview, { color: colors.foregroundMuted }]}
               numberOfLines={1}
             >
               {prefix ? (
-                // Can't use JSX inside a Text string template, so compose manually
-                `${prefix}: ${text}`
+                <>
+                  <Text style={styles.previewPrefix}>{`${prefix}: `}</Text>
+                  {text}
+                </>
               ) : text}
             </Text>
           )}
@@ -404,7 +400,11 @@ const styles = StyleSheet.create({
   },
   preview: {
     fontSize: 14,
+    fontFamily: 'Geist_400Regular',
     flex: 1,
+  },
+  previewPrefix: {
+    fontFamily: 'Geist_500Medium',
   },
   badge: {
     minWidth: 20,
