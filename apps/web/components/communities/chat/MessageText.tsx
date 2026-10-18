@@ -96,7 +96,7 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
 }
 
 /** Number of lines shown before a long message collapses behind "Read more". */
-const COLLAPSED_LINES = 5;
+const COLLAPSED_LINES = 10;
 
 export function MessageContent({
   content,

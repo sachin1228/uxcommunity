@@ -19,7 +19,7 @@ export const MAX_MESSAGE_CHARS = 500;
 export const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 /** Number of lines shown before a long message collapses behind "Read more". */
-export const COLLAPSED_LINES = 5;
+export const COLLAPSED_LINES = 10;
 
 /**
  * The community chat retention window — the same 15 days the server-side
