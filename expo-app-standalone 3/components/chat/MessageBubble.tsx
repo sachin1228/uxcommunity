@@ -133,32 +133,39 @@ function ReplyBubble({
       disabled={!onPress}
       style={[
         styles.replyBubble,
-        {
-          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
-          // The rule wears the quoted author's name color when known.
-          borderLeftColor: reply.user_id
-            ? nameColor
-            : isOwn
-              ? colors.chatReplyBorderOwn
-              : colors.chatReplyBorderOther,
-        },
+        { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
-      <Text
-        numberOfLines={1}
-        style={[styles.replyName, { color: nameColor, opacity: isOwn ? 0.85 : 1 }]}
-      >
-        {reply.user_name}
-      </Text>
-      <Text
-        numberOfLines={2}
+      {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
+      <View
         style={[
-          styles.replyContent,
-          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          styles.replyBar,
+          {
+            backgroundColor: reply.user_id
+              ? nameColor
+              : isOwn
+                ? colors.chatReplyBorderOwn
+                : colors.chatReplyBorderOther,
+          },
         ]}
-      >
-        {reply.content || '📷 Image'}
-      </Text>
+      />
+      <View style={styles.replyBody}>
+        <Text
+          numberOfLines={1}
+          style={[styles.replyName, { color: nameColor, opacity: isOwn ? 0.85 : 1 }]}
+        >
+          {reply.user_name}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.replyContent,
+            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          ]}
+        >
+          {reply.content || '📷 Image'}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -188,30 +195,39 @@ function ContentReplyQuote({
       disabled={!onPress}
       style={[
         styles.replyBubble,
-        {
-          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
-          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
-        },
+        { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
-      <Text
-        numberOfLines={1}
+      <View
         style={[
-          styles.contentReplyLabel,
-          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          styles.replyBar,
+          {
+            backgroundColor: isOwn
+              ? colors.chatReplyBorderOwn
+              : colors.chatReplyBorderOther,
+          },
         ]}
-      >
-        {label}
-      </Text>
-      <Text
-        numberOfLines={2}
-        style={[
-          styles.replyContent,
-          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.7 : 1 },
-        ]}
-      >
-        {reply.title || label}
-      </Text>
+      />
+      <View style={styles.replyBody}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.contentReplyLabel,
+            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+          ]}
+        >
+          {label}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.replyContent,
+            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.7 : 1 },
+          ]}
+        >
+          {reply.title || label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -782,13 +798,20 @@ const styles = StyleSheet.create({
 
   // ── reply quote ─────────────────────────────────────────────────────────
   replyBubble: {
-    borderLeftWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'stretch',
     borderRadius: 12,
-    paddingHorizontal: 10,
+    // Clips the flush accent rule to the rounded corners.
+    overflow: 'hidden',
+    paddingRight: 10,
     paddingVertical: 6,
     marginBottom: 4,
     maxWidth: '100%',
+    gap: 8,
   },
+  /** WhatsApp's short rounded rule — flush left, inset by the chip padding. */
+  replyBar: { width: 3, borderRadius: 2 },
+  replyBody: { flexShrink: 1, minWidth: 0 },
   replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
   contentReplyLabel: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14, letterSpacing: 0.3 },
   replyContent: { fontSize: 11, lineHeight: 15 },

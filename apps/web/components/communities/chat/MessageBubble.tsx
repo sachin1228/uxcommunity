@@ -61,13 +61,20 @@ function ReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`mt-1 mb-1 px-2.5 py-1.5 rounded-md border-l-2 text-left max-w-full cursor-pointer
+      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md overflow-hidden text-left max-w-full cursor-pointer
         ${isMe
-          ? "bg-black/20 border-white/20 hover:bg-black/30"
-          : "bg-black/10 border-white/15 hover:bg-black/20"
+          ? "bg-black/20 hover:bg-black/30"
+          : "bg-black/10 hover:bg-black/20"
         } transition-colors`}
-      style={nameColor && !isMe ? { borderLeftColor: nameColor } : undefined}
     >
+      {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
+      <span
+        aria-hidden
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full ${
+          nameColor && !isMe ? "" : isMe ? "bg-white/20" : "bg-white/15"
+        }`}
+        style={nameColor && !isMe ? { backgroundColor: nameColor } : undefined}
+      />
       <p
         className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
         style={nameColor && !isMe ? { color: nameColor } : undefined}
@@ -100,12 +107,18 @@ function ContentReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`mt-1 mb-1 px-2.5 py-1.5 rounded-md border-l-2 text-left max-w-full cursor-pointer
+      className={`relative mt-1 mb-1 pl-3.5 pr-2.5 py-1.5 rounded-md overflow-hidden text-left max-w-full cursor-pointer
         ${isMe
-          ? "bg-black/20 border-white/20 hover:bg-black/30"
-          : "bg-black/10 border-white/15 hover:bg-black/20"
+          ? "bg-black/20 hover:bg-black/30"
+          : "bg-black/10 hover:bg-black/20"
         } transition-colors`}
     >
+      <span
+        aria-hidden
+        className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full ${
+          isMe ? "bg-white/20" : "bg-white/15"
+        }`}
+      />
       <p
         className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
       >
