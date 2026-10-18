@@ -67,18 +67,17 @@ function ReplyBubble({
           : "bg-black/10 hover:bg-black/20"
         } transition-colors`}
     >
-      {/* WhatsApp's accent — full-height square bar, clipped into the corners. */}
+      {/* WhatsApp's accent — full-height square bar, clipped into the corners.
+          Wears the replied author's chat color even inside own bubbles, like mobile. */}
       <span
         aria-hidden
-        className={`w-[4px] shrink-0 ${
-          nameColor && !isMe ? "" : isMe ? "bg-white/20" : "bg-white/15"
-        }`}
-        style={nameColor && !isMe ? { backgroundColor: nameColor } : undefined}
+        className={`w-[4px] shrink-0 ${nameColor ? "" : isMe ? "bg-white/20" : "bg-white/15"}`}
+        style={nameColor ? { backgroundColor: nameColor } : undefined}
       />
       <div className="flex-1 min-w-0 py-1.5 pl-[10px]">
         <p
           className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
-          style={nameColor && !isMe ? { color: nameColor } : undefined}
+          style={nameColor ? { color: nameColor } : undefined}
         >
           {reply.user_name}
         </p>
