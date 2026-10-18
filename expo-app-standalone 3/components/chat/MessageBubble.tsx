@@ -821,11 +821,12 @@ const styles = StyleSheet.create({
   // ── reply quote ─────────────────────────────────────────────────────────
   replyBubble: {
     flexDirection: 'row',
-    // Web's quote chip: the bar side's corners barely round, the far side full.
+    // Web's quote chip: the bar side's corners barely round (4), the far side
+    // rounded-md (8).
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: 4,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
     paddingRight: 10,
     marginBottom: 4,
     maxWidth: '100%',
