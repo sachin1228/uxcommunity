@@ -181,10 +181,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const overLimit = input.length > MAX_MESSAGE_CHARS;
     const canSend = (!!input.trim() || !!pendingImagePreview) && !overLimit;
 
-    // The quote wears the replied author's chat name color — quoting your own
-    // message stays neutral, matching the sent bubble.
-    const quotedSelf = !!replyTo?.user_id && replyTo.user_id === currentUserId;
-    const replyColor = replyTo?.user_id && !quotedSelf ? userColorVar(replyTo.user_id) : null;
+    // The quote wears the replied author's chat name color — including when
+    // you quote your own message, matching the sent bubble.
+    const replyColor = replyTo?.user_id ? userColorVar(replyTo.user_id) : null;
 
     // Mirror content for the visual overlay (plain text + emoji SVGs + blue
     // mention tokens). Color spans never change layout, so the overlay stays
@@ -378,12 +377,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               <div className="flex items-center gap-2 mt-2 mb-1 mx-2 rounded-md bg-background overflow-hidden">
                 <span
                   aria-hidden
-                  className={`w-[4px] shrink-0 self-stretch ${replyColor ? "" : quotedSelf ? "bg-foreground-muted" : "bg-accent"}`}
+                  className={`w-[4px] shrink-0 self-stretch ${replyColor ? "" : "bg-accent"}`}
                   style={replyColor ? { backgroundColor: replyColor } : undefined}
                 />
                 <div className="flex-1 min-w-0 py-2">
                   <p
-                    className={`font-body text-[11px] font-semibold line-clamp-1 break-words ${replyColor ? "" : quotedSelf ? "text-foreground" : "text-accent"}`}
+                    className={`font-body text-[11px] font-semibold line-clamp-1 break-words ${replyColor ? "" : "text-accent"}`}
                     style={replyColor ? { color: replyColor } : undefined}
                   >
                     {replyTo.content_kind

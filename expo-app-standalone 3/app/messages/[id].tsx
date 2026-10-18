@@ -89,6 +89,7 @@ interface RealtimeDmPayload {
   created_at: string;
   reply_to_id?: string | null;
   reply_sender_name?: string | null;
+  reply_sender_id?: string | null;
   image_url?: string | null;
   edited_at?: string | null;
 }
@@ -127,7 +128,7 @@ function messageFromRealtime(payload: RealtimeDmPayload): DmMessage {
           id: payload.reply_to_id,
           content: null,
           user_name: payload.reply_sender_name ?? '',
-          user_id: null,
+          user_id: payload.reply_sender_id ?? null,
         }
       : null,
     status: 'sent',

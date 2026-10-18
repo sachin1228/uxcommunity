@@ -48,23 +48,22 @@ const EMOJI_MESSAGE_SIZE = 48;
 function ReplyBubble({
   reply,
   isMe,
-  currentUserId,
   onReplyClick,
+  topGap = false,
 }: {
   reply: ReplyPreview;
   isMe: boolean;
-  currentUserId: string;
   onReplyClick: (replyId: string) => void;
+  /** Extra 2px above the quote when the sender name sits above it. */
+  topGap?: boolean;
 }) {
-  // Reply names get the same per-user color as chat sender names — when the
-  // parent author's id is known. Quoting your own message stays neutral white;
-  // history-built previews omit the id and fall back to neutral too.
-  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
-  const nameColor = reply.user_id && !quotedSelf ? userColorVar(reply.user_id) : undefined;
+  // The quote wears the quoted author's chat color — including when you quote
+  // yourself. Previews that predate the author id keep the neutral fallback.
+  const nameColor = reply.user_id ? userColorVar(reply.user_id) : undefined;
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`flex mt-1 mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
+      className={`flex ${topGap ? "mt-1.5" : "mt-1"} mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
         ${isMe
           ? "bg-black/20 hover:bg-black/30"
           : "bg-black/10 hover:bg-black/20"
@@ -101,17 +100,20 @@ function ContentReplyBubble({
   reply,
   isMe,
   onReplyClick,
+  topGap = false,
 }: {
   reply: NonNullable<CachedMessage["reply_to_content"]>;
   isMe: boolean;
   onReplyClick: (replyId: string) => void;
+  /** Extra 2px above the quote when the sender name sits above it. */
+  topGap?: boolean;
 }) {
   // Same eyebrow label the card itself shows ("Thread", "Resource", …).
   const label = KIND_THEME[reply.kind].label;
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`flex mt-1 mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
+      className={`flex ${topGap ? "mt-1.5" : "mt-1"} mb-1 pr-2.5 rounded-md text-left max-w-full cursor-pointer overflow-hidden
         ${isMe
           ? "bg-black/20 hover:bg-black/30"
           : "bg-black/10 hover:bg-black/20"
@@ -711,12 +713,17 @@ export const MessageBubble = memo(function MessageBubble({
                     <ReplyBubble
                       reply={replyTo}
                       isMe={isMe}
-                      currentUserId={currentUserId}
                       onReplyClick={onReplyClick}
+                      topGap={!isMe && showHeader && !!sender}
                     />
                   )}
                   {!replyTo && replyToContent && (
-                    <ContentReplyBubble reply={replyToContent} isMe={isMe} onReplyClick={onReplyClick} />
+                    <ContentReplyBubble
+                      reply={replyToContent}
+                      isMe={isMe}
+                      onReplyClick={onReplyClick}
+                      topGap={!isMe && showHeader && !!sender}
+                    />
                   )}
                   {imageUrl && (
                     <BubbleImage

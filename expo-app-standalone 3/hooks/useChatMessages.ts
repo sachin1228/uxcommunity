@@ -295,6 +295,7 @@ export function useChatMessages(communityId: string) {
           created_at: string;
           reply_to_id: string | null;
           reply_sender_name?: string | null;
+          reply_sender_id?: string | null;
           reply_to_content_id?: string | null;
           reply_content_kind?: string | null;
           reply_content_title?: string | null;
@@ -340,7 +341,7 @@ export function useChatMessages(communityId: string) {
                   id: row.reply_to_id,
                   content: '',
                   user_name: row.reply_sender_name,
-                  user_id: null,
+                  user_id: row.reply_sender_id ?? null,
                 };
               }
             }

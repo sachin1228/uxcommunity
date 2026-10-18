@@ -347,6 +347,7 @@ export async function POST(
   after(async () => {
     try {
       let replySenderName: string | null = null;
+      let replySenderId: string | null = null;
       if (inserted.reply_to_id) {
         const { data: parentRow } = await db
           .from("dm_messages")
@@ -355,6 +356,7 @@ export async function POST(
           .maybeSingle();
         const parentId = (parentRow as { user_id?: string } | null)?.user_id ?? null;
         if (parentId) {
+          replySenderId = parentId;
           const { data: parentUser } = await db
             .from("users")
             .select("name")
@@ -378,6 +380,7 @@ export async function POST(
           created_at: inserted.created_at,
           reply_to_id: inserted.reply_to_id ?? null,
           reply_sender_name: replySenderName,
+          reply_sender_id: replySenderId,
           image_url: inserted.image_url ?? null,
         },
       });

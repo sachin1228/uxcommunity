@@ -791,6 +791,7 @@ export function ContentDetail({
   actions,
   communityName,
   visible,
+  loading = false,
   onClose,
   onEdit,
   onDelete,
@@ -801,6 +802,8 @@ export function ContentDetail({
   actions: ContentActionsApi;
   communityName?: string | null;
   visible: boolean;
+  /** The row is still being fetched — show a spinner instead of nothing. */
+  loading?: boolean;
   onClose: () => void;
   onEdit?: (item: CommunityContent) => void;
   onDelete?: (item: CommunityContent) => Promise<void> | void;
@@ -809,29 +812,30 @@ export function ContentDetail({
   const insets = useSafeAreaInsets();
   const resource = kind === 'resources' ? (item as CommunityResource | null) : null;
   const previewImage = useResourcePreview(resource?.url);
-  // The comment section lives at the bottom of the page, exactly as on the web
-  // detail: tapping the footer count scrolls to it rather than opening a sheet.
+  // The page always opens at its own start — the reader asked for this post,
+  // not for its comments. Tapping the footer's comment count still jumps to
+  // the discussion, so its offset is all this needs to know.
   const scrollRef = useRef<ScrollView>(null);
-  // The section's offset inside the scroll content. Kept as state so the
-  // landing scroll can follow it: remote images above the discussion resolve
-  // after the first layout and push it down.
   const [commentsY, setCommentsY] = useState(0);
-  const [commentsLaidOut, setCommentsLaidOut] = useState(false);
-  // Once the reader drags the page, the landing scroll stops following layout.
-  const readerScrolled = useRef(false);
-
+  // Some screens keep the sheet mounted between posts, so a previously read
+  // page must not carry its scroll offset into the next open.
   useEffect(() => {
-    if (visible) return;
-    readerScrolled.current = false;
-    setCommentsLaidOut(false);
-  }, [visible]);
+    if (visible) scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [visible, item?.id]);
 
-  useEffect(() => {
-    if (!visible || !commentsLaidOut || readerScrolled.current) return;
-    scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: false });
-  }, [visible, commentsLaidOut, commentsY]);
-
-  if (!item) return null;
+  // A chat card can open the page before its tab's list has loaded, so the
+  // sheet has to answer the tap itself rather than staying invisible until the
+  // row arrives.
+  if (!item) {
+    if (!visible || !loading) return null;
+    return (
+      <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+        <View style={[styles.detailRoot, styles.detailLoading, { backgroundColor: colors.background }]}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </Modal>
+    );
+  }
 
   const thread = kind === 'threads' ? item as CommunityThread : null;
   const event = kind === 'events' ? item as CommunityEvent : null;
@@ -880,9 +884,6 @@ export function ContentDetail({
           // The comment composer sits inside this scroll view, so the keyboard
           // must shorten it rather than cover the field being typed into.
           automaticallyAdjustKeyboardInsets
-          onScrollBeginDrag={() => {
-            readerScrolled.current = true;
-          }}
         >
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
 
@@ -987,12 +988,7 @@ export function ContentDetail({
             onComments={scrollToComments}
           />
 
-          <View
-            onLayout={(event) => {
-              setCommentsY(event.nativeEvent.layout.y);
-              setCommentsLaidOut(true);
-            }}
-          >
+          <View onLayout={(event) => setCommentsY(event.nativeEvent.layout.y)}>
             <CommentSection
               communityId={item.community_id}
               kind={kind}
@@ -1686,6 +1682,7 @@ const styles = StyleSheet.create({
   threadImage: { width: '100%', height: '100%' },
 
   detailRoot: { flex: 1 },
+  detailLoading: { alignItems: 'center', justifyContent: 'center' },
   detailHeader: {
     minHeight: 64,
     paddingHorizontal: 12,

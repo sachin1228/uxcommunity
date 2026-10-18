@@ -25,6 +25,11 @@ import {
   userNameColor,
   type ContentRun,
 } from '@/lib/chat';
+import {
+  READ_MORE_SUFFIX,
+  nextTruncationPhase,
+  type TruncationPhase,
+} from '@/lib/chatTruncation';
 import { MessageBubbleTail } from './MessageBubbleTail';
 import { CheckCheckIcon } from './CheckCheckIcon';
 
@@ -121,25 +126,29 @@ function ReplyBubble({
   reply,
   isOwn,
   colors,
-  currentUserId,
   onPress,
+  topGap = false,
 }: {
   reply: NonNullable<Message['reply_to']>;
   isOwn: boolean;
   colors: Palette;
-  currentUserId: string;
   onPress?: () => void;
+  /** Extra 2px above the quote when the sender name sits above it. */
+  topGap?: boolean;
 }) {
-  // Reply names get the same per-user color as sender names when the author's
-  // id is known — except a quote of your own message stays neutral white.
-  // History-built previews omit the id and fall back to neutral too.
+  // The quote wears the quoted author's chat color — including when you quote
+  // yourself. Previews that predate the author id keep the neutral fallback.
   const ownText = colors.chatOwnBubbleForeground;
-  const quotedSelf = !!reply.user_id && reply.user_id === currentUserId;
-  const nameColor = reply.user_id && !quotedSelf
+  const nameColor = reply.user_id
     ? userNameColor(reply.user_id, colors)
     : isOwn
       ? ownText
       : colors.mutedForeground;
+  const barColor = reply.user_id
+    ? nameColor
+    : isOwn
+      ? colors.chatReplyBorderOwn
+      : colors.chatReplyBorderOther;
 
   return (
     <Pressable
@@ -147,22 +156,12 @@ function ReplyBubble({
       disabled={!onPress}
       style={[
         styles.replyBubble,
+        topGap && styles.replyBubbleTopGap,
         { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
       {/* Short rounded rule, WhatsApp-style — the author's color when known. */}
-      <View
-        style={[
-          styles.replyBar,
-          {
-            backgroundColor: reply.user_id && !quotedSelf
-              ? nameColor
-              : isOwn
-                ? colors.chatReplyBorderOwn
-                : colors.chatReplyBorderOther,
-          },
-        ]}
-      />
+      <View style={[styles.replyBar, { backgroundColor: barColor }]} />
       <View style={styles.replyBody}>
         <Text
           numberOfLines={1}
@@ -195,11 +194,14 @@ function ContentReplyQuote({
   isOwn,
   colors,
   onPress,
+  topGap = false,
 }: {
   reply: NonNullable<Message['reply_to_content']>;
   isOwn: boolean;
   colors: Palette;
   onPress?: () => void;
+  /** Extra 2px above the quote when the sender name sits above it. */
+  topGap?: boolean;
 }) {
   const ownText = colors.chatOwnBubbleForeground;
   const label = CHAT_CONTENT_KIND_THEME[reply.kind].label;
@@ -209,6 +211,7 @@ function ContentReplyQuote({
       disabled={!onPress}
       style={[
         styles.replyBubble,
+        topGap && styles.replyBubbleTopGap,
         { backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther },
       ]}
     >
@@ -249,19 +252,6 @@ function ContentReplyQuote({
 // ---------------------------------------------------------------------------
 // Rich message text: mentions + links + emoji enlargement + "Read more"
 // ---------------------------------------------------------------------------
-
-/** Inline suffix that ends the collapsed text, matching the web composer. */
-const READ_MORE_SUFFIX = '\u2060… Read more';
-
-/**
- * Collapse phases: measure the uncapped text in a clipped offscreen copy,
- * then re-fit the cut until the suffix lands on the last allowed line.
- * `ready` with `cut: null` means the message fits and never shows the link.
- */
-type TruncationPhase =
-  | { kind: 'measuring-full' }
-  | { kind: 'measuring-candidate'; cut: number }
-  | { kind: 'ready'; cut: number | null };
 
 function RichContent({
   content,
@@ -331,78 +321,25 @@ function RichContent({
     });
   }
 
-  /** Estimate the suffix's width in characters of the measured line. */
-  function suffixCharEstimate(lastLine: { text: string; width: number } | undefined) {
-    const avgChar =
-      lastLine && lastLine.text.length > 0 ? lastLine.width / lastLine.text.length : 8;
-    return {
-      avgChar,
-      chars: Math.ceil(82 / Math.max(avgChar, 1)) + 2,
-    };
-  }
-
-  function trimToWordBoundary(from: number) {
-    let cut = Math.max(0, from);
-    while (cut > 0 && !/\s/.test(plain[cut - 1] ?? '')) cut--;
-    return cut;
-  }
-
   /**
    * Inline "… Read more" (web parity). RN can't append content after its
-   * native clamp, so the uncapped layout is measured offscreen, the end of
-   * the last allowed line is located in the plain text, and characters are
-   * trimmed until the suffix fits on that line. The visible bubble keeps its
-   * clamp the whole time, so the list never remeasures a cell.
+   * native clamp, so the uncapped layout is measured offscreen and the cut is
+   * re-fitted until the body plus the suffix stays inside the clamp. A
+   * measurement that never converges fails open to the full message — the
+   * bubble must never collapse into just the affordance. The visible bubble
+   * keeps its clamp the whole time, so the list never remeasures a cell.
    */
-  function finishReady(cut: number | null) {
-    setPhase({ kind: 'ready', cut });
-    onTruncatedChange(cut !== null);
-  }
-
   function handleMeasureLayout(event: TextLayoutEvent) {
-    const lines = event.nativeEvent.lines;
-    if (phase.kind === 'measuring-full') {
-      if (lines.length <= COLLAPSED_LINES) {
-        finishReady(null);
-        return;
-      }
-      let cursor = 0;
-      for (let i = 0; i < COLLAPSED_LINES; i++) {
-        const lineText = lines[i]?.text ?? '';
-        if (!lineText) {
-          cursor = Math.min(plain.length, cursor + 1);
-          continue;
-        }
-        const found = plain.indexOf(lineText, cursor);
-        cursor = found === -1
-          ? Math.min(plain.length, cursor + lineText.length)
-          : Math.min(plain.length, found + lineText.length);
-      }
-      const { chars } = suffixCharEstimate(lines[COLLAPSED_LINES - 1]);
-      setPhase({ kind: 'measuring-candidate', cut: trimToWordBoundary(cursor - chars) });
-      return;
-    }
-    if (phase.kind !== 'measuring-candidate') return;
-    const fits =
-      lines.length <= COLLAPSED_LINES &&
-      (lines[COLLAPSED_LINES - 1]?.text ?? '').trimEnd().endsWith('Read more');
-    if (fits) {
-      finishReady(phase.cut);
-      return;
-    }
-    // The suffix wrapped: trim roughly its measured width in characters of
-    // the candidate's last line, then retry.
-    const lastLine = lines[COLLAPSED_LINES - 1];
-    const overflowLine = lines[COLLAPSED_LINES];
-    const { avgChar, chars } = suffixCharEstimate(lastLine);
-    const overflowChars = overflowLine
-      ? Math.max(1, Math.ceil(overflowLine.width / Math.max(avgChar, 1)))
-      : Math.max(1, Math.ceil(chars / 2));
-    const nextCut = trimToWordBoundary(phase.cut - overflowChars - 1);
-    if (nextCut === phase.cut) {
-      finishReady(phase.cut);
-    } else {
-      setPhase({ kind: 'measuring-candidate', cut: nextCut });
+    const next = nextTruncationPhase(
+      phase,
+      plain,
+      event.nativeEvent.lines,
+      COLLAPSED_LINES,
+    );
+    if (next.kind === 'ready' && phase.kind === 'ready') return;
+    setPhase(next);
+    if (next.kind === 'ready') {
+      onTruncatedChange(next.cut !== null);
     }
   }
 
@@ -620,6 +557,16 @@ export const MessageBubble = memo(function MessageBubble({
   /** Long-message collapse is owned here so a bubble tap can expand it too. */
   const [textExpanded, setTextExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
+  /** Collapsed width, captured before expanding so the tap cannot reflow the
+   *  bubble wider (the collapsed text and the full text wrap differently). */
+  const collapsedBubbleWidth = useRef<number | null>(null);
+  const [expandedBubbleWidth, setExpandedBubbleWidth] = useState<number | null>(null);
+
+  // A rotation changes the usable width — let the expanded bubble re-fit
+  // instead of keeping a width measured for the old screen.
+  useEffect(() => {
+    setExpandedBubbleWidth(null);
+  }, [screenWidth]);
 
   // Row focus flash — the web row's translucent blue, faded like its
   // `transition-colors` rather than popping on and off.
@@ -736,6 +683,7 @@ export const MessageBubble = memo(function MessageBubble({
     // taps land here — expand the whole message.
     if (!isDeleted && textTruncated && !textExpanded) {
       hapticSelection();
+      setExpandedBubbleWidth(collapsedBubbleWidth.current);
       setTextExpanded(true);
     }
   }, [isDeleted, isOwn, failed, onRetry, message.id, textExpanded, textTruncated]);
@@ -852,6 +800,10 @@ export const MessageBubble = memo(function MessageBubble({
                 onPress={handlePress}
                 onLongPress={handleLongPress}
                 delayLongPress={350}
+                onLayout={(event) => {
+                  const width = event.nativeEvent.layout.width;
+                  if (!textExpanded && width > 0) collapsedBubbleWidth.current = width;
+                }}
                 style={[
                   styles.bubble,
                   imageUrl ? styles.bubbleMedia : styles.bubbleText,
@@ -861,6 +813,7 @@ export const MessageBubble = memo(function MessageBubble({
                   },
                   isFirstInGroup &&
                     (isOwn ? styles.bubbleFirstOwn : styles.bubbleFirstOther),
+                  textExpanded && expandedBubbleWidth ? { width: expandedBubbleWidth } : null,
                 ]}
               >
                 {isFirstInGroup && <MessageBubbleTail side={isOwn ? 'right' : 'left'} color={tailColor} />}
@@ -916,8 +869,8 @@ export const MessageBubble = memo(function MessageBubble({
                         reply={replyTo}
                         isOwn={isOwn}
                         colors={colors}
-                        currentUserId={currentUserId}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
+                        topGap={!isOwn && showHeader}
                       />
                     )}
 
@@ -931,6 +884,7 @@ export const MessageBubble = memo(function MessageBubble({
                             ? () => onContentReplyPress(replyToContent.id)
                             : undefined
                         }
+                        topGap={!isOwn && showHeader}
                       />
                     )}
 
@@ -1012,7 +966,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
+    // The avatar gutter is tighter than the right edge (own bubbles keep the
+    // original 16pt), so incoming rows start 6pt closer to the screen edge.
+    paddingLeft: 10,
+    paddingRight: 16,
     gap: 8,
   },
   rowFirst: { marginTop: 12 },
@@ -1023,8 +980,8 @@ const styles = StyleSheet.create({
   contentCol: { flexShrink: 1, minWidth: 0 },
 
   swipeReplyCue: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center' },
-  // The bubble's origin: row padding (16) + avatar column (28) + gap (8).
-  swipeReplyCueOther: { left: 52 },
+  // The bubble's origin: left padding (10) + avatar column (28) + gap (8).
+  swipeReplyCueOther: { left: 46 },
   swipeReplyCueOwn: { right: 16 },
 
   bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -1088,6 +1045,8 @@ const styles = StyleSheet.create({
     gap: 8,
     overflow: 'hidden',
   },
+  /** Extra breathing room under the sender-name header, first bubble only. */
+  replyBubbleTopGap: { marginTop: 2 },
   /** WhatsApp's accent — a full-height square bar, clipped into the chip's
    *  corners by the overflow above (their exact DOM pattern). */
   replyBar: { width: 4, flexShrink: 0 },
