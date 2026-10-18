@@ -1005,6 +1005,7 @@ export default function CommunityChat() {
           onRetry={handleRetry}
           onReplyPress={handleReplyPress}
           onContentReplyPress={handleContentChipPress}
+          onSwipeReply={handleMessageReply}
           highlighted={flashMessageId === item.msg.id}
         />
       );
@@ -1019,6 +1020,7 @@ export default function CommunityChat() {
       handleRetry,
       handleReplyPress,
       handleContentChipPress,
+      handleMessageReply,
       handleContentOpen,
       handleContentLongPress,
       handleContentReaction,

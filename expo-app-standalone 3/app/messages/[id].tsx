@@ -1106,6 +1106,7 @@ export default function DmThreadScreen() {
                     onCancel={handleCancel}
                     onRetry={handleRetry}
                     onReplyPress={handleReplyPress}
+                    onSwipeReply={handleReply}
                     highlighted={flashMessageId === item.msg.id}
                   />
                 );

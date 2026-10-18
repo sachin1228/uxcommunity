@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Linking,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -46,6 +47,8 @@ interface Props {
   onReplyPress?: (messageId: string) => void;
   /** Jumps the list to the "created a …" card this one replies to. */
   onContentReplyPress?: (contentId: string) => void;
+  /** Swiping the bubble away from its edge starts a reply (WhatsApp-style). */
+  onSwipeReply?: (message: Message) => void;
   /** Row focus flash after a reply jump (web parity) — fades a blue tint in/out. */
   highlighted?: boolean;
 }
@@ -53,6 +56,9 @@ interface Props {
 type Palette = ReturnType<typeof useColors>;
 
 const EMOJI_MESSAGE_SIZE = 48;
+/** Max bubble travel during a reply swipe, and the release distance that fires it. */
+const SWIPE_TRAVEL = 80;
+const SWIPE_THRESHOLD = 56;
 
 // ---------------------------------------------------------------------------
 // Reaction pills — sit half-outside the bubble, WhatsApp-style
@@ -478,6 +484,7 @@ export const MessageBubble = memo(function MessageBubble({
   onRetry,
   onReplyPress,
   onContentReplyPress,
+  onSwipeReply,
   highlighted = false,
 }: Props) {
   const colors = useColors();
@@ -499,6 +506,62 @@ export const MessageBubble = memo(function MessageBubble({
       outputRange: ['rgba(0, 98, 209, 0)', 'rgba(0, 98, 209, 0.25)'],
     }),
   };
+
+  // Swipe-to-reply: the bubble slides away from the edge it's anchored to —
+  // right for other people's messages, left for your own — revealing a reply
+  // arrow, as WhatsApp does. Vertical-dominant drags stay with the list.
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const swipeProgress = useRef(new Animated.Value(0)).current;
+  const swipeCrossed = useRef(false);
+  const swipeEnabled = !message.deleted_at && !message.id.startsWith('temp-') && !!onSwipeReply;
+
+  const resetSwipe = useCallback(() => {
+    swipeCrossed.current = false;
+    Animated.spring(swipeX, {
+      toValue: 0,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 0,
+    }).start();
+    Animated.timing(swipeProgress, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [swipeProgress, swipeX]);
+
+  const swipePan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        // Capture claims the drag even while a child Pressable holds the touch.
+        onMoveShouldSetPanResponderCapture: (_, g) => {
+          if (!swipeEnabled) return false;
+          const outward = isOwn ? -g.dx : g.dx;
+          return outward > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+        },
+        onPanResponderMove: (_, g) => {
+          const outward = Math.max(0, isOwn ? -g.dx : g.dx);
+          const travel = Math.min(outward, SWIPE_TRAVEL);
+          swipeX.setValue(isOwn ? -travel : travel);
+          swipeProgress.setValue(Math.min(outward / SWIPE_THRESHOLD, 1));
+          const crossed = outward >= SWIPE_THRESHOLD;
+          if (crossed && !swipeCrossed.current) hapticSelection();
+          swipeCrossed.current = crossed;
+        },
+        onPanResponderRelease: (_, g) => {
+          const outward = Math.max(0, isOwn ? -g.dx : g.dx);
+          if (outward >= SWIPE_THRESHOLD) {
+            hapticImpact();
+            onSwipeReply?.(message);
+          }
+          resetSwipe();
+        },
+        onPanResponderTerminate: resetSwipe,
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [isOwn, message, onSwipeReply, resetSwipe, swipeEnabled, swipeProgress, swipeX],
+  );
 
   const sender = message.users;
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
@@ -576,8 +639,43 @@ export const MessageBubble = memo(function MessageBubble({
         </View>
       )}
 
+      {/* Swipe cue, revealed from the edge the bubble slides away from */}
+      {swipeEnabled && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.swipeReplyCue,
+            isOwn ? styles.swipeReplyCueOwn : styles.swipeReplyCueOther,
+            {
+              opacity: swipeProgress,
+              transform: [
+                {
+                  scale: swipeProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons
+            name={isOwn ? 'arrow-redo' : 'arrow-undo'}
+            size={20}
+            color={colors.mutedForeground}
+          />
+        </Animated.View>
+      )}
+
       {/* Content column */}
-      <View style={[styles.contentCol, { maxWidth: bubbleMaxWidth }]}>
+      <Animated.View
+        {...swipePan.panHandlers}
+        style={[
+          styles.contentCol,
+          { maxWidth: bubbleMaxWidth },
+          { transform: [{ translateX: swipeX }] },
+        ]}
+      >
         {!isDeleted && isEmojiMsg ? (
           <View
             style={[
@@ -757,7 +855,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Reserve room for the pills that hang below the bubble */}
         {reactions.length > 0 && !isDeleted && <View style={styles.reactionSpacer} />}
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -779,6 +877,11 @@ const styles = StyleSheet.create({
   avatarCol: { width: 28, flexShrink: 0 },
 
   contentCol: { flexShrink: 1, minWidth: 0 },
+
+  swipeReplyCue: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center' },
+  // The bubble's origin: row padding (16) + avatar column (28) + gap (8).
+  swipeReplyCueOther: { left: 52 },
+  swipeReplyCueOwn: { right: 16 },
 
   bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bubbleRowOwn: { flexDirection: 'row-reverse' },

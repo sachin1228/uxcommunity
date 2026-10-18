@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -72,6 +72,12 @@ export function ChatInput({
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const inputRef = useRef<TextInput>(null);
+
+  // Starting a reply (sheet, swipe, or chip tap) drops the caret straight into
+  // the composer so the keyboard opens on the action, as WhatsApp does.
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus();
+  }, [replyTo]);
 
   // The emoji panel is owned by the parent screen (it renders the panel below
   // the footer and closes it on scroll/tab change); this is just a shorthand.
