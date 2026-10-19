@@ -737,6 +737,7 @@ export function ContentCard({
               event={event}
               goingCount={eventGoingCount}
               rsvped={eventRsvped}
+              notchColor={colors.backgroundSubtle}
               onToggleRsvp={() => actions.action(item, 'events', 'rsvp')}
             />
           </>
@@ -1068,6 +1069,7 @@ export function ContentDetail({
               goingCount={eventGoingCount}
               rsvped={eventRsvped}
               variant="detail"
+              notchColor={colors.background}
               onToggleRsvp={() => actions.action(item, 'events', 'rsvp')}
             />
           ) : (

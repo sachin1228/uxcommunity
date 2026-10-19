@@ -3,6 +3,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { Circle, Line, Svg } from 'react-native-svg';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { formatEventDate } from '@/lib/eventDate';
 import { formatEventTimeRange, hostScheduleForViewer } from '@/lib/eventDisplay';
@@ -15,6 +16,12 @@ import { hapticToggle } from '@/lib/haptics';
  * the big date and the RSVP call to action. On a phone the web card stacks
  * these three panels vertically (its sub-`lg` layout), so this one does too.
  *
+ * The stacked layout still reads as a ticket, so the perforation is drawn
+ * across the body/stub seam: the web's dashed line between the tangent points
+ * and the semicircular cut-outs at both edges. The web clips those out of the
+ * paper; here they are punched with the colour of whatever surface the ticket
+ * sits on, which is why `notchColor` comes from the caller.
+ *
  * The card keeps the web's fixed dark paper and prints its own colors: the
  * ticket is deliberately the same black in both themes, and the accent color
  * the host picked is the only hue on it.
@@ -22,6 +29,9 @@ import { hapticToggle } from '@/lib/haptics';
 
 const ACCENT_FALLBACK = '#e8e14a';
 const TICKET_BG = '#111111';
+const TICKET_BORDER = 1.5;
+const NOTCH_R = 13;
+const SEAM_STROKE = 'rgba(255,255,255,0.22)';
 const STONE_50 = '#fafaf9';
 const STONE_200 = '#e7e5e4';
 const STONE_300 = '#d6d3d1';
@@ -55,6 +65,8 @@ interface EventTicketProps {
   goingCount: number;
   rsvped: boolean;
   onToggleRsvp: () => void;
+  /** The surface behind the ticket, used to punch the notch cut-outs. */
+  notchColor: string;
   /** Feed cards clamp the title; the event page lets it wrap in full. */
   variant?: 'card' | 'detail';
 }
@@ -64,6 +76,7 @@ export function EventTicket({
   goingCount,
   rsvped,
   onToggleRsvp,
+  notchColor,
   variant = 'card',
 }: EventTicketProps) {
   const accent = /^#[0-9a-fA-F]{6}$/.test(event.accent_color ?? '')
@@ -85,197 +98,247 @@ export function EventTicket({
   const [posterRatio, setPosterRatio] = useState<number | null>(null);
   useEffect(() => setPosterRatio(null), [event.cover_image_url]);
 
+  // The perforation is drawn over the seam between the body and the stub, so
+  // it needs that seam's y and the ticket's outer width. Both land after the
+  // first layout pass; the overlay simply appears one frame later.
+  const [seam, setSeam] = useState<{ width: number; y: number } | null>(null);
+
   const gradient =
     POSTER_GRADIENTS[(event.id.charCodeAt(0) || 0) % POSTER_GRADIENTS.length];
 
   return (
-    <View style={styles.ticket}>
-      {/* Panel 1 — the poster, inset like a mounted print. */}
-      <View style={styles.posterPanel}>
-        <View style={styles.posterWrap}>
-          {event.cover_image_url ? (
-            <Image
-              source={{ uri: event.cover_image_url }}
-              style={[styles.poster, posterRatio ? { aspectRatio: posterRatio } : styles.posterFallback]}
-              contentFit="cover"
-              onLoad={(load) => {
-                const width = load.source?.width ?? 0;
-                const height = load.source?.height ?? 0;
-                if (width > 0 && height > 0) setPosterRatio(width / height);
-              }}
-              accessibilityLabel={event.title}
-            />
-          ) : (
-            <LinearGradient
-              colors={gradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.posterFallback}
-            />
-          )}
-          {event.location ? (
-            <LinearGradient
-              colors={['rgba(0,0,0,0.85)', 'transparent']}
-              start={{ x: 0.5, y: 1 }}
-              end={{ x: 0.5, y: 0 }}
-              style={styles.locationCaption}
-              pointerEvents="none"
-            >
-              <Feather name="map-pin" size={14} color="#ffffff" />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {event.location}
-              </Text>
-            </LinearGradient>
-          ) : null}
-        </View>
-      </View>
-
-      {/* Panel 2 — title and schedule. */}
-      <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={variant === 'card' ? 2 : undefined}>
-          {event.title}
-        </Text>
-
-        <View style={styles.meta}>
-          {dateLabel ? (
-            <View style={styles.metaRow}>
-              <Feather name="calendar" size={13} color={STONE_400} />
-              <Text style={styles.metaText}>{dateLabel}</Text>
-            </View>
-          ) : null}
-          {timeRange ? (
-            <View style={styles.metaRow}>
-              <Feather name="clock" size={13} color={STONE_400} />
-              <Text style={styles.metaText}>{timeRange}</Text>
-            </View>
-          ) : null}
-          {hostSchedule ? (
-            <Text style={styles.hostTime}>
-              Host time: {hostSchedule.range} ({hostSchedule.zone})
-            </Text>
-          ) : null}
-          {event.is_online ? (
-            event.meet_link ? (
-              <Pressable
-                onPress={() => { void Linking.openURL(event.meet_link as string); }}
-                style={styles.metaRow}
-                accessibilityRole="link"
-                accessibilityLabel="Open meeting link"
-              >
-                <Feather name="video" size={13} color={STONE_400} />
-                <Text style={[styles.metaText, styles.metaLink]}>Online (Google Meet)</Text>
-              </Pressable>
+    <View
+      style={styles.frame}
+      onLayout={(layout) => {
+        const width = layout.nativeEvent.layout.width;
+        setSeam((current) => ({ width, y: current?.y ?? 0 }));
+      }}
+    >
+      <View style={styles.ticket}>
+        {/* Panel 1 — the poster, inset like a mounted print. */}
+        <View style={styles.posterPanel}>
+          <View style={styles.posterWrap}>
+            {event.cover_image_url ? (
+              <Image
+                source={{ uri: event.cover_image_url }}
+                style={[styles.poster, posterRatio ? { aspectRatio: posterRatio } : styles.posterFallback]}
+                contentFit="cover"
+                onLoad={(load) => {
+                  const width = load.source?.width ?? 0;
+                  const height = load.source?.height ?? 0;
+                  if (width > 0 && height > 0) setPosterRatio(width / height);
+                }}
+                accessibilityLabel={event.title}
+              />
             ) : (
-              <View style={styles.metaRow}>
-                <Feather name="video" size={13} color={STONE_400} />
-                <Text style={styles.metaText}>Online</Text>
-              </View>
-            )
-          ) : event.location ? (
-            <View style={styles.metaRow}>
-              <Feather name="map-pin" size={13} color={STONE_400} />
-              <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
-            </View>
-          ) : null}
-          {spotsLeft !== null ? (
-            <View style={styles.metaRow}>
-              <Feather name="users" size={13} color={STONE_400} />
-              <Text style={[styles.metaText, spotsLeft <= 0 ? styles.metaSpent : null]}>
-                {spotsLeft > 0 ? `${spotsLeft} spots remaining` : 'No spots remaining'}
-              </Text>
-            </View>
-          ) : null}
+              <LinearGradient
+                colors={gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.posterFallback}
+              />
+            )}
+            {event.location ? (
+              <LinearGradient
+                colors={['rgba(0,0,0,0.85)', 'transparent']}
+                start={{ x: 0.5, y: 1 }}
+                end={{ x: 0.5, y: 0 }}
+                style={styles.locationCaption}
+                pointerEvents="none"
+              >
+                <Feather name="map-pin" size={14} color="#ffffff" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {event.location}
+                </Text>
+              </LinearGradient>
+            ) : null}
+          </View>
         </View>
 
-        {count > 0 ? (
-          <View style={styles.goingRow}>
-            {event.rsvps?.length ? (
-              <View style={styles.avatarStrip}>
-                {event.rsvps.slice(0, 5).map((rsvp, index) => (
-                  <PersonAvatar
-                    key={rsvp.user_id || `attendee-${index}`}
-                    name={rsvp.users?.name}
-                    url={rsvp.users?.avatar_url}
-                    size={28}
-                    style={{
-                      marginLeft: index === 0 ? 0 : -8,
-                      zIndex: 10 - index,
-                      borderWidth: 2,
-                      borderColor: TICKET_BG,
-                    }}
-                  />
-                ))}
+        {/* Panel 2 — title and schedule. */}
+        <View
+          style={styles.body}
+          onLayout={(layout) => {
+            const { y, height } = layout.nativeEvent.layout;
+            setSeam((current) => ({ width: current?.width ?? 0, y: TICKET_BORDER + y + height }));
+          }}
+        >
+          <Text style={styles.title} numberOfLines={variant === 'card' ? 2 : undefined}>
+            {event.title}
+          </Text>
+
+          <View style={styles.meta}>
+            {dateLabel ? (
+              <View style={styles.metaRow}>
+                <Feather name="calendar" size={13} color={STONE_400} />
+                <Text style={styles.metaText}>{dateLabel}</Text>
               </View>
             ) : null}
-            <Text style={styles.goingText}>
-              {count} {count === 1 ? 'person' : 'people'} going
-            </Text>
+            {timeRange ? (
+              <View style={styles.metaRow}>
+                <Feather name="clock" size={13} color={STONE_400} />
+                <Text style={styles.metaText}>{timeRange}</Text>
+              </View>
+            ) : null}
+            {hostSchedule ? (
+              <Text style={styles.hostTime}>
+                Host time: {hostSchedule.range} ({hostSchedule.zone})
+              </Text>
+            ) : null}
+            {event.is_online ? (
+              event.meet_link ? (
+                <Pressable
+                  onPress={() => { void Linking.openURL(event.meet_link as string); }}
+                  style={styles.metaRow}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open meeting link"
+                >
+                  <Feather name="video" size={13} color={STONE_400} />
+                  <Text style={[styles.metaText, styles.metaLink]}>Online (Google Meet)</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.metaRow}>
+                  <Feather name="video" size={13} color={STONE_400} />
+                  <Text style={styles.metaText}>Online</Text>
+                </View>
+              )
+            ) : event.location ? (
+              <View style={styles.metaRow}>
+                <Feather name="map-pin" size={13} color={STONE_400} />
+                <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
+              </View>
+            ) : null}
+            {spotsLeft !== null ? (
+              <View style={styles.metaRow}>
+                <Feather name="users" size={13} color={STONE_400} />
+                <Text style={[styles.metaText, spotsLeft <= 0 ? styles.metaSpent : null]}>
+                  {spotsLeft > 0 ? `${spotsLeft} spots remaining` : 'No spots remaining'}
+                </Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </View>
 
-      {/* Panel 3 — the stub: date block and the RSVP call to action. */}
-      <LinearGradient
-        colors={[`${accent}1f`, 'transparent']}
-        locations={[0, 0.7]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.stub}
-      >
-        <View style={styles.dateBlock}>
-          <Text style={styles.stubWeekday}>{weekday}</Text>
-          <Text style={[styles.stubDay, { color: accent }]}>{start.getDate()}</Text>
-          <Text style={styles.stubMonth}>
-            {month} {year}
-          </Text>
+          {count > 0 ? (
+            <View style={styles.goingRow}>
+              {event.rsvps?.length ? (
+                <View style={styles.avatarStrip}>
+                  {event.rsvps.slice(0, 5).map((rsvp, index) => (
+                    <PersonAvatar
+                      key={rsvp.user_id || `attendee-${index}`}
+                      name={rsvp.users?.name}
+                      url={rsvp.users?.avatar_url}
+                      size={28}
+                      style={{
+                        marginLeft: index === 0 ? 0 : -8,
+                        zIndex: 10 - index,
+                        borderWidth: 2,
+                        borderColor: TICKET_BG,
+                      }}
+                    />
+                  ))}
+                </View>
+              ) : null}
+              <Text style={styles.goingText}>
+                {count} {count === 1 ? 'person' : 'people'} going
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        <View style={styles.stubDivider} />
-
-        {!past ? (
-          <Pressable
-            onPress={() => {
-              hapticToggle(!rsvped);
-              onToggleRsvp();
-            }}
-            disabled={full}
-            style={[
-              styles.rsvpButton,
-              rsvped
-                ? { backgroundColor: `${accent}33` }
-                : full
-                  ? styles.rsvpFull
-                  : { backgroundColor: accent },
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: rsvped, disabled: full }}
-            accessibilityLabel={
-              rsvped ? 'Going — tap to withdraw' : full ? 'Event full' : "I'm going"
-            }
-          >
-            <Text
-              style={[
-                styles.rsvpText,
-                { color: rsvped ? accent : full ? STONE_500 : onAccentInk },
-              ]}
-            >
-              {rsvped ? 'Going' : full ? 'Event Full' : "I'm Going"}
+        {/* Panel 3 — the stub: date block and the RSVP call to action. */}
+        <LinearGradient
+          colors={[`${accent}1f`, 'transparent']}
+          locations={[0, 0.7]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.stub}
+        >
+          <View style={styles.dateBlock}>
+            <Text style={styles.stubWeekday}>{weekday}</Text>
+            <Text style={[styles.stubDay, { color: accent }]}>{start.getDate()}</Text>
+            <Text style={styles.stubMonth}>
+              {month} {year}
             </Text>
-            {rsvped ? (
-              <Feather name="check" size={14} color={accent} />
-            ) : full ? null : (
-              <Feather name="arrow-right" size={14} color={onAccentInk} />
-            )}
-          </Pressable>
-        ) : (
-          <Text style={styles.ended}>This event has ended</Text>
-        )}
-      </LinearGradient>
+          </View>
+
+          <View style={styles.stubDivider} />
+
+          {!past ? (
+            <Pressable
+              onPress={() => {
+                hapticToggle(!rsvped);
+                onToggleRsvp();
+              }}
+              disabled={full}
+              style={[
+                styles.rsvpButton,
+                rsvped
+                  ? { backgroundColor: `${accent}33` }
+                  : full
+                    ? styles.rsvpFull
+                    : { backgroundColor: accent },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: rsvped, disabled: full }}
+              accessibilityLabel={
+                rsvped ? 'Going — tap to withdraw' : full ? 'Event full' : "I'm going"
+              }
+            >
+              <Text
+                style={[
+                  styles.rsvpText,
+                  { color: rsvped ? accent : full ? STONE_500 : onAccentInk },
+                ]}
+              >
+                {rsvped ? 'Going' : full ? 'Event Full' : "I'm Going"}
+              </Text>
+              {rsvped ? (
+                <Feather name="check" size={14} color={accent} />
+              ) : full ? null : (
+                <Feather name="arrow-right" size={14} color={onAccentInk} />
+              )}
+            </Pressable>
+          ) : (
+            <Text style={styles.ended}>This event has ended</Text>
+          )}
+        </LinearGradient>
+      </View>
+
+      {seam && seam.width > 0 && seam.y > 0 ? (
+        <Svg
+          style={[styles.seam, { top: seam.y - NOTCH_R, width: seam.width }]}
+          pointerEvents="none"
+        >
+          {/* The web draws the dash between the notch tangent points. */}
+          <Line
+            x1={NOTCH_R}
+            y1={NOTCH_R}
+            x2={seam.width - NOTCH_R}
+            y2={NOTCH_R}
+            stroke={SEAM_STROKE}
+            strokeWidth={TICKET_BORDER}
+            strokeDasharray="5 6"
+          />
+          <Circle cx={0} cy={NOTCH_R} r={NOTCH_R} fill={notchColor} />
+          <Circle cx={seam.width} cy={NOTCH_R} r={NOTCH_R} fill={notchColor} />
+        </Svg>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Unclipped parent so the notch cut-outs can cover the ticket's own border.
+  frame: { position: 'relative' },
+  seam: {
+    position: 'absolute',
+    left: 0,
+    height: NOTCH_R * 2,
+    // The ticket raises itself on Android; without a higher elevation the
+    // paper would redraw over the cut-outs.
+    zIndex: 10,
+    elevation: 6,
+  },
   ticket: {
     borderRadius: 16,
     borderWidth: 1.5,
