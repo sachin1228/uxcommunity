@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, View,
@@ -10,10 +10,10 @@ import { isVideoAsset, uploadShowcaseVideo } from '@/lib/showcaseVideo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
-  CommunityContent, ContentKind, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS, SHOWCASE_MEDIA_MAX,
-  THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS, THREAD_IMAGE_MAX,
-  ThreadAttachment, contentLabel, createCommunityContent,
-  updateCommunityContent, uploadContentImage,
+  CommunityContent, ContentKind, LinkPreviewData, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS,
+  SHOWCASE_MEDIA_MAX, THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS,
+  THREAD_IMAGE_MAX, ThreadAttachment, contentLabel, createCommunityContent,
+  getLinkPreview, updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
 import {
   deviceClockReading,
@@ -96,6 +96,25 @@ const DEFAULT_TYPE: Partial<Record<ContentKind, string>> = {
   showcase: 'product_design',
 };
 
+/** The web `ResourceFormModal` only previews URLs it can actually open. */
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** The host a preview card credits, without the "www." noise. */
+function previewDomain(value: string): string {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '');
+  } catch {
+    return value;
+  }
+}
+
 export function CommunityContentEditor({ visible, communityId, kind, item, onClose, onSaved }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -130,6 +149,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   // The video currently in flight, e.g. "clip.mp4 — 42%" — videos are large
   // enough that a silent spinner reads as a hang.
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  // Resource URL metadata — the web composer's link preview card. Typing a
+  // URL debounces into one lookup; a dismissed card stays down until the URL
+  // changes again.
+  const [preview, setPreview] = useState<LinkPreviewData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewDismissed, setPreviewDismissed] = useState(false);
+  const previewAbortRef = useRef<AbortController | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,6 +177,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setIsPublic(Boolean(item?.is_public));
     setAttachments(initialAttachments(kind, item));
     setUploadStatus(null);
+    setPreview(null);
+    setPreviewLoading(false);
+    setPreviewDismissed(false);
     setType(DEFAULT_TYPE[kind] ?? 'question');
     setTab('post');
     setPollDraft(null);
@@ -162,7 +191,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       setType(
         THREAD_CATEGORY_OPTIONS.some((option) => option.value === category) ? category : null,
       );
-      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
+      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
       // Editing keeps the thread's type, as on the web: a poll edits its poll,
       // a post edits its text.
       const poll = item && 'poll' in item ? item.poll : null;
@@ -173,9 +202,10 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     } else if (kind === 'resources') {
       setType(item && 'resource_type' in item ? item.resource_type : 'article');
       setUrl(item && 'url' in item ? item.url : '');
+      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
     } else if (kind === 'showcase') {
       setType(item && 'category' in item ? item.category : 'product_design');
-      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
+      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
     } else {
       // The zone starts as the one the event was created in, and the phone's
       // own for a new event. Prefilling from anywhere else would read the times
@@ -203,6 +233,46 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     }
     setError(null);
   }, [item, kind, visible, deviceZone]);
+
+  // URL → metadata card, exactly the web composer's contract: only http(s)
+  // URLs preview, typing debounces 700ms, and the in-flight lookup is dropped
+  // the moment the URL changes or the editor closes.
+  useEffect(() => {
+    if (!visible || kind !== 'resources') {
+      previewAbortRef.current?.abort();
+      return;
+    }
+    const trimmed = url.trim();
+    if (!isValidHttpUrl(trimmed)) {
+      previewAbortRef.current?.abort();
+      previewAbortRef.current = null;
+      setPreview(null);
+      setPreviewLoading(false);
+      setPreviewDismissed(false);
+      return;
+    }
+    setPreviewDismissed(false);
+    const timer = setTimeout(() => {
+      previewAbortRef.current?.abort();
+      const controller = new AbortController();
+      previewAbortRef.current = controller;
+      setPreviewLoading(true);
+      setPreview(null);
+      getLinkPreview(trimmed, controller.signal)
+        .then((data) => {
+          if (!controller.signal.aborted) setPreview(data);
+        })
+        // A preview is a bonus — a failed lookup leaves the card off.
+        .catch(() => {})
+        .finally(() => {
+          if (!controller.signal.aborted) setPreviewLoading(false);
+        });
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      previewAbortRef.current?.abort();
+    };
+  }, [url, visible, kind]);
 
   const pickMedia = async () => {
     const remaining = mediaLimit - attachments.length;
@@ -313,6 +383,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         url: url.trim(),
         tags: cleanTags,
         is_public: isPublic,
+        allow_replies: allowReplies,
       };
     } else if (kind === 'showcase') {
       if (!title.trim()) return setError('Add a title for your work.');
@@ -491,17 +562,51 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {kind === 'resources' ? (
-            <Field label="URL">
-              <TextInput
-                value={url}
-                onChangeText={setUrl}
-                style={inputStyle}
-                placeholder="https://"
-                placeholderTextColor={colors.foregroundSubtle}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-            </Field>
+            <>
+              <Field label="URL *">
+                <View>
+                  <TextInput
+                    value={url}
+                    onChangeText={setUrl}
+                    style={[inputStyle, styles.urlInput]}
+                    placeholder="https://"
+                    placeholderTextColor={colors.foregroundSubtle}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                  <View style={styles.urlAccessory} pointerEvents="none">
+                    {previewLoading ? (
+                      <ActivityIndicator size="small" color={colors.foregroundSubtle} />
+                    ) : isValidHttpUrl(url) && !preview ? (
+                      <Feather name="globe" size={14} color={colors.foregroundSubtle} />
+                    ) : null}
+                  </View>
+                </View>
+              </Field>
+
+              {!previewDismissed && (previewLoading || preview) ? (
+                previewLoading && !preview ? (
+                  <View
+                    style={[
+                      styles.previewLoading,
+                      { borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={colors.foregroundSubtle} />
+                    <Text style={[styles.previewLoadingText, { color: colors.foregroundSubtle }]}>
+                      Loading preview…
+                    </Text>
+                  </View>
+                ) : preview ? (
+                  <ResourceLinkPreview
+                    data={preview}
+                    colors={colors}
+                    onDismiss={() => setPreviewDismissed(true)}
+                  />
+                ) : null
+              ) : null}
+            </>
           ) : null}
 
           {kind !== 'threads' && !isShowcase ? (
@@ -672,13 +777,15 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </Field>
           ) : null}
 
-          {kind === 'threads' || isShowcase ? (
+          {kind === 'threads' || kind === 'resources' || isShowcase ? (
             <Toggle
               label="Allow replies"
               description={
                 isShowcase
                   ? 'Other members can comment on this showcase.'
-                  : 'Other members can reply to this thread.'
+                  : kind === 'resources'
+                    ? 'Other members can comment on this resource.'
+                    : 'Other members can reply to this thread.'
               }
               value={allowReplies}
               onValueChange={setAllowReplies}
@@ -827,6 +934,86 @@ function Toggle({
         thumbColor={value ? '#FFFFFF' : colors.foregroundSubtle}
         ios_backgroundColor={colors.border}
       />
+    </View>
+  );
+}
+
+/**
+ * The web `LinkPreviewCard`: a quiet raised tile with the page's own title,
+ * description and social image, credited to its domain. Dismissible, because
+ * a bad upstream preview shouldn't sit in the author's way.
+ */
+function ResourceLinkPreview({
+  data,
+  colors,
+  onDismiss,
+}: {
+  data: LinkPreviewData;
+  colors: ReturnType<typeof useColors>;
+  onDismiss: () => void;
+}) {
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  const domain = previewDomain(data.url);
+
+  return (
+    <View
+      style={[
+        styles.previewCard,
+        { borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+      ]}
+    >
+      <View style={styles.previewCopy}>
+        {data.title ? (
+          <Text
+            numberOfLines={2}
+            style={[styles.previewTitle, { color: colors.foreground }]}
+          >
+            {data.title}
+          </Text>
+        ) : null}
+        {data.description ? (
+          <Text
+            numberOfLines={3}
+            style={[styles.previewDescription, { color: colors.foregroundMuted }]}
+          >
+            {data.description}
+          </Text>
+        ) : null}
+        <View style={styles.previewDomainRow}>
+          {faviconFailed ? (
+            <Feather name="globe" size={11} color={colors.foregroundSubtle} />
+          ) : (
+            <Image
+              source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=32` }}
+              style={styles.previewFavicon}
+              onError={() => setFaviconFailed(true)}
+            />
+          )}
+          <Text
+            numberOfLines={1}
+            style={[styles.previewDomain, { color: colors.foregroundSubtle }]}
+          >
+            {domain}
+          </Text>
+        </View>
+      </View>
+
+      {data.image ? (
+        <Image
+          source={{ uri: data.image }}
+          style={[styles.previewImage, { backgroundColor: colors.surface }]}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      <Pressable
+        onPress={onDismiss}
+        style={styles.previewDismiss}
+        hitSlop={8}
+        accessibilityLabel="Remove preview"
+      >
+        <Feather name="x" size={12} color="#FFFFFF" />
+      </Pressable>
     </View>
   );
 }
@@ -1100,6 +1287,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 124, paddingTop: 13 },
+  urlInput: { paddingRight: 40 },
+  urlAccessory: {
+    position: 'absolute',
+    right: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  previewLoading: {
+    minHeight: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  previewLoadingText: { fontFamily: 'Geist_400Regular', fontSize: 14 },
+  previewCard: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  previewCopy: { flex: 1, minWidth: 0 },
+  previewTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 12, lineHeight: 16 },
+  previewDescription: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
+  },
+  previewDomainRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  previewFavicon: { width: 14, height: 14, borderRadius: 2 },
+  previewDomain: { flexShrink: 1, fontFamily: 'Geist_400Regular', fontSize: 11 },
+  previewImage: { width: 144, height: 96, borderRadius: 8 },
+  previewDismiss: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
   showcaseTitle: { paddingBottom: 22 },
   threadBody: { paddingBottom: 22 },
   counter: {
