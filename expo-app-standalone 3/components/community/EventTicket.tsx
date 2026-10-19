@@ -3,7 +3,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { Circle, Line, Svg } from 'react-native-svg';
+import { Circle, Line, Path, Svg } from 'react-native-svg';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { formatEventDate } from '@/lib/eventDate';
 import { formatEventTimeRange, hostScheduleForViewer } from '@/lib/eventDisplay';
@@ -18,9 +18,10 @@ import { hapticToggle } from '@/lib/haptics';
  *
  * The stacked layout still reads as a ticket, so the perforation is drawn
  * across the body/stub seam: the web's dashed line between the tangent points
- * and the semicircular cut-outs at both edges. The web clips those out of the
- * paper; here they are punched with the colour of whatever surface the ticket
- * sits on, which is why `notchColor` comes from the caller.
+ * and the semicircular cut-outs at both edges, with the ticket border carried
+ * round the half of each cut-out that bites into the paper. The web clips those
+ * out of the paper; here they are punched with the colour of whatever surface
+ * the ticket sits on, which is why `notchColor` comes from the caller.
  *
  * The card keeps the web's fixed dark paper and prints its own colors: the
  * ticket is deliberately the same black in both themes, and the accent color
@@ -30,6 +31,7 @@ import { hapticToggle } from '@/lib/haptics';
 const ACCENT_FALLBACK = '#e8e14a';
 const TICKET_BG = '#111111';
 const TICKET_BORDER = 1.5;
+const TICKET_BORDER_COLOR = 'rgba(255,255,255,0.16)';
 const NOTCH_R = 13;
 const SEAM_STROKE = 'rgba(255,255,255,0.22)';
 const STONE_50 = '#fafaf9';
@@ -306,21 +308,37 @@ export function EventTicket({
 
       {seam && seam.width > 0 && seam.y > 0 ? (
         <Svg
-          style={[styles.seam, { top: seam.y - NOTCH_R, width: seam.width }]}
+          style={[styles.seam, { top: seam.y - NOTCH_R, width: seam.width + NOTCH_R * 2 }]}
           pointerEvents="none"
         >
+          {/* Punch the cut-outs first: the disc erases the straight border that
+              would otherwise run across the notch. */}
+          <Circle cx={NOTCH_R} cy={NOTCH_R} r={NOTCH_R} fill={notchColor} />
+          <Circle cx={seam.width + NOTCH_R} cy={NOTCH_R} r={NOTCH_R} fill={notchColor} />
           {/* The web draws the dash between the notch tangent points. */}
           <Line
-            x1={NOTCH_R}
+            x1={NOTCH_R * 2}
             y1={NOTCH_R}
-            x2={seam.width - NOTCH_R}
+            x2={seam.width}
             y2={NOTCH_R}
             stroke={SEAM_STROKE}
             strokeWidth={TICKET_BORDER}
             strokeDasharray="5 6"
           />
-          <Circle cx={0} cy={NOTCH_R} r={NOTCH_R} fill={notchColor} />
-          <Circle cx={seam.width} cy={NOTCH_R} r={NOTCH_R} fill={notchColor} />
+          {/* Then the border continues around the half of each notch that bites
+              into the paper, exactly like the web's outline path. */}
+          <Path
+            d={`M ${NOTCH_R} 0 A ${NOTCH_R} ${NOTCH_R} 0 0 1 ${NOTCH_R} ${NOTCH_R * 2}`}
+            stroke={TICKET_BORDER_COLOR}
+            strokeWidth={TICKET_BORDER}
+            fill="none"
+          />
+          <Path
+            d={`M ${seam.width + NOTCH_R} 0 A ${NOTCH_R} ${NOTCH_R} 0 0 0 ${seam.width + NOTCH_R} ${NOTCH_R * 2}`}
+            stroke={TICKET_BORDER_COLOR}
+            strokeWidth={TICKET_BORDER}
+            fill="none"
+          />
         </Svg>
       ) : null}
     </View>
@@ -332,7 +350,10 @@ const styles = StyleSheet.create({
   frame: { position: 'relative' },
   seam: {
     position: 'absolute',
-    left: 0,
+    // The SVG clips at its own bounds, so the viewport overhangs the ticket by
+    // a notch radius — otherwise the edge pixel of the right cut-out is dropped
+    // and the paper border shows through the notch.
+    left: -NOTCH_R,
     height: NOTCH_R * 2,
     // The ticket raises itself on Android; without a higher elevation the
     // paper would redraw over the cut-outs.
@@ -342,7 +363,7 @@ const styles = StyleSheet.create({
   ticket: {
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: TICKET_BORDER_COLOR,
     backgroundColor: TICKET_BG,
     overflow: 'hidden',
     shadowColor: '#000000',
