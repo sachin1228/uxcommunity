@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -10,6 +10,9 @@ import type { CityOption } from '@/lib/cities';
  * The event form's city picker — the web form's `<select>` as a searchable
  * sheet. The chosen city is what the city Events page lists the event under,
  * which is why the form asks for it whenever the event is public.
+ *
+ * Drawn as an overlay inside the composer's own modal: a nested `<Modal>`
+ * dismisses the composer on Android.
  */
 export function CityPickerSheet({
   visible,
@@ -38,8 +41,10 @@ export function CityPickerSheet({
     return cities.filter((city) => city.name.toLowerCase().includes(needle));
   }, [cities, query]);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <View style={styles.overlay}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close city picker">
         <Pressable
           style={[
@@ -112,11 +117,12 @@ export function CityPickerSheet({
           />
         </Pressable>
       </Pressable>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 60, elevation: 60 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     maxHeight: '72%',

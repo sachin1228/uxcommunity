@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -91,8 +91,13 @@ function SheetShell({ visible, title, onClose, children }: SheetShellProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
+  // A plain overlay inside the editor's own full-screen modal. A nested
+  // <Modal> here dismisses the composer on Android the moment it presents, so
+  // the sheet is drawn above the form instead of opening a second window.
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <View style={styles.overlay}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close picker">
         <Pressable
           style={[
@@ -116,7 +121,7 @@ function SheetShell({ visible, title, onClose, children }: SheetShellProps) {
           {children}
         </Pressable>
       </Pressable>
-    </Modal>
+    </View>
   );
 }
 
@@ -373,6 +378,7 @@ export function EventTimePickerSheet({
 }
 
 const styles = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 60, elevation: 60 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     borderTopLeftRadius: 20,

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -984,7 +984,10 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
               <Field label="Date *">
                 <Pressable
-                  onPress={() => setDatePickerOpen(true)}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setDatePickerOpen(true);
+                  }}
                   disabled={eventStartIsPast}
                   style={[
                     styles.input,
@@ -1016,7 +1019,10 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 <View style={styles.timeHalf}>
                   <Field label="Start time *">
                     <Pressable
-                      onPress={() => setTimePicker('start')}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTimePicker('start');
+                      }}
                       disabled={eventStartIsPast}
                       style={[
                         styles.input,
@@ -1047,7 +1053,10 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 <View style={styles.timeHalf}>
                   <Field label="End time *">
                     <Pressable
-                      onPress={() => setTimePicker('end')}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTimePicker('end');
+                      }}
                       style={[
                         styles.input,
                         styles.pickerTrigger,
@@ -1167,7 +1176,10 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               {isPublic ? (
                 <Field label="City *">
                   <Pressable
-                    onPress={() => setCityPickerOpen(true)}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setCityPickerOpen(true);
+                    }}
                     style={[
                       styles.input,
                       styles.pickerTrigger,
