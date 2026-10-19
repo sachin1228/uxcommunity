@@ -301,9 +301,9 @@ export function EventTicket({
   return (
     <>
     <Animated.View
-      // The rest tilt and the swing share one pivot, just under the top edge, so
-      // they add up like nested layers and the far end sweeps the widest arc.
-      style={[styles.frame, { transform: [{ rotate: '0.7deg' }, { rotate: deg(swing) }] }]}
+      // No rest tilt: the ticket hangs plumb, and the swing is a departure from
+      // plumb that always comes back to it. One pivot, just under the top edge.
+      style={[styles.frame, { transform: [{ rotate: deg(swing) }] }]}
       onLayout={(layout) => {
         const width = layout.nativeEvent.layout.width;
         setSeam((current) => ({ width, y: current?.y ?? 0 }));
