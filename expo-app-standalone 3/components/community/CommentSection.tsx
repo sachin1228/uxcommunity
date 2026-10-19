@@ -376,6 +376,7 @@ export function CommentComposer({
   maxLength,
   autoFocus,
   replyToName,
+  replyToBody,
   onCancelReply,
   onPosted,
   bottomInset = 0,
@@ -391,6 +392,8 @@ export function CommentComposer({
   autoFocus?: boolean;
   /** Present while replying: names the person above the field and offers a way out. */
   replyToName?: string | null;
+  /** The comment being replied to, shown as a one-line preview under the name. */
+  replyToBody?: string | null;
   onCancelReply?: () => void;
   onPosted: (comment: CommunityComment) => void;
   bottomInset?: number;
@@ -405,6 +408,10 @@ export function CommentComposer({
   // field — an empty composer should read as a prompt, not a form. It stays
   // mounted while saving so the spinner has somewhere to live.
   const showSend = trimmed.length > 0 || sending;
+
+  // One clean line for the quote: newlines and runs of spaces collapse so the
+  // body never eats more than its single ellipsized row.
+  const replyPreview = replyToBody ? replyToBody.replace(/\s+/g, ' ').trim() : '';
 
   const send = async () => {
     if (!canSend) return;
@@ -438,26 +445,37 @@ export function CommentComposer({
     >
       {replyToName ? (
         <View style={styles.replyContext}>
-          <Feather name="corner-up-left" size={12} color={colors.foregroundMuted} />
-          <Text
-            style={[styles.replyContextText, { color: colors.foregroundMuted }]}
-            numberOfLines={1}
-          >
-            Replying to <Text style={{ color: colors.foreground }}>{replyToName}</Text>
-          </Text>
-          {onCancelReply ? (
-            <Pressable
-              onPress={() => {
-                hapticSelection();
-                onCancelReply();
-              }}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel reply"
-              style={styles.replyCancel}
+          <View style={styles.replyContextLine}>
+            <Feather name="corner-up-left" size={12} color={colors.foregroundMuted} />
+            <Text
+              style={[styles.replyContextText, { color: colors.foregroundMuted }]}
+              numberOfLines={1}
             >
-              <Feather name="x" size={14} color={colors.foregroundMuted} />
-            </Pressable>
+              Replying to <Text style={{ color: colors.foreground }}>{replyToName}</Text>
+            </Text>
+            {onCancelReply ? (
+              <Pressable
+                onPress={() => {
+                  hapticSelection();
+                  onCancelReply();
+                }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel reply"
+                style={styles.replyCancel}
+              >
+                <Feather name="x" size={14} color={colors.foregroundMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+          {replyPreview ? (
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.replyPreview, { color: colors.foregroundSubtle }]}
+            >
+              {replyPreview}
+            </Text>
           ) : null}
         </View>
       ) : null}
@@ -1080,13 +1098,21 @@ const styles = StyleSheet.create({
     gap: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  replyContext: {
+  replyContext: { gap: 2 },
+  replyContextLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 2,
   },
   replyContextText: { flex: 1, fontSize: 12, fontFamily: 'Geist_500Medium' },
+  // Indented past the ↩ glyph so the quote reads under the name, not the icon.
+  replyPreview: {
+    marginLeft: 20,
+    marginRight: 2,
+    fontSize: 12,
+    fontFamily: 'Geist_400Regular',
+  },
   replyCancel: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   composerField: {
     flexDirection: 'row',

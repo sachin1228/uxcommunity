@@ -1062,6 +1062,7 @@ export function ContentDetail({
             submitLabel={replyTarget ? 'Reply' : 'Send'}
             autoFocus={Boolean(replyTarget)}
             replyToName={replyTarget ? replyTarget.users?.name ?? 'Member' : null}
+            replyToBody={replyTarget?.body ?? null}
             onCancelReply={() => setReplyTarget(null)}
             onPosted={handleCommentPosted}
             bottomInset={composerBottomInset}
