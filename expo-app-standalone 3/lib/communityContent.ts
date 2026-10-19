@@ -66,6 +66,12 @@ export interface CommunityThread extends BaseContent {
   poll_undo_used?: boolean;
 }
 
+/** One attendee face on the event ticket's going strip (web `EventRsvp`). */
+export interface EventRsvpPreview {
+  user_id: string;
+  users: { name: string | null; avatar_url: string | null } | null;
+}
+
 export interface CommunityEvent extends BaseContent {
   event_date: string;
   end_date: string | null;
@@ -74,12 +80,20 @@ export interface CommunityEvent extends BaseContent {
    * column, and on any create that could not name a zone.
    */
   host_timezone: string | null;
+  /** The host zone's offset at the start — the fallback when the name can't resolve. */
+  host_utc_offset_minutes?: number | null;
+  /** The city whose Events page lists the event. */
+  city_id?: string | null;
+  /** The ticket's accent color; null on events created before the column. */
+  accent_color?: string | null;
   is_online: boolean;
   location: string | null;
   meet_link: string | null;
   max_attendees: number | null;
   cover_image_url: string | null;
   rsvp_count: number;
+  /** Up to five attendee faces, oldest first — the web card's avatar stack. */
+  rsvps?: EventRsvpPreview[];
   like_count: number;
   save_count: number;
   user_rsvped: boolean;
