@@ -73,7 +73,11 @@ function TypingDots({ color }: { color: string }) {
 // Pin mark — the web row's Pin glyph (lucide), drawn with Svg (Feather has no pin)
 // ---------------------------------------------------------------------------
 
-function PinIcon({ size, color }: { size: number; color: string }) {
+/**
+ * The web row's Pin glyph, exported for every surface that previews a room the
+ * sidebar will pin (an event's group chat, on its RSVP dialog).
+ */
+export function PinIcon({ size, color }: { size: number; color: string }) {
   return (
     <Svg
       width={size}
@@ -95,7 +99,8 @@ function PinIcon({ size, color }: { size: number; color: string }) {
 // Avatar / Initials
 // ---------------------------------------------------------------------------
 
-function Initials({
+/** A community's own face when it has no picture — exported for room previews. */
+export function Initials({
   name,
   size = 48,
   colors,

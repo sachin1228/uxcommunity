@@ -1,5 +1,6 @@
 import { apiFetch, apiFormUpload } from './api';
 import type { ThreadPoll } from './communityPoll';
+import type { EventJoinAnswers } from './eventJoinQuestions';
 
 export type { ThreadPoll } from './communityPoll';
 
@@ -66,6 +67,25 @@ export interface CommunityThread extends BaseContent {
   poll_undo_used?: boolean;
 }
 
+/** One attendee face on the event ticket's going strip (web `EventRsvp`). */
+export interface EventRsvpPreview {
+  user_id: string;
+  users: { name: string | null; avatar_url: string | null } | null;
+}
+
+/**
+ * The group chat an event carries, as the read models attach it to the event —
+ * the room the RSVP dialog previews and the sidebar lists. No room yet, null.
+ */
+export interface EventChatCommunity {
+  id: string;
+  name: string;
+  image_url: string | null;
+  member_count: number;
+  /** Whether the viewer is already in the room (an RSVP is what puts them in). */
+  joined: boolean;
+}
+
 export interface CommunityEvent extends BaseContent {
   event_date: string;
   end_date: string | null;
@@ -74,12 +94,27 @@ export interface CommunityEvent extends BaseContent {
    * column, and on any create that could not name a zone.
    */
   host_timezone: string | null;
+  /** The host zone's offset at the start — the fallback when the name can't resolve. */
+  host_utc_offset_minutes?: number | null;
+  /** The city whose Events page lists the event. */
+  city_id?: string | null;
+  /** The ticket's accent color; null on events created before the column. */
+  accent_color?: string | null;
   is_online: boolean;
   location: string | null;
   meet_link: string | null;
   max_attendees: number | null;
   cover_image_url: string | null;
   rsvp_count: number;
+  /** Up to five attendee faces, oldest first — the web card's avatar stack. */
+  rsvps?: EventRsvpPreview[];
+  /**
+   * Heads in the event's group room — the line the RSVP confirm dialog puts
+   * under the room's preview. Null when the event has no room yet.
+   */
+  chat_member_count?: number | null;
+  /** The event's group room, which an RSVP is the door to. */
+  chat_community?: EventChatCommunity | null;
   like_count: number;
   save_count: number;
   user_rsvped: boolean;
@@ -356,6 +391,47 @@ export interface ActionResult {
  * Returns the confirmed value (and count where the endpoint reports one) so the
  * caller can reconcile an optimistic update instead of guessing.
  */
+/** What an RSVP write costs and buys, as the server confirms it. */
+export interface RsvpResult {
+  /** The viewer's going state after the write. */
+  value: boolean;
+  /** The authoritative going count. */
+  count: number;
+  /**
+   * The event's group room, which the RSVP is the door to — null when the
+   * event has none. The sidebar has to be re-read either way.
+   */
+  chatCommunityId: string | null;
+}
+
+/**
+ * Send one RSVP, with the host's join answers when the dialog collected them.
+ *
+ * The endpoint is a toggle, not a desired-state write: it flips the row, and
+ * taking the RSVP is also what joins (or leaves) the event's group chat.
+ * Answers are optional server-side — a client that RSVPs without them keeps the
+ * ones recorded on an earlier join.
+ */
+export async function sendEventRsvp(
+  communityId: string,
+  eventId: string,
+  answers?: EventJoinAnswers | null,
+): Promise<RsvpResult> {
+  const { data } = await apiFetch<{
+    rsvped?: boolean;
+    rsvp_count?: number;
+    chat_community_id?: string | null;
+  }>(`/api/communities/${communityId}/events/${eventId}/rsvp`, {
+    method: 'POST',
+    body: answers ? { answers } : {},
+  });
+  return {
+    value: data.rsvped === true,
+    count: Number(data.rsvp_count ?? 0),
+    chatCommunityId: data.chat_community_id ?? null,
+  };
+}
+
 export async function setContentAction(
   communityId: string,
   kind: ContentKind,
@@ -372,11 +448,8 @@ export async function setContentAction(
   }
 
   if (action === 'rsvp') {
-    const { data } = await apiFetch<{ rsvped?: boolean; rsvp_count?: number }>(
-      `/api/communities/${communityId}/${kind}/${itemId}/rsvp`,
-      { method: 'POST', body: {} },
-    );
-    return { value: data.rsvped ?? desired, count: data.rsvp_count };
+    const result = await sendEventRsvp(communityId, itemId);
+    return { value: result.value, count: result.count };
   }
 
   const bodyKey = action === 'like' ? 'liked' : action === 'bookmark' ? 'bookmarked' : 'saved';

@@ -41,11 +41,14 @@ import {
   formatRelativeDate,
   getLinkPreview,
   linkPreviewDomain,
+  sendEventRsvp,
   setContentAction,
   threadBody,
   voteOnThreadPoll,
   type LinkPreviewData,
 } from '@/lib/communityContent';
+import { communityStore } from '@/lib/communityStore';
+import type { EventJoinAnswers } from '@/lib/eventJoinQuestions';
 import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
 import { COMMENT_MAX_LENGTH, type CommunityComment } from '@/lib/comments';
 import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
@@ -57,10 +60,10 @@ import {
 } from './CommentSection';
 import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
-import { formatEventDate } from '@/lib/eventDate';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
 import { VideoPlayerModal } from './VideoPlayerModal';
+import { EventTicket } from './EventTicket';
 
 /**
  * The detail page is a full-screen `Modal`, where iOS's own keyboard avoiding
@@ -118,14 +121,22 @@ const BOOKMARK: ActionDefinition = { action: 'bookmark', icon: 'bookmark', label
 /**
  * What the card footer shows, per kind — the web cards keep the footer to the
  * heart and the comment count and move everything else into the ··· menu.
- * (Events additionally keep their RSVP there: the web shows it as its own wide
- * call-to-action, which the mobile footer stands in for.)
+ * Events keep their RSVP where the web card puts it: the wide call to action
+ * on the ticket's stub, not a footer chip.
  */
 export const FOOTER_ACTIONS_BY_KIND: Record<ContentKind, ActionDefinition[]> = {
   threads: [LIKE],
   showcase: [LIKE],
-  events: [LIKE, RSVP],
+  events: [LIKE],
   resources: [RESOURCE_LIKE],
+};
+
+/**
+ * Actions that live outside the footer but still answer to `actionDefinition`
+ * — the event ticket's RSVP is driven by the stub's own button.
+ */
+const TICKET_ACTIONS_BY_KIND: Partial<Record<ContentKind, ActionDefinition[]>> = {
+  events: [RSVP],
 };
 
 /** Instagram's window: a second tap inside this counts as a double tap. */
@@ -140,7 +151,11 @@ const MENU_ACTION_BY_KIND: Record<ContentKind, ActionDefinition | null> = {
 };
 
 export function actionDefinition(kind: ContentKind, action: ContentAction): ActionDefinition | undefined {
-  const all = [...FOOTER_ACTIONS_BY_KIND[kind], MENU_ACTION_BY_KIND[kind]].filter(Boolean) as ActionDefinition[];
+  const all = [
+    ...FOOTER_ACTIONS_BY_KIND[kind],
+    MENU_ACTION_BY_KIND[kind],
+    ...(TICKET_ACTIONS_BY_KIND[kind] ?? []),
+  ].filter(Boolean) as ActionDefinition[];
   return all.find((entry) => entry.action === action);
 }
 
@@ -160,6 +175,18 @@ export interface ContentActionsApi {
   countFor: (item: CommunityContent, kind: ContentKind, action: ContentAction) => number;
   commentCountFor: (item: CommunityContent) => number;
   setCommentCount: (itemId: string, total: number) => void;
+  /**
+   * Write one interaction's state into the card from outside the tap path —
+   * the RSVP, whose dialog owns the request, its spinner and its error, and so
+   * drives the optimistic flip and the server's answer itself.
+   */
+  applyResult: (
+    item: CommunityContent,
+    kind: ContentKind,
+    action: ContentAction,
+    value: boolean,
+    count?: number,
+  ) => void;
   /** Drop every local override — used when the server sends fresh rows. */
   reset: () => void;
   /** Alert surfaced from a failed write, for screens that render their own toast. */
@@ -307,6 +334,22 @@ export function useContentActions(): ContentActionsApi {
   const setCommentCount = useCallback(
     (itemId: string, total: number) =>
       setCommentCounts((current) => ({ ...current, [itemId]: total })),
+    [],
+  );
+
+  const applyResult = useCallback(
+    (
+      item: CommunityContent,
+      kind: ContentKind,
+      actionName: ContentAction,
+      value: boolean,
+      count?: number,
+    ) => {
+      setOverrides((current) => ({
+        ...current,
+        [`${kind}:${item.id}:${actionName}`]: { value, count },
+      }));
+    },
     [],
   );
 
@@ -465,6 +508,7 @@ export function useContentActions(): ContentActionsApi {
     countFor,
     commentCountFor,
     setCommentCount,
+    applyResult,
     reset,
     lastError,
     clearError: useCallback(() => setLastError(null), []),
@@ -474,6 +518,53 @@ export function useContentActions(): ContentActionsApi {
     resetPoll,
     applyPollUpdate,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The RSVP the ticket's dialogs send
+// ---------------------------------------------------------------------------
+
+/**
+ * The writer behind the ticket's confirm and questions dialogs — the mobile
+ * shape of the web card's `commitRsvp`.
+ *
+ * The card flips first, the request goes out, and the server's answer replaces
+ * the guess. A failure puts the original state back and hands the reason to the
+ * dialog that asked, which stays open with it. An RSVP is also the door into the
+ * event's group chat, so the room list is told to re-read itself instead of
+ * waiting for its next fetch.
+ */
+function useEventRsvpSender(
+  event: CommunityEvent | null,
+  rsvped: boolean,
+  goingCount: number,
+  actions: ContentActionsApi,
+) {
+  const apply = useCallback(
+    (value: boolean, count?: number) => {
+      if (event) actions.applyResult(event, 'events', 'rsvp', value, count);
+    },
+    [actions, event],
+  );
+
+  return useCallback(
+    async (answers: EventJoinAnswers | null) => {
+      if (!event || !event.community_id) return;
+      const next = !rsvped;
+      apply(next, Math.max(0, goingCount + (next ? 1 : -1)));
+      try {
+        const result = await sendEventRsvp(event.community_id, event.id, answers);
+        apply(result.value, result.count);
+        if (result.chatCommunityId) {
+          communityStore.notifyCommunityChanged({ kind: 'refresh' });
+        }
+      } catch (error) {
+        apply(rsvped, goingCount);
+        throw error;
+      }
+    },
+    [apply, event, goingCount, rsvped],
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -613,17 +704,14 @@ export function ContentCard({
   // Showcase media renders through the carousel only — its first attachment is
   // already the cover, so a separate banner would show the same image twice.
   // Resources render the link tile instead of a cover, like the web card.
-  const coverImage = event?.cover_image_url ?? null;
-  // Every event card says when — the web card's first row — and a bad
-  // timestamp costs the row rather than printing "Invalid Date".
-  const eventDateLabel = event ? formatEventDate(event.event_date) : null;
+  // Events draw their poster inside the ticket below.
   const isOwner = item.user_id === currentUserId;
 
   // The body text each kind puts on its card, mirroring the web cards: a thread
   // shows its body (the whole post lives in `title` on the web) collapsed behind
-  // "Read more", an event shows a 2-line title plus a collapsible description, a
-  // resource clamps its description to 3 lines, and a showcase title is never
-  // clamped.
+  // "Read more", an event shows its description above the ticket (its title is
+  // the ticket's own), a resource clamps its description to 3 lines, and a
+  // showcase title is never clamped.
   const primaryBody = resource
     ? resource.description || resource.title
     : kind === 'threads' && thread
@@ -632,10 +720,12 @@ export function ContentCard({
   const secondaryBody = kind === 'events' ? item.description : null;
   const primaryLines =
     kind === 'threads' ? collapsedBodyLines(kind, item)
-      : kind === 'events' ? 2
-        : kind === 'resources' ? 3
-          : undefined;
+      : kind === 'resources' ? 3
+        : undefined;
   const pollState = thread?.poll ? actions.pollState(item) : null;
+  const eventRsvped = event ? actions.isActive(item, 'events', 'rsvp') : false;
+  const eventGoingCount = event ? actions.countFor(item, 'events', 'rsvp') : 0;
+  const sendRsvp = useEventRsvpSender(event, eventRsvped, eventGoingCount, actions);
 
   // A double tap on the card likes it — Instagram's gesture. The footer heart
   // is still the explicit control; this is the shortcut, and it only ever
@@ -688,8 +778,6 @@ export function ContentCard({
       accessible={false}
       style={[styles.card, { backgroundColor: colors.backgroundSubtle, borderColor: colors.border }]}
     >
-      {coverImage ? <Image source={{ uri: coverImage }} style={styles.cover} /> : null}
-
       <View style={styles.cardBody}>
         {/* Author meta — name and relative date on one line, the category as
             the muted second line, exactly like the web `PostAuthorMeta`. */}
@@ -718,15 +806,31 @@ export function ContentCard({
           />
         </View>
 
-        <CollapsibleBody
-          text={primaryBody}
-          textStyle={styles.cardTitle}
-          collapsedLines={primaryLines}
-          expandable={kind === 'threads'}
-        />
-        {secondaryBody ? (
-          <CollapsibleBody text={secondaryBody} textStyle={styles.description} collapsedLines={2} />
-        ) : null}
+        {event ? (
+          <>
+            {/* The web event card leads with the description, then the ticket;
+                the event's title lives inside the ticket. */}
+            {secondaryBody ? (
+              <CollapsibleBody text={secondaryBody} textStyle={styles.description} collapsedLines={2} />
+            ) : null}
+            <EventTicket
+              event={event}
+              goingCount={eventGoingCount}
+              rsvped={eventRsvped}
+              notchColor={colors.backgroundSubtle}
+              communityName={communityName ?? null}
+              isOwner={isOwner}
+              onRsvp={sendRsvp}
+            />
+          </>
+        ) : (
+          <CollapsibleBody
+            text={primaryBody}
+            textStyle={styles.cardTitle}
+            collapsedLines={primaryLines}
+            expandable={kind === 'threads'}
+          />
+        )}
         {thread?.poll && pollState ? (
           <ThreadPollView
             poll={thread.poll}
@@ -763,18 +867,6 @@ export function ContentCard({
             data={resourcePreview}
             onPress={() => { void Linking.openURL(resource.url); }}
           />
-        ) : null}
-
-        {event ? (
-          <View style={styles.eventMetaStack}>
-            {eventDateLabel ? <DetailRow icon="calendar" text={eventDateLabel} /> : null}
-            <View style={styles.eventMeta}>
-              <Feather name={event.is_online ? 'video' : 'map-pin'} size={15} color={colors.accent} />
-              <Text style={[styles.eventMetaText, { color: colors.foregroundMuted }]}>
-                {event.is_online ? 'Online event' : event.location || 'Location to be announced'}
-              </Text>
-            </View>
-          </View>
         ) : null}
 
         <ContentActionRow
@@ -978,9 +1070,12 @@ export function ContentDetail({
   const files = (thread?.attachments ?? []).filter((attachment) => !attachment.type.startsWith('image/'));
   // Showcase media lives in the carousel below the body; a cover copy on top
   // would repeat the first attachment. Resources show the link tile instead.
-  const coverImage = event?.cover_image_url ?? null;
+  // Events draw their poster inside the ticket that takes the body's place.
   const isOwner = item.user_id === currentUserId;
   const pollState = thread?.poll ? actions.pollState(item) : null;
+  const eventRsvped = event ? actions.isActive(item, 'events', 'rsvp') : false;
+  const eventGoingCount = event ? actions.countFor(item, 'events', 'rsvp') : 0;
+  const sendRsvp = useEventRsvpSender(event, eventRsvped, eventGoingCount, actions);
   // Events have no reply switch — their comment threads are always open.
   const allowReplies =
     kind === 'events'
@@ -1032,8 +1127,6 @@ export function ContentDetail({
           contentContainerStyle={[styles.detailContent, { paddingBottom: 24 }]}
           keyboardShouldPersistTaps="handled"
         >
-          {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
-
           <View style={styles.authorRow}>
             <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
             <View style={styles.authorCopy}>
@@ -1051,23 +1144,39 @@ export function ContentDetail({
             </View>
           </View>
 
-          {/* Threads carry the whole post in the body and showcase titles are
-              card text on the web too, so both keep the compact type here
-              instead of the large title the other kinds still use. Resources
-              keep the same compact body as their card. */}
-          <Text
-            style={[
-              thread || showcase || resource ? styles.detailThreadBody : styles.detailTitle,
-              { color: colors.foreground },
-            ]}
-          >
-            {thread ? threadBody(thread) : resource ? resource.description || resource.title : item.title}
-          </Text>
-          {!thread && !resource && item.description ? (
-            <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
-              {item.description}
-            </Text>
-          ) : null}
+          {event ? (
+            // The web event page renders the same ticket the feed does; the
+            // title and schedule live inside it, not above it.
+            <EventTicket
+              event={event}
+              goingCount={eventGoingCount}
+              rsvped={eventRsvped}
+              variant="detail"
+              notchColor={colors.background}
+              communityName={communityName ?? null}
+              isOwner={isOwner}
+              onRsvp={sendRsvp}
+            />
+          ) : (
+            <>
+              {/* Threads carry the whole post in the body and showcase titles
+                  are card text on the web too, so both keep the compact type
+                  here. Resources keep the same compact body as their card. */}
+              <Text
+                style={[
+                  thread || showcase || resource ? styles.detailThreadBody : styles.detailTitle,
+                  { color: colors.foreground },
+                ]}
+              >
+                {thread ? threadBody(thread) : resource ? resource.description || resource.title : item.title}
+              </Text>
+              {!thread && !resource && item.description ? (
+                <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
+                  {item.description}
+                </Text>
+              ) : null}
+            </>
+          )}
           {resource && resourcePreview && (resourcePreview.title || resourcePreview.description || resourcePreview.image) ? (
             <ResourcePreviewTile
               data={resourcePreview}
@@ -1113,25 +1222,6 @@ export function ContentDetail({
               <Text style={[styles.linkText, { color: colors.accent }]} numberOfLines={1}>{file.name}</Text>
             </Pressable>
           ))}
-
-          {event ? (
-            <View style={[styles.detailPanel, { backgroundColor: colors.surfaceRaised }]}>
-              <DetailRow icon="calendar" text={new Date(event.event_date).toLocaleString()} />
-              <DetailRow
-                icon={event.is_online ? 'video' : 'map-pin'}
-                text={event.is_online ? 'Online event' : event.location || 'Location to be announced'}
-              />
-              {event.meet_link ? (
-                <Pressable
-                  onPress={() => Linking.openURL(event.meet_link!)}
-                  style={[styles.linkButton, { backgroundColor: colors.surface }]}
-                >
-                  <Feather name="video" size={16} color={colors.accent} />
-                  <Text style={[styles.linkText, { color: colors.accent }]}>Open meeting link</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
 
           <ContentActionRow
             item={item}
@@ -1701,16 +1791,6 @@ function VideoThumb({
   );
 }
 
-function DetailRow({ icon, text }: { icon: React.ComponentProps<typeof Feather>['name']; text: string }) {
-  const colors = useColors();
-  return (
-    <View style={styles.eventMeta}>
-      <Feather name={icon} size={16} color={colors.accent} />
-      <Text style={[styles.eventMetaText, { color: colors.foregroundMuted }]}>{text}</Text>
-    </View>
-  );
-}
-
 function Action({ icon, label, active, activeColor = 'accent', compact = false, onPress, accessibilityLabel }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
@@ -1790,7 +1870,6 @@ const styles = StyleSheet.create({
     // Above the photo grid it is drawn over.
     zIndex: 1,
   },
-  cover: { width: '100%', height: 170 },
   cardBody: { padding: 20, gap: 12 },
   // The web resource card's link tile — same type scale and 144×96 image.
   previewTile: {
@@ -1888,9 +1967,6 @@ const styles = StyleSheet.create({
   // Web card body: font-display text-sm font-normal leading-snug.
   cardTitle: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   description: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
-  eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  eventMetaStack: { gap: 6 },
-  eventMetaText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 13 },
   linkButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   linkText: { flex: 1, fontFamily: 'Geist_500Medium', fontSize: 13 },
 
@@ -1999,11 +2075,9 @@ const styles = StyleSheet.create({
   headerButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   detailHeaderTitle: { flex: 1, fontFamily: 'Geist_600SemiBold', fontSize: 19 },
   detailContent: { padding: 18, gap: 16 },
-  detailCover: { width: '100%', height: 230, borderRadius: 14 },
   detailTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 25, lineHeight: 32 },
   // The detail body for a thread reads like the web detail card: same
   // text-sm / normal weight / leading-snug as the feed card.
   detailThreadBody: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   detailDescription: { fontFamily: 'Geist_400Regular', fontSize: 16, lineHeight: 25 },
-  detailPanel: { borderRadius: 14, padding: 14, gap: 12 },
 });

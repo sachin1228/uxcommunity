@@ -1,0 +1,79 @@
+/**
+ * The questions an event asks before someone joins its group chat, ported from
+ * the web app's `lib/communities/event-join-questions.ts`.
+ *
+ * These are compulsory: neither the ticket's "I'm Going" nor the web room's own
+ * join confirmation sends anything until both are answered. The host reads the
+ * recorded answers back in the room's Members tab.
+ *
+ * Pure on purpose (no React, no fetch) so the modal and the send agree on one
+ * definition of "answered".
+ */
+
+/** The questions, in the order the join form asks them. */
+export const EVENT_JOIN_QUESTIONS = [
+  {
+    /** Payload key — also the storage column's JSON field in API payloads. */
+    key: 'why_attend',
+    label: 'Why do you want to attend this meetup?',
+    placeholder: 'Tell the host why this meetup is for you…',
+    multiline: true,
+  },
+  {
+    key: 'expectations',
+    label: 'What are you expecting from this meetup?',
+    placeholder: 'What would make it worth your while?',
+    multiline: true,
+  },
+] as const;
+
+export type EventJoinQuestionKey = (typeof EVENT_JOIN_QUESTIONS)[number]['key'];
+
+/** One member's recorded answers, keyed exactly like the questions above. */
+export interface EventJoinAnswers {
+  why_attend: string;
+  expectations: string;
+}
+
+/** Bounds mirrored by the storage table's checks (see the join-questions migration). */
+export const EVENT_JOIN_ANSWER_LIMITS: Record<EventJoinQuestionKey, number> = {
+  why_attend: 2000,
+  expectations: 2000,
+};
+
+/** Trimmed answer for a key — the shape both the form and the API trade in. */
+export function trimJoinAnswer(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Which questions still need an answer. Every one of them is compulsory, so an
+ * empty-after-trim answer is always missing — and an answer longer than its
+ * bound is invalid rather than silently truncated.
+ */
+export function missingJoinAnswers(
+  answers: Partial<Record<EventJoinQuestionKey, unknown>>,
+): EventJoinQuestionKey[] {
+  return EVENT_JOIN_QUESTIONS.filter(({ key }) => {
+    const value = trimJoinAnswer(answers[key]);
+    return value.length === 0 || value.length > EVENT_JOIN_ANSWER_LIMITS[key];
+  }).map(({ key }) => key);
+}
+
+/** True when the form may be submitted — every answer present and in bounds. */
+export function joinAnswersComplete(
+  answers: Partial<Record<EventJoinQuestionKey, unknown>>,
+): answers is EventJoinAnswers {
+  return missingJoinAnswers(answers).length === 0;
+}
+
+/** The payload the join routes accept: trimmed answers, or null while incomplete. */
+export function joinAnswersPayload(
+  answers: Partial<Record<EventJoinQuestionKey, unknown>>,
+): EventJoinAnswers | null {
+  if (!joinAnswersComplete(answers)) return null;
+  return {
+    why_attend: trimJoinAnswer(answers.why_attend),
+    expectations: trimJoinAnswer(answers.expectations),
+  };
+}

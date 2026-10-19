@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -16,11 +16,8 @@ import {
   getLinkPreview, linkPreviewDomain, updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
 import {
-  deviceClockReading,
   deviceOffsetMinutes,
   deviceTimeZone,
-  timeZoneChoices,
-  timeZoneIsSupported,
   wallClockInZone,
   wallClockToIso,
   zoneOffsetMinutes,
@@ -38,7 +35,18 @@ import {
   type ThreadPoll,
   type ThreadPollDraft,
 } from '@/lib/communityPoll';
-import { TimeZonePickerSheet } from './TimeZonePickerSheet';
+import { getCities, type CityOption } from '@/lib/cities';
+import { getOwnProfile } from '@/lib/profile';
+import { CityPickerSheet } from './CityPickerSheet';
+import {
+  EventDatePickerSheet,
+  EventTimePickerSheet,
+  addDaysToStamp,
+  daysBetweenStamps,
+  formatDateStamp,
+  formatTimeValue,
+} from './EventDateTimePicker';
+import { DEFAULT_EVENT_ACCENT, EventAccentPicker } from './EventAccentPicker';
 
 interface Props {
   visible: boolean;
@@ -137,13 +145,23 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [tags, setTags] = useState('');
   const [url, setUrl] = useState('');
   const [eventDate, setEventDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  // Which clock those two fields are read on. A phone is usually right about
-  // its own zone, so that is the default; the picker exists for the two cases
-  // it isn't — a device set to the wrong zone, and a host scheduling for
-  // somewhere they aren't.
+  const [eventTime, setEventTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  // A legacy event whose end lands on a later day keeps that distance, so the
+  // single date field (the web form's own shape) doesn't shorten it on save.
+  const [endDayOffset, setEndDayOffset] = useState(0);
+  // Which clock the typed times are read on. The web form has no zone field:
+  // the phone's own zone is the reading, and it rides along with the event so
+  // the card can show the host's clock to other members.
   const [hostZone, setHostZone] = useState<string | null>(null);
-  const [zonePickerOpen, setZonePickerOpen] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [accentColor, setAccentColor] = useState(DEFAULT_EVENT_ACCENT);
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [timePicker, setTimePicker] = useState<'start' | 'end' | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [location, setLocation] = useState('');
   const [meetLink, setMeetLink] = useState('');
@@ -227,16 +245,31 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       setHostZone(zone);
       const inZone = (iso: string | null | undefined) =>
         iso && zone ? wallClockInZone(iso, zone) : null;
-      setEventDate(
-        item && 'event_date' in item
-          ? inZone(item.event_date) ?? toLocalDateTime(item.event_date)
-          : '',
+      const startWall = item && 'event_date' in item
+        ? inZone(item.event_date) ?? toLocalDateTime(item.event_date)
+        : '';
+      const endWall = item && 'end_date' in item && item.end_date
+        ? inZone(item.end_date) ?? toLocalDateTime(item.end_date)
+        : '';
+      setEventDate(startWall ? startWall.slice(0, 10) : '');
+      setEventTime(startWall ? startWall.slice(11, 16) : '');
+      setEndTime(endWall ? endWall.slice(11, 16) : '');
+      setEndDayOffset(
+        startWall && endWall
+          ? daysBetweenStamps(startWall.slice(0, 10), endWall.slice(0, 10))
+          : 0,
       );
-      setEndDate(
-        item && 'end_date' in item && item.end_date
-          ? inZone(item.end_date) ?? toLocalDateTime(item.end_date)
-          : '',
+      setCoverImageUrl(item && 'cover_image_url' in item ? item.cover_image_url : null);
+      setCoverUploading(false);
+      setAccentColor(
+        item && 'accent_color' in item && item.accent_color
+          ? item.accent_color
+          : DEFAULT_EVENT_ACCENT,
       );
+      setCityId(item && 'city_id' in item ? item.city_id ?? null : null);
+      setDatePickerOpen(false);
+      setTimePicker(null);
+      setCityPickerOpen(false);
       setIsOnline(Boolean(item && 'is_online' in item && item.is_online));
       setLocation(item && 'location' in item ? item.location ?? '' : '');
       setMeetLink(item && 'meet_link' in item ? item.meet_link ?? '' : '');
@@ -246,6 +279,60 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     }
     setError(null);
   }, [item, kind, visible, deviceZone]);
+
+  // The city list and, for a new event, the member's own city as the prefill —
+  // the same two reads the web form makes when it opens.
+  useEffect(() => {
+    if (!visible || kind !== 'events') return;
+    let cancelled = false;
+    getCities()
+      .then((list) => { if (!cancelled) setCities(list); })
+      .catch(() => { /* The picker stays empty; the rest of the form works. */ });
+    if (!item) {
+      getOwnProfile()
+        .then((profile) => {
+          if (!cancelled) setCityId((current) => current ?? profile.profile?.cities?.id ?? null);
+        })
+        .catch(() => { /* City can still be picked by hand. */ });
+    }
+    return () => { cancelled = true; };
+  }, [visible, kind, item]);
+
+  const pickCover = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') return setError('Photo library permission is required.');
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets.length) return;
+    setCoverUploading(true);
+    setError(null);
+    try {
+      const asset = result.assets[0];
+      // Animated GIFs pass through untouched — re-encoding flattens the
+      // animation into a still frame, as the web upload also avoids.
+      const isGif = (asset.mimeType ?? '').toLowerCase() === 'image/gif';
+      const prepared = isGif
+        ? {
+            uri: asset.uri,
+            name: asset.fileName ?? `event-cover-${Date.now()}.gif`,
+            mimeType: 'image/gif',
+          }
+        : await prepareImageForUpload(asset, `event-cover-${Date.now()}`);
+      const attachment = await uploadContentImage(communityId, 'events', {
+        uri: prepared.uri,
+        name: prepared.name,
+        type: prepared.mimeType,
+      });
+      setCoverImageUrl(attachment.url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not upload the cover image.');
+    } finally {
+      setCoverUploading(false);
+    }
+  };
 
   // URL → metadata card, exactly the web composer's contract: only http(s)
   // URLs preview, typing debounces 700ms, and the in-flight lookup is dropped
@@ -414,24 +501,34 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         allow_replies: allowReplies,
       };
     } else {
+      // The web form's field rules, in its own order: description, cover and
+      // the schedule are required, and a public event must name its city.
       if (!title.trim()) return setError('Title is required.');
+      if (!description.trim()) return setError('Description is required.');
+      if (!coverImageUrl) return setError('Cover image is required.');
+      if (!eventDate || !eventTime) return setError('Event date and time are required.');
       const zone = hostZone ?? deviceZone;
-      const start = toInstant(eventDate, zone);
-      const end = endDate.trim() ? toInstant(endDate, zone) : null;
-      if (!start) return setError('Use YYYY-MM-DD HH:MM for the event date.');
-      if (endDate.trim() && !end) return setError('Use YYYY-MM-DD HH:MM for the end date.');
-      // The start must not be in the past — matching the web form. An existing
-      // event whose start was left untouched stays editable, so fixing a typo
-      // in the description doesn't require inventing a new date.
-      const untouchedStart =
-        item && 'event_date' in item &&
-        Math.abs(new Date(item.event_date).getTime() - new Date(start).getTime()) < 60_000;
-      if (!untouchedStart && new Date(start).getTime() < Date.now() - 60_000) {
-        return setError("The event start can't be in the past.");
+      const start = toInstant(`${eventDate} ${eventTime}`, zone);
+      if (!start) return setError('Event start is not a valid time.');
+      // An existing event whose start already passed stays editable — a
+      // description fix must not require inventing a new date. Its date and
+      // time fields are locked, so the start cannot move under this check.
+      const storedStart = item && 'event_date' in item ? item.event_date : null;
+      const startIsPast = storedStart ? new Date(storedStart).getTime() < Date.now() : false;
+      const startMoved = !storedStart ||
+        Math.abs(new Date(storedStart).getTime() - new Date(start).getTime()) >= 60_000;
+      if (!startIsPast && startMoved && new Date(start).getTime() < Date.now() - 60_000) {
+        return setError("Start time can't be in the past. Pick a time from now onward.");
       }
-      if (end && new Date(end).getTime() <= new Date(start).getTime()) {
-        return setError('The end must be after the start.');
+      if (!endTime) return setError('End time is required.');
+      // The end rides the start's date — one date field covers both — with a
+      // legacy multi-day end keeping its offset.
+      const end = toInstant(`${addDaysToStamp(eventDate, endDayOffset)} ${endTime}`, zone);
+      if (!end) return setError('End time is not a valid time.');
+      if (new Date(end).getTime() <= new Date(start).getTime()) {
+        return setError('End time must be after the start time.');
       }
+      if (isPublic && !cityId) return setError('City is required.');
       body = {
         title: title.trim(),
         description: description.trim() || null,
@@ -440,13 +537,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         is_online: isOnline,
         location: location.trim() || null,
         meet_link: meetLink.trim() || null,
+        city_id: cityId,
         max_attendees: maxAttendees ? Number(maxAttendees) : null,
-        cover_image_url: item && 'cover_image_url' in item ? item.cover_image_url : null,
+        cover_image_url: coverImageUrl,
+        accent_color: accentColor,
         is_public: isPublic,
-        // The host's own side of the schedule, so a card can later show the
-        // time they actually set beside each member's reading of it. The offset
-        // is that zone's at the event's instant, and the fallback when another
-        // browser cannot resolve the name.
+        // The host's own side of the schedule, so a card can show the time
+        // they actually set beside each member's reading of it.
         host_timezone: zone,
         host_utc_offset_minutes: startOffsetMinutes(start, zone),
       };
@@ -474,26 +571,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const choices = OPTIONS[kind] ?? [];
   const label = contentLabel(kind);
 
-  // The zone the two time fields are read on, what it is called, and — when
-  // that isn't the phone's own zone — what the typed start lands on in the
-  // host's own clock, which is the check that catches a wrong pick.
-  const canPickZone = timeZoneIsSupported();
-  const zone = hostZone ?? deviceZone;
-  const zoneAnchor = useMemo(() => {
-    const typed = eventDate.trim().slice(0, 10);
-    const noon = new Date(`${typed}T12:00:00Z`);
-    // No day typed yet: label the list for today rather than nothing.
-    return Number.isNaN(noon.getTime()) ? new Date() : noon;
-  }, [eventDate]);
-  const zoneRows = useMemo(
-    () => timeZoneChoices(zoneAnchor, [zone, deviceZone]),
-    [zoneAnchor, zone, deviceZone],
+  // The web edit form locks the date and start of an event that has already
+  // begun; everything else stays editable.
+  const eventStartIsPast = Boolean(
+    item && 'event_date' in item && new Date(item.event_date).getTime() < Date.now(),
   );
-  const zoneSummary = zoneRows.find((row) => row.zone === zone)?.label ?? zone ?? 'Pick a timezone';
-  const zoneCity = zoneSummary.split(' · ')[0];
-  const overriding = Boolean(zone && deviceZone && zone !== deviceZone);
-  const zoneStartIso = eventDate.trim() ? toInstant(eventDate, zone) : null;
-  const zoneReading = overriding && zoneStartIso ? deviceClockReading(zoneStartIso, eventDate) : null;
+  const minEventDate = eventStartIsPast ? undefined : todayStamp();
+  const selectedCity = cities.find((city) => city.id === cityId) ?? null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
@@ -678,19 +762,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </>
           ) : null}
 
-          {kind === 'events' ? (
-            <Field label="Title">
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                style={inputStyle}
-                maxLength={120}
-                placeholder={`Give your ${label.toLowerCase()} a title`}
-                placeholderTextColor={colors.foregroundSubtle}
-              />
-            </Field>
-          ) : null}
-
           {kind === 'threads' ? (
             tab === 'poll' ? (
               pollDraft ? (
@@ -715,19 +786,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 </View>
               </Field>
             )
-          ) : kind === 'events' ? (
-            <Field label="Description">
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                style={[inputStyle, styles.multiline]}
-                multiline
-                maxLength={5000}
-                textAlignVertical="top"
-                placeholder="Add helpful details"
-                placeholderTextColor={colors.foregroundSubtle}
-              />
-            </Field>
           ) : null}
 
           {canUpload ? (
@@ -852,100 +910,354 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
           {kind === 'events' ? (
             <>
-              <Field label="Starts">
-                <TextInput value={eventDate} onChangeText={setEventDate} style={inputStyle} placeholder="2026-08-15 18:30" placeholderTextColor={colors.foregroundSubtle} />
+              {/* The web form's exact fields and order: description, cover,
+                  name, the schedule, type, place and cap, then the ticket's
+                  color, visibility and city. */}
+              <Field label="Description *">
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  style={[inputStyle, styles.multiline]}
+                  multiline
+                  maxLength={5000}
+                  textAlignVertical="top"
+                  placeholder="Tell people what to expect…"
+                  placeholderTextColor={colors.foregroundSubtle}
+                />
               </Field>
-              <Field label="Ends (optional)">
-                <TextInput value={endDate} onChangeText={setEndDate} style={inputStyle} placeholder="2026-08-15 20:00" placeholderTextColor={colors.foregroundSubtle} />
-              </Field>
-              {/* Which clock the two fields above are read on. Hidden outright
-                  where the runtime cannot resolve a zone: offering a picker
-                  the app cannot honour is how a host ends up publishing an
-                  event hours from the time they meant. */}
-              {canPickZone ? (
-                <Field label="Timezone">
+
+              <Field label="Cover image *">
+                {coverImageUrl ? (
+                  <View style={styles.coverPreviewWrap}>
+                    <Image source={{ uri: coverImageUrl }} style={styles.coverPreview} />
+                    <Pressable
+                      onPress={() => setCoverImageUrl(null)}
+                      style={styles.coverRemove}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove cover image"
+                    >
+                      <Feather name="x" size={14} color="#FFFFFF" />
+                    </Pressable>
+                  </View>
+                ) : (
                   <Pressable
-                    onPress={() => setZonePickerOpen(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Timezone, ${zoneSummary}`}
+                    onPress={pickCover}
+                    disabled={coverUploading}
                     style={[
-                      styles.input,
-                      styles.zoneTrigger,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.borderSubtle },
+                      styles.coverPick,
+                      { borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Upload a cover image"
+                  >
+                    {coverUploading ? (
+                      <ActivityIndicator color={colors.accent} />
+                    ) : (
+                      <Feather name="image" size={20} color={colors.foregroundMuted} />
+                    )}
+                    <Text style={[styles.coverPickTitle, { color: colors.foregroundMuted }]}>
+                      {coverUploading ? 'Uploading…' : 'Tap to upload a cover image'}
+                    </Text>
+                    <Text style={[styles.fieldHint, { color: colors.foregroundSubtle }]}>
+                      JPEG, PNG, WebP, GIF or AVIF · max 5 MB
+                    </Text>
+                  </Pressable>
+                )}
+              </Field>
+
+              <Field label="Event name *">
+                <View>
+                  <TextInput
+                    value={title}
+                    onChangeText={setTitle}
+                    style={[inputStyle, styles.eventName]}
+                    maxLength={120}
+                    placeholder="What's the event called?"
+                    placeholderTextColor={colors.foregroundSubtle}
+                  />
+                  <Text style={[styles.counter, { color: colors.foregroundSubtle }]}>
+                    {title.length}/120
+                  </Text>
+                </View>
+              </Field>
+
+              <Field label="Date *">
+                <Pressable
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setDatePickerOpen(true);
+                  }}
+                  disabled={eventStartIsPast}
+                  style={[
+                    styles.input,
+                    styles.pickerTrigger,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: colors.borderSubtle,
+                      opacity: eventStartIsPast ? 0.5 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={eventDate ? `Date, ${formatDateStamp(eventDate)}` : 'Select date'}
+                  accessibilityState={{ disabled: eventStartIsPast }}
+                >
+                  <Feather name="calendar" size={16} color={colors.foregroundMuted} />
+                  <Text
+                    style={[
+                      styles.pickerText,
+                      { color: eventDate ? colors.foreground : colors.foregroundSubtle },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {eventDate ? formatDateStamp(eventDate) : 'Select date'}
+                  </Text>
+                </Pressable>
+              </Field>
+
+              <View style={styles.timeRow}>
+                <View style={styles.timeHalf}>
+                  <Field label="Start time *">
+                    <Pressable
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTimePicker('start');
+                      }}
+                      disabled={eventStartIsPast}
+                      style={[
+                        styles.input,
+                        styles.pickerTrigger,
+                        {
+                          backgroundColor: colors.inputBackground,
+                          borderColor: colors.borderSubtle,
+                          opacity: eventStartIsPast ? 0.5 : 1,
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={eventTime ? `Start time, ${formatTimeValue(eventTime)}` : 'Select start time'}
+                      accessibilityState={{ disabled: eventStartIsPast }}
+                    >
+                      <Feather name="clock" size={16} color={colors.foregroundMuted} />
+                      <Text
+                        style={[
+                          styles.pickerText,
+                          { color: eventTime ? colors.foreground : colors.foregroundSubtle },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {eventTime ? formatTimeValue(eventTime) : 'Select time'}
+                      </Text>
+                    </Pressable>
+                  </Field>
+                </View>
+                <View style={styles.timeHalf}>
+                  <Field label="End time *">
+                    <Pressable
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTimePicker('end');
+                      }}
+                      style={[
+                        styles.input,
+                        styles.pickerTrigger,
+                        { backgroundColor: colors.inputBackground, borderColor: colors.borderSubtle },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={endTime ? `End time, ${formatTimeValue(endTime)}` : 'Select end time'}
+                    >
+                      <Feather name="clock" size={16} color={colors.foregroundMuted} />
+                      <Text
+                        style={[
+                          styles.pickerText,
+                          { color: endTime ? colors.foreground : colors.foregroundSubtle },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {endTime ? formatTimeValue(endTime) : 'Select time'}
+                      </Text>
+                    </Pressable>
+                  </Field>
+                </View>
+              </View>
+              {eventStartIsPast ? (
+                <Text style={[styles.fieldHint, { color: colors.foregroundMuted }]}>
+                  The start of an event that has already happened can&apos;t be changed.
+                </Text>
+              ) : null}
+
+              <Field label="Event type">
+                <View style={styles.chips}>
+                  <Pressable
+                    onPress={() => setIsOnline(true)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isOnline }}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: isOnline ? colors.accentSoft : colors.surfaceRaised },
                     ]}
                   >
+                    <Feather
+                      name="video"
+                      size={14}
+                      color={isOnline ? colors.foreground : colors.foregroundMuted}
+                    />
                     <Text
-                      style={[styles.zoneTriggerText, { color: colors.foreground }]}
-                      numberOfLines={1}
+                      style={[
+                        styles.chipText,
+                        { color: isOnline ? colors.foreground : colors.foregroundMuted },
+                      ]}
                     >
-                      {zoneSummary}
+                      Online
                     </Text>
-                    <Feather name="chevron-down" size={18} color={colors.foregroundMuted} />
                   </Pressable>
-                  <Text style={[styles.zoneHint, { color: colors.foregroundMuted }]}>
-                    {overriding
-                      ? `Times are read in ${zoneCity} time. Everyone else sees the same moment on their own clock.`
-                      : "Times are in this phone's timezone. Everyone else sees the same moment on their own clock."}
-                  </Text>
-                  {zoneReading ? (
-                    <Text style={[styles.zoneHint, { color: colors.foregroundMuted }]}>
-                      {`On your own clock that's ${zoneReading}.`}
+                  <Pressable
+                    onPress={() => setIsOnline(false)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: !isOnline }}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: !isOnline ? colors.accentSoft : colors.surfaceRaised },
+                    ]}
+                  >
+                    <Feather
+                      name="map-pin"
+                      size={14}
+                      color={!isOnline ? colors.foreground : colors.foregroundMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: !isOnline ? colors.foreground : colors.foregroundMuted },
+                      ]}
+                    >
+                      In person
                     </Text>
-                  ) : null}
-                </Field>
-              ) : null}
-              <Toggle label="Online event" value={isOnline} onValueChange={setIsOnline} colors={colors} />
-              <Field label={isOnline ? 'Meeting link' : 'Location'}>
+                  </Pressable>
+                </View>
+              </Field>
+
+              <Field label={isOnline ? 'Meeting link (optional)' : 'Location (optional)'}>
                 <TextInput
                   value={isOnline ? meetLink : location}
                   onChangeText={isOnline ? setMeetLink : setLocation}
                   style={inputStyle}
                   autoCapitalize="none"
-                  placeholder={isOnline ? 'https://meet.example.com' : 'Venue or address'}
+                  placeholder={isOnline ? 'https://meet.google.com/…' : 'Address or venue name'}
                   placeholderTextColor={colors.foregroundSubtle}
                 />
               </Field>
-              <Field label="Maximum attendees (optional)">
+
+              <Field label="Max attendees (optional)">
                 <TextInput
                   value={maxAttendees}
                   onChangeText={setMaxAttendees}
                   style={inputStyle}
                   keyboardType="number-pad"
-                  placeholder="No limit"
+                  placeholder="Leave blank for unlimited"
                   placeholderTextColor={colors.foregroundSubtle}
                 />
               </Field>
+
+              <Field label="Card color">
+                <EventAccentPicker value={accentColor} onChange={setAccentColor} />
+                <Text style={[styles.fieldHint, { color: colors.foregroundSubtle }]}>
+                  The main color of this event&apos;s ticket.
+                </Text>
+              </Field>
+
+              <Toggle
+                label="Share publicly"
+                description="This event will appear on the home feed for all members."
+                value={isPublic}
+                onValueChange={setIsPublic}
+                colors={colors}
+              />
+
+              {isPublic ? (
+                <Field label="City *">
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setCityPickerOpen(true);
+                    }}
+                    style={[
+                      styles.input,
+                      styles.pickerTrigger,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.borderSubtle },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={selectedCity ? `City, ${selectedCity.name}` : 'Select city'}
+                  >
+                    <Feather name="map-pin" size={16} color={colors.foregroundMuted} />
+                    <Text
+                      style={[
+                        styles.pickerText,
+                        { color: selectedCity ? colors.foreground : colors.foregroundSubtle },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {selectedCity?.name ?? 'Select a city…'}
+                    </Text>
+                    <Feather name="chevron-down" size={18} color={colors.foregroundMuted} />
+                  </Pressable>
+                  <Text style={[styles.fieldHint, { color: colors.foregroundSubtle }]}>
+                    Shown on this city&apos;s Events page, so people there can discover and join it.
+                  </Text>
+                </Field>
+              ) : null}
             </>
           ) : null}
 
-          <Toggle
-            label="Share publicly"
-            description={
-              kind === 'threads' || isShowcase
-                ? 'Visible to everyone, not just community members.'
-                : 'Also show this post in the public community feed.'
-            }
-            value={isPublic}
-            onValueChange={setIsPublic}
-            colors={colors}
-          />
+          {kind !== 'events' ? (
+            <Toggle
+              label="Share publicly"
+              description={
+                kind === 'threads' || isShowcase
+                  ? 'Visible to everyone, not just community members.'
+                  : 'Also show this post in the public community feed.'
+              }
+              value={isPublic}
+              onValueChange={setIsPublic}
+              colors={colors}
+            />
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* A page sheet over the composer: the list is long enough that opening
-          it inline would fight the keyboard and the form's scroll position. */}
-      {canPickZone ? (
-        <TimeZonePickerSheet
-          visible={zonePickerOpen}
-          choices={zoneRows}
-          value={zone}
-          deviceZone={deviceZone}
-          onSelect={(next) => {
-            setHostZone(next);
-            setZonePickerOpen(false);
-          }}
-          onClose={() => setZonePickerOpen(false)}
-        />
+      {kind === 'events' ? (
+        <>
+          <EventDatePickerSheet
+            visible={datePickerOpen}
+            value={eventDate}
+            min={minEventDate}
+            onSelect={(next) => {
+              setEventDate(next);
+              setDatePickerOpen(false);
+            }}
+            onClose={() => setDatePickerOpen(false)}
+          />
+          <EventTimePickerSheet
+            visible={timePicker !== null}
+            value={timePicker === 'end' ? endTime : eventTime}
+            title={timePicker === 'end' ? 'Select end time' : 'Select start time'}
+            onSelect={(next) => {
+              if (timePicker === 'end') setEndTime(next);
+              else setEventTime(next);
+              setTimePicker(null);
+            }}
+            onClose={() => setTimePicker(null)}
+          />
+          <CityPickerSheet
+            visible={cityPickerOpen}
+            cities={cities}
+            value={cityId}
+            onSelect={(next) => {
+              setCityId(next);
+              setCityPickerOpen(false);
+            }}
+            onClose={() => setCityPickerOpen(false)}
+          />
+        </>
       ) : null}
     </Modal>
   );
@@ -1290,6 +1602,12 @@ function toLocalDateTime(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Today on the phone's own calendar, as a date-picker stamp. */
+function todayStamp(now: Date = new Date()) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function parseDateTime(value: string) {
   const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
   if (!match) return null;
@@ -1451,9 +1769,36 @@ const styles = StyleSheet.create({
   },
   pollAddText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
   pollHint: { fontFamily: 'Geist_400Regular', fontSize: 11 },
-  zoneTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  zoneTriggerText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 15 },
-  zoneHint: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 },
+  pickerTrigger: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pickerText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 15 },
+  fieldHint: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 },
+  timeRow: { flexDirection: 'row', gap: 10 },
+  timeHalf: { flex: 1 },
+  eventName: { paddingRight: 56 },
+  coverPick: {
+    minHeight: 150,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 16,
+  },
+  coverPickTitle: { fontFamily: 'Geist_500Medium', fontSize: 13 },
+  coverPreviewWrap: { position: 'relative', borderRadius: 12, overflow: 'hidden' },
+  coverPreview: { width: '100%', height: 190 },
+  coverRemove: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     minHeight: 32,

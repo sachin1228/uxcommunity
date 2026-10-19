@@ -7,14 +7,17 @@ import { useColors } from '@/hooks/useColors';
 import { useCommunityContent, communityContentKey } from '@/hooks/useCommunityContent';
 import {
   CommunityContent,
+  CommunityEvent,
   CommunityThread,
   ContentKind,
   contentLabel,
   deleteCommunityContent,
 } from '@/lib/communityContent';
+import { communityStore } from '@/lib/communityStore';
 import { chatContentEventFromCreated, chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { CommunityContentEditor } from './CommunityContentEditor';
+import { EventGroupCreatedModal } from './EventGroupCreatedModal';
 import { ContentCard, ContentDetail, useContentActions } from './contentView';
 
 interface Props {
@@ -42,6 +45,9 @@ export function CommunityContentView({
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);
+  // A new event arrives with its own group chat, and the creator is in it —
+  // the notice says so before they go looking for the room.
+  const [createdChat, setCreatedChat] = useState<CommunityEvent | null>(null);
 
   const items = query.data ?? [];
   const resetActions = actions.reset;
@@ -88,6 +94,14 @@ export function CommunityContentView({
         communityId,
         event: chatContentEventFromCreated(kind, item),
       });
+      // An event comes with its own group chat, which the creator is already in.
+      // The room list has to re-read for that pin to appear, and the notice is
+      // what tells the creator the room exists at all.
+      const created = item as CommunityEvent;
+      if (kind === 'events' && created.chat_community) {
+        setCreatedChat(created);
+        communityStore.notifyCommunityChanged({ kind: 'refresh' });
+      }
     }
     setSelected((current) => current?.id === item.id ? merged : current);
   };
@@ -201,6 +215,16 @@ export function CommunityContentView({
         onClose={() => { setEditorVisible(false); setEditing(null); }}
         onSaved={replace}
       />
+
+      {createdChat ? (
+        <EventGroupCreatedModal
+          eventTitle={createdChat.title}
+          eventDate={createdChat.event_date}
+          eventEnd={createdChat.end_date ?? createdChat.event_date}
+          coverImageUrl={createdChat.cover_image_url}
+          onClose={() => setCreatedChat(null)}
+        />
+      ) : null}
 
       <ContentDetail
         item={selected}
