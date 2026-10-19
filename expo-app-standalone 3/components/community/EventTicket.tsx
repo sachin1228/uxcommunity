@@ -17,7 +17,10 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { formatEventDate } from '@/lib/eventDate';
 import { formatEventTimeRange, hostScheduleForViewer } from '@/lib/eventDisplay';
 import type { CommunityEvent } from '@/lib/communityContent';
+import type { EventJoinAnswers } from '@/lib/eventJoinQuestions';
 import { hapticToggle } from '@/lib/haptics';
+import { EventJoinQuestionsModal } from './EventJoinQuestionsModal';
+import { RsvpConfirmDialog, type RsvpConfirmMode } from './RsvpConfirmDialog';
 
 /**
  * The event ticket — a port of the web `EventCard`'s ticket body: poster,
@@ -35,6 +38,11 @@ import { hapticToggle } from '@/lib/haptics';
  * The card keeps the web's fixed dark paper and prints its own colors: the
  * ticket is deliberately the same black in both themes, and the accent color
  * the host picked is the only hue on it.
+ *
+ * The stub's button is not a bare toggle. Going and not-going each open or
+ * close the event's group chat, so a tap only asks — the dialog that answers
+ * shows the room it is about — and joining the room goes through the host's
+ * compulsory questions first.
  *
  * It also hangs. The tilt and the depth are the resting state; every so often
  * something nudges the ticket and it swings through a few decaying passes back
@@ -122,7 +130,16 @@ interface EventTicketProps {
   event: CommunityEvent;
   goingCount: number;
   rsvped: boolean;
-  onToggleRsvp: () => void;
+  /**
+   * Send the RSVP — the host's answers ride with it when the questions dialog
+   * collected them. Resolves when the server has agreed and rejects with the
+   * reason, which the open dialog shows.
+   */
+  onRsvp: (answers: EventJoinAnswers | null) => Promise<void>;
+  /** The community the event belongs to, named in the questions' intro. */
+  communityName?: string | null;
+  /** Whether the viewer hosts this event — the room outlives their RSVP. */
+  isOwner?: boolean;
   /** The surface behind the ticket, used to punch the notch cut-outs. */
   notchColor: string;
   /** Feed cards clamp the title; the event page lets it wrap in full. */
@@ -133,7 +150,9 @@ export function EventTicket({
   event,
   goingCount,
   rsvped,
-  onToggleRsvp,
+  onRsvp,
+  communityName = null,
+  isOwner = false,
   notchColor,
   variant = 'card',
 }: EventTicketProps) {
@@ -160,6 +179,30 @@ export function EventTicket({
   // it needs that seam's y and the ticket's outer width. Both land after the
   // first layout pass; the overlay simply appears one frame later.
   const [seam, setSeam] = useState<{ width: number; y: number } | null>(null);
+
+  // Going and not-going both open the event's group chat or close it, so the
+  // button asks first — the web card's rule. Joining answers the host's
+  // questions on the way, and only the dialog's own button sends. A failure
+  // leaves the dialog up with the reason, so nothing the member typed is lost.
+  const [confirm, setConfirm] = useState<RsvpConfirmMode | null>(null);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const commit = async (answers: EventJoinAnswers | null = null) => {
+    hapticToggle(!rsvped);
+    setPending(true);
+    setError(null);
+    try {
+      await onRsvp(answers);
+      setConfirm(null);
+      setQuestionsOpen(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Couldn't update your RSVP.");
+    } finally {
+      setPending(false);
+    }
+  };
 
   // The going-count tick: when an RSVP lands, the newest face tucks into the
   // strip and the number rolls up a beat behind it. `landed` is the state the
@@ -256,6 +299,7 @@ export function EventTicket({
     POSTER_GRADIENTS[(event.id.charCodeAt(0) || 0) % POSTER_GRADIENTS.length];
 
   return (
+    <>
     <Animated.View
       // The rest tilt and the swing share one pivot, just under the top edge, so
       // they add up like nested layers and the far end sweeps the widest arc.
@@ -439,8 +483,9 @@ export function EventTicket({
           {!past ? (
             <Pressable
               onPress={() => {
-                hapticToggle(!rsvped);
-                onToggleRsvp();
+                if (pending) return;
+                setError(null);
+                setConfirm(rsvped ? 'leave' : 'join');
               }}
               disabled={full}
               style={[
@@ -550,6 +595,44 @@ export function EventTicket({
         </Svg>
       ) : null}
     </Animated.View>
+
+    {confirm ? (
+      <RsvpConfirmDialog
+        mode={confirm}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => {
+          // Joining asks the host's compulsory questions before anything is
+          // sent; withdrawing needs nothing and goes straight out.
+          if (confirm === 'join') {
+            setConfirm(null);
+            setQuestionsOpen(true);
+          } else {
+            void commit();
+          }
+        }}
+        eventTitle={event.title}
+        eventDate={event.event_date}
+        eventEnd={event.end_date ?? event.event_date}
+        coverImageUrl={event.cover_image_url}
+        chatMemberCount={event.chat_member_count ?? null}
+        isOwner={isOwner}
+        pending={pending}
+        error={error}
+      />
+    ) : null}
+
+    {questionsOpen ? (
+      <EventJoinQuestionsModal
+        onClose={() => setQuestionsOpen(false)}
+        onSubmit={(answers) => void commit(answers)}
+        eventTitle={event.title}
+        communityName={communityName}
+        pending={pending}
+        error={error}
+        confirmLabel="Confirm RSVP"
+      />
+    ) : null}
+    </>
   );
 }
 

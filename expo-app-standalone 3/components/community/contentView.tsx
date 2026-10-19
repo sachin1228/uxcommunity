@@ -41,11 +41,14 @@ import {
   formatRelativeDate,
   getLinkPreview,
   linkPreviewDomain,
+  sendEventRsvp,
   setContentAction,
   threadBody,
   voteOnThreadPoll,
   type LinkPreviewData,
 } from '@/lib/communityContent';
+import { communityStore } from '@/lib/communityStore';
+import type { EventJoinAnswers } from '@/lib/eventJoinQuestions';
 import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
 import { COMMENT_MAX_LENGTH, type CommunityComment } from '@/lib/comments';
 import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
@@ -172,6 +175,18 @@ export interface ContentActionsApi {
   countFor: (item: CommunityContent, kind: ContentKind, action: ContentAction) => number;
   commentCountFor: (item: CommunityContent) => number;
   setCommentCount: (itemId: string, total: number) => void;
+  /**
+   * Write one interaction's state into the card from outside the tap path —
+   * the RSVP, whose dialog owns the request, its spinner and its error, and so
+   * drives the optimistic flip and the server's answer itself.
+   */
+  applyResult: (
+    item: CommunityContent,
+    kind: ContentKind,
+    action: ContentAction,
+    value: boolean,
+    count?: number,
+  ) => void;
   /** Drop every local override — used when the server sends fresh rows. */
   reset: () => void;
   /** Alert surfaced from a failed write, for screens that render their own toast. */
@@ -319,6 +334,22 @@ export function useContentActions(): ContentActionsApi {
   const setCommentCount = useCallback(
     (itemId: string, total: number) =>
       setCommentCounts((current) => ({ ...current, [itemId]: total })),
+    [],
+  );
+
+  const applyResult = useCallback(
+    (
+      item: CommunityContent,
+      kind: ContentKind,
+      actionName: ContentAction,
+      value: boolean,
+      count?: number,
+    ) => {
+      setOverrides((current) => ({
+        ...current,
+        [`${kind}:${item.id}:${actionName}`]: { value, count },
+      }));
+    },
     [],
   );
 
@@ -477,6 +508,7 @@ export function useContentActions(): ContentActionsApi {
     countFor,
     commentCountFor,
     setCommentCount,
+    applyResult,
     reset,
     lastError,
     clearError: useCallback(() => setLastError(null), []),
@@ -486,6 +518,53 @@ export function useContentActions(): ContentActionsApi {
     resetPoll,
     applyPollUpdate,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The RSVP the ticket's dialogs send
+// ---------------------------------------------------------------------------
+
+/**
+ * The writer behind the ticket's confirm and questions dialogs — the mobile
+ * shape of the web card's `commitRsvp`.
+ *
+ * The card flips first, the request goes out, and the server's answer replaces
+ * the guess. A failure puts the original state back and hands the reason to the
+ * dialog that asked, which stays open with it. An RSVP is also the door into the
+ * event's group chat, so the room list is told to re-read itself instead of
+ * waiting for its next fetch.
+ */
+function useEventRsvpSender(
+  event: CommunityEvent | null,
+  rsvped: boolean,
+  goingCount: number,
+  actions: ContentActionsApi,
+) {
+  const apply = useCallback(
+    (value: boolean, count?: number) => {
+      if (event) actions.applyResult(event, 'events', 'rsvp', value, count);
+    },
+    [actions, event],
+  );
+
+  return useCallback(
+    async (answers: EventJoinAnswers | null) => {
+      if (!event || !event.community_id) return;
+      const next = !rsvped;
+      apply(next, Math.max(0, goingCount + (next ? 1 : -1)));
+      try {
+        const result = await sendEventRsvp(event.community_id, event.id, answers);
+        apply(result.value, result.count);
+        if (result.chatCommunityId) {
+          communityStore.notifyCommunityChanged({ kind: 'refresh' });
+        }
+      } catch (error) {
+        apply(rsvped, goingCount);
+        throw error;
+      }
+    },
+    [apply, event, goingCount, rsvped],
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -646,6 +725,7 @@ export function ContentCard({
   const pollState = thread?.poll ? actions.pollState(item) : null;
   const eventRsvped = event ? actions.isActive(item, 'events', 'rsvp') : false;
   const eventGoingCount = event ? actions.countFor(item, 'events', 'rsvp') : 0;
+  const sendRsvp = useEventRsvpSender(event, eventRsvped, eventGoingCount, actions);
 
   // A double tap on the card likes it — Instagram's gesture. The footer heart
   // is still the explicit control; this is the shortcut, and it only ever
@@ -738,7 +818,9 @@ export function ContentCard({
               goingCount={eventGoingCount}
               rsvped={eventRsvped}
               notchColor={colors.backgroundSubtle}
-              onToggleRsvp={() => actions.action(item, 'events', 'rsvp')}
+              communityName={communityName ?? null}
+              isOwner={isOwner}
+              onRsvp={sendRsvp}
             />
           </>
         ) : (
@@ -993,6 +1075,7 @@ export function ContentDetail({
   const pollState = thread?.poll ? actions.pollState(item) : null;
   const eventRsvped = event ? actions.isActive(item, 'events', 'rsvp') : false;
   const eventGoingCount = event ? actions.countFor(item, 'events', 'rsvp') : 0;
+  const sendRsvp = useEventRsvpSender(event, eventRsvped, eventGoingCount, actions);
   // Events have no reply switch — their comment threads are always open.
   const allowReplies =
     kind === 'events'
@@ -1070,7 +1153,9 @@ export function ContentDetail({
               rsvped={eventRsvped}
               variant="detail"
               notchColor={colors.background}
-              onToggleRsvp={() => actions.action(item, 'events', 'rsvp')}
+              communityName={communityName ?? null}
+              isOwner={isOwner}
+              onRsvp={sendRsvp}
             />
           ) : (
             <>
