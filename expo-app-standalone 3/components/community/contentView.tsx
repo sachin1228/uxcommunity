@@ -33,6 +33,7 @@ import {
   CommunityThread,
   ContentAction,
   ContentKind,
+  ThreadAttachment,
   collapsedBodyLines,
   contentAuthor,
   contentLabel,
@@ -57,6 +58,7 @@ import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { formatEventDate } from '@/lib/eventDate';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
+import { VideoPlayerModal } from './VideoPlayerModal';
 
 /**
  * The detail page is a full-screen `Modal`, where iOS's own keyboard avoiding
@@ -529,10 +531,13 @@ export function ContentCard({
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const showcase = kind === 'showcase' ? item as CommunityShowcase : null;
   const author = contentAuthor(item);
-  const images = (thread?.attachments ?? showcase?.attachments ?? [])
+  const images = (thread?.attachments ?? [])
     .filter((attachment) => attachment.type.startsWith('image/'));
+  const showcaseMedia = showcase ? showcaseMediaForPost(showcase) : [];
   const previewImage = useResourcePreview(resource?.url);
-  const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
+  // Showcase media renders through the carousel only — its first attachment is
+  // already the cover, so a separate banner would show the same image twice.
+  const coverImage = event?.cover_image_url ?? (resource ? previewImage : null);
   // Every event card says when — the web card's first row — and a bad
   // timestamp costs the row rather than printing "Invalid Date".
   const eventDateLabel = event ? formatEventDate(event.event_date) : null;
@@ -655,9 +660,19 @@ export function ContentCard({
             onUndo={() => actions.undoPoll(item)}
           />
         ) : null}
-        {images.length ? (
+        {showcaseMedia.length ? (
           <MediaCarousel
-            images={images}
+            media={showcaseMedia}
+            owner={{
+              name: author?.name ?? null,
+              avatarUrl: author?.avatar_url ?? null,
+              createdAt: item.created_at,
+            }}
+            onDoubleTap={likeFromDoubleTap}
+          />
+        ) : images.length ? (
+          <MediaCarousel
+            media={images}
             owner={{
               name: author?.name ?? null,
               avatarUrl: author?.avatar_url ?? null,
@@ -874,10 +889,13 @@ export function ContentDetail({
   const event = kind === 'events' ? item as CommunityEvent : null;
   const showcase = kind === 'showcase' ? item as CommunityShowcase : null;
   const author = contentAuthor(item);
-  const images = (thread?.attachments ?? showcase?.attachments ?? [])
+  const images = (thread?.attachments ?? [])
     .filter((attachment) => attachment.type.startsWith('image/'));
+  const showcaseMedia = showcase ? showcaseMediaForPost(showcase) : [];
   const files = (thread?.attachments ?? []).filter((attachment) => !attachment.type.startsWith('image/'));
-  const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
+  // Showcase media lives in the carousel below the body; a cover copy on top
+  // would repeat the first attachment.
+  const coverImage = event?.cover_image_url ?? (resource ? previewImage : null);
   const isOwner = item.user_id === currentUserId;
   const pollState = thread?.poll ? actions.pollState(item) : null;
   // Events have no reply switch — their comment threads are always open.
@@ -975,9 +993,18 @@ export function ContentDetail({
               onUndo={() => actions.undoPoll(item)}
             />
           ) : null}
-          {images.length ? (
+          {showcaseMedia.length ? (
             <MediaCarousel
-              images={images}
+              media={showcaseMedia}
+              owner={{
+                name: author?.name ?? null,
+                avatarUrl: author?.avatar_url ?? null,
+                createdAt: item.created_at,
+              }}
+            />
+          ) : images.length ? (
+            <MediaCarousel
+              media={images}
               owner={{
                 name: author?.name ?? null,
                 avatarUrl: author?.avatar_url ?? null,
@@ -1322,21 +1349,38 @@ export function CollapsibleBody({
   );
 }
 
+/** One image or video on a card — the shape both threads and showcase share. */
+type MediaEntry = { url: string; type?: string; poster?: string; name?: string };
+
+function isVideoAttachment(media: { type?: string }): boolean {
+  return (media.type ?? '').startsWith('video/');
+}
+
+/** A showcase post's attachments, with the legacy cover standing in as one image. */
+function showcaseMediaForPost(post: CommunityShowcase): MediaEntry[] {
+  if (Array.isArray(post.attachments) && post.attachments.length) return post.attachments;
+  return post.image_url
+    ? [{ name: post.title, url: post.image_url, type: 'image/jpeg' }]
+    : [];
+}
+
 /**
- * A thread's images, at the bottom of its body.
+ * A post's media, at the bottom of its body.
  *
  * One image keeps its natural aspect ratio; several become a swipeable
- * carousel with a counter, rather than a cropped tile grid. Tapping opens the
- * app's own lightbox — the same one the community chat uses — never the
- * system browser, so images stay inside the app.
+ * carousel with a counter, rather than a cropped tile grid. Tapping an image
+ * opens the app's own lightbox — the same one the community chat uses — never
+ * the system browser, so images stay inside the app. Showcase videos show
+ * their poster (or a black tile) with a play badge, and tapping opens the
+ * in-app player.
  */
 export function MediaCarousel({
-  images,
+  media,
   owner,
   /** Double tap on a photo: like the post instead of opening the viewer. */
   onDoubleTap,
 }: {
-  images: Array<{ url: string }>;
+  media: MediaEntry[];
   /** The poster — the lightbox header's name, avatar and date, as in chat. */
   owner: { name: string | null; avatarUrl: string | null; createdAt: string };
   onDoubleTap?: () => void;
@@ -1346,15 +1390,21 @@ export function MediaCarousel({
   const [containerWidth, setContainerWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [playingVideo, setPlayingVideo] = useState<MediaEntry | null>(null);
   const stripRef = useRef<ScrollView>(null);
-  const single = images.length === 1;
-  // The web's thread media keeps every image at its natural aspect ratio,
-  // capped at 480px tall and never cropped. A carousel takes its height from
-  // the first image — the web's invisible sizing anchor — so the card adopts
-  // the same shape a single image would and the slides letterbox inside it,
-  // just as `object-contain` does there.
-  const anchorRatio = useImageAspectRatio(images[0]?.url);
-  // One page per image. Before the first layout pass the container's width is
+  const single = media.length === 1;
+  const imageMedia = media.filter((entry) => !isVideoAttachment(entry));
+  // The web's media keeps every image at its natural aspect ratio, capped at
+  // 480px tall and never cropped. A carousel takes its height from the first
+  // image — the web's invisible sizing anchor — so the card adopts the same
+  // shape a single image would and the slides letterbox inside it, just as
+  // `object-contain` does there. A video anchors on its poster, else 16:9.
+  const anchor = media.find((entry) => !isVideoAttachment(entry))
+    ?? media.find((entry) => Boolean(entry.poster));
+  const anchorRatio = useImageAspectRatio(
+    anchor ? (isVideoAttachment(anchor) ? anchor.poster : anchor.url) : undefined,
+  );
+  // One page per item. Before the first layout pass the container's width is
   // unknown, so start from the screen width less the usual card gutter.
   const pageWidth = containerWidth || Math.max(1, screenWidth - 40);
   const pageHeight = anchorRatio
@@ -1379,7 +1429,12 @@ export function MediaCarousel({
     stripRef.current?.scrollTo({ x: page * pageWidth, animated: true });
   };
 
-  const handleImagePress = (imageIndex: number) => {
+  const openViewer = (entry: MediaEntry) => {
+    const viewerIndexForEntry = imageMedia.findIndex((image) => image.url === entry.url);
+    if (viewerIndexForEntry >= 0) setViewerIndex(viewerIndexForEntry);
+  };
+
+  const handleImagePress = (entry: MediaEntry) => {
     const now = Date.now();
     if (now - lastTapAt.current <= DOUBLE_TAP_MS) {
       lastTapAt.current = 0;
@@ -1394,11 +1449,11 @@ export function MediaCarousel({
     if (openTimer.current) clearTimeout(openTimer.current);
     openTimer.current = setTimeout(() => {
       openTimer.current = null;
-      setViewerIndex(imageIndex);
+      openViewer(entry);
     }, DOUBLE_TAP_MS);
   };
 
-  const lightboxImages: LightboxImage[] = images.map((image) => ({
+  const lightboxImages: LightboxImage[] = imageMedia.map((image) => ({
     url: image.url,
     content: null,
     user_name: owner.name,
@@ -1416,11 +1471,36 @@ export function MediaCarousel({
       />
     ) : null;
 
+  const player = playingVideo ? (
+    <VideoPlayerModal
+      url={playingVideo.url}
+      title={playingVideo.name ?? owner.name}
+      onClose={() => setPlayingVideo(null)}
+    />
+  ) : null;
+
   if (single) {
+    const entry = media[0];
+    if (isVideoAttachment(entry)) {
+      return (
+        <>
+          <VideoThumb
+            entry={entry}
+            style={[
+              styles.imageSingle,
+              anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
+              { borderColor: colors.border },
+            ]}
+            onPress={() => setPlayingVideo(entry)}
+          />
+          {player}
+        </>
+      );
+    }
     return (
       <>
         <Pressable
-          onPress={() => handleImagePress(0)}
+          onPress={() => handleImagePress(entry)}
           style={[
             styles.imageSingle,
             anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
@@ -1429,7 +1509,7 @@ export function MediaCarousel({
           accessibilityRole="button"
           accessibilityLabel="Open image"
         >
-          <Image source={{ uri: images[0].url }} style={styles.threadImage} resizeMode="contain" />
+          <Image source={{ uri: entry.url }} style={styles.threadImage} resizeMode="contain" />
         </Pressable>
         {viewer}
       </>
@@ -1451,24 +1531,33 @@ export function MediaCarousel({
           setIndex(Math.round(event.nativeEvent.contentOffset.x / Math.max(1, pageWidth)));
         }}
       >
-        {images.map((image, imageIndex) => (
-          <Pressable
-            key={`${image.url}-${imageIndex}`}
-            onPress={() => handleImagePress(imageIndex)}
-            style={{ width: pageWidth, height: pageHeight }}
-            accessibilityRole="button"
-            accessibilityLabel={`Open image ${imageIndex + 1} of ${images.length}`}
-          >
-            {/* Contain, not cover: the web never crops a thread image. */}
-            <Image source={{ uri: image.url }} style={styles.threadImage} resizeMode="contain" />
-          </Pressable>
-        ))}
+        {media.map((entry, mediaIndex) =>
+          isVideoAttachment(entry) ? (
+            <VideoThumb
+              key={`${entry.url}-${mediaIndex}`}
+              entry={entry}
+              style={{ width: pageWidth, height: pageHeight }}
+              onPress={() => setPlayingVideo(entry)}
+            />
+          ) : (
+            <Pressable
+              key={`${entry.url}-${mediaIndex}`}
+              onPress={() => handleImagePress(entry)}
+              style={{ width: pageWidth, height: pageHeight }}
+              accessibilityRole="button"
+              accessibilityLabel={`Open image ${mediaIndex + 1} of ${media.length}`}
+            >
+              {/* Contain, not cover: the web never crops a thread image. */}
+              <Image source={{ uri: entry.url }} style={styles.threadImage} resizeMode="contain" />
+            </Pressable>
+          ),
+        )}
       </ScrollView>
 
       {/* Counter, top-right — the Instagram-style "1/3". */}
       <View style={styles.carouselCounter} pointerEvents="none">
         <Text style={styles.carouselCounterText}>
-          {Math.min(index + 1, images.length)}/{images.length}
+          {Math.min(index + 1, media.length)}/{media.length}
         </Text>
       </View>
 
@@ -1476,15 +1565,15 @@ export function MediaCarousel({
           bottom edge of the viewport. */}
       <View style={styles.carouselDotsRow} pointerEvents="box-none">
         <View style={styles.carouselDots}>
-          {images.map((image, dotIndex) => {
+          {media.map((entry, dotIndex) => {
             const active = dotIndex === index;
             return (
               <Pressable
-                key={`${image.url}-dot-${dotIndex}`}
+                key={`${entry.url}-dot-${dotIndex}`}
                 onPress={() => scrollToPage(dotIndex)}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel={`Go to image ${dotIndex + 1} of ${images.length}`}
+                accessibilityLabel={`Go to item ${dotIndex + 1} of ${media.length}`}
                 accessibilityState={{ selected: active }}
                 style={styles.carouselDotButton}
               >
@@ -1500,8 +1589,35 @@ export function MediaCarousel({
         </View>
       </View>
 
-      {viewer}
+      {player}
     </View>
+  );
+}
+
+/** A video's poster (or a black fallback) with a play badge. */
+function VideoThumb({
+  entry,
+  style,
+  onPress,
+}: {
+  entry: MediaEntry;
+  style: React.ComponentProps<typeof View>['style'];
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.videoThumb, style]}
+      accessibilityRole="button"
+      accessibilityLabel={entry.name ? `Play video ${entry.name}` : 'Play video'}
+    >
+      {entry.poster ? (
+        <Image source={{ uri: entry.poster }} style={styles.threadImage} resizeMode="cover" />
+      ) : null}
+      <View style={styles.videoPlayBadge}>
+        <Feather name="play" size={22} color="#FFFFFF" />
+      </View>
+    </Pressable>
   );
 }
 
@@ -1750,6 +1866,21 @@ const styles = StyleSheet.create({
   },
   imageSingleFallback: { height: 220 },
   threadImage: { width: '100%', height: '100%' },
+  videoThumb: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+  videoPlayBadge: {
+    position: 'absolute',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
 
   detailRoot: { flex: 1 },
   flex: { flex: 1 },

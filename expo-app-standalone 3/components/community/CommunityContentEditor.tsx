@@ -6,6 +6,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
+import { isVideoAsset, uploadShowcaseVideo } from '@/lib/showcaseVideo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -71,8 +72,23 @@ function optionLabel(kind: ContentKind, value: string): string {
   return SHOWCASE_CATEGORY_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
-/** Kinds whose composer offers direct image uploads. */
+/** Kinds whose composer offers direct media uploads (showcase adds videos). */
 const UPLOAD_KINDS: ContentKind[] = ['threads', 'showcase'];
+
+/**
+ * What an edited post already carries. Legacy showcase rows predate
+ * `attachments` and hold only `image_url`, so that cover is treated as one
+ * image attachment — otherwise editing one would silently drop its image on
+ * save.
+ */
+function initialAttachments(kind: ContentKind, item: CommunityContent | null | undefined): ThreadAttachment[] {
+  if (!item || !('attachments' in item)) return [];
+  if (kind !== 'showcase') return item.attachments ?? [];
+  if (item.attachments?.length) return item.attachments;
+  return 'image_url' in item && item.image_url
+    ? [{ name: item.title, url: item.image_url, type: 'image/jpeg', size: 0 }]
+    : [];
+}
 
 const DEFAULT_TYPE: Partial<Record<ContentKind, string>> = {
   threads: 'question',
@@ -111,11 +127,15 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [isPublic, setIsPublic] = useState(false);
   const [attachments, setAttachments] = useState<ThreadAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  // The video currently in flight, e.g. "clip.mp4 — 42%" — videos are large
+  // enough that a silent spinner reads as a hang.
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canUpload = UPLOAD_KINDS.includes(kind);
-  const mediaLimit = kind === 'showcase'
+  const isShowcase = kind === 'showcase';
+  const mediaLimit = isShowcase
     ? SHOWCASE_MEDIA_MAX
     : kind === 'threads'
       ? THREAD_IMAGE_MAX
@@ -129,7 +149,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     );
     setTags('tags' in (item ?? {}) ? ((item as { tags: string[] }).tags ?? []).join(', ') : '');
     setIsPublic(Boolean(item?.is_public));
-    setAttachments(item && 'attachments' in item ? item.attachments : []);
+    setAttachments(initialAttachments(kind, item));
+    setUploadStatus(null);
     setType(DEFAULT_TYPE[kind] ?? 'question');
     setTab('post');
     setPollDraft(null);
@@ -183,33 +204,48 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setError(null);
   }, [item, kind, visible, deviceZone]);
 
-  const pickImage = async () => {
-    if (attachments.length >= mediaLimit) {
-      return setError(`You can add up to ${mediaLimit} images.`);
+  const pickMedia = async () => {
+    const remaining = mediaLimit - attachments.length;
+    if (remaining <= 0) {
+      return setError(`You can add up to ${mediaLimit} ${isShowcase ? 'images or videos' : 'images'}.`);
     }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== 'granted') return setError('Photo library permission is required.');
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      // The web showcase composer accepts images and videos; threads stay images.
+      mediaTypes: isShowcase ? ['images', 'videos'] : ['images'],
       quality: 1,
       allowsEditing: false,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
     });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
+    if (result.canceled || !result.assets.length) return;
     setUploading(true);
     setError(null);
     try {
-      // Native WebP encode (quality 0.90, ≤ 2560px) — same contract as the web app.
-      const prepared = await prepareImageForUpload(asset, `${kind}-image-${Date.now()}`);
-      const attachment = await uploadContentImage(communityId, kind, {
-        uri: prepared.uri,
-        name: prepared.name,
-        type: prepared.mimeType,
-      });
-      setAttachments((current) => [...current, attachment]);
+      for (const asset of result.assets) {
+        if (isShowcase && isVideoAsset(asset)) {
+          const label = asset.fileName?.trim() || 'video';
+          setUploadStatus(`Uploading ${label} — 0%`);
+          const attachment = await uploadShowcaseVideo(communityId, asset, (percent) => {
+            setUploadStatus(`Uploading ${label} — ${percent}%`);
+          });
+          setAttachments((current) => [...current, attachment]);
+        } else {
+          // Native WebP encode (quality 0.90, ≤ 2560px) — same contract as the web app.
+          const prepared = await prepareImageForUpload(asset, `${kind}-image-${Date.now()}`);
+          const attachment = await uploadContentImage(communityId, kind, {
+            uri: prepared.uri,
+            name: prepared.name,
+            type: prepared.mimeType,
+          });
+          setAttachments((current) => [...current, attachment]);
+        }
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not upload image.');
+      setError(e instanceof Error ? e.message : 'Could not upload media.');
     } finally {
+      setUploadStatus(null);
       setUploading(false);
     }
   };
@@ -350,7 +386,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   ];
   const choices = OPTIONS[kind] ?? [];
   const label = contentLabel(kind);
-  const isShowcase = kind === 'showcase';
 
   // The zone the two time fields are read on, what it is called, and — when
   // that isn't the phone's own zone — what the typed start lands on in the
@@ -388,16 +423,22 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               style={[styles.title, { color: colors.foreground }]}
               numberOfLines={1}
             >
-              {item ? 'Edit' : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'} {isShowcase ? '' : label}
+              {item
+                ? isShowcase ? 'Edit showcase' : `Edit ${label}`
+                : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'}
             </Text>
-            {kind === 'threads' ? (
+            {kind === 'threads' || isShowcase ? (
               <Text
                 style={[styles.subtitle, { color: colors.foregroundMuted }]}
-                numberOfLines={1}
+                numberOfLines={2}
               >
-                {item
-                  ? 'Update the content, images, or privacy of this thread'
-                  : 'Share your thoughts, ask a question, or start a discussion'}
+                {isShowcase
+                  ? item
+                    ? 'Update the details of your showcase post'
+                    : 'Give the community a closer look at what you’re making'
+                  : item
+                    ? 'Update the content, images, or privacy of this thread'
+                    : 'Share your thoughts, ask a question, or start a discussion'}
               </Text>
             ) : null}
           </View>
@@ -411,7 +452,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               <ActivityIndicator color={colors.accentForeground} />
             ) : (
               <Text style={[styles.saveText, { color: colors.accentForeground }]}>
-                {isShowcase ? 'Share' : item ? 'Save' : kind === 'threads' ? 'Post' : 'Save'}
+                {item ? 'Save' : isShowcase ? 'Share' : kind === 'threads' ? 'Post' : 'Save'}
               </Text>
             )}
           </Pressable>
@@ -431,16 +472,21 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
           {isShowcase ? (
             <Field label="Title *">
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                style={[inputStyle, styles.multiline]}
-                multiline
-                maxLength={THREAD_BODY_MAX_LENGTH}
-                textAlignVertical="top"
-                placeholder="What did you make? Walk us through it…"
-                placeholderTextColor={colors.foregroundSubtle}
-              />
+              <View>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  style={[inputStyle, styles.multiline, styles.showcaseTitle]}
+                  multiline
+                  maxLength={THREAD_BODY_MAX_LENGTH}
+                  textAlignVertical="top"
+                  placeholder="What did you make? Walk us through it…"
+                  placeholderTextColor={colors.foregroundSubtle}
+                />
+                <Text style={[styles.counter, { color: colors.foregroundSubtle }]}>
+                  {title.length}/{THREAD_BODY_MAX_LENGTH}
+                </Text>
+              </View>
             </Field>
           ) : null}
 
@@ -511,13 +557,34 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {canUpload ? (
-            <Field label={`Images (up to ${mediaLimit})`}>
+            <Field
+              label={
+                isShowcase
+                  ? `Media — images & videos (up to ${mediaLimit})`
+                  : `Images (up to ${mediaLimit})`
+              }
+            >
               <View style={styles.imageList}>
-                {attachments
-                  .filter((attachment) => attachment.type.startsWith('image/'))
-                  .map((attachment) => (
+                {attachments.map((attachment) => {
+                  const isVideo = attachment.type.startsWith('video/');
+                  return (
                     <View key={attachment.url} style={styles.imagePreviewShell}>
-                      <Image source={{ uri: attachment.url }} style={styles.imagePreview} />
+                      {isVideo ? (
+                        attachment.poster ? (
+                          <Image source={{ uri: attachment.poster }} style={styles.imagePreview} />
+                        ) : (
+                          <View style={[styles.imagePreview, styles.videoTile]}>
+                            <Feather name="film" size={20} color={colors.foregroundMuted} />
+                          </View>
+                        )
+                      ) : (
+                        <Image source={{ uri: attachment.url }} style={styles.imagePreview} />
+                      )}
+                      {isVideo ? (
+                        <View style={styles.videoBadge}>
+                          <Feather name="play" size={11} color="#FFFFFF" />
+                        </View>
+                      ) : null}
                       <Pressable
                         onPress={() =>
                           setAttachments((current) =>
@@ -525,15 +592,16 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                           )
                         }
                         style={[styles.removeImage, { backgroundColor: colors.surface }]}
-                        accessibilityLabel="Remove image"
+                        accessibilityLabel={isVideo ? 'Remove video' : 'Remove image'}
                       >
                         <Feather name="x" size={16} color={colors.foreground} />
                       </Pressable>
                     </View>
-                  ))}
+                  );
+                })}
               </View>
               <Pressable
-                onPress={pickImage}
+                onPress={pickMedia}
                 disabled={uploading || attachments.length >= mediaLimit}
                 style={[styles.addImage, { backgroundColor: colors.surfaceRaised }]}
               >
@@ -542,8 +610,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 ) : (
                   <Feather name="image" size={19} color={colors.accent} />
                 )}
-                <Text style={[styles.addImageText, { color: colors.accent }]}>
-                  {uploading ? 'Uploading image…' : 'Add image'}
+                <Text style={[styles.addImageText, { color: colors.accent }]} numberOfLines={1}>
+                  {uploadStatus ??
+                    (uploading
+                      ? 'Uploading…'
+                      : isShowcase
+                        ? 'Add image or video'
+                        : 'Add image')}
                 </Text>
               </Pressable>
             </Field>
@@ -603,7 +676,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             <Toggle
               label="Allow replies"
               description={
-                kind === 'threads' ? 'Other members can reply to this thread.' : undefined
+                isShowcase
+                  ? 'Other members can comment on this showcase.'
+                  : 'Other members can reply to this thread.'
               }
               value={allowReplies}
               onValueChange={setAllowReplies}
@@ -682,7 +757,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           <Toggle
             label="Share publicly"
             description={
-              kind === 'threads'
+              kind === 'threads' || isShowcase
                 ? 'Visible to everyone, not just community members.'
                 : 'Also show this post in the public community feed.'
             }
@@ -1025,6 +1100,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 124, paddingTop: 13 },
+  showcaseTitle: { paddingBottom: 22 },
   threadBody: { paddingBottom: 22 },
   counter: {
     position: 'absolute',
@@ -1101,6 +1177,18 @@ const styles = StyleSheet.create({
   imageList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   imagePreviewShell: { width: 86, height: 86 },
   imagePreview: { width: '100%', height: '100%', borderRadius: 10 },
+  videoTile: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
+  videoBadge: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
   removeImage: {
     position: 'absolute',
     right: 4,
