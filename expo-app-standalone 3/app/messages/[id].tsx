@@ -1201,7 +1201,6 @@ export default function DmThreadScreen() {
               {
                 borderTopColor: colors.border,
                 backgroundColor: colors.background,
-                paddingBottom: emojiPanelOpen ? 0 : 6,
               },
             ]}
           >

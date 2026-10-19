@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   KeyboardEvents,
-  useReanimatedKeyboardAnimation,
+  useKeyboardHandler,
 } from 'react-native-keyboard-controller';
 import {
   Easing,
@@ -76,9 +76,9 @@ const PANEL_TRANSITION_MS = 200;
  *
  * `react-native-keyboard-controller` supplies both halves: `keyboardWillShow`
  * is emitted on the IME animation's first frame on both platforms (React
- * Native's own `Keyboard` module has no will-show event on Android), and
- * `progress` is a shared value driven on the UI thread for the duration of the
- * animation.
+ * Native's own `Keyboard` module has no will-show event on Android), and the
+ * progress below is a shared value fed by the same per-frame handler the
+ * chat's `KeyboardAvoidingView` uses for its own height.
  *
  * @param open    whether the panel is currently open
  * @param setOpen closes (or opens) it
@@ -87,11 +87,63 @@ export function useEmojiKeyboardSwap(
   open: boolean,
   setOpen: (open: boolean) => void,
 ) {
-  const { progress } = useReanimatedKeyboardAnimation();
+  /**
+   * The IME's progress, 0..1, frame by frame.
+   *
+   * Deliberately read through `useKeyboardHandler` rather than the provider's
+   * `useReanimatedKeyboardAnimation`: the chat's avoidance animates its height
+   * from this exact channel, so mirroring it here guarantees the two add up to
+   * one keyboard's worth of space on every single frame. The provider's copy
+   * comes from a different native path and can trail the avoidance while the
+   * IME snaps open on Android — enough for the composer to hop and come back.
+   */
+  const progress = useSharedValue(0);
+  /**
+   * The IME's full height (dp), captured from the same per-frame handler that
+   * drives the chat's avoidance. Sizing the panel from here rather than from
+   * the JS `keyboardWillShow` event keeps it on the same value, and the same
+   * thread, as the height the avoidance reserves — the two cannot disagree
+   * about how much space the keyboard takes.
+   */
+  const imeHeight = useSharedValue(lastMeasuredImeHeight || DEFAULT_PANEL_HEIGHT);
+
+  /** The IME's height as of the last show, for the picker's static content. */
   const [keyboardHeight, setKeyboardHeight] = useState(lastMeasuredImeHeight);
-  /** Whether the panel should render at all — it outlives `open` while it
-   *  hands its space over to (or takes it back from) the IME. */
-  const [panelMounted, setPanelMounted] = useState(open);
+
+  /** Remember the IME's height for this screen and the next one. */
+  const rememberImeHeight = (height: number) => {
+    lastMeasuredImeHeight = height;
+    setKeyboardHeight(height);
+  };
+
+  useKeyboardHandler(
+    {
+      onStart: (e) => {
+        'worklet';
+
+        if (e.height > 0) {
+          imeHeight.value = e.height;
+          runOnJS(rememberImeHeight)(e.height);
+        }
+      },
+      onMove: (e) => {
+        'worklet';
+
+        progress.value = e.progress;
+      },
+      onInteractive: (e) => {
+        'worklet';
+
+        progress.value = e.progress;
+      },
+      onEnd: (e) => {
+        'worklet';
+
+        progress.value = e.progress;
+      },
+    },
+    [],
+  );
 
   /** 1 while the panel's height mirrors the IME, 0 while it animates alone. */
   const tracking = useSharedValue(0);
@@ -130,29 +182,44 @@ export function useEmojiKeyboardSwap(
       }
     };
 
-    const onWillShow = (event: { height: number }) => {
+    const onWillShow = () => {
       keyboardVisibleRef.current = true;
-      lastMeasuredImeHeight = event.height;
-      setKeyboardHeight(event.height);
       clearTimer();
-      // From this frame the panel mirrors the IME. At progress 0 the mirrored
-      // fraction is a full height, which is where the panel already is, so the
-      // take-over is seamless in either direction.
+
+      if (!openRef.current) {
+        // A plain keyboard open — the panel is shut, so it must not claim any
+        // space. Its mirrored height is (1 - progress) of the full panel,
+        // which at progress 0 is the *whole panel*: mirroring here used to
+        // shove the composer straight to its final position on the IME's
+        // first frame, leaving it to wait there while the keyboard slid up
+        // underneath. With the panel flat, the chat's keyboard avoidance
+        // alone moves the composer, in step with the IME.
+        tracking.value = 0;
+        ownFraction.value = 0;
+        return;
+      }
+
+      // Tapping the field while emoji are open asks for the keyboard, so the
+      // panel hands its space to the IME. It is already at full height, then
+      // shrinks exactly as fast as the IME grows: the composer between them
+      // never moves.
       tracking.value = 1;
       ownFraction.value = 0;
-      // Mount the panel now, at zero height, rather than when the emoji button
-      // is tapped. Mounting it later raced the IME's own inset release by a
-      // frame, and that frame is a visible dip in the composer.
-      setPanelMounted(true);
-      // Tapping the field is asking for the keyboard, so the panel steps aside.
-      if (openRef.current) setOpenRef.current(false);
+      setOpenRef.current(false);
     };
 
     const onHide = () => {
       keyboardVisibleRef.current = false;
-      // The IME has gone and the panel is closed: its space is zero by now, so
-      // there is nothing left to render.
-      if (!openRef.current) setPanelMounted(false);
+      if (openRef.current) {
+        // The panel is open and the IME is leaving: the panel mirrors it, so
+        // its space grows back as the IME gives it up.
+        return;
+      }
+      // The IME is leaving and the panel is shut. It owns no space, and must
+      // not start mirroring the hide (that would cancel the chat's own
+      // keyboard avoidance and leave the composer floating).
+      tracking.value = 0;
+      ownFraction.value = 0;
     };
 
     const showSub = KeyboardEvents.addListener('keyboardWillShow', onWillShow);
@@ -169,7 +236,6 @@ export function useEmojiKeyboardSwap(
 
   useEffect(() => {
     if (open) {
-      setPanelMounted(true);
       if (keyboardVisibleRef.current) {
         // Opening over a keyboard that is on its way down: the panel grows
         // into exactly the space the IME gives back, frame for frame.
@@ -188,7 +254,7 @@ export function useEmojiKeyboardSwap(
 
     // Closing. If the IME is rising it takes the space over (the will-show
     // listener above), so there is nothing to animate here.
-    if (keyboardVisibleRef.current || !panelMounted) return;
+    if (keyboardVisibleRef.current) return;
 
     if (tracking.value === 1) {
       // Hand the tracked height to the panel's own animation at the value it
@@ -196,37 +262,53 @@ export function useEmojiKeyboardSwap(
       ownFraction.value = 1 - progress.value;
       tracking.value = 0;
     }
-    ownFraction.value = withTiming(
-      0,
-      { duration: PANEL_TRANSITION_MS, easing: Easing.out(Easing.cubic) },
-      (finished) => {
-        'worklet';
-        if (finished) runOnJS(setPanelMounted)(false);
-      },
-    );
-  }, [open, panelMounted, ownFraction, progress, tracking]);
+    ownFraction.value = withTiming(0, {
+      duration: PANEL_TRANSITION_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [open, ownFraction, progress, tracking]);
 
   /** The space the panel occupies, animated — exactly the IME's complement. */
-  const panelStyle = useAnimatedStyle(
-    () => ({
-      height:
-        Math.max(0, tracking.value === 1 ? 1 - progress.value : ownFraction.value) *
-        panelHeight,
-    }),
-    [panelHeight, ownFraction, progress, tracking],
-  );
+  const panelStyle = useAnimatedStyle(() => {
+    const fraction = Math.max(
+      0,
+      tracking.value === 1 ? 1 - progress.value : ownFraction.value,
+    );
+    const imeSpace = Math.max(imeHeight.value - insets.bottom, MIN_PANEL_HEIGHT);
+
+    return { height: fraction * imeSpace };
+  }, [imeHeight, insets.bottom, ownFraction, progress, tracking]);
+
+  /**
+   * Call immediately before opening the panel (and, if one is up, dismissing
+   * the IME). The panel is already in the layout at zero height; flipping it
+   * to mirror the IME *before* the dismissal begins means both halves move on
+   * the same frame. Waiting for the open effect would let the chat's keyboard
+   * avoidance expand on its own for a frame while the panel was still flat.
+   */
+  const preparePanelOpen = () => {
+    if (!keyboardVisibleRef.current) return;
+    tracking.value = 1;
+    ownFraction.value = 0;
+  };
 
   /**
    * The user asked for the keyboard (touched the field, or tapped the keyboard
    * glyph) while the panel is open. The panel is *not* collapsed here — it
-   * waits for the IME's own announcement a few milliseconds later and then
-   * mirrors it. This only arms the fallback for a tap that never raises the
-   * keyboard.
+   * starts mirroring the IME from this moment, which at progress 0 is the full
+   * panel already on screen, so nothing moves yet; every frame of the IME's
+   * rise then takes its space back. Waiting for the IME's own announcement
+   * would let the keyboard grow for a frame or two while the panel still held
+   * its full height — a hop the user sees.
+   *
+   * This also arms the fallback for a tap that never raises the keyboard.
    *
    * Callers still focus the field themselves.
    */
   const startHandoff = () => {
     if (!openRef.current) return;
+    tracking.value = 1;
+    ownFraction.value = 0;
     if (timerRef.current !== null) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
@@ -239,8 +321,8 @@ export function useEmojiKeyboardSwap(
     panelHeight,
     /** Animated height of the space the panel occupies; pass to the picker. */
     panelStyle,
-    /** Whether the picker should render (it outlives `open` during a swap). */
-    panelMounted,
+    /** Arm the IME mirror just before opening the panel over a keyboard. */
+    preparePanelOpen,
     startHandoff,
   };
 }

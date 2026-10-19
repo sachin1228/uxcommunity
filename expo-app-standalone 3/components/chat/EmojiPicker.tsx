@@ -79,8 +79,8 @@ interface Props {
   /** The animated space around the panel (see `useEmojiKeyboardSwap`). */
   animatedStyle?: AnimatedStyle<ViewStyle>;
   /**
-   * Whether to render the emoji grid. The panel's space is mounted as soon as
-   * a keyboard appears (at zero height) so opening it can never race the IME,
+   * Whether to render the emoji grid. The panel's space stays mounted (at zero
+   * height while shut) so opening it can never race the IME's own animation,
    * and the grid follows `open` — off while the panel is shut, so typing does
    * not pay for a couple of hundred emoji cells that nobody can see.
    */

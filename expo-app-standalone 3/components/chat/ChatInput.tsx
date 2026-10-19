@@ -146,6 +146,7 @@ export function ChatInput({
       emojiSwap.startHandoff();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
+      emojiSwap.preparePanelOpen();
       setPickerOpen(true);
       Keyboard.dismiss();
     }
@@ -392,16 +393,15 @@ export function ChatInput({
         </View>
       </View>
 
-      {/* Mounted past `pickerOpen` on purpose: while it trades places with the
-          keyboard the panel is still on screen, holding a shrinking space. */}
-      {emojiSwap.panelMounted && (
-        <EmojiPicker
-          onSelect={insertEmoji}
-          height={emojiSwap.panelHeight}
-          animatedStyle={emojiSwap.panelStyle}
-          showContent={pickerOpen}
-        />
-      )}
+      {/* Always mounted (at zero height while shut): the panel's space has to
+          exist before the IME starts moving, so opening it — or trading places
+          with the keyboard — can never race the keyboard's own animation. */}
+      <EmojiPicker
+        onSelect={insertEmoji}
+        height={emojiSwap.panelHeight}
+        animatedStyle={emojiSwap.panelStyle}
+        showContent={pickerOpen}
+      />
     </View>
   );
 }

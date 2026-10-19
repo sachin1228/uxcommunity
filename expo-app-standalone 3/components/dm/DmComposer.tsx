@@ -100,6 +100,7 @@ export function DmComposer({
       emojiSwap.startHandoff();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
+      emojiSwap.preparePanelOpen();
       onEmojiPanelOpenChange(true);
       Keyboard.dismiss();
     }
@@ -285,16 +286,15 @@ export function DmComposer({
         </Pressable>
       </View>
 
-      {/* Mounted past `emojiPanelOpen` on purpose: while it trades places with
-          the keyboard the panel is still on screen, holding a shrinking space. */}
-      {emojiSwap.panelMounted && (
-        <EmojiPicker
-          onSelect={insertEmoji}
-          height={emojiSwap.panelHeight}
-          animatedStyle={emojiSwap.panelStyle}
-          showContent={emojiPanelOpen}
-        />
-      )}
+      {/* Always mounted (at zero height while shut): the panel's space has to
+          exist before the IME starts moving, so opening it — or trading places
+          with the keyboard — can never race the keyboard's own animation. */}
+      <EmojiPicker
+        onSelect={insertEmoji}
+        height={emojiSwap.panelHeight}
+        animatedStyle={emojiSwap.panelStyle}
+        showContent={emojiPanelOpen}
+      />
     </View>
   );
 }
