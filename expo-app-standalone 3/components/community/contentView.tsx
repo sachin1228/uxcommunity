@@ -1046,6 +1046,14 @@ export function ContentDetail({
     }
   }, [visible, item?.id]);
 
+  // The RSVP sender is a hook, so it has to run before the early return below.
+  // Returning a spinner while the row loads and then calling it once the row
+  // arrives would change the hook order between renders (React error #310).
+  const event = kind === 'events' && item ? (item as CommunityEvent) : null;
+  const eventRsvped = event ? actions.isActive(event, 'events', 'rsvp') : false;
+  const eventGoingCount = event ? actions.countFor(event, 'events', 'rsvp') : 0;
+  const sendRsvp = useEventRsvpSender(event, eventRsvped, eventGoingCount, actions);
+
   // A chat card can open the page before its tab's list has loaded, so the
   // sheet has to answer the tap itself rather than staying invisible until the
   // row arrives.
@@ -1061,7 +1069,6 @@ export function ContentDetail({
   }
 
   const thread = kind === 'threads' ? item as CommunityThread : null;
-  const event = kind === 'events' ? item as CommunityEvent : null;
   const showcase = kind === 'showcase' ? item as CommunityShowcase : null;
   const author = contentAuthor(item);
   const images = (thread?.attachments ?? [])
@@ -1073,9 +1080,6 @@ export function ContentDetail({
   // Events draw their poster inside the ticket that takes the body's place.
   const isOwner = item.user_id === currentUserId;
   const pollState = thread?.poll ? actions.pollState(item) : null;
-  const eventRsvped = event ? actions.isActive(item, 'events', 'rsvp') : false;
-  const eventGoingCount = event ? actions.countFor(item, 'events', 'rsvp') : 0;
-  const sendRsvp = useEventRsvpSender(event, eventRsvped, eventGoingCount, actions);
   // Events have no reply switch — their comment threads are always open.
   const allowReplies =
     kind === 'events'
@@ -1145,18 +1149,25 @@ export function ContentDetail({
           </View>
 
           {event ? (
-            // The web event page renders the same ticket the feed does; the
-            // title and schedule live inside it, not above it.
-            <EventTicket
-              event={event}
-              goingCount={eventGoingCount}
-              rsvped={eventRsvped}
-              variant="detail"
-              notchColor={colors.background}
-              communityName={communityName ?? null}
-              isOwner={isOwner}
-              onRsvp={sendRsvp}
-            />
+            <>
+              {/* The web event page leads with the description, then the
+                  ticket — the title and schedule live inside it. */}
+              {event.description?.trim() ? (
+                <Text style={[styles.detailThreadBody, { color: colors.foreground }]}>
+                  {event.description}
+                </Text>
+              ) : null}
+              <EventTicket
+                event={event}
+                goingCount={eventGoingCount}
+                rsvped={eventRsvped}
+                variant="detail"
+                notchColor={colors.background}
+                communityName={communityName ?? null}
+                isOwner={isOwner}
+                onRsvp={sendRsvp}
+              />
+            </>
           ) : (
             <>
               {/* Threads carry the whole post in the body and showcase titles
@@ -1964,9 +1975,9 @@ const styles = StyleSheet.create({
   },
   confirmActionText: { fontFamily: 'Geist_600SemiBold', fontSize: 15 },
 
-  // Web card body: font-display text-sm font-normal leading-snug.
-  cardTitle: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
-  description: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
+  // Card body/description: 15px, 20px leading, medium — same on every kind.
+  cardTitle: { fontFamily: 'Geist_500Medium', fontSize: 15, lineHeight: 20 },
+  description: { fontFamily: 'Geist_500Medium', fontSize: 15, lineHeight: 20 },
   linkButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   linkText: { flex: 1, fontFamily: 'Geist_500Medium', fontSize: 13 },
 
@@ -2076,8 +2087,8 @@ const styles = StyleSheet.create({
   detailHeaderTitle: { flex: 1, fontFamily: 'Geist_600SemiBold', fontSize: 19 },
   detailContent: { padding: 18, gap: 16 },
   detailTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 25, lineHeight: 32 },
-  // The detail body for a thread reads like the web detail card: same
-  // text-sm / normal weight / leading-snug as the feed card.
-  detailThreadBody: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
-  detailDescription: { fontFamily: 'Geist_400Regular', fontSize: 16, lineHeight: 25 },
+  // The detail body mirrors the feed card: one type scale for every content
+  // kind, so a post does not change size when it opens.
+  detailThreadBody: { fontFamily: 'Geist_500Medium', fontSize: 15, lineHeight: 20 },
+  detailDescription: { fontFamily: 'Geist_500Medium', fontSize: 15, lineHeight: 20 },
 });
