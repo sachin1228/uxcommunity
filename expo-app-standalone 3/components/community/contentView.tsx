@@ -968,12 +968,12 @@ export function ContentDetail({
             </View>
           </View>
 
-          {/* Threads carry the whole post in the body, exactly like the web
-              card, so the detail uses the same compact type instead of the
-              large title the other kinds still use. */}
+          {/* Threads carry the whole post in the body and showcase titles are
+              card text on the web too, so both keep the compact type here
+              instead of the large title the other kinds still use. */}
           <Text
             style={[
-              thread ? styles.detailThreadBody : styles.detailTitle,
+              thread || showcase ? styles.detailThreadBody : styles.detailTitle,
               { color: colors.foreground },
             ]}
           >
