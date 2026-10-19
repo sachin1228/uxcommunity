@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
   FlatList,
@@ -69,7 +70,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useCommunityChatImeLayout } from '@/hooks/useCommunityChatImeLayout';
+import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
@@ -119,10 +120,11 @@ export default function CommunityChat() {
   }>();
   const colors = useColors();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
-  const imeLayout = useCommunityChatImeLayout(activeTab === 'chat');
+  const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused);
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -1713,6 +1715,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 5,
+    overflow: 'visible',
   },
   imeSpacer: { flexShrink: 0 },
   jumpBtn: {

@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -18,10 +17,7 @@ import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import type { PendingImage } from '@/components/chat/ChatInput';
-import {
-  COMPOSER_BOTTOM_INSET,
-  useEmojiKeyboardSwap,
-} from '@/hooks/useEmojiKeyboardSwap';
+import { CHAT_COMPOSER_BOTTOM_INSET, type ChatImeLayout } from '@/hooks/useChatImeLayout';
 
 /**
  * The DM composer — the community ChatInput without the community-only pieces
@@ -45,8 +41,8 @@ interface Props {
   onTypingChange: (text: string) => void;
   disabled?: boolean;
   error?: string | null;
-  emojiPanelOpen: boolean;
-  onEmojiPanelOpenChange: (open: boolean) => void;
+  leadingAccessory?: React.ReactNode;
+  imeLayout: ChatImeLayout;
 }
 
 export function DmComposer({
@@ -56,18 +52,18 @@ export function DmComposer({
   onTypingChange,
   disabled,
   error,
-  emojiPanelOpen,
-  onEmojiPanelOpenChange,
+  leadingAccessory,
+  imeLayout,
 }: Props) {
   const colors = useColors();
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const focusRequestIdRef = useRef(0);
   /** Caret/selection as last reported by the field — emoji insert here. */
   const selectionRef = useRef({ start: 0, end: 0 });
 
-  // The panel yields to the keyboard in one motion (see the hook).
-  const emojiSwap = useEmojiKeyboardSwap(emojiPanelOpen, onEmojiPanelOpenChange);
+  const emojiPanelOpen = imeLayout.panelOpen;
 
   const overLimit = text.length > MAX_MESSAGE_CHARS;
   const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
@@ -83,9 +79,22 @@ export function DmComposer({
     onSend(text.trim(), pendingImage ?? undefined);
     setText('');
     setPendingImage(null);
-    onEmojiPanelOpenChange(false);
+    imeLayout.closePanel();
     onTypingChange('');
     selectionRef.current = { start: 0, end: 0 };
+  }
+
+  function requestKeyboard() {
+    const requestId = ++focusRequestIdRef.current;
+    const restoreFocus = () => {
+      if (focusRequestIdRef.current === requestId) inputRef.current?.focus();
+    };
+    imeLayout.requestKeyboard(restoreFocus);
+  }
+
+  function openEmojiPanel() {
+    focusRequestIdRef.current += 1;
+    imeLayout.openEmojiPanel();
   }
 
   /**
@@ -94,14 +103,12 @@ export function DmComposer({
    * glyph that brings it back.
    */
   function togglePicker() {
-    if (emojiPanelOpen) {
+    if (imeLayout.panelOpenRef.current) {
       // Ask for the keyboard first; the panel goes when the IME reports in, so
       // the two trade places in one motion rather than in two steps.
-      emojiSwap.startHandoff();
-      requestAnimationFrame(() => inputRef.current?.focus());
+      requestKeyboard();
     } else {
-      onEmojiPanelOpenChange(true);
-      Keyboard.dismiss();
+      openEmojiPanel();
     }
   }
 
@@ -141,9 +148,11 @@ export function DmComposer({
   // the keyboard — the same pixel either way.
   return (
     <View style={styles.root}>
-      {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
+      <View style={styles.stack} onLayout={imeLayout.onComposerStackLayout}>
+        {leadingAccessory}
+        {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
-      <View style={styles.composerRow}>
+        <View style={styles.composerRow}>
         <View style={[styles.box, { backgroundColor: colors.surfaceRaised }]}>
           {replyTo && (
             <View
@@ -215,13 +224,13 @@ export function DmComposer({
               placeholderTextColor={colors.mutedForeground}
               value={text}
               onChangeText={(value) => {
-                if (emojiPanelOpen) onEmojiPanelOpenChange(false);
+                if (imeLayout.panelOpenRef.current) requestKeyboard();
                 handleChangeText(value);
               }}
               // The panel dismisses the IME rather than suppressing it, so a
               // tap always focuses the field and raises the keyboard in the
               // same gesture.
-              onPressIn={emojiSwap.startHandoff}
+              onPressIn={() => requestKeyboard()}
               onSelectionChange={(e) => {
                 selectionRef.current = e.nativeEvent.selection;
               }}
@@ -283,24 +292,27 @@ export function DmComposer({
             <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={20} />
           )}
         </Pressable>
+        </View>
       </View>
 
-      {/* Mounted past `emojiPanelOpen` on purpose: while it trades places with
-          the keyboard the panel is still on screen, holding a shrinking space. */}
-      {emojiSwap.panelMounted && (
-        <EmojiPicker
-          onSelect={insertEmoji}
-          height={emojiSwap.panelHeight}
-          animatedStyle={emojiSwap.panelStyle}
-          showContent={emojiPanelOpen}
-        />
-      )}
+      <EmojiPicker
+        onSelect={insertEmoji}
+        height={imeLayout.panelHeight}
+        animatedStyle={imeLayout.panelStyle}
+        showContent
+        interactive={imeLayout.panelInteractive}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { paddingTop: 6 },
+  root: { paddingHorizontal: 12, paddingTop: 2, position: 'relative', overflow: 'visible' },
+  stack: {
+    gap: 6,
+    // Keep the input a constant distance from either the keyboard or panel.
+    marginBottom: CHAT_COMPOSER_BOTTOM_INSET,
+  },
   errorText: {
     fontFamily: 'Geist_400Regular',
     fontSize: 12.5,
@@ -311,9 +323,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-    paddingHorizontal: 12,
-    // Between the pill and the panel (or the keyboard when the panel is shut).
-    marginBottom: COMPOSER_BOTTOM_INSET,
   },
   box: {
     flex: 1,

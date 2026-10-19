@@ -22,11 +22,9 @@ import { useColors } from '@/hooks/useColors';
  * sending, or scrolling the chat), and tapping an emoji inserts it at the
  * caret while keeping the panel open for several picks in a row.
  *
- * The panel itself is always this tall; what moves is the `animatedStyle`
- * space around it, which the composer animates in step with the IME (see
- * `useEmojiKeyboardSwap`). Growing that space clips the block from the bottom
- * up, so the panel rises out of the edge the way the keyboard does — and the
- * composer above it keeps still while the two trade places.
+ * The panel itself is always this tall. Its animated wrapper is absolutely
+ * positioned immediately below the fixed-height composer, so growing the
+ * panel never changes the dock's measured height or moves the composer.
  */
 
 const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
@@ -76,7 +74,7 @@ interface Props {
   /** The panel's full height — the height the IME takes on this screen, so the
    *  two are the same size when they trade places. */
   height?: number;
-  /** The animated space around the panel (see `useEmojiKeyboardSwap`). */
+  /** The animated space around the panel (see `useChatImeLayout`). */
   animatedStyle?: AnimatedStyle<ViewStyle>;
   /**
    * Whether to render the emoji grid. The panel's space is mounted as soon as
@@ -101,7 +99,7 @@ export function EmojiPicker({
   return (
     <Animated.View
       pointerEvents={interactive ? 'auto' : 'none'}
-      style={[styles.clip, animatedStyle]}
+      style={[styles.clip, styles.belowComposer, animatedStyle]}
     >
       {/* The space below the chat already stops at the safe area — the screen
           renders a spacer under it — so the panel needs no bottom padding of
@@ -149,10 +147,10 @@ export function EmojiPicker({
 
 const styles = StyleSheet.create({
   /** The animated space the panel occupies — it starts at zero height while the
-   *  keyboard still owns the strip, hence the clipping. The space is exactly the
-   *  panel's height, and the composer's own bottom padding above it supplies the
-   *  gap, so a shut panel adds nothing under the composer. */
+   *  keyboard still owns the strip. Its parent reserves the same vertical extent
+   *  for the composer, and the wrapper grows down to the keyboard's top edge. */
   clip: { overflow: 'hidden' },
+  belowComposer: { position: 'absolute', left: 0, right: 0, top: '100%' },
   /** No top border: the panel is a continuation of the chat, not a sheet over
    *  it — a hairline here would draw the one line the keyboard does not have. */
   panel: { height: 320 },

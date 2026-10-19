@@ -14,8 +14,7 @@ import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
-import { COMPOSER_BOTTOM_INSET } from '@/hooks/useEmojiKeyboardSwap';
-import type { CommunityChatImeLayout } from '@/hooks/useCommunityChatImeLayout';
+import { CHAT_COMPOSER_BOTTOM_INSET, type ChatImeLayout } from '@/hooks/useChatImeLayout';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from './EmojiPicker';
@@ -50,7 +49,7 @@ interface Props {
   /** Populated by the parent so a send failure shows inside the composer, as on web. */
   error?: string | null;
   /** Shared bottom-dock layout owner created by the community screen. */
-  imeLayout: CommunityChatImeLayout;
+  imeLayout: ChatImeLayout;
 }
 
 export function ChatInput({
@@ -68,6 +67,7 @@ export function ChatInput({
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const focusRequestIdRef = useRef(0);
   /** Caret/selection as last reported by the field — emoji insert here. */
   const selectionRef = useRef({ start: 0, end: 0 });
 
@@ -78,10 +78,6 @@ export function ChatInput({
   }, [replyTo]);
 
   const pickerOpen = imeLayout.panelOpen;
-  const setPickerOpen = (open: boolean) => {
-    if (open) imeLayout.openEmojiPanel();
-    else imeLayout.closePanel();
-  };
 
   const {
     mentionOpen,
@@ -118,10 +114,25 @@ export function ChatInput({
     onSend(trimmed, pendingImage ?? undefined, resolveMentions(trimmed));
     setText('');
     setPendingImage(null);
-    setPickerOpen(false);
+    imeLayout.closePanel();
     onTypingChange('');
     resetMentions();
     selectionRef.current = { start: 0, end: 0 };
+  }
+
+  function requestKeyboard() {
+    const requestId = ++focusRequestIdRef.current;
+    const restoreFocus = () => {
+      if (focusRequestIdRef.current === requestId) inputRef.current?.focus();
+    };
+    imeLayout.requestKeyboard(restoreFocus);
+  }
+
+  function openEmojiPanel() {
+    // Invalidate any focus scheduled by a keyboard tap earlier in this
+    // transition. Otherwise that stale RAF can reopen the IME after this panel.
+    focusRequestIdRef.current += 1;
+    imeLayout.openEmojiPanel();
   }
 
   /**
@@ -131,11 +142,10 @@ export function ChatInput({
    * back and puts the panel away.
    */
   function togglePicker() {
-    if (pickerOpen) {
-      imeLayout.requestKeyboard();
-      requestAnimationFrame(() => inputRef.current?.focus());
+    if (imeLayout.panelOpenRef.current) {
+      requestKeyboard();
     } else {
-      imeLayout.openEmojiPanel();
+      openEmojiPanel();
     }
   }
 
@@ -195,7 +205,7 @@ export function ChatInput({
           it stays mounted at zero height while the keyboard is up, and a 6pt
           gap around a zero-height panel would show up as extra dead space
           under the composer. Its gap travels inside its animated space
-          instead (see useCommunityChatImeLayout). */}
+          instead (see useChatImeLayout). */}
       <View style={styles.stack} onLayout={imeLayout.onComposerStackLayout}>
         {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
@@ -306,13 +316,13 @@ export function ChatInput({
                 onChangeText={(v) => {
                   // Typing means the user wants the keyboard back — close the
                   // emoji panel so keyboard and panel never fight for space.
-                  if (pickerOpen) setPickerOpen(false);
+                  if (imeLayout.panelOpenRef.current) requestKeyboard();
                   handleChangeText(v);
                 }}
                 // The panel dismisses the IME rather than suppressing it, so the
                 // field stays plain: a tap focuses it and the keyboard comes up
                 // in the same gesture, replacing the panel.
-                onPressIn={imeLayout.requestKeyboard}
+                onPressIn={() => requestKeyboard()}
                 onSelectionChange={(e) => {
                   selectionRef.current = e.nativeEvent.selection;
                   onComposerActivity(text, e.nativeEvent.selection.end);
@@ -397,6 +407,8 @@ const styles = StyleSheet.create({
   root: {
     paddingHorizontal: 12,
     paddingTop: 2,
+    position: 'relative',
+    overflow: 'visible',
   },
 
 /** Everything above the panel: reply/error/mention/composer rows. */
@@ -406,7 +418,7 @@ const styles = StyleSheet.create({
     // (the panel, or nothing when the panel is shut), never below the panel —
     // that keeps the pill the same distance from the panel as from the
     // keyboard and puts the panel's top edge exactly on the keyboard's.
-    marginBottom: COMPOSER_BOTTOM_INSET,
+    marginBottom: CHAT_COMPOSER_BOTTOM_INSET,
   },
 
   box: {
