@@ -125,7 +125,9 @@ export default function EmailSettingsScreen() {
                     <Switch
                       value={prefs[row.key]}
                       onValueChange={(value) => void save(row.key, value)}
-                      trackColor={{ true: colors.primary, false: colors.border }}
+                      trackColor={{ true: colors.chatOwnBubble, false: colors.border }}
+                      thumbColor={prefs[row.key] ? '#FFFFFF' : colors.foregroundSubtle}
+                      ios_backgroundColor={colors.border}
                     />
                   </View>
                 </View>

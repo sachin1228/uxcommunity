@@ -748,7 +748,9 @@ function Toggle({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.accent }}
+        trackColor={{ false: colors.border, true: colors.chatOwnBubble }}
+        thumbColor={value ? '#FFFFFF' : colors.foregroundSubtle}
+        ios_backgroundColor={colors.border}
       />
     </View>
   );
