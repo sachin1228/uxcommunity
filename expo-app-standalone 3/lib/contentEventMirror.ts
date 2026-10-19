@@ -16,6 +16,7 @@
  */
 
 import type { ChatContentEvent, ChatContentKind } from './chatContentEvents';
+import { patchCachedBootstrapContentEvents } from './communityBootstrap';
 
 export type ContentEventChange =
   | { kind: 'insert'; communityId: string; event: ChatContentEvent }
@@ -27,6 +28,15 @@ const listeners = new Set<Listener>();
 
 /** Announce a local create/delete to the timeline. */
 export function notifyContentEvent(change: ContentEventChange): void {
+  // The chat screen is often unmounted when this fires (the content was
+  // created from another tab), so keep the cached chat snapshot in step too —
+  // otherwise switching to Chat inside the bootstrap window misses the card.
+  patchCachedBootstrapContentEvents(
+    change.communityId,
+    change.kind === 'insert'
+      ? { kind: 'insert', event: change.event }
+      : { kind: 'delete', id: change.id },
+  );
   for (const listener of listeners) listener(change);
 }
 
