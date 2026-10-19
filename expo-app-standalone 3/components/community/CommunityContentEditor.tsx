@@ -53,7 +53,8 @@ interface Props {
 const OPTIONS: Record<string, readonly string[]> = {
   // The web composer and the API both accept only these four.
   threads: THREAD_CATEGORY_OPTIONS.map((option) => option.value),
-  resources: ['article', 'figma', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
+  // Same order as the web `RESOURCE_TYPES`.
+  resources: ['figma', 'article', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
   showcase: SHOWCASE_CATEGORY_OPTIONS.map((option) => option.value),
 };
 
@@ -63,6 +64,21 @@ const THREAD_CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Feather>
   discussion: 'message-circle',
   idea: 'zap',
   feedback: 'thumbs-up',
+};
+
+/** The web `RESOURCE_TYPE_ICONS`, on Feather's glyphs. */
+const RESOURCE_TYPE_ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
+  figma: 'pen-tool',
+  article: 'file-text',
+  tool: 'tool',
+  video: 'play',
+  book: 'book-open',
+  font: 'type',
+  icon_pack: 'layers',
+  color: 'droplet',
+  template: 'layout',
+  inspiration: 'star',
+  other: 'package',
 };
 
 /** The display label for one chip, whichever kind is composing. */
@@ -92,7 +108,6 @@ function initialAttachments(kind: ContentKind, item: CommunityContent | null | u
 
 const DEFAULT_TYPE: Partial<Record<ContentKind, string>> = {
   threads: 'question',
-  resources: 'article',
   showcase: 'product_design',
 };
 
@@ -171,7 +186,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     if (!visible) return;
     setTitle(item?.title ?? '');
     setDescription(
-      kind === 'threads' && item ? threadToBody(item.title, item.description) : item?.description ?? '',
+      kind === 'threads' && item
+        ? threadToBody(item.title, item.description)
+        : kind === 'resources' && item
+          // The web resource form owns one description — legacy mobile rows
+          // that only carry a title still open with their text.
+          ? item.description || item.title
+          : item?.description ?? '',
     );
     setTags('tags' in (item ?? {}) ? ((item as { tags: string[] }).tags ?? []).join(', ') : '');
     setIsPublic(Boolean(item?.is_public));
@@ -180,7 +201,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setPreview(null);
     setPreviewLoading(false);
     setPreviewDismissed(false);
-    setType(DEFAULT_TYPE[kind] ?? 'question');
+    setType(DEFAULT_TYPE[kind] ?? null);
     setTab('post');
     setPollDraft(null);
 
@@ -200,7 +221,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         setPollDraft(pollDraftFromPoll(poll));
       }
     } else if (kind === 'resources') {
-      setType(item && 'resource_type' in item ? item.resource_type : 'article');
+      // No default: the web form requires the author to pick a type.
+      setType(item && 'resource_type' in item ? item.resource_type : null);
       setUrl(item && 'url' in item ? item.url : '');
       setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
     } else if (kind === 'showcase') {
@@ -372,16 +394,19 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         poll,
       };
     } else if (kind === 'resources') {
-      if (!title.trim()) return setError('Title is required.');
+      // Same contract as the web form: one description, the title derived
+      // from it, and an explicitly chosen type.
+      const trimmedDescription = description.trim();
+      if (!trimmedDescription) return setError('Description is required.');
+      if (!type) return setError('Pick a resource type.');
       if (!/^https?:\/\//i.test(url.trim())) {
         return setError('Enter a URL beginning with http:// or https://.');
       }
       body = {
-        title: title.trim(),
-        description: description.trim() || null,
+        title: trimmedDescription.slice(0, 120),
+        description: trimmedDescription,
         resource_type: type,
         url: url.trim(),
-        tags: cleanTags,
         is_public: isPublic,
         allow_replies: allowReplies,
       };
@@ -496,9 +521,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             >
               {item
                 ? isShowcase ? 'Edit showcase' : `Edit ${label}`
-                : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'}
+                : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share a Resource' : 'Create'}
             </Text>
-            {kind === 'threads' || isShowcase ? (
+            {kind === 'threads' || isShowcase || kind === 'resources' ? (
               <Text
                 style={[styles.subtitle, { color: colors.foregroundMuted }]}
                 numberOfLines={2}
@@ -507,9 +532,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                   ? item
                     ? 'Update the details of your showcase post'
                     : 'Give the community a closer look at what you’re making'
-                  : item
-                    ? 'Update the content, images, or privacy of this thread'
-                    : 'Share your thoughts, ask a question, or start a discussion'}
+                  : kind === 'resources'
+                    ? item
+                      ? 'Update the details of your resource.'
+                      : 'Share something useful with your community.'
+                    : item
+                      ? 'Update the content, images, or privacy of this thread'
+                      : 'Share your thoughts, ask a question, or start a discussion'}
               </Text>
             ) : null}
           </View>
@@ -563,13 +592,62 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 
           {kind === 'resources' ? (
             <>
+              {/* The web resource form's exact fields and order: description,
+                  type, URL, then the preview card the URL resolves to. */}
+              <Field label="Description *">
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  style={[inputStyle, styles.multiline]}
+                  multiline
+                  maxLength={2000}
+                  textAlignVertical="top"
+                  placeholder="What makes this resource worth sharing?"
+                  placeholderTextColor={colors.foregroundSubtle}
+                />
+              </Field>
+
+              <Field label="Type *">
+                <View style={styles.chips}>
+                  {choices.map((choice) => {
+                    const active = type === choice;
+                    return (
+                      <Pressable
+                        key={choice}
+                        onPress={() => setType(choice)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        style={[
+                          styles.chip,
+                          { backgroundColor: active ? colors.accentSoft : colors.surfaceRaised },
+                        ]}
+                      >
+                        <Feather
+                          name={RESOURCE_TYPE_ICONS[choice] ?? 'package'}
+                          size={11}
+                          color={active ? colors.foreground : colors.foregroundMuted}
+                        />
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: active ? colors.foreground : colors.foregroundMuted },
+                          ]}
+                        >
+                          {optionLabel(kind, choice)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </Field>
+
               <Field label="URL *">
                 <View>
                   <TextInput
                     value={url}
                     onChangeText={setUrl}
                     style={[inputStyle, styles.urlInput]}
-                    placeholder="https://"
+                    placeholder="https://..."
                     placeholderTextColor={colors.foregroundSubtle}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -609,7 +687,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </>
           ) : null}
 
-          {kind !== 'threads' && !isShowcase ? (
+          {kind === 'events' ? (
             <Field label="Title">
               <TextInput
                 value={title}
@@ -646,14 +724,14 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 </View>
               </Field>
             )
-          ) : !isShowcase ? (
+          ) : kind === 'events' ? (
             <Field label="Description">
               <TextInput
                 value={description}
                 onChangeText={setDescription}
                 style={[inputStyle, styles.multiline]}
                 multiline
-                maxLength={kind === 'resources' ? 2000 : 5000}
+                maxLength={5000}
                 textAlignVertical="top"
                 placeholder="Add helpful details"
                 placeholderTextColor={colors.foregroundSubtle}
@@ -727,8 +805,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </Field>
           ) : null}
 
-          {choices.length ? (
-            <Field label={isShowcase || kind === 'threads' ? 'Category *' : 'Type'}>
+          {choices.length && kind !== 'resources' ? (
+            <Field label="Category *">
               <View style={styles.chips}>
                 {choices.map((choice) => {
                   const active = type === choice;
@@ -762,18 +840,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                   );
                 })}
               </View>
-            </Field>
-          ) : null}
-
-          {kind !== 'events' && kind !== 'threads' && !isShowcase ? (
-            <Field label="Tags (up to 3, comma separated)">
-              <TextInput
-                value={tags}
-                onChangeText={setTags}
-                style={inputStyle}
-                placeholder="design, research"
-                placeholderTextColor={colors.foregroundSubtle}
-              />
             </Field>
           ) : null}
 
