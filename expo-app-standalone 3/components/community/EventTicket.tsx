@@ -440,8 +440,6 @@ export function EventTicket({
             </Text>
           </View>
 
-          <View style={styles.stubDivider} />
-
           {!past ? (
             <Pressable
               onPress={() => {
@@ -472,9 +470,9 @@ export function EventTicket({
                 {rsvped ? 'Going' : full ? 'Event Full' : "I'm Going"}
               </Text>
               {rsvped ? (
-                <Feather name="check" size={14} color={accent} />
+                <Feather name="check" size={16} color={accent} />
               ) : full ? null : (
-                <Feather name="arrow-right" size={14} color={onAccentInk} />
+                <Feather name="arrow-right" size={16} color={onAccentInk} />
               )}
             </Pressable>
           ) : (
@@ -672,22 +670,22 @@ const styles = StyleSheet.create({
     color: STONE_300,
     marginTop: 4,
   },
-  stubDivider: { width: '80%', height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
   rsvpButton: {
     width: '100%',
-    minHeight: 36,
+    minHeight: 44,
     borderRadius: 999,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
   },
   rsvpFull: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   rsvpText: {
     fontFamily: 'Geist_700Bold',
-    fontSize: 11,
-    letterSpacing: 1.6,
+    fontSize: 13,
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
   ended: { fontFamily: 'Geist_500Medium', fontSize: 12, color: STONE_500 },
