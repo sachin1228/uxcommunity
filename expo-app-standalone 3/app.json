@@ -52,7 +52,8 @@
           "savePhotosPermission": "Allow uxcommunity to save chat images to your gallery.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "notification": {
       "color": "#0062D1"

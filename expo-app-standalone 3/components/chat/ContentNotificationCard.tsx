@@ -12,7 +12,6 @@ import { fmtTime, userNameColor } from '@/lib/chat';
 import { hapticImpact } from '@/lib/haptics';
 import {
   CHAT_CONTENT_KIND_THEME,
-  firstLine,
   fmtEventSchedule,
   prettyUrl,
   splitBody,
@@ -157,16 +156,16 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
       ? RESOURCE_TILE_ICON[meta.resource_type] ?? KIND_ICON.resource
       : KIND_ICON[event.kind];
 
-  // Subtitle line under the title — kind-dependent. Thread and showcase
-  // bodies store their whole text in `title`, so split headline vs body.
+  // Subtitle line under the title — kind-dependent. Thread bodies store their
+  // whole text in `title`, so split headline vs body. A showcase card shows
+  // only the work's title (clamped to two lines) — the header already names
+  // the kind, and a split body would read as a second, competing line.
   let title = event.title;
   let subtitle: string | null = null;
-  if (event.kind === 'thread' || event.kind === 'showcase') {
+  if (event.kind === 'thread') {
     const split = splitBody(event.title);
     title = split.title;
-    subtitle =
-      split.subtitle ??
-      (event.kind === 'showcase' && meta?.description ? firstLine(meta.description, 80) : null);
+    subtitle = split.subtitle;
   } else if (event.kind === 'event') {
     subtitle = meta?.event_date ? fmtEventSchedule(meta.event_date) : null;
   } else if (event.kind === 'resource') {
@@ -299,11 +298,12 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 )}
               </View>
 
-              {/* Text column — a thread card skips the kind eyebrow: the header
-                  already says "created a thread". Other kinds keep theirs (a
-                  resource's type is more specific than the header's noun). */}
+              {/* Text column — thread and showcase cards skip the kind
+                  eyebrow: the header already says "created a thread/showcase".
+                  Other kinds keep theirs (a resource's type is more specific
+                  than the header's noun). */}
               <View style={styles.textCol}>
-                {event.kind !== 'thread' && (
+                {event.kind !== 'thread' && event.kind !== 'showcase' && (
                   <View style={styles.eyebrowRow}>
                     <ContentIcon name={KIND_ICON[event.kind]} size={12} color={isOwn ? ownText : theme.accent} />
                     <Text style={[styles.eyebrow, { color: isOwn ? ownText : theme.accent }]}>
