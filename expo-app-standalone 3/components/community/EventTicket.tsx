@@ -705,9 +705,9 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: 16, paddingVertical: 16 },
   title: {
-    fontFamily: 'Geist_700Bold',
-    fontSize: 16,
-    lineHeight: 22,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 15,
+    lineHeight: 20,
     color: STONE_50,
   },
 
