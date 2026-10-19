@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -15,10 +14,8 @@ import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
-import {
-  COMPOSER_BOTTOM_INSET,
-  useEmojiKeyboardSwap,
-} from '@/hooks/useEmojiKeyboardSwap';
+import { COMPOSER_BOTTOM_INSET } from '@/hooks/useEmojiKeyboardSwap';
+import type { CommunityChatImeLayout } from '@/hooks/useCommunityChatImeLayout';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
 import { EmojiPicker } from './EmojiPicker';
@@ -52,12 +49,8 @@ interface Props {
   disabled?: boolean;
   /** Populated by the parent so a send failure shows inside the composer, as on web. */
   error?: string | null;
-  /** Whether the inline emoji panel below the composer is open. Controlled by
-   *  the parent screen so it can also close the panel (tab switch, scroll). */
-  emojiPanelOpen?: boolean;
-  /** Reports panel open/close so the parent can render the panel below the
-   *  footer and close it from outside (scrolling, tab change). */
-  onEmojiPanelOpenChange?: (open: boolean) => void;
+  /** Shared bottom-dock layout owner created by the community screen. */
+  imeLayout: CommunityChatImeLayout;
 }
 
 export function ChatInput({
@@ -69,8 +62,7 @@ export function ChatInput({
   onTypingChange,
   disabled,
   error,
-  emojiPanelOpen = false,
-  onEmojiPanelOpenChange,
+  imeLayout,
 }: Props) {
   const colors = useColors();
   const [text, setText] = useState('');
@@ -85,12 +77,11 @@ export function ChatInput({
     if (replyTo) inputRef.current?.focus();
   }, [replyTo]);
 
-  // The emoji panel is owned by the parent screen (it renders the panel below
-  // the footer and closes it on scroll/tab change); this is just a shorthand.
-  const pickerOpen = emojiPanelOpen;
-  const setPickerOpen = (open: boolean) => onEmojiPanelOpenChange?.(open);
-  // The panel yields to the keyboard in one motion (see the hook).
-  const emojiSwap = useEmojiKeyboardSwap(pickerOpen, setPickerOpen);
+  const pickerOpen = imeLayout.panelOpen;
+  const setPickerOpen = (open: boolean) => {
+    if (open) imeLayout.openEmojiPanel();
+    else imeLayout.closePanel();
+  };
 
   const {
     mentionOpen,
@@ -141,13 +132,10 @@ export function ChatInput({
    */
   function togglePicker() {
     if (pickerOpen) {
-      // Ask for the keyboard first; the panel goes when the IME reports in, so
-      // the two trade places in one motion rather than in two steps.
-      emojiSwap.startHandoff();
+      imeLayout.requestKeyboard();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
-      setPickerOpen(true);
-      Keyboard.dismiss();
+      imeLayout.openEmojiPanel();
     }
   }
 
@@ -207,8 +195,8 @@ export function ChatInput({
           it stays mounted at zero height while the keyboard is up, and a 6pt
           gap around a zero-height panel would show up as extra dead space
           under the composer. Its gap travels inside its animated space
-          instead (see useEmojiKeyboardSwap). */}
-      <View style={styles.stack}>
+          instead (see useCommunityChatImeLayout). */}
+      <View style={styles.stack} onLayout={imeLayout.onComposerStackLayout}>
         {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
         {/* ── @-mention picker — floats above the composer while typing ── */}
@@ -324,7 +312,7 @@ export function ChatInput({
                 // The panel dismisses the IME rather than suppressing it, so the
                 // field stays plain: a tap focuses it and the keyboard comes up
                 // in the same gesture, replacing the panel.
-                onPressIn={emojiSwap.startHandoff}
+                onPressIn={imeLayout.requestKeyboard}
                 onSelectionChange={(e) => {
                   selectionRef.current = e.nativeEvent.selection;
                   onComposerActivity(text, e.nativeEvent.selection.end);
@@ -392,16 +380,15 @@ export function ChatInput({
         </View>
       </View>
 
-      {/* Mounted past `pickerOpen` on purpose: while it trades places with the
-          keyboard the panel is still on screen, holding a shrinking space. */}
-      {emojiSwap.panelMounted && (
-        <EmojiPicker
-          onSelect={insertEmoji}
-          height={emojiSwap.panelHeight}
-          animatedStyle={emojiSwap.panelStyle}
-          showContent={pickerOpen}
-        />
-      )}
+      {/* Keep one clipped panel mounted so the same dock can hand its space to
+          the system IME without mounting or removing children mid-swap. */}
+      <EmojiPicker
+        onSelect={insertEmoji}
+        height={imeLayout.panelHeight}
+        animatedStyle={imeLayout.panelStyle}
+        showContent
+        interactive={imeLayout.panelInteractive}
+      />
     </View>
   );
 }
