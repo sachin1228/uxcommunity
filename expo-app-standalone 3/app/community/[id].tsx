@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView as RNKeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { KeyboardAvoidingView as KeyboardControllerAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useChatContentEvents } from '@/hooks/useChatContentEvents';
@@ -69,7 +71,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useCommunityChatImeLayout } from '@/hooks/useCommunityChatImeLayout';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
@@ -121,8 +122,11 @@ export default function CommunityChat() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const [headerHeight, setHeaderHeight] = useState(0);
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
-  const imeLayout = useCommunityChatImeLayout(activeTab === 'chat');
+  /** Inline emoji panel below the composer (WhatsApp-style) — closed when
+   *  the chat scrolls, a tab changes, or the screen loses the composer. */
+  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -872,9 +876,9 @@ export default function CommunityChat() {
    * browse that tab, so the active tab stays where it is.
    */
   const handleContentOpen = useCallback((event: ChatContentEvent) => {
-    imeLayout.closePanel();
+    setEmojiPanelOpen(false);
     setChatDetail({ kind: tabForChatContentKind(event.kind), id: event.id });
-  }, [imeLayout.closePanel]);
+  }, []);
 
   /**
    * Card reactions — the same desired-state flow as message reactions: the
@@ -1090,11 +1094,11 @@ export default function CommunityChat() {
           // A cached window is already the right thing to look at: show it at
           // once and let the bootstrap anchor it when the network settles (the
           // inverted list starts at offset 0 = the newest row).
-          style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
+          style={{ opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }}
           contentContainerStyle={[styles.messagesList, { paddingTop: 8 }]}
           // Reading old messages means the user is done picking emoji —
           // close the inline panel so it doesn't eat half the screen.
-          onScrollBeginDrag={imeLayout.closePanel}
+          onScrollBeginDrag={() => setEmojiPanelOpen(false)}
           onScroll={handleScroll}
           scrollEventThrottle={32}
           // Web parity: the DOM list has no "keep the old anchor" behavior — a
@@ -1165,6 +1169,38 @@ export default function CommunityChat() {
         />
       )}
 
+      {/* The footer grows/shrinks (reply banner, typing indicator, emoji
+          panel) and the list above it resizes with it; an inverted list keeps
+          offset 0 parked at the bottom edge through any such resize. */}
+      <View style={styles.footer}>
+        {/* Scroll-to-bottom button — floats just above the footer edge */}
+        {!atBottom && !isLoading && (
+          <Pressable
+            onPress={() => scrollToLatest(true)}
+            accessibilityLabel="Scroll to latest message"
+            hitSlop={6}
+            style={[
+              styles.jumpBtn,
+              { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
+
+        <TypingIndicator users={typingUsers} />
+
+        <ChatInput
+          communityId={id}
+          currentUserId={user?.id ?? ''}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+          onSend={handleSend}
+          onTypingChange={onInputChange}
+          emojiPanelOpen={emojiPanelOpen}
+          onEmojiPanelOpenChange={setEmojiPanelOpen}
+        />
+      </View>
     </View>
   );
 
@@ -1172,8 +1208,9 @@ export default function CommunityChat() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
-      {/* The header stays outside the chat's keyboard-managed viewport. */}
+      {/* Header measured for iOS keyboard offset. Android uses keyboard-controller height resize. */}
       <View
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
         style={[
           styles.header,
           {
@@ -1332,7 +1369,7 @@ export default function CommunityChat() {
               <Pressable
                 key={tab.key}
                 onPress={() => {
-                  imeLayout.closePanel();
+                  setEmojiPanelOpen(false);
                   setActiveTab(tab.key);
                 }}
                 style={[
@@ -1364,48 +1401,19 @@ export default function CommunityChat() {
 
       {activeTab === 'chat' ? (
         <>
-          <View style={styles.flex}>
-            <View style={styles.flex}>
+          {Platform.OS === 'android' ? (
+            <KeyboardControllerAvoidingView style={styles.flex} behavior="height">
               {chatContent}
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.imeSpacer, imeLayout.listSpacerStyle]}
-              />
-            </View>
-
-            <Animated.View
-              pointerEvents="box-none"
-              style={[styles.chatDock, imeLayout.dockStyle]}
+            </KeyboardControllerAvoidingView>
+          ) : (
+            <RNKeyboardAvoidingView
+              style={styles.flex}
+              behavior="padding"
+              keyboardVerticalOffset={headerHeight}
             >
-              {!atBottom && !isLoading && (
-                <Pressable
-                  onPress={() => scrollToLatest(true)}
-                  accessibilityLabel="Scroll to latest message"
-                  hitSlop={6}
-                  style={[
-                    styles.jumpBtn,
-                    { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
-                  ]}
-                >
-                  <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
-                </Pressable>
-              )}
-
-              <View onLayout={imeLayout.onTypingIndicatorLayout}>
-                <TypingIndicator users={typingUsers} />
-              </View>
-
-              <ChatInput
-                communityId={id}
-                currentUserId={user?.id ?? ''}
-                replyTo={replyTo}
-                onCancelReply={() => setReplyTo(null)}
-                onSend={handleSend}
-                onTypingChange={onInputChange}
-                imeLayout={imeLayout}
-              />
-            </Animated.View>
-          </View>
+              {chatContent}
+            </RNKeyboardAvoidingView>
+          )}
           <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
         </>
       ) : (
@@ -1707,14 +1715,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   emptySubtext: { fontSize: 12 },
-  chatDock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 5,
-  },
-  imeSpacer: { flexShrink: 0 },
+  footer: { position: 'relative' },
   jumpBtn: {
     position: 'absolute',
     right: 16,
