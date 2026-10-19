@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -1091,7 +1090,7 @@ const styles = StyleSheet.create({
   replyCancel: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   composerField: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 8,
     // 40px tall and a true pill: the radius is past half the height, so the
     // ends are round without the field turning into a capsule as it grows.
@@ -1108,7 +1107,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontFamily: 'Geist_400Regular',
-    paddingTop: Platform.OS === 'ios' ? 6 : 4,
+    // Symmetric padding puts the 20px line on the pill's centre line; Android
+    // otherwise adds font padding that leaves the caret sitting high.
+    paddingVertical: 6,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   composerSend: {
     width: 32,
