@@ -75,10 +75,12 @@ const SWING: Array<[number, number]> = [
 /** How still the ticket sits between two swings. */
 const SWING_REST_MS = 5000;
 /** The glint takes this long across the paper, then waits out the cycle. */
-const SHINE_MS = 1000;
-const SHINE_REST_MS = 19000;
-/** The lit band's width in dp — a glint, not a wash over the paper. */
-const SHINE_BAND = 12;
+const SHINE_MS = 420;
+const SHINE_REST_MS = 19580;
+/** The lit band's width as a share of the ticket — a blade, not a wash. */
+const SHINE_BAND_FRAC = 0.3;
+/** How far the band leans: the light axis runs 10deg past horizontal. */
+const SHINE_TILT = '10deg';
 const STONE_50 = '#fafaf9';
 const STONE_200 = '#e7e5e4';
 const STONE_300 = '#d6d3d1';
@@ -297,6 +299,10 @@ export function EventTicket({
 
   const gradient =
     POSTER_GRADIENTS[(event.id.charCodeAt(0) || 0) % POSTER_GRADIENTS.length];
+
+  // The band is sized off the ticket it crosses, so the glint reads the same on
+  // a feed card and on the full-width detail page.
+  const shineBand = Math.round((seam?.width ?? 0) * SHINE_BAND_FRAC);
 
   return (
     <>
@@ -522,21 +528,25 @@ export function EventTicket({
         </LinearGradient>
 
         {seam && seam.width > 0 ? (
-          // The shine: a narrow glint crossing the paper, then parked off the
-          // ticket's left edge for the rest of the cycle.
+          // The shine: a leaning blade of light that crosses in a blink, then
+          // parks off the ticket's left edge for the rest of the cycle.
           <Animated.View
             pointerEvents="none"
             style={[
               styles.shine,
               {
-                width: SHINE_BAND,
+                width: shineBand,
                 transform: [
                   {
+                    // The tilt costs some run-off: the blade's top and bottom
+                    // are a fifth of the ticket apart, so it has to start and
+                    // finish clear of the paper by more than its own width.
                     translateX: shine.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-SHINE_BAND, seam.width],
+                      outputRange: [-seam.width * 0.55, seam.width * 1.25],
                     }),
                   },
+                  { rotate: SHINE_TILT },
                 ],
               },
             ]}
@@ -545,11 +555,11 @@ export function EventTicket({
               colors={[
                 'rgba(255,255,255,0)',
                 'rgba(255,255,255,0.05)',
-                'rgba(255,255,255,0.16)',
+                'rgba(255,255,255,0.13)',
                 'rgba(255,255,255,0.05)',
                 'rgba(255,255,255,0)',
               ]}
-              locations={[0, 0.3, 0.5, 0.7, 1]}
+              locations={[0, 0.36, 0.5, 0.64, 1]}
               start={{ x: 0, y: 0.5 }}
               end={{ x: 1, y: 0.5 }}
               style={StyleSheet.absoluteFill}
