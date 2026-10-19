@@ -13,7 +13,7 @@ import {
   CommunityContent, ContentKind, LinkPreviewData, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS,
   SHOWCASE_MEDIA_MAX, THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS,
   THREAD_IMAGE_MAX, ThreadAttachment, contentLabel, createCommunityContent,
-  getLinkPreview, updateCommunityContent, uploadContentImage,
+  getLinkPreview, linkPreviewDomain, updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
 import {
   deviceClockReading,
@@ -118,15 +118,6 @@ function isValidHttpUrl(value: string): boolean {
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
-  }
-}
-
-/** The host a preview card credits, without the "www." noise. */
-function previewDomain(value: string): string {
-  try {
-    return new URL(value).hostname.replace(/^www\./, '');
-  } catch {
-    return value;
   }
 }
 
@@ -1019,7 +1010,7 @@ function ResourceLinkPreview({
   onDismiss: () => void;
 }) {
   const [faviconFailed, setFaviconFailed] = useState(false);
-  const domain = previewDomain(data.url);
+  const domain = linkPreviewDomain(data.url);
 
   return (
     <View

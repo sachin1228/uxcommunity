@@ -445,6 +445,15 @@ export interface LinkPreviewData {
   siteName: string | null;
 }
 
+/** The host a preview card credits, without the "www." noise. */
+export function linkPreviewDomain(value: string): string {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '');
+  } catch {
+    return value;
+  }
+}
+
 /** Link metadata for a URL — the web `LinkPreviewData` shape. */
 export async function getLinkPreview(
   url: string,
@@ -461,11 +470,6 @@ export async function getLinkPreview(
     image: data.image ?? null,
     siteName: data.siteName ?? null,
   };
-}
-
-export async function getLinkPreviewImage(url: string): Promise<string | null> {
-  const preview = await getLinkPreview(url);
-  return preview?.image ?? null;
 }
 
 /**
