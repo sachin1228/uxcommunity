@@ -91,6 +91,8 @@ export interface CommunityResource extends BaseContent {
   resource_type: 'figma' | 'article' | 'tool' | 'video' | 'book' | 'font' | 'icon_pack' | 'color' | 'template' | 'inspiration' | 'other';
   url: string;
   tags: string[];
+  /** Older read payloads omit it; the web treats a missing flag as true. */
+  allow_replies?: boolean;
   save_count: number;
   comment_count: number;
   bookmark_count: number;
@@ -433,11 +435,41 @@ export async function voteOnThreadPoll(
   };
 }
 
-export async function getLinkPreviewImage(url: string): Promise<string | null> {
-  const { data } = await apiFetch<{ image?: string | null }>(
+export interface LinkPreviewData {
+  url: string;
+  title: string | null;
+  description: string | null;
+  /** Absolute URL to the OG / twitter image, if any. */
+  image: string | null;
+  /** og:site_name or derived from hostname. */
+  siteName: string | null;
+}
+
+/** The host a preview card credits, without the "www." noise. */
+export function linkPreviewDomain(value: string): string {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '');
+  } catch {
+    return value;
+  }
+}
+
+/** Link metadata for a URL — the web `LinkPreviewData` shape. */
+export async function getLinkPreview(
+  url: string,
+  signal?: AbortSignal,
+): Promise<LinkPreviewData | null> {
+  const { data } = await apiFetch<Partial<LinkPreviewData>>(
     `/api/link-preview?url=${encodeURIComponent(url)}`,
+    signal ? { signal } : {},
   );
-  return data.image ?? null;
+  return {
+    url: data.url ?? url,
+    title: data.title ?? null,
+    description: data.description ?? null,
+    image: data.image ?? null,
+    siteName: data.siteName ?? null,
+  };
 }
 
 /**

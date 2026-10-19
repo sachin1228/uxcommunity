@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, View,
@@ -10,10 +10,10 @@ import { isVideoAsset, uploadShowcaseVideo } from '@/lib/showcaseVideo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
-  CommunityContent, ContentKind, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS, SHOWCASE_MEDIA_MAX,
-  THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS, THREAD_IMAGE_MAX,
-  ThreadAttachment, contentLabel, createCommunityContent,
-  updateCommunityContent, uploadContentImage,
+  CommunityContent, ContentKind, LinkPreviewData, RESOURCE_TYPE_LABELS, SHOWCASE_CATEGORY_OPTIONS,
+  SHOWCASE_MEDIA_MAX, THREAD_BODY_MAX_LENGTH, THREAD_CATEGORY_LABELS, THREAD_CATEGORY_OPTIONS,
+  THREAD_IMAGE_MAX, ThreadAttachment, contentLabel, createCommunityContent,
+  getLinkPreview, linkPreviewDomain, updateCommunityContent, uploadContentImage,
 } from '@/lib/communityContent';
 import {
   deviceClockReading,
@@ -53,7 +53,8 @@ interface Props {
 const OPTIONS: Record<string, readonly string[]> = {
   // The web composer and the API both accept only these four.
   threads: THREAD_CATEGORY_OPTIONS.map((option) => option.value),
-  resources: ['article', 'figma', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
+  // Same order as the web `RESOURCE_TYPES`.
+  resources: ['figma', 'article', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
   showcase: SHOWCASE_CATEGORY_OPTIONS.map((option) => option.value),
 };
 
@@ -63,6 +64,21 @@ const THREAD_CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Feather>
   discussion: 'message-circle',
   idea: 'zap',
   feedback: 'thumbs-up',
+};
+
+/** The web `RESOURCE_TYPE_ICONS`, on Feather's glyphs. */
+const RESOURCE_TYPE_ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
+  figma: 'pen-tool',
+  article: 'file-text',
+  tool: 'tool',
+  video: 'play',
+  book: 'book-open',
+  font: 'type',
+  icon_pack: 'layers',
+  color: 'droplet',
+  template: 'layout',
+  inspiration: 'star',
+  other: 'package',
 };
 
 /** The display label for one chip, whichever kind is composing. */
@@ -92,9 +108,18 @@ function initialAttachments(kind: ContentKind, item: CommunityContent | null | u
 
 const DEFAULT_TYPE: Partial<Record<ContentKind, string>> = {
   threads: 'question',
-  resources: 'article',
   showcase: 'product_design',
 };
+
+/** The web `ResourceFormModal` only previews URLs it can actually open. */
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export function CommunityContentEditor({ visible, communityId, kind, item, onClose, onSaved }: Props) {
   const colors = useColors();
@@ -130,6 +155,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   // The video currently in flight, e.g. "clip.mp4 — 42%" — videos are large
   // enough that a silent spinner reads as a hang.
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  // Resource URL metadata — the web composer's link preview card. Typing a
+  // URL debounces into one lookup; a dismissed card stays down until the URL
+  // changes again.
+  const [preview, setPreview] = useState<LinkPreviewData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewDismissed, setPreviewDismissed] = useState(false);
+  const previewAbortRef = useRef<AbortController | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,13 +177,22 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     if (!visible) return;
     setTitle(item?.title ?? '');
     setDescription(
-      kind === 'threads' && item ? threadToBody(item.title, item.description) : item?.description ?? '',
+      kind === 'threads' && item
+        ? threadToBody(item.title, item.description)
+        : kind === 'resources' && item
+          // The web resource form owns one description — legacy mobile rows
+          // that only carry a title still open with their text.
+          ? item.description || item.title
+          : item?.description ?? '',
     );
     setTags('tags' in (item ?? {}) ? ((item as { tags: string[] }).tags ?? []).join(', ') : '');
     setIsPublic(Boolean(item?.is_public));
     setAttachments(initialAttachments(kind, item));
     setUploadStatus(null);
-    setType(DEFAULT_TYPE[kind] ?? 'question');
+    setPreview(null);
+    setPreviewLoading(false);
+    setPreviewDismissed(false);
+    setType(DEFAULT_TYPE[kind] ?? null);
     setTab('post');
     setPollDraft(null);
 
@@ -162,7 +203,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       setType(
         THREAD_CATEGORY_OPTIONS.some((option) => option.value === category) ? category : null,
       );
-      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
+      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
       // Editing keeps the thread's type, as on the web: a poll edits its poll,
       // a post edits its text.
       const poll = item && 'poll' in item ? item.poll : null;
@@ -171,11 +212,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         setPollDraft(pollDraftFromPoll(poll));
       }
     } else if (kind === 'resources') {
-      setType(item && 'resource_type' in item ? item.resource_type : 'article');
+      // No default: the web form requires the author to pick a type.
+      setType(item && 'resource_type' in item ? item.resource_type : null);
       setUrl(item && 'url' in item ? item.url : '');
+      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
     } else if (kind === 'showcase') {
       setType(item && 'category' in item ? item.category : 'product_design');
-      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
+      setAllowReplies(item && 'allow_replies' in item ? item.allow_replies ?? true : true);
     } else {
       // The zone starts as the one the event was created in, and the phone's
       // own for a new event. Prefilling from anywhere else would read the times
@@ -203,6 +246,46 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     }
     setError(null);
   }, [item, kind, visible, deviceZone]);
+
+  // URL → metadata card, exactly the web composer's contract: only http(s)
+  // URLs preview, typing debounces 700ms, and the in-flight lookup is dropped
+  // the moment the URL changes or the editor closes.
+  useEffect(() => {
+    if (!visible || kind !== 'resources') {
+      previewAbortRef.current?.abort();
+      return;
+    }
+    const trimmed = url.trim();
+    if (!isValidHttpUrl(trimmed)) {
+      previewAbortRef.current?.abort();
+      previewAbortRef.current = null;
+      setPreview(null);
+      setPreviewLoading(false);
+      setPreviewDismissed(false);
+      return;
+    }
+    setPreviewDismissed(false);
+    const timer = setTimeout(() => {
+      previewAbortRef.current?.abort();
+      const controller = new AbortController();
+      previewAbortRef.current = controller;
+      setPreviewLoading(true);
+      setPreview(null);
+      getLinkPreview(trimmed, controller.signal)
+        .then((data) => {
+          if (!controller.signal.aborted) setPreview(data);
+        })
+        // A preview is a bonus — a failed lookup leaves the card off.
+        .catch(() => {})
+        .finally(() => {
+          if (!controller.signal.aborted) setPreviewLoading(false);
+        });
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      previewAbortRef.current?.abort();
+    };
+  }, [url, visible, kind]);
 
   const pickMedia = async () => {
     const remaining = mediaLimit - attachments.length;
@@ -302,17 +385,21 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         poll,
       };
     } else if (kind === 'resources') {
-      if (!title.trim()) return setError('Title is required.');
+      // Same contract as the web form: one description, the title derived
+      // from it, and an explicitly chosen type.
+      const trimmedDescription = description.trim();
+      if (!trimmedDescription) return setError('Description is required.');
+      if (!type) return setError('Pick a resource type.');
       if (!/^https?:\/\//i.test(url.trim())) {
         return setError('Enter a URL beginning with http:// or https://.');
       }
       body = {
-        title: title.trim(),
-        description: description.trim() || null,
+        title: trimmedDescription.slice(0, 120),
+        description: trimmedDescription,
         resource_type: type,
         url: url.trim(),
-        tags: cleanTags,
         is_public: isPublic,
+        allow_replies: allowReplies,
       };
     } else if (kind === 'showcase') {
       if (!title.trim()) return setError('Add a title for your work.');
@@ -425,9 +512,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             >
               {item
                 ? isShowcase ? 'Edit showcase' : `Edit ${label}`
-                : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share' : 'Create'}
+                : isShowcase ? 'Share your work' : kind === 'resources' ? 'Share a Resource' : 'Create'}
             </Text>
-            {kind === 'threads' || isShowcase ? (
+            {kind === 'threads' || isShowcase || kind === 'resources' ? (
               <Text
                 style={[styles.subtitle, { color: colors.foregroundMuted }]}
                 numberOfLines={2}
@@ -436,9 +523,13 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                   ? item
                     ? 'Update the details of your showcase post'
                     : 'Give the community a closer look at what you’re making'
-                  : item
-                    ? 'Update the content, images, or privacy of this thread'
-                    : 'Share your thoughts, ask a question, or start a discussion'}
+                  : kind === 'resources'
+                    ? item
+                      ? 'Update the details of your resource.'
+                      : 'Share something useful with your community.'
+                    : item
+                      ? 'Update the content, images, or privacy of this thread'
+                      : 'Share your thoughts, ask a question, or start a discussion'}
               </Text>
             ) : null}
           </View>
@@ -491,20 +582,103 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ) : null}
 
           {kind === 'resources' ? (
-            <Field label="URL">
-              <TextInput
-                value={url}
-                onChangeText={setUrl}
-                style={inputStyle}
-                placeholder="https://"
-                placeholderTextColor={colors.foregroundSubtle}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-            </Field>
+            <>
+              {/* The web resource form's exact fields and order: description,
+                  type, URL, then the preview card the URL resolves to. */}
+              <Field label="Description *">
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  style={[inputStyle, styles.multiline]}
+                  multiline
+                  maxLength={2000}
+                  textAlignVertical="top"
+                  placeholder="What makes this resource worth sharing?"
+                  placeholderTextColor={colors.foregroundSubtle}
+                />
+              </Field>
+
+              <Field label="Type *">
+                <View style={styles.chips}>
+                  {choices.map((choice) => {
+                    const active = type === choice;
+                    return (
+                      <Pressable
+                        key={choice}
+                        onPress={() => setType(choice)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        style={[
+                          styles.chip,
+                          { backgroundColor: active ? colors.accentSoft : colors.surfaceRaised },
+                        ]}
+                      >
+                        <Feather
+                          name={RESOURCE_TYPE_ICONS[choice] ?? 'package'}
+                          size={11}
+                          color={active ? colors.foreground : colors.foregroundMuted}
+                        />
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: active ? colors.foreground : colors.foregroundMuted },
+                          ]}
+                        >
+                          {optionLabel(kind, choice)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </Field>
+
+              <Field label="URL *">
+                <View>
+                  <TextInput
+                    value={url}
+                    onChangeText={setUrl}
+                    style={[inputStyle, styles.urlInput]}
+                    placeholder="https://..."
+                    placeholderTextColor={colors.foregroundSubtle}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                  <View style={styles.urlAccessory} pointerEvents="none">
+                    {previewLoading ? (
+                      <ActivityIndicator size="small" color={colors.foregroundSubtle} />
+                    ) : isValidHttpUrl(url) && !preview ? (
+                      <Feather name="globe" size={14} color={colors.foregroundSubtle} />
+                    ) : null}
+                  </View>
+                </View>
+              </Field>
+
+              {!previewDismissed && (previewLoading || preview) ? (
+                previewLoading && !preview ? (
+                  <View
+                    style={[
+                      styles.previewLoading,
+                      { borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={colors.foregroundSubtle} />
+                    <Text style={[styles.previewLoadingText, { color: colors.foregroundSubtle }]}>
+                      Loading preview…
+                    </Text>
+                  </View>
+                ) : preview ? (
+                  <ResourceLinkPreview
+                    data={preview}
+                    colors={colors}
+                    onDismiss={() => setPreviewDismissed(true)}
+                  />
+                ) : null
+              ) : null}
+            </>
           ) : null}
 
-          {kind !== 'threads' && !isShowcase ? (
+          {kind === 'events' ? (
             <Field label="Title">
               <TextInput
                 value={title}
@@ -541,14 +715,14 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 </View>
               </Field>
             )
-          ) : !isShowcase ? (
+          ) : kind === 'events' ? (
             <Field label="Description">
               <TextInput
                 value={description}
                 onChangeText={setDescription}
                 style={[inputStyle, styles.multiline]}
                 multiline
-                maxLength={kind === 'resources' ? 2000 : 5000}
+                maxLength={5000}
                 textAlignVertical="top"
                 placeholder="Add helpful details"
                 placeholderTextColor={colors.foregroundSubtle}
@@ -622,8 +796,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </Field>
           ) : null}
 
-          {choices.length ? (
-            <Field label={isShowcase || kind === 'threads' ? 'Category *' : 'Type'}>
+          {choices.length && kind !== 'resources' ? (
+            <Field label="Category *">
               <View style={styles.chips}>
                 {choices.map((choice) => {
                   const active = type === choice;
@@ -660,25 +834,15 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             </Field>
           ) : null}
 
-          {kind !== 'events' && kind !== 'threads' && !isShowcase ? (
-            <Field label="Tags (up to 3, comma separated)">
-              <TextInput
-                value={tags}
-                onChangeText={setTags}
-                style={inputStyle}
-                placeholder="design, research"
-                placeholderTextColor={colors.foregroundSubtle}
-              />
-            </Field>
-          ) : null}
-
-          {kind === 'threads' || isShowcase ? (
+          {kind === 'threads' || kind === 'resources' || isShowcase ? (
             <Toggle
               label="Allow replies"
               description={
                 isShowcase
                   ? 'Other members can comment on this showcase.'
-                  : 'Other members can reply to this thread.'
+                  : kind === 'resources'
+                    ? 'Other members can comment on this resource.'
+                    : 'Other members can reply to this thread.'
               }
               value={allowReplies}
               onValueChange={setAllowReplies}
@@ -827,6 +991,86 @@ function Toggle({
         thumbColor={value ? '#FFFFFF' : colors.foregroundSubtle}
         ios_backgroundColor={colors.border}
       />
+    </View>
+  );
+}
+
+/**
+ * The web `LinkPreviewCard`: a quiet raised tile with the page's own title,
+ * description and social image, credited to its domain. Dismissible, because
+ * a bad upstream preview shouldn't sit in the author's way.
+ */
+function ResourceLinkPreview({
+  data,
+  colors,
+  onDismiss,
+}: {
+  data: LinkPreviewData;
+  colors: ReturnType<typeof useColors>;
+  onDismiss: () => void;
+}) {
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  const domain = linkPreviewDomain(data.url);
+
+  return (
+    <View
+      style={[
+        styles.previewCard,
+        { borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+      ]}
+    >
+      <View style={styles.previewCopy}>
+        {data.title ? (
+          <Text
+            numberOfLines={2}
+            style={[styles.previewTitle, { color: colors.foreground }]}
+          >
+            {data.title}
+          </Text>
+        ) : null}
+        {data.description ? (
+          <Text
+            numberOfLines={3}
+            style={[styles.previewDescription, { color: colors.foregroundMuted }]}
+          >
+            {data.description}
+          </Text>
+        ) : null}
+        <View style={styles.previewDomainRow}>
+          {faviconFailed ? (
+            <Feather name="globe" size={11} color={colors.foregroundSubtle} />
+          ) : (
+            <Image
+              source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=32` }}
+              style={styles.previewFavicon}
+              onError={() => setFaviconFailed(true)}
+            />
+          )}
+          <Text
+            numberOfLines={1}
+            style={[styles.previewDomain, { color: colors.foregroundSubtle }]}
+          >
+            {domain}
+          </Text>
+        </View>
+      </View>
+
+      {data.image ? (
+        <Image
+          source={{ uri: data.image }}
+          style={[styles.previewImage, { backgroundColor: colors.surface }]}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      <Pressable
+        onPress={onDismiss}
+        style={styles.previewDismiss}
+        hitSlop={8}
+        accessibilityLabel="Remove preview"
+      >
+        <Feather name="x" size={12} color="#FFFFFF" />
+      </Pressable>
     </View>
   );
 }
@@ -1100,6 +1344,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 124, paddingTop: 13 },
+  urlInput: { paddingRight: 40 },
+  urlAccessory: {
+    position: 'absolute',
+    right: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  previewLoading: {
+    minHeight: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  previewLoadingText: { fontFamily: 'Geist_400Regular', fontSize: 14 },
+  previewCard: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  previewCopy: { flex: 1, minWidth: 0 },
+  previewTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 12, lineHeight: 16 },
+  previewDescription: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
+  },
+  previewDomainRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  previewFavicon: { width: 14, height: 14, borderRadius: 2 },
+  previewDomain: { flexShrink: 1, fontFamily: 'Geist_400Regular', fontSize: 11 },
+  previewImage: { width: 144, height: 96, borderRadius: 8 },
+  previewDismiss: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
   showcaseTitle: { paddingBottom: 22 },
   threadBody: { paddingBottom: 22 },
   counter: {

@@ -39,10 +39,12 @@ import {
   contentLabel,
   contentSecondaryLabel,
   formatRelativeDate,
-  getLinkPreviewImage,
+  getLinkPreview,
+  linkPreviewDomain,
   setContentAction,
   threadBody,
   voteOnThreadPoll,
+  type LinkPreviewData,
 } from '@/lib/communityContent';
 import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
 import { COMMENT_MAX_LENGTH, type CommunityComment } from '@/lib/comments';
@@ -478,21 +480,94 @@ export function useContentActions(): ContentActionsApi {
 // Resource link preview
 // ---------------------------------------------------------------------------
 
-const previewCache = new Map<string, string | null>();
+const previewCache = new Map<string, LinkPreviewData | null>();
 
-export function useResourcePreview(url?: string) {
-  const [image, setImage] = useState<string | null>(
-    () => (url && previewCache.has(url) ? previewCache.get(url) ?? null : null),
-  );
+/** Link metadata for a resource URL, shared by every card and detail page. */
+export function useResourceLinkPreview(url?: string) {
+  const [data, setData] = useState<LinkPreviewData | null>(null);
   useEffect(() => {
-    if (!url || previewCache.has(url)) return;
+    if (!url) { setData(null); return; }
+    const cached = previewCache.get(url);
+    if (cached !== undefined) { setData(cached); return; }
     let active = true;
-    getLinkPreviewImage(url)
-      .then((result) => { previewCache.set(url, result); if (active) setImage(result); })
+    getLinkPreview(url)
+      .then((result) => { previewCache.set(url, result); if (active) setData(result); })
       .catch(() => previewCache.set(url, null));
     return () => { active = false; };
   }, [url]);
-  return image;
+  return data;
+}
+
+/**
+ * The web resource card's link tile: the page's own title, description and
+ * social image, credited to its domain. The whole tile opens the URL — the
+ * web card's `<a>`.
+ */
+function ResourcePreviewTile({
+  data,
+  onPress,
+}: {
+  data: LinkPreviewData;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  const domain = linkPreviewDomain(data.url);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      accessibilityLabel={`Open ${domain}`}
+      style={[
+        styles.previewTile,
+        { borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+      ]}
+    >
+      <View style={styles.previewTileCopy}>
+        {data.title ? (
+          <Text
+            numberOfLines={2}
+            style={[styles.previewTileTitle, { color: colors.foreground }]}
+          >
+            {data.title}
+          </Text>
+        ) : null}
+        {data.description ? (
+          <Text
+            numberOfLines={3}
+            style={[styles.previewTileDescription, { color: colors.foregroundMuted }]}
+          >
+            {data.description}
+          </Text>
+        ) : null}
+        <View style={styles.previewTileDomainRow}>
+          {faviconFailed ? (
+            <Feather name="globe" size={11} color={colors.foregroundSubtle} />
+          ) : (
+            <Image
+              source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=32` }}
+              style={styles.previewTileFavicon}
+              onError={() => setFaviconFailed(true)}
+            />
+          )}
+          <Text
+            numberOfLines={1}
+            style={[styles.previewTileDomain, { color: colors.foregroundSubtle }]}
+          >
+            {domain}
+          </Text>
+        </View>
+      </View>
+      {data.image ? (
+        <Image
+          source={{ uri: data.image }}
+          style={[styles.previewTileImage, { backgroundColor: colors.surface }]}
+          resizeMode="cover"
+        />
+      ) : null}
+    </Pressable>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -534,10 +609,11 @@ export function ContentCard({
   const images = (thread?.attachments ?? [])
     .filter((attachment) => attachment.type.startsWith('image/'));
   const showcaseMedia = showcase ? showcaseMediaForPost(showcase) : [];
-  const previewImage = useResourcePreview(resource?.url);
+  const resourcePreview = useResourceLinkPreview(resource?.url);
   // Showcase media renders through the carousel only — its first attachment is
   // already the cover, so a separate banner would show the same image twice.
-  const coverImage = event?.cover_image_url ?? (resource ? previewImage : null);
+  // Resources render the link tile instead of a cover, like the web card.
+  const coverImage = event?.cover_image_url ?? null;
   // Every event card says when — the web card's first row — and a bad
   // timestamp costs the row rather than printing "Invalid Date".
   const eventDateLabel = event ? formatEventDate(event.event_date) : null;
@@ -679,6 +755,13 @@ export function ContentCard({
               createdAt: item.created_at,
             }}
             onDoubleTap={likeFromDoubleTap}
+          />
+        ) : null}
+
+        {resource && resourcePreview && (resourcePreview.title || resourcePreview.description || resourcePreview.image) ? (
+          <ResourcePreviewTile
+            data={resourcePreview}
+            onPress={() => { void Linking.openURL(resource.url); }}
           />
         ) : null}
 
@@ -852,7 +935,7 @@ export function ContentDetail({
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const resource = kind === 'resources' ? (item as CommunityResource | null) : null;
-  const previewImage = useResourcePreview(resource?.url);
+  const resourcePreview = useResourceLinkPreview(resource?.url);
   // The page always opens at its own start — the reader asked for this post,
   // not for its comments. Tapping the footer's comment count still jumps to
   // the discussion, so its offset is all this needs to know.
@@ -894,8 +977,8 @@ export function ContentDetail({
   const showcaseMedia = showcase ? showcaseMediaForPost(showcase) : [];
   const files = (thread?.attachments ?? []).filter((attachment) => !attachment.type.startsWith('image/'));
   // Showcase media lives in the carousel below the body; a cover copy on top
-  // would repeat the first attachment.
-  const coverImage = event?.cover_image_url ?? (resource ? previewImage : null);
+  // would repeat the first attachment. Resources show the link tile instead.
+  const coverImage = event?.cover_image_url ?? null;
   const isOwner = item.user_id === currentUserId;
   const pollState = thread?.poll ? actions.pollState(item) : null;
   // Events have no reply switch — their comment threads are always open.
@@ -970,19 +1053,26 @@ export function ContentDetail({
 
           {/* Threads carry the whole post in the body and showcase titles are
               card text on the web too, so both keep the compact type here
-              instead of the large title the other kinds still use. */}
+              instead of the large title the other kinds still use. Resources
+              keep the same compact body as their card. */}
           <Text
             style={[
-              thread || showcase ? styles.detailThreadBody : styles.detailTitle,
+              thread || showcase || resource ? styles.detailThreadBody : styles.detailTitle,
               { color: colors.foreground },
             ]}
           >
-            {thread ? threadBody(thread) : item.title}
+            {thread ? threadBody(thread) : resource ? resource.description || resource.title : item.title}
           </Text>
-          {!thread && item.description ? (
+          {!thread && !resource && item.description ? (
             <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
               {item.description}
             </Text>
+          ) : null}
+          {resource && resourcePreview && (resourcePreview.title || resourcePreview.description || resourcePreview.image) ? (
+            <ResourcePreviewTile
+              data={resourcePreview}
+              onPress={() => { void Linking.openURL(resource.url); }}
+            />
           ) : null}
           {thread?.poll && pollState ? (
             <ThreadPollView
@@ -1041,16 +1131,6 @@ export function ContentDetail({
                 </Pressable>
               ) : null}
             </View>
-          ) : null}
-
-          {resource ? (
-            <Pressable
-              onPress={() => Linking.openURL(resource.url)}
-              style={[styles.primaryLink, { backgroundColor: colors.accent }]}
-            >
-              <Feather name="external-link" size={17} color={colors.accentForeground} />
-              <Text style={[styles.primaryLinkText, { color: colors.accentForeground }]}>Open resource</Text>
-            </Pressable>
           ) : null}
 
           <ContentActionRow
@@ -1712,6 +1792,28 @@ const styles = StyleSheet.create({
   },
   cover: { width: '100%', height: 170 },
   cardBody: { padding: 20, gap: 12 },
+  // The web resource card's link tile — same type scale and 144×96 image.
+  previewTile: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  previewTileCopy: { flex: 1, minWidth: 0 },
+  previewTileTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 12, lineHeight: 16 },
+  previewTileDescription: {
+    fontFamily: 'Geist_400Regular',
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
+  },
+  previewTileDomainRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  previewTileFavicon: { width: 14, height: 14, borderRadius: 2 },
+  previewTileDomain: { flexShrink: 1, fontFamily: 'Geist_400Regular', fontSize: 11 },
+  previewTileImage: { width: 144, height: 96, borderRadius: 8 },
 
   communityLabel: {
     flexShrink: 1,
@@ -1904,13 +2006,4 @@ const styles = StyleSheet.create({
   detailThreadBody: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 19 },
   detailDescription: { fontFamily: 'Geist_400Regular', fontSize: 16, lineHeight: 25 },
   detailPanel: { borderRadius: 14, padding: 14, gap: 12 },
-  primaryLink: {
-    height: 48,
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryLinkText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
 });
