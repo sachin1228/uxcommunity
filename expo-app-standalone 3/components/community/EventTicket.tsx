@@ -1,5 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -34,6 +43,8 @@ const TICKET_BORDER = 1.5;
 const TICKET_BORDER_COLOR = 'rgba(255,255,255,0.16)';
 const NOTCH_R = 13;
 const SEAM_STROKE = 'rgba(255,255,255,0.22)';
+/** The whole going-count tick: face in, then the number. */
+const TICK_MS = 460;
 const STONE_50 = '#fafaf9';
 const STONE_200 = '#e7e5e4';
 const STONE_300 = '#d6d3d1';
@@ -104,6 +115,57 @@ export function EventTicket({
   // it needs that seam's y and the ticket's outer width. Both land after the
   // first layout pass; the overlay simply appears one frame later.
   const [seam, setSeam] = useState<{ width: number; y: number } | null>(null);
+
+  // The going-count tick: when an RSVP lands, the newest face tucks into the
+  // strip and the number rolls up a beat behind it. `landed` is the state the
+  // strip was last drawn for; a bump reads from the render pass that shows it
+  // and is retired only once the tick has run.
+  const attendees = (event.rsvps ?? []).slice(0, 5);
+  const landed = useRef({ count, attendees: attendees.length });
+  const countUp = count > landed.current.count;
+  const faceIn = attendees.length > landed.current.attendees;
+  const ticked = countUp || faceIn;
+  const tick = useRef(new Animated.Value(1)).current;
+  const reduceMotion = useRef(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => { reduceMotion.current = enabled; })
+      .catch(() => { /* assume motion is fine */ });
+  }, []);
+
+  useEffect(() => {
+    const snapshot = { count, attendees: attendees.length };
+    // A render with no bump retires the baseline too, otherwise a 1 → 0 → 1
+    // round trip keeps comparing against the stale 1 and never ticks.
+    if (!ticked || reduceMotion.current) {
+      landed.current = snapshot;
+      return;
+    }
+    tick.setValue(0);
+    Animated.timing(tick, {
+      toValue: 1,
+      duration: TICK_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => { landed.current = snapshot; });
+  }, [ticked, count, attendees.length, tick]);
+
+  // One travelling value carries both beats. `Animated.timing`'s delay is
+  // dropped by the native driver, so the stagger lives in the ranges: the face
+  // is home by 55% of the tick, the number only starts moving at 30%.
+  const newFaceStyle = {
+    opacity: tick.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 1, 1] }),
+    transform: [{
+      translateX: tick.interpolate({ inputRange: [0, 0.55, 1], outputRange: [16, 0, 0] }),
+    }],
+  };
+  const rollingNumberStyle = {
+    opacity: tick.interpolate({ inputRange: [0, 0.3, 0.9, 1], outputRange: [0, 0, 1, 1] }),
+    transform: [{
+      translateY: tick.interpolate({ inputRange: [0, 0.3, 0.9, 1], outputRange: [9, 9, 0, 0] }),
+    }],
+  };
 
   const gradient =
     POSTER_GRADIENTS[(event.id.charCodeAt(0) || 0) % POSTER_GRADIENTS.length];
@@ -225,27 +287,48 @@ export function EventTicket({
 
           {count > 0 ? (
             <View style={styles.goingRow}>
-              {event.rsvps?.length ? (
+              {attendees.length ? (
                 <View style={styles.avatarStrip}>
-                  {event.rsvps.slice(0, 5).map((rsvp, index) => (
-                    <PersonAvatar
-                      key={rsvp.user_id || `attendee-${index}`}
-                      name={rsvp.users?.name}
-                      url={rsvp.users?.avatar_url}
-                      size={28}
-                      style={{
-                        marginLeft: index === 0 ? 0 : -8,
-                        zIndex: 10 - index,
-                        borderWidth: 2,
-                        borderColor: TICKET_BG,
-                      }}
-                    />
-                  ))}
+                  {attendees.map((rsvp, index) => {
+                    const key = rsvp.user_id || `attendee-${index}`;
+                    const overlap = index === 0 ? 0 : -8;
+                    // Only the face that just arrived travels. Its negative
+                    // margin moves onto the wrapper so the sliding disc still
+                    // tucks under its neighbour.
+                    const isNewFace = faceIn && index === attendees.length - 1;
+                    const avatar = (
+                      <PersonAvatar
+                        name={rsvp.users?.name}
+                        url={rsvp.users?.avatar_url}
+                        size={28}
+                        style={{
+                          zIndex: 10 - index,
+                          marginLeft: isNewFace ? 0 : overlap,
+                          borderWidth: 2,
+                          borderColor: TICKET_BG,
+                        }}
+                      />
+                    );
+                    if (!isNewFace) return <React.Fragment key={key}>{avatar}</React.Fragment>;
+                    return (
+                      <Animated.View
+                        key={key}
+                        style={[{ zIndex: 10 - index, marginLeft: overlap }, newFaceStyle]}
+                      >
+                        {avatar}
+                      </Animated.View>
+                    );
+                  })}
                 </View>
               ) : null}
-              <Text style={styles.goingText}>
-                {count} {count === 1 ? 'person' : 'people'} going
-              </Text>
+              <View style={styles.goingLabel}>
+                <Animated.View style={rollingNumberStyle}>
+                  <Text style={styles.goingText}>{count}</Text>
+                </Animated.View>
+                <Text style={[styles.goingText, styles.goingWords]}>
+                  {count === 1 ? 'person' : 'people'} going
+                </Text>
+              </View>
             </View>
           ) : null}
         </View>
@@ -423,6 +506,9 @@ const styles = StyleSheet.create({
 
   goingRow: { marginTop: 16, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   avatarStrip: { flexDirection: 'row', alignItems: 'center' },
+  // The count rolls on its own, so the number keeps its own travelling box.
+  goingLabel: { flexDirection: 'row', alignItems: 'flex-end' },
+  goingWords: { marginLeft: 4 },
   goingText: { fontFamily: 'Geist_400Regular', fontSize: 12, color: STONE_400 },
 
   stub: {
