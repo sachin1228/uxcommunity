@@ -118,3 +118,37 @@ export function patchCachedBootstrapMessages(
     data: { ...cached.data, messages },
   });
 }
+
+/**
+ * Fold a local content create/delete into the cached bootstrap's
+ * "created a …" cards.
+ *
+ * WHY THIS EXISTS
+ *   The chat timeline only learns about a new card from three places: the
+ *   local mirror (subscribed only while the chat screen is mounted), realtime
+ *   (same), or the bootstrap. Creating a resource from the Resources tab and
+ *   switching to Chat inside the 15-minute window used to serve the
+ *   fetch-time snapshot, so "You created a resource" was missing until an app
+ *   restart. Patching the entry keeps the card there without a refetch, and
+ *   never fabricates an entry — an unknown community still fetches fresh.
+ */
+export function patchCachedBootstrapContentEvents(
+  communityId: string,
+  change:
+    | { kind: 'insert'; event: ChatContentEvent }
+    | { kind: 'delete'; id: string },
+): void {
+  const cached = cache.get(communityId);
+  if (!cached) return;
+  const events = change.kind === 'delete'
+    ? cached.data.contentEvents.filter((event) => event.id !== change.id)
+    : cached.data.contentEvents.some((event) => event.id === change.event.id)
+      ? cached.data.contentEvents
+      : [...cached.data.contentEvents, change.event].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+  cache.set(communityId, {
+    fetchedAt: cached.fetchedAt,
+    data: { ...cached.data, contentEvents: events },
+  });
+}

@@ -22,8 +22,10 @@ import test, { before, beforeEach } from 'node:test';
 import {
   COMMUNITY_BOOTSTRAP_STALE_MS,
   fetchCommunityBootstrap,
+  patchCachedBootstrapContentEvents,
   patchCachedBootstrapMessages,
 } from './communityBootstrap';
+import type { ChatContentEvent } from './chatContentEvents';
 import type { Message } from './communities';
 
 // ── A minimal Message-shaped row ───────────────────────────────────────────
@@ -47,6 +49,21 @@ function bootstrapPayload(ids: string[]) {
   return {
     messages: { messages: ids.map((id) => row(id)) },
     'content-events': { events: [{ id: 'evt-1', title: 'A card' }] },
+  };
+}
+
+/** A minimal content-event card, as the create response yields it. */
+function contentEvent(id: string, created_at = '2026-10-17T10:02:00Z'): ChatContentEvent {
+  return {
+    id,
+    community_id: 'cards-community',
+    user_id: 'user-a',
+    kind: 'resource',
+    title: `card ${id}`,
+    created_at,
+    meta: null,
+    reactions: [],
+    users: null,
   };
 }
 
@@ -159,6 +176,67 @@ test('patching an unknown community never fabricates an entry', async () => {
   assert.deepEqual(
     fetched.messages.map((message) => message.id),
     ['m1'],
+    'the network answer, not the patch',
+  );
+  assert.equal(fetchCalls, 1);
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// Content-event patches — "created a …" cards survive re-entry
+// ══════════════════════════════════════════════════════════════════════════
+
+test('a locally created card survives re-entry inside the freshness window', async () => {
+  nextPayload = bootstrapPayload(['m1']);
+  const first = await fetchCommunityBootstrap('cards-community');
+  assert.deepEqual(first.contentEvents.map((event) => event.id), ['evt-1']);
+
+  // The resource was created from its tab while the chat screen was unmounted,
+  // so only the mirror's cache patch knows about it until the next fetch.
+  patchCachedBootstrapContentEvents('cards-community', {
+    kind: 'insert',
+    event: contentEvent('evt-2'),
+  });
+
+  const reopened = await fetchCommunityBootstrap('cards-community');
+  assert.deepEqual(
+    reopened.contentEvents.map((event) => event.id),
+    ['evt-1', 'evt-2'],
+    'the "You created a …" card is on the timeline',
+  );
+  assert.equal(fetchCalls, 1, 'and the re-entry still costs no request');
+});
+
+test('a delivered card is idempotent by id', async () => {
+  nextPayload = bootstrapPayload(['m1']);
+  await fetchCommunityBootstrap('cards-dedupe');
+  patchCachedBootstrapContentEvents('cards-dedupe', { kind: 'insert', event: contentEvent('evt-2') });
+  patchCachedBootstrapContentEvents('cards-dedupe', { kind: 'insert', event: contentEvent('evt-2') });
+
+  const reopened = await fetchCommunityBootstrap('cards-dedupe');
+  assert.deepEqual(reopened.contentEvents.map((event) => event.id), ['evt-1', 'evt-2']);
+});
+
+test('a locally deleted card leaves the cached timeline', async () => {
+  nextPayload = bootstrapPayload(['m1']);
+  await fetchCommunityBootstrap('cards-delete');
+  patchCachedBootstrapContentEvents('cards-delete', { kind: 'delete', id: 'evt-1' });
+
+  const reopened = await fetchCommunityBootstrap('cards-delete');
+  assert.deepEqual(reopened.contentEvents, []);
+  assert.equal(fetchCalls, 1);
+});
+
+test('patching cards on an unknown community never fabricates an entry', async () => {
+  patchCachedBootstrapContentEvents('cards-never-fetched', {
+    kind: 'insert',
+    event: contentEvent('evt-2'),
+  });
+
+  nextPayload = bootstrapPayload(['m1']);
+  const fetched = await fetchCommunityBootstrap('cards-never-fetched');
+  assert.deepEqual(
+    fetched.contentEvents.map((event) => event.id),
+    ['evt-1'],
     'the network answer, not the patch',
   );
   assert.equal(fetchCalls, 1);
