@@ -191,7 +191,9 @@ export default function NotificationSettingsScreen() {
               <Switch
                 value={preferences.chatPushEnabled}
                 onValueChange={(value) => void updatePreferences({ chatPushEnabled: value })}
-                trackColor={{ true: colors.primary, false: colors.border }}
+                trackColor={{ true: colors.chatOwnBubble, false: colors.border }}
+                thumbColor={preferences.chatPushEnabled ? '#FFFFFF' : colors.foregroundSubtle}
+                ios_backgroundColor={colors.border}
               />
             </Row>
 
@@ -230,7 +232,9 @@ export default function NotificationSettingsScreen() {
               <Switch
                 value={preferences.quietHoursEnabled}
                 onValueChange={(value) => void updateQuietHours({ quietHoursEnabled: value })}
-                trackColor={{ true: colors.primary, false: colors.border }}
+                trackColor={{ true: colors.chatOwnBubble, false: colors.border }}
+                thumbColor={preferences.quietHoursEnabled ? '#FFFFFF' : colors.foregroundSubtle}
+                ios_backgroundColor={colors.border}
                 disabled={!preferences.chatPushEnabled}
               />
             </Row>

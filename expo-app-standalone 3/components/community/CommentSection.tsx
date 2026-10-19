@@ -1,9 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -15,7 +22,6 @@ import { useColors } from '@/hooks/useColors';
 import { hapticError, hapticSelection, hapticSuccess, hapticToggle } from '@/lib/haptics';
 import {
   ALLOWED_COMMENT_REACTIONS,
-  COMMENT_MAX_LENGTH,
   commentReactionsSupported,
   deleteComment,
   getComments,
@@ -36,12 +42,16 @@ import { PersonAvatar } from '@/components/PersonAvatar';
  *
  * It renders inline — under the post on the detail page — rather than in a
  * modal, exactly where the web puts it. One section serves every content type
- * (threads, showcase, resources, events) and mirrors the web design: the
- * composer first, then the sort control, then a 36px circular avatar in a
- * gutter with a connector bracket dropping to a thread's replies, the author's
- * name and relative time on one line with a `···` options menu on the right,
- * their experience level under it, the body with `@mentions` painted blue, then
- * one flat muted action strip — emoji reaction picker, reaction chips, Reply.
+ * (threads, showcase, resources, events) and mirrors the web design: the sort
+ * control, then a 36px circular avatar in a gutter with a connector bracket
+ * dropping to a thread's replies, the author's name and relative time on one
+ * line with a `···` options menu on the right, their experience level under it,
+ * the body with `@mentions` painted blue, then one flat muted action strip —
+ * emoji reaction picker, reaction chips, Reply.
+ *
+ * The composer itself is pinned by the detail screen under this list, above
+ * the keyboard, so it is always reachable — including when the keyboard is up.
+ * Reply targeting is controlled by that screen for the same reason.
  */
 
 /** Matches the web `Avatar size="lg"`: one size for the whole thread. */
@@ -71,6 +81,15 @@ interface Props {
   allowReplies?: boolean;
   /** Reports the live comment total so the parent's counter stays correct. */
   onCountChange?: (total: number) => void;
+  /** Owned by the detail screen, which renders the pinned composer. */
+  replyTarget: CommunityComment | null;
+  onReplyTargetChange: (target: CommunityComment | null) => void;
+}
+
+/** Lets the detail screen hand a comment posted from its pinned composer back
+ *  into this list without lifting the whole comment tree up. */
+export interface CommentSectionHandle {
+  appendPosted: (comment: CommunityComment) => void;
 }
 
 function formatRelativeDate(value: string): string {
@@ -91,30 +110,33 @@ export function commentTotal(comments: CommunityComment[]): number {
  * Seed text for the reply composer: mention the author we're replying to, the
  * way the web app does — unless it's our own comment.
  */
-function replyMention(target: CommunityComment, currentUserId: string): string | undefined {
+export function replyMention(target: CommunityComment, currentUserId: string): string | undefined {
   const name = target.users?.name;
   if (!name || target.user_id === currentUserId) return undefined;
   return `@${name} `;
 }
 
-export function CommentSection({
-  communityId,
-  kind,
-  targetId,
-  currentUserId,
-  allowReplies = true,
-  onCountChange,
-}: Props) {
+export const CommentSection = forwardRef<CommentSectionHandle, Props>(function CommentSection(
+  {
+    communityId,
+    kind,
+    targetId,
+    currentUserId,
+    allowReplies = true,
+    onCountChange,
+    replyTarget,
+    onReplyTargetChange,
+  }: Props,
+  ref,
+) {
   const colors = useColors();
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<CommentSortOrder>('newest');
-  const [replyTarget, setReplyTarget] = useState<CommunityComment | null>(null);
   const [layer, setLayer] = useState<OpenLayer>(null);
 
   const canReact = commentReactionsSupported(kind);
-  const maxLength = COMMENT_MAX_LENGTH[kind];
 
   // Held in a ref so `load` stays stable: an inline parent callback would
   // otherwise re-create it on every render and re-fire the fetch effect below,
@@ -155,8 +177,9 @@ export function CommentSection({
       onCountChangeRef.current?.(commentTotal(next));
       return next;
     });
-    setReplyTarget(null);
   }, []);
+
+  useImperativeHandle(ref, () => ({ appendPosted: handlePosted }), [handlePosted]);
 
   const handleDeleted = useCallback((commentId: string, parentId: string | null) => {
     setComments((previous) => {
@@ -203,19 +226,7 @@ export function CommentSection({
 
   return (
     <View style={styles.root}>
-      {/* Composer first, then the sort control, then the thread — the order the
-          web puts them in inside a post's comment section. */}
-      {allowReplies ? (
-        <CommentComposer
-          communityId={communityId}
-          kind={kind}
-          targetId={targetId}
-          maxLength={maxLength}
-          placeholder="Add comment"
-          submitLabel="Send"
-          onPosted={handlePosted}
-        />
-      ) : (
+      {allowReplies ? null : (
         <View style={[styles.closed, { borderColor: colors.border }]}>
           <Text style={[styles.closedText, { color: colors.foregroundSubtle }]}>
             Replies are closed.
@@ -339,9 +350,8 @@ export function CommentSection({
               layer={layer}
               onLayerChange={setLayer}
               replyTarget={replyTarget}
-              onReplyTargetChange={setReplyTarget}
+              onReplyTargetChange={onReplyTargetChange}
               onDeleted={handleDeleted}
-              onReplied={handlePosted}
               onReactionToggled={handleReactionToggled}
             />
           ))}
@@ -349,13 +359,13 @@ export function CommentSection({
       )}
     </View>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Composer
 // ---------------------------------------------------------------------------
 
-function CommentComposer({
+export function CommentComposer({
   communityId,
   kind,
   targetId,
@@ -365,23 +375,27 @@ function CommentComposer({
   submitLabel,
   maxLength,
   autoFocus,
-  compact,
+  replyToName,
+  replyToBody,
+  onCancelReply,
   onPosted,
-  onCancel,
   bottomInset = 0,
 }: {
   communityId: string;
   kind: CommentKind;
   targetId: string;
-  parentId?: string;
+  parentId?: string | null;
   initialBody?: string;
   placeholder?: string;
   submitLabel: string;
   maxLength: number;
   autoFocus?: boolean;
-  compact?: boolean;
+  /** Present while replying: names the person above the field and offers a way out. */
+  replyToName?: string | null;
+  /** The comment being replied to, shown as a one-line preview under the name. */
+  replyToBody?: string | null;
+  onCancelReply?: () => void;
   onPosted: (comment: CommunityComment) => void;
-  onCancel?: () => void;
   bottomInset?: number;
 }) {
   const colors = useColors();
@@ -394,6 +408,10 @@ function CommentComposer({
   // field — an empty composer should read as a prompt, not a form. It stays
   // mounted while saving so the spinner has somewhere to live.
   const showSend = trimmed.length > 0 || sending;
+
+  // One clean line for the quote: newlines and runs of spaces collapse so the
+  // body never eats more than its single ellipsized row.
+  const replyPreview = replyToBody ? replyToBody.replace(/\s+/g, ' ').trim() : '';
 
   const send = async () => {
     if (!canSend) return;
@@ -421,10 +439,46 @@ function CommentComposer({
         {
           backgroundColor: colors.background,
           borderTopColor: colors.borderSubtle,
-          paddingBottom: bottomInset + 12,
+          paddingBottom: bottomInset,
         },
       ]}
     >
+      {replyToName ? (
+        <View style={styles.replyContext}>
+          <View style={styles.replyContextLine}>
+            <Feather name="corner-up-left" size={12} color={colors.foregroundMuted} />
+            <Text
+              style={[styles.replyContextText, { color: colors.foregroundMuted }]}
+              numberOfLines={1}
+            >
+              Replying to <Text style={{ color: colors.foreground }}>{replyToName}</Text>
+            </Text>
+            {onCancelReply ? (
+              <Pressable
+                onPress={() => {
+                  hapticSelection();
+                  onCancelReply();
+                }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel reply"
+                style={styles.replyCancel}
+              >
+                <Feather name="x" size={14} color={colors.foregroundMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+          {replyPreview ? (
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.replyPreview, { color: colors.foregroundSubtle }]}
+            >
+              {replyPreview}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       <View style={[styles.composerField, { backgroundColor: colors.surfaceRaised }]}>
         <TextInput
           value={body}
@@ -464,18 +518,6 @@ function CommentComposer({
           </Pressable>
         ) : null}
       </View>
-      {compact && onCancel ? (
-        <Pressable
-          onPress={() => {
-            hapticSelection();
-            onCancel();
-          }}
-          hitSlop={6}
-          style={styles.composerCancel}
-        >
-          <Text style={[styles.composerCancelText, { color: colors.foregroundMuted }]}>Cancel</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -499,7 +541,6 @@ function CommentRow({
   replyTarget,
   onReplyTargetChange,
   onDeleted,
-  onReplied,
   onReactionToggled,
 }: {
   comment: CommunityComment;
@@ -516,7 +557,6 @@ function CommentRow({
   replyTarget: CommunityComment | null;
   onReplyTargetChange: (target: CommunityComment | null) => void;
   onDeleted: (id: string, parentId: string | null) => void;
-  onReplied: (comment: CommunityComment) => void;
   onReactionToggled: (
     commentId: string,
     parentId: string | null,
@@ -539,19 +579,15 @@ function CommentRow({
   const designation = comment.users?.designation ?? null;
   const replies = comment.replies ?? [];
   const hasReplies = !isReply && replies.length > 0;
-  const hostsReplyComposer = Boolean(
-    !isReply && replyTarget && (replyTarget.id === comment.id || replyTarget.parent_id === comment.id),
-  );
   // Top-level comments with a reply thread hang the connector bracket in the
   // avatar gutter, spanning the replies below them.
-  const showConnector = !isReply && (hasReplies || hostsReplyComposer);
+  const showConnector = !isReply && hasReplies;
   // The blue the web comment menus use for a selected reaction / Reply, and the
   // wash behind it.
   const accentText = colors.isDark ? colors.chatMentionOwn : colors.chatMention;
   const accentWash = colors.isDark ? 'rgba(82, 168, 255, 0.14)' : 'rgba(0, 114, 245, 0.10)';
   const connectorColor = colors.isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.10)';
   const replyActive = replyTarget?.id === comment.id;
-  const activeReplyTarget = hostsReplyComposer ? replyTarget : null;
   const bodySegments = useMemo(
     () => splitCommentText(comment.body, mentionNames),
     [comment.body, mentionNames],
@@ -803,7 +839,7 @@ function CommentRow({
           </View>
         ) : null}
 
-        {!isReply && (hasReplies || hostsReplyComposer) ? (
+        {!isReply && hasReplies ? (
           <View style={styles.replyBlock}>
             {hasReplies && repliesOpen ? (
               <View style={styles.replyList}>
@@ -824,7 +860,6 @@ function CommentRow({
                     replyTarget={replyTarget}
                     onReplyTargetChange={onReplyTargetChange}
                     onDeleted={onDeleted}
-                    onReplied={onReplied}
                     onReactionToggled={onReactionToggled}
                   />
                 ))}
@@ -853,29 +888,6 @@ function CommentRow({
                   color={colors.foreground}
                 />
               </Pressable>
-            ) : null}
-
-            {activeReplyTarget ? (
-              <View style={styles.replyComposer}>
-                <CommentComposer
-                  key={activeReplyTarget.id}
-                  communityId={communityId}
-                  kind={kind}
-                  targetId={targetId}
-                  // One level of nesting — replies always land on the top-level comment.
-                  parentId={comment.id}
-                  initialBody={replyMention(activeReplyTarget, currentUserId)}
-                  maxLength={COMMENT_MAX_LENGTH[kind]}
-                  // Same prompt as every other comment field — the seeded
-                  // `@Name` already says who this reply is aimed at.
-                  placeholder="Add comment"
-                  submitLabel="Reply"
-                  autoFocus
-                  compact
-                  onPosted={onReplied}
-                  onCancel={() => onReplyTargetChange(null)}
-                />
-              </View>
             ) : null}
           </View>
         ) : null}
@@ -1078,15 +1090,33 @@ const styles = StyleSheet.create({
   replyList: { gap: 12 },
   hideReplies: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   hideRepliesText: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
-  replyComposer: { marginTop: 2 },
 
+  // Pinned bar under the detail list, above the keyboard.
   composer: {
-    paddingTop: 4,
+    paddingTop: 8,
+    paddingHorizontal: 18,
     gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
+  replyContext: { gap: 2 },
+  replyContextLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  replyContextText: { flex: 1, fontSize: 12, fontFamily: 'Geist_500Medium' },
+  // Indented past the ↩ glyph so the quote reads under the name, not the icon.
+  replyPreview: {
+    marginLeft: 20,
+    marginRight: 2,
+    fontSize: 12,
+    fontFamily: 'Geist_400Regular',
+  },
+  replyCancel: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   composerField: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 8,
     // 40px tall and a true pill: the radius is past half the height, so the
     // ends are round without the field turning into a capsule as it grows.
@@ -1103,7 +1133,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontFamily: 'Geist_400Regular',
-    paddingTop: Platform.OS === 'ios' ? 6 : 4,
+    // Symmetric padding puts the 20px line on the pill's centre line; Android
+    // otherwise adds font padding that leaves the caret sitting high.
+    paddingVertical: 6,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   composerSend: {
     width: 32,
@@ -1112,8 +1146,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  composerCancel: { alignSelf: 'flex-end', paddingVertical: 2 },
-  composerCancelText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
 
   closed: {
     borderWidth: StyleSheet.hairlineWidth,

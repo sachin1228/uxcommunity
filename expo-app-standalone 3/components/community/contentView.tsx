@@ -5,8 +5,10 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView as RNKeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +16,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import {
+  KeyboardAvoidingView as KeyboardControllerAvoidingView,
+  useKeyboardState,
+} from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -38,13 +44,33 @@ import {
   voteOnThreadPoll,
 } from '@/lib/communityContent';
 import { normalizePollCounts, type PollViewState } from '@/lib/communityPoll';
+import { COMMENT_MAX_LENGTH, type CommunityComment } from '@/lib/comments';
 import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
-import { CommentSection } from './CommentSection';
+import {
+  CommentComposer,
+  CommentSection,
+  replyMention,
+  type CommentSectionHandle,
+} from './CommentSection';
 import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { formatEventDate } from '@/lib/eventDate';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
+
+/**
+ * The detail page is a full-screen `Modal`, where iOS's own keyboard avoiding
+ * view is the dependable option; Android uses the keyboard-controller build
+ * that the chat screens already rely on.
+ */
+const KeyboardAvoider: React.ComponentType<
+  React.ComponentProps<typeof RNKeyboardAvoidingView>
+> =
+  Platform.OS === 'ios'
+    ? RNKeyboardAvoidingView
+    : (KeyboardControllerAvoidingView as React.ComponentType<
+        React.ComponentProps<typeof RNKeyboardAvoidingView>
+      >);
 
 /**
  * The community card, the card detail, and the optimistic interaction state
@@ -817,10 +843,17 @@ export function ContentDetail({
   // the discussion, so its offset is all this needs to know.
   const scrollRef = useRef<ScrollView>(null);
   const [commentsY, setCommentsY] = useState(0);
+  const sectionRef = useRef<CommentSectionHandle>(null);
+  // Who the pinned composer is aimed at — null means a top-level comment.
+  const [replyTarget, setReplyTarget] = useState<CommunityComment | null>(null);
+  const keyboardVisible = useKeyboardState((state) => state.isVisible);
   // Some screens keep the sheet mounted between posts, so a previously read
   // page must not carry its scroll offset into the next open.
   useEffect(() => {
-    if (visible) scrollRef.current?.scrollTo({ y: 0, animated: false });
+    if (visible) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      setReplyTarget(null);
+    }
   }, [visible, item?.id]);
 
   // A chat card can open the page before its tab's list has loaded, so the
@@ -857,6 +890,17 @@ export function ContentDetail({
     scrollRef.current?.scrollTo({ y: Math.max(0, commentsY - 8), animated: true });
   };
 
+  // A comment posted from the pinned composer joins the list the section
+  // already owns, and a reply leaves reply mode.
+  const handleCommentPosted = (comment: CommunityComment) => {
+    sectionRef.current?.appendPosted(comment);
+    setReplyTarget(null);
+  };
+
+  // The composer bar keeps its safe-area padding only while the keyboard is
+  // down; with the keyboard up it hugs the keyboard's top edge.
+  const composerBottomInset = keyboardVisible ? 8 : Math.max(insets.bottom, 8);
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={[styles.detailRoot, { backgroundColor: colors.background }]}>
@@ -877,13 +921,15 @@ export function ContentDetail({
           />
         </View>
 
+        <KeyboardAvoider
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 32 }]}
+          style={styles.flex}
+          contentContainerStyle={[styles.detailContent, { paddingBottom: 24 }]}
           keyboardShouldPersistTaps="handled"
-          // The comment composer sits inside this scroll view, so the keyboard
-          // must shorten it rather than cover the field being typed into.
-          automaticallyAdjustKeyboardInsets
         >
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.detailCover} /> : null}
 
@@ -990,15 +1036,39 @@ export function ContentDetail({
 
           <View onLayout={(event) => setCommentsY(event.nativeEvent.layout.y)}>
             <CommentSection
+              ref={sectionRef}
               communityId={item.community_id}
               kind={kind}
               targetId={item.id}
               currentUserId={currentUserId}
               allowReplies={allowReplies}
+              replyTarget={replyTarget}
+              onReplyTargetChange={setReplyTarget}
               onCountChange={(total) => actions.setCommentCount(item.id, total)}
             />
           </View>
         </ScrollView>
+
+        {allowReplies ? (
+          <CommentComposer
+            key={replyTarget?.id ?? 'root'}
+            communityId={item.community_id}
+            kind={kind}
+            targetId={item.id}
+            parentId={replyTarget ? replyTarget.parent_id ?? replyTarget.id : null}
+            initialBody={replyTarget ? replyMention(replyTarget, currentUserId) : undefined}
+            maxLength={COMMENT_MAX_LENGTH[kind]}
+            placeholder="Add comment"
+            submitLabel={replyTarget ? 'Reply' : 'Send'}
+            autoFocus={Boolean(replyTarget)}
+            replyToName={replyTarget ? replyTarget.users?.name ?? 'Member' : null}
+            replyToBody={replyTarget?.body ?? null}
+            onCancelReply={() => setReplyTarget(null)}
+            onPosted={handleCommentPosted}
+            bottomInset={composerBottomInset}
+          />
+        ) : null}
+        </KeyboardAvoider>
       </View>
     </Modal>
   );
@@ -1682,6 +1752,7 @@ const styles = StyleSheet.create({
   threadImage: { width: '100%', height: '100%' },
 
   detailRoot: { flex: 1 },
+  flex: { flex: 1 },
   detailLoading: { alignItems: 'center', justifyContent: 'center' },
   detailHeader: {
     minHeight: 64,
