@@ -85,6 +85,8 @@ interface Props {
    * not pay for a couple of hundred emoji cells that nobody can see.
    */
   showContent?: boolean;
+  /** Ignore presses until the panel has finished opening. */
+  interactive?: boolean;
 }
 
 export function EmojiPicker({
@@ -92,11 +94,15 @@ export function EmojiPicker({
   height = styles.panel.height,
   animatedStyle,
   showContent = true,
+  interactive = true,
 }: Props) {
   const colors = useColors();
 
   return (
-    <Animated.View style={[styles.clip, animatedStyle]}>
+    <Animated.View
+      pointerEvents={interactive ? 'auto' : 'none'}
+      style={[styles.clip, animatedStyle]}
+    >
       {/* The space below the chat already stops at the safe area — the screen
           renders a spacer under it — so the panel needs no bottom padding of
           its own. */}
