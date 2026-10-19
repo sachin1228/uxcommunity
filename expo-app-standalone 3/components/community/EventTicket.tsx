@@ -162,7 +162,10 @@ export function EventTicket({
           style={styles.body}
           onLayout={(layout) => {
             const { y, height } = layout.nativeEvent.layout;
-            setSeam((current) => ({ width: current?.width ?? 0, y: TICKET_BORDER + y + height }));
+            // Yoga reports the body's y from the ticket's border-box origin, so
+            // this bottom edge already is the seam — adding the border again
+            // drops the dash below the body/stub boundary.
+            setSeam((current) => ({ width: current?.width ?? 0, y: y + height }));
           }}
         >
           <Text style={styles.title} numberOfLines={variant === 'card' ? 2 : undefined}>
