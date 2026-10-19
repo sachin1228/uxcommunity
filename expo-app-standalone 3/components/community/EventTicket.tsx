@@ -35,6 +35,11 @@ import { hapticToggle } from '@/lib/haptics';
  * The card keeps the web's fixed dark paper and prints its own colors: the
  * ticket is deliberately the same black in both themes, and the accent color
  * the host picked is the only hue on it.
+ *
+ * It also hangs. The tilt and the depth are the resting state; two slow turns
+ * on unaligned periods drift it the way a thing on a string does in moving air,
+ * and a shine band crosses the paper once a cycle. All of it runs on the native
+ * driver, and none of it runs when the phone asks for reduced motion.
  */
 
 const ACCENT_FALLBACK = '#e8e14a';
@@ -45,6 +50,15 @@ const NOTCH_R = 13;
 const SEAM_STROKE = 'rgba(255,255,255,0.22)';
 /** The whole going-count tick: face in, then the number. */
 const TICK_MS = 460;
+/** The hang's gust: one breath through the ticket, then the quiet. */
+const GUST_MS = 8500;
+/** The second turn of the same air, on a longer, deliberately unaligned period. */
+const DRIFT_MS = 13000;
+/** The shine takes this long across the paper, then waits out the cycle. */
+const SHINE_MS = 3200;
+const SHINE_REST_MS = 16800;
+/** The lit band's width as a fraction of the ticket's. */
+const SHINE_BAND = 0.62;
 const STONE_50 = '#fafaf9';
 const STONE_200 = '#e7e5e4';
 const STONE_300 = '#d6d3d1';
@@ -71,6 +85,25 @@ function accentNeedsDarkText(hex: string): boolean {
   };
   const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
   return luminance > 0.8;
+}
+
+/**
+ * One leg of the hang: turn the layer to `to` degrees over `ms`. The breath's
+ * shape — nearly still, then a swing out and decaying passes — lives in the step
+ * durations rather than in one curve.
+ */
+function turn(value: Animated.Value, to: number, ms: number, easing = Easing.inOut(Easing.quad)) {
+  return Animated.timing(value, {
+    toValue: to,
+    duration: ms,
+    easing,
+    useNativeDriver: true,
+  });
+}
+
+/** The hang values are degrees; a transform wants them labelled as such. */
+function deg(value: Animated.Value) {
+  return value.interpolate({ inputRange: [-3, 3], outputRange: ['-3deg', '3deg'] });
 }
 
 interface EventTicketProps {
@@ -127,12 +160,65 @@ export function EventTicket({
   const ticked = countUp || faceIn;
   const tick = useRef(new Animated.Value(1)).current;
   const reduceMotion = useRef(false);
+  const [motion, setMotion] = useState(false);
+
+  // The hang: two turns, a gust on 8.5 s and a drift on 13 s that never line up,
+  // so the ticket has no visible loop the way a thing on a string in a room with
+  // air has none. The shine rides its own value and is off the paper between
+  // sweeps.
+  const gust = useRef(new Animated.Value(0.05)).current;
+  const drift = useRef(new Animated.Value(0.2)).current;
+  const shine = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => { reduceMotion.current = enabled; })
-      .catch(() => { /* assume motion is fine */ });
+      .then((enabled) => {
+        reduceMotion.current = enabled;
+        setMotion(!enabled);
+      })
+      .catch(() => { setMotion(true); /* assume motion is fine */ });
   }, []);
+
+  useEffect(() => {
+    if (!motion) return undefined;
+    // The shares are the keyframe weights of the approved motion.
+    const g = (share: number) => Math.round(GUST_MS * share);
+    const d = (share: number) => Math.round(DRIFT_MS * share);
+    const gustLoop = Animated.loop(
+      Animated.sequence([
+        turn(gust, 0.05, g(0.14), Easing.linear),
+        turn(gust, -1.3, g(0.16)),
+        turn(gust, 1.5, g(0.18)),
+        turn(gust, -0.7, g(0.16)),
+        turn(gust, 0.5, g(0.16)),
+        turn(gust, 0.05, g(0.14)),
+        turn(gust, 0.05, g(0.06), Easing.linear),
+      ]),
+    );
+    const driftLoop = Animated.loop(
+      Animated.sequence([
+        turn(drift, -0.45, d(0.32)),
+        turn(drift, 0.4, d(0.34)),
+        turn(drift, 0.2, d(0.34)),
+      ]),
+    );
+    const shineLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shine, {
+          toValue: 1,
+          duration: SHINE_MS,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(SHINE_REST_MS),
+        // The band sits off the ticket at both ends, so the reset is invisible.
+        Animated.timing(shine, { toValue: 0, duration: 1, useNativeDriver: true }),
+      ]),
+    );
+    const loops = [gustLoop, driftLoop, shineLoop];
+    loops.forEach((loop) => { loop.start(); });
+    return () => { loops.forEach((loop) => { loop.stop(); }); };
+  }, [motion, gust, drift, shine]);
 
   useEffect(() => {
     const snapshot = { count, attendees: attendees.length };
@@ -171,8 +257,13 @@ export function EventTicket({
     POSTER_GRADIENTS[(event.id.charCodeAt(0) || 0) % POSTER_GRADIENTS.length];
 
   return (
-    <View
-      style={styles.frame}
+    <Animated.View
+      // The three turns share one pivot, just under the top edge, so they add up
+      // the way nested layers would and the far end sweeps the widest arc.
+      style={[
+        styles.frame,
+        { transform: [{ rotate: '0.7deg' }, { rotate: deg(gust) }, { rotate: deg(drift) }] },
+      ]}
       onLayout={(layout) => {
         const width = layout.nativeEvent.layout.width;
         setSeam((current) => ({ width, y: current?.y ?? 0 }));
@@ -390,6 +481,43 @@ export function EventTicket({
             <Text style={styles.ended}>This event has ended</Text>
           )}
         </LinearGradient>
+
+        {seam && seam.width > 0 ? (
+          // The shine: one wide, soft band taking its time across the paper, then
+          // parked off the ticket's left edge for the rest of the cycle.
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.shine,
+              {
+                width: seam.width * SHINE_BAND,
+                transform: [
+                  {
+                    translateX: shine.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-seam.width * SHINE_BAND, seam.width],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[
+                'rgba(255,255,255,0)',
+                'rgba(255,255,255,0.04)',
+                'rgba(255,255,255,0.10)',
+                'rgba(255,255,255,0.04)',
+                'rgba(255,255,255,0)',
+              ]}
+              locations={[0, 0.31, 0.5, 0.69, 1]}
+              start={{ x: 0, y: 0.34 }}
+              end={{ x: 1, y: 0.66 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          </Animated.View>
+        ) : null}
       </View>
 
       {seam && seam.width > 0 && seam.y > 0 ? (
@@ -427,13 +555,21 @@ export function EventTicket({
           />
         </Svg>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   // Unclipped parent so the notch cut-outs can cover the ticket's own border.
-  frame: { position: 'relative' },
+  // It is also the hanger: the whole card turns about this pivot.
+  frame: { position: 'relative', transformOrigin: '50% 8px' },
+  shine: {
+    position: 'absolute',
+    top: '-20%',
+    bottom: '-20%',
+    left: 0,
+    zIndex: 5,
+  },
   seam: {
     position: 'absolute',
     // The SVG clips at its own bounds, so the viewport overhangs the ticket by
