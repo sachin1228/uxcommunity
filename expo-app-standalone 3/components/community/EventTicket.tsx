@@ -36,10 +36,11 @@ import { hapticToggle } from '@/lib/haptics';
  * ticket is deliberately the same black in both themes, and the accent color
  * the host picked is the only hue on it.
  *
- * It also hangs. The tilt and the depth are the resting state; two slow turns
- * on unaligned periods drift it the way a thing on a string does in moving air,
- * and a shine band crosses the paper once a cycle. All of it runs on the native
- * driver, and none of it runs when the phone asks for reduced motion.
+ * It also hangs. The tilt and the depth are the resting state; every so often
+ * something nudges the ticket and it swings through a few decaying passes back
+ * to exactly that tilt, then rests until the next one. A narrow glint crosses
+ * the paper on its own slower beat. All of it runs on the native driver, and
+ * none of it runs when the phone asks for reduced motion.
  */
 
 const ACCENT_FALLBACK = '#e8e14a';
@@ -50,15 +51,26 @@ const NOTCH_R = 13;
 const SEAM_STROKE = 'rgba(255,255,255,0.22)';
 /** The whole going-count tick: face in, then the number. */
 const TICK_MS = 460;
-/** The hang's gust: one breath through the ticket, then the quiet. */
-const GUST_MS = 8500;
-/** The second turn of the same air, on a longer, deliberately unaligned period. */
-const DRIFT_MS = 13000;
-/** The shine takes this long across the paper, then waits out the cycle. */
-const SHINE_MS = 3200;
-const SHINE_REST_MS = 16800;
-/** The lit band's width as a fraction of the ticket's. */
-const SHINE_BAND = 0.62;
+/**
+ * The hang's swing: degrees off the rest tilt, and how long each pass takes.
+ * Decaying passes, the last one landing back on 0 — the ticket returns to
+ * precisely the angle it started from and holds there for `SWING_REST_MS`.
+ */
+const SWING: Array<[number, number]> = [
+  [1.6, 620],
+  [-1.25, 560],
+  [0.9, 520],
+  [-0.55, 480],
+  [0.28, 440],
+  [0, 420],
+];
+/** How still the ticket sits between two swings. */
+const SWING_REST_MS = 5000;
+/** The glint takes this long across the paper, then waits out the cycle. */
+const SHINE_MS = 1000;
+const SHINE_REST_MS = 19000;
+/** The lit band's width in dp — a glint, not a wash over the paper. */
+const SHINE_BAND = 12;
 const STONE_50 = '#fafaf9';
 const STONE_200 = '#e7e5e4';
 const STONE_300 = '#d6d3d1';
@@ -88,9 +100,9 @@ function accentNeedsDarkText(hex: string): boolean {
 }
 
 /**
- * One leg of the hang: turn the layer to `to` degrees over `ms`. The breath's
- * shape — nearly still, then a swing out and decaying passes — lives in the step
- * durations rather than in one curve.
+ * One leg of the swing: turn the layer to `to` degrees over `ms`. A pass between
+ * two extremes is quickest through the middle, which is what inOut gives; the
+ * decay lives in the amplitudes, not in one curve.
  */
 function turn(value: Animated.Value, to: number, ms: number, easing = Easing.inOut(Easing.quad)) {
   return Animated.timing(value, {
@@ -101,7 +113,7 @@ function turn(value: Animated.Value, to: number, ms: number, easing = Easing.inO
   });
 }
 
-/** The hang values are degrees; a transform wants them labelled as such. */
+/** The hang's value is degrees; a transform wants it labelled as such. */
 function deg(value: Animated.Value) {
   return value.interpolate({ inputRange: [-3, 3], outputRange: ['-3deg', '3deg'] });
 }
@@ -162,12 +174,10 @@ export function EventTicket({
   const reduceMotion = useRef(false);
   const [motion, setMotion] = useState(false);
 
-  // The hang: two turns, a gust on 8.5 s and a drift on 13 s that never line up,
-  // so the ticket has no visible loop the way a thing on a string in a room with
-  // air has none. The shine rides its own value and is off the paper between
-  // sweeps.
-  const gust = useRef(new Animated.Value(0.05)).current;
-  const drift = useRef(new Animated.Value(0.2)).current;
+  // The hang: one swing through decaying passes, back to the rest tilt, then
+  // five seconds of nothing before the next. The shine rides its own value and
+  // is off the paper between sweeps.
+  const swing = useRef(new Animated.Value(0)).current;
   const shine = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -181,25 +191,14 @@ export function EventTicket({
 
   useEffect(() => {
     if (!motion) return undefined;
-    // The shares are the keyframe weights of the approved motion.
-    const g = (share: number) => Math.round(GUST_MS * share);
-    const d = (share: number) => Math.round(DRIFT_MS * share);
-    const gustLoop = Animated.loop(
+    const [first, ...rest] = SWING;
+    const swingLoop = Animated.loop(
       Animated.sequence([
-        turn(gust, 0.05, g(0.14), Easing.linear),
-        turn(gust, -1.3, g(0.16)),
-        turn(gust, 1.5, g(0.18)),
-        turn(gust, -0.7, g(0.16)),
-        turn(gust, 0.5, g(0.16)),
-        turn(gust, 0.05, g(0.14)),
-        turn(gust, 0.05, g(0.06), Easing.linear),
-      ]),
-    );
-    const driftLoop = Animated.loop(
-      Animated.sequence([
-        turn(drift, -0.45, d(0.32)),
-        turn(drift, 0.4, d(0.34)),
-        turn(drift, 0.2, d(0.34)),
+        // Pushed from stillness, so the first pass decelerates into its extreme;
+        // every pass after it crosses the middle at speed, which is inOut.
+        turn(swing, first[0], first[1], Easing.out(Easing.quad)),
+        ...rest.map(([to, ms]) => turn(swing, to, ms)),
+        Animated.delay(SWING_REST_MS),
       ]),
     );
     const shineLoop = Animated.loop(
@@ -207,7 +206,7 @@ export function EventTicket({
         Animated.timing(shine, {
           toValue: 1,
           duration: SHINE_MS,
-          easing: Easing.inOut(Easing.quad),
+          easing: Easing.linear,
           useNativeDriver: true,
         }),
         Animated.delay(SHINE_REST_MS),
@@ -215,10 +214,10 @@ export function EventTicket({
         Animated.timing(shine, { toValue: 0, duration: 1, useNativeDriver: true }),
       ]),
     );
-    const loops = [gustLoop, driftLoop, shineLoop];
+    const loops = [swingLoop, shineLoop];
     loops.forEach((loop) => { loop.start(); });
     return () => { loops.forEach((loop) => { loop.stop(); }); };
-  }, [motion, gust, drift, shine]);
+  }, [motion, swing, shine]);
 
   useEffect(() => {
     const snapshot = { count, attendees: attendees.length };
@@ -258,12 +257,9 @@ export function EventTicket({
 
   return (
     <Animated.View
-      // The three turns share one pivot, just under the top edge, so they add up
-      // the way nested layers would and the far end sweeps the widest arc.
-      style={[
-        styles.frame,
-        { transform: [{ rotate: '0.7deg' }, { rotate: deg(gust) }, { rotate: deg(drift) }] },
-      ]}
+      // The rest tilt and the swing share one pivot, just under the top edge, so
+      // they add up like nested layers and the far end sweeps the widest arc.
+      style={[styles.frame, { transform: [{ rotate: '0.7deg' }, { rotate: deg(swing) }] }]}
       onLayout={(layout) => {
         const width = layout.nativeEvent.layout.width;
         setSeam((current) => ({ width, y: current?.y ?? 0 }));
@@ -481,19 +477,19 @@ export function EventTicket({
         </LinearGradient>
 
         {seam && seam.width > 0 ? (
-          // The shine: one wide, soft band taking its time across the paper, then
-          // parked off the ticket's left edge for the rest of the cycle.
+          // The shine: a narrow glint crossing the paper, then parked off the
+          // ticket's left edge for the rest of the cycle.
           <Animated.View
             pointerEvents="none"
             style={[
               styles.shine,
               {
-                width: seam.width * SHINE_BAND,
+                width: SHINE_BAND,
                 transform: [
                   {
                     translateX: shine.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-seam.width * SHINE_BAND, seam.width],
+                      outputRange: [-SHINE_BAND, seam.width],
                     }),
                   },
                 ],
@@ -503,14 +499,14 @@ export function EventTicket({
             <LinearGradient
               colors={[
                 'rgba(255,255,255,0)',
-                'rgba(255,255,255,0.04)',
-                'rgba(255,255,255,0.10)',
-                'rgba(255,255,255,0.04)',
+                'rgba(255,255,255,0.05)',
+                'rgba(255,255,255,0.16)',
+                'rgba(255,255,255,0.05)',
                 'rgba(255,255,255,0)',
               ]}
-              locations={[0, 0.31, 0.5, 0.69, 1]}
-              start={{ x: 0, y: 0.34 }}
-              end={{ x: 1, y: 0.66 }}
+              locations={[0, 0.3, 0.5, 0.7, 1]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
