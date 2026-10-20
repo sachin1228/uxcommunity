@@ -51,7 +51,7 @@ export function BrowserNotificationInitializer() {
         >
           <BellOff strokeWidth={2.5} className="size-5 shrink-0 text-accent" aria-hidden="true" />
           <p className="min-w-0 flex-1 font-body text-xs leading-relaxed">
-            Message notifications are off.{" "}
+            Notifications are off.{" "}
             <button
               type="button"
               onClick={turnOnNotifications}
@@ -100,7 +100,7 @@ export function BrowserNotificationInitializer() {
               <p id="notification-guide-description" className="font-body text-sm leading-relaxed text-pretty text-foreground-muted sm:text-base">
                 {permission === "denied"
                   ? "Open the site controls beside the address bar, set Notifications to Allow, then refresh this page."
-                  : "Choose Allow in the browser prompt above to get community messages while this tab is in the background."}
+                  : "Choose Allow in the browser prompt above to get chat messages and event reminders while this tab is in the background."}
               </p>
             </div>
             <button

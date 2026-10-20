@@ -76,7 +76,7 @@ const TAB_EMPTY: Record<NotificationTab, { icon: FeatherName; title: string; hin
   events: {
     icon: 'calendar',
     title: 'No event activity yet',
-    hint: 'RSVPs and comments on your events will appear here.',
+    hint: "Reminders for events you're going to, and RSVPs and comments on your own events, will appear here.",
   },
   jobs: {
     icon: 'briefcase',
@@ -149,6 +149,8 @@ export default function NotificationsScreen() {
         router.push(`/community/${route.communityId}${query}`);
       } else if (route.kind === 'jobs') {
         router.push('/jobs');
+      } else if (route.kind === 'events') {
+        router.push('/events');
       }
     },
     [markRead, router],
@@ -206,6 +208,15 @@ export default function NotificationsScreen() {
             {item.type === 'job_match' ? (
               <View style={styles.viewJob}>
                 <Text style={[styles.viewJobText, { color: colors.accent }]}>View job</Text>
+                <Feather name="arrow-right" size={12} color={colors.accent} />
+              </View>
+            ) : null}
+
+            {item.type === 'event_reminder' ||
+            item.type === 'event_live' ||
+            item.type === 'event_ended' ? (
+              <View style={styles.viewJob}>
+                <Text style={[styles.viewJobText, { color: colors.accent }]}>View event</Text>
                 <Feather name="arrow-right" size={12} color={colors.accent} />
               </View>
             ) : null}
@@ -320,7 +331,7 @@ export default function NotificationsScreen() {
                   No notifications yet
                 </Text>
                 <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                  Likes, comments, event RSVPs and job matches will appear here.
+                  Likes, comments, event reminders and job matches will appear here.
                 </Text>
               </View>
             ) : (

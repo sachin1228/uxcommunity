@@ -184,7 +184,7 @@ export function NotificationsView({ userId }: { userId: string }) {
           <EmptyNotifications
             icon={Bell}
             title="No notifications yet"
-            hint="Likes, comments, event RSVPs and job matches will appear here."
+            hint="Likes, comments, event reminders and job matches will appear here."
           />
         ) : visible.length === 0 ? (
           tab === "activity" ? (
@@ -197,7 +197,7 @@ export function NotificationsView({ userId }: { userId: string }) {
             <EmptyNotifications
               icon={CalendarDays}
               title="No event activity yet"
-              hint="RSVPs and comments on your events will appear here."
+              hint="Reminders for events you're going to, and RSVPs and comments on your own events, will appear here."
             />
           ) : tab === "jobs" ? (
             <EmptyNotifications

@@ -44,13 +44,20 @@ new_sqlite_classes = ["AlertMonitor"]
 # daily so a big first-run backlog drains the same day, and each empty run is a
 # single indexed query.
 #
-# Cron Triggers are per-Worker and free, which is why both live here:
+# Event lifecycle: every minute this Worker asks the web app which events have
+# a reminder due — tomorrow, this morning, in half an hour, live, ended — and
+# the web app writes the in-app row and sends the Expo push (see
+# src/event-notifications.ts and apps/web/lib/events/lifecycle-notifications.ts).
+# Minute-accurate because the moments are clock-accurate; a tick with nothing
+# due is a handful of indexed queries.
+#
+# Cron Triggers are per-Worker and free, which is why all three live here:
 # the realtime Worker already runs this app's Durable Objects and already holds
 # API_URL / API_SECRET, so this adds no deployment, no secret and no resource
 # to provision. The monitor also cannot alert about the web app itself being
 # down — the email is sent BY the web app — so that case is logged instead.
 [triggers]
-crons = ["*/5 * * * *", "0 */6 * * *"]
+crons = ["*/5 * * * *", "0 */6 * * *", "* * * * *"]
 
 # Invocation logs. These used to live in a duplicate config at the repository
 # root, which existed only so the Cloudflare Git integration could build from

@@ -8,11 +8,14 @@
  * the sender, muted communities and anyone who turned chat push off); this
  * module registers the device and decides how an incoming push is presented.
  *
- * Two Android channels exist because Android channel settings are immutable
+ * Three Android channels exist because Android channel settings are immutable
  * after creation: `messages` buzzes, `messages-silent` exists so the server
  * can update a notification without re-ringing it (quiet hours and the
- * per-minute budget both rely on that). Android also drops a notification
- * targeting a channel that does not exist yet, so both are created up front.
+ * per-minute budget both rely on that), and `events` carries the calendar
+ * moments — tomorrow, the half-hour call, live, ended — so a member can mute
+ * reminders from chat without losing either. Android also drops a notification
+ * targeting a channel that does not exist yet, so all three are created up
+ * front.
  *
  * Every failure here is recorded rather than thrown: push is a nice-to-have,
  * and the settings screen surfaces the recorded reason so a device that is not
@@ -39,6 +42,8 @@ const MUTED_KEY = '@push/muted_communities';
 export const MESSAGE_CHANNEL_ID = 'messages';
 /** Android channel for a silent update to an existing notification. */
 export const SILENT_CHANNEL_ID = 'messages-silent';
+/** Android channel for the event lifecycle reminders and announcements. */
+export const EVENT_CHANNEL_ID = 'events';
 
 /** Payload shape attached by the server when it sends a chat push. */
 export interface CommunityMessagePushData {
@@ -50,6 +55,24 @@ export interface CommunityMessagePushData {
   /** True when the server chose not to buzz for this one. */
   silent?: boolean;
 }
+
+export type EventLifecycleStage = 'tomorrow' | 'today' | 'soon' | 'live' | 'ended';
+
+/**
+ * Payload shape for an event reminder or lifecycle announcement. `communityId`
+ * is the event's group chat when one exists — the screen the tap opens — and
+ * null for an event nobody has a room for yet.
+ */
+export interface EventLifecyclePushData {
+  type: 'event_lifecycle';
+  stage: EventLifecycleStage;
+  eventId: string;
+  communityId?: string | null;
+  href?: string;
+}
+
+/** Every push this app understands; anything else is ignored on tap. */
+export type PushData = CommunityMessagePushData | EventLifecyclePushData;
 
 /** What we last observed about this device's push registration. */
 export interface PushDiagnostics {
@@ -192,12 +215,20 @@ export async function setMutedCommunities(ids: string[]): Promise<void> {
 export function registerNotificationHandler(): void {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
-      const data = (notification.request.content.data ?? {}) as Partial<CommunityMessagePushData>;
+      const data = (notification.request.content.data ?? {}) as Partial<PushData>;
       const isChat = data.type === 'community_message' && !!data.communityId;
+      const isEvent = data.type === 'event_lifecycle' && !!(data as EventLifecyclePushData).eventId;
       const muted = isChat && isCommunityMuted(data.communityId!);
-      const alreadyReading = isChat && communityStore.activeCommunityId === data.communityId;
+      // An event push for the room already on screen adds nothing on top of it;
+      // the chat mute is a chat switch and never silences calendar moments.
+      const alreadyReading =
+        (isChat || isEvent) &&
+        'communityId' in data &&
+        !!data.communityId &&
+        communityStore.activeCommunityId === data.communityId;
       const suppress = muted || alreadyReading;
-      const badge = typeof data.badge === 'number' ? data.badge : null;
+      const badge =
+        data.type === 'community_message' && typeof data.badge === 'number' ? data.badge : null;
 
       // The badge is applied even for a suppressed notification: muting a
       // community stops it interrupting, not from counting as unread.
@@ -215,15 +246,22 @@ export function registerNotificationHandler(): void {
   });
 }
 
-/** Reads the push data off a notification response, or null if it isn't one. */
+/**
+ * Reads the push data off a notification response, or null when it is not one
+ * this app knows how to open.
+ */
 export function pushDataFrom(
   response: Notifications.NotificationResponse | null,
-): CommunityMessagePushData | null {
+): PushData | null {
   if (!response) return null;
-  const data = (response.notification.request.content.data ?? {}) as
-    Partial<CommunityMessagePushData>;
-  if (data.type !== 'community_message' || !data.communityId) return null;
-  return data as CommunityMessagePushData;
+  const data = (response.notification.request.content.data ?? {}) as Partial<PushData>;
+  if (data.type === 'community_message' && data.communityId) {
+    return data as CommunityMessagePushData;
+  }
+  if (data.type === 'event_lifecycle' && (data as EventLifecyclePushData).eventId) {
+    return data as EventLifecyclePushData;
+  }
+  return null;
 }
 
 /**
@@ -252,6 +290,18 @@ export async function ensureNotificationChannels(): Promise<void> {
     vibrationPattern: [0],
     lightColor: '#0062D1',
     sound: null,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  }).catch(() => {
+    /* channel creation is best-effort */
+  });
+
+  await Notifications.setNotificationChannelAsync(EVENT_CHANNEL_ID, {
+    name: 'Event reminders',
+    description: 'Reminders for events you are going to, and when they go live or end',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#0062D1',
+    sound: 'default',
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   }).catch(() => {
     /* channel creation is best-effort */

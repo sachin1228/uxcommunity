@@ -43,6 +43,8 @@ const MIN_WORD_PX = 4;
 /** The state pill's metrics, as fractions of the DP (see the web ratios). */
 const PILL_HEIGHT_RATIO = 0.42;
 const PILL_FONT_RATIO = 0.22;
+/** ENDED has a fifth glyph and the pill is clamped to the DP's width. */
+const PILL_FONT_RATIO_ENDED = 0.18;
 const PILL_DOT_RATIO = 0.15;
 const PILL_GAP_RATIO = 0.06;
 const PILL_PAD_RATIO = 0.14;
@@ -152,7 +154,7 @@ export function DpWithEventDate({
   const tileRadius = Math.max(3, Math.round(badgeSize * TILE_RADIUS_RATIO));
 
   const pillHeight = Math.max(MIN_PILL_HEIGHT_PX, Math.round(dpSize * PILL_HEIGHT_RATIO));
-  const pillFont = Math.round(dpSize * PILL_FONT_RATIO);
+  const pillFont = Math.round(dpSize * (isEnded ? PILL_FONT_RATIO_ENDED : PILL_FONT_RATIO));
   const pillDot = Math.max(MIN_PILL_DOT_PX, Math.round(dpSize * PILL_DOT_RATIO));
   const pillGap = Math.max(1, Math.round(dpSize * PILL_GAP_RATIO));
   const pillPad = Math.max(3, Math.round(dpSize * PILL_PAD_RATIO));

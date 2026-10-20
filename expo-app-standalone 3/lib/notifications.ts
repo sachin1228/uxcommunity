@@ -33,7 +33,10 @@ export type NotificationType =
   | 'report_reviewed'
   | 'content_restored'
   | 'job_match'
-  | 'join_request_accepted';
+  | 'join_request_accepted'
+  | 'event_reminder'
+  | 'event_live'
+  | 'event_ended';
 
 /** One row of GET /api/notifications, trimmed to what the list draws. */
 export interface NotificationItem {
@@ -75,7 +78,14 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     'resource_comment',
     'resource_reply',
   ]),
-  events: new Set(['event_comment', 'event_reply', 'event_rsvp']),
+  events: new Set([
+    'event_comment',
+    'event_reply',
+    'event_rsvp',
+    'event_reminder',
+    'event_live',
+    'event_ended',
+  ]),
   jobs: new Set(['job_match']),
   other: new Set([
     'thread_deleted',
@@ -266,6 +276,8 @@ export type NotificationRoute =
       contentKind?: ContentKind;
       contentId?: string;
     }
+  /** A city event with no community of its own — the Events tab lists it. */
+  | { kind: 'events' }
   | { kind: 'jobs' }
   | { kind: 'none' };
 
@@ -294,6 +306,8 @@ export function notificationHrefToRoute(href: string): NotificationRoute {
     }
     return { kind: 'community', communityId: id };
   }
+
+  if (section === 'events' && id) return { kind: 'events' };
 
   if (section === 'jobs' && id) return { kind: 'jobs' };
 
