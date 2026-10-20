@@ -202,18 +202,21 @@ export function DmComposer({
             <Pressable
               onPress={togglePicker}
               disabled={disabled}
-              hitSlop={6}
+              hitSlop={5}
               accessibilityLabel={emojiPanelOpen ? 'Show keyboard' : 'Open emoji picker'}
-              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+              style={({ pressed }) => [
+                styles.pillBtn,
+                { backgroundColor: pressed ? colors.surfaceHover : 'transparent' },
+              ]}
             >
               {emojiPanelOpen ? (
                 <MaterialCommunityIcons
                   name="keyboard-outline"
-                  size={20}
-                  color={colors.accent}
+                  size={22}
+                  color={colors.mutedForeground}
                 />
               ) : (
-                <Feather name="smile" size={19} color={colors.mutedForeground} />
+                <Feather name="smile" size={22} color={colors.mutedForeground} />
               )}
             </Pressable>
 
@@ -255,11 +258,14 @@ export function DmComposer({
               disabled={disabled}
               hitSlop={6}
               accessibilityLabel="Attach image"
-              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+              style={({ pressed }) => [
+                styles.pillBtn,
+                { backgroundColor: pressed ? colors.surfaceHover : 'transparent' },
+              ]}
             >
               <Feather
                 name="image"
-                size={19}
+                size={21}
                 color={pendingImage ? colors.accent : colors.mutedForeground}
               />
             </Pressable>
@@ -289,7 +295,7 @@ export function DmComposer({
           {disabled ? (
             <ActivityIndicator size="small" color={colors.mutedForeground} />
           ) : (
-            <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={20} />
+            <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={22} />
           )}
         </Pressable>
         </View>
@@ -328,15 +334,15 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 22,
     paddingHorizontal: 8,
-    paddingVertical: 6,
-    minHeight: 44,
+    paddingVertical: 7,
+    minHeight: 50,
   },
   replyBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
     borderLeftWidth: 3,
-    borderRadius: 8,
+    borderRadius: 22,
     paddingHorizontal: 10,
     paddingVertical: 7,
     marginBottom: 6,
@@ -356,8 +362,9 @@ const styles = StyleSheet.create({
   imageReady: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 12 },
   boxInner: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   pillBtn: {
-    width: 30,
-    height: 32,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -369,8 +376,9 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 6,
     paddingHorizontal: 2,
-    fontFamily: 'Geist_400Regular',
-    fontSize: 15,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 15.5,
+    lineHeight: 24,
   },
   counter: { fontFamily: 'Geist_400Regular', fontSize: 10.5, paddingBottom: 8, paddingRight: 2 },
   limitError: {
@@ -380,9 +388,9 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 3,

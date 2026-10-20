@@ -451,7 +451,7 @@ function BubbleImage({
         <View style={[styles.mediaTimeOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
           <Text style={styles.mediaTimeText}>{fmtTime(createdAt)}</Text>
           {isOwn && (
-            <CheckCheckIcon size={11} color="rgba(255,255,255,0.9)" />
+            <CheckCheckIcon size={12} color="rgba(255,255,255,0.9)" />
           )}
         </View>
       )}
@@ -508,7 +508,7 @@ function TimeRow({
         {fmtTime(message.created_at)}
       </Text>
       {isOwn && status === 'sending' && (
-        // The spinner sits in the check mark's exact 11pt slot (scaled to fit):
+        // The spinner sits in the check mark's exact 12pt slot (scaled to fit):
         // an ActivityIndicator's unscaled box is ~20pt and a transform does
         // not shrink layout, so without the slot the row widened while
         // sending and snapped back when the double check appeared.
@@ -517,7 +517,7 @@ function TimeRow({
         </View>
       )}
       {isOwn && (status === 'sent' || !status) && (
-        <CheckCheckIcon size={11} color={timeColor} opacity={0.7} />
+        <CheckCheckIcon size={12} color={timeColor} opacity={0.7} />
       )}
       {isOwn && status === 'failed' && (
         <Text style={[styles.timeText, { color: colors.destructive }]}>!</Text>
@@ -1014,12 +1014,12 @@ const styles = StyleSheet.create({
   nameOnMedia: { marginBottom: 4, paddingLeft: 4 },
 
   content: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 15.5,
+    lineHeight: 24,
     fontFamily: 'Geist_400Regular',
   },
   mentionText: { fontFamily: 'Geist_600SemiBold' },
-  readMore: { fontSize: 15, lineHeight: 22, fontFamily: 'Geist_500Medium' },
+  readMore: { fontSize: 15.5, lineHeight: 24, fontFamily: 'Geist_500Medium' },
   contentOnMedia: { paddingLeft: 4, paddingRight: 4 },
   /** Offscreen measuring copy: absolute and zero-height so it never affects
    *  the cell's layout or paints over neighbouring bubbles. */
@@ -1069,7 +1069,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  mediaTimeText: { fontSize: 10, fontFamily: 'Geist_400Regular', color: 'rgba(255,255,255,0.9)' },
+  mediaTimeText: { fontSize: 11, fontFamily: 'Geist_500Medium', color: 'rgba(255,255,255,0.9)' },
 
   // ── time row ────────────────────────────────────────────────────────────
   timeRow: {
@@ -1080,9 +1080,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   timeRowOnMedia: { paddingRight: 4, paddingBottom: 2 },
-  timeText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
+  timeText: { fontSize: 11, fontFamily: 'Geist_500Medium' },
   /** The check mark's exact box — the sending spinner renders inside it. */
-  statusSlot: { width: 11, height: 11, alignItems: 'center', justifyContent: 'center' },
+  statusSlot: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center' },
   tinySpinner: { transform: [{ scale: 0.55 }] },
 
   // ── own-message overlays ────────────────────────────────────────────────

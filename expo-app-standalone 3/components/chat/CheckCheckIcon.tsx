@@ -8,7 +8,7 @@ import Svg, { Path } from 'react-native-svg';
  * different, filled glyph; this keeps the web's thin round-capped strokes.
  */
 export function CheckCheckIcon({
-  size = 11,
+  size = 12,
   color,
   opacity,
 }: {

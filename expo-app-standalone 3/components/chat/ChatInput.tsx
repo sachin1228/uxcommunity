@@ -289,21 +289,21 @@ export function ChatInput({
               <Pressable
                 onPress={togglePicker}
                 disabled={disabled}
-                hitSlop={6}
+                hitSlop={5}
                 accessibilityLabel={pickerOpen ? 'Show keyboard' : 'Open emoji picker'}
                 style={({ pressed }) => [
                   styles.pillBtn,
-                  { opacity: pressed ? 0.5 : 1 },
+                  { backgroundColor: pressed ? colors.surfaceHover : 'transparent' },
                 ]}
               >
                 {pickerOpen ? (
                   <MaterialCommunityIcons
                     name="keyboard-outline"
-                    size={20}
-                    color={colors.accent}
+                    size={22}
+                    color={colors.mutedForeground}
                   />
                 ) : (
-                  <Feather name="smile" size={19} color={colors.mutedForeground} />
+                  <Feather name="smile" size={22} color={colors.mutedForeground} />
                 )}
               </Pressable>
 
@@ -350,11 +350,14 @@ export function ChatInput({
                 disabled={disabled}
                 hitSlop={6}
                 accessibilityLabel="Attach image"
-                style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+                style={({ pressed }) => [
+                  styles.pillBtn,
+                  { backgroundColor: pressed ? colors.surfaceHover : 'transparent' },
+                ]}
               >
                 <Feather
                   name="image"
-                  size={19}
+                  size={21}
                   color={pendingImage ? colors.accent : colors.mutedForeground}
                 />
               </Pressable>
@@ -384,7 +387,7 @@ export function ChatInput({
             {disabled ? (
               <ActivityIndicator size="small" color={colors.mutedForeground} />
             ) : (
-              <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={20} />
+              <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={22} />
             )}
           </Pressable>
         </View>
@@ -423,7 +426,7 @@ const styles = StyleSheet.create({
 
   box: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 22,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -437,7 +440,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
 
   /** Pill + send-button row — the button is a sibling of the pill, not
@@ -451,9 +454,7 @@ const styles = StyleSheet.create({
   replyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    // Concentric with the pill: box radius (18) minus this banner's 6pt side
-    // inset — the inner corners trace the outer container's curve.
-    borderRadius: 12,
+    borderRadius: 22,
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
@@ -488,8 +489,9 @@ const styles = StyleSheet.create({
   linkText: { flex: 1, fontSize: 10, fontFamily: 'Geist_400Regular' },
 
   pillBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -498,9 +500,9 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     minWidth: 0,
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'Geist_400Regular',
+    fontSize: 15.5,
+    lineHeight: 24,
+    fontFamily: 'Geist_500Medium',
     maxHeight: 120,
     paddingTop: 7,
     paddingBottom: 7,
@@ -512,11 +514,10 @@ const styles = StyleSheet.create({
   counter: { fontSize: 10, fontFamily: 'Geist_400Regular', marginBottom: 10, flexShrink: 0 },
 
   sendBtn: {
-    // Matches the pill's single-line height (padding 4+4 + input 36) so the
-    // circle is flush with the pill's bottom edge, exactly like WhatsApp.
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    // Keeps the send circle aligned with the pill's bottom edge.
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
