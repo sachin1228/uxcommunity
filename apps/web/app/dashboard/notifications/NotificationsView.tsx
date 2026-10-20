@@ -48,7 +48,8 @@ function iconFor(type: NotificationType) {
 
 /** Icons are a view concern; the tab keys/labels come from the shared module. */
 const TAB_ICONS: Record<NotificationTab, typeof Bell> = {
-  activity: MessageCircle,
+  likes: Heart,
+  comments: MessageCircle,
   events: CalendarDays,
   jobs: Briefcase,
   other: Bell,
@@ -91,19 +92,27 @@ export function NotificationsView({ userId }: { userId: string }) {
   const { notifications, unreadCount, loading, markOneRead, markAllRead } =
     useNotifications(userId, { autoMarkSeen: true });
 
-  const [tab, setTab] = useState<NotificationTab>("activity");
+  const [tab, setTab] = useState<NotificationTab>("likes");
 
   const hasUnread = unreadCount > 0;
 
   // Unread counts are derived from the loaded page — the server total
   // (`unreadCount`) is not split by type.
-  const { activity, events, jobs, other, unreadByTab } = useMemo(
+  const { likes, comments, events, jobs, other, unreadByTab } = useMemo(
     () => splitNotificationsByTab(notifications),
     [notifications],
   );
 
   const visible =
-    tab === "activity" ? activity : tab === "events" ? events : tab === "jobs" ? jobs : other;
+    tab === "likes"
+      ? likes
+      : tab === "comments"
+        ? comments
+        : tab === "events"
+          ? events
+          : tab === "jobs"
+            ? jobs
+            : other;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
@@ -187,11 +196,17 @@ export function NotificationsView({ userId }: { userId: string }) {
             hint="Likes, comments, event reminders and job matches will appear here."
           />
         ) : visible.length === 0 ? (
-          tab === "activity" ? (
+          tab === "likes" ? (
+            <EmptyNotifications
+              icon={Heart}
+              title="No likes yet"
+              hint="Likes on your threads and resources will appear here."
+            />
+          ) : tab === "comments" ? (
             <EmptyNotifications
               icon={MessageCircle}
-              title="No likes or comments yet"
-              hint="Likes and comments on your threads and resources will appear here."
+              title="No comments yet"
+              hint="Comments and replies on your threads and resources will appear here."
             />
           ) : tab === "events" ? (
             <EmptyNotifications

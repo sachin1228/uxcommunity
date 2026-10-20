@@ -50,10 +50,11 @@ function fakeStorage(initial: Record<string, string> = {}) {
 test('every tab the web declares renders under the tab it names', () => {
   assert.deepEqual(
     NOTIFICATION_TABS.map((entry) => entry.key),
-    ['activity', 'events', 'jobs', 'other'],
+    ['likes', 'comments', 'events', 'jobs', 'other'],
   );
-  assert.equal(notificationTabFor('thread_like'), 'activity');
-  assert.equal(notificationTabFor('resource_reply'), 'activity');
+  assert.equal(notificationTabFor('thread_like'), 'likes');
+  assert.equal(notificationTabFor('thread_comment'), 'comments');
+  assert.equal(notificationTabFor('resource_reply'), 'comments');
   assert.equal(notificationTabFor('event_rsvp'), 'events');
   assert.equal(notificationTabFor('event_reminder'), 'events');
   assert.equal(notificationTabFor('event_live'), 'events');
@@ -74,11 +75,15 @@ test('split keeps order, counts unread per tab and drops unclaimed types', () =>
     item({ id: 'f', type: 'community_thread' as NotificationType }),
   ];
 
-  const { activity, events, jobs, other, unreadByTab } = splitNotificationsByTab(items);
+  const { likes, comments, events, jobs, other, unreadByTab } = splitNotificationsByTab(items);
 
   assert.deepEqual(
-    activity.map((row) => row.id),
-    ['a', 'b'],
+    likes.map((row) => row.id),
+    ['a'],
+  );
+  assert.deepEqual(
+    comments.map((row) => row.id),
+    ['b'],
   );
   assert.deepEqual(
     events.map((row) => row.id),
@@ -92,7 +97,29 @@ test('split keeps order, counts unread per tab and drops unclaimed types', () =>
     other.map((row) => row.id),
     ['e'],
   );
-  assert.deepEqual(unreadByTab, { activity: 1, events: 1, jobs: 1, other: 1 });
+  assert.deepEqual(unreadByTab, { likes: 1, comments: 0, events: 1, jobs: 1, other: 1 });
+});
+
+test('likes and comments split into separate tabs', () => {
+  const items = [
+    item({ id: 'a', type: 'thread_like' }),
+    item({ id: 'b', type: 'thread_comment' }),
+    item({ id: 'c', type: 'resource_reply' }),
+    item({ id: 'd', type: 'thread_like', read_at: '2026-10-17T01:00:00.000Z' }),
+  ];
+
+  const { likes, comments, unreadByTab } = splitNotificationsByTab(items);
+
+  assert.deepEqual(
+    likes.map((row) => row.id),
+    ['a', 'd'],
+  );
+  assert.deepEqual(
+    comments.map((row) => row.id),
+    ['b', 'c'],
+  );
+  assert.equal(unreadByTab.likes, 1);
+  assert.equal(unreadByTab.comments, 2);
 });
 
 test('the seen watermark hydrates once, advances monotonically and persists', async () => {
