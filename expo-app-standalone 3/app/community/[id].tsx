@@ -76,6 +76,7 @@ import { CommunityContentView } from '@/components/community/CommunityContentVie
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
 import { isContentKind, type CommunityTab, type ContentKind } from '@/lib/communityContent';
+import { canModerateContent } from '@/lib/communityPermissions';
 
 /** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
 type ChatRow =
@@ -563,6 +564,9 @@ export default function CommunityChat() {
   const canManageMembers = isOwnCommunity || isGranted('can_manage_members');
   const canManageModerators = isOwnCommunity || myRole === 'admin';
   const canModerateMessages = isOwnCommunity || isGranted('can_delete_messages');
+  /** Content tabs' manager gate — owners moderate everything, managers their grants. */
+  const canModerateTab = (kind: ContentKind) =>
+    canModerateContent(kind, myRole, myPermissions);
 
   const listRef = useRef<FlatList<ChatRow>>(null);
   const chatComposerRef = useRef<ChatComposerHandle>(null);
@@ -1544,6 +1548,7 @@ export default function CommunityChat() {
           currentUserId={user?.id ?? ''}
           openContentId={openTarget && openTarget.tab === activeTab ? openTarget.id : null}
           onOpenConsumed={() => setOpenTarget(null)}
+          canModerate={canModerateTab(activeTab as ContentKind)}
         />
       )}
 

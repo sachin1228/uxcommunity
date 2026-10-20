@@ -15,10 +15,13 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
+import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { getCityEventPage, firstPageCursor, type CityEventItem, type CityEventPhase } from '@/lib/cityEvents';
-import { CommunityContent, CommunityEvent } from '@/lib/communityContent';
+import { CommunityContent, CommunityEvent, deleteCommunityContent } from '@/lib/communityContent';
+import { chatContentKindForTab } from '@/lib/chatContentEvents';
+import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
 import { getOwnProfile } from '@/lib/profile';
 
@@ -82,6 +85,8 @@ export default function EventsTab() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  /** The event row whose editor is open (host-only; null when closed). */
+  const [editing, setEditing] = useState<FeedItem | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   const resetActions = actions.reset;
@@ -176,6 +181,66 @@ export default function EventsTab() {
     [items],
   );
 
+  // The city listing's rows are feed rows: keep their `_type` and community
+  // attribution when an edit response replaces the event's own fields.
+  const replaceItem = useCallback((saved: CommunityContent) => {
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === saved.id
+          ? {
+              ...entry,
+              ...saved,
+              _type: entry._type,
+              community_name: entry.community_name,
+              community_image: entry.community_image,
+            }
+          : entry,
+      ),
+    );
+    setSelected((current) =>
+      current && current.id === saved.id
+        ? {
+            ...current,
+            ...saved,
+            _type: current._type,
+            community_name: current.community_name,
+            community_image: current.community_image,
+          }
+        : current,
+    );
+    setEditing(null);
+  }, []);
+
+  const editItem = useCallback(
+    (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (row) setEditing(row);
+    },
+    [items],
+  );
+
+  const deleteItem = useCallback(
+    async (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (!row?.community_id) return;
+      const kind = feedItemKind(row);
+      await deleteCommunityContent(row.community_id, kind, row.id);
+      setItems((current) =>
+        current.filter((item) => !(item.id === row.id && item._type === row._type)),
+      );
+      setSelected((current) =>
+        current?.id === row.id && current._type === row._type ? null : current,
+      );
+      notifyContentEvent({
+        kind: 'delete',
+        communityId: row.community_id,
+        id: row.id,
+        contentKind: chatContentKindForTab(kind),
+      });
+    },
+    [items],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => (
       // A past event dims under its tab, exactly like the web list.
@@ -188,10 +253,12 @@ export default function EventsTab() {
           communityName={item.community_name}
           communityImage={item.community_image}
           onComments={openItem}
+          onEdit={editItem}
+          onDelete={deleteItem}
         />
       </View>
     ),
-    [actions, items, now, openItem, user?.id],
+    [actions, deleteItem, editItem, now, openItem, user?.id],
   );
 
   const emptyState =
@@ -320,6 +387,17 @@ export default function EventsTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
+        onEdit={editItem}
+        onDelete={deleteItem}
+      />
+
+      <CommunityContentEditor
+        visible={Boolean(editing)}
+        communityId={editing?.community_id ?? ''}
+        kind="events"
+        item={editing}
+        onClose={() => setEditing(null)}
+        onSaved={replaceItem}
       />
     </View>
   );

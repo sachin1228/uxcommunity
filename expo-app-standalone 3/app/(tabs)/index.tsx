@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,25 +15,61 @@ import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
-import { CommunityContent } from '@/lib/communityContent';
+import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
+import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent';
+import { chatContentKindForTab } from '@/lib/chatContentEvents';
+import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, getHomeFeed, type FeedItem } from '@/lib/homeFeed';
+import {
+  DEFAULT_HOME_FEED_SCOPE,
+  HOME_FEED_TAB_SCOPES,
+  type HomeFeedScope,
+} from '@/lib/homeFeedScope';
+import { readStoredHomeFeedScope, storeHomeFeedScope } from '@/lib/homeFeedScopeStore';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 
 /**
- * Home — the cross-community feed.
+ * Home — the cross-community feed, split into the web dashboard's two sources:
+ * "Public Posts" (public cards from communities the member hasn't joined) and
+ * "Your Communities" (everything from the communities they have). The chosen
+ * tab is remembered across launches, like the web's localStorage choice.
  *
  * Renders the same cards as the community tabs (likes, saves, RSVPs and the
  * comment thread all work identically), with a chip naming the community each
- * post came from. Posts are read-only here: editing and deleting stay on the
- * post's own community tab, where membership is known.
+ * post came from. The ··· menu carries the same owner Edit/Delete rows the web
+ * feed has — the editor and the delete call are hosted here, so removing a post
+ * from the feed updates the list in place.
  */
+
+type FeatherName = React.ComponentProps<typeof Feather>['name'];
+
+/** One tab per feed source — the web switcher's labels and glyphs. */
+const TAB_META: Record<HomeFeedScope, { label: string; icon: FeatherName }> = {
+  public: { label: 'Public Posts', icon: 'globe' },
+  communities: { label: 'Your Communities', icon: 'lock' },
+};
+
+/** Tab order comes from the shared axis — the web switcher's order. */
+const TABS = HOME_FEED_TAB_SCOPES.map((key) => ({ key, ...TAB_META[key] }));
+
+/** The web feed's empty-state copy per source — the two tabs show disjoint posts. */
+const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
+  public:
+    "Posts that members share publicly — from communities you haven't joined — will appear here.",
+  communities:
+    "Everything posted in the communities you've joined will appear here, whether or not it was shared publicly.",
+};
+
 export default function HomeTab() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const actions = useContentActions();
 
+  const [scope, setScope] = useState<HomeFeedScope>(DEFAULT_HOME_FEED_SCOPE);
+  /** The live source — load callbacks compare against it to drop stale pages. */
+  const scopeRef = useRef<HomeFeedScope>(DEFAULT_HOME_FEED_SCOPE);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,35 +77,71 @@ export default function HomeTab() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  /** The feed row whose editor is open (owner-only; null when closed). */
+  const [editing, setEditing] = useState<FeedItem | null>(null);
 
   const resetActions = actions.reset;
 
   const load = useCallback(
-    async (mode: 'initial' | 'refresh' = 'initial') => {
+    async (targetScope: HomeFeedScope, mode: 'initial' | 'refresh' = 'initial') => {
       if (mode === 'initial') setLoading(true);
       else setRefreshing(true);
       setError(null);
       try {
-        const page = await getHomeFeed();
+        const page = await getHomeFeed(targetScope);
+        // A tab switch while this page was in flight owns the list now.
+        if (scopeRef.current !== targetScope) return;
         setItems(page.items);
         setHasMore(page.hasMore);
         resetActions();
       } catch (e) {
+        if (scopeRef.current !== targetScope) return;
         setError(e instanceof Error ? e.message : 'Failed to load your feed.');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (scopeRef.current === targetScope) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [resetActions],
   );
 
+  // Open on the remembered tab. The first load waits for the stored choice, so
+  // a member who last read "Your Communities" never sees the public feed flash.
   useEffect(() => {
-    void load('initial');
+    let cancelled = false;
+    void (async () => {
+      const stored = await readStoredHomeFeedScope();
+      if (cancelled) return;
+      const initial = stored ?? DEFAULT_HOME_FEED_SCOPE;
+      scopeRef.current = initial;
+      setScope(initial);
+      await load(initial, 'initial');
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
-  // Poll tallies for the threads in this mixed feed. Only communities with a
-  // visible poll are subscribed — a feed of plain posts opens no sockets.
+  const handleScopeChange = useCallback(
+    (next: HomeFeedScope) => {
+      if (next === scopeRef.current) return;
+      scopeRef.current = next;
+      setScope(next);
+      // Clear immediately: the old tab's cards must never linger under the new
+      // tab's name while its page loads.
+      setItems([]);
+      setSelected(null);
+      setHasMore(true);
+      void storeHomeFeedScope(next);
+      void load(next, 'initial');
+    },
+    [load],
+  );
+
+  // Poll tallies for the threads in this feed. Only communities with a visible
+  // poll are subscribed — a feed of plain posts opens no sockets.
   const applyPollUpdate = actions.applyPollUpdate;
   const pollCommunityIds = useMemo(() => feedPollCommunityIds(items), [items]);
 
@@ -95,7 +167,7 @@ export default function HomeTab() {
 
   // A reconnected room missed events while it was down; settle from the API.
   const handlePollGap = useCallback(() => {
-    void load('refresh');
+    void load(scopeRef.current, 'refresh');
   }, [load]);
 
   useThreadPollRealtime({
@@ -106,10 +178,12 @@ export default function HomeTab() {
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || items.length === 0) return;
+    const target = scopeRef.current;
     const last = items[items.length - 1];
     setLoadingMore(true);
     try {
-      const page = await getHomeFeed(last.created_at);
+      const page = await getHomeFeed(target, last.created_at);
+      if (scopeRef.current !== target) return;
       setItems((current) => {
         const seen = new Set(current.map(feedItemKey));
         return [...current, ...page.items.filter((item) => !seen.has(feedItemKey(item)))];
@@ -129,6 +203,69 @@ export default function HomeTab() {
     setSelected(match ?? null);
   }, [items]);
 
+  // Feed rows carry their singular `_type`; the editor and the delete endpoint
+  // want the plural tab key. An update response also lacks the row's community
+  // attribution, so the feed keeps its own copy of those fields.
+  const replaceItem = useCallback((saved: CommunityContent) => {
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === saved.id
+          ? {
+              ...entry,
+              ...saved,
+              _type: entry._type,
+              community_name: entry.community_name,
+              community_image: entry.community_image,
+            }
+          : entry,
+      ),
+    );
+    setSelected((current) =>
+      current && current.id === saved.id
+        ? {
+            ...current,
+            ...saved,
+            _type: current._type,
+            community_name: current.community_name,
+            community_image: current.community_image,
+          }
+        : current,
+    );
+    setEditing(null);
+  }, []);
+
+  const editItem = useCallback(
+    (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (row) setEditing(row);
+    },
+    [items],
+  );
+
+  const deleteItem = useCallback(
+    async (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (!row?.community_id) return;
+      const kind = feedItemKind(row);
+      await deleteCommunityContent(row.community_id, kind, row.id);
+      setItems((current) =>
+        current.filter((item) => !(item.id === row.id && item._type === row._type)),
+      );
+      setSelected((current) =>
+        current?.id === row.id && current._type === row._type ? null : current,
+      );
+      // Keep the community chat's "created a …" card in step, like the
+      // community tab's own delete path.
+      notifyContentEvent({
+        kind: 'delete',
+        communityId: row.community_id,
+        id: row.id,
+        contentKind: chatContentKindForTab(kind),
+      });
+    },
+    [items],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => (
       <ContentCard
@@ -139,15 +276,39 @@ export default function HomeTab() {
         communityName={item.community_name}
         communityImage={item.community_image}
         onComments={openItem}
+        onEdit={editItem}
+        onDelete={deleteItem}
       />
     ),
-    [actions, items, openItem, user?.id],
+    [actions, deleteItem, editItem, openItem, user?.id],
   );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
+
+      {/* ── Feed source tabs — the web switcher's two disjoint feeds ── */}
+      <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
+        {TABS.map((tab) => {
+          const active = scope === tab.key;
+          const labelColor = active ? colors.foreground : colors.mutedForeground;
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => handleScopeChange(tab.key)}
+              style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <View style={styles.tabInner}>
+                <Feather name={tab.icon} size={14} color={labelColor} />
+                <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -158,7 +319,7 @@ export default function HomeTab() {
           <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
           <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t load your feed</Text>
           <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
-          <Pressable onPress={() => void load('initial')} accessibilityRole="button">
+          <Pressable onPress={() => void load(scopeRef.current, 'initial')} accessibilityRole="button">
             <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
           </Pressable>
         </View>
@@ -173,7 +334,7 @@ export default function HomeTab() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => void load('refresh')}
+              onRefresh={() => void load(scopeRef.current, 'refresh')}
               tintColor={colors.foregroundMuted}
             />
           }
@@ -186,11 +347,14 @@ export default function HomeTab() {
           }
           ListEmptyComponent={
             <View style={styles.center}>
-              <Feather name="inbox" size={32} color={colors.foregroundSubtle} />
+              <Feather
+                name={scope === 'communities' ? 'users' : 'globe'}
+                size={32}
+                color={colors.foregroundSubtle}
+              />
               <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
               <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                When community members share threads, events, resources or their work
-                publicly, they&apos;ll appear here.
+                {EMPTY_STATE_DESCRIPTION[scope]}
               </Text>
             </View>
           }
@@ -205,6 +369,17 @@ export default function HomeTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
+        onEdit={editItem}
+        onDelete={deleteItem}
+      />
+
+      <CommunityContentEditor
+        visible={Boolean(editing)}
+        communityId={editing?.community_id ?? ''}
+        kind={editing ? feedItemKind(editing) : 'threads'}
+        item={editing}
+        onClose={() => setEditing(null)}
+        onSaved={replaceItem}
       />
     </View>
   );
@@ -212,6 +387,19 @@ export default function HomeTab() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  tabsShell: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tab: {
+    flex: 1,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+  },
+  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabText: { fontSize: 12.5, fontFamily: 'Geist_500Medium' },
   list: { padding: 12, gap: 12, flexGrow: 1 },
   center: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   stateTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16 },
