@@ -16,11 +16,8 @@ import { useColors } from '@/hooks/useColors';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { Initials } from '@/components/communities/CommunityRow';
 import { communityStore } from '@/lib/communityStore';
-import {
-  getCommunityPreview,
-  joinCommunity,
-  type CommunityPreviewData,
-} from '@/lib/communityPreviewData';
+import { type CommunityPreviewData } from '@/lib/communityPreviewData';
+import { getCommunityPreview, joinCommunity } from '@/lib/communityPreviewApi';
 import { hapticSelection } from '@/lib/haptics';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 

@@ -20,10 +20,10 @@ import {
   REPORT_DETAILS_MAX_LENGTH,
   REPORT_REASONS,
   isAlreadyReported,
-  reportContent,
   type ReportReason,
   type ReportableContentType,
 } from '@/lib/contentReports';
+import { reportContent } from '@/lib/contentReportsApi';
 
 /**
  * The content report flow opened from a card's ··· menu — the mobile reading

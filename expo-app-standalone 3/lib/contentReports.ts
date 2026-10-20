@@ -1,14 +1,17 @@
-import { apiFetch } from './api';
 import type { ContentKind } from './communityContent';
 
 /**
- * The content report flow — the mobile mirror of the web app's
- * `lib/communities/report-reasons.ts` and `POST /api/content-reports`.
+ * The content report flow's shared vocabulary — the mobile mirror of the web
+ * app's `lib/communities/report-reasons.ts`, with the `POST` itself in
+ * `contentReportsApi.ts`.
  *
  * The reason values are the persisted ids the `content_reports` check
  * constraint accepts; the labels are what the modal offers and what a removal
  * notice quotes back. Keep this list in step with the web module — the report
  * API validates against the same values.
+ *
+ * This module deliberately imports nothing from React Native (the API client
+ * does), so the value contract runs in the plain-Node suite.
  */
 
 export const REPORT_REASONS = [
@@ -52,32 +55,6 @@ export const REPORT_CONTENT_TYPE_BY_KIND: Record<ContentKind, ReportableContentT
 /** The label for a stored reason, falling back to the raw id for old rows. */
 export function reportReasonLabel(reason: string): string {
   return REPORT_REASONS.find((item) => item.value === reason)?.label ?? reason;
-}
-
-/**
- * File one report. Resolves when the report was accepted (or was already on
- * file — the API answers 409); rejects with the server's copy otherwise.
- */
-export async function reportContent({
-  contentType,
-  contentId,
-  reason,
-  details,
-}: {
-  contentType: ReportableContentType;
-  contentId: string;
-  reason: ReportReason;
-  details: string;
-}): Promise<void> {
-  await apiFetch('/api/content-reports', {
-    method: 'POST',
-    body: {
-      content_type: contentType,
-      content_id: contentId,
-      reason,
-      details: details.trim(),
-    },
-  });
 }
 
 /**
