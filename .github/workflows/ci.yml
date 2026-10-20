@@ -90,6 +90,12 @@ jobs:
       - name: Run mobile home feed scope tests
         run: npm run test:mobile-home-feed
 
+      # Blocking. The card ··· menu's parity work (report reasons/API types,
+      # join outcomes, moderation grants) lives in React-Native-free modules,
+      # so it runs here like the suites above.
+      - name: Run mobile content action tests
+        run: npm run test:mobile-content-actions
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest

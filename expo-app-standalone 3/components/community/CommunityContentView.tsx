@@ -28,6 +28,8 @@ interface Props {
   openContentId?: string | null;
   /** The open request has been honoured (or proved stale) — clear it. */
   onOpenConsumed?: () => void;
+  /** Manager holding this tab's moderation grant — Delete on others' cards. */
+  canModerate?: boolean;
 }
 
 export function CommunityContentView({
@@ -36,6 +38,7 @@ export function CommunityContentView({
   currentUserId,
   openContentId = null,
   onOpenConsumed,
+  canModerate = false,
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -165,6 +168,7 @@ export function CommunityContentView({
             onComments={openItem}
             onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
             onDelete={remove}
+            canModerate={canModerate}
           />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 112 }]}
@@ -235,6 +239,7 @@ export function CommunityContentView({
         onClose={() => setSelected(null)}
         onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
         onDelete={remove}
+        canModerate={canModerate}
       />
     </View>
   );

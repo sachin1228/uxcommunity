@@ -119,7 +119,8 @@
     "test:k6-realtime": "tsx --test k6/lib/realtime-fanout.test.mjs",
     "test:mobile-communities": "tsx --test \"expo-app-standalone 3/lib/eventDate.test.ts\" \"expo-app-standalone 3/lib/communityBadges.test.ts\" \"expo-app-standalone 3/lib/communityMute.test.ts\" \"expo-app-standalone 3/lib/communityPreview.test.ts\" \"expo-app-standalone 3/lib/sidebarOrder.test.ts\" \"expo-app-standalone 3/lib/sidebarMerge.test.ts\" \"expo-app-standalone 3/lib/tabSeen.test.ts\"",
     "test:mobile-polls": "tsx --test \"expo-app-standalone 3/lib/communityPoll.test.ts\" \"expo-app-standalone 3/lib/feedPollRealtime.test.ts\"",
-    "test:mobile-home-feed": "tsx --test \"expo-app-standalone 3/lib/homeFeedScope.test.ts\""
+    "test:mobile-home-feed": "tsx --test \"expo-app-standalone 3/lib/homeFeedScope.test.ts\"",
+    "test:mobile-content-actions": "tsx --test \"expo-app-standalone 3/lib/contentReports.test.ts\" \"expo-app-standalone 3/lib/communityPreviewData.test.ts\" \"expo-app-standalone 3/lib/communityPermissions.test.ts\""
   },
   "engines": {
     "node": ">=22.0.0",

@@ -1,3 +1,5 @@
+import type { ContentKind } from './communityContent';
+
 /**
  * The community management capability catalogue — the mobile mirror of the
  * web app's `lib/communities/permissions.ts`. The server validates and
@@ -44,6 +46,29 @@ export const MODERATOR_DEFAULT_PERMISSIONS: CommunityPermissions = {
   can_moderate_resources: true,
   can_moderate_events: true,
 };
+
+/** The moderation grant each content tab's cards read. */
+export const MODERATION_PERMISSION_BY_KIND: Record<ContentKind, CommunityPermission> = {
+  threads: 'can_moderate_threads',
+  showcase: 'can_moderate_showcase',
+  resources: 'can_moderate_resources',
+  events: 'can_moderate_events',
+};
+
+/**
+ * Whether the viewer may delete another member's card of this kind — the web
+ * card menus' `canModerate` rule. Owners hold every capability; managers
+ * (admin/moderator) hold only the grants on their permission row.
+ */
+export function canModerateContent(
+  kind: ContentKind,
+  role: CommunityRole | null | undefined,
+  permissions: CommunityPermissions | null | undefined,
+): boolean {
+  if (role === 'owner') return true;
+  if (role !== 'admin' && role !== 'moderator') return false;
+  return Boolean(permissions?.[MODERATION_PERMISSION_BY_KIND[kind]]);
+}
 
 export type CommunityPermissionGroup = 'Content moderation' | 'Administration';
 

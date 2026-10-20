@@ -21,10 +21,13 @@ import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
+import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
-import { CommunityContent } from '@/lib/communityContent';
+import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent';
+import { chatContentKindForTab } from '@/lib/chatContentEvents';
+import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
@@ -118,6 +121,8 @@ export default function ProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  /** The activity row whose editor is open (owner-only; null when closed). */
+  const [editing, setEditing] = useState<FeedItem | null>(null);
 
   // ── Hero edit flows ──
   const [avatarPick, setAvatarPick] = useState<PreparedImage | null>(null);
@@ -254,6 +259,66 @@ export default function ProfileScreen() {
     [items],
   );
 
+  // An edit response carries the post's own fields, not the feed row's
+  // `_type` / community attribution — keep the row's copy of those.
+  const replaceItem = useCallback((saved: CommunityContent) => {
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === saved.id
+          ? {
+              ...entry,
+              ...saved,
+              _type: entry._type,
+              community_name: entry.community_name,
+              community_image: entry.community_image,
+            }
+          : entry,
+      ),
+    );
+    setSelected((current) =>
+      current && current.id === saved.id
+        ? {
+            ...current,
+            ...saved,
+            _type: current._type,
+            community_name: current.community_name,
+            community_image: current.community_image,
+          }
+        : current,
+    );
+    setEditing(null);
+  }, []);
+
+  const editItem = useCallback(
+    (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (row) setEditing(row);
+    },
+    [items],
+  );
+
+  const deleteItem = useCallback(
+    async (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (!row?.community_id) return;
+      const kind = feedItemKind(row);
+      await deleteCommunityContent(row.community_id, kind, row.id);
+      setItems((current) =>
+        current.filter((item) => !(item.id === row.id && item._type === row._type)),
+      );
+      setSelected((current) =>
+        current?.id === row.id && current._type === row._type ? null : current,
+      );
+      notifyContentEvent({
+        kind: 'delete',
+        communityId: row.community_id,
+        id: row.id,
+        contentKind: chatContentKindForTab(kind),
+      });
+    },
+    [items],
+  );
+
   // ── Change picture — the OS library sheet is the file chooser, then the
   //    confirm modal previews and saves, exactly like the web flow. ──
   const handleChangePicture = useCallback(async () => {
@@ -325,9 +390,11 @@ export default function ProfileScreen() {
         communityName={item.community_name}
         communityImage={item.community_image}
         onComments={openItem}
+        onEdit={editItem}
+        onDelete={deleteItem}
       />
     ),
-    [actions, items, openItem, user?.id],
+    [actions, deleteItem, editItem, openItem, user?.id],
   );
 
   const body = profile?.profile;
@@ -489,6 +556,17 @@ export default function ProfileScreen() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
+        onEdit={editItem}
+        onDelete={deleteItem}
+      />
+
+      <CommunityContentEditor
+        visible={Boolean(editing)}
+        communityId={editing?.community_id ?? ''}
+        kind={editing ? feedItemKind(editing) : 'threads'}
+        item={editing}
+        onClose={() => setEditing(null)}
+        onSaved={replaceItem}
       />
 
       <AvatarPickerModal

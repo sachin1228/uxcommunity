@@ -9,6 +9,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -61,6 +62,10 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
 import { VideoPlayerModal } from './VideoPlayerModal';
 import { EventTicket } from './EventTicket';
+import { ContentReportModal } from './ContentReportModal';
+import { CommunityPreviewSheet } from './CommunityPreviewSheet';
+import { REPORT_CONTENT_TYPE_BY_KIND } from '@/lib/contentReports';
+import { eventShareUrl } from '@/lib/contentLinks';
 
 /**
  * The community card, the card detail, and the optimistic interaction state
@@ -661,6 +666,8 @@ export interface ContentCardProps {
   onEdit?: (item: CommunityContent) => void;
   /** Rejects when the server refuses, so the confirm can stay open. */
   onDelete?: (item: CommunityContent) => Promise<void> | void;
+  /** Manager with this kind's moderation grant — offers Delete on others' cards. */
+  canModerate?: boolean;
 }
 
 export function ContentCard({
@@ -673,6 +680,7 @@ export function ContentCard({
   onComments,
   onEdit,
   onDelete,
+  canModerate = false,
 }: ContentCardProps) {
   const colors = useColors();
   const thread = kind === 'threads' ? item as CommunityThread : null;
@@ -784,6 +792,7 @@ export function ContentCard({
             kind={kind}
             actions={actions}
             isOwner={isOwner}
+            canModerate={canModerate}
             onEdit={onEdit}
             onDelete={onDelete}
           />
@@ -913,69 +922,90 @@ export function ContentActionRow({
 }) {
   const colors = useColors();
   const communityAvatar = resolveProfilePictureUri(communityImage);
+  const [previewOpen, setPreviewOpen] = useState(false);
   return (
-    <View style={styles.actions}>
-      {FOOTER_ACTIONS_BY_KIND[kind].map((definition) => {
-        const active = actions.isActive(item, kind, definition.action);
-        const count = actions.countFor(item, kind, definition.action);
-        // Count-less actions toggle their verb instead of showing a number,
-        // exactly like the web "Save" / "Unsave" buttons.
-        const label = definition.countSuffix
-          ? `${count} ${definition.countSuffix}`
-          : definition.countField
-            ? String(count)
-            : active
-              ? 'Unsave'
-              : definition.label;
-        return (
-          <Action
-            key={definition.action}
-            icon={definition.icon}
-            label={label}
-            active={active}
-            activeColor={definition.activeColor}
-            accessibilityLabel={`${active ? 'Remove' : 'Add'} ${definition.label}`}
-            onPress={() => {
-              // Every footer action is a desired-state flip: the tick follows the
-              // direction the tap is about to take.
-              hapticToggle(!active);
-              actions.action(item, kind, definition.action);
-            }}
-          />
-        );
-      })}
-      <Action
-        icon="message-circle"
-        label={String(commentCount)}
-        compact
-        accessibilityLabel="Comments"
-        onPress={() => {
-          hapticSelection();
-          onComments(item);
-        }}
-      />
+    <>
+      <View style={styles.actions}>
+        {FOOTER_ACTIONS_BY_KIND[kind].map((definition) => {
+          const active = actions.isActive(item, kind, definition.action);
+          const count = actions.countFor(item, kind, definition.action);
+          // Count-less actions toggle their verb instead of showing a number,
+          // exactly like the web "Save" / "Unsave" buttons.
+          const label = definition.countSuffix
+            ? `${count} ${definition.countSuffix}`
+            : definition.countField
+              ? String(count)
+              : active
+                ? 'Unsave'
+                : definition.label;
+          return (
+            <Action
+              key={definition.action}
+              icon={definition.icon}
+              label={label}
+              active={active}
+              activeColor={definition.activeColor}
+              accessibilityLabel={`${active ? 'Remove' : 'Add'} ${definition.label}`}
+              onPress={() => {
+                // Every footer action is a desired-state flip: the tick follows the
+                // direction the tap is about to take.
+                hapticToggle(!active);
+                actions.action(item, kind, definition.action);
+              }}
+            />
+          );
+        })}
+        <Action
+          icon="message-circle"
+          label={String(commentCount)}
+          compact
+          accessibilityLabel="Comments"
+          onPress={() => {
+            hapticSelection();
+            onComments(item);
+          }}
+        />
 
-      {/* Community attribution — the web keeps the engagement cluster on the
-          left and puts "posted in <community>" at the bottom-right. */}
-      {communityName ? (
-        <View style={styles.communityLabel}>
-          <Text style={[styles.communityLabelText, { color: colors.foregroundSubtle }]} numberOfLines={1}>
-            posted in
-          </Text>
-          {communityAvatar ? (
-            <Image source={{ uri: communityAvatar }} style={styles.communityLabelAvatar} />
-          ) : (
-            <View style={[styles.communityLabelAvatar, { backgroundColor: colors.surfaceRaised }]} />
-          )}
-          <Text
-            style={[styles.communityLabelName, { color: colors.foregroundMuted }]}
-            numberOfLines={1}
+        {/* Community attribution — the web keeps the engagement cluster on the
+            left and puts "posted in <community>" at the bottom-right. Tapping it
+            opens the community preview in place, exactly like the web label. */}
+        {communityName ? (
+          <Pressable
+            onPress={(pressEvent) => {
+              pressEvent.stopPropagation();
+              hapticSelection();
+              setPreviewOpen(true);
+            }}
+            style={styles.communityLabel}
+            accessibilityRole="button"
+            accessibilityLabel={`Posted in ${communityName}. Open community preview`}
           >
-            {communityName}
-          </Text>
-        </View>
+            <Text style={[styles.communityLabelText, { color: colors.foregroundSubtle }]} numberOfLines={1}>
+              posted in
+            </Text>
+            {communityAvatar ? (
+              <Image source={{ uri: communityAvatar }} style={styles.communityLabelAvatar} />
+            ) : (
+              <View style={[styles.communityLabelAvatar, { backgroundColor: colors.surfaceRaised }]} />
+            )}
+            <Text
+              style={[styles.communityLabelName, { color: colors.foregroundMuted }]}
+              numberOfLines={1}
+            >
+              {communityName}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {communityName ? (
+        <CommunityPreviewSheet
+          visible={previewOpen}
+          communityId={item.community_id}
+          onClose={() => setPreviewOpen(false)}
+        />
       ) : null}
-    </View>
+    </>
   );
 }
 
@@ -994,6 +1024,7 @@ export function ContentDetail({
   onClose,
   onEdit,
   onDelete,
+  canModerate = false,
 }: {
   item: CommunityContent | null;
   kind: ContentKind;
@@ -1006,6 +1037,7 @@ export function ContentDetail({
   onClose: () => void;
   onEdit?: (item: CommunityContent) => void;
   onDelete?: (item: CommunityContent) => Promise<void> | void;
+  canModerate?: boolean;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -1102,6 +1134,7 @@ export function ContentDetail({
             kind={kind}
             actions={actions}
             isOwner={isOwner}
+            canModerate={canModerate}
             onEdit={onEdit}
             onDelete={onDelete}
           />
@@ -1282,15 +1315,23 @@ export function ContentDetail({
 /**
  * The ··· menu.
  *
- * Mirrors the web dropdown: Save/Unsave first (available to everyone — this is
- * where saving lives, it is deliberately not in the footer), then Edit and
- * Delete for the author.
+ * Mirrors the web dropdown row for row:
+ *   Save/Unsave (every card)
+ *   Share (events only)
+ *   Edit (the author, while an event is still ahead)
+ *   Delete (the author, or a manager holding this kind's moderation grant —
+ *           including on an event that already ended)
+ *   Report (everyone else, flipping to "Reported" once acknowledged)
+ *
+ * Save is where saving lives, deliberately not in the footer. Delete confirms
+ * in-sheet, like the message and chat-actions sheets.
  */
 export function ContentOptionsMenu({
   item,
   kind,
   actions,
   isOwner,
+  canModerate = false,
   onEdit,
   onDelete,
 }: {
@@ -1298,6 +1339,8 @@ export function ContentOptionsMenu({
   kind: ContentKind;
   actions: ContentActionsApi;
   isOwner: boolean;
+  /** Manager with this kind's moderation grant — Delete on others' cards. */
+  canModerate?: boolean;
   onEdit?: (item: CommunityContent) => void;
   /** Rejects when the server refuses, so the confirm can stay open. */
   onDelete?: (item: CommunityContent) => Promise<void> | void;
@@ -1309,9 +1352,21 @@ export function ContentOptionsMenu({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
   const saveAction = MENU_ACTION_BY_KIND[kind];
   const saved = saveAction ? actions.isActive(item, kind, saveAction.action) : false;
   const noun = contentLabel(kind).toLowerCase();
+  const event = kind === 'events' ? (item as CommunityEvent) : null;
+  // The web menu's window rule: an event whose start has gone by can no longer
+  // be rescheduled (the form refuses a past start), but it can still be taken
+  // down — deleting a finished event is exactly when a host wants the row.
+  const past = event
+    ? new Date(event.end_date ?? event.event_date).getTime() < Date.now()
+    : false;
+  const showEdit = isOwner && Boolean(onEdit) && !past;
+  const showDelete = (isOwner || canModerate) && Boolean(onDelete);
+  const showReport = !isOwner && !canModerate;
 
   const close = () => {
     if (deleting) return;
@@ -1336,11 +1391,33 @@ export function ContentOptionsMenu({
     }
   };
 
+  const share = () => {
+    if (!event) return;
+    close();
+    // Let the action sheet finish dismissing before the system share sheet
+    // presents; on iOS the two cannot present in the same frame.
+    setTimeout(() => {
+      void Share.share({
+        title: event.title,
+        message: eventShareUrl(event.community_id, event.id),
+      }).catch(() => {
+        // A dismissed system sheet is not an error.
+      });
+    }, 240);
+  };
+
+  const openReport = () => {
+    close();
+    // Two Modals cannot present in the same frame on iOS; let the action sheet
+    // finish dismissing before the report wizard slides in.
+    setTimeout(() => setReportOpen(true), 240);
+  };
+
   return (
     <>
       <Pressable
-        onPress={(event) => {
-          event.stopPropagation();
+        onPress={(pressEvent) => {
+          pressEvent.stopPropagation();
           hapticSelection();
           setVisible(true);
         }}
@@ -1434,37 +1511,87 @@ export function ContentOptionsMenu({
               </Pressable>
             ) : null}
 
-            {!confirmingDelete && isOwner && onEdit && onDelete ? (
+            {!confirmingDelete && event ? (
               <>
                 <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
-                <Pressable
-                  onPress={() => {
-                    hapticSelection();
-                    close();
-                    onEdit(item);
-                  }}
-                  style={styles.optionRow}
-                  accessibilityRole="button"
-                >
-                  <Feather name="edit-2" size={16} color={colors.foreground} />
-                  <Text style={[styles.optionText, { color: colors.foreground }]}>Edit</Text>
+                <Pressable onPress={share} style={styles.optionRow} accessibilityRole="button">
+                  <Feather name="share-2" size={16} color={colors.foreground} />
+                  <Text style={[styles.optionText, { color: colors.foreground }]}>Share</Text>
                 </Pressable>
-                <Pressable
-                  onPress={() => {
-                    hapticSelection();
-                    setConfirmingDelete(true);
-                  }}
-                  style={styles.optionRow}
-                  accessibilityRole="button"
-                >
-                  <Feather name="trash-2" size={16} color={colors.destructive} />
-                  <Text style={[styles.optionText, { color: colors.destructive }]}>Delete</Text>
-                </Pressable>
+              </>
+            ) : null}
+
+            {!confirmingDelete && (showEdit || showDelete || showReport) ? (
+              <>
+                {!event ? (
+                  <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
+                ) : null}
+                {showEdit ? (
+                  <Pressable
+                    onPress={() => {
+                      hapticSelection();
+                      close();
+                      onEdit?.(item);
+                    }}
+                    style={styles.optionRow}
+                    accessibilityRole="button"
+                  >
+                    <Feather name="edit-2" size={16} color={colors.foreground} />
+                    <Text style={[styles.optionText, { color: colors.foreground }]}>Edit</Text>
+                  </Pressable>
+                ) : null}
+                {showDelete ? (
+                  <Pressable
+                    onPress={() => {
+                      hapticSelection();
+                      setConfirmingDelete(true);
+                    }}
+                    style={styles.optionRow}
+                    accessibilityRole="button"
+                  >
+                    <Feather name="trash-2" size={16} color={colors.destructive} />
+                    <Text style={[styles.optionText, { color: colors.destructive }]}>Delete</Text>
+                  </Pressable>
+                ) : null}
+                {showReport ? (
+                  <Pressable
+                    onPress={() => {
+                      hapticSelection();
+                      openReport();
+                    }}
+                    disabled={reported}
+                    style={styles.optionRow}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: reported }}
+                  >
+                    <Feather
+                      name="flag"
+                      size={16}
+                      color={reported ? colors.foregroundSubtle : colors.foreground}
+                    />
+                    <Text
+                      style={[
+                        styles.optionText,
+                        { color: reported ? colors.foregroundSubtle : colors.foreground },
+                      ]}
+                    >
+                      {reported ? 'Reported' : 'Report'}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </>
             ) : null}
           </View>
         </Pressable>
       </Modal>
+
+      <ContentReportModal
+        visible={reportOpen}
+        contentType={REPORT_CONTENT_TYPE_BY_KIND[kind]}
+        contentId={item.id}
+        onClose={() => setReportOpen(false)}
+        onReported={() => setReported(true)}
+      />
     </>
   );
 }

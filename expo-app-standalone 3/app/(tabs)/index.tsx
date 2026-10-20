@@ -15,7 +15,10 @@ import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
-import { CommunityContent } from '@/lib/communityContent';
+import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
+import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent';
+import { chatContentKindForTab } from '@/lib/chatContentEvents';
+import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
 import { feedItemKey, feedItemKind, getHomeFeed, type FeedItem } from '@/lib/homeFeed';
 import {
@@ -34,8 +37,9 @@ import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
  *
  * Renders the same cards as the community tabs (likes, saves, RSVPs and the
  * comment thread all work identically), with a chip naming the community each
- * post came from. Posts are read-only here: editing and deleting stay on the
- * post's own community tab, where membership is known.
+ * post came from. The ··· menu carries the same owner Edit/Delete rows the web
+ * feed has — the editor and the delete call are hosted here, so removing a post
+ * from the feed updates the list in place.
  */
 
 type FeatherName = React.ComponentProps<typeof Feather>['name'];
@@ -73,6 +77,8 @@ export default function HomeTab() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  /** The feed row whose editor is open (owner-only; null when closed). */
+  const [editing, setEditing] = useState<FeedItem | null>(null);
 
   const resetActions = actions.reset;
 
@@ -197,6 +203,69 @@ export default function HomeTab() {
     setSelected(match ?? null);
   }, [items]);
 
+  // Feed rows carry their singular `_type`; the editor and the delete endpoint
+  // want the plural tab key. An update response also lacks the row's community
+  // attribution, so the feed keeps its own copy of those fields.
+  const replaceItem = useCallback((saved: CommunityContent) => {
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === saved.id
+          ? {
+              ...entry,
+              ...saved,
+              _type: entry._type,
+              community_name: entry.community_name,
+              community_image: entry.community_image,
+            }
+          : entry,
+      ),
+    );
+    setSelected((current) =>
+      current && current.id === saved.id
+        ? {
+            ...current,
+            ...saved,
+            _type: current._type,
+            community_name: current.community_name,
+            community_image: current.community_image,
+          }
+        : current,
+    );
+    setEditing(null);
+  }, []);
+
+  const editItem = useCallback(
+    (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (row) setEditing(row);
+    },
+    [items],
+  );
+
+  const deleteItem = useCallback(
+    async (entry: CommunityContent) => {
+      const row = items.find((item) => item.id === entry.id);
+      if (!row?.community_id) return;
+      const kind = feedItemKind(row);
+      await deleteCommunityContent(row.community_id, kind, row.id);
+      setItems((current) =>
+        current.filter((item) => !(item.id === row.id && item._type === row._type)),
+      );
+      setSelected((current) =>
+        current?.id === row.id && current._type === row._type ? null : current,
+      );
+      // Keep the community chat's "created a …" card in step, like the
+      // community tab's own delete path.
+      notifyContentEvent({
+        kind: 'delete',
+        communityId: row.community_id,
+        id: row.id,
+        contentKind: chatContentKindForTab(kind),
+      });
+    },
+    [items],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => (
       <ContentCard
@@ -207,9 +276,11 @@ export default function HomeTab() {
         communityName={item.community_name}
         communityImage={item.community_image}
         onComments={openItem}
+        onEdit={editItem}
+        onDelete={deleteItem}
       />
     ),
-    [actions, items, openItem, user?.id],
+    [actions, deleteItem, editItem, openItem, user?.id],
   );
 
   return (
@@ -298,6 +369,17 @@ export default function HomeTab() {
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
+        onEdit={editItem}
+        onDelete={deleteItem}
+      />
+
+      <CommunityContentEditor
+        visible={Boolean(editing)}
+        communityId={editing?.community_id ?? ''}
+        kind={editing ? feedItemKind(editing) : 'threads'}
+        item={editing}
+        onClose={() => setEditing(null)}
+        onSaved={replaceItem}
       />
     </View>
   );
