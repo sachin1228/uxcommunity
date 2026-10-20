@@ -1087,6 +1087,7 @@ export default function CommunityChat() {
             onOpen={handleContentOpen}
             onLongPress={handleContentLongPress}
             onReaction={handleContentReaction}
+            onAuthorPress={handleAuthorPress}
           />
         );
       }
