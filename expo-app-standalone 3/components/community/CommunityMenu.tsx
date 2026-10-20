@@ -58,6 +58,9 @@ interface Props {
   muted: boolean;
   /** "Muted" for the forever flag, "Muted until …" for a timed one. */
   muteStateLabel: string | null;
+  /** Owner, or a manager granted "edit community settings". */
+  canOpenSettings?: boolean;
+  onOpenSettings?: () => void;
   onClose: () => void;
   /** The row's durations / off switch live in the mute sheet. */
   onOpenMuteOptions: () => void;
@@ -72,6 +75,8 @@ export function CommunityMenu({
   anchor,
   muted,
   muteStateLabel,
+  canOpenSettings = false,
+  onOpenSettings,
   onClose,
   onOpenMuteOptions,
   onMute,
@@ -186,6 +191,20 @@ export function CommunityMenu({
             </View>
           ) : (
             <View>
+              {canOpenSettings && onOpenSettings && (
+                <>
+                  <MenuRow
+                    icon="settings"
+                    label="Community settings"
+                    chevron
+                    onPress={() => {
+                      onClose();
+                      onOpenSettings();
+                    }}
+                  />
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                </>
+              )}
               <MenuRow
                 icon={muted ? 'bell' : 'bell-off'}
                 label={muted ? 'Unmute notifications' : 'Mute notifications'}

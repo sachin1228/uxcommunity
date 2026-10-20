@@ -39,11 +39,15 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
  * Upload a file as multipart/form-data.
  * Uses the same session-cookie mechanism as apiFetch, but does NOT set
  * Content-Type so that fetch can inject the multipart boundary automatically.
+ *
+ * `method` defaults to POST; the settings PATCH is multipart too (the photo
+ * rides the same form as the fields it belongs to), so callers can pick it.
  */
 export async function apiFormUpload<T = unknown>(
   path: string,
   formData: FormData,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  method: 'POST' | 'PATCH' = 'POST'
 ): Promise<{ data: T; status: number }> {
   const sessionToken = await getStoredSession();
   const cookieHeader = sessionToken
@@ -56,7 +60,7 @@ export async function apiFormUpload<T = unknown>(
   };
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
+    method,
     headers,
     body: formData,
     ...(signal ? { signal } : {}),

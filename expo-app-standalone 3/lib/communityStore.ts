@@ -12,7 +12,19 @@ import type { Community } from '@/lib/communities';
 
 /** Fields a chat screen may patch onto the list's copy of a community. */
 export type CommunityRowPatch = Partial<
-  Pick<Community, 'notifications_muted' | 'notifications_muted_until' | 'is_archived'>
+  Pick<
+    Community,
+    | 'notifications_muted'
+    | 'notifications_muted_until'
+    | 'is_archived'
+    // Community settings — patched after a save so the list (and the chat
+    // header above it) repaints without a refetch.
+    | 'name'
+    | 'image_url'
+    | 'is_private'
+    | 'enabled_tabs'
+    | 'showcase_enabled'
+  >
 >;
 
 export type CommunityChange =

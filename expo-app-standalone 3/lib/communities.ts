@@ -1,6 +1,7 @@
 import { apiFetch, apiFormUpload } from './api';
 import type { MentionCandidate, MessageMention, Reaction } from './chat';
 import type { ChatContentKind } from './chatContentEvents';
+import type { CommunityPermissions, CommunityRole } from './communityPermissions';
 
 export type { Reaction };
 
@@ -311,6 +312,16 @@ export interface CommunityDetailRow {
   is_private?: boolean | null;
   reference_name?: string | null;
   member_count?: number | null;
+  /** The owner's id — the settings flow's privacy/delete gate. */
+  owner_id?: string | null;
+  /** Only present for the owner; managers regenerate one to read it. */
+  invite_token?: string | null;
+  enabled_tabs?: string[] | null;
+  /** Absent on rows that predate the flag; reads as on. */
+  showcase_enabled?: boolean | null;
+  /** The signed-in member's effective role and grants (web read model). */
+  current_user_role?: CommunityRole | null;
+  current_user_permissions?: CommunityPermissions | null;
 }
 
 /**
@@ -339,6 +350,234 @@ export async function getCommunityRules(communityId: string): Promise<CommunityR
     `/api/communities/${communityId}/rules`
   );
   return data.rules ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export interface CommunitySettingsInput {
+  name: string;
+  description: string;
+  /** Owner only — the server ignores it for managers. */
+  isPrivate?: boolean;
+  /** The tabbed areas, showcase excluded (it rides its own flag). */
+  tabs: string[];
+  showcase: boolean;
+  /** Omit to leave the stored rules untouched (e.g. their fetch failed). */
+  rules?: string[];
+  /** A prepared (WebP, ≤2560px) image from the picker. */
+  image?: { uri: string; name: string; type: string } | null;
+  removeImage?: boolean;
+}
+
+/**
+ * Save the community settings — the web CommunitySettingsView's multipart
+ * PATCH, same fields and same server validation. Answers the new image URL
+ * only when the photo changed.
+ */
+export async function updateCommunitySettings(
+  communityId: string,
+  input: CommunitySettingsInput
+): Promise<{ image_url?: string | null }> {
+  const formData = new FormData();
+  formData.append('name', input.name);
+  formData.append('description', input.description);
+  if (input.isPrivate !== undefined) {
+    formData.append('is_private', input.isPrivate ? 'true' : 'false');
+  }
+  formData.append('tabs', JSON.stringify(input.tabs));
+  formData.append('showcase', input.showcase ? 'true' : 'false');
+  if (input.rules !== undefined) formData.append('rules', JSON.stringify(input.rules));
+  if (input.image) {
+    formData.append('image', {
+      uri: input.image.uri,
+      type: normaliseMimeType(input.image.type),
+      name: input.image.name,
+    } as unknown as Blob);
+  } else if (input.removeImage) {
+    formData.append('remove_image', 'true');
+  }
+
+  const { data } = await apiFormUpload<{ image_url?: string | null; error?: string }>(
+    `/api/communities/${communityId}`,
+    formData,
+    undefined,
+    'PATCH'
+  );
+  return { image_url: data?.image_url };
+}
+
+/** Invalidate the community's invite token; answers the new link. */
+export async function regenerateCommunityInvite(
+  communityId: string
+): Promise<{ invite_token: string; invite_url: string }> {
+  const { data } = await apiFetch<{ invite_token?: string; invite_url?: string }>(
+    `/api/communities/${communityId}/invite/regenerate`,
+    { method: 'POST' }
+  );
+  return {
+    invite_token: data.invite_token ?? '',
+    invite_url: data.invite_url ?? '',
+  };
+}
+
+/** Permanently delete the community (owner only, soft-delete server-side). */
+export async function deleteCommunity(communityId: string): Promise<void> {
+  await apiFetch(`/api/communities/${communityId}`, { method: 'DELETE' });
+}
+
+// ---------------------------------------------------------------------------
+// Members, requests and management activity
+// ---------------------------------------------------------------------------
+
+/** One roster row as the Members tab manages it (web MembersView row). */
+export interface CommunityMemberRow {
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+  designation: string | null;
+  joined_at: string;
+  role: CommunityRole | string;
+  /** Effective grants — only sent for moderators to the manager tier. */
+  permissions?: CommunityPermissions | null;
+}
+
+/** A pending join request on a private community. */
+export interface CommunityJoinRequest {
+  id: string;
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+  requested_at: string;
+  request_message: string | null;
+}
+
+/**
+ * One page of the roster with roles (and moderator grants for the manager
+ * tier). The server owns the 30-row page size and applies the search filter.
+ */
+export async function getCommunityMembersDetailed(
+  communityId: string,
+  page = 0,
+  search = ''
+): Promise<{ members: CommunityMemberRow[]; hasMore: boolean; total: number }> {
+  const params = new URLSearchParams({ page: String(page) });
+  if (search) params.set('search', search);
+  const { data } = await apiFetch<{
+    members?: CommunityMemberRow[];
+    has_more?: boolean;
+    total?: number;
+  }>(`/api/communities/${communityId}/members?${params.toString()}`);
+  return {
+    members: data.members ?? [],
+    hasMore: data.has_more ?? false,
+    total: data.total ?? 0,
+  };
+}
+
+export async function getCommunityJoinRequests(
+  communityId: string
+): Promise<CommunityJoinRequest[]> {
+  const { data } = await apiFetch<{ requests?: CommunityJoinRequest[] }>(
+    `/api/communities/${communityId}/requests`
+  );
+  return data.requests ?? [];
+}
+
+export async function acceptCommunityJoinRequest(
+  communityId: string,
+  requestId: string
+): Promise<void> {
+  await apiFetch(`/api/communities/${communityId}/requests/${requestId}/accept`, {
+    method: 'POST',
+  });
+}
+
+export async function declineCommunityJoinRequest(
+  communityId: string,
+  requestId: string
+): Promise<void> {
+  await apiFetch(`/api/communities/${communityId}/requests/${requestId}/decline`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Promote a member to moderator (with grants), re-apply a moderator's grants,
+ * or dismiss them with `role: "member"`.
+ */
+export async function updateCommunityMemberRole(
+  communityId: string,
+  userId: string,
+  body:
+    | { role: 'moderator'; permissions?: CommunityPermissions }
+    | { role: 'member' }
+): Promise<{ role: string; permissions: CommunityPermissions | null }> {
+  const { data } = await apiFetch<{
+    member?: { role?: string; permissions?: CommunityPermissions | null };
+  }>(`/api/communities/${communityId}/members/${userId}`, {
+    method: 'PATCH',
+    body: body as Record<string, unknown>,
+  });
+  return {
+    role: data.member?.role ?? body.role,
+    permissions: data.member?.permissions ?? null,
+  };
+}
+
+export async function removeCommunityMember(
+  communityId: string,
+  userId: string
+): Promise<void> {
+  await apiFetch(`/api/communities/${communityId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+/** One row of the community's management audit trail. */
+export interface CommunityActivityEntry {
+  id: string;
+  community_id: string;
+  actor_id: string | null;
+  /** Only the manager tier writes here — never a plain member. */
+  actor_role: 'owner' | 'admin' | 'moderator' | 'platform';
+  actor_name: string | null;
+  actor_avatar_url?: string | null;
+  action: string;
+  target_user_id: string | null;
+  target_user_name?: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Keyset-paginated activity page for the manager-tier Activity tab. */
+export async function getCommunityActivity(
+  communityId: string,
+  before?: string
+): Promise<{ activity: CommunityActivityEntry[]; hasMore: boolean }> {
+  const qs = before ? `?before=${encodeURIComponent(before)}` : '';
+  const { data } = await apiFetch<{ activity?: CommunityActivityEntry[]; has_more?: boolean }>(
+    `/api/communities/${communityId}/activity${qs}`
+  );
+  return { activity: data.activity ?? [], hasMore: Boolean(data.has_more) };
+}
+
+/** One member's recorded answers to an event's compulsory join questions. */
+export interface EventJoinResponseRow {
+  user_id: string;
+  why_attend: string;
+  expectations: string;
+  created_at: string;
+}
+
+export async function getEventJoinResponses(
+  communityId: string
+): Promise<EventJoinResponseRow[]> {
+  const { data } = await apiFetch<{ responses?: EventJoinResponseRow[] }>(
+    `/api/communities/${communityId}/event-join-responses`
+  );
+  return data.responses ?? [];
 }
 
 /** The community the create flow just made. */
