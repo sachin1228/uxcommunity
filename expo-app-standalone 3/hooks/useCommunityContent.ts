@@ -4,6 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
 import { ContentByKind, ContentKind, getCommunityContent } from '@/lib/communityContent';
+import {
+  applyContentRealtimeEvent,
+  needsContentRevalidation,
+} from '@/lib/communityContentRealtime';
 
 export function communityContentKey(communityId: string, kind: ContentKind) {
   return ['community-content', communityId, kind] as const;
@@ -22,7 +26,9 @@ const ROOM_TOPICS: Partial<Record<ContentKind, { getRoom: (cid: string) => strin
     getRoom: (cid) => realtimeRooms.threads(cid),
     // `poll` lands after every vote/undo, so the row's tallies and the
     // viewer's vote stay in step with the web tab.
-    topics: ['thread', 'like', 'save', 'poll'],
+    // Thread saves are local-only today; the server publishes no `save` event
+    // for this kind, so do not subscribe to a topic that can only cause work.
+    topics: ['thread', 'like', 'poll'],
   },
   events: {
     getRoom: (cid) => realtimeRooms.events(cid),
@@ -34,7 +40,12 @@ const ROOM_TOPICS: Partial<Record<ContentKind, { getRoom: (cid: string) => strin
   },
 };
 
-export function useCommunityContent<K extends ContentKind>(communityId: string, kind: K, enabled = true) {
+export function useCommunityContent<K extends ContentKind>(
+  communityId: string,
+  kind: K,
+  currentUserId: string,
+  enabled = true,
+) {
   const queryClient = useQueryClient();
   // Memoized by its parts, not rebuilt per render: every realtime subscription
   // below hangs off `invalidate`, and a fresh key array on each render would
@@ -73,6 +84,35 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
   );
   useEffect(() => () => gapRefetch.cancel(), [gapRefetch]);
 
+  /**
+   * Apply the interaction locally when the payload is complete. Only an
+   * incomplete/unknown payload schedules a refetch, through the same debounced
+   * single-flight scheduler the reconnect gap uses — a burst of events cannot
+   * become a burst of full-list requests.
+   */
+  const handleRealtimeEvent = useCallback(
+    (topic: string, data: unknown) => {
+      const current = queryClient.getQueryData<ContentByKind[K][]>(queryKey);
+      if (!current) {
+        gapRefetch.schedule();
+        return;
+      }
+      const update = applyContentRealtimeEvent(
+        kind,
+        current,
+        topic,
+        data,
+        currentUserId,
+      );
+      if (needsContentRevalidation(update)) {
+        gapRefetch.schedule();
+        return;
+      }
+      if (update.changed) queryClient.setQueryData(queryKey, update.items);
+    },
+    [currentUserId, gapRefetch, kind, queryClient, queryKey],
+  );
+
   // Realtime subscription via Cloudflare singleton
   useEffect(() => {
     if (!communityId || !enabled) return;
@@ -86,7 +126,7 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
     const unsubRoom = realtimeClient.subscribe(room);
 
     const unsubscribes = config.topics.map((topic) =>
-      realtimeClient.on(room, topic, invalidate)
+      realtimeClient.on(room, topic, (data) => handleRealtimeEvent(topic, data))
     );
     // Whatever was published before this socket came up is gone; refetch it
     // instead of waiting for the next tab switch.
@@ -100,7 +140,7 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
       unsubscribes.forEach((unsub) => unsub());
       unsubRoom();
     };
-  }, [communityId, enabled, invalidate, kind, gapRefetch]);
+  }, [communityId, enabled, handleRealtimeEvent, kind, gapRefetch]);
 
   useEffect(() => {
     if (!enabled) return;
