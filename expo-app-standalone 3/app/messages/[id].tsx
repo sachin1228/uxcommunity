@@ -1340,8 +1340,14 @@ export default function DmThreadScreen() {
           </View>
           </Animated.View>
           </View>
-          {/* The safe-area strip sits outside the animated dock and the IME. */}
-          <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+          {/* The safe-area strip sits outside the animated dock and the IME; it
+              takes the panel's colour while the panel owns the bottom edge. */}
+          <View
+            style={{
+              height: insets.bottom,
+              backgroundColor: imeLayout.panelOpen ? colors.card : colors.background,
+            }}
+          />
         </>
       )}
 

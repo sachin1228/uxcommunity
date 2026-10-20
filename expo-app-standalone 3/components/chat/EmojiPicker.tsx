@@ -28,6 +28,9 @@ import { useColors } from '@/hooks/useColors';
  * panel never changes the dock's measured height or moves the composer.
  */
 
+const EMOJI_COLUMNS = 8;
+const EMOJI_GRID_PADDING = 16;
+
 const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
   {
     title: 'Smileys',
@@ -105,6 +108,11 @@ export function EmojiPicker({
   const colors = useColors();
   const [panelWidth, setPanelWidth] = useState(0);
   const panelCornerRadius = Math.min(32, panelWidth / 2, height / 2);
+  // Explicit square cells: a percentage width with aspectRatio was resolving
+  // the height from the glyph's line box, leaving wide, short press targets
+  // whose emoji did not look centred.
+  const emojiCellSize =
+    panelWidth > 0 ? (panelWidth - EMOJI_GRID_PADDING * 2) / EMOJI_COLUMNS : 0;
 
   return (
     <Animated.View
@@ -160,6 +168,7 @@ export function EmojiPicker({
                         onPress={() => onSelect?.(emoji)}
                         style={({ pressed }) => [
                           styles.emojiCell,
+                          emojiCellSize > 0 && { width: emojiCellSize, height: emojiCellSize },
                           { backgroundColor: pressed ? colors.subtle : 'transparent' },
                         ]}
                       >
@@ -190,7 +199,7 @@ const styles = StyleSheet.create({
   panel: { height: 320, position: 'relative' },
   panelBackground: { position: 'absolute', top: 0, left: 0 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: EMOJI_GRID_PADDING, paddingBottom: 24 },
   sectionTitle: {
     fontSize: 11,
     fontFamily: 'Geist_600SemiBold',
@@ -204,11 +213,15 @@ const styles = StyleSheet.create({
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   emojiCell: {
-    width: '12.5%',
-    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
   },
-  emoji: { fontSize: 24 },
+  emoji: {
+    fontSize: 24,
+    lineHeight: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
 });

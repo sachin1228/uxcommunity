@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1426,10 +1425,11 @@ export default function CommunityChat() {
               />
             </Animated.View>
           </View>
+          {/* Match the gesture bar to the panel while it owns the bottom edge. */}
           <View
             style={{
               height: insets.bottom,
-              backgroundColor: Platform.OS === 'android' ? '#FF0000' : colors.background,
+              backgroundColor: imeLayout.panelOpen ? colors.card : colors.background,
             }}
           />
         </>

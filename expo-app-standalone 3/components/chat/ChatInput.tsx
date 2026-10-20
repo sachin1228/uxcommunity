@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   replyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 22,
+    borderRadius: 12,
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,
