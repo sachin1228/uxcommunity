@@ -17,8 +17,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { EmojiPicker } from '@/components/chat/EmojiPicker';
+import type { ChatImeLayout } from '@/hooks/useChatImeLayout';
 import { hapticError, hapticSelection, hapticSuccess, hapticToggle } from '@/lib/haptics';
 import {
   ALLOWED_COMMENT_REACTIONS,
@@ -379,7 +381,7 @@ export function CommentComposer({
   replyToBody,
   onCancelReply,
   onPosted,
-  bottomInset = 0,
+  imeLayout,
 }: {
   communityId: string;
   kind: CommentKind;
@@ -396,11 +398,16 @@ export function CommentComposer({
   replyToBody?: string | null;
   onCancelReply?: () => void;
   onPosted: (comment: CommunityComment) => void;
-  bottomInset?: number;
+  imeLayout: ChatImeLayout;
 }) {
   const colors = useColors();
-  const [body, setBody] = useState(initialBody ?? '');
+  const initialText = initialBody ?? '';
+  const [body, setBody] = useState(initialText);
   const [sending, setSending] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const focusRequestIdRef = useRef(0);
+  const selectionRef = useRef({ start: initialText.length, end: initialText.length });
+  const emojiPanelOpen = imeLayout.panelOpen;
 
   const trimmed = body.trim();
   const canSend = trimmed.length > 0 && trimmed.length <= maxLength && !sending;
@@ -422,6 +429,8 @@ export function CommentComposer({
         parent_id: parentId ?? null,
       });
       setBody('');
+      selectionRef.current = { start: 0, end: 0 };
+      imeLayout.closePanel();
       hapticSuccess();
       onPosted(comment);
     } catch (e) {
@@ -432,17 +441,40 @@ export function CommentComposer({
     }
   };
 
+  const requestKeyboard = () => {
+    const requestId = ++focusRequestIdRef.current;
+    const restoreFocus = () => {
+      if (focusRequestIdRef.current === requestId) inputRef.current?.focus();
+    };
+    imeLayout.requestKeyboard(restoreFocus);
+  };
+
+  const openEmojiPanel = () => {
+    focusRequestIdRef.current += 1;
+    imeLayout.openEmojiPanel();
+  };
+
+  const toggleEmojiPicker = () => {
+    if (imeLayout.panelOpenRef.current) {
+      requestKeyboard();
+    } else {
+      openEmojiPanel();
+    }
+  };
+
+  const insertEmoji = (emoji: string) => {
+    const from = Math.min(selectionRef.current.start, body.length);
+    const to = Math.min(Math.max(selectionRef.current.end, from), body.length);
+    const next = body.slice(0, from) + emoji + body.slice(to);
+    const caret = from + emoji.length;
+    selectionRef.current = { start: caret, end: caret };
+    setBody(next);
+    requestAnimationFrame(() => inputRef.current?.setSelection(caret, caret));
+  };
+
   return (
-    <View
-      style={[
-        styles.composer,
-        {
-          backgroundColor: colors.background,
-          borderTopColor: colors.borderSubtle,
-          paddingBottom: bottomInset,
-        },
-      ]}
-    >
+    <View style={[styles.composer, { backgroundColor: colors.background, borderTopColor: colors.borderSubtle }]}>
+      <View style={styles.composerStack} onLayout={imeLayout.onComposerStackLayout}>
       {replyToName ? (
         <View style={styles.replyContext}>
           <View style={styles.replyContextLine}>
@@ -480,9 +512,30 @@ export function CommentComposer({
         </View>
       ) : null}
       <View style={[styles.composerField, { backgroundColor: colors.surfaceRaised }]}>
+        <Pressable
+          onPress={toggleEmojiPicker}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={emojiPanelOpen ? 'Show keyboard' : 'Open emoji picker'}
+          style={({ pressed }) => [styles.composerEmoji, { opacity: pressed ? 0.55 : 1 }]}
+        >
+          {emojiPanelOpen ? (
+            <MaterialCommunityIcons name="keyboard-outline" size={20} color={colors.accent} />
+          ) : (
+            <Feather name="smile" size={19} color={colors.foregroundMuted} />
+          )}
+        </Pressable>
         <TextInput
+          ref={inputRef}
           value={body}
-          onChangeText={setBody}
+          onChangeText={(value) => {
+            if (imeLayout.panelOpenRef.current) requestKeyboard();
+            setBody(value);
+          }}
+          onPressIn={() => requestKeyboard()}
+          onSelectionChange={(event) => {
+            selectionRef.current = event.nativeEvent.selection;
+          }}
           placeholder={placeholder ?? 'Add comment'}
           placeholderTextColor={colors.foregroundSubtle}
           multiline
@@ -518,6 +571,14 @@ export function CommentComposer({
           </Pressable>
         ) : null}
       </View>
+      </View>
+      <EmojiPicker
+        onSelect={insertEmoji}
+        height={imeLayout.panelHeight}
+        animatedStyle={imeLayout.panelStyle}
+        showContent
+        interactive={imeLayout.panelInteractive}
+      />
     </View>
   );
 }
@@ -1093,10 +1154,15 @@ const styles = StyleSheet.create({
 
   // Pinned bar under the detail list, above the keyboard.
   composer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  composerStack: {
     paddingTop: 8,
     paddingHorizontal: 18,
+    paddingBottom: 8,
     gap: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   replyContext: { gap: 2 },
   replyContextLine: {
@@ -1117,14 +1183,21 @@ const styles = StyleSheet.create({
   composerField: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     // 40px tall and a true pill: the radius is past half the height, so the
     // ends are round without the field turning into a capsule as it grows.
     minHeight: 40,
     borderRadius: 20,
-    paddingLeft: 14,
+    paddingLeft: 4,
     paddingRight: 4,
     paddingVertical: 4,
+  },
+  composerEmoji: {
+    width: 30,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   composerInput: {
     flex: 1,

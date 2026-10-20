@@ -12,10 +12,10 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView as RNKeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -23,10 +23,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import {
-  KeyboardAvoidingView as KeyboardControllerAvoidingView,
-  KeyboardEvents,
-} from 'react-native-keyboard-controller';
+import { KeyboardEvents } from 'react-native-keyboard-controller';
+import Animated from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -41,6 +39,7 @@ import { DmReportModal } from '@/components/dm/DmReportModal';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
 import { useDmSend } from '@/hooks/useDmSend';
 import { useDmTyping } from '@/hooks/useDmTyping';
@@ -139,6 +138,8 @@ export default function DmThreadScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const imeLayout = useChatImeLayout(isFocused);
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const params = useLocalSearchParams<{
@@ -187,14 +188,11 @@ export default function DmThreadScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  /** Measured for the iOS keyboard offset — the KAV starts below the header. */
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<DmMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<DmMessage | null>(null);
   const [imageIndex, setImageIndex] = useState<number | null>(null);
-  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
   const [answering, setAnswering] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
@@ -324,9 +322,8 @@ export default function DmThreadScreen() {
     listRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
 
-  // Android's keyboard-controller resizes the screen; jump to the newest
-  // message when it opens, exactly like the community chat (iOS is handled by
-  // the KAV offset below).
+  // Keep the newest message visible when the IME opens, while the shared chat
+  // layout controller moves the dock and list viewport together.
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
@@ -994,7 +991,6 @@ export default function DmThreadScreen() {
 
       {/* Header — peer identity (opens their profile) + the ⋯ safety menu. */}
       <View
-        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
         style={[
           styles.header,
           {
@@ -1060,7 +1056,7 @@ export default function DmThreadScreen() {
         </View>
       ) : (
         <>
-          <ThreadKeyboardView headerHeight={headerHeight}>
+          <View style={styles.flex}>
             <View style={styles.flex}>
             <FlatList
               ref={listRef}
@@ -1069,7 +1065,7 @@ export default function DmThreadScreen() {
               keyExtractor={(row) => row.key}
               // A cached window paints at once; the anchor runs when the page
               // request settles and may move it to the unread divider.
-              style={{ opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }}
+              style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
               contentContainerStyle={styles.list}
               keyboardDismissMode="on-drag"
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -1079,7 +1075,7 @@ export default function DmThreadScreen() {
                 setAtBottom((current) => (current === next ? current : next));
               }}
               scrollEventThrottle={32}
-              onScrollBeginDrag={() => setEmojiPanelOpen(false)}
+              onScrollBeginDrag={imeLayout.closePanel}
               onEndReached={() => void loadMore()}
               onEndReachedThreshold={0.3}
               onScrollToIndexFailed={(info) => {
@@ -1180,6 +1176,11 @@ export default function DmThreadScreen() {
               }
             />
 
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.imeSpacer, imeLayout.listSpacerStyle]}
+            />
+
             {!atBottom && !loading ? (
               <Pressable
                 onPress={() => scrollToLatest(true)}
@@ -1195,20 +1196,25 @@ export default function DmThreadScreen() {
             ) : null}
           </View>
 
+          <Animated.View
+            pointerEvents="box-none"
+            style={[styles.dmDock, imeLayout.dockStyle]}
+          >
           <View
             style={[
               styles.footer,
               {
                 borderTopColor: colors.border,
                 backgroundColor: colors.background,
-                paddingBottom: emojiPanelOpen ? 0 : 6,
               },
             ]}
           >
-            <TypingIndicator users={typingUsers} />
+            <View onLayout={imeLayout.onTypingIndicatorLayout}>
+              <TypingIndicator users={typingUsers} />
+            </View>
 
             {!composerReady ? null : composerState.kind === 'blocked' ? (
-              <View style={styles.footerBar}>
+              <View style={styles.footerBar} onLayout={imeLayout.onFixedDockLayout}>
                 <Feather name="slash" size={15} color={colors.destructive} />
                 <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
                   You blocked{' '}
@@ -1232,7 +1238,7 @@ export default function DmThreadScreen() {
                 </Pressable>
               </View>
             ) : composerState.kind === 'incoming-request' ? (
-              <View style={styles.footerBar}>
+              <View style={styles.footerBar} onLayout={imeLayout.onFixedDockLayout}>
                 <View style={styles.footerCopy}>
                   <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
                     <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
@@ -1277,7 +1283,7 @@ export default function DmThreadScreen() {
                 </View>
               </View>
             ) : composerState.kind === 'outgoing-request' ? (
-              <View style={styles.footerInfo}>
+              <View style={styles.footerInfo} onLayout={imeLayout.onFixedDockLayout}>
                 <Feather name="clock" size={15} color={colors.foregroundMuted} />
                 <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
                   Message request sent —{' '}
@@ -1288,7 +1294,7 @@ export default function DmThreadScreen() {
                 </Text>
               </View>
             ) : composerState.kind === 'rejected' ? (
-              <View style={styles.footerInfo}>
+              <View style={styles.footerInfo} onLayout={imeLayout.onFixedDockLayout}>
                 <Feather name="x-circle" size={15} color={colors.foregroundMuted} />
                 <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
                   {rejectedByMe
@@ -1297,8 +1303,8 @@ export default function DmThreadScreen() {
                 </Text>
               </View>
             ) : (
-              <>
-                {unstarted ? (
+              <DmComposer
+                leadingAccessory={unstarted ? (
                   <View style={styles.preSendHint}>
                     <Feather name="info" size={12} color={colors.foregroundMuted} />
                     <Text style={[styles.preSendText, { color: colors.foregroundMuted }]}>
@@ -1306,25 +1312,22 @@ export default function DmThreadScreen() {
                     </Text>
                   </View>
                 ) : null}
-                <DmComposer
-                  replyTo={replyTo}
-                  onCancelReply={() => setReplyTo(null)}
-                  onSend={(text, pendingImage) => {
-                    handleSend(text, pendingImage, replyTo);
-                    setReplyTo(null);
-                  }}
-                  onTypingChange={(text) => notifyTyping(text.length > 0)}
-                  disabled={unstarted && sending}
-                  error={sendError}
-                  emojiPanelOpen={emojiPanelOpen}
-                  onEmojiPanelOpenChange={setEmojiPanelOpen}
-                />
-              </>
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
+                onSend={(text, pendingImage) => {
+                  handleSend(text, pendingImage, replyTo);
+                  setReplyTo(null);
+                }}
+                onTypingChange={(text) => notifyTyping(text.length > 0)}
+                disabled={unstarted && sending}
+                error={sendError}
+                imeLayout={imeLayout}
+              />
             )}
           </View>
-          </ThreadKeyboardView>
-          {/* The home-indicator strip below the composer, outside the KAV —
-              the community chat lays it out the same way. */}
+          </Animated.View>
+          </View>
+          {/* The safe-area strip sits outside the animated dock and the IME. */}
           <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
         </>
       )}
@@ -1409,31 +1412,6 @@ export default function DmThreadScreen() {
  * the header); Android uses keyboard-controller's height wrapper, since the
  * screen is resized rather than padded.
  */
-function ThreadKeyboardView({
-  headerHeight,
-  children,
-}: {
-  headerHeight: number;
-  children: React.ReactNode;
-}) {
-  if (Platform.OS === 'android') {
-    return (
-      <KeyboardControllerAvoidingView style={styles.flex} behavior="height">
-        {children}
-      </KeyboardControllerAvoidingView>
-    );
-  }
-  return (
-    <RNKeyboardAvoidingView
-      style={styles.flex}
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}
-    >
-      {children}
-    </RNKeyboardAvoidingView>
-  );
-}
-
 /** Header ⋯ menu — Report, plus Block or Unblock depending on the state. */
 function ThreadOptionsSheet({
   visible,
@@ -1523,6 +1501,15 @@ function ThreadOptionsSheet({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
+  dmDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+    overflow: 'visible',
+  },
+  imeSpacer: { flexShrink: 0 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1613,6 +1600,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,
+    overflow: 'visible',
   },
   footerBar: {
     flexDirection: 'row',

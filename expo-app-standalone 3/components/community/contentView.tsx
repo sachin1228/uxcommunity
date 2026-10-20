@@ -5,10 +5,8 @@ import {
   Animated,
   Easing,
   Image,
-  KeyboardAvoidingView as RNKeyboardAvoidingView,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,13 +14,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import {
-  KeyboardAvoidingView as KeyboardControllerAvoidingView,
-  useKeyboardState,
-} from 'react-native-keyboard-controller';
+import { useIsFocused } from '@react-navigation/native';
+import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
 import {
@@ -64,20 +61,6 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
 import { VideoPlayerModal } from './VideoPlayerModal';
 import { EventTicket } from './EventTicket';
-
-/**
- * The detail page is a full-screen `Modal`, where iOS's own keyboard avoiding
- * view is the dependable option; Android uses the keyboard-controller build
- * that the chat screens already rely on.
- */
-const KeyboardAvoider: React.ComponentType<
-  React.ComponentProps<typeof RNKeyboardAvoidingView>
-> =
-  Platform.OS === 'ios'
-    ? RNKeyboardAvoidingView
-    : (KeyboardControllerAvoidingView as React.ComponentType<
-        React.ComponentProps<typeof RNKeyboardAvoidingView>
-      >);
 
 /**
  * The community card, the card detail, and the optimistic interaction state
@@ -1026,6 +1009,12 @@ export function ContentDetail({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const canCompose = Boolean(
+    visible && isFocused && item &&
+    (kind === 'events' || (item as { allow_replies?: boolean }).allow_replies !== false),
+  );
+  const imeLayout = useChatImeLayout(canCompose, { top: 0, bottom: 0 });
   const resource = kind === 'resources' ? (item as CommunityResource | null) : null;
   const resourcePreview = useResourceLinkPreview(resource?.url);
   // The page always opens at its own start — the reader asked for this post,
@@ -1036,15 +1025,16 @@ export function ContentDetail({
   const sectionRef = useRef<CommentSectionHandle>(null);
   // Who the pinned composer is aimed at — null means a top-level comment.
   const [replyTarget, setReplyTarget] = useState<CommunityComment | null>(null);
-  const keyboardVisible = useKeyboardState((state) => state.isVisible);
   // Some screens keep the sheet mounted between posts, so a previously read
   // page must not carry its scroll offset into the next open.
   useEffect(() => {
     if (visible) {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
       setReplyTarget(null);
+    } else {
+      imeLayout.closePanel();
     }
-  }, [visible, item?.id]);
+  }, [imeLayout.closePanel, visible, item?.id]);
 
   // The RSVP sender is a hook, so it has to run before the early return below.
   // Returning a spinner while the row loads and then calling it once the row
@@ -1097,10 +1087,6 @@ export function ContentDetail({
     setReplyTarget(null);
   };
 
-  // The composer bar keeps its safe-area padding only while the keyboard is
-  // down; with the keyboard up it hugs the keyboard's top edge.
-  const composerBottomInset = keyboardVisible ? 8 : Math.max(insets.bottom, 8);
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={[styles.detailRoot, { backgroundColor: colors.background }]}>
@@ -1121,11 +1107,8 @@ export function ContentDetail({
           />
         </View>
 
-        <KeyboardAvoider
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-        <ScrollView
+        <View style={styles.flex}>
+          <ScrollView
           ref={scrollRef}
           style={styles.flex}
           contentContainerStyle={[styles.detailContent, { paddingBottom: 24 }]}
@@ -1255,28 +1238,38 @@ export function ContentDetail({
               onCountChange={(total) => actions.setCommentCount(item.id, total)}
             />
           </View>
-        </ScrollView>
+          </ScrollView>
+          <ReanimatedAnimated.View
+            pointerEvents="none"
+            style={imeLayout.listSpacerStyle}
+          />
 
         {allowReplies ? (
-          <CommentComposer
-            key={replyTarget?.id ?? 'root'}
-            communityId={item.community_id}
-            kind={kind}
-            targetId={item.id}
-            parentId={replyTarget ? replyTarget.parent_id ?? replyTarget.id : null}
-            initialBody={replyTarget ? replyMention(replyTarget, currentUserId) : undefined}
-            maxLength={COMMENT_MAX_LENGTH[kind]}
-            placeholder="Add comment"
-            submitLabel={replyTarget ? 'Reply' : 'Send'}
-            autoFocus={Boolean(replyTarget)}
-            replyToName={replyTarget ? replyTarget.users?.name ?? 'Member' : null}
-            replyToBody={replyTarget?.body ?? null}
-            onCancelReply={() => setReplyTarget(null)}
-            onPosted={handleCommentPosted}
-            bottomInset={composerBottomInset}
-          />
+          <ReanimatedAnimated.View
+            pointerEvents="box-none"
+            style={[styles.commentDock, imeLayout.dockStyle]}
+          >
+            <CommentComposer
+              key={replyTarget?.id ?? 'root'}
+              communityId={item.community_id}
+              kind={kind}
+              targetId={item.id}
+              parentId={replyTarget ? replyTarget.parent_id ?? replyTarget.id : null}
+              initialBody={replyTarget ? replyMention(replyTarget, currentUserId) : undefined}
+              maxLength={COMMENT_MAX_LENGTH[kind]}
+              placeholder="Add comment"
+              submitLabel={replyTarget ? 'Reply' : 'Send'}
+              autoFocus={Boolean(replyTarget)}
+              replyToName={replyTarget ? replyTarget.users?.name ?? 'Member' : null}
+              replyToBody={replyTarget?.body ?? null}
+              onCancelReply={() => setReplyTarget(null)}
+              onPosted={handleCommentPosted}
+              imeLayout={imeLayout}
+            />
+          </ReanimatedAnimated.View>
         ) : null}
-        </KeyboardAvoider>
+        </View>
+        <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
       </View>
     </Modal>
   );
@@ -2073,6 +2066,14 @@ const styles = StyleSheet.create({
 
   detailRoot: { flex: 1 },
   flex: { flex: 1 },
+  commentDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+    overflow: 'visible',
+  },
   detailLoading: { alignItems: 'center', justifyContent: 'center' },
   detailHeader: {
     minHeight: 64,
