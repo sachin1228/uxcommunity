@@ -115,10 +115,23 @@ export function EmojiPicker({
           styles.panel,
           {
             height,
-            backgroundColor: colors.card,
           },
         ]}
       >
+        {panelWidth > 0 && height > 0 && (
+          <Svg
+            pointerEvents="none"
+            width={panelWidth}
+            height={height}
+            viewBox={`0 0 ${panelWidth} ${height}`}
+            style={styles.panelBackground}
+          >
+            <Path
+              d={`M 0 ${panelCornerRadius} A ${panelCornerRadius} ${panelCornerRadius} 0 0 1 ${panelCornerRadius} 0 H ${panelWidth - panelCornerRadius} A ${panelCornerRadius} ${panelCornerRadius} 0 0 1 ${panelWidth} ${panelCornerRadius} V ${height} H 0 Z`}
+              fill={colors.card}
+            />
+          </Svg>
+        )}
         {showContent && (
           <>
             {/* No drag handle: the panel is not a sheet — it takes the
@@ -182,8 +195,9 @@ const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   belowComposer: { position: 'absolute', left: -8, right: -8, top: '100%' },
   /** Holds a subtle border matching the community tab row separator. */
-  panel: { height: 320 },
-  panelOutline: { position: 'absolute', top: 0, left: 0 },
+  panel: { height: 320, position: 'relative' },
+  panelBackground: { position: 'absolute', top: 0, left: 0 },
+  panelOutline: { position: 'absolute', top: 2, left: 0 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   sectionTitle: {
