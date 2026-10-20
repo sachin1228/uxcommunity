@@ -13,6 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityRow } from '@/components/communities/CommunityRow';
 import { useColors } from '@/hooks/useColors';
@@ -34,6 +35,7 @@ const FOCUS_CATCH_UP_MIN_AWAY_MS = 5_000;
 export default function CommunitiesScreen() {
   const colors = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     communities,
     isLoading,
@@ -150,9 +152,8 @@ export default function CommunitiesScreen() {
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
-      {/* Search + create — the list's two verbs, on one line under the app
-          header. Search filters the joined list locally; the + opens the
-          create-community flow (the web sidebar's "Your Community" plus). */}
+      {/* Search filters the joined list locally. Creating lives in the
+          floating + at the bottom-right, above the tab bar. */}
       <View style={styles.searchRow}>
         <View
           style={[
@@ -183,21 +184,6 @@ export default function CommunitiesScreen() {
             </Pressable>
           )}
         </View>
-        <Pressable
-          onPress={() => router.push('/create-community')}
-          hitSlop={4}
-          accessibilityRole="button"
-          accessibilityLabel="Create community"
-          style={({ pressed }) => [
-            styles.createBtn,
-            {
-              backgroundColor: pressed ? colors.border : colors.surfaceRaised,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Feather name="plus" size={18} color={colors.foreground} />
-        </Pressable>
       </View>
 
       {isLoading && (
@@ -220,7 +206,7 @@ export default function CommunitiesScreen() {
           <Feather name="users" size={40} color={colors.mutedForeground} />
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No communities yet</Text>
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            You haven&apos;t joined any communities. Create one with the + above.
+            You haven&apos;t joined any communities. Create one with the + button.
           </Text>
         </View>
       )}
@@ -230,7 +216,7 @@ export default function CommunitiesScreen() {
           data={visible}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 120 }]}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.noResults}>
@@ -253,6 +239,26 @@ export default function CommunitiesScreen() {
           }
         />
       )}
+
+      {/* Fixed floating create — same round control the search row used to
+          hold, now hovering above the tab bar while the list scrolls. */}
+      <Pressable
+        onPress={() => router.push('/create-community')}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel="Create community"
+        style={({ pressed }) => [
+          styles.fab,
+          {
+            backgroundColor: pressed ? colors.accentHover : colors.accent,
+            borderColor: colors.accent,
+            bottom: insets.bottom + 84,
+            shadowColor: '#000000',
+          },
+        ]}
+      >
+        <Feather name="plus" size={20} color={colors.accentForeground} />
+      </Pressable>
     </View>
   );
 }
@@ -283,13 +289,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_400Regular',
     paddingVertical: 0,
   },
-  createBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  fab: {
+    position: 'absolute',
+    right: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 8,
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
   },
   noResults: {
     alignItems: 'center',

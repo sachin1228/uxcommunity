@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -60,6 +63,107 @@ const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
   communities:
     "Everything posted in the communities you've joined will appear here, whether or not it was shared publicly.",
 };
+
+/** Space the floating switcher reserves above the first card. */
+const FEED_TOP_INSET = 58;
+
+/** A tab's measured slot inside the track, used to glide the indicator. */
+type ScopeRect = { x: number; width: number };
+
+/**
+ * The floating feed switcher — a compact pill that hovers over the list while
+ * the cards scroll underneath it. The active slot is a sliding capsule that
+ * eases between the two measured tab widths, mirroring the web switcher.
+ */
+function FeedScopePill({
+  scope,
+  onChange,
+}: {
+  scope: HomeFeedScope;
+  onChange: (next: HomeFeedScope) => void;
+}) {
+  const colors = useColors();
+  const [rects, setRects] = useState<Partial<Record<HomeFeedScope, ScopeRect>>>({});
+  const indicatorX = useRef(new Animated.Value(0)).current;
+  const indicatorWidth = useRef(new Animated.Value(0)).current;
+  const positioned = useRef(false);
+
+  const activeRect = rects[scope];
+
+  // Measure first, then glide. The very first placement is instant so the
+  // capsule never sweeps in from the left edge on launch.
+  useEffect(() => {
+    if (!activeRect) return;
+    const duration = positioned.current ? 240 : 0;
+    const animation = Animated.parallel([
+      Animated.timing(indicatorX, {
+        toValue: activeRect.x,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(indicatorWidth, {
+        toValue: activeRect.width,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]);
+    animation.start();
+    positioned.current = true;
+    return () => animation.stop();
+  }, [activeRect, indicatorWidth, indicatorX]);
+
+  const measure = useCallback((key: HomeFeedScope, event: LayoutChangeEvent) => {
+    const { x, width } = event.nativeEvent.layout;
+    setRects((current) => {
+      const previous = current[key];
+      if (previous && previous.x === x && previous.width === width) return current;
+      return { ...current, [key]: { x, width } };
+    });
+  }, []);
+
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={[
+        styles.scopePill,
+        { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
+      ]}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.scopeIndicator,
+          {
+            backgroundColor: colors.borderStrong,
+            width: indicatorWidth,
+            transform: [{ translateX: indicatorX }],
+          },
+        ]}
+      />
+
+      {TABS.map((tab) => {
+        const active = scope === tab.key;
+        const tint = active ? colors.foreground : colors.foregroundMuted;
+        return (
+          <Pressable
+            key={tab.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            hitSlop={4}
+            onPress={() => onChange(tab.key)}
+            onLayout={(event) => measure(tab.key, event)}
+            style={({ pressed }) => [styles.scopeSegment, pressed && styles.scopeSegmentPressed]}
+          >
+            <Feather name={tab.icon} size={12} color={tint} />
+            <Text style={[styles.scopeSegmentText, { color: tint }]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function HomeTab() {
   const colors = useColors();
@@ -288,78 +392,68 @@ export default function HomeTab() {
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
-      {/* ── Feed source tabs — the web switcher's two disjoint feeds ── */}
-      <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
-        {TABS.map((tab) => {
-          const active = scope === tab.key;
-          const labelColor = active ? colors.foreground : colors.mutedForeground;
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => handleScopeChange(tab.key)}
-              style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-            >
-              <View style={styles.tabInner}>
-                <Feather name={tab.icon} size={14} color={labelColor} />
-                <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
-              </View>
+      <View style={styles.feedArea}>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
+            <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t load your feed</Text>
+            <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
+            <Pressable onPress={() => void load(scopeRef.current, 'initial')} accessibilityRole="button">
+              <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
             </Pressable>
-          );
-        })}
-      </View>
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
-          <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t load your feed</Text>
-          <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
-          <Pressable onPress={() => void load(scopeRef.current, 'initial')} accessibilityRole="button">
-            <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={feedItemKey}
-          renderItem={renderItem}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.4}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void load(scopeRef.current, 'refresh')}
-              tintColor={colors.foregroundMuted}
-            />
-          }
-          ListFooterComponent={
-            loadingMore ? (
-              <View style={styles.footer}>
-                <ActivityIndicator size="small" color={colors.foregroundMuted} />
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Feather
-                name={scope === 'communities' ? 'users' : 'globe'}
-                size={32}
-                color={colors.foregroundSubtle}
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={feedItemKey}
+            renderItem={renderItem}
+            contentContainerStyle={[
+              styles.list,
+              { paddingTop: FEED_TOP_INSET, paddingBottom: insets.bottom + 96 },
+            ]}
+            scrollIndicatorInsets={{ top: FEED_TOP_INSET }}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => void load(scopeRef.current, 'refresh')}
+                tintColor={colors.foregroundMuted}
+                progressViewOffset={FEED_TOP_INSET}
               />
-              <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
-              <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                {EMPTY_STATE_DESCRIPTION[scope]}
-              </Text>
-            </View>
-          }
-        />
-      )}
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footer}>
+                  <ActivityIndicator size="small" color={colors.foregroundMuted} />
+                </View>
+              ) : null
+            }
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Feather
+                  name={scope === 'communities' ? 'users' : 'globe'}
+                  size={32}
+                  color={colors.foregroundSubtle}
+                />
+                <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
+                <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
+                  {EMPTY_STATE_DESCRIPTION[scope]}
+                </Text>
+              </View>
+            }
+          />
+        )}
+
+        {/* ── Floating source switcher — the cards scroll underneath it ── */}
+        <View pointerEvents="box-none" style={styles.floatingTabs}>
+          <FeedScopePill scope={scope} onChange={handleScopeChange} />
+        </View>
+      </View>
 
       <ContentDetail
         item={selected}
@@ -387,19 +481,52 @@ export default function HomeTab() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  tabsShell: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tab: {
-    flex: 1,
-    height: 46,
+  feedArea: { flex: 1 },
+
+  // The switcher floats above the list; cards scroll beneath its shadow.
+  floatingTabs: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 2,
+    zIndex: 10,
   },
-  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tabText: { fontSize: 12.5, fontFamily: 'Geist_500Medium' },
+  scopePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    padding: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000000',
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  scopeIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: 999,
+  },
+  scopeSegment: {
+    height: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+  },
+  scopeSegmentPressed: { opacity: 0.7 },
+  scopeSegmentText: {
+    fontSize: 12,
+    letterSpacing: 0.1,
+    fontFamily: 'Geist_600SemiBold',
+  },
+
   list: { padding: 12, gap: 12, flexGrow: 1 },
   center: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   stateTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16 },
