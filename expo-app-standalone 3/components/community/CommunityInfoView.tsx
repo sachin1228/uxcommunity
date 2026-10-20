@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -10,37 +10,32 @@ import {
   View,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
-  getCommunityDetail,
-  getCommunityMembersPage,
   getCommunityRules,
   type CommunityDetailRow,
   type CommunityRule,
 } from '@/lib/communities';
-import { PersonAvatar } from '@/components/PersonAvatar';
+import { loadCommunityDetail, peekCommunityDetail } from '@/lib/communityDetailCache';
+import { peekCommunityRules, putCommunityRules } from '@/lib/communityRulesCache';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { MembersPanel } from '@/components/community/MembersPanel';
+import { ActivityPanel } from '@/components/community/ActivityPanel';
 import { communityNameBadges } from '@/lib/communityBadges';
-import { useAuth } from '@/context/AuthContext';
-import type { MentionCandidate } from '@/lib/chat';
 
 /**
  * The community info screen behind the chat header's title — WhatsApp's
- * contact-info layout (close + "Community info", centred hero, divided
- * sections) carrying the web right sidebar's content: the member list, About
- * (description / created date / type chips) and the numbered rules. Reads the
- * same endpoints the web panel reads (GET /api/communities/:id and its
- * /members and /rules), so both clients agree on every line.
+ * contact-info layout carrying the web right sidebar's content (members,
+ * about, rules) plus the management surfaces the web chat header offers:
+ * pending requests and member administration in the Members tab, and the
+ * manager-tier Activity audit trail as a third tab.
+ *
+ * Reads the same endpoints the web client reads, so both clients agree on
+ * every line, every permission and every request.
  */
 
-/**
- * Everything the hero can paint without the detail request. The chat route's
- * param snapshot satisfies it, as does the resolved community row — so the
- * avatar and name are there on the first frame either way.
- */
 export interface CommunityInfoCommunity {
   id: string;
   name: string;
@@ -53,9 +48,16 @@ export interface CommunityInfoCommunity {
 
 interface Props {
   visible: boolean;
-  /** The route snapshot or the chat screen's resolved community. */
+  /** The chat screen's live community snapshot. */
   community: CommunityInfoCommunity | null;
   onlineCount: number;
+  currentUserId: string;
+  /** The caller owns the community. */
+  isOwner?: boolean;
+  /** Owner or manager granted "manage members". */
+  canManageMembers?: boolean;
+  /** Owner or platform-appointed admin — sees Activity and appoints moderators. */
+  canManageModerators?: boolean;
   onClose: () => void;
 }
 
@@ -96,111 +98,55 @@ function fmtCreatedAt(iso?: string | null): string {
   });
 }
 
-/** Overview carries the description, meta and rules; Members keeps the roster. */
-const INFO_TABS: Array<{ key: 'about' | 'members'; label: string }> = [
-  { key: 'about', label: 'Overview' },
-  { key: 'members', label: 'Members' },
-];
-
-// Module-level memos so reopening the screen inside the windows costs no
-// Worker invocations — the same freshness rules the web panel applies
-// (metaCache's 5-minute staleness; the rules endpoint's 60-second cache).
-const DETAIL_STALE_MS = 5 * 60_000;
-const RULES_STALE_MS = 60_000;
-const detailCache = new Map<string, { fetchedAt: number; row: CommunityDetailRow | null }>();
-const rulesCache = new Map<string, { fetchedAt: number; rules: CommunityRule[] }>();
-// Only page 0 is cached, like the web members panel; later pages always fetch.
-const MEMBERS_STALE_MS = 60_000;
-const membersCache = new Map<
-  string,
-  { fetchedAt: number; members: MentionCandidate[]; hasMore: boolean }
->();
+/** Rules endpoint's 60-second freshness, like the web panel's request cache. */
+type InfoTab = 'about' | 'members' | 'activity';
 
 export function CommunityInfoView({
   visible,
   community,
   onlineCount,
+  currentUserId,
+  isOwner = false,
+  canManageMembers = false,
+  canManageModerators = false,
   onClose,
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const { user } = useAuth();
   const communityId = community?.id ?? '';
 
   const [detail, setDetail] = useState<CommunityDetailRow | null>(null);
-  const [members, setMembers] = useState<MentionCandidate[] | null>(null);
-  const [membersPage, setMembersPage] = useState(0);
-  const [membersHasMore, setMembersHasMore] = useState(false);
-  const [membersLoadingMore, setMembersLoadingMore] = useState(false);
-  /** Synchronous in-flight guard — scroll events can fire faster than state paints. */
-  const membersInFlight = useRef(false);
   const [rules, setRules] = useState<CommunityRule[] | null>(null);
+  const [activeTab, setActiveTab] = useState<InfoTab>('about');
 
-  const [activeTab, setActiveTab] = useState<'about' | 'members'>('about');
-  const scrollRef = useRef<ScrollView>(null);
-  // Each opening starts back on Overview, at the top.
+  // Each opening starts back on Overview; the detail cache paints instantly
+  // when it is fresh, and the request refreshes it in the background.
   useEffect(() => {
     if (!visible) return;
     setActiveTab('about');
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [visible]);
+    setDetail(peekCommunityDetail(communityId) ?? null);
+  }, [visible, communityId]);
 
-  // Fill from cache when fresh; otherwise fetch and remember. Only the roster
-  // shows a spinner — detail and rules land quietly into their sections.
   useEffect(() => {
-    if (!visible || !communityId) return;
+    if (!visible || !communityId) return undefined;
     let cancelled = false;
 
-    const freshDetail = detailCache.get(communityId);
-    if (freshDetail && Date.now() - freshDetail.fetchedAt < DETAIL_STALE_MS) {
-      setDetail(freshDetail.row);
-    } else {
-      setDetail(null);
-      getCommunityDetail(communityId)
-        .then((row) => {
-          detailCache.set(communityId, { fetchedAt: Date.now(), row });
-          if (!cancelled) setDetail(row);
-        })
-        .catch(() => {});
-    }
+    loadCommunityDetail(communityId)
+      .then((row) => {
+        if (!cancelled) setDetail(row);
+      })
+      .catch(() => {
+        /* the route snapshot still carries the hero */
+      });
 
-    // Members arrive one server-sized page (30) at a time — page 0 here,
-    // further pages from the scroll sentinel below, like the web panel.
-    const freshMembers = membersCache.get(communityId);
-    if (freshMembers && Date.now() - freshMembers.fetchedAt < MEMBERS_STALE_MS) {
-      setMembers(freshMembers.members);
-      setMembersHasMore(freshMembers.hasMore);
-      setMembersPage(0);
-      membersInFlight.current = false;
-    } else {
-      setMembers(null);
-      setMembersHasMore(false);
-      setMembersPage(0);
-      membersInFlight.current = true;
-      getCommunityMembersPage(communityId, 0)
-        .then(({ members: rows, hasMore }) => {
-          membersCache.set(communityId, { members: rows, hasMore, fetchedAt: Date.now() });
-          if (cancelled) return;
-          setMembers(rows);
-          setMembersHasMore(hasMore);
-        })
-        .catch(() => {
-          if (!cancelled) setMembers([]);
-        })
-        .finally(() => {
-          membersInFlight.current = false;
-        });
-    }
-
-    const freshRules = rulesCache.get(communityId);
-    if (freshRules && Date.now() - freshRules.fetchedAt < RULES_STALE_MS) {
-      setRules(freshRules.rules);
+    const freshRules = peekCommunityRules(communityId);
+    if (freshRules) {
+      setRules(freshRules);
     } else {
       setRules(null);
       getCommunityRules(communityId)
         .then((list) => {
-          rulesCache.set(communityId, { fetchedAt: Date.now(), rules: list });
+          putCommunityRules(communityId, list);
           if (!cancelled) setRules(list);
         })
         .catch(() => {
@@ -213,57 +159,86 @@ export function CommunityInfoView({
     };
   }, [visible, communityId]);
 
-  const loadMoreMembers = useCallback(() => {
-    if (members === null || !membersHasMore || membersInFlight.current) return;
-    membersInFlight.current = true;
-    setMembersLoadingMore(true);
-    const nextPage = membersPage + 1;
-    getCommunityMembersPage(communityId, nextPage)
-      .then(({ members: rows, hasMore }) => {
-        setMembers((prev) => [...(prev ?? []), ...rows]);
-        setMembersPage(nextPage);
-        setMembersHasMore(hasMore);
-      })
-      .catch(() => {
-        /* keep what is loaded; the next scroll retries */
-      })
-      .finally(() => {
-        membersInFlight.current = false;
-        setMembersLoadingMore(false);
-      });
-  }, [communityId, members, membersHasMore, membersPage]);
+  // A role change elsewhere (or a save in settings) can take Activity away.
+  useEffect(() => {
+    if (activeTab === 'activity' && !canManageModerators) setActiveTab('about');
+  }, [activeTab, canManageModerators]);
 
   const name = detail?.name ?? community?.name ?? 'Community';
   const imageUrl = detail?.image_url ?? community?.image_url ?? null;
   const type = detail?.type ?? community?.type;
   const referenceName = detail?.reference_name ?? community?.reference_name ?? null;
   const memberCount = detail?.member_count ?? community?.member_count ?? null;
-  const description =
-    detail?.description ?? fallbackDescription(type, referenceName);
+  const isPrivate = detail?.is_private ?? community?.is_private;
+  const isEventChat = type === 'event';
+  const description = detail?.description ?? fallbackDescription(type, referenceName);
+
   // The web panel's chips: the type's label, then the reference name.
   const tags = [
     ...(type && TYPE_LABELS[type] ? [TYPE_LABELS[type]] : []),
     ...(referenceName ? [referenceName] : []),
   ];
 
-  // The name renders word by word so the badges can flow after the last word
-  // on the final line (a single Text block would seat them beside the block,
-  // vertically centred across both lines). One a11y element out of the runs.
-  const nameWords = name.split(/\s+/).filter(Boolean);
-  const heroBadges = communityNameBadges(type, detail?.is_private ?? community?.is_private);
-  const heroLabel = [
-    name,
-    heroBadges.verified ? 'Verified community' : null,
-    heroBadges.visibility === 'lock'
-      ? 'Private community'
-      : heroBadges.visibility === 'globe'
-        ? 'Public community'
-        : null,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const infoTabs = useMemo<Array<{ key: InfoTab; label: string }>>(
+    () => [
+      { key: 'about', label: 'Overview' },
+      { key: 'members', label: 'Members' },
+      ...(canManageModerators ? [{ key: 'activity' as InfoTab, label: 'Activity' }] : []),
+    ],
+    [canManageModerators]
+  );
 
   if (!visible) return null;
+
+  const header = (
+    <View>
+      <InfoHero
+        name={name}
+        imageUrl={imageUrl}
+        type={type}
+        isPrivate={isPrivate}
+        memberCount={memberCount}
+        onlineCount={onlineCount}
+      />
+      <View
+        style={[
+          styles.tabsShell,
+          { backgroundColor: colors.background, borderBottomColor: colors.border },
+        ]}
+      >
+        {infoTabs.map((tab) => {
+          const active = activeTab === tab.key;
+          const labelColor = active ? colors.foreground : colors.mutedForeground;
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => {
+                if (active) return;
+                setActiveTab(tab.key);
+              }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              style={[
+                styles.tab,
+                { borderBottomColor: active ? colors.accent : 'transparent' },
+              ]}
+            >
+              <View style={styles.tabInner}>
+                {tab.key === 'about' ? (
+                  <Feather name="info" size={14} strokeWidth={2.5} color={labelColor} />
+                ) : tab.key === 'members' ? (
+                  <Ionicons name="people" size={14} color={labelColor} />
+                ) : (
+                  <Feather name="activity" size={14} strokeWidth={2.5} color={labelColor} />
+                )}
+                <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -284,240 +259,167 @@ export function CommunityInfoView({
           <Text style={[styles.topTitle, { color: colors.foreground }]}>Community info</Text>
         </View>
 
-        <ScrollView
-          ref={scrollRef}
-          onScroll={({ nativeEvent }) => {
-            if (activeTab !== 'members') return;
-            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-            if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 160) {
-              loadMoreMembers();
-            }
-          }}
-          scrollEventThrottle={16}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Hero: avatar, name, the room's size ── */}
-          <View style={styles.hero}>
-            {imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={[styles.heroAvatar, { borderColor: colors.border }]} />
-            ) : (
-              <View style={[styles.heroAvatar, styles.heroAvatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-                <Text style={[styles.heroAvatarText, { color: colors.mutedForeground }]}>
-                  {name.slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <View
-              style={styles.heroNameRow}
-              accessible
-              accessibilityLabel={heroLabel}
-            >
-              {nameWords.map((word, index) => (
-                <Text
-                  key={`${word}-${index}`}
-                  style={[styles.heroName, { color: colors.foreground }]}
-                >
-                  {word}
-                </Text>
-              ))}
-              <CommunityNameBadges
-                type={type}
-                isPrivate={detail?.is_private ?? community?.is_private}
-                size={14}
-              />
-            </View>
-            {memberCount !== null && (
-              <View style={styles.heroMetaRow}>
-                <View style={styles.metaItem}>
-                  <Ionicons name="people" size={12} color={colors.mutedForeground} />
-                  <Text style={[styles.heroMeta, { color: colors.mutedForeground }]}>
-                    {memberCount} member{memberCount === 1 ? '' : 's'}
-                  </Text>
-                </View>
-                {onlineCount > 0 && (
-                  <View style={styles.metaItem} accessible accessibilityLabel={`${onlineCount} online`}>
-                    <View style={styles.onlineDot} />
-                    <Text style={[styles.heroMeta, { color: colors.mutedForeground }]}>
-                      {onlineCount} online
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Two tabs in the chat header's vocabulary: Overview carries the
-              description and rules; Members keeps the roster to itself. */}
-          <View
-            style={[
-              styles.tabsShell,
-              { backgroundColor: colors.background, borderBottomColor: colors.border },
-            ]}
+        {activeTab === 'members' ? (
+          <MembersPanel
+            communityId={communityId}
+            isPrivate={Boolean(isPrivate)}
+            isEventChat={isEventChat}
+            currentUserId={currentUserId}
+            isOwner={isOwner}
+            canManageMembers={canManageMembers}
+            canManageModerators={canManageModerators}
+            header={header}
+          />
+        ) : activeTab === 'activity' ? (
+          <ActivityPanel communityId={communityId} currentUserId={currentUserId} header={header} />
+        ) : (
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+            showsVerticalScrollIndicator={false}
           >
-            {INFO_TABS.map((tab) => {
-              const active = activeTab === tab.key;
-              const labelColor = active ? colors.foreground : colors.mutedForeground;
-              return (
-                <Pressable
-                  key={tab.key}
-                  onPress={() => {
-                    if (active) return;
-                    setActiveTab(tab.key);
-                    scrollRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.tab,
-                    { borderBottomColor: active ? colors.accent : 'transparent' },
-                  ]}
-                >
-                  <View style={styles.tabInner}>
-                    {tab.key === 'about' ? (
-                      <Feather name="info" size={14} strokeWidth={2.5} color={labelColor} />
-                    ) : (
-                      <Ionicons name="people" size={14} color={labelColor} />
-                    )}
-                    <Text style={[styles.tabText, { color: labelColor }]}>
-                      {tab.label}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+            {header}
 
-          {activeTab === 'about' ? (
-            <>
-              {/* ── About ── */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
-                <Text style={[styles.aboutText, { color: colors.mutedForeground }]}>{description}</Text>
-                <View style={styles.aboutRows}>
-                  {type === 'city' && referenceName && (
-                    <View style={styles.aboutRow}>
-                      <Feather name="map-pin" size={15} color={colors.foregroundSubtle} />
-                      <Text style={[styles.aboutRowText, { color: colors.mutedForeground }]}>
-                        {referenceName}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.aboutRow}>
-                    <Feather name="calendar" size={15} color={colors.foregroundSubtle} />
-                    <Text style={[styles.aboutRowText, { color: colors.mutedForeground }]}>
-                      Created {fmtCreatedAt(detail?.created_at)}
-                    </Text>
-                  </View>
-                </View>
-                {tags.length > 0 && (
-                  <View style={styles.tagRow}>
-                    {tags.map((tag) => (
-                      <View
-                        key={tag}
-                        style={[styles.tag, { borderColor: colors.border }]}
-                      >
-                        <Text style={[styles.tagText, { color: colors.mutedForeground }]}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              {/* ── Rules ── */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rules</Text>
-                {rules === null ? (
-                  <ActivityIndicator color={colors.accent} style={styles.membersSpinner} />
-                ) : rules.length > 0 ? (
-                  <View style={styles.rulesList}>
-                    {rules.map((rule, index) => (
-                      <View key={rule.id} style={styles.ruleRow}>
-                        <View style={[styles.ruleNumber, { backgroundColor: colors.surfaceRaised }]}>
-                          <Text style={[styles.ruleNumberText, { color: colors.mutedForeground }]}>
-                            {index + 1}
-                          </Text>
-                        </View>
-                        <Text style={[styles.ruleText, { color: colors.mutedForeground }]}>
-                          {rule.rule_text}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={[styles.aboutText, { color: colors.mutedForeground }]}>
-                    No community rules have been added yet.
-                  </Text>
-                )}
-              </View>
-            </>
-          ) : (
-            /* ── Members ── */
+            {/* ── About ── */}
             <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-                  Members{memberCount !== null ? ` (${memberCount})` : ''}
-                </Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
+              <Text style={[styles.aboutText, { color: colors.mutedForeground }]}>
+                {description}
+              </Text>
+              <View style={styles.aboutRows}>
+                {type === 'city' && referenceName && (
+                  <View style={styles.aboutRow}>
+                    <Feather name="map-pin" size={15} color={colors.foregroundSubtle} />
+                    <Text style={[styles.aboutRowText, { color: colors.mutedForeground }]}>
+                      {referenceName}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.aboutRow}>
+                  <Feather name="calendar" size={15} color={colors.foregroundSubtle} />
+                  <Text style={[styles.aboutRowText, { color: colors.mutedForeground }]}>
+                    Created {fmtCreatedAt(detail?.created_at)}
+                  </Text>
+                </View>
               </View>
-
-              {members === null ? (
-                <ActivityIndicator color={colors.accent} style={styles.membersSpinner} />
-              ) : (
-                members.map((member) => (
-                  <Pressable
-                    key={member.user_id}
-                    onPress={() => {
-                      onClose();
-                      if (member.user_id === user?.id) {
-                        router.push('/profile');
-                        return;
-                      }
-                      router.push({ pathname: '/member/[id]', params: { id: member.user_id } });
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      member.designation
-                        ? `${member.name}, ${member.designation}. Open profile`
-                        : `${member.name}. Open profile`
-                    }
-                    style={({ pressed }) => [
-                      styles.memberRow,
-                      pressed && { backgroundColor: colors.surfaceRaised },
-                    ]}
-                  >
-                    <PersonAvatar
-                      name={member.name}
-                      url={member.avatar_url}
-                      size={40}
-                    />
-                    <View style={styles.memberText}>
-                      <Text numberOfLines={1} style={[styles.memberName, { color: colors.foreground }]}>
-                        {member.name}
+              {tags.length > 0 && (
+                <View style={styles.tagRow}>
+                  {tags.map((tag) => (
+                    <View key={tag} style={[styles.tag, { borderColor: colors.border }]}>
+                      <Text style={[styles.tagText, { color: colors.mutedForeground }]}>
+                        {tag}
                       </Text>
-                      {!!member.designation && (
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.memberDesignation, { color: colors.mutedForeground }]}
-                        >
-                          {member.designation}
-                        </Text>
-                      )}
                     </View>
-                    <Feather name="chevron-right" size={16} color={colors.foregroundSubtle} />
-                  </Pressable>
-                ))
+                  ))}
+                </View>
               )}
-
-              {membersLoadingMore ? (
-                <ActivityIndicator color={colors.accent} style={styles.membersSpinner} />
-              ) : null}
             </View>
-          )}
-        </ScrollView>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            {/* ── Rules ── */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rules</Text>
+              {rules === null ? (
+                <ActivityIndicator color={colors.accent} style={styles.rulesSpinner} />
+              ) : rules.length > 0 ? (
+                <View style={styles.rulesList}>
+                  {rules.map((rule, index) => (
+                    <View key={rule.id} style={styles.ruleRow}>
+                      <View style={[styles.ruleNumber, { backgroundColor: colors.surfaceRaised }]}>
+                        <Text style={[styles.ruleNumberText, { color: colors.mutedForeground }]}>
+                          {index + 1}
+                        </Text>
+                      </View>
+                      <Text style={[styles.ruleText, { color: colors.mutedForeground }]}>
+                        {rule.rule_text}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.aboutText, { color: colors.mutedForeground }]}>
+                  No community rules have been added yet.
+                </Text>
+              )}
+            </View>
+          </ScrollView>
+        )}
       </View>
     </Modal>
+  );
+}
+
+function InfoHero({
+  name,
+  imageUrl,
+  type,
+  isPrivate,
+  memberCount,
+  onlineCount,
+}: {
+  name: string;
+  imageUrl: string | null;
+  type?: string;
+  isPrivate?: boolean;
+  memberCount: number | null;
+  onlineCount: number;
+}) {
+  const colors = useColors();
+  // The name renders word by word so the badges can flow after the last word
+  // on the final line (a single Text block would seat them beside the block,
+  // vertically centred across both lines). One a11y element out of the runs.
+  const nameWords = name.split(/\s+/).filter(Boolean);
+  const heroBadges = communityNameBadges(type, isPrivate);
+  const heroLabel = [
+    name,
+    heroBadges.verified ? 'Verified community' : null,
+    heroBadges.visibility === 'lock'
+      ? 'Private community'
+      : heroBadges.visibility === 'globe'
+        ? 'Public community'
+        : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  return (
+    <View style={styles.hero}>
+      {imageUrl ? (
+        <Image source={{ uri: imageUrl }} style={[styles.heroAvatar, { borderColor: colors.border }]} />
+      ) : (
+        <View style={[styles.heroAvatar, styles.heroAvatarFallback, { backgroundColor: colors.surfaceRaised }]}>
+          <Text style={[styles.heroAvatarText, { color: colors.mutedForeground }]}>
+            {name.slice(0, 1).toUpperCase()}
+          </Text>
+        </View>
+      )}
+      <View style={styles.heroNameRow} accessible accessibilityLabel={heroLabel}>
+        {nameWords.map((word, index) => (
+          <Text key={`${word}-${index}`} style={[styles.heroName, { color: colors.foreground }]}>
+            {word}
+          </Text>
+        ))}
+        <CommunityNameBadges type={type} isPrivate={isPrivate} size={14} />
+      </View>
+      {memberCount !== null && (
+        <View style={styles.heroMetaRow}>
+          <View style={styles.metaItem}>
+            <Ionicons name="people" size={12} color={colors.mutedForeground} />
+            <Text style={[styles.heroMeta, { color: colors.mutedForeground }]}>
+              {memberCount} member{memberCount === 1 ? '' : 's'}
+            </Text>
+          </View>
+          {onlineCount > 0 && (
+            <View style={styles.metaItem} accessible accessibilityLabel={`${onlineCount} online`}>
+              <View style={styles.onlineDot} />
+              <Text style={[styles.heroMeta, { color: colors.mutedForeground }]}>
+                {onlineCount} online
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -559,8 +461,8 @@ const styles = StyleSheet.create({
 
   divider: { height: StyleSheet.hairlineWidth },
 
-  // The chat header's tab-strip language: two equal cells (100% width),
-  // icon + label, accent underline.
+  // The chat header's tab-strip language: equal cells, icon + label, accent
+  // underline.
   tabsShell: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -581,25 +483,7 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
 
   section: { paddingHorizontal: 20, paddingVertical: 20 },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
   sectionTitle: { fontSize: 15, fontFamily: 'Geist_600SemiBold' },
-
-  membersSpinner: { alignSelf: 'flex-start', marginTop: 12 },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-    marginTop: 4,
-  },
-  memberText: { flex: 1, minWidth: 0 },
-  memberName: { fontSize: 15, fontFamily: 'Geist_500Medium' },
-  memberDesignation: { fontSize: 12, fontFamily: 'Geist_400Regular', marginTop: 1 },
 
   aboutText: { fontSize: 14, lineHeight: 21, fontFamily: 'Geist_400Regular', marginTop: 12 },
   aboutRows: { marginTop: 14, gap: 8 },
@@ -609,6 +493,7 @@ const styles = StyleSheet.create({
   tag: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4 },
   tagText: { fontSize: 12, fontFamily: 'Geist_400Regular' },
 
+  rulesSpinner: { alignSelf: 'flex-start', marginTop: 12 },
   rulesList: { marginTop: 12, gap: 12 },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   ruleNumber: {

@@ -42,8 +42,8 @@ import {
   setContentEventReaction,
   deleteMessage,
   getCommunities,
-  getCommunityDetail,
   type Community,
+  type CommunityDetailRow,
   type CommunityMuteDuration,
   type Message,
 } from '@/lib/communities';
@@ -65,7 +65,8 @@ import {
 } from '@/lib/chatContentEvents';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
-import { communityStore } from '@/lib/communityStore';
+import { communityStore, type CommunityRowPatch } from '@/lib/communityStore';
+import { loadCommunityDetail } from '@/lib/communityDetailCache';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -73,7 +74,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
-import { CommunityInfoView, type CommunityInfoCommunity } from '@/components/community/CommunityInfoView';
+import { CommunityInfoView } from '@/components/community/CommunityInfoView';
 import { isContentKind, type CommunityTab, type ContentKind } from '@/lib/communityContent';
 
 /** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
@@ -143,22 +144,17 @@ export default function CommunityChat() {
    */
   const [resolved, setResolved] = useState<Community | null>(null);
   /**
-   * The info screen's hero paints before the list lookup returns — it reads
-   * the same route snapshot the header uses (name, image, count, badges), and
-   * the id lets its own detail/roster/rules requests start right away.
+   * The signed-in member's role and grants — the server read model's copy,
+   * which the ⋯ menu reads to decide whether settings and management actions
+   * are theirs. The list row only knows the owner id.
    */
-  const routeCommunity = useMemo<CommunityInfoCommunity | null>(() => {
-    if (!name) return null;
-    const count = members ? Number(members) : NaN;
-    return {
-      id,
-      name: decodeURIComponent(name),
-      image_url: image ? decodeURIComponent(image) : null,
-      type: typeParam ? decodeURIComponent(typeParam) : undefined,
-      is_private: privateParam === undefined ? undefined : privateParam === '1',
-      member_count: Number.isFinite(count) ? count : null,
-    };
-  }, [id, name, image, typeParam, privateParam, members]);
+  const [detail, setDetail] = useState<CommunityDetailRow | null>(null);
+  /**
+   * Settings saved on the pushed screen patch the list through the store; the
+   * same patch lands here so the header repaints without a refetch (and the
+   * route params, taken when the row was tapped, stop being authoritative).
+   */
+  const [livePatch, setLivePatch] = useState<CommunityRowPatch>({});
   /** Detail-route fallback for the header count when the list lacks the row. */
   const [detailMemberCount, setDetailMemberCount] = useState<number | null>(null);
   const [memberCountLoading, setMemberCountLoading] = useState(true);
@@ -179,7 +175,7 @@ export default function CommunityChat() {
     const fillCount = async (row: Community | null) => {
       if (cancelled || row?.member_count != null) return;
       try {
-        const detail = await getCommunityDetail(id);
+        const detail = await loadCommunityDetail(id);
         if (!cancelled && detail?.member_count != null) {
           setDetailMemberCount(detail.member_count);
         }
@@ -207,10 +203,39 @@ export default function CommunityChat() {
     };
   }, [id]);
 
+  // Role + grants for the ⋯ menu's settings row and the info screen's
+  // management actions. Shares the one read with the info screen and the
+  // count fallback above (see lib/communityDetailCache).
+  useEffect(() => {
+    let cancelled = false;
+    loadCommunityDetail(id)
+      .then((row) => {
+        if (!cancelled) setDetail(row);
+      })
+      .catch(() => {
+        /* no role available — the screen keeps its read-only menus */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Settings saved on the pushed screen patch the list through the store;
+  // the header listens to the same channel so it repaints in the same frame.
+  useEffect(
+    () =>
+      communityStore.subscribeCommunityChanges((change) => {
+        if (change.kind !== 'patch' || change.communityId !== id) return;
+        setLivePatch((prev) => ({ ...prev, ...change.patch }));
+      }),
+    [id],
+  );
+
   const enabledTabs = new Set(
-    (enabledTabsParam
-      ? decodeURIComponent(enabledTabsParam).split(',')
-      : resolved?.enabled_tabs ?? ['chat', 'threads', 'showcase', 'resources', 'events']
+    (livePatch.enabled_tabs ??
+      (enabledTabsParam
+        ? decodeURIComponent(enabledTabsParam).split(',')
+        : resolved?.enabled_tabs ?? ['chat', 'threads', 'showcase', 'resources', 'events'])
     ).map((tab) => tab.trim().toLowerCase()),
   );
   // Same order and labels as the web community header.
@@ -225,12 +250,24 @@ export default function CommunityChat() {
    * Showcase keeps its own flag and defaults to on (web `isShowcaseEnabled`),
    * so a community whose row predates the flag still shows the tab.
    */
-  const showcaseEnabled = showcaseParam !== '0' && resolved?.showcase_enabled !== false;
+  const showcaseEnabled =
+    livePatch.showcase_enabled !== undefined
+      ? livePatch.showcase_enabled !== false
+      : showcaseParam !== '0' && resolved?.showcase_enabled !== false;
   const tabs = allTabs.filter((tab) => {
     if (tab.key === 'chat') return true;
     if (tab.key === 'showcase') return showcaseEnabled;
     return enabledTabs.has(tab.key);
   });
+  // A settings save can disable the tab the reader is on — fall back to Chat,
+  // exactly like the web chat's renderedTab guard.
+  const tabsKey = tabs.map((tab) => tab.key).join(',');
+  useEffect(() => {
+    if (!allTabs.some((tab) => tab.key === activeTab)) return;
+    if (tabs.some((tab) => tab.key === activeTab)) return;
+    setActiveTab('chat');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabsKey, activeTab]);
 
   // Unread marker inputs, snapshotted before the list zeroes its badge.
   const initialUnreadCount = Number(unreadParam ?? resolved?.unread_count ?? 0) || 0;
@@ -513,8 +550,19 @@ export default function CommunityChat() {
     });
   }, [toast, dismissToast, showToast]);
 
-  const ownerId = ownerParam ?? resolved?.owner_id;
+  const ownerId = detail?.owner_id ?? resolved?.owner_id ?? ownerParam;
   const isOwnCommunity = !!ownerId && !!user?.id && ownerId === user.id;
+  // The web chat's manager capabilities: owners hold everything, while a
+  // platform-appointed admin or an in-app moderator holds their grants. An
+  // admin appoints moderators (the manager tier); a moderator never does.
+  const myRole = detail?.current_user_role ?? (isOwnCommunity ? 'owner' : null);
+  const myPermissions = detail?.current_user_permissions;
+  const isGranted = (key: 'can_edit_settings' | 'can_manage_members' | 'can_delete_messages') =>
+    (myRole === 'admin' || myRole === 'moderator') && Boolean(myPermissions?.[key]);
+  const canOpenSettings = isOwnCommunity || isGranted('can_edit_settings');
+  const canManageMembers = isOwnCommunity || isGranted('can_manage_members');
+  const canManageModerators = isOwnCommunity || myRole === 'admin';
+  const canModerateMessages = isOwnCommunity || isGranted('can_delete_messages');
 
   const listRef = useRef<FlatList<ChatRow>>(null);
   const chatComposerRef = useRef<ChatComposerHandle>(null);
@@ -1088,15 +1136,31 @@ export default function CommunityChat() {
     if (hasMore && !isLoadingMore) loadMore();
   }, [hasMore, isLoadingMore, loadMore]);
 
-  const communityName = name ? decodeURIComponent(name) : resolved?.name ?? 'Community';
+  const communityName =
+    livePatch.name ?? resolved?.name ?? (name ? decodeURIComponent(name) : 'Community');
   // Route params carry the list row's snapshot so the name's badges paint on
   // the first frame; the resolved row then has the last word.
   const badgeType = resolved?.type ?? (typeParam ? decodeURIComponent(typeParam) : undefined);
   const badgeIsPrivate =
-    resolved?.is_private ?? (privateParam === undefined ? undefined : privateParam === '1');
-  const communityImage = image
-    ? decodeURIComponent(image)
-    : resolved?.image_url ?? null;
+    livePatch.is_private ??
+    resolved?.is_private ??
+    (privateParam === undefined ? undefined : privateParam === '1');
+  const routeImage = image ? decodeURIComponent(image) : null;
+  const communityImage =
+    livePatch.image_url !== undefined
+      ? livePatch.image_url
+      : (resolved?.image_url ?? routeImage);
+  const infoCommunity = {
+    id,
+    name: communityName,
+    image_url: communityImage,
+    type: badgeType,
+    is_private: badgeIsPrivate,
+    member_count:
+      detail?.member_count ??
+      resolved?.member_count ??
+      (members && Number.isFinite(Number(members)) ? Number(members) : null),
+  };
 
   const chatContent = (
     <View style={styles.flex}>
@@ -1496,7 +1560,7 @@ export default function CommunityChat() {
       <MessageActionsSheet
         message={selectedMessage}
         currentUserId={user?.id ?? ''}
-        canModerate={isOwnCommunity}
+        canModerate={canModerateMessages}
         onClose={() => setSelectedMessage(null)}
         onReact={handleReaction}
         onReply={handleMessageReply}
@@ -1535,8 +1599,12 @@ export default function CommunityChat() {
           web right sidebar's content: members, about, rules) */}
       <CommunityInfoView
         visible={infoOpen}
-        community={resolved ?? routeCommunity}
+        community={infoCommunity}
         onlineCount={onlineCount}
+        currentUserId={user?.id ?? ''}
+        isOwner={isOwnCommunity}
+        canManageMembers={canManageMembers}
+        canManageModerators={canManageModerators}
         onClose={() => setInfoOpen(false)}
       />
 
@@ -1558,6 +1626,13 @@ export default function CommunityChat() {
         anchor={{ top: headerHeight + 6, right: 8 }}
         muted={muted}
         muteStateLabel={muteStateLabel}
+        canOpenSettings={canOpenSettings}
+        onOpenSettings={() =>
+          router.push({
+            pathname: '/community-settings/[id]',
+            params: { id, name: communityName },
+          })
+        }
         onClose={() => setMenuOpen(false)}
         onOpenMuteOptions={() => {
           setMenuOpen(false);
