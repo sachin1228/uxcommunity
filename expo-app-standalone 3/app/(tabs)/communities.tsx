@@ -122,8 +122,12 @@ export default function CommunitiesScreen() {
       // The count rides along so the chat header's second line paints from the
       // first frame, before its own community lookup returns.
       const membersParam = `&members=${community.member_count ?? ''}`;
+      // Same idea for the name's verified/lock badges — otherwise they pop in
+      // only after the chat's own fetch.
+      const typeParam = `&type=${encodeURIComponent(community.type)}`;
+      const privateParam = `&private=${community.is_private ? '1' : '0'}`;
       router.push(
-        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${showcaseParam}${ownerParam}${unreadParam}${readParam}${membersParam}`
+        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${showcaseParam}${ownerParam}${unreadParam}${readParam}${membersParam}${typeParam}${privateParam}`
       );
     },
     [router, markCommunityRead]

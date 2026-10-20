@@ -179,8 +179,10 @@ export default function CreateCommunityScreen() {
     const tabsParam = `&tabs=${encodeURIComponent(created.enabled_tabs.join(','))}`;
     const showcaseParam = `&showcase=${areas.includes('showcase') ? '1' : '0'}`;
     const membersParam = `&members=${created.member_count ?? ''}`;
+    const typeParam = `&type=${encodeURIComponent(created.type)}`;
+    const privateParam = `&private=${created.is_private ? '1' : '0'}`;
     router.replace(
-      `/community/${created.id}?name=${encodeURIComponent(created.name)}${imageParam}${tabsParam}${showcaseParam}${membersParam}`
+      `/community/${created.id}?name=${encodeURIComponent(created.name)}${imageParam}${tabsParam}${showcaseParam}${membersParam}${typeParam}${privateParam}`
     );
   }, [created, areas, router]);
 
