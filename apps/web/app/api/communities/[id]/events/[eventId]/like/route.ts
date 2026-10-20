@@ -44,7 +44,13 @@ export async function POST(
   if (mutation.error) return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
 
   void publishRealtimeBatch([
-    { room: realtimeRooms.events(communityId), topic: "like", data: { event_id: eventId, user_id: userId } },
+    {
+      room: realtimeRooms.events(communityId),
+      topic: "like",
+      // The INSERT/DELETE marker lets clients patch the row; without it an
+      // event id + user id cannot tell a like from an unlike.
+      data: { event: body.liked ? "INSERT" : "DELETE", event_id: eventId, user_id: userId },
+    },
   ]);
 
   const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([

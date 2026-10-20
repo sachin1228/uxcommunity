@@ -44,7 +44,13 @@ export async function POST(
   if (mutation.error) return NextResponse.json({ error: "Failed to update save." }, { status: 500 });
 
   void publishRealtimeBatch([
-    { room: realtimeRooms.events(communityId), topic: "save", data: { event_id: eventId, user_id: userId } },
+    {
+      room: realtimeRooms.events(communityId),
+      topic: "save",
+      // Same contract as the like route: clients patch from the marker instead
+      // of refetching both event pages to learn which way the count moved.
+      data: { event: body.saved ? "INSERT" : "DELETE", event_id: eventId, user_id: userId },
+    },
   ]);
 
   const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
