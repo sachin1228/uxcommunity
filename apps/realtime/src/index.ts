@@ -6,6 +6,7 @@ import { runBoundedPool } from "./subscriptions";
 import { isRetryableStatus, retryWithBackoff } from "./retry";
 import { logEvent } from "./log";
 import { runRetentionSweep } from "./retention";
+import { runEventLifecycleNotifications } from "./event-notifications";
 export { UserDO } from "./user";
 export { Room } from "./room";
 export { AlertMonitor } from "./alert-monitor";
@@ -85,6 +86,7 @@ function parseCookies(header: string | null): Map<string, string> {
  */
 const ALERT_MONITOR_CRON = "*/5 * * * *";
 const RETENTION_SWEEP_CRON = "0 */6 * * *";
+const EVENT_LIFECYCLE_CRON = "* * * * *";
 
 export default {
   /**
@@ -98,10 +100,17 @@ export default {
    *     `wrangler dev --test-scheduled`.
    *   * (every 6 h) — the community chat retention sweep (see src/retention.ts).
    *     Stateless: a POST to the web app, which owns the deletion itself.
+   *   * (every minute) — event lifecycle notifications (see
+   *     src/event-notifications.ts). Same stateless POST shape; the web app
+   *     owns the stage clock, the delivery ledger and the push.
    */
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (controller.cron === RETENTION_SWEEP_CRON) {
       await runRetentionSweep(env);
+      return;
+    }
+    if (controller.cron === EVENT_LIFECYCLE_CRON) {
+      await runEventLifecycleNotifications(env);
       return;
     }
     if (controller.cron !== ALERT_MONITOR_CRON) {

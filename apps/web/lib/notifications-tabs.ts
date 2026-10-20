@@ -22,6 +22,9 @@ const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
   "event_comment",
   "event_reply",
   "event_rsvp",
+  "event_reminder",
+  "event_live",
+  "event_ended",
 ]);
 
 /**

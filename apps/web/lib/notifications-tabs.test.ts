@@ -39,6 +39,9 @@ const ALL_TYPES: NotificationType[] = [
   "content_restored",
   "job_match",
   "join_request_accepted",
+  "event_reminder",
+  "event_live",
+  "event_ended",
 ];
 
 test("every generated notification type lands in a tab", () => {
@@ -60,7 +63,14 @@ test("likes and comments on threads/resources render under the activity tab", ()
 });
 
 test("all event types render under the events tab", () => {
-  for (const type of ["event_comment", "event_reply", "event_rsvp"] as NotificationType[]) {
+  for (const type of [
+    "event_comment",
+    "event_reply",
+    "event_rsvp",
+    "event_reminder",
+    "event_live",
+    "event_ended",
+  ] as NotificationType[]) {
     assert.equal(notificationTabFor(type), "events", type);
   }
 });

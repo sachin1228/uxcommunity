@@ -55,6 +55,9 @@ test('every tab the web declares renders under the tab it names', () => {
   assert.equal(notificationTabFor('thread_like'), 'activity');
   assert.equal(notificationTabFor('resource_reply'), 'activity');
   assert.equal(notificationTabFor('event_rsvp'), 'events');
+  assert.equal(notificationTabFor('event_reminder'), 'events');
+  assert.equal(notificationTabFor('event_live'), 'events');
+  assert.equal(notificationTabFor('event_ended'), 'events');
   assert.equal(notificationTabFor('job_match'), 'jobs');
   assert.equal(notificationTabFor('thread_deleted'), 'other');
   assert.equal(notificationTabFor('join_request_accepted'), 'other');
@@ -175,6 +178,7 @@ test("a notification's href walks to the app route that can open it", () => {
     contentId: 'e-1',
   });
   assert.deepEqual(notificationHrefToRoute('/dashboard/jobs/j-1'), { kind: 'jobs' });
+  assert.deepEqual(notificationHrefToRoute('/dashboard/events/e-1'), { kind: 'events' });
 });
 
 test('an href the app cannot open is left alone', () => {

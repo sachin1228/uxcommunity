@@ -1544,6 +1544,42 @@ export type Database = {
           },
         ];
       };
+      event_notification_deliveries: {
+        Row: {
+          event_id: string;
+          sent_at: string;
+          stage: string;
+          user_id: string;
+        };
+        Insert: {
+          event_id: string;
+          sent_at?: string;
+          stage: string;
+          user_id: string;
+        };
+        Update: {
+          event_id?: string;
+          sent_at?: string;
+          stage?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "event_notification_deliveries_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "community_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_notification_deliveries_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       event_rsvps: {
         Row: {
           created_at: string;

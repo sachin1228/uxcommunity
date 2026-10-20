@@ -10,15 +10,26 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import {
   pushDataFrom,
   registerBadgeRefresh,
   registerForPushNotificationsAsync,
   registerNotificationHandler,
+  type PushData,
 } from '@/lib/push';
 import { fetchNotificationSettings } from '@/lib/notificationSettings';
+
+/** Where a tap opens: the chat it came from, the event's room, or the city feed. */
+function routeForPush(data: PushData): Href {
+  if (data.type === 'community_message') {
+    return { pathname: '/community/[id]', params: { id: data.communityId } };
+  }
+  return data.communityId
+    ? { pathname: '/community/[id]', params: { id: data.communityId } }
+    : '/events';
+}
 
 export function usePushNotifications() {
   const { user } = useAuth();
@@ -71,7 +82,7 @@ export function usePushNotifications() {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = pushDataFrom(response);
       if (!data) return;
-      router.push(`/community/${data.communityId}`);
+      router.push(routeForPush(data));
     });
     return () => subscription.remove();
   }, []);
@@ -82,7 +93,7 @@ export function usePushNotifications() {
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (cancelled) return;
       const data = pushDataFrom(response);
-      if (data) router.push(`/community/${data.communityId}`);
+      if (data) router.push(routeForPush(data));
     });
     return () => {
       cancelled = true;

@@ -12,9 +12,10 @@ import type { Json } from "@/lib/supabase/database.types";
  * content (comments, replies, likes), event RSVPs, manager/platform removals
  * of the user's content, the thank-you a reporter gets once their report has
  * been reviewed, the all-clear when an admin undoes a removal, the roles
- * posted that match a member's profile (see lib/jobs/notifications.ts), and
- * the approval a member gets once an owner accepts their private-community
- * join request.
+ * posted that match a member's profile (see lib/jobs/notifications.ts), the
+ * approval a member gets once an owner accepts their private-community join
+ * request, and the event lifecycle moments — tomorrow, the morning-of nudge,
+ * the half-hour call, live and ended (see lib/events/lifecycle-notifications.ts).
  *
  * The community broadcasts ("started a new thread", "shared a new resource",
  * "created a new event") and the chat @mention rows are gone — no route
@@ -37,7 +38,10 @@ export type NotificationType =
   | "report_reviewed"
   | "content_restored"
   | "job_match"
-  | "join_request_accepted";
+  | "join_request_accepted"
+  | "event_reminder"
+  | "event_live"
+  | "event_ended";
 
 export type NotificationEntityType =
   | "thread"

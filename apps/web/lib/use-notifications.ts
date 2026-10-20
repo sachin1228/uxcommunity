@@ -33,25 +33,11 @@ import {
   subscribeToRequest,
 } from "@/lib/request-cache";
 
-// Mirrors NotificationType in lib/notifications.ts — the types still generated
-// (community broadcasts and chat @mentions were removed).
-export type NotificationType =
-  | "thread_comment"
-  | "thread_reply"
-  | "thread_like"
-  | "resource_comment"
-  | "resource_reply"
-  | "event_comment"
-  | "event_reply"
-  | "event_rsvp"
-  | "thread_deleted"
-  | "showcase_deleted"
-  | "resource_deleted"
-  | "event_deleted"
-  | "report_reviewed"
-  | "content_restored"
-  | "job_match"
-  | "join_request_accepted";
+// The one type list lives beside the writer (lib/notifications.ts), so the
+// reader and the producer can never drift apart again.
+import type { NotificationType } from "@/lib/notifications";
+
+export type { NotificationType };
 
 export interface NotificationItem {
   id: string;
