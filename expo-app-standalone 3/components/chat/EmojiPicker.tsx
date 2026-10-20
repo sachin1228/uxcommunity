@@ -104,7 +104,17 @@ export function EmojiPicker({
       {/* The space below the chat already stops at the safe area — the screen
           renders a spacer under it — so the panel needs no bottom padding of
           its own. */}
-      <View style={[styles.panel, { height, backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.panel,
+          {
+            height,
+            backgroundColor: colors.background,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: colors.mutedForeground,
+          },
+        ]}
+      >
         {showContent && (
           <>
             {/* No drag handle: the panel is not a sheet — it takes the
@@ -150,12 +160,11 @@ const styles = StyleSheet.create({
    *  keyboard still owns the strip. Its parent reserves the same vertical extent
    *  for the composer, and the wrapper grows down to the keyboard's top edge. */
   clip: { overflow: 'hidden' },
-  belowComposer: { position: 'absolute', left: 0, right: 0, top: '100%' },
-  /** No top border: the panel is a continuation of the chat, not a sheet over
-   *  it — a hairline here would draw the one line the keyboard does not have. */
+  belowComposer: { position: 'absolute', left: -8, right: -8, top: '100%' },
+  /** Subtle divider marks the top edge of the emoji panel, above its section title. */
   panel: { height: 320 },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   sectionTitle: {
     fontSize: 11,
     fontFamily: 'Geist_600SemiBold',

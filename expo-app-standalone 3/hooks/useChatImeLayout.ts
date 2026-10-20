@@ -27,6 +27,8 @@ let lastMeasuredKeyboardHeight = 0;
 let androidImeOwnerCount = 0;
 
 export interface ChatImeLayout {
+  /** Composer-to-bottom spacing configured by the screen using this layout. */
+  composerBottomSpacing: number;
   panelOpen: boolean;
   /** Synchronous desired mode for taps that arrive before React rerenders. */
   panelOpenRef: { current: boolean };
@@ -535,6 +537,7 @@ export function useChatImeLayout(
   }), [composerBaseHeight, imeInset, panelExtent, typingIndicatorHeight]);
 
   return {
+    composerBottomSpacing,
     panelOpen,
     panelOpenRef,
     panelHeight,

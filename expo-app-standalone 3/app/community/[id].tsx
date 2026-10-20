@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -91,6 +92,7 @@ type ChatRow =
  * it never lights the pill.
  */
 const JUMP_PILL_THRESHOLD = 80;
+const COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET = 6;
 
 export default function CommunityChat() {
   const {
@@ -124,7 +126,9 @@ export default function CommunityChat() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
-  const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused);
+  const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused, {
+    bottom: COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET,
+  });
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -1408,7 +1412,12 @@ export default function CommunityChat() {
               />
             </Animated.View>
           </View>
-          <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+          <View
+            style={{
+              height: insets.bottom,
+              backgroundColor: Platform.OS === 'android' ? '#FF0000' : colors.background,
+            }}
+          />
         </>
       ) : (
         <CommunityContentView
