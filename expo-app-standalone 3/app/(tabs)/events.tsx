@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -16,9 +15,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
+import { EventFiltersSheet } from '@/components/events/EventFiltersSheet';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
-import { getCityEventPage, firstPageCursor, type CityEventItem, type CityEventPhase } from '@/lib/cityEvents';
+import {
+  getCityEventPage,
+  firstPageCursor,
+  type CityEventDateFilter,
+  type CityEventFilters,
+  type CityEventItem,
+  type CityEventPhase,
+  type CityEventTypeFilter,
+} from '@/lib/cityEvents';
 import { CommunityContent, CommunityEvent, deleteCommunityContent } from '@/lib/communityContent';
 import { chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
@@ -34,17 +42,13 @@ import { getOwnProfile } from '@/lib/profile';
  * the community that owns it) and the same empty states, including the one
  * that asks for a city when the profile has none.
  *
- * The type and date filters the web header carries are not here yet: the app's
- * event surfaces have never had them.
+ * The web page's Upcoming/Past chips and its Type/Date dropdown are folded
+ * into one filter sheet beside the heading: the list is always one stream
+ * narrowed by status, type and start-date window.
  */
 
 /** How often the Upcoming/Past split re-reads the clock — the web tick. */
 const SPLIT_TICK_MS = 30_000;
-
-const PHASES: Array<{ key: CityEventPhase; label: string; icon: React.ComponentProps<typeof Feather>['name'] }> = [
-  { key: 'upcoming', label: 'Upcoming', icon: 'clock' },
-  { key: 'past', label: 'Past', icon: 'check-circle' },
-];
 
 /** The city listing answers with event rows; the shared card wants the home feed's `_type` shape. */
 function toFeedItems(events: CityEventItem[]): FeedItem[] {
@@ -80,6 +84,9 @@ export default function EventsTab() {
     past: null,
   });
   const [phase, setPhase] = useState<CityEventPhase>('upcoming');
+  const [typeFilter, setTypeFilter] = useState<CityEventTypeFilter>('all');
+  const [dateFilter, setDateFilter] = useState<CityEventDateFilter>('any');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -90,20 +97,31 @@ export default function EventsTab() {
   const [now, setNow] = useState(() => Date.now());
 
   const resetActions = actions.reset;
+  const filters = useMemo<CityEventFilters>(
+    () => ({ type: typeFilter, date: dateFilter }),
+    [dateFilter, typeFilter],
+  );
+
+  /** Last load wins — a filter picked mid-flight owns the list when it lands. */
+  const loadRequest = useRef(0);
 
   /**
    * Both phases in one round trip, exactly like the web page's first paint —
    * the member's city comes off their own profile, so a profile without one
-   * asks for it instead of guessing.
+   * asks for it instead of guessing. Type/date ride along with both phase
+   * requests, and every request replaces both cursors: paging never mixes
+   * filter sets.
    */
   const load = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
+      const request = ++loadRequest.current;
       if (mode === 'initial') setLoading(true);
       else setRefreshing(true);
       setError(null);
 
       try {
         const profile = await getOwnProfile();
+        if (request !== loadRequest.current) return;
         const city = profile.profile?.cities?.name ?? null;
         setCityName(city);
 
@@ -114,22 +132,26 @@ export default function EventsTab() {
         }
 
         const [upcomingPage, pastPage] = await Promise.all([
-          getCityEventPage(firstPageCursor('upcoming')),
-          getCityEventPage(firstPageCursor('past')),
+          getCityEventPage(firstPageCursor('upcoming'), filters),
+          getCityEventPage(firstPageCursor('past'), filters),
         ]);
+        if (request !== loadRequest.current) return;
 
         setItems(mergeUnique([...toFeedItems(upcomingPage.events), ...toFeedItems(pastPage.events)]));
         setCursors({ upcoming: upcomingPage.nextCursor, past: pastPage.nextCursor });
         setNow(Date.now());
         resetActions();
       } catch (e) {
+        if (request !== loadRequest.current) return;
         setError(e instanceof Error ? e.message : 'Failed to load events.');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (request === loadRequest.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [resetActions],
+    [filters, resetActions],
   );
 
   useEffect(() => {
@@ -146,9 +168,12 @@ export default function EventsTab() {
   const loadMore = useCallback(async () => {
     const cursor = cursors[phase];
     if (!cursor || loadingMore || loading) return;
+    const request = loadRequest.current;
     setLoadingMore(true);
     try {
-      const page = await getCityEventPage(cursor);
+      const page = await getCityEventPage(cursor, filters);
+      // A filter change while this page was in flight owns the list now.
+      if (request !== loadRequest.current) return;
       setItems((current) => mergeUnique([...current, ...toFeedItems(page.events)]));
       setCursors((current) => ({ ...current, [phase]: page.nextCursor }));
     } catch {
@@ -156,7 +181,7 @@ export default function EventsTab() {
     } finally {
       setLoadingMore(false);
     }
-  }, [cursors, loading, loadingMore, phase]);
+  }, [cursors, filters, loading, loadingMore, phase]);
 
   const { upcoming, past } = useMemo(() => {
     const split = { upcoming: [] as FeedItem[], past: [] as FeedItem[] };
@@ -171,6 +196,14 @@ export default function EventsTab() {
 
   const activeList = phase === 'upcoming' ? upcoming : past;
   const counts: Record<CityEventPhase, number> = { upcoming: upcoming.length, past: past.length };
+  const filtersActive =
+    phase !== 'upcoming' || filters.type !== 'all' || filters.date !== 'any';
+
+  const resetFilters = useCallback(() => {
+    setPhase('upcoming');
+    setTypeFilter('all');
+    setDateFilter('any');
+  }, []);
 
   // The comment count is the only route into an event's own page, where the
   // comments live under the event itself.
@@ -263,18 +296,27 @@ export default function EventsTab() {
 
   const emptyState =
     items.length === 0
-      ? {
-          title: `No public events in ${cityName} yet`,
-          body: 'Events shared publicly for your city will show up here.',
-        }
+      ? filtersActive
+        ? {
+            title: 'No events match these filters',
+            body: 'Try a different status, date window or type.',
+          }
+        : {
+            title: `No public events in ${cityName} yet`,
+            body: 'Events shared publicly for your city will show up here.',
+          }
       : phase === 'upcoming'
         ? {
             title: 'No upcoming events',
-            body: 'Nothing is scheduled right now — the Past tab has what already happened.',
+            body: filtersActive
+              ? 'Nothing matches these filters here — try Past or widen them.'
+              : 'Nothing is scheduled right now — Past has what already happened.',
           }
         : {
             title: 'No past events',
-            body: 'Nothing in your city has wrapped up yet.',
+            body: filtersActive
+              ? 'Nothing matches these filters here — try Upcoming or widen them.'
+              : 'Nothing in your city has wrapped up yet.',
           };
 
   return (
@@ -282,42 +324,44 @@ export default function EventsTab() {
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
-      {/* The web page header, verbatim: the title and the city line. */}
+      {/* The web page header, with every filter behind the button at the
+          heading's right edge — status, type and start-date window in one. */}
       <View style={styles.pageHeader}>
-        <Text style={[styles.pageTitle, { color: colors.foreground }]}>Events</Text>
-        <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
-          {cityName
-            ? `Public events happening in ${cityName}.`
-            : 'Public events happening in your city.'}
-        </Text>
-      </View>
-
-      {cityName && !loading && !error ? (
-        <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            {PHASES.map((entry) => {
-              const active = phase === entry.key;
-              const labelColor = active ? colors.foreground : colors.mutedForeground;
-              return (
-                <Pressable
-                  key={entry.key}
-                  onPress={() => setPhase(entry.key)}
-                  style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                >
-                  <View style={styles.tabInner}>
-                    <Feather name={entry.icon} size={14} color={labelColor} />
-                    <Text style={[styles.tabText, { color: labelColor }]}>
-                      {entry.label} ({counts[entry.key]})
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+        <View style={styles.pageHeaderText}>
+          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Events</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
+            {cityName
+              ? `Public events happening in ${cityName}.`
+              : 'Public events happening in your city.'}
+          </Text>
         </View>
-      ) : null}
+
+        {cityName ? (
+          <Pressable
+            onPress={() => setFiltersOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Filter events"
+            accessibilityState={{ expanded: filtersOpen }}
+            style={({ pressed }) => [
+              styles.filterButton,
+              {
+                borderColor: filtersActive ? colors.accent : colors.border,
+                backgroundColor: filtersActive ? colors.accentSoft : colors.surfaceRaised,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Feather
+              name="sliders"
+              size={16}
+              color={filtersActive ? colors.accent : colors.foregroundMuted}
+            />
+            {filtersActive ? (
+              <View style={[styles.filterDot, { backgroundColor: colors.accent }]} />
+            ) : null}
+          </Pressable>
+        ) : null}
+      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -399,27 +443,55 @@ export default function EventsTab() {
         onClose={() => setEditing(null)}
         onSaved={replaceItem}
       />
+
+      <EventFiltersSheet
+        visible={filtersOpen}
+        phase={phase}
+        type={typeFilter}
+        date={dateFilter}
+        counts={counts}
+        active={filtersActive}
+        onChangePhase={setPhase}
+        onChangeType={setTypeFilter}
+        onChangeDate={setDateFilter}
+        onReset={resetFilters}
+        onClose={() => setFiltersOpen(false)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  pageHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 4 },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  pageHeaderText: { flex: 1, gap: 4 },
   pageTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 20, letterSpacing: -0.3 },
   pageSubtitle: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
-  tabsShell: { marginTop: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  tabs: { minWidth: '100%', justifyContent: 'flex-start', paddingHorizontal: 16 },
-  tab: {
-    minWidth: 118,
-    height: 46,
-    paddingHorizontal: 12,
+  filterButton: {
+    width: 34,
+    height: 34,
+    marginTop: 2,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 2,
   },
-  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tabText: { fontSize: 12.5, fontFamily: 'Geist_500Medium' },
+  filterDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
   list: { padding: 12, gap: 12, flexGrow: 1 },
   pastCard: { opacity: 0.6 },
   center: {
