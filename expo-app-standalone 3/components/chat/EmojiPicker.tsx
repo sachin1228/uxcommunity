@@ -110,8 +110,6 @@ export function EmojiPicker({
           {
             height,
             backgroundColor: colors.background,
-            borderTopWidth: StyleSheet.hairlineWidth,
-            borderTopColor: colors.mutedForeground,
           },
         ]}
       >
@@ -150,6 +148,13 @@ export function EmojiPicker({
             </ScrollView>
           </>
         )}
+        <View
+          pointerEvents="none"
+          style={[
+            styles.secondTopRule,
+            { backgroundColor: '#6366F1' },
+          ]}
+        />
       </View>
     </Animated.View>
   );
@@ -162,7 +167,16 @@ const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   belowComposer: { position: 'absolute', left: -8, right: -8, top: '100%' },
   /** Subtle divider marks the top edge of the emoji panel, above its section title. */
-  panel: { height: 320 },
+  panel: { height: 320, position: 'relative' },
+  secondTopRule: {
+    position: 'absolute',
+    // Keep the remaining indigo rule at its previous position.
+    top: StyleSheet.hairlineWidth * 7,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    borderRadius: 22,
+  },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   sectionTitle: {
