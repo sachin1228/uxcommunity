@@ -17,7 +17,7 @@ import {
 } from "@/lib/communities/create-community-dialog";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
+import { prefetchCommunityRoute } from "@/lib/navigation/community-prefetch";
 import { useEventBrowserNotifications } from "@/lib/events/browser-notifications";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
@@ -57,16 +57,13 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
 
   const sorted = [...communities].sort(compareByRecentActivity);
 
-  // Prefetch on hover so clicking is instant: the RSC route payload is fetched
-  // by Next (same request a click would fire), and the community's API sections
-  // are hydrated into the client request cache — both are cache hits on click.
+  // Hover prefetches the RSC route only. Bootstrapping the community on hover
+  // was removed: it is the heaviest API route, and a pointer sweep over the
+  // sidebar could fetch a full bootstrap for every row the member never opens.
   const { prefetch } = useGuardedRouter();
   const prefetchCommunity = useCallback(
-    (communityId: string) => {
-      prefetch(`/dashboard/communities/${communityId}`);
-      fetchAndHydrateCommunityBootstrap(communityId, userId).catch(() => {});
-    },
-    [userId, prefetch],
+    (communityId: string) => prefetchCommunityRoute(prefetch, communityId),
+    [prefetch],
   );
 
   const homeActive =

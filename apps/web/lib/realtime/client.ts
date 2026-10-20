@@ -50,10 +50,55 @@ type StatusHandler = (connected: boolean) => void;
 const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15_000;
+const MAX_RECONNECT_ATTEMPTS = 6;
+const RECONNECT_COOLDOWN_MS = 5 * 60_000;
+const RECONNECT_JITTER = 0.2;
 /** How often to send a heartbeat on an idle-but-open socket. */
 const HEARTBEAT_INTERVAL_MS = 25_000;
 /** How long to wait for a pong before declaring the socket dead. */
 const HEARTBEAT_TIMEOUT_MS = 6_000;
+
+/**
+ * Close codes that mean "do not retry this room": policy violation and the
+ * application-level authorization codes. A 401/403 handshake is surfaced by the
+ * browser as 1006 (the HTTP status is hidden), which the attempt cap covers.
+ */
+const TERMINAL_CLOSE_CODES = new Set([1008, 4401, 4403]);
+
+export function isTerminalCloseCode(code: number | null | undefined): boolean {
+  return typeof code === "number" && TERMINAL_CLOSE_CODES.has(code);
+}
+
+export interface RealtimeTimings {
+  reconnectBaseMs?: number;
+  reconnectMaxMs?: number;
+  maxReconnectAttempts?: number;
+  reconnectCooldownMs?: number;
+  reconnectJitter?: number;
+  heartbeatIntervalMs?: number;
+  heartbeatTimeoutMs?: number;
+}
+
+/**
+ * Delay before reconnect attempt `attempt` (0-based). Jitter only subtracts, so
+ * the configured cap is a true upper bound.
+ */
+export function reconnectDelayMs(
+  attempt: number,
+  timings: {
+    baseMs: number;
+    maxMs: number;
+    maxAttempts: number;
+    cooldownMs: number;
+    jitter: number;
+  },
+  random: () => number = Math.random,
+): number {
+  if (attempt >= timings.maxAttempts) return timings.cooldownMs;
+  const base = Math.min(timings.baseMs * 2 ** attempt, timings.maxMs);
+  const factor = 1 - timings.jitter * Math.min(1, Math.max(0, random()));
+  return Math.max(0, Math.round(base * factor));
+}
 const PING_FRAME = "ping";
 const PONG_FRAME = "pong";
 /**
@@ -105,6 +150,8 @@ interface ConnectionState {
   ws: WebSocket | null;
   connected: boolean;
   manuallyClosed: boolean;
+  /** A terminal close code was seen — wait for a lifecycle probe/connect. */
+  terminal: boolean;
   reconnectAttempt: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   heartbeatTimer: ReturnType<typeof setInterval> | null;
@@ -131,7 +178,15 @@ interface ConnectionState {
  *   - subscribeRefs === 0 (no subscribe() callers)
  *   - No presence handlers
  */
-class RealtimeClient {
+export class RealtimeClient {
+  private readonly reconnectBaseMs: number;
+  private readonly reconnectMaxMs: number;
+  private readonly maxReconnectAttempts: number;
+  private readonly reconnectCooldownMs: number;
+  private readonly reconnectJitter: number;
+  private readonly heartbeatIntervalMs: number;
+  private readonly heartbeatTimeoutMs: number;
+
   /** connection key (community room name, or `user:${userId}`) → connection state */
   private connections = new Map<string, ConnectionState>();
   /** roomName → room subscription state */
@@ -145,6 +200,16 @@ class RealtimeClient {
   /** Identity persisted across connections so sockets created later still send `join`. */
   private user: RealtimeUser | null = null;
   private lifecycleBound = false;
+
+  constructor(timings: RealtimeTimings = {}) {
+    this.reconnectBaseMs = timings.reconnectBaseMs ?? RECONNECT_BASE_MS;
+    this.reconnectMaxMs = timings.reconnectMaxMs ?? RECONNECT_MAX_MS;
+    this.maxReconnectAttempts = timings.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
+    this.reconnectCooldownMs = timings.reconnectCooldownMs ?? RECONNECT_COOLDOWN_MS;
+    this.reconnectJitter = timings.reconnectJitter ?? RECONNECT_JITTER;
+    this.heartbeatIntervalMs = timings.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
+    this.heartbeatTimeoutMs = timings.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
+  }
 
   init(user: RealtimeUser): void {
     const previousKey = this.userConnectionKey();
@@ -213,6 +278,8 @@ class RealtimeClient {
     // Connect all active connections
     for (const [, conn] of this.connections) {
       conn.manuallyClosed = false;
+      conn.terminal = false;
+      conn.reconnectAttempt = 0;
       if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
         this.openConnection(conn);
       }
@@ -242,13 +309,15 @@ class RealtimeClient {
   /** Immediately verify a connection is alive; reconnect if it isn't. */
   private probeConnection(conn: ConnectionState): void {
     if (conn.manuallyClosed) return;
+    // Visibility/online/pageshow/focus are explicit recovery signals: clear a
+    // terminal park and any cooldown before trying again.
+    conn.terminal = false;
+    conn.reconnectAttempt = 0;
+    if (conn.reconnectTimer !== null) {
+      clearTimeout(conn.reconnectTimer);
+      conn.reconnectTimer = null;
+    }
     if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
-      // Socket is gone — reconnect right now rather than waiting for backoff.
-      if (conn.reconnectTimer !== null) {
-        clearTimeout(conn.reconnectTimer);
-        conn.reconnectTimer = null;
-      }
-      conn.reconnectAttempt = 0;
       this.openConnection(conn);
       return;
     }
@@ -265,6 +334,7 @@ class RealtimeClient {
         ws: null,
         connected: false,
         manuallyClosed: false,
+        terminal: false,
         reconnectAttempt: 0,
         reconnectTimer: null,
         heartbeatTimer: null,
@@ -280,6 +350,7 @@ class RealtimeClient {
   private openConnection(conn: ConnectionState): void {
     if (conn.ws && conn.ws.readyState < WebSocket.CLOSING) return;
     if (conn.manuallyClosed) return;
+    if (conn.terminal) return;
 
     // Only open sockets for connections that are still registered.
     if (this.connections.get(conn.key) !== conn) return;
@@ -372,13 +443,21 @@ class RealtimeClient {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       // Ignore close events from sockets this connection no longer owns.
       if (conn.ws !== ws) return;
       conn.ws = null;
       conn.connected = false;
       this.stopHeartbeat(conn);
       this.emitGlobalStatus(this.isConnected());
+      if (isTerminalCloseCode(event?.code)) {
+        // The server said this room is not for this identity. Wait for a
+        // visibility/online/pageshow probe or an explicit connect instead of
+        // hammering the same unauthorized room every 15 s.
+        conn.terminal = true;
+        conn.reconnectAttempt = 0;
+        return;
+      }
       if (!conn.manuallyClosed) this.scheduleReconnect(conn);
     };
 
@@ -393,13 +472,17 @@ class RealtimeClient {
   }
 
   private scheduleReconnect(conn: ConnectionState): void {
-    if (conn.reconnectTimer !== null || conn.manuallyClosed) return;
+    if (conn.reconnectTimer !== null || conn.manuallyClosed || conn.terminal) return;
     if (this.connections.get(conn.key) !== conn) return;
-    const delay = Math.min(
-      RECONNECT_BASE_MS * 2 ** conn.reconnectAttempt,
-      RECONNECT_MAX_MS,
-    );
-    conn.reconnectAttempt += 1;
+    const attempt = conn.reconnectAttempt;
+    const delay = reconnectDelayMs(attempt, {
+      baseMs: this.reconnectBaseMs,
+      maxMs: this.reconnectMaxMs,
+      maxAttempts: this.maxReconnectAttempts,
+      cooldownMs: this.reconnectCooldownMs,
+      jitter: this.reconnectJitter,
+    });
+    conn.reconnectAttempt = attempt >= this.maxReconnectAttempts ? 0 : attempt + 1;
     conn.reconnectTimer = setTimeout(() => {
       conn.reconnectTimer = null;
       this.openConnection(conn);
@@ -410,7 +493,7 @@ class RealtimeClient {
 
   private startHeartbeat(conn: ConnectionState): void {
     this.stopHeartbeat(conn);
-    conn.heartbeatTimer = setInterval(() => this.sendPing(conn), HEARTBEAT_INTERVAL_MS);
+    conn.heartbeatTimer = setInterval(() => this.sendPing(conn), this.heartbeatIntervalMs);
   }
 
   private stopHeartbeat(conn: ConnectionState): void {
@@ -444,7 +527,7 @@ class RealtimeClient {
       if (conn.ws !== ws) return;
       // No pong: the socket is half-open. Tear it down and reconnect now.
       this.recycleConnection(conn);
-    }, HEARTBEAT_TIMEOUT_MS);
+    }, this.heartbeatTimeoutMs);
   }
 
   /** Force-close a suspected-dead socket and reconnect immediately. */
@@ -574,6 +657,10 @@ class RealtimeClient {
     if (prev === 0) {
       const conn = this.getRoomConnection(room);
       conn.manuallyClosed = false;
+      // A fresh subscription is explicit intent: let a room parked by a
+      // terminal close try again after a remount/session renewal.
+      conn.terminal = false;
+      conn.reconnectAttempt = 0;
       this.sendToConnection(conn, { t: "subscribe", room, topic });
     }
 
@@ -742,7 +829,11 @@ class RealtimeClient {
     conn.pending.push(json);
     if (conn.pending.length > MAX_PENDING_FRAMES) conn.pending.shift();
     // Ensure a socket is on its way so the queued frame actually flushes.
-    if (!conn.manuallyClosed && (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING)) {
+    if (
+      !conn.manuallyClosed &&
+      !conn.terminal &&
+      (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING)
+    ) {
       this.openConnection(conn);
     }
   }

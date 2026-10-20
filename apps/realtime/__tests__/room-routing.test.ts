@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  communityIdFromRoomName,
   isUserScopedRoomAllowed,
   resolveRoomTarget,
   USER_ROOM_PREFIXES,
@@ -76,6 +77,7 @@ describe("resolveRoomTarget", () => {
     "events:community-1",
     "resources:community-1",
     "resource-comments:resource-1",
+    "showcase:community-1:post-1",
     "showcase:post-1",
     "rules:community-1",
     "presence:community-1",
@@ -107,6 +109,33 @@ describe("resolveRoomTarget", () => {
     // Guards against a new user-scoped room being added in the web app without
     // extending the routing prefixes — the symptom would be silent non-delivery.
     expect([...USER_ROOM_PREFIXES]).toEqual(["notifications:", "profile:", "dm:"]);
+  });
+});
+
+/**
+ * The membership subject a Room DO derives from its own name.
+ *
+ * Showcase rooms carry the community segment explicitly. Before this, the DO
+ * treated a post id as a community id and refused every showcase socket with
+ * 403; clients then retried forever and comment events never reached anyone.
+ */
+describe("communityIdFromRoomName", () => {
+  it("reads the community from a normal community room", () => {
+    expect(communityIdFromRoomName("chat:community-1")).toBe("community-1");
+    expect(communityIdFromRoomName("threads:community-1")).toBe("community-1");
+    expect(communityIdFromRoomName("thread-comments:thread-1")).toBe("thread-1");
+  });
+
+  it("reads the community, not the post, from a showcase room", () => {
+    expect(communityIdFromRoomName("showcase:community-1:post-1")).toBe("community-1");
+  });
+
+  it("fails closed for a legacy showcase room with no community segment", () => {
+    // Old clients publish/subscribe `showcase:<postId>`. There is no way to
+    // authorize that against membership, so it must not be mistaken for a
+    // community id.
+    expect(communityIdFromRoomName("showcase:post-1")).toBe("post-1");
+    expect(communityIdFromRoomName("showcase:")).toBe("");
   });
 });
 

@@ -40,7 +40,7 @@ export function CommunityContentView({
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const query = useCommunityContent(communityId, kind);
+  const query = useCommunityContent(communityId, kind, currentUserId);
   const actions = useContentActions();
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);

@@ -379,7 +379,36 @@ describe("Sub-entity comments: multi-device", () => {
 });
 
 // ============================================================================
-// TEST 8: ROUTING TABLE CONSISTENCY
+// TEST 8: SHOWCASE ROOM AUTHORIZATION + DELIVERY
+// ============================================================================
+
+describe("Showcase comments: community-scoped room", () => {
+  it("delivers comment events on showcase:<community>:<post>", async () => {
+    const room = "showcase:community-showcase-1:post-1";
+    const tokenA = await createToken("showcase_author");
+    const tokenB = await createToken("showcase_viewer");
+
+    const connA = connectCommunityWs(room, tokenA);
+    const connB = connectCommunityWs(room, tokenB);
+    try {
+      await joinAndSubscribe(connA.ws, connA.messages, "showcase_author", room, "comment");
+      await joinAndSubscribe(connB.ws, connB.messages, "showcase_viewer", room, "comment");
+      await new Promise((r) => setTimeout(r, 500));
+
+      await publish(room, "comment", { user_id: "showcase_author" });
+      const event = await waitForMessage(connB.messages, "event", 5000);
+      expect(event.room).toBe(room);
+      expect(event.topic).toBe("comment");
+      expect(event.data.user_id).toBe("showcase_author");
+    } finally {
+      connA.close();
+      connB.close();
+    }
+  });
+});
+
+// ============================================================================
+// TEST 9: ROUTING TABLE CONSISTENCY
 // ============================================================================
 
 describe("Sub-entity comments: routing table", () => {

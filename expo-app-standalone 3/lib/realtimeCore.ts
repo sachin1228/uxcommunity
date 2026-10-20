@@ -81,7 +81,7 @@ export interface RealtimeSocket {
   readyState: number;
   onopen: (() => void) | null;
   onmessage: ((event: { data: string | ArrayBuffer }) => void) | null;
-  onclose: (() => void) | null;
+  onclose: ((event?: { code?: number; reason?: string }) => void) | null;
   onerror: (() => void) | null;
   send(data: string): void;
   close(code?: number, reason?: string): void;
@@ -136,12 +136,59 @@ export function sessionCookieHeaders(
 export interface RealtimeTimings {
   reconnectBaseMs?: number;
   reconnectMaxMs?: number;
+  /**
+   * Consecutive failed opens before the backoff switches to a long cooldown.
+   * Handshake 401/403 responses are indistinguishable from a network failure in
+   * the browser/React Native WebSocket API, so this cap is the terminal brake
+   * that stops an unauthorized room from retrying forever at 15 s.
+   */
+  maxReconnectAttempts?: number;
+  /** Delay after the attempt cap is spent; a later attempt starts a fresh cycle. */
+  reconnectCooldownMs?: number;
+  /** Fraction of the computed delay that may be randomly subtracted (0–1). */
+  reconnectJitter?: number;
   heartbeatIntervalMs?: number;
   heartbeatTimeoutMs?: number;
 }
 
 const DEFAULT_RECONNECT_BASE_MS = 1000;
 const DEFAULT_RECONNECT_MAX_MS = 15_000;
+const DEFAULT_MAX_RECONNECT_ATTEMPTS = 6;
+const DEFAULT_RECONNECT_COOLDOWN_MS = 5 * 60_000;
+const DEFAULT_RECONNECT_JITTER = 0.2;
+
+/**
+ * Close codes that mean "do not retry this room": policy violation and the
+ * application-level authorization codes. A 401/403 handshake arrives as 1006
+ * (the status is hidden), which the attempt cap above covers.
+ */
+const TERMINAL_CLOSE_CODES = new Set([1008, 4401, 4403]);
+
+export function isTerminalCloseCode(code: number | null | undefined): boolean {
+  return typeof code === "number" && TERMINAL_CLOSE_CODES.has(code);
+}
+
+/**
+ * Delay before reconnect attempt `attempt` (0-based). Jitter only subtracts,
+ * so a test or a low-power device can never wait longer than the configured
+ * cap because of it.
+ */
+export function reconnectDelayMs(
+  attempt: number,
+  timings: {
+    baseMs: number;
+    maxMs: number;
+    maxAttempts: number;
+    cooldownMs: number;
+    jitter: number;
+  },
+  random: () => number = Math.random,
+): number {
+  if (attempt >= timings.maxAttempts) return timings.cooldownMs;
+  const base = Math.min(timings.baseMs * 2 ** attempt, timings.maxMs);
+  const factor = 1 - timings.jitter * Math.min(1, Math.max(0, random()));
+  return Math.max(0, Math.round(base * factor));
+}
 /** How often to send a heartbeat on an idle-but-open socket. */
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 25_000;
 /** How long to wait for a pong before declaring the socket dead. */
@@ -221,7 +268,7 @@ export const realtimeRooms = {
   events: (communityId: string) => `events:${communityId}`,
   resources: (communityId: string) => `resources:${communityId}`,
   resourceComments: (resourceId: string) => `resource-comments:${resourceId}`,
-  showcase: (postId: string) => `showcase:${postId}`,
+  showcase: (communityId: string, postId: string) => `showcase:${communityId}:${postId}`,
   rules: (communityId: string) => `rules:${communityId}`,
   notifications: (userId: string) => `notifications:${userId}`,
   dm: (userId: string) => `dm:${userId}`,
@@ -248,6 +295,8 @@ interface ConnectionState {
   /** True once a socket for this connection has been open at least once. */
   openedOnce: boolean;
   manuallyClosed: boolean;
+  /** A terminal close code was seen — wait for an explicit lifecycle probe. */
+  terminal: boolean;
   reconnectAttempt: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   heartbeatTimer: ReturnType<typeof setInterval> | null;
@@ -285,6 +334,9 @@ export class RealtimeClient {
 
   private readonly reconnectBaseMs: number;
   private readonly reconnectMaxMs: number;
+  private readonly maxReconnectAttempts: number;
+  private readonly reconnectCooldownMs: number;
+  private readonly reconnectJitter: number;
   private readonly heartbeatIntervalMs: number;
   private readonly heartbeatTimeoutMs: number;
 
@@ -294,6 +346,11 @@ export class RealtimeClient {
   ) {
     this.reconnectBaseMs = timings.reconnectBaseMs ?? DEFAULT_RECONNECT_BASE_MS;
     this.reconnectMaxMs = timings.reconnectMaxMs ?? DEFAULT_RECONNECT_MAX_MS;
+    this.maxReconnectAttempts =
+      timings.maxReconnectAttempts ?? DEFAULT_MAX_RECONNECT_ATTEMPTS;
+    this.reconnectCooldownMs =
+      timings.reconnectCooldownMs ?? DEFAULT_RECONNECT_COOLDOWN_MS;
+    this.reconnectJitter = timings.reconnectJitter ?? DEFAULT_RECONNECT_JITTER;
     this.heartbeatIntervalMs = timings.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
     this.heartbeatTimeoutMs = timings.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS;
   }
@@ -406,13 +463,16 @@ export class RealtimeClient {
   /** Immediately verify a connection is alive; reconnect if it isn't. */
   private probeConnection(conn: ConnectionState): void {
     if (conn.manuallyClosed) return;
+    // A lifecycle probe is an explicit recovery signal (foreground, network
+    // return): clear the terminal/parked state and try immediately.
+    conn.terminal = false;
+    conn.reconnectAttempt = 0;
+    if (conn.reconnectTimer !== null) {
+      clearTimeout(conn.reconnectTimer);
+      conn.reconnectTimer = null;
+    }
     if (!conn.ws || conn.ws.readyState >= SOCKET_CLOSING) {
       // Socket is gone — reconnect now rather than waiting for backoff.
-      if (conn.reconnectTimer !== null) {
-        clearTimeout(conn.reconnectTimer);
-        conn.reconnectTimer = null;
-      }
-      conn.reconnectAttempt = 0;
       void this.openConnection(conn);
       return;
     }
@@ -430,6 +490,8 @@ export class RealtimeClient {
     if (room) {
       const conn = this.getRoomConnection(room);
       conn.manuallyClosed = false;
+      conn.terminal = false;
+      conn.reconnectAttempt = 0;
       if (!conn.ws || conn.ws.readyState >= SOCKET_CLOSING) {
         void this.openConnection(conn);
       }
@@ -438,6 +500,8 @@ export class RealtimeClient {
 
     for (const [, conn] of this.connections) {
       conn.manuallyClosed = false;
+      conn.terminal = false;
+      conn.reconnectAttempt = 0;
       if (!conn.ws || conn.ws.readyState >= SOCKET_CLOSING) {
         void this.openConnection(conn);
       }
@@ -456,6 +520,7 @@ export class RealtimeClient {
         connected: false,
         openedOnce: false,
         manuallyClosed: false,
+        terminal: false,
         reconnectAttempt: 0,
         reconnectTimer: null,
         heartbeatTimer: null,
@@ -472,6 +537,7 @@ export class RealtimeClient {
     if (conn.ws && conn.ws.readyState < SOCKET_CLOSING) return;
     if (conn.opening) return;
     if (conn.manuallyClosed) return;
+    if (conn.terminal) return;
 
     // Only open sockets for connections that are still registered.
     if (this.connections.get(conn.key) !== conn) return;
@@ -598,7 +664,7 @@ export class RealtimeClient {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event?: { code?: number }) => {
       // Ignore close events from sockets this connection no longer owns.
       if (conn.ws !== ws) return;
       conn.ws = null;
@@ -607,6 +673,13 @@ export class RealtimeClient {
       this.stopHeartbeat(conn);
       this.emitGlobalStatus(this.isConnected());
       if (wasConnected) this.emitRoomStatus(conn, false);
+      if (isTerminalCloseCode(event?.code)) {
+        // The server said this room is not for this identity. Waiting for a
+        // foreground/network/session reset is cheaper than a 15 s retry loop.
+        conn.terminal = true;
+        conn.reconnectAttempt = 0;
+        return;
+      }
       if (!conn.manuallyClosed) this.scheduleReconnect(conn);
     };
 
@@ -623,13 +696,19 @@ export class RealtimeClient {
   }
 
   private scheduleReconnect(conn: ConnectionState): void {
-    if (conn.reconnectTimer !== null || conn.manuallyClosed) return;
+    if (conn.reconnectTimer !== null || conn.manuallyClosed || conn.terminal) return;
     if (this.connections.get(conn.key) !== conn) return;
-    const delay = Math.min(
-      this.reconnectBaseMs * 2 ** conn.reconnectAttempt,
-      this.reconnectMaxMs,
-    );
-    conn.reconnectAttempt += 1;
+    const attempt = conn.reconnectAttempt;
+    const delay = reconnectDelayMs(attempt, {
+      baseMs: this.reconnectBaseMs,
+      maxMs: this.reconnectMaxMs,
+      maxAttempts: this.maxReconnectAttempts,
+      cooldownMs: this.reconnectCooldownMs,
+      jitter: this.reconnectJitter,
+    });
+    // A cooldown starts a fresh cycle: the room gets quick retries again if the
+    // network or session recovers, then parks for another cooldown if not.
+    conn.reconnectAttempt = attempt >= this.maxReconnectAttempts ? 0 : attempt + 1;
     conn.reconnectTimer = setTimeout(() => {
       conn.reconnectTimer = null;
       void this.openConnection(conn);
@@ -817,6 +896,10 @@ export class RealtimeClient {
     if (prev === 0) {
       const conn = this.getRoomConnection(room);
       conn.manuallyClosed = false;
+      // A fresh subscription is explicit intent: let a room that was parked
+      // by a terminal close try again (a remount after re-auth/session renew).
+      conn.terminal = false;
+      conn.reconnectAttempt = 0;
       this.sendToConnection(conn, { t: 'subscribe', room, topic });
       // Ensure connection is open
       if (!conn.ws || conn.ws.readyState >= SOCKET_CLOSING) {

@@ -14,7 +14,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { error } = await db.from("showcase_comments").delete().eq("id", commentId).eq("user_id", userId);
   if (error) return NextResponse.json({ error: "Failed to delete comment." }, { status: 500 });
   after(() => {
-    void publishRealtimeBatch([{ room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: authorId } }]);
+    void publishRealtimeBatch([{ room: realtimeRooms.showcase(id, postId), topic: "comment", data: { user_id: authorId } }]);
     // Republish the remaining total so the chat card's "💬 n" shrinks too.
     void publishContentCommentCount(db, id, postId, "showcase");
   });

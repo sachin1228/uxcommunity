@@ -702,6 +702,20 @@ describe("Membership authorization", () => {
         expect(statusCode).toBe(403);
       }
       try { ws.close(); } catch { /* ignore */ }
+
+      // Showcase rooms carry the community id in their key specifically so the
+      // DO can authorize them. A non-member must be refused there too.
+      const showcaseWs = new WebSocket(
+        `${membershipUrl}/ws?room=${encodeURIComponent(`showcase:comm_nonmember:post-1`)}&token=${token}`,
+      );
+      const showcaseStatus = await new Promise<number>((resolve) => {
+        showcaseWs.on("error", () => resolve(0));
+        showcaseWs.on("unexpected-response", (_req: any, res: any) => resolve(res.statusCode ?? 0));
+        showcaseWs.on("open", () => resolve(200));
+        setTimeout(() => resolve(0), 3000);
+      });
+      expect(showcaseStatus).toBe(403);
+      try { showcaseWs.close(); } catch { /* ignore */ }
     } finally {
       await membershipWorker.stop();
       mockApi.close();

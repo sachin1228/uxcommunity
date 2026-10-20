@@ -29,6 +29,8 @@ import test from 'node:test';
 import {
   RealtimeClient,
   isCommunityRoom,
+  isTerminalCloseCode,
+  reconnectDelayMs,
   realtimeRooms,
   userSocketKey,
   type RealtimePlatform,
@@ -47,7 +49,7 @@ class FakeSocket implements RealtimeSocket {
   sent: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string | ArrayBuffer }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event?: { code?: number; reason?: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   /** True once the client (or the fake) closed this socket. */
   closed = false;
@@ -64,10 +66,10 @@ class FakeSocket implements RealtimeSocket {
   }
 
   /** The network killed the socket: `close` fires on its own. */
-  drop(): void {
+  drop(code = 1006): void {
     this.closed = true;
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.({ code });
   }
 
   send(data: string): void {
@@ -172,6 +174,7 @@ interface ConnectionView {
   ws: FakeSocket | null;
   connected: boolean;
   manuallyClosed: boolean;
+  terminal: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   pending: string[];
   user: RealtimeUser | null;
@@ -941,5 +944,100 @@ test('the foreground probe replaces a dead socket and revives nothing that was r
   await flush();
   assert.equal(platform.sockets.length, 2, 'a released room is never reopened');
 
+  client.destroy();
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// G. Reconnect safety: jitter, attempt cap and terminal authorization
+// ══════════════════════════════════════════════════════════════════════════
+
+test('reconnect delay jitters below the cap and parks at the cooldown', () => {
+  const timing = {
+    baseMs: 1000,
+    maxMs: 15_000,
+    maxAttempts: 3,
+    cooldownMs: 60_000,
+    jitter: 0.2,
+  };
+
+  assert.equal(reconnectDelayMs(0, timing, () => 1), 800, 'jitter only subtracts');
+  assert.equal(reconnectDelayMs(0, timing, () => 0), 1000);
+  assert.equal(reconnectDelayMs(8, timing, () => 0), 60_000, 'attempt cap uses the cooldown');
+
+  assert.equal(isTerminalCloseCode(4403), true);
+  assert.equal(isTerminalCloseCode(4401), true);
+  assert.equal(isTerminalCloseCode(1008), true);
+  assert.equal(isTerminalCloseCode(1006), false, 'an unknown handshake failure is retryable');
+});
+
+test('a terminal close code parks the room until a lifecycle probe', async () => {
+  const { client, platform } = createClient({
+    ...FAST_TIMINGS,
+    reconnectJitter: 0,
+    reconnectCooldownMs: 20,
+  });
+  client.init(ALICE);
+
+  const room = realtimeRooms.chat('terminal-room');
+  const unsubMessage = client.on(room, 'message', () => {});
+  const unsubRoom = client.subscribe(room);
+
+  await flush();
+  const first = platform.current!;
+  first.open();
+  await flush();
+
+  first.drop(4403);
+  await sleep(20);
+
+  assert.equal(platform.sockets.length, 1, 'no reconnect after an authorization close');
+  assert.equal(connection(client, room)?.terminal, true);
+
+  // A foreground return is an explicit recovery signal (the session may have
+  // been renewed); the parked room is allowed to try again.
+  platform.resumeApp();
+  await flush();
+  assert.equal(platform.sockets.length, 2, 'the lifecycle probe retries a parked room');
+
+  unsubMessage();
+  unsubRoom();
+  client.destroy();
+});
+
+test('repeated failed opens use the attempt cap and then a cooldown', async () => {
+  const { client, platform } = createClient({
+    ...FAST_TIMINGS,
+    reconnectBaseMs: 2,
+    reconnectMaxMs: 4,
+    maxReconnectAttempts: 2,
+    reconnectCooldownMs: 80,
+    reconnectJitter: 0,
+  });
+  client.init(ALICE);
+
+  const room = realtimeRooms.chat('failing-room');
+  const unsubMessage = client.on(room, 'message', () => {});
+  const unsubRoom = client.subscribe(room);
+
+  await flush();
+  assert.equal(platform.sockets.length, 1);
+
+  // Two quick backoff attempts.
+  platform.current!.drop(1006);
+  await sleep(10);
+  assert.equal(platform.sockets.length, 2);
+  platform.current!.drop(1006);
+  await sleep(15);
+  assert.equal(platform.sockets.length, 3);
+
+  // The third failure spends the cap and parks for the cooldown.
+  platform.current!.drop(1006);
+  await sleep(30);
+  assert.equal(platform.sockets.length, 3, 'no attempt during the cooldown');
+  await sleep(70);
+  assert.equal(platform.sockets.length, 4, 'one attempt after the cooldown');
+
+  unsubMessage();
+  unsubRoom();
   client.destroy();
 });

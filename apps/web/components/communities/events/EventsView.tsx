@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, CalendarCheck2, CalendarX2, Plus } from "lucide-react";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
@@ -21,6 +21,7 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import { invalidateCommunitiesList, notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
+import { applyEventRealtimeEvent } from "@/lib/communities/event-realtime";
 import { useNowTick } from "@/lib/use-now-tick";
 
 const EVENTS_STALE_MS = 60_000;
@@ -69,8 +70,16 @@ export function EventsView({
   const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState<"upcoming" | "past">("upcoming");
   const isVisible = useDocumentVisible();
+  /** Latest painted list for event handlers (avoids stale closures). */
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
+  /** One refresh at a time; a burst of structural events is debounced. */
+  const refreshInFlightRef = useRef(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchEvents = useCallback(async (background = false, force = false) => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     if (!background) setLoading(true);
     try {
       const [upcomingData, pastData] = await Promise.all([
@@ -92,9 +101,48 @@ export function EventsView({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
     } finally {
+      refreshInFlightRef.current = false;
       setLoading(false);
     }
   }, [currentUserId, requestUrl]);
+
+  /**
+   * Structural events and legacy payloads revalidate once, not once per
+   * event: 300 ms debounce plus the in-flight guard in fetchEvents.
+   */
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) return;
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      void fetchEvents(true, true);
+    }, 300);
+  }, [fetchEvents]);
+
+  /** Patch a complete interaction event in place; revalidate anything else. */
+  const handleLiveEvent = useCallback((topic: string, data: unknown) => {
+    const update = applyEventRealtimeEvent(
+      eventsRef.current,
+      topic,
+      data,
+      currentUserId,
+    );
+    if (!update.handled) {
+      scheduleRefresh();
+      return;
+    }
+    if (!update.changed) return;
+    eventsRef.current = update.items;
+    setEvents(update.items);
+    patchCachedRequest<{ events?: CommunityEvent[] }>(
+      requestUrl,
+      (current) => ({ ...current, events: update.items }),
+      currentUserId,
+    );
+  }, [currentUserId, requestUrl, scheduleRefresh]);
+
+  useEffect(() => () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -104,19 +152,14 @@ export function EventsView({
     const unsubscribes: Array<() => void> = [];
     const unsubRoom = realtimeClient.subscribe(room);
 
-    unsubscribes.push(realtimeClient.on(room, "event", () => void fetchEvents(true, true)));
-    unsubscribes.push(realtimeClient.on(room, "rsvp", () => void fetchEvents(true, true)));
-    unsubscribes.push(realtimeClient.on(room, "like", () => void fetchEvents(true, true)));
-    unsubscribes.push(
-      realtimeClient.on(room, "save", (data) => {
-        const record = data as { user_id?: string } | null;
-        // Our own save was already applied optimistically with the exact count
-        // the route returned. Refetching both event pages for it would stall
-        // the tab behind two fresh requests for no new information.
-        if (record?.user_id === currentUserId) return;
-        void fetchEvents(true, true);
-      }),
-    );
+    // Structural changes can alter ordering/pagination and the enriched
+    // attendee/chat fields, so those still revalidate.
+    unsubscribes.push(realtimeClient.on(room, "event", () => scheduleRefresh()));
+    for (const topic of ["rsvp", "like", "save"] as const) {
+      unsubscribes.push(
+        realtimeClient.on(room, topic, (data) => handleLiveEvent(topic, data)),
+      );
+    }
 
     realtimeClient.connect();
 
@@ -124,7 +167,7 @@ export function EventsView({
       unsubscribes.forEach((unsub) => unsub());
       unsubRoom();
     };
-  }, [communityId, currentUserId, fetchEvents, isVisible]);
+  }, [communityId, fetchEvents, handleLiveEvent, isVisible, scheduleRefresh]);
 
   // Refetch on returning to the tab only after a real absence (missed realtime
   // events aren't replayed); brief alt-tabs no longer fire a request each.

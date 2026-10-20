@@ -68,7 +68,7 @@ export async function POST(
   const reactions = (enriched as { reactions?: CommentReactionSummary[] }).reactions ?? [];
 
   void publishRealtimeBatch([
-    { room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: userId, reaction: true } },
+    { room: realtimeRooms.showcase(communityId, postId), topic: "comment", data: { user_id: userId, reaction: true } },
   ]);
 
   return NextResponse.json({ reactions });
