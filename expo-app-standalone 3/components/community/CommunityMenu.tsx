@@ -13,19 +13,18 @@ import type { CommunityMuteDuration } from '@/lib/communities';
 import { hapticSelection } from '@/lib/haptics';
 
 /**
- * The chat header's ⋯ menu — a card anchored under the button, the way
+ * The chat header's ⋯ menu — a card anchored under the header, the way
  * WhatsApp opens it, instead of a bottom sheet.
  *
- *   Mute notifications → the three durations in the same card (or a single
- *                        "Unmute notifications" row, with the deadline,
- *                        while muted)
- *   Delete chat        — removes the chat from your own list only
- *   Exit community     — removes your membership (the more destructive action,
- *                        so it sits last)
+ *   Mute notifications ›  opens the mute-duration sheet (or, while muted,
+ *                         unmutes in place)
+ *   Delete chat           — removes the chat from your own list only
+ *   Exit community        — removes your membership (the more destructive
+ *                           action, so it sits last)
  *
- * Delete and Exit confirm inside the card, so the whole flow stays on one
- * surface; the parent's `onConfirm` rejects on failure and the card hands
- * itself back with its busy state cleared.
+ * Delete and Exit confirm inside the card, so those flows stay on one surface;
+ * the parent's `onConfirm` rejects on failure and the card hands itself back
+ * with its busy state cleared.
  */
 
 export type CommunityConfirmAction = 'delete' | 'leave';
@@ -46,12 +45,6 @@ const CONFIRM_COPY: Record<
   },
 };
 
-const MUTE_DURATIONS: Array<{ duration: CommunityMuteDuration; label: string }> = [
-  { duration: '8h', label: '8 hours' },
-  { duration: '1w', label: '1 week' },
-  { duration: 'always', label: 'Always' },
-];
-
 export interface CommunityMenuAnchor {
   top: number;
   right: number;
@@ -66,6 +59,9 @@ interface Props {
   /** "Muted" for the forever flag, "Muted until …" for a timed one. */
   muteStateLabel: string | null;
   onClose: () => void;
+  /** The row's durations / off switch live in the mute sheet. */
+  onOpenMuteOptions: () => void;
+  /** Called with 'off' when the muted row is tapped. */
   onMute: (duration: CommunityMuteDuration) => void;
   /** Runs the action; must reject when the server refuses, so the card stays up. */
   onConfirm: (action: CommunityConfirmAction) => Promise<void>;
@@ -77,11 +73,11 @@ export function CommunityMenu({
   muted,
   muteStateLabel,
   onClose,
+  onOpenMuteOptions,
   onMute,
   onConfirm,
 }: Props) {
   const colors = useColors();
-  const [durationsOpen, setDurationsOpen] = useState(false);
   const [confirming, setConfirming] = useState<CommunityConfirmAction | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -90,7 +86,6 @@ export function CommunityMenu({
   // (not close) so the fading-out card keeps its last content.
   useEffect(() => {
     if (!open) return;
-    setDurationsOpen(false);
     setConfirming(null);
     setBusy(false);
   }, [open]);
@@ -189,28 +184,18 @@ export function CommunityMenu({
                 </Text>
               </Pressable>
             </View>
-          ) : durationsOpen ? (
-            <View>
-              {MUTE_DURATIONS.map(({ duration, label }) => (
-                <MenuRow
-                  key={duration}
-                  icon="bell-off"
-                  label={label}
-                  onPress={() => onMute(duration)}
-                />
-              ))}
-            </View>
           ) : (
             <View>
               <MenuRow
                 icon={muted ? 'bell' : 'bell-off'}
                 label={muted ? 'Unmute notifications' : 'Mute notifications'}
                 sublabel={muted ? muteStateLabel : null}
+                chevron={!muted}
                 onPress={() => {
                   if (muted) {
                     onMute('off');
                   } else {
-                    setDurationsOpen(true);
+                    onOpenMuteOptions();
                   }
                 }}
               />
@@ -242,12 +227,15 @@ function MenuRow({
   label,
   sublabel,
   destructive,
+  chevron,
   onPress,
 }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   sublabel?: string | null;
   destructive?: boolean;
+  /** Marks a row that opens another surface, like WhatsApp's "More ›". */
+  chevron?: boolean;
   onPress: () => void;
 }) {
   const colors = useColors();
@@ -290,6 +278,9 @@ function MenuRow({
           </Text>
         ) : null}
       </View>
+      {chevron ? (
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      ) : null}
     </Pressable>
   );
 }
@@ -320,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  rowText: { flexShrink: 1 },
+  rowText: { flex: 1, minWidth: 0 },
   rowLabel: { fontSize: 15, fontFamily: 'Geist_500Medium' },
   rowSublabel: { fontSize: 11.5, fontFamily: 'Geist_400Regular', marginTop: 2 },
   confirmHeader: {

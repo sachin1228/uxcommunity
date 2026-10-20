@@ -28,6 +28,7 @@ import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
 import { CommunityMenu, type CommunityConfirmAction } from '@/components/community/CommunityMenu';
+import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
@@ -335,6 +336,8 @@ export default function CommunityChat() {
 
   /** The mute duration save in flight. */
   const [muteBusy, setMuteBusy] = useState(false);
+  /** The ⋯ menu's mute row opens these durations in a sheet. */
+  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
   /** The header ⋯ menu — notifications, Delete chat, Exit community. */
   const [menuOpen, setMenuOpen] = useState(false);
   /** Bottom of the chat header, in the screen root's own coordinates. */
@@ -443,6 +446,7 @@ export default function CommunityChat() {
             },
           });
         }
+        setMuteSheetOpen(false);
         return true;
       } catch {
         if (reportFailure) {
@@ -1555,12 +1559,30 @@ export default function CommunityChat() {
         muted={muted}
         muteStateLabel={muteStateLabel}
         onClose={() => setMenuOpen(false)}
+        onOpenMuteOptions={() => {
+          setMenuOpen(false);
+          setMuteSheetOpen(true);
+        }}
         onMute={(duration) => {
           // The menu dismisses first; the toast reports the save.
           setMenuOpen(false);
           void applyMute(duration);
         }}
         onConfirm={handleCommunityAction}
+      />
+
+      {/* Mute durations — opened from the ⋯ menu's mute row */}
+      <CommunityMuteSheet
+        open={muteSheetOpen}
+        muted={muted}
+        muteStateLabel={muteStateLabel}
+        busy={muteBusy}
+        onChoose={(duration) => {
+          void applyMute(duration);
+        }}
+        onClose={() => {
+          if (!muteBusy) setMuteSheetOpen(false);
+        }}
       />
     </View>
   );
