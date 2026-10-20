@@ -1354,7 +1354,7 @@ export default function CommunityChat() {
           ]}
         >
           <Feather
-            name="more-horizontal"
+            name="more-vertical"
             size={18}
             strokeWidth={2.5}
             color={colors.mutedForeground}
