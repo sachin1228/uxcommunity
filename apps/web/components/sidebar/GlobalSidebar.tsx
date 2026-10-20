@@ -18,6 +18,7 @@ import {
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
+import { useEventBrowserNotifications } from "@/lib/events/browser-notifications";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
 interface Props {
@@ -48,6 +49,11 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
     handleNavigate,
     router,
   } = useSidebarCommunities(userId);
+
+  // Desktop OS notifications for the event moments. Mounted only on the
+  // desktop sidebar: the native app owns reminders on a phone, and a second
+  // mobile-web subscription would raise both at once.
+  useEventBrowserNotifications(mobile ? null : userId);
 
   const sorted = [...communities].sort(compareByRecentActivity);
 
