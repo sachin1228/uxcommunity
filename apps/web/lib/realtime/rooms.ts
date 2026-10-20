@@ -15,6 +15,11 @@ export const realtimeRooms = {
   events: (communityId: string) => `events:${communityId}`,
   resources: (communityId: string) => `resources:${communityId}`,
   resourceComments: (resourceId: string) => `resource-comments:${resourceId}`,
-  showcase: (postId: string) => `showcase:${postId}`,
+  /**
+   * Showcase comments are scoped to the community *and* the post: the Room DO
+   * authorizes a socket by the community segment, and the post segment keeps
+   * one post's comment traffic isolated from another's.
+   */
+  showcase: (communityId: string, postId: string) => `showcase:${communityId}:${postId}`,
   rules: (communityId: string) => `rules:${communityId}`,
 } as const;

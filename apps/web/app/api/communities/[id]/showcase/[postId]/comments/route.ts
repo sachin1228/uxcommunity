@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { data, error } = await db.from("showcase_comments").insert({ post_id: postId, user_id: userId, parent_id: parentId, body }).select("id, post_id, user_id, parent_id, body, created_at, updated_at").single();
   if (error || !data) return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
   after(() => {
-    void publishRealtimeBatch([{ room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: userId } }]);
+    void publishRealtimeBatch([{ room: realtimeRooms.showcase(id, postId), topic: "comment", data: { user_id: userId } }]);
     // The chat timeline's "created a showcase" card shows this post's comment
     // count — broadcast the new total so open chats update without a reload.
     void publishContentCommentCount(db, id, postId, "showcase");

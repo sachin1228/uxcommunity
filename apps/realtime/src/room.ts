@@ -17,6 +17,7 @@ import {
 import { EventIdDedupe } from "./event-dedupe";
 import { MembershipAuthorizer } from "./membership-auth";
 import { PresenceBroadcaster } from "./presence";
+import { communityIdFromRoomName } from "./room-routing";
 import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
 
 /**
@@ -513,9 +514,7 @@ export class Room extends DurableObject<Env> {
   }
 
   private communityIdFromRoom(): string {
-    const name = this.roomName();
-    const idx = name.indexOf(":");
-    return idx >= 0 ? name.slice(idx + 1) : name;
+    return communityIdFromRoomName(this.roomName());
   }
 
   private sendToClient(ws: WebSocket, msg: unknown): void {

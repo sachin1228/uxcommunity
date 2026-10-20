@@ -67,7 +67,7 @@ export function ShowcaseDetailClient({
   }, [communityId, post.id]);
   useEffect(() => {
     if (!isVisible) return;
-    const room = realtimeRooms.showcase(post.id);
+    const room = realtimeRooms.showcase(communityId, post.id);
     const unsubRoom = realtimeClient.subscribe(room);
     const unsub = realtimeClient.on(room, "comment", () => void fetchComments());
     realtimeClient.connect();
@@ -75,7 +75,7 @@ export function ShowcaseDetailClient({
       unsub();
       unsubRoom();
     };
-  }, [post.id, currentUserId, fetchComments, isVisible]);
+  }, [communityId, post.id, currentUserId, fetchComments, isVisible]);
   async function removePost() {
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}`,

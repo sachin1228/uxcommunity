@@ -71,6 +71,29 @@ export function isUserScopedRoomAllowed(room: string, userId: string): boolean {
 }
 
 /**
+ * The community a room belongs to.
+ *
+ * Most community rooms are `prefix:<communityId>`. Showcase rooms are the
+ * exception: they carry both the community and the post, because a post id
+ * alone is not a membership subject. Parsing the community from
+ * `showcase:<communityId>:<postId>` is what lets the Room DO authorize the
+ * socket against the real community instead of a post id.
+ *
+ * Legacy `showcase:<postId>` names (a pre-fix client or an in-flight publish)
+ * have no community segment; they fall back to the old value and therefore
+ * fail the membership check closed rather than authorizing against a post.
+ */
+export function communityIdFromRoomName(room: string): string {
+  if (room.startsWith("showcase:")) {
+    const rest = room.slice("showcase:".length);
+    const separator = rest.indexOf(":");
+    return separator >= 0 ? rest.slice(0, separator) : rest;
+  }
+  const separator = room.indexOf(":");
+  return separator >= 0 ? room.slice(separator + 1) : room;
+}
+
+/**
  * Resolve which Durable Object owns a logical room.
  *
  * The returned `name` is the DO instance to address; the caller must keep
