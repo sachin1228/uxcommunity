@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1189,9 +1190,13 @@ export default function CommunityChat() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
-        </Pressable>
+        {/* Android reaches back via the system gesture/button, so the chevron
+            only earns its space on iOS. */}
+        {Platform.OS === 'ios' ? (
+          <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
+          </Pressable>
+        ) : null}
 
         {/* Tapping the title area opens the community info screen, like
             WhatsApp's contact info (web parity: the right sidebar there). */}
