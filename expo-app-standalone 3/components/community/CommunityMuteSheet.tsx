@@ -118,22 +118,28 @@ export function CommunityMuteSheet({
               onPress={() => onChoose('off')}
             />
           ) : (
-            MUTE_DURATIONS.map(({ duration, label }) => (
-              <SheetRow
-                key={duration}
-                icon={
-                  <Feather
-                    name="bell-off"
-                    size={16}
-                    strokeWidth={2.5}
-                    color={colors.mutedForeground}
-                  />
-                }
-                label={label}
-                disabled={busy}
-                onPress={() => onChoose(duration)}
-              />
-            ))
+            <>
+              <Text style={[styles.title, { color: colors.foreground }]}>
+                Mute notifications
+              </Text>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              {MUTE_DURATIONS.map(({ duration, label }) => (
+                <SheetRow
+                  key={duration}
+                  icon={
+                    <Feather
+                      name="bell-off"
+                      size={16}
+                      strokeWidth={2.5}
+                      color={colors.mutedForeground}
+                    />
+                  }
+                  label={label}
+                  disabled={busy}
+                  onPress={() => onChoose(duration)}
+                />
+              ))}
+            </>
           )}
         </Pressable>
       </Pressable>
@@ -144,19 +150,22 @@ export function CommunityMuteSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 8,
+    paddingVertical: 6,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowRadius: 24,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: 8 },
     elevation: 16,
   },
   row: {
@@ -166,6 +175,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
+  title: {
+    fontSize: 16,
+    fontFamily: 'Geist_600SemiBold',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  divider: { height: StyleSheet.hairlineWidth },
   rowText: { flexShrink: 1 },
   rowLabel: { fontSize: 15, fontFamily: 'Geist_500Medium' },
   rowSublabel: { fontSize: 12, fontFamily: 'Geist_400Regular', marginTop: 2 },
