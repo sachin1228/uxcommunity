@@ -83,6 +83,13 @@ jobs:
       - name: Run mobile chat content tests
         run: npm run test:mobile-chat-content
 
+      # Blocking. The Home feed's two tabs (Public Posts / Your Communities)
+      # ship in the mobile app, and the stored choice decides which one opens.
+      # The axis lives in a React-Native-free module, so it runs here like the
+      # suites above.
+      - name: Run mobile home feed scope tests
+        run: npm run test:mobile-home-feed
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest
