@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, { type AnimatedStyle } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 
 /**
@@ -26,6 +27,9 @@ import { useColors } from '@/hooks/useColors';
  * positioned immediately below the fixed-height composer, so growing the
  * panel never changes the dock's measured height or moves the composer.
  */
+
+const EMOJI_COLUMNS = 8;
+const EMOJI_GRID_PADDING = 16;
 
 const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
   {
@@ -85,6 +89,12 @@ interface Props {
   showContent?: boolean;
   /** Ignore presses until the panel has finished opening. */
   interactive?: boolean;
+  /**
+   * `screen` anchors to the bottom edge of the mount's parent (chat screens
+   * mount it at dock level so Android can hit-test it). `inline` hangs the
+   * panel directly below its parent, for composers inside scrolling sheets.
+   */
+  placement?: 'screen' | 'inline';
 }
 
 export function EmojiPicker({
@@ -93,18 +103,48 @@ export function EmojiPicker({
   animatedStyle,
   showContent = true,
   interactive = true,
+  placement = 'screen',
 }: Props) {
   const colors = useColors();
+  const [panelWidth, setPanelWidth] = useState(0);
+  const panelCornerRadius = Math.min(32, panelWidth / 2, height / 2);
+  // Explicit square cells: a percentage width with aspectRatio was resolving
+  // the height from the glyph's line box, leaving wide, short press targets
+  // whose emoji did not look centred.
+  const emojiCellSize =
+    panelWidth > 0 ? (panelWidth - EMOJI_GRID_PADDING * 2) / EMOJI_COLUMNS : 0;
 
   return (
     <Animated.View
       pointerEvents={interactive ? 'auto' : 'none'}
-      style={[styles.clip, styles.belowComposer, animatedStyle]}
+      style={[styles.clip, placement === 'screen' ? styles.anchorBottom : styles.belowComposer, animatedStyle]}
     >
       {/* The space below the chat already stops at the safe area — the screen
           renders a spacer under it — so the panel needs no bottom padding of
           its own. */}
-      <View style={[styles.panel, { height, backgroundColor: colors.background }]}>
+      <View
+        onLayout={({ nativeEvent: { layout } }) => setPanelWidth(layout.width)}
+        style={[
+          styles.panel,
+          {
+            height,
+          },
+        ]}
+      >
+        {panelWidth > 0 && height > 0 && (
+          <Svg
+            pointerEvents="none"
+            width={panelWidth}
+            height={height}
+            viewBox={`0 0 ${panelWidth} ${height}`}
+            style={styles.panelBackground}
+          >
+            <Path
+              d={`M 0 ${panelCornerRadius} A ${panelCornerRadius} ${panelCornerRadius} 0 0 1 ${panelCornerRadius} 0 H ${panelWidth - panelCornerRadius} A ${panelCornerRadius} ${panelCornerRadius} 0 0 1 ${panelWidth} ${panelCornerRadius} V ${height} H 0 Z`}
+              fill={colors.card}
+            />
+          </Svg>
+        )}
         {showContent && (
           <>
             {/* No drag handle: the panel is not a sheet — it takes the
@@ -128,6 +168,7 @@ export function EmojiPicker({
                         onPress={() => onSelect?.(emoji)}
                         style={({ pressed }) => [
                           styles.emojiCell,
+                          emojiCellSize > 0 && { width: emojiCellSize, height: emojiCellSize },
                           { backgroundColor: pressed ? colors.subtle : 'transparent' },
                         ]}
                       >
@@ -147,15 +188,18 @@ export function EmojiPicker({
 
 const styles = StyleSheet.create({
   /** The animated space the panel occupies — it starts at zero height while the
-   *  keyboard still owns the strip. Its parent reserves the same vertical extent
-   *  for the composer, and the wrapper grows down to the keyboard's top edge. */
+   *  keyboard still owns the strip, then grows upward from the screen's bottom
+   *  edge to the keyboard's height. */
   clip: { overflow: 'hidden' },
-  belowComposer: { position: 'absolute', left: 0, right: 0, top: '100%' },
-  /** No top border: the panel is a continuation of the chat, not a sheet over
-   *  it — a hairline here would draw the one line the keyboard does not have. */
-  panel: { height: 320 },
+  /** Anchored to the bottom of the screen-level dock area rather than inside
+   *  the composer: a child laid out below its parent's native bounds never
+   *  receives touches on Android, which makes the panel unable to scroll. */
+  anchorBottom: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  belowComposer: { position: 'absolute', left: -8, right: -8, top: '100%' },
+  panel: { height: 320, position: 'relative' },
+  panelBackground: { position: 'absolute', top: 0, left: 0 },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: EMOJI_GRID_PADDING, paddingBottom: 24 },
   sectionTitle: {
     fontSize: 11,
     fontFamily: 'Geist_600SemiBold',
@@ -169,11 +213,15 @@ const styles = StyleSheet.create({
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   emojiCell: {
-    width: '12.5%',
-    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
   },
-  emoji: { fontSize: 24 },
+  emoji: {
+    fontSize: 24,
+    lineHeight: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
 });

@@ -20,6 +20,8 @@ import {
 const DEFAULT_PANEL_HEIGHT = 320;
 const MIN_PANEL_HEIGHT = 160;
 const PANEL_TRANSITION_MS = 200;
+/** Grace period for the IME to claim the space before a panel swap gives up. */
+const PANEL_TO_KEYBOARD_FALLBACK_MS = 350;
 export const CHAT_COMPOSER_BOTTOM_INSET = 8;
 export const CHAT_COMPOSER_TOP_INSET = 2;
 
@@ -27,6 +29,8 @@ let lastMeasuredKeyboardHeight = 0;
 let androidImeOwnerCount = 0;
 
 export interface ChatImeLayout {
+  /** Composer-to-bottom spacing configured by the screen using this layout. */
+  composerBottomSpacing: number;
   panelOpen: boolean;
   /** Synchronous desired mode for taps that arrive before React rerenders. */
   panelOpenRef: { current: boolean };
@@ -479,6 +483,47 @@ export function useChatImeLayout(
     setPanelOpenState,
   ]);
 
+  const collapsePanelWhenKeyboardNeverShows = useCallback((requestId: number) => {
+    'worklet';
+
+    if (!ownerEnabled.value || requestId !== modeRequestId.value) return;
+    // A keyboard that is starting, animating, or already visible owns the
+    // dock now — only a request that produced no IME at all falls through.
+    if (
+      panelRequested.value ||
+      keyboardTargetVisible.value ||
+      imeAnimationRunning.value ||
+      imeInset.value > 1
+    ) {
+      return;
+    }
+
+    // Hardware-keyboard devices and IMEs that refuse to open never emit a
+    // keyboard event, which used to leave the panel open with the composer's
+    // button already flipped back to the smiley. Collapse the panel's space
+    // so the dock (and the toggle) settle in the closed state.
+    keyboardShowPending.value = false;
+    panelDismissPending.value = false;
+    restoreKeyboardAfterPanelDismiss.value = false;
+    cancelAnimation(panelExtent);
+    panelExtent.value = withTiming(0, {
+      duration: PANEL_TRANSITION_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [
+    cancelAnimation,
+    imeAnimationRunning,
+    imeInset,
+    keyboardShowPending,
+    keyboardTargetVisible,
+    modeRequestId,
+    ownerEnabled,
+    panelDismissPending,
+    panelExtent,
+    panelRequested,
+    restoreKeyboardAfterPanelDismiss,
+  ]);
+
   const requestKeyboard = useCallback((restoreFocus?: () => void) => {
     const requestId = ++modeRequestRef.current;
     if (restoreFocus) focusInputRef.current = restoreFocus;
@@ -489,7 +534,20 @@ export function useChatImeLayout(
     runOnUI(prepareKeyboardOnUI)(requestId, wasPanelOpen);
     // Keep the panel's occupied height until the IME reports its own frame;
     // the transition formula below hands the exact space over to the keyboard.
-  }, [prepareKeyboardOnUI, setPanelOpenState]);
+    if (wasPanelOpen) {
+      // Let the IME claim the space first; if it never reports (hardware
+      // keyboard, refused IME), close the panel instead of leaving a stuck
+      // open panel under a smiley button.
+      setTimeout(
+        () => runOnUI(collapsePanelWhenKeyboardNeverShows)(requestId),
+        PANEL_TO_KEYBOARD_FALLBACK_MS,
+      );
+      setTimeout(
+        () => runOnUI(collapsePanelWhenKeyboardNeverShows)(requestId),
+        PANEL_TO_KEYBOARD_FALLBACK_MS * 3,
+      );
+    }
+  }, [collapsePanelWhenKeyboardNeverShows, prepareKeyboardOnUI, setPanelOpenState]);
 
   const closePanel = useCallback(() => {
     const requestId = ++modeRequestRef.current;
@@ -535,6 +593,7 @@ export function useChatImeLayout(
   }), [composerBaseHeight, imeInset, panelExtent, typingIndicatorHeight]);
 
   return {
+    composerBottomSpacing,
     panelOpen,
     panelOpenRef,
     panelHeight,

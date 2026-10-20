@@ -35,6 +35,8 @@ import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { DmComposer } from '@/components/dm/DmComposer';
+import { EmojiPicker } from '@/components/chat/EmojiPicker';
+import type { ChatComposerHandle } from '@/components/chat/ChatInput';
 import { DmReportModal } from '@/components/dm/DmReportModal';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
@@ -223,6 +225,7 @@ export default function DmThreadScreen() {
   const initialScrollDoneRef = useRef(false);
   const atBottomRef = useRef(true);
   const listRef = useRef<FlatList<ThreadRow>>(null);
+  const dmComposerRef = useRef<ChatComposerHandle>(null);
   const rowsRef = useRef<ThreadRow[]>([]);
   const reactionIntentRef = useRef(new Map<string, ReactionIntent>());
   const catchUpDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1196,6 +1199,15 @@ export default function DmThreadScreen() {
             ) : null}
           </View>
 
+          {/* Screen-level mount so the panel's native bounds are hit-testable. */}
+          <EmojiPicker
+            onSelect={(emoji) => dmComposerRef.current?.insertEmoji(emoji)}
+            height={imeLayout.panelHeight}
+            animatedStyle={imeLayout.panelStyle}
+            showContent
+            interactive={imeLayout.panelInteractive}
+          />
+
           <Animated.View
             pointerEvents="box-none"
             style={[styles.dmDock, imeLayout.dockStyle]}
@@ -1304,6 +1316,7 @@ export default function DmThreadScreen() {
               </View>
             ) : (
               <DmComposer
+                ref={dmComposerRef}
                 leadingAccessory={unstarted ? (
                   <View style={styles.preSendHint}>
                     <Feather name="info" size={12} color={colors.foregroundMuted} />
@@ -1327,8 +1340,14 @@ export default function DmThreadScreen() {
           </View>
           </Animated.View>
           </View>
-          {/* The safe-area strip sits outside the animated dock and the IME. */}
-          <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+          {/* The safe-area strip sits outside the animated dock and the IME; it
+              takes the panel's colour while the panel owns the bottom edge. */}
+          <View
+            style={{
+              height: insets.bottom,
+              backgroundColor: imeLayout.panelOpen ? colors.card : colors.background,
+            }}
+          />
         </>
       )}
 

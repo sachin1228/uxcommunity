@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,10 +14,9 @@ import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, userNameColor, type MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { useMemberMentions } from '@/hooks/useMemberMentions';
-import { CHAT_COMPOSER_BOTTOM_INSET, type ChatImeLayout } from '@/hooks/useChatImeLayout';
+import type { ChatImeLayout } from '@/hooks/useChatImeLayout';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
-import { EmojiPicker } from './EmojiPicker';
 import { MentionSuggestions } from './MentionSuggestions';
 
 export interface PendingImage {
@@ -52,7 +51,12 @@ interface Props {
   imeLayout: ChatImeLayout;
 }
 
-export function ChatInput({
+/** Caret-aware emoji insertion, used by the screen-level emoji panel. */
+export interface ChatComposerHandle {
+  insertEmoji: (emoji: string) => void;
+}
+
+export const ChatInput = forwardRef<ChatComposerHandle, Props>(function ChatInput({
   communityId,
   currentUserId,
   replyTo,
@@ -62,7 +66,7 @@ export function ChatInput({
   disabled,
   error,
   imeLayout,
-}: Props) {
+}: Props, ref) {
   const colors = useColors();
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
@@ -175,6 +179,8 @@ export function ChatInput({
     requestAnimationFrame(() => inputRef.current?.setSelection(caret, caret));
   }
 
+  useImperativeHandle(ref, () => ({ insertEmoji }));
+
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
@@ -201,12 +207,10 @@ export function ChatInput({
 
   return (
     <View style={styles.root}>
-      {/* The panel is a sibling of this stack, not a child of it, on purpose:
-          it stays mounted at zero height while the keyboard is up, and a 6pt
-          gap around a zero-height panel would show up as extra dead space
-          under the composer. Its gap travels inside its animated space
-          instead (see useChatImeLayout). */}
-      <View style={styles.stack} onLayout={imeLayout.onComposerStackLayout}>
+      <View
+        style={[styles.stack, { marginBottom: imeLayout.composerBottomSpacing }]}
+        onLayout={imeLayout.onComposerStackLayout}
+      >
         {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
         {/* ── @-mention picker — floats above the composer while typing ── */}
@@ -392,23 +396,13 @@ export function ChatInput({
           </Pressable>
         </View>
       </View>
-
-      {/* Keep one clipped panel mounted so the same dock can hand its space to
-          the system IME without mounting or removing children mid-swap. */}
-      <EmojiPicker
-        onSelect={insertEmoji}
-        height={imeLayout.panelHeight}
-        animatedStyle={imeLayout.panelStyle}
-        showContent
-        interactive={imeLayout.panelInteractive}
-      />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingTop: 2,
     position: 'relative',
     overflow: 'visible',
@@ -417,11 +411,6 @@ const styles = StyleSheet.create({
 /** Everything above the panel: reply/error/mention/composer rows. */
   stack: {
     gap: 6,
-    // The 8 dp strip lives *between* the composer and whatever is under it
-    // (the panel, or nothing when the panel is shut), never below the panel —
-    // that keeps the pill the same distance from the panel as from the
-    // keyboard and puts the panel's top edge exactly on the keyboard's.
-    marginBottom: CHAT_COMPOSER_BOTTOM_INSET,
   },
 
   box: {
@@ -439,7 +428,7 @@ const styles = StyleSheet.create({
   boxInner: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     paddingVertical: 5,
   },
 
@@ -454,7 +443,7 @@ const styles = StyleSheet.create({
   replyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 22,
+    borderRadius: 12,
     marginTop: 4,
     marginBottom: 2,
     marginHorizontal: 6,

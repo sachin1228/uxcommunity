@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -15,8 +15,7 @@ import { useColors } from '@/hooks/useColors';
 import { MAX_MESSAGE_CHARS } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
 import { prepareImageForUpload } from '@/lib/prepareImage';
-import { EmojiPicker } from '@/components/chat/EmojiPicker';
-import type { PendingImage } from '@/components/chat/ChatInput';
+import type { ChatComposerHandle, PendingImage } from '@/components/chat/ChatInput';
 import { CHAT_COMPOSER_BOTTOM_INSET, type ChatImeLayout } from '@/hooks/useChatImeLayout';
 
 /**
@@ -45,7 +44,7 @@ interface Props {
   imeLayout: ChatImeLayout;
 }
 
-export function DmComposer({
+export const DmComposer = forwardRef<ChatComposerHandle, Props>(function DmComposer({
   replyTo,
   onCancelReply,
   onSend,
@@ -54,7 +53,7 @@ export function DmComposer({
   error,
   leadingAccessory,
   imeLayout,
-}: Props) {
+}: Props, ref) {
   const colors = useColors();
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
@@ -122,6 +121,8 @@ export function DmComposer({
     onTypingChange(next);
     requestAnimationFrame(() => inputRef.current?.setSelection(caret, caret));
   }
+
+  useImperativeHandle(ref, () => ({ insertEmoji }));
 
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -300,17 +301,9 @@ export function DmComposer({
         </Pressable>
         </View>
       </View>
-
-      <EmojiPicker
-        onSelect={insertEmoji}
-        height={imeLayout.panelHeight}
-        animatedStyle={imeLayout.panelStyle}
-        showContent
-        interactive={imeLayout.panelInteractive}
-      />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { paddingHorizontal: 12, paddingTop: 2, position: 'relative', overflow: 'visible' },
@@ -342,7 +335,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
     borderLeftWidth: 3,
-    borderRadius: 22,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 7,
     marginBottom: 6,
