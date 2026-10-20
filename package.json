@@ -35,6 +35,7 @@
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts apps/web/lib/auth/signup-status.test.ts",
     "test:request-cache": "tsx --test apps/web/lib/request-cache.test.ts",
+    "test:load-risk-fixes": "tsx --test apps/web/lib/realtime/reconnect-safety.test.ts apps/web/lib/communities/event-realtime.test.ts apps/web/lib/navigation/community-prefetch.test.ts \"expo-app-standalone 3/lib/communityContentRealtime.test.ts\" \"expo-app-standalone 3/lib/realtimeCore.test.ts\"",
     "test:session-cache": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/session-cache.test.ts",
     "test:password": "tsx --test apps/web/lib/auth/password.test.ts",
     "test:dedupe": "tsx --test apps/web/lib/dedupe-fetch.test.ts apps/web/lib/navigation-guard.test.ts",
