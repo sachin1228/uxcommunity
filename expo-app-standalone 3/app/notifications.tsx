@@ -164,8 +164,8 @@ export default function NotificationsScreen() {
         router.push(`/community/${route.communityId}${query}`);
       } else if (route.kind === 'jobs') {
         router.push('/jobs');
-      } else if (route.kind === 'events') {
-        router.push('/events');
+      } else if (route.kind === 'feed') {
+        router.push('/(tabs)');
       }
     },
     [markRead, router],

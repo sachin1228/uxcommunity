@@ -205,7 +205,7 @@ test("a notification's href walks to the app route that can open it", () => {
     contentId: 'e-1',
   });
   assert.deepEqual(notificationHrefToRoute('/dashboard/jobs/j-1'), { kind: 'jobs' });
-  assert.deepEqual(notificationHrefToRoute('/dashboard/events/e-1'), { kind: 'events' });
+  assert.deepEqual(notificationHrefToRoute('/dashboard/events/e-1'), { kind: 'feed' });
 });
 
 test('an href the app cannot open is left alone', () => {

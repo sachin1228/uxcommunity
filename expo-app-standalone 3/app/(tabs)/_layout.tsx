@@ -54,21 +54,21 @@ function TabBarButton({
 function NativeTabLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="communities">
         <Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
         <Label>Chat</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="index">
+        <Icon sf={{ default: 'square.stack.3d.up', selected: 'square.stack.3d.up.fill' }} />
+        <Label>Feed</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="jobs">
         <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
         <Label>Jobs</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="events">
-        <Icon sf={{ default: 'calendar', selected: 'calendar' }} />
-        <Label>Events</Label>
+      <NativeTabs.Trigger name="explore">
+        <Icon sf={{ default: 'binoculars', selected: 'binoculars.fill' }} />
+        <Label>Explore</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} />
@@ -129,19 +129,6 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarButton: tabButton('/'),
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={28} />
-            ) : (
-              <Feather name="home" size={26} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="communities"
         options={{
           title: 'Chat',
@@ -151,6 +138,19 @@ function ClassicTabLayout() {
               <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={28} />
             ) : (
               <Feather name="message-circle" size={26} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Feed',
+          tabBarButton: tabButton('/'),
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="square.stack.3d.up" tintColor={color} size={28} />
+            ) : (
+              <Feather name="layers" size={26} color={color} />
             ),
         }}
       />
@@ -168,15 +168,15 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="events"
+        name="explore"
         options={{
-          title: 'Events',
-          tabBarButton: tabButton('/events'),
+          title: 'Explore',
+          tabBarButton: tabButton('/explore'),
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="calendar" tintColor={color} size={28} />
+              <SymbolView name="binoculars" tintColor={color} size={28} />
             ) : (
-              <Feather name="calendar" size={26} color={color} />
+              <Feather name="compass" size={26} color={color} />
             ),
         }}
       />

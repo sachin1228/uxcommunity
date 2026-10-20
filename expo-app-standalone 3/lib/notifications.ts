@@ -289,8 +289,8 @@ export type NotificationRoute =
       contentKind?: ContentKind;
       contentId?: string;
     }
-  /** A city event with no community of its own — the Events tab lists it. */
-  | { kind: 'events' }
+  /** A city event with no community of its own — the home feed lists it. */
+  | { kind: 'feed' }
   | { kind: 'jobs' }
   | { kind: 'none' };
 
@@ -320,7 +320,7 @@ export function notificationHrefToRoute(href: string): NotificationRoute {
     return { kind: 'community', communityId: id };
   }
 
-  if (section === 'events' && id) return { kind: 'events' };
+  if (section === 'events' && id) return { kind: 'feed' };
 
   if (section === 'jobs' && id) return { kind: 'jobs' };
 

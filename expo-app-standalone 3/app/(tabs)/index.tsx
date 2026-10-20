@@ -53,7 +53,7 @@ const TAB_META: Record<HomeFeedScope, { label: string; icon: FeatherName }> = {
   communities: { label: 'Your Communities', icon: 'lock' },
 };
 
-/** Tab order comes from the shared axis — the web switcher's order. */
+/** Tab order comes from the shared axis — Your Communities leads. */
 const TABS = HOME_FEED_TAB_SCOPES.map((key) => ({ key, ...TAB_META[key] }));
 
 /** The web feed's empty-state copy per source — the two tabs show disjoint posts. */

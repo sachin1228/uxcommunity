@@ -13,7 +13,7 @@
  * it; it is the feed the two tabs replace.
  */
 
-export const HOME_FEED_TAB_SCOPES = ['public', 'communities'] as const;
+export const HOME_FEED_TAB_SCOPES = ['communities', 'public'] as const;
 
 export type HomeFeedScope = (typeof HOME_FEED_TAB_SCOPES)[number];
 
