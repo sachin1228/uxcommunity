@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, { type AnimatedStyle } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 
 /**
@@ -95,6 +96,10 @@ export function EmojiPicker({
   interactive = true,
 }: Props) {
   const colors = useColors();
+  const [panelWidth, setPanelWidth] = useState(0);
+  const panelCornerRadius = Math.min(24, panelWidth / 2, height / 2);
+  const panelOutlineStrokeWidth = StyleSheet.hairlineWidth;
+  const panelOutlineCenterRadius = panelCornerRadius - panelOutlineStrokeWidth / 2;
 
   return (
     <Animated.View
@@ -105,6 +110,7 @@ export function EmojiPicker({
           renders a spacer under it — so the panel needs no bottom padding of
           its own. */}
       <View
+        onLayout={({ nativeEvent: { layout } }) => setPanelWidth(layout.width)}
         style={[
           styles.panel,
           {
@@ -148,13 +154,22 @@ export function EmojiPicker({
             </ScrollView>
           </>
         )}
-        <View
-          pointerEvents="none"
-          style={[
-            styles.secondTopRule,
-            { backgroundColor: '#6366F1' },
-          ]}
-        />
+        {panelWidth > 0 && panelOutlineCenterRadius > 0 && (
+          <Svg
+            pointerEvents="none"
+            width={panelWidth}
+            height={panelCornerRadius + panelOutlineStrokeWidth}
+            viewBox={`0 0 ${panelWidth} ${panelCornerRadius + panelOutlineStrokeWidth}`}
+            style={styles.panelOutline}
+          >
+            <Path
+              d={`M ${panelOutlineStrokeWidth / 2} ${panelCornerRadius} A ${panelOutlineCenterRadius} ${panelOutlineCenterRadius} 0 0 1 ${panelCornerRadius} ${panelOutlineStrokeWidth / 2} H ${panelWidth - panelCornerRadius} A ${panelOutlineCenterRadius} ${panelOutlineCenterRadius} 0 0 1 ${panelWidth - panelOutlineStrokeWidth / 2} ${panelCornerRadius}`}
+              fill="none"
+              stroke={colors.border}
+              strokeWidth={panelOutlineStrokeWidth}
+            />
+          </Svg>
+        )}
       </View>
     </Animated.View>
   );
@@ -166,17 +181,9 @@ const styles = StyleSheet.create({
    *  for the composer, and the wrapper grows down to the keyboard's top edge. */
   clip: { overflow: 'hidden' },
   belowComposer: { position: 'absolute', left: -8, right: -8, top: '100%' },
-  /** Subtle divider marks the top edge of the emoji panel, above its section title. */
-  panel: { height: 320, position: 'relative' },
-  secondTopRule: {
-    position: 'absolute',
-    // Keep the remaining indigo rule at its previous position.
-    top: StyleSheet.hairlineWidth * 7,
-    left: 0,
-    right: 0,
-    height: StyleSheet.hairlineWidth,
-    borderRadius: 22,
-  },
+  /** Holds a subtle border matching the community tab row separator. */
+  panel: { height: 320 },
+  panelOutline: { position: 'absolute', top: 0, left: 0 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   sectionTitle: {
