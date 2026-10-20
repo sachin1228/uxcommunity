@@ -4,14 +4,15 @@
 
 import type { NotificationType } from "./use-notifications";
 
-export type NotificationTab = "activity" | "events" | "jobs" | "other";
+export type NotificationTab = "likes" | "comments" | "events" | "jobs" | "other";
 
 /** Tab order and labels — the view supplies the icons. */
 export const NOTIFICATION_TABS: ReadonlyArray<{
   key: NotificationTab;
   label: string;
 }> = [
-  { key: "activity", label: "Likes and comments" },
+  { key: "likes", label: "Likes" },
+  { key: "comments", label: "Comments" },
   { key: "events", label: "Events" },
   { key: "jobs", label: "Jobs" },
   { key: "other", label: "Other" },
@@ -30,8 +31,9 @@ const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
 /**
  * Which types each tab renders.
  *
- * - `activity` — engagement on the user's own content: a like or a
- *   comment/reply anywhere in the thread under what they posted.
+ * - `likes` — likes on the user's own threads and resources.
+ * - `comments` — comments and replies anywhere in the thread under what the
+ *   user posted, on both threads and resources.
  * - `events` — everything about the user's events: RSVPs plus the
  *   comments/replies posted on them.
  * - `jobs` — the roles posted that match the member's profile: the poster
@@ -49,8 +51,8 @@ const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
  * invisible rather than leaking into a tab that did not ask for it.
  */
 const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
-  activity: new Set([
-    "thread_like",
+  likes: new Set(["thread_like"]),
+  comments: new Set([
     "thread_comment",
     "thread_reply",
     "resource_comment",
@@ -71,7 +73,8 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
 
 /** The tab a type renders under, or null while no tab claims it yet. */
 export function notificationTabFor(type: NotificationType): NotificationTab | null {
-  if (TAB_TYPES.activity.has(type)) return "activity";
+  if (TAB_TYPES.likes.has(type)) return "likes";
+  if (TAB_TYPES.comments.has(type)) return "comments";
   if (TAB_TYPES.events.has(type)) return "events";
   if (TAB_TYPES.jobs.has(type)) return "jobs";
   if (TAB_TYPES.other.has(type)) return "other";
@@ -89,18 +92,21 @@ export function notificationTabFor(type: NotificationType): NotificationTab | nu
 export function splitNotificationsByTab<
   T extends { type: NotificationType; read_at: string | null },
 >(items: readonly T[]): {
-  activity: T[];
+  likes: T[];
+  comments: T[];
   events: T[];
   jobs: T[];
   other: T[];
   unreadByTab: Record<NotificationTab, number>;
 } {
-  const activity: T[] = [];
+  const likes: T[] = [];
+  const comments: T[] = [];
   const events: T[] = [];
   const jobs: T[] = [];
   const other: T[] = [];
   const unreadByTab: Record<NotificationTab, number> = {
-    activity: 0,
+    likes: 0,
+    comments: 0,
     events: 0,
     jobs: 0,
     other: 0,
@@ -109,11 +115,19 @@ export function splitNotificationsByTab<
   for (const item of items) {
     const tab = notificationTabFor(item.type);
     if (!tab) continue;
-    (tab === "activity" ? activity : tab === "events" ? events : tab === "jobs" ? jobs : other).push(
-      item
-    );
+    const bucket =
+      tab === "likes"
+        ? likes
+        : tab === "comments"
+          ? comments
+          : tab === "events"
+            ? events
+            : tab === "jobs"
+              ? jobs
+              : other;
+    bucket.push(item);
     if (!item.read_at) unreadByTab[tab] += 1;
   }
 
-  return { activity, events, jobs, other, unreadByTab };
+  return { likes, comments, events, jobs, other, unreadByTab };
 }

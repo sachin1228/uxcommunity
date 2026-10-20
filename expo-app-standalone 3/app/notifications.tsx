@@ -31,7 +31,7 @@ import {
  * Notifications — the mobile reading of the web page at
  * /dashboard/notifications.
  *
- * Same feed, same four tabs, same empty states: the page the bell opens.
+ * Same feed, same five tabs, same empty states: the page the bell opens.
  * Rows mark themselves read on the tap (optimistically, like the web), then
  * open what they are about — a community's item, or the Jobs tab for a role
  * match. The web page's realtime sync is not here; the bell and this list
@@ -60,7 +60,8 @@ function iconFor(type: NotificationType): FeatherName {
 
 /** Tab key → its icon (the web's TAB_ICONS). Labels come from the shared module. */
 const TAB_ICONS: Record<NotificationTab, FeatherName> = {
-  activity: 'message-circle',
+  likes: 'heart',
+  comments: 'message-circle',
   events: 'calendar',
   jobs: 'briefcase',
   other: 'bell',
@@ -68,10 +69,15 @@ const TAB_ICONS: Record<NotificationTab, FeatherName> = {
 
 /** The per-tab empty states, verbatim from the web view. */
 const TAB_EMPTY: Record<NotificationTab, { icon: FeatherName; title: string; hint: string }> = {
-  activity: {
+  likes: {
+    icon: 'heart',
+    title: 'No likes yet',
+    hint: 'Likes on your threads and resources will appear here.',
+  },
+  comments: {
     icon: 'message-circle',
-    title: 'No likes or comments yet',
-    hint: 'Likes and comments on your threads and resources will appear here.',
+    title: 'No comments yet',
+    hint: 'Comments and replies on your threads and resources will appear here.',
   },
   events: {
     icon: 'calendar',
@@ -111,19 +117,28 @@ export default function NotificationsScreen() {
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
     useNotifications(user?.id, { autoMarkSeen: true });
 
-  const [tab, setTab] = useState<NotificationTab>('activity');
+  const [tab, setTab] = useState<NotificationTab>('likes');
   const [refreshing, setRefreshing] = useState(false);
 
   const hasUnread = unreadCount > 0;
 
   // Unread counts are derived from the loaded page — the server total
   // (unreadCount) is not split by type.
-  const { activity, events, jobs, other, unreadByTab } = useMemo(
+  const { likes, comments, events, jobs, other, unreadByTab } = useMemo(
     () => splitNotificationsByTab(notifications),
     [notifications],
   );
 
-  const visible = tab === 'activity' ? activity : tab === 'events' ? events : tab === 'jobs' ? jobs : other;
+  const visible =
+    tab === 'likes'
+      ? likes
+      : tab === 'comments'
+        ? comments
+        : tab === 'events'
+          ? events
+          : tab === 'jobs'
+            ? jobs
+            : other;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
