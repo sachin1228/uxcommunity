@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -41,6 +41,8 @@ interface Props {
   onLongPress: (event: ChatContentEvent) => void;
   /** Toggle/replace the current user's emoji reaction on this card. */
   onReaction: (event: ChatContentEvent, emoji: string) => void;
+  /** Opens the author's read-only member profile (avatar / header name tap). */
+  onAuthorPress?: (userId: string) => void;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -137,6 +139,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   onOpen,
   onLongPress,
   onReaction,
+  onAuthorPress,
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
@@ -146,6 +149,10 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   // The avatar must key off the real display name — "You" is only the label.
   const senderName = event.users?.name ?? 'Someone';
   const name = isOwn ? 'You' : senderName;
+
+  const handleAuthorPress = useCallback(() => {
+    onAuthorPress?.(event.user_id);
+  }, [event.user_id, onAuthorPress]);
 
   // Thumbnail precedence: real image > video poster > kind icon tile.
   const imageUrl = meta?.image_url ?? null;
@@ -209,11 +216,19 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
       {/* Avatar column — own notifications skip it, matching message bubbles */}
       {!isOwn && (
         <View style={styles.avatarCol}>
-          <PersonAvatar
-            name={senderName}
-            url={event.users?.avatar_url ?? null}
-            size={28}
-          />
+          <Pressable
+            onPress={handleAuthorPress}
+            disabled={!onAuthorPress}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${senderName}'s profile`}
+          >
+            <PersonAvatar
+              name={senderName}
+              url={event.users?.avatar_url ?? null}
+              size={28}
+            />
+          </Pressable>
         </View>
       )}
 
@@ -240,12 +255,20 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
               color={isOwn ? colors.chatOwnBubble : colors.surfaceRaised}
             />
 
-            {/* Header line — "You created a showcase" */}
+            {/* Header line — "You created a showcase". Someone else's name is
+                tappable and opens their profile, like the web card's Link. */}
             <Text style={[styles.header, { color: mutedColor }]}>
               {isOwn ? (
                 <Text style={styles.headerName}>{name}</Text>
               ) : (
-                <Text style={[styles.headerName, { color: userNameColor(event.user_id, colors) }]}>
+                <Text
+                  style={[styles.headerName, { color: userNameColor(event.user_id, colors) }]}
+                  onPress={handleAuthorPress}
+                  disabled={!onAuthorPress}
+                  suppressHighlighting
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${senderName}'s profile`}
+                >
                   {name}
                 </Text>
               )}
