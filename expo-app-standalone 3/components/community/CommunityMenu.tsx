@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
+  BackHandler,
   Pressable,
   StyleSheet,
   Text,
@@ -59,7 +59,7 @@ export interface CommunityMenuAnchor {
 
 interface Props {
   open: boolean;
-  /** Window coordinates of the ⋯ button, measured before opening. */
+  /** Position inside the chat screen — header height + right edge, both local. */
   anchor: CommunityMenuAnchor | null;
   /** Effective mute (forever OR a live timed deadline — see isCommunityMuted). */
   muted: boolean;
@@ -112,17 +112,20 @@ export function CommunityMenu({
     }
   };
 
-  if (!anchor) return null;
+  // No Modal, so Android's back button needs the same dismissal explicitly.
+  useEffect(() => {
+    if (!open) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!busy) onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [open, busy, onClose]);
+
+  if (!open || !anchor) return null;
 
   return (
-    // No statusBarTranslucent: on Android that window includes the status bar
-    // while measureInWindow excludes it, so the card sat one inset too high.
-    <Modal
-      transparent
-      animationType="fade"
-      visible={open}
-      onRequestClose={close}
-    >
+    <View style={styles.overlay} pointerEvents="box-none">
       <Pressable style={styles.backdrop} onPress={close}>
         <Pressable
           style={[
@@ -230,7 +233,7 @@ export function CommunityMenu({
           )}
         </Pressable>
       </Pressable>
-    </Modal>
+    </View>
   );
 }
 
@@ -294,6 +297,7 @@ function MenuRow({
 const styles = StyleSheet.create({
   // Transparent: the chat stays at full brightness behind the card, like the
   // WhatsApp menu, while the pressable layer catches the outside tap.
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   backdrop: { flex: 1 },
   card: {
     position: 'absolute',

@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
@@ -28,7 +27,7 @@ import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
-import { CommunityMenu, type CommunityConfirmAction, type CommunityMenuAnchor } from '@/components/community/CommunityMenu';
+import { CommunityMenu, type CommunityConfirmAction } from '@/components/community/CommunityMenu';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
@@ -338,9 +337,8 @@ export default function CommunityChat() {
   const [muteBusy, setMuteBusy] = useState(false);
   /** The header ⋯ menu — notifications, Delete chat, Exit community. */
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState<CommunityMenuAnchor | null>(null);
-  const menuButtonRef = useRef<View>(null);
-  const { width: windowWidth } = useWindowDimensions();
+  /** Bottom of the chat header, in the screen root's own coordinates. */
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   /**
    * The name line: verified/lock badges ride after the name only while the
@@ -501,21 +499,6 @@ export default function CommunityChat() {
     },
     [id, router, showToast],
   );
-
-  /**
-   * The ⋯ menu hangs under its button, WhatsApp-style: measure the button in
-   * window coordinates, then anchor the card's top-right to it. Runs from the
-   * press handler, so the header has always laid out by then.
-   */
-  const openCommunityMenu = useCallback(() => {
-    menuButtonRef.current?.measureInWindow((x, y, width, height) => {
-      setMenuAnchor({
-        top: y + height + 6,
-        right: Math.max(8, windowWidth - (x + width) - 4),
-      });
-      setMenuOpen(true);
-    });
-  }, [windowWidth]);
 
   const handleToastAction = useCallback(() => {
     const action = toast?.onAction;
@@ -1238,6 +1221,7 @@ export default function CommunityChat() {
 
       {/* The header stays outside the chat's keyboard-managed viewport. */}
       <View
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
         style={[
           styles.header,
           {
@@ -1356,8 +1340,7 @@ export default function CommunityChat() {
         {/* Community options — anchored under this button, WhatsApp-style:
             notifications (the old header bell), Delete chat, Exit community. */}
         <Pressable
-          ref={menuButtonRef}
-          onPress={openCommunityMenu}
+          onPress={() => setMenuOpen(true)}
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel="Community options"
@@ -1568,7 +1551,7 @@ export default function CommunityChat() {
       {/* Header ⋯ menu — anchored under the button */}
       <CommunityMenu
         open={menuOpen}
-        anchor={menuAnchor}
+        anchor={{ top: headerHeight + 6, right: 8 }}
         muted={muted}
         muteStateLabel={muteStateLabel}
         onClose={() => setMenuOpen(false)}
