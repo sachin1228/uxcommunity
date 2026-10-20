@@ -115,7 +115,7 @@ export function EmojiPicker({
           styles.panel,
           {
             height,
-            backgroundColor: colors.background,
+            backgroundColor: colors.card,
           },
         ]}
       >
