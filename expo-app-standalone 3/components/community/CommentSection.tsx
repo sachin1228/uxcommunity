@@ -578,6 +578,7 @@ export function CommentComposer({
         animatedStyle={imeLayout.panelStyle}
         showContent
         interactive={imeLayout.panelInteractive}
+        placement="inline"
       />
     </View>
   );

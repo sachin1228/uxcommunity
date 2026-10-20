@@ -22,7 +22,8 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ContentNotificationCard } from '@/components/chat/ContentNotificationCard';
 import { ContentActionsSheet } from '@/components/chat/ContentActionsSheet';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
-import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
+import { ChatInput, ChatComposerHandle, PendingImage } from '@/components/chat/ChatInput';
+import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
@@ -478,6 +479,7 @@ export default function CommunityChat() {
   const isOwnCommunity = !!ownerId && !!user?.id && ownerId === user.id;
 
   const listRef = useRef<FlatList<ChatRow>>(null);
+  const chatComposerRef = useRef<ChatComposerHandle>(null);
 
   /**
    * Inverted list (DM thread parity): data[0] is the newest row and native
@@ -1379,6 +1381,17 @@ export default function CommunityChat() {
               />
             </View>
 
+            {/* Mounted above the dock, anchored to the screen's bottom edge:
+                a panel laid out below the composer's own bounds cannot receive
+                touches on Android. */}
+            <EmojiPicker
+              onSelect={(emoji) => chatComposerRef.current?.insertEmoji(emoji)}
+              height={imeLayout.panelHeight}
+              animatedStyle={imeLayout.panelStyle}
+              showContent
+              interactive={imeLayout.panelInteractive}
+            />
+
             <Animated.View
               pointerEvents="box-none"
               style={[styles.chatDock, imeLayout.dockStyle]}
@@ -1402,6 +1415,7 @@ export default function CommunityChat() {
               </View>
 
               <ChatInput
+                ref={chatComposerRef}
                 communityId={id}
                 currentUserId={user?.id ?? ''}
                 replyTo={replyTo}

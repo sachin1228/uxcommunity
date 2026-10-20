@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -17,7 +17,6 @@ import { useMemberMentions } from '@/hooks/useMemberMentions';
 import type { ChatImeLayout } from '@/hooks/useChatImeLayout';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForUpload } from '@/lib/prepareImage';
-import { EmojiPicker } from './EmojiPicker';
 import { MentionSuggestions } from './MentionSuggestions';
 
 export interface PendingImage {
@@ -52,7 +51,12 @@ interface Props {
   imeLayout: ChatImeLayout;
 }
 
-export function ChatInput({
+/** Caret-aware emoji insertion, used by the screen-level emoji panel. */
+export interface ChatComposerHandle {
+  insertEmoji: (emoji: string) => void;
+}
+
+export const ChatInput = forwardRef<ChatComposerHandle, Props>(function ChatInput({
   communityId,
   currentUserId,
   replyTo,
@@ -62,7 +66,7 @@ export function ChatInput({
   disabled,
   error,
   imeLayout,
-}: Props) {
+}: Props, ref) {
   const colors = useColors();
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
@@ -175,6 +179,8 @@ export function ChatInput({
     requestAnimationFrame(() => inputRef.current?.setSelection(caret, caret));
   }
 
+  useImperativeHandle(ref, () => ({ insertEmoji }));
+
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
@@ -201,11 +207,6 @@ export function ChatInput({
 
   return (
     <View style={styles.root}>
-      {/* The panel is a sibling of this stack, not a child of it, on purpose:
-          it stays mounted at zero height while the keyboard is up, and a gap
-          around a zero-height panel would show up as extra dead space
-          under the composer. Its gap travels inside its animated space
-          instead (see useChatImeLayout). */}
       <View
         style={[styles.stack, { marginBottom: imeLayout.composerBottomSpacing }]}
         onLayout={imeLayout.onComposerStackLayout}
@@ -395,19 +396,9 @@ export function ChatInput({
           </Pressable>
         </View>
       </View>
-
-      {/* Keep one clipped panel mounted so the same dock can hand its space to
-          the system IME without mounting or removing children mid-swap. */}
-      <EmojiPicker
-        onSelect={insertEmoji}
-        height={imeLayout.panelHeight}
-        animatedStyle={imeLayout.panelStyle}
-        showContent
-        interactive={imeLayout.panelInteractive}
-      />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {

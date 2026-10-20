@@ -86,6 +86,12 @@ interface Props {
   showContent?: boolean;
   /** Ignore presses until the panel has finished opening. */
   interactive?: boolean;
+  /**
+   * `screen` anchors to the bottom edge of the mount's parent (chat screens
+   * mount it at dock level so Android can hit-test it). `inline` hangs the
+   * panel directly below its parent, for composers inside scrolling sheets.
+   */
+  placement?: 'screen' | 'inline';
 }
 
 export function EmojiPicker({
@@ -94,17 +100,16 @@ export function EmojiPicker({
   animatedStyle,
   showContent = true,
   interactive = true,
+  placement = 'screen',
 }: Props) {
   const colors = useColors();
   const [panelWidth, setPanelWidth] = useState(0);
-  const panelCornerRadius = Math.min(24, panelWidth / 2, height / 2);
-  const panelOutlineStrokeWidth = StyleSheet.hairlineWidth;
-  const panelOutlineCenterRadius = panelCornerRadius - panelOutlineStrokeWidth / 2;
+  const panelCornerRadius = Math.min(32, panelWidth / 2, height / 2);
 
   return (
     <Animated.View
       pointerEvents={interactive ? 'auto' : 'none'}
-      style={[styles.clip, styles.belowComposer, animatedStyle]}
+      style={[styles.clip, placement === 'screen' ? styles.anchorBottom : styles.belowComposer, animatedStyle]}
     >
       {/* The space below the chat already stops at the safe area — the screen
           renders a spacer under it — so the panel needs no bottom padding of
@@ -167,22 +172,6 @@ export function EmojiPicker({
             </ScrollView>
           </>
         )}
-        {panelWidth > 0 && panelOutlineCenterRadius > 0 && (
-          <Svg
-            pointerEvents="none"
-            width={panelWidth}
-            height={panelCornerRadius + panelOutlineStrokeWidth}
-            viewBox={`0 0 ${panelWidth} ${panelCornerRadius + panelOutlineStrokeWidth}`}
-            style={styles.panelOutline}
-          >
-            <Path
-              d={`M ${panelOutlineStrokeWidth / 2} ${panelCornerRadius} A ${panelOutlineCenterRadius} ${panelOutlineCenterRadius} 0 0 1 ${panelCornerRadius} ${panelOutlineStrokeWidth / 2} H ${panelWidth - panelCornerRadius} A ${panelOutlineCenterRadius} ${panelOutlineCenterRadius} 0 0 1 ${panelWidth - panelOutlineStrokeWidth / 2} ${panelCornerRadius}`}
-              fill="none"
-              stroke={colors.border}
-              strokeWidth={panelOutlineStrokeWidth}
-            />
-          </Svg>
-        )}
       </View>
     </Animated.View>
   );
@@ -190,14 +179,16 @@ export function EmojiPicker({
 
 const styles = StyleSheet.create({
   /** The animated space the panel occupies — it starts at zero height while the
-   *  keyboard still owns the strip. Its parent reserves the same vertical extent
-   *  for the composer, and the wrapper grows down to the keyboard's top edge. */
+   *  keyboard still owns the strip, then grows upward from the screen's bottom
+   *  edge to the keyboard's height. */
   clip: { overflow: 'hidden' },
+  /** Anchored to the bottom of the screen-level dock area rather than inside
+   *  the composer: a child laid out below its parent's native bounds never
+   *  receives touches on Android, which makes the panel unable to scroll. */
+  anchorBottom: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   belowComposer: { position: 'absolute', left: -8, right: -8, top: '100%' },
-  /** Holds a subtle border matching the community tab row separator. */
   panel: { height: 320, position: 'relative' },
   panelBackground: { position: 'absolute', top: 0, left: 0 },
-  panelOutline: { position: 'absolute', top: 2, left: 0 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   sectionTitle: {
