@@ -3,8 +3,12 @@ import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
-import { Community } from '@/lib/communities';
-import { formatLastMessagePreview } from '@/lib/communityPreview';
+import { Community, LastContent } from '@/lib/communities';
+import {
+  contentIsNewerThanLastMessage,
+  formatContentPreview,
+  formatLastMessagePreview,
+} from '@/lib/communityPreview';
 import { isCommunityMuted } from '@/lib/communityMute';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
@@ -149,10 +153,15 @@ function formatTime(iso: string): string {
 
 function previewText(
   community: Community,
-  typingLabel: string | null
+  typingLabel: string | null,
+  lastContent: LastContent | null,
 ): { text: string; prefix?: string } {
   // Typing takes priority — handled separately via TypingDots
   if (typingLabel) return { text: typingLabel };
+
+  // Content notification: "John: created a thread" — newest activity wins,
+  // mirroring the web sidebar and the chat timeline's card for the same event.
+  if (lastContent) return formatContentPreview(lastContent);
 
   // Reaction: "<Name> reacted 👍 to: <preview>"
   if (community.lastReaction) {
@@ -178,15 +187,30 @@ function previewText(
 export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) {
   const colors = useColors();
 
-  const lastTime =
-    community.lastReaction?.createdAt ??
-    community.last_message?.created_at ??
-    community.joined_at;
+  // A content item newer than the newest message takes over the preview line
+  // ("John: created a thread"); older ones leave the message preview alone.
+  const lastContent =
+    community.last_content &&
+    contentIsNewerThanLastMessage(community.last_content, community)
+      ? community.last_content
+      : null;
+
+  const contentAt = lastContent?.created_at;
+  const messageAt = community.last_message?.created_at;
+  // Match the preview's priority: the timestamp belongs to whatever the row is
+  // actually showing, so a content card never sits beside an older message time.
+  const lastTime = lastContent
+    ? contentAt ?? community.joined_at
+    : community.lastReaction?.createdAt ?? messageAt ?? community.joined_at;
 
   const isTyping = !!typingLabel;
-  const { text, prefix } = previewText(community, typingLabel);
+  const { text, prefix } = previewText(community, typingLabel, lastContent);
 
-  const hasUnread = community.unread_count > 0;
+  // The badge counts messages plus unread content created by others — the
+  // same total web's sidebar renders.
+  const unreadCount =
+    (community.unread_count ?? 0) + (community.unread_content_count ?? 0);
+  const hasUnread = unreadCount > 0;
   // Timed mutes lapse on their own without the row being rewritten, so the
   // mark is computed from the deadline against the list's clock.
   const isMuted = isCommunityMuted(community, nowMs);
@@ -318,7 +342,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
           {hasUnread && (
             <View style={[styles.badge, { backgroundColor: colors.success }]}>
               <Text style={[styles.badgeText, { color: colors.successForeground }]}>
-                {community.unread_count > 99 ? '99+' : community.unread_count}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </Text>
             </View>
           )}

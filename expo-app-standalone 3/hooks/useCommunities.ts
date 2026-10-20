@@ -29,9 +29,13 @@ import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
 import { selectLiveCommunityIds } from '@/lib/realtimeWindow';
 import { createNameCache } from '@/lib/nameCache';
-import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
+import { getCommunities, markRead, Community, LastContent, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { bubbleToTop, expiredPinIds, sortByLastActivity } from '@/lib/sidebarOrder';
+import { mergeContentActivity } from '@/lib/sidebarMerge';
+import { scheduleMarkRead } from '@/lib/readManager';
+import { patchCachedBootstrapContentEvents } from '@/lib/communityBootstrap';
+import { subscribeContentEvents } from '@/lib/contentEventMirror';
 import { apiFetch } from '@/lib/api';
 import { setAppBadgeCountAsync } from '@/lib/push';
 import { syncBadgeFromServer } from '@/lib/notificationSettings';
@@ -90,6 +94,20 @@ export function useCommunities() {
   const reconcileRef   = useRef(false);
   /** Latest visible list, so markCommunityRead can sum unread without a re-render. */
   const communitiesRef = useRef<Community[]>([]);
+  /**
+   * The last content insert this device applied, keyed by community. A list
+   * fetch that BEGAN before that insert cannot be authoritative about it (its
+   * snapshot predates the row), so reconcile keeps the local card. Anything
+   * applied before the fetch began is discarded if the server no longer has
+   * it — that is how a thread deleted while the socket was down disappears.
+   */
+  const contentAppliedRef = useRef(new Map<string, { id: string; generation: number }>());
+  /**
+   * Bumped when a reconcile starts. An insert stamped with the current
+   * generation landed while that fetch was in flight; an older stamp (or no
+   * stamp) predates it and the server snapshot is authoritative.
+   */
+  const reconcileGenerationRef = useRef(0);
   const typingMapRef   = useRef<Map<string, Map<string, { name: string; lastSeen: number }>>>(new Map());
 
   // ── Name resolution ────────────────────────────────────────────────────────
@@ -121,6 +139,7 @@ export function useCommunities() {
   const reconcile = useCallback(async () => {
     if (reconcileRef.current) return;
     reconcileRef.current = true;
+    const generation = ++reconcileGenerationRef.current;
     try {
       const fresh = await getCommunities();
       setCommunities((prev) => {
@@ -129,12 +148,24 @@ export function useCommunities() {
         const merged = fresh.map((server) => {
           const local = prevMap.get(server.id);
           if (!local) return server;
+          // The server snapshot is authoritative about what still exists. Keep
+          // a local content preview only when this device applied it AFTER the
+          // fetch began — then the snapshot simply predates it. Anything older
+          // (a thread deleted while the socket was down) goes with the server.
+          const { lastContent, unreadContentCount } = mergeContentActivity(
+            local,
+            server,
+            contentAppliedRef.current.get(server.id),
+            generation,
+          );
           return {
             ...server,
             unread_count:
               server.id === activeId
                 ? 0
                 : Math.max(server.unread_count, local.unread_count),
+            unread_content_count: server.id === activeId ? 0 : unreadContentCount,
+            last_content: lastContent,
           };
         });
         return sortByLastActivity(merged);
@@ -348,6 +379,138 @@ export function useCommunities() {
                   },
                 };
               })
+            );
+          }),
+        );
+
+        // ── Content notifications (threads / showcase / resources / events) ──
+        // The chat room carries one topic per create/delete for every kind.
+        // A creation raises the row's unread total (server calls this
+        // unread_content_count) and takes over the preview line — "john
+        // created a thread" — exactly like the chat timeline's card.
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'content-insert', (data) => {
+            const row = data as {
+              id?: string;
+              community_id?: string;
+              user_id?: string;
+              kind?: LastContent['kind'];
+              created_at?: string;
+            };
+            if (!row.id || !row.community_id || !row.user_id || !row.kind || !row.created_at) return;
+            // An event's creation is also published to its group-chat room,
+            // but the card belongs to the source community's row — update by
+            // the payload's scope, exactly like the web sidebar.
+            const targetCommunityId = row.community_id;
+
+            const insertId = row.id;
+            const insertUserId = row.user_id;
+            const insertKind = row.kind;
+            const insertCreatedAt = row.created_at;
+            const isOwn = insertUserId === user?.id;
+            const isActive = communityStore.activeCommunityId === targetCommunityId;
+
+            // While the member is looking at this community, the card is
+            // already in front of them — clear the server-side content unread
+            // instead of letting it resurface after they leave (web parity).
+            if (!isOwn && isActive) {
+              scheduleMarkRead(targetCommunityId, { patch: markRead });
+            }
+
+            const commitContent = (firstName: string | null) => {
+              const lastContent: LastContent = {
+                id: insertId,
+                kind: insertKind,
+                created_at: insertCreatedAt,
+                isOwn,
+                firstName: isOwn ? 'You' : firstName,
+              };
+              contentAppliedRef.current.set(targetCommunityId, {
+                id: insertId,
+                generation: reconcileGenerationRef.current,
+              });
+              setCommunities((prev) => {
+                const patched = prev.map((c) => {
+                  if (c.id !== targetCommunityId) return c;
+                  const previewIsNewer =
+                    !c.last_content || insertCreatedAt >= c.last_content.created_at;
+                  return {
+                    ...c,
+                    is_archived: false,
+                    last_content: previewIsNewer ? lastContent : c.last_content,
+                    // Count each item once — a duplicate echo or a room
+                    // reconnect must not inflate the badge.
+                    unread_content_count:
+                      !isOwn && !isActive && c.last_content?.id !== insertId
+                        ? (c.unread_content_count ?? 0) + 1
+                        : c.unread_content_count ?? 0,
+                  };
+                });
+                return bubbleToTop(patched, targetCommunityId);
+              });
+            };
+
+            if (isOwn) {
+              commitContent(null);
+              return;
+            }
+            // Resolve the author before painting so the preview never flashes
+            // "Someone created a thread" and then rewrites itself.
+            const knownName = resolvedNames.current.get(insertUserId) ?? null;
+            if (knownName) {
+              commitContent(knownName.split(' ')[0]);
+              return;
+            }
+            resolveName(targetCommunityId, insertUserId).then((name) => {
+              if (name) resolvedNames.current.set(insertUserId, name);
+              commitContent(name?.split(' ')[0] ?? null);
+            });
+          }),
+        );
+
+        // ── Content removed (thread deleted, post/resource/event removed) ────
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'content-delete', (data) => {
+            const row = data as {
+              id?: string;
+              community_id?: string;
+              kind?: LastContent['kind'];
+            };
+            if (!row.id) return;
+            const deleteId = row.id;
+            const targetCommunityId = row.community_id ?? cid;
+            const eventGone = row.kind === 'event';
+            // The chat's bootstrap window is reused for 15 minutes — keep it
+            // in step even when the chat screen is closed, so a deleted
+            // thread's "created a thread" card cannot reappear on re-entry.
+            patchCachedBootstrapContentEvents(targetCommunityId, {
+              kind: 'delete',
+              id: deleteId,
+            });
+            setCommunities((prev) =>
+              prev.map((c) => {
+                if (c.id !== targetCommunityId) return c;
+                const clearsPreview = c.last_content?.id === deleteId;
+                // Only content created by someone else raised the badge; a
+                // preview showing the member's own item never incremented it.
+                const wasUnread = clearsPreview && !c.last_content?.isOwn;
+                // Nothing about this row changed — hand back the same object.
+                if (!eventGone && !clearsPreview) return c;
+                return {
+                  ...c,
+                  ...(eventGone
+                    ? { event_date: null, pinned_until: null, event_end: null }
+                    : null),
+                  ...(clearsPreview
+                    ? {
+                        last_content: null,
+                        unread_content_count: wasUnread
+                          ? Math.max(0, (c.unread_content_count ?? 0) - 1)
+                          : c.unread_content_count ?? 0,
+                      }
+                    : null),
+                };
+              }),
             );
           }),
         );
@@ -589,6 +752,66 @@ export function useCommunities() {
     [load],
   );
 
+  // Content created or deleted from the community's own tabs mirrors into the
+  // list in the same frame — without it the "john created a thread" preview
+  // and badge would wait for the realtime echo (or survive it, if the socket
+  // happened to be down). The echo dedupes by content id, so both paths are
+  // safe to apply.
+  useEffect(
+    () =>
+      subscribeContentEvents((change) => {
+        if (change.kind === 'insert') {
+          const event = change.event;
+          contentAppliedRef.current.set(change.communityId, {
+            id: event.id,
+            generation: reconcileGenerationRef.current,
+          });
+          setCommunities((prev) =>
+            bubbleToTop(
+              prev.map((c) => {
+                if (c.id !== change.communityId) return c;
+                const lastContent: LastContent = {
+                  id: event.id,
+                  kind: event.kind,
+                  created_at: event.created_at,
+                  // This channel only carries the current member's mutations.
+                  isOwn: true,
+                  firstName: 'You',
+                };
+                return { ...c, is_archived: false, last_content: lastContent };
+              }),
+              change.communityId,
+            ),
+          );
+          return;
+        }
+
+        setCommunities((prev) =>
+          prev.map((c) => {
+            const eventGone = change.contentKind === 'event';
+            const clearsPreview = c.last_content?.id === change.id;
+            if (c.id !== change.communityId || (!eventGone && !clearsPreview)) return c;
+            const wasUnread = clearsPreview && !c.last_content?.isOwn;
+            return {
+              ...c,
+              ...(eventGone
+                ? { event_date: null, pinned_until: null, event_end: null }
+                : null),
+              ...(clearsPreview
+                ? {
+                    last_content: null,
+                    unread_content_count: wasUnread
+                      ? Math.max(0, (c.unread_content_count ?? 0) - 1)
+                      : c.unread_content_count ?? 0,
+                  }
+                : null),
+            };
+          }),
+        );
+      }),
+    [],
+  );
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   /**
@@ -604,11 +827,19 @@ export function useCommunities() {
   const markCommunityRead = useCallback((communityId: string) => {
     communityStore.activeCommunityId = communityId;
     setCommunities((prev) =>
-      prev.map((c) => (c.id === communityId ? { ...c, unread_count: 0 } : c))
+      prev.map((c) =>
+        c.id === communityId
+          ? { ...c, unread_count: 0, unread_content_count: 0 }
+          : c,
+      )
     );
 
     const remaining = communitiesRef.current.reduce(
-      (sum, c) => sum + (c.id === communityId ? 0 : c.unread_count ?? 0),
+      (sum, c) =>
+        sum +
+        (c.id === communityId
+          ? 0
+          : (c.unread_count ?? 0) + (c.unread_content_count ?? 0)),
       0
     );
     void setAppBadgeCountAsync(remaining);

@@ -20,8 +20,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
-import { getMemberBrief } from '@/lib/communities';
-import { fetchCommunityBootstrap } from '@/lib/communityBootstrap';
+import { getMemberBrief, markRead } from '@/lib/communities';
+import {
+  fetchCommunityBootstrap,
+  patchCachedBootstrapContentEvents,
+} from '@/lib/communityBootstrap';
+import { scheduleMarkRead } from '@/lib/readManager';
 import { chatCache } from '@/lib/chatCacheStore';
 import { applyReactionDelete, applyReactionInsert, type Reaction } from '@/lib/chat';
 import {
@@ -214,6 +218,15 @@ export function useChatContentEvents(communityId: string) {
           reactions: [],
           users,
         };
+        // The shared bootstrap is reused for 15 minutes: fold the live card
+        // into it so leaving and re-entering the chat inside that window does
+        // not paint the fetch-time snapshot and lose this card.
+        patchCachedBootstrapContentEvents(communityId, { kind: 'insert', event });
+        if (row.user_id !== user.id) {
+          // The member has the card in front of them — clear the server-side
+          // content unread instead of letting it resurface after they leave.
+          scheduleMarkRead(communityId, { patch: markRead });
+        }
         setEvents((prev) => {
           // The creator's own mirror insert (or a duplicate echo) already has it.
           if (prev.some((entry) => entry.id === event.id)) return prev;
@@ -227,6 +240,9 @@ export function useChatContentEvents(communityId: string) {
       realtimeClient.on(room, 'content-delete', (data) => {
         const row = data as { id?: string };
         if (!row.id) return;
+        // Drop it from the shared bootstrap as well — otherwise re-entering
+        // the chat inside its 15-minute window resurrects the deleted card.
+        patchCachedBootstrapContentEvents(communityId, { kind: 'delete', id: row.id });
         setEvents((prev) => prev.filter((event) => event.id !== row.id));
       }),
     );

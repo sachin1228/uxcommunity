@@ -156,16 +156,14 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
       ? RESOURCE_TILE_ICON[meta.resource_type] ?? KIND_ICON.resource
       : KIND_ICON[event.kind];
 
-  // Subtitle line under the title — kind-dependent. Thread bodies store their
-  // whole text in `title`, so split headline vs body. A showcase card shows
-  // only the work's title (clamped to two lines) — the header already names
-  // the kind, and a split body would read as a second, competing line.
+  // Subtitle line under the title — kind-dependent. Thread and showcase bodies
+  // store their whole text in `title`, so the card keeps the headline only:
+  // their later paragraphs are the item's body, not a card preview, and a
+  // second muted paragraph made the compact chat row too tall.
   let title = event.title;
   let subtitle: string | null = null;
-  if (event.kind === 'thread') {
-    const split = splitBody(event.title);
-    title = split.title;
-    subtitle = split.subtitle;
+  if (event.kind === 'thread' || event.kind === 'showcase') {
+    title = splitBody(event.title).title;
   } else if (event.kind === 'event') {
     subtitle = meta?.event_date ? fmtEventSchedule(meta.event_date) : null;
   } else if (event.kind === 'resource') {
