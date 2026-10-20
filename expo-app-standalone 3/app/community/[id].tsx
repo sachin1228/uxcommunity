@@ -4,11 +4,11 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
@@ -28,14 +28,12 @@ import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
-import { CommunityActionsSheet, type CommunityConfirmAction } from '@/components/community/CommunityActionsSheet';
-import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
+import { CommunityMenu, type CommunityConfirmAction, type CommunityMenuAnchor } from '@/components/community/CommunityMenu';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
-import { ContentIcon } from '@/components/chat/ContentIcons';
 import {
   archiveCommunity,
   leaveCommunity,
@@ -70,12 +68,12 @@ import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
-import { CommunityInfoView } from '@/components/community/CommunityInfoView';
+import { CommunityInfoView, type CommunityInfoCommunity } from '@/components/community/CommunityInfoView';
 import { isContentKind, type CommunityTab, type ContentKind } from '@/lib/communityContent';
 
 /** FlatList row: a day divider, the unread marker, the retention notice, a message, or a "created a …" card. */
@@ -100,6 +98,8 @@ export default function CommunityChat() {
     id,
     name,
     image,
+    type: typeParam,
+    private: privateParam,
     tabs: enabledTabsParam,
     showcase: showcaseParam,
     owner: ownerParam,
@@ -112,6 +112,8 @@ export default function CommunityChat() {
     id: string;
     name: string;
     image?: string;
+    type?: string;
+    private?: string;
     tabs?: string;
     showcase?: string;
     owner?: string;
@@ -135,11 +137,28 @@ export default function CommunityChat() {
   /**
    * Every open resolves the community from the signed-in member's list — not
    * just push deep-links, where the route can only carry the id. The header's
-   * bell menu, name badges and event tile read the live community object
+   * ⋯ menu, name badges and event tile read the live community object
    * (mute state, event dates), while the route params only carry the display
    * snapshot taken when the list row was tapped.
    */
   const [resolved, setResolved] = useState<Community | null>(null);
+  /**
+   * The info screen's hero paints before the list lookup returns — it reads
+   * the same route snapshot the header uses (name, image, count, badges), and
+   * the id lets its own detail/roster/rules requests start right away.
+   */
+  const routeCommunity = useMemo<CommunityInfoCommunity | null>(() => {
+    if (!name) return null;
+    const count = members ? Number(members) : NaN;
+    return {
+      id,
+      name: decodeURIComponent(name),
+      image_url: image ? decodeURIComponent(image) : null,
+      type: typeParam ? decodeURIComponent(typeParam) : undefined,
+      is_private: privateParam === undefined ? undefined : privateParam === '1',
+      member_count: Number.isFinite(count) ? count : null,
+    };
+  }, [id, name, image, typeParam, privateParam, members]);
   /** Detail-route fallback for the header count when the list lacks the row. */
   const [detailMemberCount, setDetailMemberCount] = useState<number | null>(null);
   const [memberCountLoading, setMemberCountLoading] = useState(true);
@@ -315,11 +334,30 @@ export default function CommunityChat() {
     setActiveTab(contentKind);
   }, [contentKind, contentId]);
 
-  /** The header bell's mute dropdown state. */
-  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  /** The mute duration save in flight. */
   const [muteBusy, setMuteBusy] = useState(false);
-  /** The header ⋯ options (Delete chat / Exit community). */
-  const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
+  /** The header ⋯ menu — notifications, Delete chat, Exit community. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<CommunityMenuAnchor | null>(null);
+  const menuButtonRef = useRef<View>(null);
+  const { width: windowWidth } = useWindowDimensions();
+
+  /**
+   * The name line: verified/lock badges ride after the name only while the
+   * whole title still fits. A long name takes the line alone and ellipsizes —
+   * the badges would otherwise sit stranded after the ellipsis and eat space
+   * the name needs. Measured once the header lays out: the intrinsic name
+   * width (hidden single-line copy) against the header center's width.
+   */
+  const [headerCenterWidth, setHeaderCenterWidth] = useState<number | null>(null);
+  const [nameWidth, setNameWidth] = useState<number | null>(null);
+  const [badgesWidth, setBadgesWidth] = useState<number | null>(null);
+  const showNameBadges =
+    headerCenterWidth === null || nameWidth === null || badgesWidth === null
+      ? true
+      : // 48 = the 40px avatar + 8px gap before the title block;
+        // 5 = headerTitleRow's gap.
+        nameWidth + 5 + badgesWidth <= headerCenterWidth - 48;
 
   /**
    * The screen's toast — Web-parity notices like "Chat muted" (with Undo),
@@ -407,7 +445,6 @@ export default function CommunityChat() {
             },
           });
         }
-        setMuteSheetOpen(false);
         return true;
       } catch {
         if (reportFailure) {
@@ -457,7 +494,6 @@ export default function CommunityChat() {
         communityStore.notifyCommunityChanged({ kind: 'remove', communityId: id });
         communityStore.activeCommunityId = null;
       }
-      setActionsSheetOpen(false);
       // Back to the communities list, like the web dialog's push to the
       // dashboard (a deep-linked screen has no back stack — replace instead).
       if (router.canGoBack()) router.back();
@@ -465,6 +501,21 @@ export default function CommunityChat() {
     },
     [id, router, showToast],
   );
+
+  /**
+   * The ⋯ menu hangs under its button, WhatsApp-style: measure the button in
+   * window coordinates, then anchor the card's top-right to it. Runs from the
+   * press handler, so the header has always laid out by then.
+   */
+  const openCommunityMenu = useCallback(() => {
+    menuButtonRef.current?.measureInWindow((x, y, width, height) => {
+      setMenuAnchor({
+        top: y + height + 6,
+        right: Math.max(8, windowWidth - (x + width) - 4),
+      });
+      setMenuOpen(true);
+    });
+  }, [windowWidth]);
 
   const handleToastAction = useCallback(() => {
     const action = toast?.onAction;
@@ -1051,6 +1102,11 @@ export default function CommunityChat() {
   }, [hasMore, isLoadingMore, loadMore]);
 
   const communityName = name ? decodeURIComponent(name) : resolved?.name ?? 'Community';
+  // Route params carry the list row's snapshot so the name's badges paint on
+  // the first frame; the resolved row then has the last word.
+  const badgeType = resolved?.type ?? (typeParam ? decodeURIComponent(typeParam) : undefined);
+  const badgeIsPrivate =
+    resolved?.is_private ?? (privateParam === undefined ? undefined : privateParam === '1');
   const communityImage = image
     ? decodeURIComponent(image)
     : resolved?.image_url ?? null;
@@ -1190,13 +1246,9 @@ export default function CommunityChat() {
           },
         ]}
       >
-        {/* Android reaches back via the system gesture/button, so the chevron
-            only earns its space on iOS. */}
-        {Platform.OS === 'ios' ? (
-          <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </Pressable>
-        ) : null}
+        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
+        </Pressable>
 
         {/* Tapping the title area opens the community info screen, like
             WhatsApp's contact info (web parity: the right sidebar there). */}
@@ -1204,6 +1256,7 @@ export default function CommunityChat() {
           onPress={() => setInfoOpen(true)}
           accessibilityRole="button"
           accessibilityLabel={`${communityName} info`}
+          onLayout={(e) => setHeaderCenterWidth(e.nativeEvent.layout.width)}
           style={styles.headerCenter}
         >
           {/* An event's group chat wears its date here too — and says LIVE
@@ -1237,11 +1290,28 @@ export default function CommunityChat() {
               <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
                 {communityName}
               </Text>
-              <CommunityNameBadges
-                type={resolved?.type}
-                isPrivate={resolved?.is_private}
-                size={12}
-              />
+              {/* Invisible one-line copy: its width tells whether the real
+                  title has to ellipsize before the badges can join it. */}
+              <Text
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                pointerEvents="none"
+                numberOfLines={1}
+                onLayout={(e) => setNameWidth(e.nativeEvent.layout.width)}
+                style={[styles.headerTitle, styles.headerTitleMeasure]}
+              >
+                {communityName}
+              </Text>
+              {showNameBadges ? (
+                <View onLayout={(e) => setBadgesWidth(e.nativeEvent.layout.width)}>
+                  <CommunityNameBadges
+                    type={badgeType}
+                    isPrivate={badgeIsPrivate}
+                    size={12}
+                  />
+                </View>
+              ) : null}
             </View>
             {/* The web header's second line — how many members the room has,
                 and (once anyone is connected) how many are online now. The
@@ -1251,7 +1321,7 @@ export default function CommunityChat() {
             <View style={styles.headerMetaRow}>
               {memberCount !== null ? (
                 <View style={styles.headerMetaItem}>
-                  <ContentIcon name="users" size={10} color={colors.mutedForeground} />
+                  <Ionicons name="people" size={12} color={colors.mutedForeground} />
                   <Text style={[styles.headerMetaText, { color: colors.mutedForeground }]}>
                     {memberCount} member{memberCount === 1 ? '' : 's'}
                   </Text>
@@ -1283,35 +1353,11 @@ export default function CommunityChat() {
           </View>
         </Pressable>
 
-        {/* Notifications — its own control beside the ⋯ button rather than an
-            item inside it, like the web header: plain bell while notifications
-            are on, crossed bell while muted; the sheet carries the durations /
-            the off switch. */}
+        {/* Community options — anchored under this button, WhatsApp-style:
+            notifications (the old header bell), Delete chat, Exit community. */}
         <Pressable
-          onPress={() => setMuteSheetOpen(true)}
-          disabled={muteBusy}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={muted ? 'Unmute notifications' : 'Mute notifications'}
-          style={({ pressed }) => [
-            styles.headerIconBtn,
-            {
-              backgroundColor: pressed ? colors.surfaceRaised : 'transparent',
-              opacity: muteBusy ? 0.5 : 1,
-            },
-          ]}
-        >
-          <Feather
-            name={muted ? 'bell-off' : 'bell'}
-            size={18}
-            strokeWidth={2.5}
-            color={colors.mutedForeground}
-          />
-        </Pressable>
-
-        {/* Community options — Delete chat / Exit community. */}
-        <Pressable
-          onPress={() => setActionsSheetOpen(true)}
+          ref={menuButtonRef}
+          onPress={openCommunityMenu}
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel="Community options"
@@ -1359,10 +1405,11 @@ export default function CommunityChat() {
                 <View style={styles.tabInner}>
                   <CommunityTabIcon tab={tab.key} size={14} color={labelColor} />
                   <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
-                  {/* The dot slot is always laid out — only its visibility
-                      toggles — so clearing a dot (opening the tab) never
-                      shifts the label or the tabs beside it (web parity). */}
+                  {/* Absolute-positioned over the tab's padding: the dot is
+                      visible without reserving width, so no tab grows to
+                      make room for it. */}
                   <View
+                    pointerEvents="none"
                     accessible={showDot}
                     accessibilityLabel={showDot ? 'New' : undefined}
                     style={[styles.tabDot, !showDot && styles.tabDotHidden]}
@@ -1501,7 +1548,7 @@ export default function CommunityChat() {
           web right sidebar's content: members, about, rules) */}
       <CommunityInfoView
         visible={infoOpen}
-        community={resolved}
+        community={resolved ?? routeCommunity}
         onlineCount={onlineCount}
         onClose={() => setInfoOpen(false)}
       />
@@ -1518,24 +1565,18 @@ export default function CommunityChat() {
         onSave={handleSaveEdit}
       />
 
-      {/* Header bell menu — mute durations / unmute */}
-      <CommunityMuteSheet
-        open={muteSheetOpen}
+      {/* Header ⋯ menu — anchored under the button */}
+      <CommunityMenu
+        open={menuOpen}
+        anchor={menuAnchor}
         muted={muted}
         muteStateLabel={muteStateLabel}
-        busy={muteBusy}
-        onChoose={(duration) => {
+        onClose={() => setMenuOpen(false)}
+        onMute={(duration) => {
+          // The menu dismisses first; the toast reports the save.
+          setMenuOpen(false);
           void applyMute(duration);
         }}
-        onClose={() => {
-          if (!muteBusy) setMuteSheetOpen(false);
-        }}
-      />
-
-      {/* Header ⋯ menu — Delete chat / Exit community */}
-      <CommunityActionsSheet
-        open={actionsSheetOpen}
-        onClose={() => setActionsSheetOpen(false)}
         onConfirm={handleCommunityAction}
       />
     </View>
@@ -1593,6 +1634,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_500Medium',
   },
   tabDot: {
+    position: 'absolute',
+    right: -6,
+    top: '50%',
+    marginTop: -2,
     width: 4,
     height: 4,
     borderRadius: 2,
@@ -1650,6 +1695,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: 'Geist_600SemiBold',
     flexShrink: 1,
+  },
+  headerTitleMeasure: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    opacity: 0,
   },
   headerIconBtn: {
     width: 34,

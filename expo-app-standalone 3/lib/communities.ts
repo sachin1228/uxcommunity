@@ -473,6 +473,21 @@ export async function getCommunityMembers(
 }
 
 /**
+ * One page of a community's member roster. The server owns the page size
+ * (30 rows — see the web members route), so a screen only ever transfers what
+ * it shows instead of walking the whole membership.
+ */
+export async function getCommunityMembersPage(
+  communityId: string,
+  page = 0,
+): Promise<{ members: MentionCandidate[]; hasMore: boolean }> {
+  const { data } = await apiFetch<{ members?: MentionCandidate[]; has_more?: boolean }>(
+    `/api/communities/${communityId}/members?page=${page}`,
+  );
+  return { members: data.members ?? [], hasMore: data.has_more ?? false };
+}
+
+/**
  * Normalise MIME types to the subset the upload API accepts.
  * Android devices sometimes report non-standard variants (e.g. "image/jpg")
  * that would be rejected by the server's ALLOWED_TYPES check.
