@@ -1,6 +1,6 @@
 /**
  * Tests for the list ordering — ported from the web sidebar's
- * `sidebar-order.test.ts`, minus `last_content` (not yet carried on mobile).
+ * `sidebar-order.test.ts`, including the content-activity key.
  */
 
 import assert from 'node:assert/strict';
@@ -91,6 +91,46 @@ test('without pins the newest activity wins, falling back to joined_at', () => {
   assert.deepEqual(
     sortByLastActivity(list).map((c) => c.id),
     ['b', 'c', 'a'],
+  );
+});
+
+test('a newer content notification outranks the newest message', () => {
+  const list = [
+    community('Chatty', '2026-10-01T10:00:00Z', { id: 'm' }),
+    community('Thread room', null, {
+      id: 't',
+      last_content: {
+        id: 'thread-1',
+        kind: 'thread',
+        created_at: '2026-10-02T10:00:00Z',
+        isOwn: false,
+        firstName: 'john',
+      },
+    }),
+  ];
+  assert.deepEqual(
+    sortByLastActivity(list).map((c) => c.id),
+    ['t', 'm'],
+  );
+});
+
+test('a message newer than the content item keeps its row above it', () => {
+  const list = [
+    community('Thread room', '2026-10-02T10:00:00Z', {
+      id: 't',
+      last_content: {
+        id: 'thread-1',
+        kind: 'thread',
+        created_at: '2026-10-01T10:00:00Z',
+        isOwn: false,
+        firstName: 'john',
+      },
+    }),
+    community('Chatty', '2026-10-03T10:00:00Z', { id: 'm' }),
+  ];
+  assert.deepEqual(
+    sortByLastActivity(list).map((c) => c.id),
+    ['m', 't'],
   );
 });
 

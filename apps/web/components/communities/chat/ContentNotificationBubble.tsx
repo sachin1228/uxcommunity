@@ -34,7 +34,6 @@ import type { CachedContentEvent, ContentEventKind } from "@/lib/communities/cac
 import {
   CONTENT_TILE,
   KIND_THEME,
-  firstLine,
   fmtEventSchedule,
   prettyUrl,
   splitBody,
@@ -99,10 +98,11 @@ function withArticle(noun: string): string {
  * author's own blue bubble everything is white, matching the message text.
  */
 function Eyebrow({ event, isMe }: { event: CachedContentEvent; isMe: boolean }) {
-  // A thread's header already says "created a thread" — no second label.
-  // Threads normally render through ThreadNotificationBubble; this guard also
-  // covers a thread event that reaches the generic content card.
-  if (event.kind === "thread") return null;
+  // Thread and showcase headers already name the kind ("created a thread/
+  // showcase") — a second label would just repeat it. Threads normally render
+  // through ThreadNotificationBubble; this guard also covers a thread event
+  // that reaches the generic content card.
+  if (event.kind === "thread" || event.kind === "showcase") return null;
   const theme = KIND_THEME[event.kind];
   const Icon = KIND_ICON[event.kind];
   const resourceLabel = resourceTypeLabel(event.meta?.resource_type);
@@ -151,14 +151,14 @@ export function ContentNotificationBubble({
       ? (RESOURCE_TILE_ICON[meta.resource_type] ?? KIND_ICON.resource)
       : KIND_ICON[event.kind];
 
-  // Subtitle line under the title — kind-dependent. Thread and showcase
-  // bodies store their whole text in `title`, so split headline vs body.
+  // Title line under the header — kind-dependent. Thread and showcase bodies
+  // store their whole text in `title`, so the card keeps the headline only:
+  // their later paragraphs are the item's body, not a card preview, and a
+  // second muted paragraph made the compact chat row too tall.
   let title = event.title;
   let subtitle: string | null = null;
   if (event.kind === "thread" || event.kind === "showcase") {
-    const split = splitBody(event.title);
-    title = split.title;
-    subtitle = split.subtitle ?? (event.kind === "showcase" && meta?.description ? firstLine(meta.description, 80) : null);
+    title = splitBody(event.title).title;
   } else if (event.kind === "event") {
     // The chat card is often the first place a member meets an event, so the
     // time it shows names the zone it was read in — see event-display.

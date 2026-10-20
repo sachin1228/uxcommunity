@@ -1,7 +1,6 @@
 /**
  * The communities list's ordering, ported from the web sidebar's
- * `sidebar-order.ts` (minus `last_content`, which the mobile list does not
- * carry yet).
+ * `sidebar-order.ts`.
  *
  * An event's group chat rides at the top of the list until its event date.
  * Presence is the whole test, and stays that way: the server sends
@@ -13,7 +12,10 @@
 
 import type { Community } from './communities';
 
-type Orderable = Pick<Community, 'id' | 'name' | 'joined_at' | 'last_message' | 'pinned_until'>;
+type Orderable = Pick<
+  Community,
+  'id' | 'name' | 'joined_at' | 'last_message' | 'last_content' | 'pinned_until'
+>;
 
 export function isPinned(community: Pick<Community, 'pinned_until'>): boolean {
   return Boolean(community.pinned_until);
@@ -45,7 +47,11 @@ export function expiredPinIds(
 
 /** The newest of the row's own activity instants. */
 function activityAt(community: Orderable): string {
-  const times = [community.last_message?.created_at ?? '', community.joined_at ?? ''].sort();
+  const times = [
+    community.last_message?.created_at ?? '',
+    community.last_content?.created_at ?? '',
+    community.joined_at ?? '',
+  ].sort();
   return times[times.length - 1] ?? '';
 }
 
@@ -53,10 +59,10 @@ function activityAt(community: Orderable): string {
  * The single list ordering: pinned event chats first (newest membership first
  * among them, so creating an event or RSVP-ing to one puts that room at the
  * very top), then most recent activity, where activity is the newest of (last
- * message, join date). A freshly joined or created community floats to the
- * top regardless of how old its last message is. Ties fall back to the name —
- * the same canonical order as the web sidebar, so both clients show the same
- * list in the same sequence.
+ * message, last content, join date). A freshly joined or created community
+ * floats to the top regardless of how old its last message is. Ties fall back
+ * to the name — the same canonical order as the web sidebar, so both clients
+ * show the same list in the same sequence.
  */
 export function compareByRecentActivity(a: Orderable, b: Orderable): number {
   const aPinned = isPinned(a);

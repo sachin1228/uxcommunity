@@ -33,6 +33,22 @@ export interface LastReaction {
   messagePreview: string | null;
 }
 
+/**
+ * The newest thread/showcase post/resource/event in a community — the sidebar
+ * preview and unread-content signal (web `SidebarLastContent`). Unlike the
+ * last message it is the newest item regardless of read state, so an opened
+ * card still keeps the preview line.
+ */
+export interface LastContent {
+  id: string;
+  kind: ChatContentKind;
+  created_at: string;
+  /** True when the signed-in member is the author ("You created a …"). */
+  isOwn: boolean;
+  /** The author's first name, or null while unresolved. */
+  firstName: string | null;
+}
+
 export interface Community {
   id: string;
   name: string;
@@ -51,10 +67,14 @@ export interface Community {
   member_count: number;
   message_count: number;
   unread_count: number;
+  /** Unread threads/showcase posts/resources/events created by others. */
+  unread_content_count?: number;
   last_read_at: string | null;
   joined_at: string;
   is_archived: boolean;
   last_message: LastMessage | null;
+  /** The newest content item — previews "john created a thread" when newer. */
+  last_content?: LastContent | null;
   lastReaction: LastReaction | null;
   /** An event group chat's own event date — its DP wears it as a badge. */
   event_date?: string | null;
@@ -115,13 +135,19 @@ export interface Message {
 
 export async function getCommunities(): Promise<Community[]> {
   const { data } = await apiFetch<{ communities: Community[] }>('/api/communities');
-  // The API returns `message_count` as the server-computed unread count.
-  // Seed `unread_count` from it so the badge is correct on initial load and
-  // after background reconciliation. Realtime events then increment/zero it
-  // locally from this baseline.
+  // The API returns `message_count` as the server-computed unread-message
+  // count. Seed `unread_count` from it so the badge is correct on initial load
+  // and after background reconciliation. Realtime events then increment/zero
+  // it locally from this baseline.
+  //
+  // Content notifications (threads / showcase posts / resources / events)
+  // travel separately: `unread_content_count` raises the same badge, and
+  // `last_content` can take over the preview line — exactly like web.
   return data.communities.map((c) => ({
     ...c,
     unread_count: c.message_count ?? 0,
+    unread_content_count: c.unread_content_count ?? 0,
+    last_content: c.last_content ?? null,
   }));
 }
 

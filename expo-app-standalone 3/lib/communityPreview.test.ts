@@ -6,8 +6,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { LastMessage } from './communities';
-import { formatLastMessagePreview } from './communityPreview';
+import type { LastContent, LastMessage } from './communities';
+import {
+  contentIsNewerThanLastMessage,
+  formatContentPreview,
+  formatLastMessagePreview,
+} from './communityPreview';
 
 function message(overrides: Partial<LastMessage> = {}): LastMessage {
   return {
@@ -90,5 +94,65 @@ test('a deleted message never leaks its body', () => {
   assert.deepEqual(
     formatLastMessagePreview(message({ is_deleted: true })),
     { prefix: 'john', text: 'Message deleted' },
+  );
+});
+
+function content(overrides: Partial<LastContent> = {}): LastContent {
+  return {
+    id: 'c1',
+    kind: 'thread',
+    created_at: '2026-09-17T11:00:00Z',
+    isOwn: false,
+    firstName: 'john',
+    ...overrides,
+  };
+}
+
+test('content previews name the author and the kind', () => {
+  assert.deepEqual(formatContentPreview(content()), {
+    prefix: 'john',
+    text: 'created a thread',
+  });
+  assert.deepEqual(formatContentPreview(content({ kind: 'resource' })), {
+    prefix: 'john',
+    text: 'created a resource',
+  });
+});
+
+test('own content previews as You', () => {
+  assert.deepEqual(formatContentPreview(content({ isOwn: true, firstName: 'You' })), {
+    prefix: 'You',
+    text: 'created a thread',
+  });
+});
+
+test('an unresolved author previews as Someone', () => {
+  assert.deepEqual(formatContentPreview(content({ firstName: null })), {
+    prefix: 'Someone',
+    text: 'created a thread',
+  });
+});
+
+test('vowel kinds take an', () => {
+  assert.deepEqual(formatContentPreview(content({ kind: 'event' })), {
+    prefix: 'john',
+    text: 'created an event',
+  });
+});
+
+test('content takes the preview only while newer than the last message', () => {
+  assert.equal(
+    contentIsNewerThanLastMessage(
+      content({ created_at: '2026-09-17T11:00:00Z' }),
+      { last_message: message({ created_at: '2026-09-17T10:00:00Z' }) },
+    ),
+    true,
+  );
+  assert.equal(
+    contentIsNewerThanLastMessage(
+      content({ created_at: '2026-09-17T09:00:00Z' }),
+      { last_message: message({ created_at: '2026-09-17T10:00:00Z' }) },
+    ),
+    false,
   );
 });
