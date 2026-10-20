@@ -115,10 +115,11 @@ export function CommunityMenu({
   if (!anchor) return null;
 
   return (
+    // No statusBarTranslucent: on Android that window includes the status bar
+    // while measureInWindow excludes it, so the card sat one inset too high.
     <Modal
       transparent
       animationType="fade"
-      statusBarTranslucent
       visible={open}
       onRequestClose={close}
     >
