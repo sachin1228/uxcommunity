@@ -25,7 +25,7 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert, AppState, Linking, Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { apiFetch } from './api';
 import { communityStore } from './communityStore';
 
@@ -308,15 +308,53 @@ export async function ensureNotificationChannels(): Promise<void> {
   });
 }
 
+export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
+
+let permissionStatus: NotificationPermissionStatus = 'undetermined';
+const permissionListeners = new Set<(status: NotificationPermissionStatus) => void>();
+
+function setPermissionStatus(status: string): void {
+  const next: NotificationPermissionStatus =
+    status === 'granted' || status === 'denied' ? status : 'undetermined';
+  if (next === permissionStatus) return;
+  permissionStatus = next;
+  for (const listener of permissionListeners) listener(next);
+}
+
+/** Last known OS permission — seeded by registration, refreshed on focus. */
+export function getNotificationPermissionStatus(): NotificationPermissionStatus {
+  return permissionStatus;
+}
+
+/** Re-reads the OS permission (foreground, return from Settings). */
+export async function refreshNotificationPermissionStatus(): Promise<NotificationPermissionStatus> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    setPermissionStatus(status);
+  } catch {
+    /* keep the last known value */
+  }
+  return permissionStatus;
+}
+
+/** Subscribe to permission changes; returns the unsubscribe. */
+export function subscribeNotificationPermissionStatus(
+  listener: (status: NotificationPermissionStatus) => void,
+): () => void {
+  permissionListeners.add(listener);
+  return () => {
+    permissionListeners.delete(listener);
+  };
+}
+
 /**
  * Asks for notification permission and registers this device's Expo push
  * token with the API. Returns the token, or null when the member declined (or
  * anything else went wrong) — push is a nice-to-have, never a blocker. The
  * reason for a null is kept in the diagnostics for the settings screen.
  *
- * A member who dismisses the OS prompt with "Don't allow" gets an alert
- * pointing at Settings: once the system dialog is gone, nothing else in the
- * app would tell them why their alerts never arrive.
+ * Every status change is broadcast so the chat list's notification banner can
+ * offer a Settings shortcut after a denial without waiting for a refetch.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   try {
@@ -324,14 +362,11 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
     const existing = await Notifications.getPermissionsAsync();
     let status: string = existing.status;
-    let prompted = false;
     if (!isGranted(status)) {
       const requested = await Notifications.requestPermissionsAsync();
       status = requested.status;
-      // canAskAgain is false once the OS will auto-deny without a dialog, so
-      // only a prompt we could actually show deserves the settings nudge.
-      prompted = existing.status !== 'denied' || existing.canAskAgain;
     }
+    setPermissionStatus(status);
 
     diagnostics = { ...diagnostics, permission: status, checkedAt: Date.now() };
 
@@ -342,21 +377,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         error: 'Notifications are turned off for this app in system settings.',
       };
       await persistDiagnostics();
-      if (prompted) {
-        Alert.alert(
-          'Enable notifications',
-          'Notifications are off, so you won’t get message alerts or event reminders. Turn them on in Settings to receive them.',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                void Linking.openSettings().catch(() => {});
-              },
-            },
-          ],
-        );
-      }
       return null;
     }
 
