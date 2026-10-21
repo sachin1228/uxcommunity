@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Send } from "lucide-react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
+import { DmIcon } from "@/components/ui/DmIcon";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
 import { invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
 import { bumpConversationWithMessage } from "@/lib/direct-messages/client-cache";
@@ -884,7 +884,7 @@ export function DirectMessagesView({
           />
         ) : (
           <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <Send size={32} strokeWidth={1.75} className="text-foreground-muted/50" />
+            <DmIcon size={24} className="text-foreground-muted/50" />
             <p className="font-body text-sm text-foreground-muted">
               {hasConversations
                 ? "Select a conversation."
