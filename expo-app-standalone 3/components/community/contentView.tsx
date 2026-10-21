@@ -700,10 +700,10 @@ export function ContentCard({
   const isOwner = item.user_id === currentUserId;
 
   // The body text each kind puts on its card, mirroring the web cards: a thread
-  // shows its body (the whole post lives in `title` on the web) collapsed behind
-  // "Read more", an event shows its description above the ticket (its title is
-  // the ticket's own), a resource clamps its description to 3 lines, and a
-  // showcase title is never clamped.
+  // and a showcase show their body (the whole post lives in `title` on the web)
+  // collapsed behind "Read more", an event shows its description above the
+  // ticket (its title is the ticket's own), and a resource clamps its
+  // description to 3 lines.
   const primaryBody = resource
     ? resource.description || resource.title
     : kind === 'threads' && thread
@@ -711,7 +711,7 @@ export function ContentCard({
       : item.title;
   const secondaryBody = kind === 'events' ? item.description : null;
   const primaryLines =
-    kind === 'threads' ? collapsedBodyLines(kind, item)
+    kind === 'threads' || kind === 'showcase' ? collapsedBodyLines(kind, item)
       : kind === 'resources' ? 3
         : undefined;
   const pollState = thread?.poll ? actions.pollState(item) : null;
@@ -821,7 +821,7 @@ export function ContentCard({
             text={primaryBody}
             textStyle={styles.cardTitle}
             collapsedLines={primaryLines}
-            expandable={kind === 'threads'}
+            expandable={kind === 'threads' || kind === 'showcase' || kind === 'resources'}
           />
         )}
         {thread?.poll && pollState ? (
@@ -1170,7 +1170,7 @@ export function ContentDetail({
                   ticket — the title and schedule live inside it. */}
               {event.description?.trim() ? (
                 <Text style={[styles.detailThreadBody, { color: colors.foreground }]}>
-                  {event.description}
+                  {bodyWithLinks(event.description, colors.link)}
                 </Text>
               ) : null}
               <EventTicket
@@ -1195,11 +1195,14 @@ export function ContentDetail({
                   { color: colors.foreground },
                 ]}
               >
-                {thread ? threadBody(thread) : resource ? resource.description || resource.title : item.title}
+                {bodyWithLinks(
+                  thread ? threadBody(thread) : resource ? resource.description || resource.title : item.title,
+                  colors.link,
+                )}
               </Text>
               {!thread && !resource && item.description ? (
                 <Text style={[styles.detailDescription, { color: colors.foregroundMuted }]}>
-                  {item.description}
+                  {bodyWithLinks(item.description, colors.link)}
                 </Text>
               ) : null}
             </>
@@ -1597,6 +1600,35 @@ export function ContentOptionsMenu({
 }
 
 /**
+ * Body text with tappable URLs — the mobile counterpart of the web
+ * `renderWithLinks`, so links inside a post read blue on both clients.
+ */
+const BODY_URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
+
+function bodyWithLinks(text: string, linkColor: string) {
+  const pieces = text.split(BODY_URL_PATTERN);
+  if (pieces.length === 1) return text;
+  return pieces.map((piece, index) =>
+    index % 2 === 0 ? (
+      piece
+    ) : (
+      <Text
+        key={`body-url-${index}`}
+        style={{ color: linkColor, textDecorationLine: 'underline' }}
+        onPress={(event) => {
+          event.stopPropagation();
+          void Linking.openURL(piece).catch(() => {
+            /* ignore un-openable links */
+          });
+        }}
+      >
+        {piece}
+      </Text>
+    ),
+  );
+}
+
+/**
  * Card body text, collapsed to `collapsedLines` behind a "Read more" — the
  * mobile equivalent of the web `TruncateMarkup` + inline Read more button.
  */
@@ -1630,7 +1662,7 @@ export function CollapsibleBody({
           setTruncated(lines >= collapsedLines);
         }}
       >
-        {text}
+        {bodyWithLinks(text, colors.link)}
       </Text>
       {truncated && !expanded && expandable ? (
         <Pressable
