@@ -5,7 +5,8 @@ import { ArrowLeft, ArrowRight, Check, Loader2, Lock, Minus } from "lucide-react
 import { Modal } from "@/components/ui/Modal";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { CommunityDp } from "@/components/communities/CommunityDp";
-import { CommunityNameBadges, SignupCommunityBadge } from "@/components/communities/CommunityBadges";
+import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
+import { communityNameBadges } from "@/lib/communities/community-badges";
 import {
   previewGroup,
   slotUnlockDate,
@@ -70,7 +71,7 @@ function formatDate(iso: string | Date): string {
   });
 }
 
-/** DP, name and the verified seal — the inside of every group slot. */
+/** DP (wearing the verified seal for default groups), name and the public/private mark — the inside of every group slot. */
 function GroupContent({
   name,
   imageUrl,
@@ -85,7 +86,13 @@ function GroupContent({
 }) {
   return (
     <>
-      <CommunityDp imageUrl={imageUrl} name={name} size={24} iconSize={12} />
+      <CommunityDp
+        imageUrl={imageUrl}
+        name={name}
+        size={24}
+        iconSize={12}
+        verified={communityNameBadges(type, false).verified}
+      />
       <span
         className={`flex min-w-0 items-center gap-1 font-body text-xs ${
           leaving ? "text-foreground-muted" : "font-medium text-foreground"
@@ -418,11 +425,10 @@ export function EditProfileForm({ data, onSaved }: Props) {
                       <ul className="flex flex-col gap-2">
                         {result.left_communities.map((group) => (
                           <li key={group.id} className="flex items-center gap-2">
-                            <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} />
+                            <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} verified />
                             <span className="min-w-0 truncate font-body text-sm text-foreground-subtle">
                               {group.name}
                             </span>
-                            <SignupCommunityBadge size={11} />
                           </li>
                         ))}
                       </ul>
@@ -436,11 +442,10 @@ export function EditProfileForm({ data, onSaved }: Props) {
                       <ul className="flex flex-col gap-2">
                         {result.joined_communities.map((group) => (
                           <li key={group.id} className="flex items-center gap-2">
-                            <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} />
+                            <CommunityDp imageUrl={group.image_url} name={group.name} size={24} iconSize={12} verified />
                             <span className="min-w-0 truncate font-body text-sm text-foreground">
                               {group.name}
                             </span>
-                            <SignupCommunityBadge size={11} />
                           </li>
                         ))}
                       </ul>

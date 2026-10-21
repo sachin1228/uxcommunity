@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { CommunityIcon } from "./CommunityIcon";
+import { VerifiedDpBadge } from "./CommunityBadges";
 
 /**
- * Community display picture: a static image (or the fallback icon).
+ * Community display picture: a static image (or the fallback icon), wearing
+ * the verified seal at its bottom-right corner when the community carries one.
  *
  * Historical note: this component used to loop a Lottie animation as the DP
  * (JSON and dotLottie players, viewport-gated playback). Animated community
@@ -26,6 +28,8 @@ export interface CommunityDpProps {
   iconSize?: number;
   /** Extra classes for the circular container (background, etc.). */
   className?: string;
+  /** Draws the verified seal over the face's bottom-right corner. */
+  verified?: boolean;
 }
 
 export function CommunityDp({
@@ -34,27 +38,30 @@ export function CommunityDp({
   size = 40,
   iconSize,
   className = "bg-surface-raised",
+  verified = false,
 }: CommunityDpProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
   return (
-    <div
-      className={`flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none ${className}`}
-      style={{ width: size, height: size }}
-    >
-      {imageUrl && !imgFailed ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imageUrl}
-          alt={name}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <CommunityIcon size={size} iconSize={iconSize} />
-      )}
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <div
+        className={`flex h-full w-full items-center justify-center rounded-full overflow-hidden select-none ${className}`}
+      >
+        {imageUrl && !imgFailed ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={name}
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <CommunityIcon size={size} iconSize={iconSize} />
+        )}
+      </div>
+      {verified ? <VerifiedDpBadge dpSize={size} /> : null}
     </div>
   );
 }

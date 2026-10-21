@@ -22,6 +22,8 @@ interface CommunityAvatarProps {
   lottieUrl?: string | null;
   lottieFormat?: unknown;
   lottieData?: unknown;
+  /** Platform default group → the verified seal rides the face. */
+  verified?: boolean;
 }
 
 export function CommunityAvatar({
@@ -30,6 +32,7 @@ export function CommunityAvatar({
   type,
   eventDate,
   eventEnd,
+  verified = false,
 }: CommunityAvatarProps) {
   return (
     <DpWithEventDate date={eventDate} endsAt={eventEnd} dpSize={36}>
@@ -39,6 +42,7 @@ export function CommunityAvatar({
         size={36}
         iconSize={16}
         className="bg-surface-raised"
+        verified={verified}
       />
     </DpWithEventDate>
   );

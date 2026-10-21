@@ -10,6 +10,7 @@ import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
 import { DpWithEventDate } from "../DpWithEventDate";
 import { CommunityNameBadges } from "../CommunityBadges";
+import { communityNameBadges } from "@/lib/communities/community-badges";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 import { isCommunityMuted } from "@/lib/communities/mute";
 import { showUndoToast } from "@/lib/undo-toast";
@@ -342,6 +343,7 @@ export const ChatHeader = memo(function ChatHeader({
                     size={44}
                     iconSize={18}
                     className="bg-surface-raised"
+                    verified={communityNameBadges(community.type, community.is_private).verified}
                   />
                 </DpWithEventDate>
                 <div>

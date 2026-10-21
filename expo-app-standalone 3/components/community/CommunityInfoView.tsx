@@ -20,7 +20,7 @@ import {
 } from '@/lib/communities';
 import { loadCommunityDetail, peekCommunityDetail } from '@/lib/communityDetailCache';
 import { peekCommunityRules, putCommunityRules } from '@/lib/communityRulesCache';
-import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { MembersPanel } from '@/components/community/MembersPanel';
 import { ActivityPanel } from '@/components/community/ActivityPanel';
 import { communityNameBadges } from '@/lib/communityBadges';
@@ -372,7 +372,6 @@ function InfoHero({
   const heroBadges = communityNameBadges(type, isPrivate);
   const heroLabel = [
     name,
-    heroBadges.verified ? 'Verified community' : null,
     heroBadges.visibility === 'lock'
       ? 'Private community'
       : heroBadges.visibility === 'globe'
@@ -384,15 +383,18 @@ function InfoHero({
 
   return (
     <View style={styles.hero}>
-      {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={[styles.heroAvatar, { borderColor: colors.border }]} />
-      ) : (
-        <View style={[styles.heroAvatar, styles.heroAvatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-          <Text style={[styles.heroAvatarText, { color: colors.mutedForeground }]}>
-            {name.slice(0, 1).toUpperCase()}
-          </Text>
-        </View>
-      )}
+      <View style={styles.heroAvatarWrap}>
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={[styles.heroAvatar, { borderColor: colors.border }]} />
+        ) : (
+          <View style={[styles.heroAvatar, styles.heroAvatarFallback, { backgroundColor: colors.surfaceRaised }]}>
+            <Text style={[styles.heroAvatarText, { color: colors.mutedForeground }]}>
+              {name.slice(0, 1).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {heroBadges.verified && <VerifiedDpBadge dpSize={96} />}
+      </View>
       <View style={styles.heroNameRow} accessible accessibilityLabel={heroLabel}>
         {nameWords.map((word, index) => (
           <Text key={`${word}-${index}`} style={[styles.heroName, { color: colors.foreground }]}>
@@ -436,6 +438,9 @@ const styles = StyleSheet.create({
   topTitle: { fontSize: 17, fontFamily: 'Geist_600SemiBold' },
 
   hero: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 8, paddingBottom: 24 },
+  heroAvatarWrap: {
+    position: 'relative',
+  },
   heroAvatar: {
     width: 96,
     height: 96,

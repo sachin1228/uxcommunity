@@ -16,8 +16,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityPreviewSheet } from '@/components/community/CommunityPreviewSheet';
-import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { Initials } from '@/components/communities/CommunityRow';
+import { communityNameBadges } from '@/lib/communityBadges';
 import { useColors } from '@/hooks/useColors';
 import {
   EXPLORE_TABS,
@@ -375,11 +376,14 @@ function ExploreCard({
           accessibilityLabel={`View ${community.name}`}
           style={styles.cardIdentity}
         >
-          <View style={disabled ? styles.faded : undefined}>
+          <View style={[styles.avatarWrap, disabled ? styles.faded : undefined]}>
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.avatar} />
             ) : (
               <Initials name={community.name} size={40} colors={colors} />
+            )}
+            {communityNameBadges(community.type, community.is_private).verified && (
+              <VerifiedDpBadge dpSize={40} />
             )}
           </View>
           <View style={styles.cardText}>
@@ -536,6 +540,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarWrap: { position: 'relative' },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   cardText: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },

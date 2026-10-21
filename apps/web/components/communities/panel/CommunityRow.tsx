@@ -2,7 +2,7 @@
 
 import { memo, useRef, useCallback } from "react";
 import { BellOff, Pin } from "lucide-react";
-import { CommunityVisibilityIcon, SignupCommunityBadge } from "../CommunityBadges";
+import { CommunityVisibilityIcon } from "../CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
 import { isCommunityMuted } from "@/lib/communities/mute";
 import { CommunityAvatar } from "./CommunityAvatar";
@@ -93,6 +93,7 @@ export const CommunityRow = memo(function CommunityRow({
           imageUrl={c.image_url}
           name={c.name}
           type={c.type}
+          verified={badges.verified}
           eventDate={c.event_date}
           // The full window deadline, ahead or past: LIVE while it runs, ENDED
           // for the day after, then no badge at all.
@@ -105,9 +106,8 @@ export const CommunityRow = memo(function CommunityRow({
             <span className="min-w-0 truncate font-body text-[14px] font-medium text-foreground">
               {c.name}
             </span>
-            {/* Badges: the verified seal, then the public/private mark
-                ("Electro ✓ 🔒", "Electro 🌐"). */}
-            {badges.verified && <SignupCommunityBadge size={12} />}
+            {/* The public/private mark ("Electro 🌐", "Electro 🔒"); the
+                verified seal rides the DP. */}
             {badges.visibility && <CommunityVisibilityIcon kind={badges.visibility} />}
             {(c.last_message || lastContent) && !typingText && (
               <SidebarTimestamp
