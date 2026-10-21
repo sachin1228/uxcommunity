@@ -57,6 +57,8 @@ interface Props {
   onSwipeReply?: (message: Message) => void;
   /** Row focus flash after a reply jump (web parity) — fades a blue tint in/out. */
   highlighted?: boolean;
+  /** The action sheet is open for this message — keep the row tinted. */
+  actionsOpen?: boolean;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -551,12 +553,15 @@ export const MessageBubble = memo(function MessageBubble({
   onContentReplyPress,
   onSwipeReply,
   highlighted = false,
+  actionsOpen = false,
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
   /** Long-message collapse is owned here so a bubble tap can expand it too. */
   const [textExpanded, setTextExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
+  /** Press feedback for the full-row long-press target. */
+  const [rowPressed, setRowPressed] = useState(false);
   /** Collapsed width, captured before expanding so the tap cannot reflow the
    *  bubble wider (the collapsed text and the full text wrap differently). */
   const collapsedBubbleWidth = useRef<number | null>(null);
@@ -707,17 +712,33 @@ export const MessageBubble = memo(function MessageBubble({
       {...swipePan.panHandlers}
       style={[
         styles.row,
-        { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
         isFirstInGroup ? styles.rowFirst : styles.rowCompact,
         flashStyle,
+        !isDeleted && (rowPressed || actionsOpen) ? styles.rowActive : null,
       ]}
     >
+      {/* The whole row is the long-press target, so the timestamp column and
+          the empty half beside a short bubble open the action sheet too. */}
+      <Pressable
+        disabled={isDeleted}
+        onLongPress={handleLongPress}
+        delayLongPress={350}
+        onPressIn={() => setRowPressed(true)}
+        onPressOut={() => setRowPressed(false)}
+        accessible={false}
+        style={[
+          styles.rowPress,
+          { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
+        ]}
+      >
       {/* Avatar column — hidden for own messages (web parity) */}
       {!isOwn && (
         <View style={styles.avatarCol}>
           {showHeader && (
             <Pressable
               onPress={handleAuthorPress}
+              onLongPress={handleLongPress}
+              delayLongPress={350}
               disabled={!onAuthorPress}
               hitSlop={6}
               accessibilityRole="button"
@@ -800,6 +821,8 @@ export const MessageBubble = memo(function MessageBubble({
                 onPress={handlePress}
                 onLongPress={handleLongPress}
                 delayLongPress={350}
+                onPressIn={isDeleted ? undefined : () => setRowPressed(true)}
+                onPressOut={isDeleted ? undefined : () => setRowPressed(false)}
                 onLayout={(event) => {
                   const width = event.nativeEvent.layout.width;
                   if (!textExpanded && width > 0) collapsedBubbleWidth.current = width;
@@ -824,6 +847,8 @@ export const MessageBubble = memo(function MessageBubble({
                 {!isOwn && showHeader && !isDeleted && (
                   <Pressable
                     onPress={handleAuthorPress}
+                    onLongPress={handleLongPress}
+                    delayLongPress={350}
                     disabled={!onAuthorPress}
                     hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                     accessibilityRole="button"
@@ -954,6 +979,7 @@ export const MessageBubble = memo(function MessageBubble({
         {/* Reserve room for the pills that hang below the bubble */}
         {reactions.length > 0 && !isDeleted && <View style={styles.reactionSpacer} />}
       </Animated.View>
+      </Pressable>
     </Animated.View>
   );
 });
@@ -966,12 +992,18 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+  },
+  rowPress: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     // The avatar gutter is tighter than the right edge (own bubbles keep the
     // original 16pt), so incoming rows start 6pt closer to the screen edge.
     paddingLeft: 10,
     paddingRight: 16,
     gap: 8,
   },
+  rowActive: { backgroundColor: 'rgba(0, 98, 209, 0.12)' },
   rowFirst: { marginTop: 12 },
   rowCompact: { marginTop: 2 },
 

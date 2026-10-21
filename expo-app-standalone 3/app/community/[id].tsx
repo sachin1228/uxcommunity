@@ -1113,6 +1113,7 @@ export default function CommunityChat() {
           onContentReplyPress={handleContentChipPress}
           onSwipeReply={handleMessageReply}
           highlighted={flashMessageId === item.msg.id}
+          actionsOpen={selectedMessage?.id === item.msg.id}
         />
       );
     },
@@ -1133,6 +1134,7 @@ export default function CommunityChat() {
       colors,
       initialUnreadCount,
       flashMessageId,
+      selectedMessage?.id,
     ],
   );
 
