@@ -330,8 +330,8 @@ export function ProfileActivityScope({
  * homepage feed and the community tabs, so an edit here immediately shows there
  * (and vice versa) and always lands in the database.
  *
- * Pass `subject` to list another member's posts instead: same cards, the All
- * tab only, with the server listing only what the viewer may see.
+ * Pass `subject` to list another member's posts instead: the same cards with
+ * no tab rail at all — the profile lists their visible All feed directly.
  */
 /** Old links may name a retired tab — land them on All. */
 function visibleTab(value: ProfileFeedScope, hasSubject: boolean): ProfileActivityTab {
@@ -387,11 +387,12 @@ export function ProfileActivityFeed({
 
   return (
     <section aria-label={subject ? `${subject.name}'s activity` : "Your activity"} className="mt-2">
-      <nav
-        role="tablist"
-        aria-label={subject ? `${subject.name}'s posts` : "Your posts"}
-        className="border-b border-border"
-      >
+      {!subject && (
+        <nav
+          role="tablist"
+          aria-label="Your posts"
+          className="border-b border-border"
+        >
         {/* Full-width halves: each tab owns an equal share of the rail. */}
         <div className="flex w-full items-center">
           {tabs.map(({ value, label, icon: Icon }) => (
@@ -415,6 +416,7 @@ export function ProfileActivityFeed({
           ))}
         </div>
       </nav>
+      )}
 
       <div className="pt-4">
         <ProfileActivityScope key={activeTab} scope={activeTab} currentUserId={currentUserId} subject={subject} />

@@ -3,13 +3,12 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, Camera, Globe, Linkedin, MapPin, MoreVertical, Plus, ShieldOff } from "lucide-react";
+import { Ban, Camera, Globe, Linkedin, MapPin, MoreVertical, Plus, Send, ShieldOff } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { PendingButton } from "@/components/ui/PendingButton";
 import type { ProfileCompanyView } from "@/components/companies/types";
-import { DmChatIcon } from "@/components/direct-messages/DmChatIcon";
 import { dmUrls } from "@/lib/direct-messages/client";
 
 interface ProfileCardProps {
@@ -422,7 +421,7 @@ export function ProfileCard({
                   href={messageHref}
                   className="flex items-center gap-1.5 rounded-full bg-[var(--ds-blue-800)] px-3 py-1.5 font-body text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)]"
                 >
-                  <DmChatIcon size={12} />
+                  <Send size={12} strokeWidth={2} />
                   Message
                 </Link>
               )
