@@ -19,6 +19,7 @@ import { useIsFocused } from '@react-navigation/native';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
@@ -61,7 +62,6 @@ import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
-import { VideoPlayerModal } from './VideoPlayerModal';
 import { EventTicket } from './EventTicket';
 import { ContentReportModal } from './ContentReportModal';
 import { CommunityPreviewSheet } from './CommunityPreviewSheet';
@@ -1703,9 +1703,8 @@ function showcaseMediaForPost(post: CommunityShowcase): MediaEntry[] {
  * One image keeps its natural aspect ratio; several become a swipeable
  * carousel with a counter, rather than a cropped tile grid. Tapping an image
  * opens the app's own lightbox — the same one the community chat uses — never
- * the system browser, so images stay inside the app. Showcase videos show
- * their poster (or a black tile) with a play badge, and tapping opens the
- * in-app player.
+ * the system browser, so images stay inside the app. Showcase videos play
+ * inline — muted, looping — with a volume toggle as their only control.
  */
 export function MediaCarousel({
   media,
@@ -1723,7 +1722,6 @@ export function MediaCarousel({
   const [containerWidth, setContainerWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [playingVideo, setPlayingVideo] = useState<MediaEntry | null>(null);
   const stripRef = useRef<ScrollView>(null);
   const single = media.length === 1;
   const imageMedia = media.filter((entry) => !isVideoAttachment(entry));
@@ -1804,30 +1802,18 @@ export function MediaCarousel({
       />
     ) : null;
 
-  const player = playingVideo ? (
-    <VideoPlayerModal
-      url={playingVideo.url}
-      title={playingVideo.name ?? owner.name}
-      onClose={() => setPlayingVideo(null)}
-    />
-  ) : null;
-
   if (single) {
     const entry = media[0];
     if (isVideoAttachment(entry)) {
       return (
-        <>
-          <VideoThumb
-            entry={entry}
-            style={[
-              styles.imageSingle,
-              anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
-              { borderColor: colors.border },
-            ]}
-            onPress={() => setPlayingVideo(entry)}
-          />
-          {player}
-        </>
+        <InlineVideo
+          entry={entry}
+          style={[
+            styles.imageSingle,
+            anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
+            { borderColor: colors.border },
+          ]}
+        />
       );
     }
     return (
@@ -1866,11 +1852,10 @@ export function MediaCarousel({
       >
         {media.map((entry, mediaIndex) =>
           isVideoAttachment(entry) ? (
-            <VideoThumb
+            <InlineVideo
               key={`${entry.url}-${mediaIndex}`}
               entry={entry}
               style={{ width: pageWidth, height: pageHeight }}
-              onPress={() => setPlayingVideo(entry)}
             />
           ) : (
             <Pressable
@@ -1921,36 +1906,51 @@ export function MediaCarousel({
           })}
         </View>
       </View>
-
-      {player}
     </View>
   );
 }
 
-/** A video's poster (or a black fallback) with a play badge. */
-function VideoThumb({
+/** Inline, muted, looping playback — the volume toggle is the only control. */
+function InlineVideo({
   entry,
   style,
-  onPress,
 }: {
   entry: MediaEntry;
   style: React.ComponentProps<typeof View>['style'];
-  onPress: () => void;
 }) {
+  const player = useVideoPlayer(entry.url, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+    instance.play();
+  });
+  const [muted, setMuted] = useState(true);
+
+  const toggleMuted = () => {
+    const next = !muted;
+    player.muted = next;
+    setMuted(next);
+    player.play();
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.videoThumb, style]}
-      accessibilityRole="button"
-      accessibilityLabel={entry.name ? `Play video ${entry.name}` : 'Play video'}
-    >
-      {entry.poster ? (
-        <Image source={{ uri: entry.poster }} style={styles.threadImage} resizeMode="cover" />
-      ) : null}
-      <View style={styles.videoPlayBadge}>
-        <Feather name="play" size={22} color="#FFFFFF" />
-      </View>
-    </Pressable>
+    <View style={[styles.videoThumb, style]}>
+      <VideoView
+        player={player}
+        style={styles.threadImage}
+        nativeControls={false}
+        contentFit="cover"
+        allowsFullscreen={false}
+      />
+      <Pressable
+        onPress={toggleMuted}
+        hitSlop={8}
+        style={styles.videoMuteButton}
+        accessibilityRole="button"
+        accessibilityLabel={muted ? 'Unmute video' : 'Mute video'}
+      >
+        <Feather name={muted ? 'volume-x' : 'volume-2'} size={18} color="#0A0A0A" />
+      </Pressable>
+    </View>
   );
 }
 
@@ -2212,14 +2212,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#000000',
   },
-  videoPlayBadge: {
+  videoMuteButton: {
     position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    right: 10,
+    bottom: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
 
   detailRoot: { flex: 1 },
