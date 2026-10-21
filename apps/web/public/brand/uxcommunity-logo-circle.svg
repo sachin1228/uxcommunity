@@ -1,35 +1,48 @@
-<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="uxcommunity">
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="256" height="256"
+     viewBox="0 0 256 256"
+     fill="none"
+     role="img"
+     aria-label="uxcommunity">
+
   <defs>
-    <linearGradient id="bg" x1="128" y1="0" x2="128" y2="256" gradientUnits="userSpaceOnUse">
+    <linearGradient id="uxc-bg" x1="128" y1="0" x2="128" y2="256"
+                    gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#30323A"/>
       <stop offset="38%" stop-color="#24262D"/>
       <stop offset="100%" stop-color="#1D1F26"/>
     </linearGradient>
-    <radialGradient id="gloss" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(105 15) rotate(70) scale(210 180)">
+
+    <radialGradient id="uxc-gloss" cx="0" cy="0" r="1"
+                    gradientUnits="userSpaceOnUse"
+                    gradientTransform="translate(105 15) rotate(70) scale(210 180)">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.12"/>
       <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.035"/>
       <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="depth" x1="128" y1="110" x2="128" y2="256" gradientUnits="userSpaceOnUse">
+
+    <linearGradient id="uxc-depth" x1="128" y1="110" x2="128" y2="256"
+                    gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0.16"/>
     </linearGradient>
-    <linearGradient id="bubble" x1="128" y1="58" x2="128" y2="170" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="72%" stop-color="#FCFCFC"/>
-      <stop offset="100%" stop-color="#E8E9ED"/>
-    </linearGradient>
-    <filter id="bubbleShadow" x="45" y="45" width="170" height="145" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
-    </filter>
-    <clipPath id="circleClip">
+
+    <clipPath id="uxc-clip">
       <circle cx="128" cy="128" r="128"/>
     </clipPath>
   </defs>
-  <g clip-path="url(#circleClip)">
-    <rect width="256" height="256" fill="url(#bg)"/>
-    <rect width="256" height="256" fill="url(#gloss)"/>
-    <rect width="256" height="256" fill="url(#depth)"/>
+
+  <g clip-path="url(#uxc-clip)">
+    <rect width="256" height="256" fill="url(#uxc-bg)"/>
+    <rect width="256" height="256" fill="url(#uxc-gloss)"/>
+    <rect width="256" height="256" fill="url(#uxc-depth)"/>
   </g>
-  <path d="M128 58 C89 58 58 79 58 112 C58 130 68 144 86 153 C87 162 84 169 78 175 C77 177 79 179 82 179 C95 178 105 173 111 167 C116 168 122 168 128 168 C167 168 198 147 198 112 C198 79 167 58 128 58Z" fill="url(#bubble)" filter="url(#bubbleShadow)"/>
+
+  <!-- Larger centered speech bubble -->
+  <g transform="translate(49 49) scale(6.6)" fill="#FFFFFF">
+    <path d="M16 4H8a7 7 0 0 0 0 14h4v4l8.16-5.39A6.78 6.78 0 0 0 23 11a7 7 0 0 0-7-7
+             M8 12.25A1.25 1.25 0 1 1 9.25 11 1.25 1.25 0 0 1 8 12.25
+             m4 0A1.25 1.25 0 1 1 13.25 11 1.25 1.25 0 0 1 12 12.25
+             m4 0A1.25 1.25 0 1 1 17.25 11 1.25 1.25 0 0 1 16 12.25"/>
+  </g>
 </svg>
