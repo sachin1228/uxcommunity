@@ -13,7 +13,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
+import { communityNameBadges } from '@/lib/communityBadges';
 import { Initials } from '@/components/communities/CommunityRow';
 import { communityStore } from '@/lib/communityStore';
 import { type CommunityPreviewData } from '@/lib/communityPreviewData';
@@ -222,11 +223,16 @@ export function CommunityPreviewSheet({ visible, communityId, onClose }: Props) 
           ) : preview ? (
             <>
               <View style={styles.identity}>
-                {imageUri ? (
-                  <Image source={{ uri: imageUri }} style={styles.avatar} />
-                ) : (
-                  <Initials name={preview.name} size={64} colors={colors} />
-                )}
+                <View style={styles.avatarWrap}>
+                  {imageUri ? (
+                    <Image source={{ uri: imageUri }} style={styles.avatar} />
+                  ) : (
+                    <Initials name={preview.name} size={64} colors={colors} />
+                  )}
+                  {communityNameBadges(preview.type, preview.is_private).verified && (
+                    <VerifiedDpBadge dpSize={64} />
+                  )}
+                </View>
                 <View style={styles.identityCopy}>
                   <View style={styles.nameRow}>
                     <Text
@@ -467,6 +473,7 @@ const styles = StyleSheet.create({
   },
   requestTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 17 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingTop: 10 },
+  avatarWrap: { position: 'relative' },
   avatar: { width: 64, height: 64, borderRadius: 32 },
   identityCopy: { flex: 1, gap: 5 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

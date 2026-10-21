@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, Lock } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
+import { communityNameBadges } from "@/lib/communities/community-badges";
 import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -80,6 +81,7 @@ function CommunityCard({
             name={c.name}
             size={36}
             className="bg-surface"
+            verified={communityNameBadges(c.type, c.is_private).verified}
           />
 
           {/* Name + member count */}

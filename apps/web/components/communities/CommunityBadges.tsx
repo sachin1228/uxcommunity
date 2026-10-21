@@ -6,18 +6,19 @@ import {
 } from "@/lib/communities/community-badges";
 
 /**
- * The badges shown after a community name, so a member can tell at a glance
- * what kind of group they are looking at:
+ * The community badges, so a member can tell at a glance what kind of group
+ * they are looking at:
  *
  *   ✓  verified seal — a default group the signup flow created for them
- *                      (city, sector, experience level, job title)
+ *                      (city, sector, experience level, job title); it rides
+ *                      the community's display picture, not its name
  *   🌐 earth         — an open group: a public member-created community or
  *                      event room
  *   🔒 lock          — a closed group: any signup default group (joined only
  *                      through the signup match), or a private community
  *
- * Which pair a community gets is decided by `communityNameBadges` in
- * `lib/communities/community-badges.ts`; this file only draws it.
+ * Which badges a community gets is decided by `communityNameBadges` in
+ * `lib/communities/community-badges.ts`; this file only draws them.
  *
  * Both badges are labels rather than decoration: each carries an aria-label so
  * it is announced, and a title so the meaning is available on hover.
@@ -83,9 +84,23 @@ export function CommunityVisibilityIcon({
 }
 
 /**
- * The full badge pair for a community name: "Name ✓", "Name 🌐", "Name 🔒" or
- * "Name ✓ 🔒". Pass the community's `type` and `is_private` straight through —
- * one component so every surface draws the same pair from the same rules, and
+ * The verified seal as it rides a community's display picture: pinned to the
+ * face's bottom-right corner, ringed in the page colour so it reads on any
+ * image. Render it inside a `relative` wrapper around the DP.
+ */
+export function VerifiedDpBadge({ dpSize }: { dpSize: number }) {
+  const sealSize = Math.max(10, Math.round(dpSize / 3));
+  return (
+    <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center rounded-full bg-background p-0.5">
+      <SignupCommunityBadge size={sealSize} />
+    </span>
+  );
+}
+
+/**
+ * The badges that sit beside a community name: "Name 🌐", "Name 🔒" or none.
+ * Pass the community's `type` and `is_private` straight through — one
+ * component so every surface draws the same pair from the same rules, and
  * renders nothing when the rules say a name carries no badge at all.
  */
 export function CommunityNameBadges({
@@ -96,17 +111,16 @@ export function CommunityNameBadges({
 }: {
   type?: string | null;
   isPrivate?: boolean | null;
-  /** Icon size in px; the seal is drawn one px larger than the visibility icon. */
+  /** Icon size in px. */
   size?: number;
   className?: string;
 }) {
-  const { verified, visibility } = communityNameBadges(type, isPrivate);
-  if (!verified && !visibility) return null;
+  const { visibility } = communityNameBadges(type, isPrivate);
+  if (!visibility) return null;
 
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 ${className}`}>
-      {verified ? <SignupCommunityBadge size={size + 1} /> : null}
-      {visibility ? <CommunityVisibilityIcon kind={visibility} size={size} /> : null}
+      <CommunityVisibilityIcon kind={visibility} size={size} />
     </span>
   );
 }

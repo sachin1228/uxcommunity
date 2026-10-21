@@ -9,18 +9,19 @@ import {
 } from '@/lib/communityBadges';
 
 /**
- * The badges shown after a community name, on mobile — a direct port of the
- * web app's `CommunityBadges.tsx`:
+ * The community badges, on mobile — a direct port of the web app's
+ * `CommunityBadges.tsx`:
 
  *   ✓  verified seal — a default group the signup flow created for them
- *                      (city, sector, experience level, job title)
+ *                      (city, sector, experience level, job title). It rides
+ *                      the community's display picture, not its name.
  *   🌐 globe         — an open group: a public member-created community or
  *                      event room
  *   🔒 lock          — a closed group: any signup default group (joined only
  *                      through the signup match), or a private community
  *
- * Which pair a community gets is decided by `communityNameBadges` in
- * `lib/communityBadges.ts`; this file only draws it.
+ * Which badges a community gets is decided by `communityNameBadges` in
+ * `lib/communityBadges.ts`; this file only draws them.
  */
 
 /** Verified color — the universal blue of a verified seal (web parity). */
@@ -70,9 +71,31 @@ export function CommunityVisibilityIcon({
 }
 
 /**
- * The full badge pair for a community name: "Name ✓", "Name 🌐", "Name 🔒" or
- * "Name ✓ 🔒". Pass the community's `type` and `is_private` straight through —
- * one component so every surface draws the same pair from the same rules, and
+ * The verified seal as it rides a community's display picture: pinned to the
+ * face's bottom-right corner, ringed in the page colour so it reads on any
+ * image. Draw it inside a positioned wrapper around the DP.
+ */
+export function VerifiedDpBadge({ dpSize }: { dpSize: number }) {
+  const colors = useColors();
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.dpBadge, { backgroundColor: colors.background }]}
+    >
+      <SignupCommunityBadge size={dpSealSize(dpSize)} />
+    </View>
+  );
+}
+
+/** One proportion for every face; the floor keeps the smallest DP legible. */
+function dpSealSize(dpSize: number): number {
+  return Math.max(10, Math.round(dpSize / 3));
+}
+
+/**
+ * The badges that sit beside a community name: "Name 🌐", "Name 🔒" or none.
+ * Pass the community's `type` and `is_private` straight through — one
+ * component so every surface draws the same pair from the same rules, and
  * renders nothing when the rules say a name carries no badge at all.
  */
 export function CommunityNameBadges({
@@ -82,16 +105,15 @@ export function CommunityNameBadges({
 }: {
   type?: string | null;
   isPrivate?: boolean | null;
-  /** Icon size in px; the seal is drawn one px larger than the visibility icon. */
+  /** Icon size in px. */
   size?: number;
 }) {
-  const { verified, visibility } = communityNameBadges(type, isPrivate);
-  if (!verified && !visibility) return null;
+  const { visibility } = communityNameBadges(type, isPrivate);
+  if (!visibility) return null;
 
   return (
     <View style={styles.row}>
-      {verified ? <SignupCommunityBadge size={size + 1} /> : null}
-      {visibility ? <CommunityVisibilityIcon kind={visibility} size={size} /> : null}
+      <CommunityVisibilityIcon kind={visibility} size={size} />
     </View>
   );
 }
@@ -102,5 +124,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,
+  },
+  dpBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    borderRadius: 999,
+    padding: 2,
   },
 });

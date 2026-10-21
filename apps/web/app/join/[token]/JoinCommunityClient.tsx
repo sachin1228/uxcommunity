@@ -6,7 +6,7 @@ import { invalidateOnJoin } from "@/lib/communities/cache";
 import { Lock, Users, Check, ImagePlus, MessageSquare } from "lucide-react";
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { PendingButton } from "@/components/ui/PendingButton";
-import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
+import { VerifiedDpBadge } from "@/components/communities/CommunityBadges";
 import { communityNameBadges } from "@/lib/communities/community-badges";
 
 interface Community {
@@ -78,14 +78,19 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-2xl">
-        {/* Community avatar */}
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground-muted">
-          {community.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={community.image_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <ImagePlus size={22} strokeWidth={2.5} />
-          )}
+        {/* Community avatar — a default group wears the verified seal here
+            too, so an invite link reads the same as the sidebar the member
+            lands in. */}
+        <div className="relative mx-auto mb-5 h-16 w-16">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground-muted">
+            {community.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={community.image_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <ImagePlus size={22} strokeWidth={2.5} />
+            )}
+          </div>
+          {isVerifiedCommunity && <VerifiedDpBadge dpSize={64} />}
         </div>
 
         {/* Privacy badge */}
@@ -102,10 +107,6 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         {/* Name + description */}
         <h1 className="flex items-center justify-center gap-1.5 font-display text-xl font-semibold text-foreground">
           {community.name}
-          {/* Default groups (city, sector, experience level, job title)
-              carry the verified seal here too, so an invite link reads the same
-              as the sidebar the member lands in. */}
-          {isVerifiedCommunity && <SignupCommunityBadge size={16} />}
         </h1>
         {community.description && (
           <p className="mt-2 text-center font-body text-sm leading-relaxed text-foreground-muted">

@@ -22,7 +22,8 @@ import {
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
-import { CommunityNameBadges } from "./CommunityBadges";
+import { CommunityNameBadges, SignupCommunityBadge } from "./CommunityBadges";
+import { communityNameBadges } from "@/lib/communities/community-badges";
 import {
   DEFAULT_ENABLED_TABS,
   isShowcaseEnabled,
@@ -278,6 +279,11 @@ export function CommunitySettingsView({
             </h2>
             <p className="mt-0.5 flex items-center gap-1 font-body text-[11px] text-foreground-muted">
               {community.name}
+              {/* No DP on this header, so the seal stays inline here rather
+                  than riding the face like it does everywhere else. */}
+              {communityNameBadges(community.type, isPrivate).verified && (
+                <SignupCommunityBadge size={12} />
+              )}
               <CommunityNameBadges type={community.type} isPrivate={isPrivate} size={11} />
             </p>
           </div>

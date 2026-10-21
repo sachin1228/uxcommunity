@@ -8,6 +8,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { setCommunityViewerState } from "@/lib/communities/cache";
 import { CommunityDp } from "./CommunityDp";
 import { CommunityNameBadges } from "./CommunityBadges";
+import { communityNameBadges } from "@/lib/communities/community-badges";
 
 /** The facts the community dialog renders — a subset of the Explore list's row. */
 export interface JoinableCommunity {
@@ -131,6 +132,7 @@ export function CommunityJoinDialog({
           name={community.name}
           size={64}
           className="bg-surface-raised"
+          verified={communityNameBadges(community.type, community.is_private).verified}
         />
         <h2 className="mt-3 flex items-center justify-center gap-1.5 font-display text-lg font-semibold text-foreground">
           <span className="min-w-0 truncate">{community.name}</span>

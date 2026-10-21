@@ -29,7 +29,7 @@ import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
 import { CommunityMenu, type CommunityConfirmAction } from '@/components/community/CommunityMenu';
 import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
-import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
@@ -47,6 +47,7 @@ import {
   type Message,
 } from '@/lib/communities';
 import { isCommunityMuted } from '@/lib/communityMute';
+import { communityNameBadges } from '@/lib/communityBadges';
 import {
   fmtDate,
   myReactionEmoji,
@@ -1149,6 +1150,7 @@ export default function CommunityChat() {
     livePatch.is_private ??
     resolved?.is_private ??
     (privateParam === undefined ? undefined : privateParam === '1');
+  const headerBadges = communityNameBadges(badgeType, badgeIsPrivate);
   const routeImage = image ? decodeURIComponent(image) : null;
   const communityImage =
     livePatch.image_url !== undefined
@@ -1340,6 +1342,7 @@ export default function CommunityChat() {
                 </Text>
               </View>
             )}
+            {headerBadges.verified && <VerifiedDpBadge dpSize={40} />}
           </DpWithEventDate>
           <View style={styles.headerTitles}>
             <View style={styles.headerTitleRow}>

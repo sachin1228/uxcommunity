@@ -10,8 +10,9 @@ import {
   formatLastMessagePreview,
 } from '@/lib/communityPreview';
 import { isCommunityMuted } from '@/lib/communityMute';
-import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
+import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
+import { communityNameBadges } from '@/lib/communityBadges';
 
 // ---------------------------------------------------------------------------
 // Member count formatting — mirrors web's fmtCount (1.2k / 3M)
@@ -214,6 +215,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
   // Timed mutes lapse on their own without the row being rewritten, so the
   // mark is computed from the deadline against the list's clock.
   const isMuted = isCommunityMuted(community, nowMs);
+  const badges = communityNameBadges(community.type, community.is_private);
 
   return (
     <Pressable
@@ -227,7 +229,8 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
       onPress={onPress}
     >
       {/* Avatar — start aligned. An event's group chat wears its event date
-          as a calendar tile over the same face everywhere (web parity). */}
+          as a calendar tile over the same face everywhere (web parity), and a
+          platform group's verified seal rides the face itself. */}
       <View style={styles.avatarWrap}>
         <DpWithEventDate
           date={community.event_date}
@@ -245,14 +248,15 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
           ) : (
             <Initials name={community.name} colors={colors} />
           )}
+          {badges.verified && <VerifiedDpBadge dpSize={48} />}
         </DpWithEventDate>
       </View>
 
       {/* Body */}
       <View style={styles.body}>
-        {/* Name + badges + time — the name line carries the verified seal
-            and the globe/lock ("Electro ✓ 🔒", "Electro 🌐"), exactly like
-            the web sidebar. */}
+        {/* Name + badges + time — the name line carries the globe/lock
+            ("Electro 🔒", "Electro 🌐"), like the web sidebar; the verified
+            seal rides the DP. */}
         <View style={styles.topRow}>
           <View style={styles.nameGroup}>
             <Text
