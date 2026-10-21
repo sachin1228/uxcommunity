@@ -1,26 +1,25 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, type ComponentType } from "react";
-import { Lock } from "lucide-react";
-import { EarthGlyph } from "@/components/ui/EarthGlyph";
-import { HOME_FEED_TAB_SCOPES } from "@/lib/feeds/home-feed-options";
+import { Layers, Lock } from "lucide-react";
+import { HOME_FEED_FILTER_SCOPES, type HomeFeedFilterScope } from "@/lib/feeds/home-feed-options";
 
 /** Small monochrome glyphs, sized like lucide icons. */
 type IconComponent = ComponentType<{ size?: string | number; strokeWidth?: string | number; className?: string }>;
 
 /** Labels for the feed source selector (see lib/feeds/home-feed-options). */
-const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
-  public: "Public Posts",
-  communities: "Your Communities",
+const SCOPE_LABELS: Record<HomeFeedFilterScope, { short: string; full: string }> = {
+  all: { short: "All", full: "All posts" },
+  communities: { short: "Communities", full: "Your communities" },
 };
 /** Same glyphs the sidebar rows use for a community's visibility. */
-const SCOPE_ICONS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], IconComponent> = {
-  public: EarthGlyph,
+const SCOPE_ICONS: Record<HomeFeedFilterScope, IconComponent> = {
+  all: Layers,
   communities: Lock,
 };
-const SCOPES = HOME_FEED_TAB_SCOPES.map((value) => ({
+const SCOPES = HOME_FEED_FILTER_SCOPES.map((value) => ({
   value,
-  label: SCOPE_LABELS[value],
+  ...SCOPE_LABELS[value],
   icon: SCOPE_ICONS[value],
 }));
 
@@ -41,21 +40,22 @@ const MOTION_DURATION = "450ms";
 const MOTION_EASING = "cubic-bezier(.22, 1, .36, 1)";
 
 interface Option {
-  value: string;
-  label: string;
+  value: HomeFeedFilterScope;
+  short: string;
+  full: string;
   icon: IconComponent;
 }
 
 interface SwitcherProps {
   label: string;
   options: readonly Option[];
-  active: string;
-  onSelect: (value: string) => void;
+  active: HomeFeedFilterScope;
+  onSelect: (value: HomeFeedFilterScope) => void;
 }
 
 function Switcher({ label, options, active, onSelect }: SwitcherProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const buttonsRef = useRef<Partial<Record<string, HTMLButtonElement | null>>>({});
+  const buttonsRef = useRef<Partial<Record<HomeFeedFilterScope, HTMLButtonElement | null>>>({});
   const pillRef = useRef<HTMLDivElement | null>(null);
   const activeButtonRef = useRef<HTMLButtonElement | null>(null);
   const firstMeasureRef = useRef(true);
@@ -123,7 +123,8 @@ function Switcher({ label, options, active, onSelect }: SwitcherProps) {
             }`}
           >
             <option.icon strokeWidth={2.5} size={12} aria-hidden="true" />
-            {option.label}
+            <span className="sm:hidden">{option.short}</span>
+            <span className="hidden sm:inline">{option.full}</span>
           </button>
         );
       })}
@@ -132,8 +133,8 @@ function Switcher({ label, options, active, onSelect }: SwitcherProps) {
 }
 
 interface HomeFeedFiltersProps {
-  scope: string;
-  onScopeChange: (scope: string) => void;
+  scope: HomeFeedFilterScope;
+  onScopeChange: (scope: HomeFeedFilterScope) => void;
 }
 
 export function HomeFeedFilters({ scope, onScopeChange }: HomeFeedFiltersProps) {

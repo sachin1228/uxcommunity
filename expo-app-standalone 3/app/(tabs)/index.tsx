@@ -33,10 +33,11 @@ import { readStoredHomeFeedScope, storeHomeFeedScope } from '@/lib/homeFeedScope
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 
 /**
- * Home — the cross-community feed, split into the web dashboard's two sources:
- * "Public Posts" (public cards from communities the member hasn't joined) and
- * "Your Communities" (everything from the communities they have). The chosen
- * tab is remembered across launches, like the web's localStorage choice.
+ * Home — the cross-community feed, with the web dashboard's two filters:
+ * "All posts" (joined-community cards plus publicly shared cards from
+ * communities the member hasn't joined) and "Your Communities" (only the
+ * communities they have joined). The chosen tab is remembered across launches,
+ * like the web's localStorage choice.
  *
  * Renders the same cards as the community tabs (likes, saves, RSVPs and the
  * comment thread all work identically), with a chip naming the community each
@@ -49,17 +50,16 @@ type FeatherName = React.ComponentProps<typeof Feather>['name'];
 
 /** One tab per feed source — the web switcher's labels and glyphs. */
 const TAB_META: Record<HomeFeedScope, { label: string; icon: FeatherName }> = {
-  public: { label: 'Public Posts', icon: 'globe' },
+  all: { label: 'All posts', icon: 'layers' },
   communities: { label: 'Your Communities', icon: 'lock' },
 };
 
-/** Tab order comes from the shared axis — Your Communities leads. */
+/** Tab order comes from the shared axis — All posts leads. */
 const TABS = HOME_FEED_TAB_SCOPES.map((key) => ({ key, ...TAB_META[key] }));
 
-/** The web feed's empty-state copy per source — the two tabs show disjoint posts. */
+/** The web feed's empty-state copy per source. */
 const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
-  public:
-    "Posts that members share publicly — from communities you haven't joined — will appear here.",
+  all: "Posts from your communities and public posts from across the community will appear here.",
   communities:
     "Everything posted in the communities you've joined will appear here, whether or not it was shared publicly.",
 };
@@ -211,9 +211,9 @@ export default function HomeTab() {
     [resetActions],
   );
 
-  // Open on the remembered tab, defaulting to Your Communities. The first load
-  // waits for the stored choice, so a returning member never sees the other
-  // feed flash.
+  // Open on the remembered tab, defaulting to All posts. The first load waits
+  // for the stored choice, so a returning member never sees the other feed
+  // flash.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -437,7 +437,7 @@ export default function HomeTab() {
             ListEmptyComponent={
               <View style={styles.center}>
                 <Feather
-                  name={scope === 'communities' ? 'users' : 'globe'}
+                  name={scope === 'communities' ? 'users' : 'layers'}
                   size={32}
                   color={colors.foregroundSubtle}
                 />

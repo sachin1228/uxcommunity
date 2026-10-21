@@ -3,9 +3,10 @@ import test, { afterEach } from "node:test"
 
 import {
   DEFAULT_HOME_FEED_SCOPE,
-  HOME_FEED_SCOPES,
+  HOME_FEED_FILTER_SCOPES,
   HOME_FEED_SCOPE_STORAGE_KEY,
-  HOME_FEED_TAB_SCOPES,
+  HOME_FEED_SCOPES,
+  isHomeFeedFilterScope,
   isHomeFeedScope,
   readStoredHomeFeedScope,
   storeHomeFeedScope,
@@ -26,27 +27,31 @@ function stubStorage(initial: Record<string, string> = {}) {
 }
 
 afterEach(() => {
-  delete (globalThis as { window?: unknown }).window
+  delete (globalThis as unknown as { window?: unknown }).window
 })
 
-test("the default feed is one of the switcher's tabs", () => {
-  assert.ok((HOME_FEED_TAB_SCOPES as readonly string[]).includes(DEFAULT_HOME_FEED_SCOPE))
-  for (const scope of HOME_FEED_TAB_SCOPES) {
-    assert.ok(isHomeFeedScope(scope), `${scope} is a valid scope`)
+test("the feed opens on all posts and offers two filters", () => {
+  assert.equal(DEFAULT_HOME_FEED_SCOPE, "all")
+  assert.deepEqual([...HOME_FEED_FILTER_SCOPES], ["all", "communities"])
+  for (const scope of HOME_FEED_FILTER_SCOPES) {
+    assert.ok(isHomeFeedFilterScope(scope), `${scope} is a valid filter`)
   }
+  assert.equal(isHomeFeedFilterScope("public"), false)
+  // The API still accepts the retired public scope for older clients.
+  assert.ok(isHomeFeedScope("public"))
 })
 
-test("a stored legacy `all` choice opens the feed that replaced it", () => {
-  stubStorage({ [HOME_FEED_SCOPE_STORAGE_KEY]: "all" })
-  assert.equal(readStoredHomeFeedScope(), DEFAULT_HOME_FEED_SCOPE)
-})
-
-test("a stored tab choice is returned as-is", () => {
+test("a stored filter is returned as-is", () => {
   stubStorage({ [HOME_FEED_SCOPE_STORAGE_KEY]: "communities" })
   assert.equal(readStoredHomeFeedScope(), "communities")
 })
 
-test("an unknown or missing stored value falls back to the default", () => {
+test("a stored filter removed from the UI opens the unified feed", () => {
+  stubStorage({ [HOME_FEED_SCOPE_STORAGE_KEY]: "public" })
+  assert.equal(readStoredHomeFeedScope(), "all")
+})
+
+test("an unknown or missing stored value falls back to all posts", () => {
   stubStorage()
   assert.equal(readStoredHomeFeedScope(), null)
 
@@ -54,7 +59,7 @@ test("an unknown or missing stored value falls back to the default", () => {
   assert.equal(readStoredHomeFeedScope(), null)
 })
 
-test("the chosen tab round-trips through storage", () => {
+test("the chosen filter round-trips through storage", () => {
   const store = stubStorage()
   storeHomeFeedScope("communities")
   assert.equal(store.get(HOME_FEED_SCOPE_STORAGE_KEY), "communities")
@@ -71,9 +76,10 @@ test("unavailable storage never throws and yields no stored choice", () => {
   }
 
   assert.equal(readStoredHomeFeedScope(), null)
-  assert.doesNotThrow(() => storeHomeFeedScope("public"))
+  assert.doesNotThrow(() => storeHomeFeedScope("all"))
 })
 
 test("every scope value is distinct", () => {
   assert.equal(new Set(HOME_FEED_SCOPES).size, HOME_FEED_SCOPES.length)
+  assert.equal(new Set(HOME_FEED_FILTER_SCOPES).size, HOME_FEED_FILTER_SCOPES.length)
 })

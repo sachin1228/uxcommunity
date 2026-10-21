@@ -120,9 +120,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Unknown or missing values fall back to `all`, the legacy every-public-post
-  // feed, so clients that send no scope (the Expo home feed) and stale clients
-  // keep working. The dashboard sends `public` or `communities` explicitly.
+  // Unknown or missing values fall back to `all`, the unified default feed
+  // (joined communities plus public posts). The dashboard sends its active
+  // filter explicitly; older clients that send no scope get the same single
+  // feed instead of the pre-unification every-public-post list.
   const rawScope = req.nextUrl.searchParams.get("scope") ?? "all";
   const scope: HomeFeedScope = (HOME_FEED_SCOPES as readonly string[]).includes(rawScope)
     ? (rawScope as HomeFeedScope)

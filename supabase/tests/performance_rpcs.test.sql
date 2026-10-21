@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(29);
 
 -- Nine arguments: the compound (created_at, id) cursor halves are appended
 -- after p_content_ids (see 20261013100000_community_message_compound_cursor).
@@ -158,15 +158,34 @@ select is(
   'member feed excludes communities the caller has not joined'
 );
 
--- The legacy scope is what clients that send no scope still get, so its
--- every-public-post behaviour must survive the split.
+-- `all` is the unified default feed: the union of the two filters. It includes
+-- private posts from joined communities *and* public posts from unjoined
+-- communities, and lists a public post from a joined community exactly once.
 select is(
   (select count(*)::integer
    from rpc_test_context context,
      lateral public.get_home_feed_page(context.user_id, null, 100, 'all'::text) feed
    where feed.item->>'title' = 'public joined-community showcase fixture'),
   1,
-  'legacy all scope still includes public posts from joined communities'
+  'default all scope lists a joined-community public post once'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'all'::text) feed
+   where feed.item->>'title' = 'private joined-community thread fixture'),
+  1,
+  'default all scope includes private posts from joined communities'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'all'::text) feed
+   where feed.item->>'title' = 'public unjoined-community thread fixture'),
+  1,
+  'default all scope includes public posts from unjoined communities'
 );
 
 -- The pre-`p_scope` call shape delegates to the scoped function.
