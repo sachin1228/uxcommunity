@@ -22,7 +22,6 @@ import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
-import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent';
@@ -48,13 +47,9 @@ import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
 /** The FlatList content's gutter — the dot band cancels it to run full-bleed. */
 const LIST_PADDING = 12;
 
-/** One activity tab per card scope the profile feed serves — the web order. */
+/** The profile keeps two activity scopes — everything authored, and saves. */
 const TABS: { key: ProfileFeedScope; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'thread', label: 'Threads' },
-  { key: 'showcase', label: 'Showcase' },
-  { key: 'resource', label: 'Resources' },
-  { key: 'event', label: 'Events' },
   { key: 'saved', label: 'Saved' },
 ];
 
@@ -85,20 +80,6 @@ const EMPTY_STATE: Record<ProfileFeedScope, { title: string; body: string }> = {
     body: 'Save a thread, event, resource or showcase post and it will appear here.',
   },
 };
-
-function TabIcon({ scope, color }: { scope: ProfileFeedScope; color: string }) {
-  if (scope === 'all') return <Feather name="grid" size={14} color={color} />;
-  if (scope === 'saved') return <Feather name="bookmark" size={14} color={color} />;
-  const kind =
-    scope === 'thread'
-      ? 'threads'
-      : scope === 'showcase'
-        ? 'showcase'
-        : scope === 'resource'
-          ? 'resources'
-          : 'events';
-  return <CommunityTabIcon tab={kind} size={14} color={color} />;
-}
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -428,20 +409,24 @@ export default function ProfileScreen() {
       {/* ── Activity tabs — the app's underline vocabulary, web's tab set ── */}
       <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {TABS.map((tab) => {
-            const active = scope === tab.key;
+          {TABS.map((entry) => {
+            const active = scope === entry.key;
             const labelColor = active ? colors.foreground : colors.mutedForeground;
             return (
               <Pressable
-                key={tab.key}
-                onPress={() => handleScopeChange(tab.key)}
+                key={entry.key}
+                onPress={() => handleScopeChange(entry.key)}
                 style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
                 <View style={styles.tabInner}>
-                  <TabIcon scope={tab.key} color={labelColor} />
-                  <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
+                  <Feather
+                    name={entry.key === 'all' ? 'grid' : 'bookmark'}
+                    size={14}
+                    color={labelColor}
+                  />
+                  <Text style={[styles.tabText, { color: labelColor }]}>{entry.label}</Text>
                 </View>
               </Pressable>
             );
@@ -635,14 +620,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tabs: {
+    flexGrow: 1,
     minWidth: '100%',
     justifyContent: 'center',
-    paddingHorizontal: 12,
   },
   tab: {
-    minWidth: 74,
+    flex: 1,
     height: 46,
-    paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 2,
