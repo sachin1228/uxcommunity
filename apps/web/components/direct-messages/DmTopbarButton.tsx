@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Send } from "lucide-react";
+import { DmIcon } from "@/components/ui/DmIcon";
 import { useDmUnreadBadge } from "./hooks/useDmUnreadBadge";
 
 /**
@@ -27,7 +27,7 @@ export function DmTopbarButton({ userId }: { userId: string }) {
           : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
       }`}
     >
-      <Send size={18} strokeWidth={2} />
+      <DmIcon size={18} />
       {unreadCount > 0 && (
         <span
           className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-[14px] text-white"
