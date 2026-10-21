@@ -10,22 +10,20 @@ import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
-import { type HomeFeedScope } from "@/lib/feeds/home-feed-options";
+import { type HomeFeedFilterScope } from "@/lib/feeds/home-feed-options";
 
 interface HomeFeedProps {
   currentUserId: string;
   refreshToken?: number;
-  /** Feed source — `public` (public, unjoined communities) or `communities` (joined only). */
-  scope: HomeFeedScope;
+  /** Feed source — the unified default or joined communities only. */
+  scope: HomeFeedFilterScope;
 }
 
-/** Empty-state copy per feed source — the two tabs show disjoint posts. */
-const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
-  public: "Posts that members share publicly — from communities you haven't joined — will appear here.",
+/** Empty-state copy per feed source — the filters partition the same cards. */
+const EMPTY_STATE_DESCRIPTION: Record<HomeFeedFilterScope, string> = {
+  all: "Posts from your communities and public posts from across the community will appear here.",
   communities:
     "Everything posted in the communities you've joined will appear here, whether or not it was shared publicly.",
-  // Not reachable from the switcher; `all` is the server-side legacy default.
-  all: "Posts that members share publicly will appear here.",
 };
 
 /**

@@ -1,7 +1,7 @@
 /**
  * Tests for the Home feed's source axis — the mobile counterpart of the web's
- * home-feed-options coverage. The stored choice decides which of the two
- * disjoint feeds opens, so an unknown value must never leak through.
+ * home-feed-options coverage. The stored choice decides which feed opens, so an
+ * unknown value must never leak through.
  *
  * The helpers take their storage, so these run on plain Node — no React Native
  * import (the AsyncStorage binding lives in homeFeedScopeStore.ts).
@@ -32,15 +32,12 @@ function fakeStorage(initial: Record<string, string> = {}) {
   };
 }
 
-test('the default feed is one of the switcher tabs', () => {
-  assert.ok((HOME_FEED_TAB_SCOPES as readonly string[]).includes(DEFAULT_HOME_FEED_SCOPE));
+test('the feed opens on all posts and offers two tabs', () => {
+  assert.equal(DEFAULT_HOME_FEED_SCOPE, 'all');
+  assert.deepEqual([...HOME_FEED_TAB_SCOPES], ['all', 'communities']);
   for (const scope of HOME_FEED_TAB_SCOPES) {
     assert.ok(isHomeFeedScope(scope), `${scope} is a valid scope`);
   }
-});
-
-test('the switcher lists Your Communities before Public Posts', () => {
-  assert.deepEqual([...HOME_FEED_TAB_SCOPES], ['communities', 'public']);
 });
 
 test('a stored tab choice is returned as-is', async () => {
@@ -52,8 +49,13 @@ test('a missing stored value yields no choice', async () => {
   assert.equal(await hydrateHomeFeedScope(fakeStorage()), null);
 });
 
-test('unknown stored values — including the legacy `all` — are rejected', async () => {
-  for (const value of ['all', 'yesterday', '', 'PUBLIC']) {
+test('the retired public filter opens the unified feed', async () => {
+  const storage = fakeStorage({ [HOME_FEED_SCOPE_STORAGE_KEY]: 'public' });
+  assert.equal(await hydrateHomeFeedScope(storage), 'all');
+});
+
+test('unknown stored values are rejected', async () => {
+  for (const value of ['yesterday', '', 'PUBLIC', 'ALL']) {
     const storage = fakeStorage({ [HOME_FEED_SCOPE_STORAGE_KEY]: value });
     assert.equal(await hydrateHomeFeedScope(storage), null, `${value} is not a tab`);
   }
@@ -80,7 +82,7 @@ test('unavailable storage never throws and yields no stored choice', async () =>
   };
 
   assert.equal(await hydrateHomeFeedScope(broken), null);
-  await assert.doesNotReject(() => persistHomeFeedScope(broken, 'public'));
+  await assert.doesNotReject(() => persistHomeFeedScope(broken, 'all'));
 });
 
 test('every scope value is distinct', () => {

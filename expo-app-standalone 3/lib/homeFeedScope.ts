@@ -2,23 +2,28 @@
  * The Home feed's source axis — the mobile counterpart of the web dashboard's
  * `lib/feeds/home-feed-options.ts`.
  *
- * The two tabs are disjoint:
- *   `public` ("Public Posts") — cards shared publicly, and only from
- *      communities the member has *not* joined (those have their own tab);
- *   `communities` ("Your Communities") — every card from the communities the
- *      member has joined, whether or not it was shared publicly.
+ * The two tabs are:
+ *   `all` ("All posts") — the default unified feed. Every card from the
+ *      communities the member has joined (whether or not it was shared
+ *      publicly), plus every publicly shared card from communities they have
+ *      not joined.
+ *   `communities` ("Your communities") — only cards from joined communities,
+ *      public or private.
  *
- * The server also accepts `all` — every public card, no membership filter — as
- * the pre-split default for clients that send no scope. The app never offers
- * it; it is the feed the two tabs replace.
+ * The two tabs partition the same cards: `all` is exactly the union of
+ * `communities` and the public cards, so filtering never hides a post from the
+ * unified feed or shows the same post twice.
+ *
+ * The API still accepts the retired `public` scope for older clients; this app
+ * does not offer it because those posts are already part of `all`.
  */
 
-export const HOME_FEED_TAB_SCOPES = ['communities', 'public'] as const;
+export const HOME_FEED_TAB_SCOPES = ['all', 'communities'] as const;
 
 export type HomeFeedScope = (typeof HOME_FEED_TAB_SCOPES)[number];
 
 /** The tab every session opens on when it has no stored choice. */
-export const DEFAULT_HOME_FEED_SCOPE: HomeFeedScope = 'communities';
+export const DEFAULT_HOME_FEED_SCOPE: HomeFeedScope = 'all';
 
 /** Storage key for the member's remembered choice (mobile's `@` convention). */
 export const HOME_FEED_SCOPE_STORAGE_KEY = '@home-feed/scope';
@@ -45,6 +50,7 @@ export async function hydrateHomeFeedScope(
 ): Promise<HomeFeedScope | null> {
   try {
     const value = await storage.getItem(HOME_FEED_SCOPE_STORAGE_KEY);
+    if (value === 'public') return DEFAULT_HOME_FEED_SCOPE;
     return isHomeFeedScope(value) ? value : null;
   } catch {
     return null;
