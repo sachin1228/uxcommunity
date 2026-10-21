@@ -1948,7 +1948,7 @@ function InlineVideo({
         accessibilityRole="button"
         accessibilityLabel={muted ? 'Unmute video' : 'Mute video'}
       >
-        <Feather name={muted ? 'volume-x' : 'volume-2'} size={18} color="#0A0A0A" />
+        <Feather name={muted ? 'volume-x' : 'volume-2'} size={16} color="#FFFFFF" />
       </Pressable>
     </View>
   );
@@ -2216,12 +2216,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     bottom: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
 
   detailRoot: { flex: 1 },
