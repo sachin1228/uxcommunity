@@ -112,7 +112,7 @@ export interface SemanticTheme {
 
   destructive: string;
   destructiveForeground: string;
-  /** Green unread badge (web `bg-green-500`). */
+  /** Success / confirm green (accept actions). */
   success: string;
   successForeground: string;
   /** The "liked" heart (web `--like`). */
