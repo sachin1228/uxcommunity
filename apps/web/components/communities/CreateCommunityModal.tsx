@@ -2,17 +2,14 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  BookOpen,
-  Calendar,
   Check,
-  Hash,
   ImagePlus,
   Lock,
   MessageSquare,
   Plus,
-  Sparkles,
   X,
 } from "lucide-react";
+import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Modal } from "@/components/ui/Modal";
@@ -53,10 +50,10 @@ const FEATURE_OPTIONS: Array<{
   required?: boolean;
 }> = [
   { id: "chat", label: "Chat", description: "Real-time member conversations", icon: MessageSquare, required: true },
-  { id: "threads", label: "Threads", description: "Topic-led discussions", icon: Hash },
-  { id: "showcase", label: "Showcase", description: "Share work and collect feedback", icon: Sparkles },
-  { id: "events", label: "Events", description: "Meetups and online sessions", icon: Calendar },
-  { id: "resources", label: "Resources", description: "Links, files, and references", icon: BookOpen },
+  { id: "threads", label: "Threads", description: "Topic-led discussions", icon: CONTENT_KIND_ICONS.thread },
+  { id: "showcase", label: "Showcase", description: "Share work and collect feedback", icon: CONTENT_KIND_ICONS.showcase },
+  { id: "events", label: "Events", description: "Meetups and online sessions", icon: CONTENT_KIND_ICONS.event },
+  { id: "resources", label: "Resources", description: "Links, files, and references", icon: CONTENT_KIND_ICONS.resource },
 ];
 
 function StepDots({ step }: { step: number }) {

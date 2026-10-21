@@ -11,15 +11,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  Image as ImageIcon,
-  Link2,
   Loader2,
-  MessagesSquare,
   Search,
   Star,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { Spinner } from "@/components/ui/Spinner";
 import { THREAD_CATEGORIES } from "@/lib/communities/models/threads";
 import { SHOWCASE_CATEGORY_OPTIONS } from "@/lib/communities/showcase-categories";
@@ -56,9 +54,9 @@ interface Candidate {
 }
 
 const KINDS: Array<{ value: Kind; label: string; badge: string; icon: LucideIcon }> = [
-  { value: "thread", label: "Threads", badge: "Thread", icon: MessagesSquare },
-  { value: "showcase", label: "Showcase", badge: "Showcase", icon: ImageIcon },
-  { value: "resource", label: "Resources", badge: "Resource", icon: Link2 },
+  { value: "thread", label: "Threads", badge: "Thread", icon: CONTENT_KIND_ICONS.thread },
+  { value: "showcase", label: "Showcase", badge: "Showcase", icon: CONTENT_KIND_ICONS.showcase },
+  { value: "resource", label: "Resources", badge: "Resource", icon: CONTENT_KIND_ICONS.resource },
 ];
 
 const PAGE_SIZE = 25;

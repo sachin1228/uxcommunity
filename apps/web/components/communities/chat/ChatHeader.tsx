@@ -1,7 +1,8 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, Bell, BellOff, BookMarked, Calendar, LogOut, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Trash2, Users } from "lucide-react";
+import { Activity, Bell, BellOff, LogOut, MessageCircle, MoreHorizontal, Settings, Trash2, Users } from "lucide-react";
+import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -490,10 +491,10 @@ export const ChatHeader = memo(function ChatHeader({
             <nav className="flex items-center gap-1 overflow-x-auto md:gap-3" aria-label="Community views">
               {([
                 ["chat",      "Chat",      MessageCircle],
-                ["threads",   "Threads",   MessagesSquare],
-                ["showcase",  "Showcase",  Sparkles],
-                ["resources", "Resources", BookMarked],
-                ["events",    "Events",    Calendar],
+                ["threads",   "Threads",   CONTENT_KIND_ICONS.thread],
+                ["showcase",  "Showcase",  CONTENT_KIND_ICONS.showcase],
+                ["resources", "Resources", CONTENT_KIND_ICONS.resource],
+                ["events",    "Events",    CONTENT_KIND_ICONS.event],
                 ["members",   "Members",   Users],
                 ["activity",  "Activity",  Activity],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (

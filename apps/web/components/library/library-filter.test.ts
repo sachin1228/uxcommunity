@@ -14,6 +14,9 @@ function showcase(id: string, category: string): FeedItem {
 function resource(id: string, resourceType: string): FeedItem {
   return { _type: "resource", id, resource_type: resourceType } as unknown as FeedItem;
 }
+function event(id: string): FeedItem {
+  return { _type: "event", id } as unknown as FeedItem;
+}
 
 const shelf: FeedItem[] = [
   thread("t-question", "question"),
@@ -23,6 +26,7 @@ const shelf: FeedItem[] = [
   showcase("s-motion", "motion_design"),
   resource("r-figma", "figma"),
   resource("r-article", "article"),
+  event("e-meetup"),
 ];
 
 const ids = (items: FeedItem[]) => items.map((item) => item.id);
@@ -71,4 +75,8 @@ test("a chip from another kind's vocabulary matches nothing", () => {
   assert.deepEqual(filterLibraryItems(shelf, "thread", "figma"), []);
   assert.deepEqual(filterLibraryItems(shelf, "resource", "question"), []);
   assert.deepEqual(filterLibraryItems(shelf, "showcase", "poll"), []);
+});
+
+test("the event tab is a placeholder and always empty", () => {
+  assert.deepEqual(filterLibraryItems(shelf, "event", "all"), []);
 });
