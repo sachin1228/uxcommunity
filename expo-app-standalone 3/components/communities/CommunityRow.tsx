@@ -13,6 +13,7 @@ import { isCommunityMuted } from '@/lib/communityMute';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { communityNameBadges } from '@/lib/communityBadges';
+import { communityDpShadow } from '@/constants/designSystem';
 
 // ---------------------------------------------------------------------------
 // Member count formatting — mirrors web's fmtCount (1.2k / 3M)
@@ -123,7 +124,7 @@ export function Initials({
     <View
       style={[
         styles.avatarBase,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primarySoft },
+        { width: size, height: size, borderRadius: size / 4, backgroundColor: colors.primarySoft },
       ]}
     >
       <Text style={[styles.avatarText, { color: colors.primary, fontSize: size * 0.38 }]}>
@@ -242,7 +243,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
               source={{ uri: community.image_url }}
               style={[
                 styles.avatarBase,
-                { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
+                { width: 48, height: 48, borderRadius: 12, borderColor: colors.border },
               ]}
             />
           ) : (
@@ -375,6 +376,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
+    ...communityDpShadow,
   },
   avatarText: {
     fontFamily: 'Geist_600SemiBold',

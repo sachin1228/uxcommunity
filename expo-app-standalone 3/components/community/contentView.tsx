@@ -24,6 +24,7 @@ import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
+import { communityDpShadow } from '@/constants/designSystem';
 import {
   CommunityContent,
   CommunityEvent,
@@ -2034,7 +2035,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   communityLabelText: { fontFamily: 'Geist_500Medium', fontSize: 11 },
-  communityLabelAvatar: { width: 16, height: 16, borderRadius: 8 },
+  communityLabelAvatar: { width: 16, height: 16, borderRadius: 4, ...communityDpShadow },
   communityLabelName: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 11 },
 
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

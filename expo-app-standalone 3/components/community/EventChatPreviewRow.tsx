@@ -5,6 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { Initials, PinIcon } from '@/components/communities/CommunityRow';
 import { eventChatName } from '@/lib/eventChatRules';
+import { communityDpShadow } from '@/constants/designSystem';
 
 /**
  * An event's group chat drawn the way the sidebar will show it — the mobile
@@ -84,10 +85,11 @@ const styles = StyleSheet.create({
   face: {
     width: FACE,
     height: FACE,
-    borderRadius: FACE / 2,
+    borderRadius: FACE / 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
+    ...communityDpShadow,
   },
   faceImage: { backgroundColor: 'transparent' },
   copy: { flex: 1, minWidth: 0 },

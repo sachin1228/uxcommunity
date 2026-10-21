@@ -226,7 +226,7 @@ export default function CommunityDetailPage() {
         />
 
         <div className="flex flex-col gap-5 px-6 pb-5 sm:flex-row sm:items-end sm:-mt-10">
-          <div className="rounded-full ring-4 ring-surface">
+          <div className="rounded-[19px] ring-4 ring-surface">
             <CommunityDp
               imageUrl={community.image_url}
               name={community.name}

@@ -24,6 +24,7 @@ import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/C
 import { MembersPanel } from '@/components/community/MembersPanel';
 import { ActivityPanel } from '@/components/community/ActivityPanel';
 import { communityNameBadges } from '@/lib/communityBadges';
+import { communityDpShadow } from '@/constants/designSystem';
 
 /**
  * The community info screen behind the chat header's title — WhatsApp's
@@ -444,8 +445,9 @@ const styles = StyleSheet.create({
   heroAvatar: {
     width: 96,
     height: 96,
-    borderRadius: 48,
+    borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
+    ...communityDpShadow,
   },
   heroAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
   heroAvatarText: { fontSize: 34, fontFamily: 'Geist_600SemiBold' },

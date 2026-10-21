@@ -33,6 +33,7 @@ import {
   regenerateCommunityInvite,
   updateCommunitySettings,
 } from '@/lib/communities';
+import { communityDpShadow } from '@/constants/designSystem';
 
 /**
  * Community settings — the mobile reading of the web CommunitySettingsView:
@@ -1158,13 +1159,13 @@ const styles = StyleSheet.create({
   photoButton: {
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    ...communityDpShadow,
   },
-  photoPreview: { width: '100%', height: '100%' },
+  photoPreview: { width: '100%', height: '100%', borderRadius: 16 },
   photoText: { gap: 4, flexShrink: 1 },
   linkText: { fontSize: 12.5, fontFamily: 'Geist_500Medium' },
 

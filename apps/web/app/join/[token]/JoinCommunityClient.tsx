@@ -82,7 +82,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
             too, so an invite link reads the same as the sidebar the member
             lands in. */}
         <div className="relative mx-auto mb-5 h-16 w-16">
-          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground-muted">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground-muted shadow-[var(--shadow-sm)]">
             {community.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={community.image_url} alt="" className="h-full w-full object-cover" />

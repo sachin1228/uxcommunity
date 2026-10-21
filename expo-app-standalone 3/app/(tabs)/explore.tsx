@@ -19,6 +19,7 @@ import { CommunityPreviewSheet } from '@/components/community/CommunityPreviewSh
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { Initials } from '@/components/communities/CommunityRow';
 import { communityNameBadges } from '@/lib/communityBadges';
+import { communityDpShadow } from '@/constants/designSystem';
 import { useColors } from '@/hooks/useColors';
 import {
   EXPLORE_TABS,
@@ -541,7 +542,7 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
+  avatar: { width: 40, height: 40, borderRadius: 10, ...communityDpShadow },
   cardText: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: {

@@ -21,6 +21,7 @@ import { type CommunityPreviewData } from '@/lib/communityPreviewData';
 import { getCommunityPreview, joinCommunity } from '@/lib/communityPreviewApi';
 import { hapticSelection } from '@/lib/haptics';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { communityDpShadow } from '@/constants/designSystem';
 
 /**
  * The feed's "posted in …" popup — the mobile reading of the web
@@ -474,7 +475,7 @@ const styles = StyleSheet.create({
   requestTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 17 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingTop: 10 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 64, height: 64, borderRadius: 32 },
+  avatar: { width: 64, height: 64, borderRadius: 16, ...communityDpShadow },
   identityCopy: { flex: 1, gap: 5 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { fontFamily: 'Geist_600SemiBold', fontSize: 18, flexShrink: 1 },

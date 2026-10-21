@@ -336,7 +336,7 @@ export function CommunitySettingsView({
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground-muted shadow-[var(--shadow-sm)] transition-colors hover:border-accent hover:text-accent"
                     aria-label="Change community photo"
                   >
                     {imagePreview ? (

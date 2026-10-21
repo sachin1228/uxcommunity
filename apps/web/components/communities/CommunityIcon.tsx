@@ -7,24 +7,24 @@ import { ImagePlus } from "lucide-react";
  *
  * The ring lives here, not on CommunityDp's shared container: only the
  * fallback reads as an empty slot ("add a picture here"), so a community
- * WITH an image keeps the plain unringed circle.
+ * WITH an image keeps the plain unringed tile.
  */
 export function CommunityIcon({
   size = 40,
   iconSize,
   className = "",
 }: {
-  /** Container diameter in px (square circle). */
+  /** Container diameter in px (rounded square). */
   size?: number;
   /** Icon size in px — defaults to roughly half the container. */
   iconSize?: number;
-  /** Extra classes for the circular container (background, etc.). */
+  /** Extra classes for the rounded-square container (background, etc.). */
   className?: string;
 }) {
   return (
     <div
-      className={`flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none border border-black/10 dark:border-white/15 bg-background ${className}`}
-      style={{ width: size, height: size }}
+      className={`flex items-center justify-center overflow-hidden shrink-0 select-none border border-black/10 dark:border-white/15 bg-background ${className}`}
+      style={{ width: size, height: size, borderRadius: Math.max(4, Math.round(size / 4)) }}
       aria-hidden
     >
       <ImagePlus

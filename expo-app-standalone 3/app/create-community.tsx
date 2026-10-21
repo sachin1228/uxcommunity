@@ -22,6 +22,7 @@ import { prepareImageForUpload } from '@/lib/prepareImage';
 import { communityStore } from '@/lib/communityStore';
 import { createCommunity, type CreatedCommunity } from '@/lib/communities';
 import type { CommunityTab } from '@/lib/communityContent';
+import { communityDpShadow } from '@/constants/designSystem';
 
 /**
  * Create a community — the mobile port of the web CreateCommunityModal, as a
@@ -697,13 +698,13 @@ const styles = StyleSheet.create({
   pictureButton: {
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    ...communityDpShadow,
   },
-  picturePreview: { width: '100%', height: '100%' },
+  picturePreview: { width: '100%', height: '100%', borderRadius: 16 },
   pictureText: { flexShrink: 1, gap: 2 },
   rulesHeader: {
     flexDirection: 'row',

@@ -26,7 +26,7 @@ export interface CommunityDpProps {
   size?: number;
   /** Glyph size inside the no-image fallback; defaults to half the container. */
   iconSize?: number;
-  /** Extra classes for the circular container (background, etc.). */
+  /** Extra classes for the rounded-square container (background, etc.). */
   className?: string;
   /** Draws the verified seal over the face's bottom-right corner. */
   verified?: boolean;
@@ -41,11 +41,15 @@ export function CommunityDp({
   verified = false,
 }: CommunityDpProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  // One proportion on every face: a quarter of the side, floored so the
+  // smallest label DP still reads as a tile rather than a circle.
+  const radius = Math.max(4, Math.round(size / 4));
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <div
-        className={`flex h-full w-full items-center justify-center rounded-full overflow-hidden select-none ${className}`}
+        className={`flex h-full w-full items-center justify-center overflow-hidden select-none ${className}`}
+        style={{ borderRadius: radius, boxShadow: "var(--shadow-sm)" }}
       >
         {imageUrl && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element

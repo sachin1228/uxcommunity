@@ -253,6 +253,20 @@ export const shadows = {
   },
 } as const;
 
+/**
+ * A whisper of lift under a community's face. The scale above is tuned for
+ * light surfaces; on the app's near-black canvas its 5% shadow cannot read,
+ * so the DPs keep the scale's shape at a strength that shows (the web's
+ * `--shadow-sm` in dark mode).
+ */
+export const communityDpShadow = {
+  shadowColor: '#000000',
+  shadowOpacity: 0.5,
+  shadowRadius: 3,
+  shadowOffset: { width: 0, height: 1 },
+  elevation: 2,
+} as const;
+
 /** Web `--chat-name-0…6`, indexed by a stable hash of the user id. */
 export const chatNameColors = {
   light: ['#0072F5', '#0D8C7D', '#8E4EC6', '#EA3E83', '#A35200', '#398E4A', '#E5484D'],

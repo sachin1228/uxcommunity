@@ -31,6 +31,7 @@ import { CommunityMenu, type CommunityConfirmAction } from '@/components/communi
 import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
+import { communityDpShadow } from '@/constants/designSystem';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
 import {
@@ -1739,9 +1740,10 @@ const styles = StyleSheet.create({
   headerAvatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
+    ...communityDpShadow,
   },
   headerAvatarFallback: {
     alignItems: 'center',
@@ -1867,8 +1869,8 @@ const styles = StyleSheet.create({
   emptyAvatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
+    borderRadius: 12,
+    ...communityDpShadow,
   },
   emptyText: {
     fontSize: 14,
