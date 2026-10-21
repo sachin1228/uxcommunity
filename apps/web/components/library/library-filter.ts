@@ -1,7 +1,11 @@
 import type { FeedItem } from "@/components/feeds/types";
 
-/** The three content kinds the Library shelves, in tab order. */
-export const LIBRARY_KINDS = ["thread", "showcase", "resource"] as const;
+/**
+ * The content kinds the Library shelves, in tab order. `event` is a
+ * placeholder: events are not curated into the Library yet, so that tab always
+ * shows its empty state.
+ */
+export const LIBRARY_KINDS = ["thread", "showcase", "resource", "event"] as const;
 export type LibraryKind = (typeof LIBRARY_KINDS)[number];
 
 /**
@@ -14,6 +18,9 @@ export type LibraryKind = (typeof LIBRARY_KINDS)[number];
  * category.
  */
 export function filterLibraryItems(items: FeedItem[], kind: LibraryKind, chip: string): FeedItem[] {
+  // Events have no shelf yet — the tab is a placeholder, so nothing matches.
+  if (kind === "event") return [];
+
   return items.filter((item) => {
     if (chip === "all") return item._type === kind;
     if (kind === "thread") {

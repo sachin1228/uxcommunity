@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { BarChart3, Image as ImageIcon, LayoutGrid, Link2, MessagesSquare, type LucideIcon } from "lucide-react";
+import { BarChart3, Calendar, Image as ImageIcon, LayoutGrid, Link2, MessagesSquare, type LucideIcon } from "lucide-react";
 import { CommunityFeedList } from "@/components/feeds/CommunityFeedList";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { filterChip } from "@/components/communities/filter-chip";
@@ -56,12 +56,15 @@ const TABS: Array<{ value: LibraryKind; label: string; icon: LucideIcon }> = [
   { value: "thread", label: "Threads", icon: MessagesSquare },
   { value: "showcase", label: "Showcase", icon: ImageIcon },
   { value: "resource", label: "Resources", icon: Link2 },
+  { value: "event", label: "Events", icon: Calendar },
 ];
 
 const CHIPS: Record<LibraryKind, Chip[]> = {
   thread: THREAD_CHIPS,
   showcase: SHOWCASE_CHIPS,
   resource: RESOURCE_CHIPS,
+  // Events are not curated into the Library yet, so the tab has no chips.
+  event: [],
 };
 
 const EMPTY_STATES: Record<LibraryKind, { icon: typeof MessagesSquare; title: string; description: string }> = {
@@ -79,6 +82,11 @@ const EMPTY_STATES: Record<LibraryKind, { icon: typeof MessagesSquare; title: st
     icon: Link2,
     title: "No resources yet",
     description: "Handpicked Figma files, articles, tools and more will appear here.",
+  },
+  event: {
+    icon: Calendar,
+    title: "No events yet",
+    description: "Handpicked events and meetups from across the community will appear here.",
   },
 };
 
@@ -169,20 +177,22 @@ export function LibraryView({
           })}
         </div>
 
-        <div className={`${communityFeedLayout.pageHeaderFilters} scrollbar-none flex items-center gap-2 overflow-x-auto pb-1`}>
-          {CHIPS[kind].map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setChip(item.value)}
-              aria-pressed={chip === item.value}
-              className={filterChip(chip === item.value)}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {CHIPS[kind].length > 0 && (
+          <div className={`${communityFeedLayout.pageHeaderFilters} scrollbar-none flex items-center gap-2 overflow-x-auto pb-1`}>
+            {CHIPS[kind].map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setChip(item.value)}
+                aria-pressed={chip === item.value}
+                className={filterChip(chip === item.value)}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <CommunityFeedList
