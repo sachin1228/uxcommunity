@@ -14,6 +14,8 @@
 
 import {
   DEFAULT_COLOR_SCHEME,
+  blue,
+  blueDark,
   chatNameColors,
   radius as radiusScale,
   themes,
@@ -94,7 +96,7 @@ function buildPalette(scheme: ColorScheme): Palette {
     chatOwnBubbleTail: '#0062D1',
     chatFailedBubble: 'rgba(239, 68, 68, 0.8)',
     chatMentionOwn: isDark ? '#52A8FF' : '#99CEFF',
-    chatMention: '#0072F5',
+    chatMention: isDark ? blueDark[900] : blue[900],
     chatNameFallback: isDark ? '#737373' : '#525252',
     chatReplyBgOther: isDark ? 'rgba(0, 0, 0, 0.10)' : 'rgba(0, 0, 0, 0.06)',
     chatReplyBorderOther: isDark ? 'rgba(255, 255, 255, 0.15)' : '#DFDFDF',
