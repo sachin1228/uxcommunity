@@ -35,12 +35,12 @@ import { resolveProfilePictureUri } from '@/lib/profilePicture';
  * Explore — the web browse page (`/dashboard/communities`) ported: every
  * community the member can discover, with their standing on each row.
  *
- * The same four pills narrow the same list (All / Public / Private / Requests
- * sent), the same two sections split it by whether the member can join
- * outright, and the same rules hide what is never browsable — a community they
- * already joined lives in Chat, and the groups the server provisions from
- * profile fields are joined by match rather than by browsing. Both rules live
- * in `lib/exploreCommunities.ts` so a test pins them down.
+ * The same two pills narrow the same list (All / Requests sent), the same two
+ * sections split it by whether the member can join outright, and the same rules
+ * hide what is never browsable — private communities, a community they already
+ * joined (it lives in Chat), and the groups the server provisions from profile
+ * fields (joined by match rather than by browsing). Both rules live in
+ * `lib/exploreCommunities.ts` so a test pins them down.
  *
  * Joining goes through the feed's community sheet, which is already the app's
  * one join dialog: it reads the community live, covers the member / requested /
@@ -122,7 +122,7 @@ export default function ExploreTab() {
       // list needs no heading.
       out.push({
         key: 'rest',
-        title: recommended.length > 0 ? (tab === 'all' ? 'All communities' : 'More communities') : '',
+        title: recommended.length > 0 ? 'All communities' : '',
         data: rest,
       });
     }

@@ -254,7 +254,6 @@ export default function CommunitiesIndexPage() {
   // is pinned by tests rather than by reading this JSX.
   const visible = visibleExploreRows(communities, activeTab, search);
 
-  const isAllTab      = activeTab === "all";
   const isRequestsTab = activeTab === "requests";
   // Recommended = the member can join outright; the rest need a request, an
   // invite or a profile change. The split reads the same on every browse tab.
@@ -378,7 +377,7 @@ export default function CommunitiesIndexPage() {
               <section>
                 {recommended.length > 0 && (
                   <h2 className="font-display text-sm font-semibold text-foreground mb-3">
-                    {isAllTab ? "All communities" : "More communities"}
+                    All communities
                   </h2>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">

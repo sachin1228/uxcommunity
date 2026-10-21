@@ -2,10 +2,10 @@
  * Which rows each Explore tab shows, and how the discovery list splits into
  * its two sections.
  *
- * The guarantees, ported with the web page's own coverage: the privacy pills
- * narrow the same list the All tab shows (never a different set of rules),
- * profile-mirror communities stay unbrowsable on every tab, and the requests
- * tab is the member's own outgoing requests rather than discovery.
+ * The guarantees, ported with the web page's own coverage: Explore browses
+ * public communities only (private rows are never listed, even when the member
+ * already asked to join), profile-mirror communities stay unbrowsable, and the
+ * requests tab is the member's own outgoing requests rather than discovery.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -32,10 +32,10 @@ function row(overrides: Partial<ExploreCommunity> & { id: string }): ExploreComm
 
 const ids = (rows: ExploreCommunity[]) => rows.map((c) => c.id);
 
-test('the privacy pills sit between All and the requests tab', () => {
+test('Explore offers two pills: All and Requests sent', () => {
   assert.deepEqual(
     EXPLORE_TABS.map((t) => t.value),
-    ['all', 'public', 'private', 'requests'],
+    ['all', 'requests'],
   );
 });
 
@@ -51,37 +51,46 @@ test('joined and profile-mirror communities never appear as discoverable', () =>
   ];
 
   assert.deepEqual(ids(visibleExploreRows(rows, 'all', '')), ['a', 'b']);
-  assert.deepEqual(ids(visibleExploreRows(rows, 'public', '')), ['a', 'b']);
-  assert.deepEqual(ids(visibleExploreRows(rows, 'private', '')), []);
 });
 
-test('a row written before is_private existed reads as public', () => {
-  const rows = [row({ id: 'unflagged' }), row({ id: 'invite-only', is_private: true })];
-
-  assert.deepEqual(ids(visibleExploreRows(rows, 'public', '')), ['unflagged']);
-  assert.deepEqual(ids(visibleExploreRows(rows, 'private', '')), ['invite-only']);
-});
-
-test('the requests tab is the member’s own pending requests', () => {
+test('private rows are never browsable, even with a pending request', () => {
   const rows = [
     row({ id: 'asked', is_private: true, can_join: false, has_pending_request: true }),
     row({ id: 'unasked', is_private: true, can_join: false }),
     row({ id: 'open' }),
   ];
 
-  // A pending private row stays listed here even though discovery hides rows the
-  // member cannot join outright.
-  assert.deepEqual(ids(visibleExploreRows(rows, 'requests', '')), ['asked']);
-  assert.deepEqual(ids(visibleExploreRows(rows, 'private', '')), ['asked', 'unasked']);
+  assert.deepEqual(ids(visibleExploreRows(rows, 'all', '')), ['open']);
+});
+
+test('a row written before is_private existed reads as public', () => {
+  const rows = [row({ id: 'unflagged' }), row({ id: 'invite-only', is_private: true })];
+
+  assert.deepEqual(ids(visibleExploreRows(rows, 'all', '')), ['unflagged']);
+});
+
+test('the requests tab is the member’s own pending requests', () => {
+  const rows = [
+    row({ id: 'asked', is_private: true, can_join: false, has_pending_request: true }),
+    row({ id: 'mirror', type: 'sector', is_private: true, has_pending_request: true }),
+    row({ id: 'unasked', is_private: true, can_join: false }),
+    row({ id: 'open' }),
+  ];
+
+  assert.deepEqual(ids(visibleExploreRows(rows, 'requests', '')), ['asked', 'mirror']);
 });
 
 test('search matches a name substring, case-insensitively', () => {
-  const rows = [row({ id: '1', name: 'Mobile Design System' }), row({ id: '2', name: 'Hiring' })];
+  const rows = [
+    row({ id: '1', name: 'Mobile Design System' }),
+    row({ id: '2', name: 'Hiring' }),
+    row({ id: '3', name: 'Mobile Guild', is_private: true, has_pending_request: true }),
+  ];
 
   assert.deepEqual(ids(visibleExploreRows(rows, 'all', 'mobile')), ['1']);
   assert.deepEqual(ids(visibleExploreRows(rows, 'all', '  MOBILE  ')), ['1']);
   assert.deepEqual(ids(visibleExploreRows(rows, 'all', '')), ['1', '2']);
-  assert.deepEqual(ids(visibleExploreRows(rows, 'requests', 'mobile')), []);
+  assert.deepEqual(ids(visibleExploreRows(rows, 'requests', 'mobile')), ['3']);
 });
 
 test('the recommended section holds only what the member can join outright', () => {

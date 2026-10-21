@@ -4,9 +4,9 @@
  *
  * Which tab hides what is the part worth pinning down, so it lives here as a
  * pure function with a plain-Node test rather than inline in the screen's JSX:
- * profile-mirror communities are never browsable, a joined community belongs
- * to the Chat tab, and "Requests sent" is a different list rather than a slice
- * of the discovery one.
+ * private and profile-mirror communities are never browsable, a joined
+ * community belongs to the Chat tab, and "Requests sent" is a different list
+ * rather than a slice of the discovery one.
  *
  * The network half lives in `exploreCommunitiesApi.ts`; this module imports
  * nothing from React Native.
@@ -30,14 +30,12 @@ export interface ExploreCommunity {
 }
 
 /**
- * The pill order is the contract: privacy filters sit between All and the
- * requests tab, and "Requests sent" stays last because it is not a privacy
- * filter at all — it is the member's own outgoing join requests.
+ * Two pills: All browses the public discovery list, and "Requests sent" is the
+ * member's own outgoing join requests. Private communities are not listed
+ * anywhere in Explore — they are reached by invite or link, not by browsing.
  */
 export const EXPLORE_TABS = [
   { label: 'All', value: 'all' },
-  { label: 'Public', value: 'public' },
-  { label: 'Private', value: 'private' },
   { label: 'Requests sent', value: 'requests' },
 ] as const;
 
@@ -59,11 +57,10 @@ export function isPrivateCommunity(c: ExploreCommunity): boolean {
 /**
  * The rows a tab shows, in list order.
  *
- * - `all`, `public` and `private` browse the same discovery list; the privacy
- *   tabs narrow it rather than filtering a different set, so a row hidden on All
- *   (joined, profile-mirror) is hidden on both.
- * - `requests` is the member's own pending private-community requests, so it is
- *   the one tab where a row the member already asked to join still appears.
+ * - `all` browses the public discovery list: private communities are left out
+ *   even when the member already has a pending request for one.
+ * - `requests` is the member's own pending join requests, so it is the one tab
+ *   where a row the member cannot browse still appears.
  */
 export function visibleExploreRows(
   rows: readonly ExploreCommunity[],
@@ -77,16 +74,14 @@ export function visibleExploreRows(
     if (tab === 'requests') return Boolean(c.has_pending_request) && matchesSearch(c);
     if (c.joined) return false;
     if (PROFILE_MIRROR_TYPES.has(c.type)) return false;
-    if (tab === 'public' && isPrivateCommunity(c)) return false;
-    if (tab === 'private' && !isPrivateCommunity(c)) return false;
+    if (isPrivateCommunity(c)) return false;
     return matchesSearch(c);
   });
 }
 
 /**
- * The two sections the discovery tabs split their rows into: the member can
- * join the first outright, the rest need a request, an invite or a profile
- * change. The second heading only reads "All communities" on the All tab.
+ * The two sections the discovery list splits its rows into: the member can
+ * join the first outright, the rest need an invite or a profile change.
  */
 export function splitExploreRows(rows: readonly ExploreCommunity[]): {
   recommended: ExploreCommunity[];
