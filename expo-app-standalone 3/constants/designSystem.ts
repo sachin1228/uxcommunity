@@ -117,7 +117,7 @@ export interface SemanticTheme {
   successForeground: string;
   /** The "liked" heart (web `--like`). */
   like: string;
-  /** Inline URLs inside post bodies (web `--ds-blue-600`). */
+  /** Inline URLs inside post bodies (web `--ds-blue-900`). */
   link: string;
   /** The profile backdrop's dots (web `--grid-dot-color`, on the `--grid-size` pitch). */
   gridDot: string;
@@ -156,7 +156,7 @@ export const lightTheme: SemanticTheme = {
   success: '#22C55E',
   successForeground: '#FFFFFF',
   like: '#F91880',
-  link: blue[600],
+  link: blue[900],
   gridDot: 'rgba(0, 0, 0, 0.16)',
 };
 
@@ -193,7 +193,7 @@ export const darkTheme: SemanticTheme = {
   success: '#22C55E',
   successForeground: '#FFFFFF',
   like: '#F91880',
-  link: blueDark[600],
+  link: blueDark[900],
   gridDot: 'rgba(255, 255, 255, 0.14)',
 };
 
