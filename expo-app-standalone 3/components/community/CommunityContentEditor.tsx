@@ -35,9 +35,6 @@ import {
   type ThreadPoll,
   type ThreadPollDraft,
 } from '@/lib/communityPoll';
-import { getCities, type CityOption } from '@/lib/cities';
-import { getOwnProfile } from '@/lib/profile';
-import { CityPickerSheet } from './CityPickerSheet';
 import {
   EventDatePickerSheet,
   EventTimePickerSheet,
@@ -157,9 +154,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const [accentColor, setAccentColor] = useState(DEFAULT_EVENT_ACCENT);
-  const [cities, setCities] = useState<CityOption[]>([]);
-  const [cityId, setCityId] = useState<string | null>(null);
-  const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePicker, setTimePicker] = useState<'start' | 'end' | null>(null);
   const [isOnline, setIsOnline] = useState(false);
@@ -266,10 +260,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           ? item.accent_color
           : DEFAULT_EVENT_ACCENT,
       );
-      setCityId(item && 'city_id' in item ? item.city_id ?? null : null);
       setDatePickerOpen(false);
       setTimePicker(null);
-      setCityPickerOpen(false);
       setIsOnline(Boolean(item && 'is_online' in item && item.is_online));
       setLocation(item && 'location' in item ? item.location ?? '' : '');
       setMeetLink(item && 'meet_link' in item ? item.meet_link ?? '' : '');
@@ -279,24 +271,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     }
     setError(null);
   }, [item, kind, visible, deviceZone]);
-
-  // The city list and, for a new event, the member's own city as the prefill —
-  // the same two reads the web form makes when it opens.
-  useEffect(() => {
-    if (!visible || kind !== 'events') return;
-    let cancelled = false;
-    getCities()
-      .then((list) => { if (!cancelled) setCities(list); })
-      .catch(() => { /* The picker stays empty; the rest of the form works. */ });
-    if (!item) {
-      getOwnProfile()
-        .then((profile) => {
-          if (!cancelled) setCityId((current) => current ?? profile.profile?.cities?.id ?? null);
-        })
-        .catch(() => { /* City can still be picked by hand. */ });
-    }
-    return () => { cancelled = true; };
-  }, [visible, kind, item]);
 
   const pickCover = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -502,7 +476,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       };
     } else {
       // The web form's field rules, in its own order: description, cover and
-      // the schedule are required, and a public event must name its city.
+      // the schedule are required.
       if (!title.trim()) return setError('Title is required.');
       if (!description.trim()) return setError('Description is required.');
       if (!coverImageUrl) return setError('Cover image is required.');
@@ -528,7 +502,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
       if (new Date(end).getTime() <= new Date(start).getTime()) {
         return setError('End time must be after the start time.');
       }
-      if (isPublic && !cityId) return setError('City is required.');
       body = {
         title: title.trim(),
         description: description.trim() || null,
@@ -537,7 +510,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         is_online: isOnline,
         location: location.trim() || null,
         meet_link: meetLink.trim() || null,
-        city_id: cityId,
         max_attendees: maxAttendees ? Number(maxAttendees) : null,
         cover_image_url: coverImageUrl,
         accent_color: accentColor,
@@ -577,7 +549,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     item && 'event_date' in item && new Date(item.event_date).getTime() < Date.now(),
   );
   const minEventDate = eventStartIsPast ? undefined : todayStamp();
-  const selectedCity = cities.find((city) => city.id === cityId) ?? null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
@@ -912,7 +883,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             <>
               {/* The web form's exact fields and order: description, cover,
                   name, the schedule, type, place and cap, then the ticket's
-                  color, visibility and city. */}
+                  color and visibility. */}
               <Field label="Description *">
                 <TextInput
                   value={description}
@@ -1172,39 +1143,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
                 onValueChange={setIsPublic}
                 colors={colors}
               />
-
-              {isPublic ? (
-                <Field label="City *">
-                  <Pressable
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      setCityPickerOpen(true);
-                    }}
-                    style={[
-                      styles.input,
-                      styles.pickerTrigger,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.borderSubtle },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={selectedCity ? `City, ${selectedCity.name}` : 'Select city'}
-                  >
-                    <Feather name="map-pin" size={16} color={colors.foregroundMuted} />
-                    <Text
-                      style={[
-                        styles.pickerText,
-                        { color: selectedCity ? colors.foreground : colors.foregroundSubtle },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {selectedCity?.name ?? 'Select a city…'}
-                    </Text>
-                    <Feather name="chevron-down" size={18} color={colors.foregroundMuted} />
-                  </Pressable>
-                  <Text style={[styles.fieldHint, { color: colors.foregroundSubtle }]}>
-                    Shown on this city&apos;s Events page, so people there can discover and join it.
-                  </Text>
-                </Field>
-              ) : null}
             </>
           ) : null}
 
@@ -1246,16 +1184,6 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               setTimePicker(null);
             }}
             onClose={() => setTimePicker(null)}
-          />
-          <CityPickerSheet
-            visible={cityPickerOpen}
-            cities={cities}
-            value={cityId}
-            onSelect={(next) => {
-              setCityId(next);
-              setCityPickerOpen(false);
-            }}
-            onClose={() => setCityPickerOpen(false)}
           />
         </>
       ) : null}

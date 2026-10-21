@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, MapPinned, Users, Video, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
@@ -97,26 +97,8 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [maxAttendees, setMaxAttendees] = useState(event.max_attendees ? String(event.max_attendees) : "");
   const [isPublic, setIsPublic] = useState(event.is_public ?? false);
   const [accentColor, setAccentColor] = useState(event.accent_color ?? DEFAULT_EVENT_ACCENT);
-  // Same picker as the create form; the stored city is the prefill, and an
-  // event from before the column existed opens on the empty option.
-  const [cityId, setCityId] = useState<string | null>(event.city_id ?? null);
-  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/data/cities");
-        const data = (await res.json()) as { cities?: { id: string; name: string }[] };
-        if (!cancelled) setCities(data.cities ?? []);
-      } catch {
-        // The picker stays empty; the rest of the form still works.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -184,9 +166,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     const endIso = buildIso(endDate, endTime);
     if (!endIso) { setError("End time is not a valid time of day."); return; }
     if (endIso <= startIso) { setError("End time must be after the start time."); return; }
-    // Only asked for while the event is public — its city is where the public
-    // listing shows it.
-    if (isPublic && !cityId) { setError("City is required."); return; }
 
     setSaving(true);
     setError(null);
@@ -203,7 +182,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           is_online: isOnline,
           location: location.trim() || null,
           meet_link: meetLink.trim() || null,
-          city_id: cityId,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
           accent_color: accentColor,
@@ -507,29 +485,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             icon={<Globe strokeWidth={2.5} size={15} />}
             flush
           />
-
-          {/* City — asked for only while the event is public, because the city
-              Events page is the one surface the choice feeds. */}
-          {isPublic && (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPinned strokeWidth={2.5} size={11} /> City <span className="text-accent">*</span>
-              </span>
-              <select
-                value={cityId ?? ""}
-                onChange={(e) => setCityId(e.target.value || null)}
-                className="field w-full"
-              >
-                <option value="" disabled>Select a city…</option>
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>{city.name}</option>
-                ))}
-              </select>
-              <p className="mt-1.5 font-body text-[11px] leading-snug text-foreground-subtle">
-                Shown on this city&apos;s Events page, so people there can discover and join it.
-              </p>
-            </label>
-          )}
         </div>
 
         </div>
