@@ -38,6 +38,7 @@ import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { useEventInteractions } from "./useEventInteractions";
 import { EventOptionsMenu } from "./EventOptionsMenu";
+import { renderWithLinks } from "../threads/renderWithLinks";
 
 // ─── Ticket outline with perforation notches (SVG) ─────────────────────────
 
@@ -774,14 +775,23 @@ export function EventCard({
       </div>
       {/* ── Description — rendered like a thread card body ── */}
       {description && (
-        isDetail || descriptionExpanded ? (
+        isDetail ? (
           <p
             id={descriptionId}
             ref={descriptionRef}
             tabIndex={-1}
             className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
           >
-            {description}
+            {renderWithLinks(description, false)}
+          </p>
+        ) : descriptionExpanded ? (
+          <p
+            id={descriptionId}
+            ref={descriptionRef}
+            tabIndex={-1}
+            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+          >
+            {renderWithLinks(description, true)}
           </p>
         ) : (
           <TruncateMarkup
@@ -812,7 +822,7 @@ export function EventCard({
               tabIndex={-1}
               className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
             >
-              {collapsedDescription}
+              {renderWithLinks(collapsedDescription, true)}
             </p>
           </TruncateMarkup>
         )

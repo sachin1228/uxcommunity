@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import TruncateMarkup from "react-truncate-markup";
+import { flattenPreviewText } from "@/lib/communities/preview-text";
 import {
   Bookmark, Flag,
   MoreHorizontal, Pencil, Trash2,
@@ -27,6 +29,7 @@ import {
 import { dedupeFetch, TOGGLE_FETCH_OPTIONS } from "@/lib/dedupe-fetch";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { usePendingMutation } from "@/lib/use-mutation";
+import { renderWithLinks } from "../threads/renderWithLinks";
 
 function useLinkPreview(url: string, enabled: boolean) {
   const [data, setData] = useState<LinkPreviewData | null | undefined>(
@@ -97,6 +100,15 @@ export function ResourceCard({
 }: ResourceCardProps) {
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
   const isOwner = resource.user_id === currentUserId;
+  const isDetail = !onOpen;
+  const [bodyExpanded, setBodyExpanded] = useState(false);
+  const bodyId = useId();
+  const bodyRef = useRef<HTMLHeadingElement | null>(null);
+  const body = resource.description || resource.title;
+  // Same collapsed shape as the thread card: 3 lines, flattened so "… Read
+  // more" trails the last visible line instead of landing under a paragraph
+  // break.
+  const collapsedBody = flattenPreviewText(body);
   const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
   const linkPreview = useLinkPreview(resource.url, !hasFigmaPrototype);
 
@@ -338,7 +350,52 @@ export function ResourceCard({
 
         <>
             {/* Card body → opens the resource view; only the link-preview block below is an external link. */}
-            <h3 className="mt-3 line-clamp-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">{resource.description || resource.title}</h3>
+            {isDetail ? (
+              <h3 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
+                {renderWithLinks(body, false)}
+              </h3>
+            ) : bodyExpanded ? (
+              <h3
+                id={bodyId}
+                ref={bodyRef}
+                tabIndex={-1}
+                className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+              >
+                {renderWithLinks(body, true)}
+              </h3>
+            ) : (
+              <TruncateMarkup
+                lines={3}
+                ellipsis={
+                  <span className="whitespace-nowrap">
+                    {"\u2060… "}
+                    <button
+                      type="button"
+                      aria-expanded={false}
+                      aria-controls={bodyId}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setBodyExpanded(true);
+                        requestAnimationFrame(() => bodyRef.current?.focus({ preventScroll: true }));
+                      }}
+                      className="inline rounded-sm align-baseline font-body text-sm font-medium text-foreground-subtle transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    >
+                      Read more
+                    </button>
+                  </span>
+                }
+              >
+                <h3
+                  id={bodyId}
+                  ref={bodyRef}
+                  tabIndex={-1}
+                  className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+                >
+                  {renderWithLinks(collapsedBody, true)}
+                </h3>
+              </TruncateMarkup>
+            )}
             {hasFigmaPrototype ? (
               <FigmaEmbed url={resource.url} compact className="mt-4" />
             ) : linkPreview && (linkPreview.title || linkPreview.description || linkPreview.image) ? (

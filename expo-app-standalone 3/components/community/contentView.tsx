@@ -821,7 +821,7 @@ export function ContentCard({
             text={primaryBody}
             textStyle={styles.cardTitle}
             collapsedLines={primaryLines}
-            expandable={kind === 'threads' || kind === 'showcase'}
+            expandable={kind === 'threads' || kind === 'showcase' || kind === 'resources'}
           />
         )}
         {thread?.poll && pollState ? (
@@ -1170,7 +1170,7 @@ export function ContentDetail({
                   ticket — the title and schedule live inside it. */}
               {event.description?.trim() ? (
                 <Text style={[styles.detailThreadBody, { color: colors.foreground }]}>
-                  {event.description}
+                  {bodyWithLinks(event.description, colors.link)}
                 </Text>
               ) : null}
               <EventTicket
