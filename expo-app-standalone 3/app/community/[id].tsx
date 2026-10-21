@@ -29,7 +29,6 @@ import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
 import { CommunityMenu, type CommunityConfirmAction } from '@/components/community/CommunityMenu';
 import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
-import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges } from '@/components/communities/CommunityBadges';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
@@ -1459,7 +1458,6 @@ export default function CommunityChat() {
                 accessibilityState={{ selected: active }}
               >
                 <View style={styles.tabInner}>
-                  <CommunityTabIcon tab={tab.key} size={14} color={labelColor} />
                   <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
                   {/* Absolute-positioned over the tab's padding: the dot is
                       visible without reserving width, so no tab grows to
