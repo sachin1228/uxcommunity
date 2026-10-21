@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { BarChart3, Calendar, Image as ImageIcon, LayoutGrid, Link2, MessagesSquare, type LucideIcon } from "lucide-react";
+import { BarChart3, LayoutGrid, type LucideIcon } from "lucide-react";
 import { CommunityFeedList } from "@/components/feeds/CommunityFeedList";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
+import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { filterChip } from "@/components/communities/filter-chip";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { CATEGORY_ICONS as THREAD_CATEGORY_ICONS } from "@/components/communities/threads/categoryIcons";
@@ -53,10 +54,10 @@ const RESOURCE_CHIPS: Chip[] = [
 ];
 
 const TABS: Array<{ value: LibraryKind; label: string; icon: LucideIcon }> = [
-  { value: "thread", label: "Threads", icon: MessagesSquare },
-  { value: "showcase", label: "Showcase", icon: ImageIcon },
-  { value: "resource", label: "Resources", icon: Link2 },
-  { value: "event", label: "Events", icon: Calendar },
+  { value: "thread", label: "Threads", icon: CONTENT_KIND_ICONS.thread },
+  { value: "showcase", label: "Showcase", icon: CONTENT_KIND_ICONS.showcase },
+  { value: "resource", label: "Resources", icon: CONTENT_KIND_ICONS.resource },
+  { value: "event", label: "Events", icon: CONTENT_KIND_ICONS.event },
 ];
 
 const CHIPS: Record<LibraryKind, Chip[]> = {
@@ -67,24 +68,20 @@ const CHIPS: Record<LibraryKind, Chip[]> = {
   event: [],
 };
 
-const EMPTY_STATES: Record<LibraryKind, { icon: typeof MessagesSquare; title: string; description: string }> = {
+const EMPTY_STATES: Record<LibraryKind, { title: string; description: string }> = {
   thread: {
-    icon: MessagesSquare,
     title: "No threads yet",
     description: "Handpicked questions, discussions, ideas and polls from across the community will appear here.",
   },
   showcase: {
-    icon: ImageIcon,
     title: "No showcase work yet",
     description: "Handpicked work from every showcase category will appear here.",
   },
   resource: {
-    icon: Link2,
     title: "No resources yet",
     description: "Handpicked Figma files, articles, tools and more will appear here.",
   },
   event: {
-    icon: Calendar,
     title: "No events yet",
     description: "Handpicked events and meetups from across the community will appear here.",
   },
@@ -123,7 +120,7 @@ export function LibraryView({
   const visible = useMemo(() => filterLibraryItems(items, kind, chip), [items, kind, chip]);
 
   const empty = EMPTY_STATES[kind];
-  const EmptyIcon = empty.icon;
+  const EmptyIcon = CONTENT_KIND_ICONS[kind];
 
   return (
     <>

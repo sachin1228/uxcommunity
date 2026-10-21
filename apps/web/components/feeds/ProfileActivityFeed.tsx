@@ -2,14 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  BookMarked,
   Bookmark,
-  Calendar,
   LayoutGrid,
-  MessagesSquare,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { CommunityFeedList } from "./CommunityFeedList";
 import { FeedLoadMore } from "./FeedLoadMore";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
@@ -36,10 +33,10 @@ export type ProfileActivityTab = ProfileFeedScope;
 
 const TAB_META: Record<ProfileActivityTab, { label: string; icon: LucideIcon }> = {
   all: { label: "All", icon: LayoutGrid },
-  thread: { label: "Threads", icon: MessagesSquare },
-  showcase: { label: "Showcase", icon: Sparkles },
-  resource: { label: "Resources", icon: BookMarked },
-  event: { label: "Events", icon: Calendar },
+  thread: { label: "Threads", icon: CONTENT_KIND_ICONS.thread },
+  showcase: { label: "Showcase", icon: CONTENT_KIND_ICONS.showcase },
+  resource: { label: "Resources", icon: CONTENT_KIND_ICONS.resource },
+  event: { label: "Events", icon: CONTENT_KIND_ICONS.event },
   saved: { label: "Saved", icon: Bookmark },
 };
 

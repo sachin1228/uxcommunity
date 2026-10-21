@@ -4,21 +4,18 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchJsonCached, setCachedRequest } from "@/lib/request-cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
 import {
-  BookOpen,
-  Calendar,
   Check,
   Copy,
-  Hash,
   ImagePlus,
   Lock,
   MessageSquare,
   Plus,
   RefreshCw,
   Save,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
+import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { EarthGlyph } from "@/components/ui/EarthGlyph";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
@@ -67,10 +64,10 @@ const FEATURE_OPTIONS: Array<{
   required?: boolean;
 }> = [
   { id: "chat",      label: "Chat",      description: "Real-time member conversations", icon: MessageSquare, required: true },
-  { id: "threads",   label: "Threads",   description: "Topic-led discussions",          icon: Hash },
-  { id: "showcase",  label: "Showcase",  description: "Share work and collect feedback", icon: Sparkles },
-  { id: "events",    label: "Events",    description: "Meetups and online sessions",    icon: Calendar },
-  { id: "resources", label: "Resources", description: "Links, files, and references",  icon: BookOpen },
+  { id: "threads",   label: "Threads",   description: "Topic-led discussions",          icon: CONTENT_KIND_ICONS.thread },
+  { id: "showcase",  label: "Showcase",  description: "Share work and collect feedback", icon: CONTENT_KIND_ICONS.showcase },
+  { id: "events",    label: "Events",    description: "Meetups and online sessions",    icon: CONTENT_KIND_ICONS.event },
+  { id: "resources", label: "Resources", description: "Links, files, and references",  icon: CONTENT_KIND_ICONS.resource },
 ];
 
 function slugify(s: string) {

@@ -1,14 +1,14 @@
 import React from 'react';
-import Svg, { Path, Polyline, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import type { CommunityTab } from '@/lib/communityContent';
 
 /**
  * The community nav's tab glyphs — the exact lucide icons the web chat
- * header draws (MessageCircle, MessagesSquare, Sparkles, BookMarked,
- * Calendar), ported as Svg so both clients show the same marks. Feather only
- * carries some of them (and draws those differently), so the paths come
- * straight from the lucide sources, on the same 24×24 grid with the same
- * round 2.5px strokes the web header uses.
+ * header draws (MessageCircle, MessagesSquare, Image, Link2, Calendar),
+ * ported as Svg so both clients show the same marks. Feather only carries
+ * some of them (and draws those differently), so the paths come straight from
+ * the lucide sources, on the same 24×24 grid with the same round 2.5px
+ * strokes the web header uses.
  */
 
 type IconProps = { size: number; color: string };
@@ -56,18 +56,17 @@ export function CommunityTabIcon({
     case 'showcase':
       return (
         <IconBody size={size} color={color}>
-          <Path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-          <Path d="M20 3v4" />
-          <Path d="M22 5h-4" />
-          <Path d="M4 17v2" />
-          <Path d="M5 18H3" />
+          <Rect width={18} height={18} x={3} y={3} rx={2} ry={2} />
+          <Circle cx={9} cy={9} r={2} />
+          <Path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
         </IconBody>
       );
     case 'resources':
       return (
         <IconBody size={size} color={color}>
-          <Path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-          <Polyline points="10 2 10 10 13 7 16 10 16 2" />
+          <Path d="M9 17H7A5 5 0 0 1 7 7h2" />
+          <Path d="M15 7h2a5 5 0 1 1 0 10h-2" />
+          <Line x1={8} x2={16} y1={12} y2={12} />
         </IconBody>
       );
     case 'events':
