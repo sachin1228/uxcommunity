@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -16,8 +16,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityRow } from '@/components/communities/CommunityRow';
+import {
+  NotificationPermissionBanner,
+  NotificationPermissionSheet,
+} from '@/components/communities/NotificationPermissionPrompt';
 import { useColors } from '@/hooks/useColors';
 import { useCommunities } from '@/hooks/useCommunities';
+import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { Community } from '@/lib/communities';
 import {
   COMMUNITY_REALTIME_LIMIT,
@@ -47,6 +52,18 @@ export default function CommunitiesScreen() {
     catchUpList,
   } = useCommunities();
   const [query, setQuery] = useState('');
+  const notificationPermission = useNotificationPermission();
+  const [notificationPromptOpen, setNotificationPromptOpen] = useState(false);
+  const [notificationNoticeDismissed, setNotificationNoticeDismissed] = useState(false);
+  const notificationPromptShownRef = useRef(false);
+
+  // Opening the app with notifications off should explain why, not wait for
+  // the banner link. Once per session; after that the banner carries it.
+  useEffect(() => {
+    if (notificationPermission !== 'denied' || notificationPromptShownRef.current) return;
+    notificationPromptShownRef.current = true;
+    setNotificationPromptOpen(true);
+  }, [notificationPermission]);
 
   /**
    * Hibernated rows: communities past the live socket window
@@ -186,6 +203,12 @@ export default function CommunitiesScreen() {
         </View>
       </View>
 
+      {notificationPermission === 'denied' && !notificationNoticeDismissed && (
+        <NotificationPermissionBanner
+          onDismiss={() => setNotificationNoticeDismissed(true)}
+        />
+      )}
+
       {isLoading && (
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
@@ -259,6 +282,11 @@ export default function CommunitiesScreen() {
       >
         <Feather name="plus" size={22} color={colors.accentForeground} />
       </Pressable>
+
+      <NotificationPermissionSheet
+        visible={notificationPromptOpen}
+        onClose={() => setNotificationPromptOpen(false)}
+      />
     </View>
   );
 }
