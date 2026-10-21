@@ -211,8 +211,9 @@ export default function HomeTab() {
     [resetActions],
   );
 
-  // Open on the remembered tab. The first load waits for the stored choice, so
-  // a member who last read "Your Communities" never sees the public feed flash.
+  // Open on the remembered tab, defaulting to Your Communities. The first load
+  // waits for the stored choice, so a returning member never sees the other
+  // feed flash.
   useEffect(() => {
     let cancelled = false;
     void (async () => {

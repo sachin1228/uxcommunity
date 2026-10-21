@@ -169,9 +169,6 @@ export default function ExploreTab() {
       <View style={styles.pageHeader}>
         <View style={styles.pageHeaderText}>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>Explore Communities</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
-            Find the groups you want to be part of.
-          </Text>
         </View>
       </View>
 
@@ -474,9 +471,8 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 10,
   },
-  pageHeaderText: { flex: 1, gap: 4 },
+  pageHeaderText: { flex: 1 },
   pageTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 20, letterSpacing: -0.3 },
-  pageSubtitle: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
 
   searchRow: {
     flexDirection: 'row',

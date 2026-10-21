@@ -59,7 +59,7 @@ function NativeTabLayout() {
         <Label>Chat</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'square.stack.3d.up', selected: 'square.stack.3d.up.fill' }} />
+        <Icon sf={{ default: 'square.grid.2x2', selected: 'square.grid.2x2.fill' }} />
         <Label>Feed</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="jobs">
@@ -148,9 +148,9 @@ function ClassicTabLayout() {
           tabBarButton: tabButton('/'),
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="square.stack.3d.up" tintColor={color} size={28} />
+              <SymbolView name="square.grid.2x2" tintColor={color} size={28} />
             ) : (
-              <Feather name="layers" size={26} color={color} />
+              <Feather name="grid" size={26} color={color} />
             ),
         }}
       />

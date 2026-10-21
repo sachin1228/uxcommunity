@@ -17,8 +17,8 @@ export const HOME_FEED_TAB_SCOPES = ['communities', 'public'] as const;
 
 export type HomeFeedScope = (typeof HOME_FEED_TAB_SCOPES)[number];
 
-/** The tab every session opens on when it has no stored choice — the web default. */
-export const DEFAULT_HOME_FEED_SCOPE: HomeFeedScope = 'public';
+/** The tab every session opens on when it has no stored choice. */
+export const DEFAULT_HOME_FEED_SCOPE: HomeFeedScope = 'communities';
 
 /** Storage key for the member's remembered choice (mobile's `@` convention). */
 export const HOME_FEED_SCOPE_STORAGE_KEY = '@home-feed/scope';
