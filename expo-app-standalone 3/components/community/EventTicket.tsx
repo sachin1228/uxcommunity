@@ -374,13 +374,13 @@ export function EventTicket({
           <View style={styles.meta}>
             {dateLabel ? (
               <View style={styles.metaRow}>
-                <Feather name="calendar" size={13} color={STONE_400} />
+                <Feather name="calendar" size={14} color={STONE_400} />
                 <Text style={styles.metaText}>{dateLabel}</Text>
               </View>
             ) : null}
             {timeRange ? (
               <View style={styles.metaRow}>
-                <Feather name="clock" size={13} color={STONE_400} />
+                <Feather name="clock" size={14} color={STONE_400} />
                 <Text style={styles.metaText}>{timeRange}</Text>
               </View>
             ) : null}
@@ -397,24 +397,24 @@ export function EventTicket({
                   accessibilityRole="link"
                   accessibilityLabel="Open meeting link"
                 >
-                  <Feather name="video" size={13} color={STONE_400} />
+                  <Feather name="video" size={14} color={STONE_400} />
                   <Text style={[styles.metaText, styles.metaLink]}>Online (Google Meet)</Text>
                 </Pressable>
               ) : (
                 <View style={styles.metaRow}>
-                  <Feather name="video" size={13} color={STONE_400} />
+                  <Feather name="video" size={14} color={STONE_400} />
                   <Text style={styles.metaText}>Online</Text>
                 </View>
               )
             ) : event.location ? (
               <View style={styles.metaRow}>
-                <Feather name="map-pin" size={13} color={STONE_400} />
+                <Feather name="map-pin" size={14} color={STONE_400} />
                 <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
               </View>
             ) : null}
             {spotsLeft !== null ? (
               <View style={styles.metaRow}>
-                <Feather name="users" size={13} color={STONE_400} />
+                <Feather name="users" size={14} color={STONE_400} />
                 <Text style={[styles.metaText, spotsLeft <= 0 ? styles.metaSpent : null]}>
                   {spotsLeft > 0 ? `${spotsLeft} spots remaining` : 'No spots remaining'}
                 </Text>
@@ -713,7 +713,7 @@ const styles = StyleSheet.create({
 
   meta: { marginTop: 12, gap: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 12, color: STONE_200 },
+  metaText: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 14, color: STONE_200 },
   metaLink: {
     color: STONE_200,
     textDecorationLine: 'underline',
