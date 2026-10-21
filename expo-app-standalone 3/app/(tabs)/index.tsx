@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
+import { useViewableKeys } from '@/hooks/useViewableKeys';
 import { useAuth } from '@/context/AuthContext';
 import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
 import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
@@ -181,6 +182,7 @@ export default function HomeTab() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   /** The feed row whose editor is open (owner-only; null when closed). */
   const [editing, setEditing] = useState<FeedItem | null>(null);
 
@@ -372,7 +374,7 @@ export default function HomeTab() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: FeedItem }) => (
+    ({ item, index }: { item: FeedItem; index: number }) => (
       <ContentCard
         item={item}
         kind={feedItemKind(item)}
@@ -383,9 +385,11 @@ export default function HomeTab() {
         onComments={openItem}
         onEdit={editItem}
         onDelete={deleteItem}
+        videoActive={!selected && visibleKeys.has(feedItemKey(item))}
+        videoRank={index}
       />
     ),
-    [actions, deleteItem, editItem, openItem, user?.id],
+    [actions, deleteItem, editItem, openItem, selected, user?.id, visibleKeys],
   );
 
   return (
@@ -417,6 +421,8 @@ export default function HomeTab() {
               { paddingTop: FEED_TOP_INSET, paddingBottom: insets.bottom + 96 },
             ]}
             scrollIndicatorInsets={{ top: FEED_TOP_INSET }}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
             onEndReached={loadMore}
             onEndReachedThreshold={0.4}
             refreshControl={

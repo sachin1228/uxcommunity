@@ -252,12 +252,12 @@ export default function CommunitiesScreen() {
           {
             backgroundColor: pressed ? colors.accentHover : colors.accent,
             borderColor: colors.accent,
-            bottom: insets.bottom + 84,
+            bottom: insets.bottom + 96,
             shadowColor: '#000000',
           },
         ]}
       >
-        <Feather name="plus" size={20} color={colors.accentForeground} />
+        <Feather name="plus" size={22} color={colors.accentForeground} />
       </Pressable>
     </View>
   );
@@ -292,16 +292,16 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 18,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 8,
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   noResults: {
     alignItems: 'center',

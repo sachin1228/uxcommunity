@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandLogo } from '@/components/BrandLogo';
 import { DmIcon } from '@/components/DmIcon';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -41,7 +40,6 @@ export function AppHeader() {
       ]}
     >
       <View style={styles.brand}>
-        <BrandLogo size={30} />
         <Text style={[styles.logo, { color: colors.foreground }]}>uxcommunity</Text>
       </View>
 
@@ -106,7 +104,6 @@ const styles = StyleSheet.create({
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   logo: {
     fontSize: 18,

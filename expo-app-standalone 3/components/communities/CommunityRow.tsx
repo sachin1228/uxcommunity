@@ -342,10 +342,10 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
             </View>
           )}
 
-          {/* Unread badge */}
+          {/* Unread badge — the same blue as the web sidebar's count. */}
           {hasUnread && (
-            <View style={[styles.badge, { backgroundColor: colors.success }]}>
-              <Text style={[styles.badgeText, { color: colors.successForeground }]}>
+            <View style={[styles.badge, { backgroundColor: colors.chatUnreadPill }]}>
+              <Text style={[styles.badgeText, { color: colors.chatOwnBubbleForeground }]}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </Text>
             </View>

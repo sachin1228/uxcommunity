@@ -143,7 +143,7 @@ function renderComposerOverlay(
     const segment = segments[i];
     if (segment.mention) {
       parts.push(
-        <span key={i} className="text-[var(--ds-blue-800)]">
+        <span key={i} className="text-[var(--ds-blue-900)]">
           {segment.text}
         </span>,
       );

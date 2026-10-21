@@ -497,7 +497,7 @@ export function ThreadCard({
             id={titleId}
             ref={titleRef}
             tabIndex={-1}
-            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
           >
             {renderWithLinks(thread.title, true)}
           </h3>
@@ -528,7 +528,7 @@ export function ThreadCard({
               id={titleId}
               ref={titleRef}
               tabIndex={-1}
-              className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+              className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
             >
               {renderWithLinks(collapsedTitle, true)}
             </h3>

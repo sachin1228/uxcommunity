@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useViewableKeys } from '@/hooks/useViewableKeys';
 import { useCommunityContent, communityContentKey } from '@/hooks/useCommunityContent';
 import {
   CommunityContent,
@@ -48,6 +49,7 @@ export function CommunityContentView({
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);
+  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   // A new event arrives with its own group chat, and the creator is in it —
   // the notice says so before they go looking for the room.
   const [createdChat, setCreatedChat] = useState<CommunityEvent | null>(null);
@@ -159,7 +161,7 @@ export function CommunityContentView({
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ContentCard
             item={item}
             kind={kind}
@@ -169,8 +171,12 @@ export function CommunityContentView({
             onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
             onDelete={remove}
             canModerate={canModerate}
+            videoActive={!selected && visibleKeys.has(item.id)}
+            videoRank={index}
           />
         )}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 112 }]}
         refreshControl={
           <RefreshControl

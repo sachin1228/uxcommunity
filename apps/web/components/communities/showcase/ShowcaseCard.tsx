@@ -229,7 +229,7 @@ export function ShowcaseCard({
         </div>
 
         {isDetail ? (
-          <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
+          <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground">
             {renderWithLinks(post.title, false)}
           </h2>
         ) : bodyExpanded ? (
@@ -237,7 +237,7 @@ export function ShowcaseCard({
             id={bodyId}
             ref={bodyRef}
             tabIndex={-1}
-            className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+            className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
           >
             {renderWithLinks(post.title, true)}
           </h2>
@@ -268,7 +268,7 @@ export function ShowcaseCard({
               id={bodyId}
               ref={bodyRef}
               tabIndex={-1}
-              className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+              className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
             >
               {renderWithLinks(collapsedBody, true)}
             </h2>

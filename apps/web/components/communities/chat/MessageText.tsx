@@ -89,7 +89,7 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
   return (
     <span
       className="inline-block max-w-full break-normal font-semibold"
-      style={{ color: isMe ? "var(--color-accent-foreground, white)" : "var(--ds-blue-700)" }}
+      style={{ color: isMe ? "var(--color-accent-foreground, white)" : "var(--ds-blue-900)" }}
     >
       {text}</span>
   );

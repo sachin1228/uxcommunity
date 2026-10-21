@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
+  AppState,
   Easing,
   Image,
   Linking,
@@ -19,6 +20,7 @@ import { useIsFocused } from '@react-navigation/native';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
@@ -67,6 +69,7 @@ import { ContentReportModal } from './ContentReportModal';
 import { CommunityPreviewSheet } from './CommunityPreviewSheet';
 import { REPORT_CONTENT_TYPE_BY_KIND } from '@/lib/contentReports';
 import { eventShareUrl } from '@/lib/contentLinks';
+import { joinVideoPlayback, leaveVideoPlayback } from '@/lib/videoPlayback';
 
 /**
  * The community card, the card detail, and the optimistic interaction state
@@ -669,6 +672,10 @@ export interface ContentCardProps {
   onDelete?: (item: CommunityContent) => Promise<void> | void;
   /** Manager with this kind's moderation grant — offers Delete on others' cards. */
   canModerate?: boolean;
+  /** Card is on screen — its inline video may autoplay. */
+  videoActive?: boolean;
+  /** List position — the topmost active video owns playback. */
+  videoRank?: number;
 }
 
 export function ContentCard({
@@ -682,6 +689,8 @@ export function ContentCard({
   onEdit,
   onDelete,
   canModerate = false,
+  videoActive = true,
+  videoRank = 0,
 }: ContentCardProps) {
   const colors = useColors();
   const thread = kind === 'threads' ? item as CommunityThread : null;
@@ -841,6 +850,8 @@ export function ContentCard({
               avatarUrl: author?.avatar_url ?? null,
               createdAt: item.created_at,
             }}
+            videoActive={videoActive}
+            videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
           />
         ) : images.length ? (
@@ -851,6 +862,8 @@ export function ContentCard({
               avatarUrl: author?.avatar_url ?? null,
               createdAt: item.created_at,
             }}
+            videoActive={videoActive}
+            videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
           />
         ) : null}
@@ -1506,7 +1519,7 @@ export function ContentOptionsMenu({
                 <Feather
                   name={saveAction.icon}
                   size={16}
-                  color={saved ? colors.accent : colors.foregroundMuted}
+                  color={saved ? colors.accent : colors.foreground}
                 />
                 <Text style={[styles.optionText, { color: saved ? colors.accent : colors.foreground }]}>
                   {saved ? 'Unsave' : 'Save'}
@@ -1703,19 +1716,25 @@ function showcaseMediaForPost(post: CommunityShowcase): MediaEntry[] {
  * One image keeps its natural aspect ratio; several become a swipeable
  * carousel with a counter, rather than a cropped tile grid. Tapping an image
  * opens the app's own lightbox — the same one the community chat uses — never
- * the system browser, so images stay inside the app. Showcase videos show
- * their poster (or a black tile) with a play badge, and tapping opens the
- * in-app player.
+ * the system browser, so images stay inside the app. Showcase videos play
+ * inline — muted, looping — with a volume toggle; tapping one opens the
+ * full player with transport controls and fullscreen rotation.
  */
 export function MediaCarousel({
   media,
   owner,
+  /** The card is on screen and nothing covers it — the video may play. */
+  videoActive = true,
+  /** List position — the topmost active video owns playback. */
+  videoRank = 0,
   /** Double tap on a photo: like the post instead of opening the viewer. */
   onDoubleTap,
 }: {
   media: MediaEntry[];
   /** The poster — the lightbox header's name, avatar and date, as in chat. */
   owner: { name: string | null; avatarUrl: string | null; createdAt: string };
+  videoActive?: boolean;
+  videoRank?: number;
   onDoubleTap?: () => void;
 }) {
   const colors = useColors();
@@ -1723,7 +1742,6 @@ export function MediaCarousel({
   const [containerWidth, setContainerWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [playingVideo, setPlayingVideo] = useState<MediaEntry | null>(null);
   const stripRef = useRef<ScrollView>(null);
   const single = media.length === 1;
   const imageMedia = media.filter((entry) => !isVideoAttachment(entry));
@@ -1804,30 +1822,20 @@ export function MediaCarousel({
       />
     ) : null;
 
-  const player = playingVideo ? (
-    <VideoPlayerModal
-      url={playingVideo.url}
-      title={playingVideo.name ?? owner.name}
-      onClose={() => setPlayingVideo(null)}
-    />
-  ) : null;
-
   if (single) {
     const entry = media[0];
     if (isVideoAttachment(entry)) {
       return (
-        <>
-          <VideoThumb
-            entry={entry}
-            style={[
-              styles.imageSingle,
-              anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
-              { borderColor: colors.border },
-            ]}
-            onPress={() => setPlayingVideo(entry)}
-          />
-          {player}
-        </>
+        <InlineVideo
+          entry={entry}
+          active={videoActive}
+          rank={videoRank}
+          style={[
+            styles.imageSingle,
+            anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
+            { borderColor: colors.border },
+          ]}
+        />
       );
     }
     return (
@@ -1866,11 +1874,12 @@ export function MediaCarousel({
       >
         {media.map((entry, mediaIndex) =>
           isVideoAttachment(entry) ? (
-            <VideoThumb
+            <InlineVideo
               key={`${entry.url}-${mediaIndex}`}
               entry={entry}
+              active={videoActive && mediaIndex === index}
+              rank={videoRank}
               style={{ width: pageWidth, height: pageHeight }}
-              onPress={() => setPlayingVideo(entry)}
             />
           ) : (
             <Pressable
@@ -1921,36 +1930,91 @@ export function MediaCarousel({
           })}
         </View>
       </View>
-
-      {player}
     </View>
   );
 }
 
-/** A video's poster (or a black fallback) with a play badge. */
-function VideoThumb({
+/** Inline, muted, looping playback — tap opens the full player. */
+function InlineVideo({
   entry,
+  active,
+  rank,
   style,
-  onPress,
 }: {
   entry: MediaEntry;
+  active: boolean;
+  rank: number;
   style: React.ComponentProps<typeof View>['style'];
-  onPress: () => void;
 }) {
+  const focused = useIsFocused();
+  const player = useVideoPlayer(entry.url, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+  });
+  const [muted, setMuted] = useState(true);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Playback follows the viewport, like the web player's IntersectionObserver.
+  // The coordinator lets only one of the on-screen videos run, so two
+  // soundtracks never overlap.
+  const wantsPlay = active && focused && appActive && !showPlayer;
+  useEffect(() => {
+    if (!wantsPlay) {
+      player.pause();
+      return;
+    }
+    const candidate = { rank, play: () => player.play(), pause: () => player.pause() };
+    joinVideoPlayback(candidate);
+    return () => leaveVideoPlayback(rank, candidate.pause);
+  }, [player, rank, wantsPlay]);
+
+  const toggleMuted = () => {
+    const next = !muted;
+    player.muted = next;
+    setMuted(next);
+    if (wantsPlay) player.play();
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.videoThumb, style]}
-      accessibilityRole="button"
-      accessibilityLabel={entry.name ? `Play video ${entry.name}` : 'Play video'}
-    >
-      {entry.poster ? (
-        <Image source={{ uri: entry.poster }} style={styles.threadImage} resizeMode="cover" />
+    <View style={[styles.videoThumb, style]}>
+      <VideoView
+        player={player}
+        style={styles.threadImage}
+        nativeControls={false}
+        contentFit="cover"
+        allowsFullscreen={false}
+      />
+      <Pressable
+        onPress={() => setShowPlayer(true)}
+        style={StyleSheet.absoluteFill}
+        accessibilityRole="button"
+        accessibilityLabel={entry.name ? `Open video ${entry.name}` : 'Open video'}
+      />
+      <Pressable
+        onPress={toggleMuted}
+        hitSlop={8}
+        style={styles.videoMuteButton}
+        accessibilityRole="button"
+        accessibilityLabel={muted ? 'Unmute video' : 'Mute video'}
+      >
+        <Feather name={muted ? 'volume-x' : 'volume-2'} size={16} color="#FFFFFF" />
+      </Pressable>
+      {showPlayer ? (
+        <VideoPlayerModal
+          url={entry.url}
+          title={entry.name}
+          onClose={() => setShowPlayer(false)}
+        />
       ) : null}
-      <View style={styles.videoPlayBadge}>
-        <Feather name="play" size={22} color="#FFFFFF" />
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -2212,11 +2276,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#000000',
   },
-  videoPlayBadge: {
+  videoMuteButton: {
     position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    right: 10,
+    bottom: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
