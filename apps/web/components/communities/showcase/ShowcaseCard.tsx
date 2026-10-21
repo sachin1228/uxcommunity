@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
+import TruncateMarkup from "react-truncate-markup";
+import { flattenPreviewText } from "@/lib/communities/preview-text";
 import { Film, Loader2 } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
@@ -13,6 +15,7 @@ import { ReportModal } from "../ReportModal";
 import { VideoPlayer } from "@/components/communities/VideoPlayer";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
 import { ThreadImageCarousel } from "../threads/ThreadImageCarousel";
+import { renderWithLinks } from "../threads/renderWithLinks";
 import { ShowcaseMediaLightbox } from "./ShowcaseMediaLightbox";
 import {
   SHOWCASE_CATEGORIES,
@@ -83,9 +86,18 @@ export function ShowcaseCard({
   // submission lands, like the thread, resource and event menus.
   const [reported, setReported] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
+  const bodyId = useId();
+  const bodyRef = useRef<HTMLHeadingElement | null>(null);
 
+  const isDetail = !onOpen;
   const categoryLabel = SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label ?? post.category;
   const media = mediaForPost(post);
+  // Same rule as the thread card: 5 lines for a text-only post, 2 once media
+  // shares the card. The collapsed preview is flattened so "… Read more" trails
+  // the last visible line instead of landing under an empty paragraph break.
+  const collapsedBodyLines = media.length === 0 ? 5 : 2;
+  const collapsedBody = flattenPreviewText(post.title);
 
   // The card root is a clickable link; clicks on controls (carousel arrows,
   // dots, lightbox triggers, the video player) must not also open the detail
@@ -216,9 +228,52 @@ export function ShowcaseCard({
           />
         </div>
 
-        <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
-          {post.title}
-        </h2>
+        {isDetail ? (
+          <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
+            {renderWithLinks(post.title, false)}
+          </h2>
+        ) : bodyExpanded ? (
+          <h2
+            id={bodyId}
+            ref={bodyRef}
+            tabIndex={-1}
+            className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+          >
+            {renderWithLinks(post.title, true)}
+          </h2>
+        ) : (
+          <TruncateMarkup
+            lines={collapsedBodyLines}
+            ellipsis={
+              <span className="whitespace-nowrap">
+                {"\u2060… "}
+                <button
+                  type="button"
+                  aria-expanded={false}
+                  aria-controls={bodyId}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setBodyExpanded(true);
+                    requestAnimationFrame(() => bodyRef.current?.focus({ preventScroll: true }));
+                  }}
+                  className="inline rounded-sm align-baseline font-body text-sm font-medium text-foreground-subtle transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  Read more
+                </button>
+              </span>
+            }
+          >
+            <h2
+              id={bodyId}
+              ref={bodyRef}
+              tabIndex={-1}
+              className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+            >
+              {renderWithLinks(collapsedBody, true)}
+            </h2>
+          </TruncateMarkup>
+        )}
 
         {mediaBlock}
 

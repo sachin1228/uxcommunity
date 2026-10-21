@@ -322,13 +322,19 @@ export function threadBody(thread: CommunityThread): string {
  * How many lines a card body is collapsed to before "Read more".
  *
  * Threads follow the web rule exactly: 5 lines for a text-only thread, 2 as
- * soon as there is an attachment (the body is then competing with media), and
- * the same 2 serves events and resources.
+ * soon as there is an attachment (the body is then competing with media).
+ * Showcase posts follow the same rule against their own media, and 2 serves
+ * events and resources.
  */
 export function collapsedBodyLines(kind: ContentKind, item: CommunityContent): number {
   if (kind === 'threads') {
     const thread = item as CommunityThread;
     return (thread.attachments?.length ?? 0) === 0 ? 5 : 2;
+  }
+  if (kind === 'showcase') {
+    const showcase = item as CommunityShowcase;
+    const hasMedia = (showcase.attachments?.length ?? 0) > 0 || Boolean(showcase.image_url);
+    return hasMedia ? 2 : 5;
   }
   return 2;
 }
