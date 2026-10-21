@@ -62,6 +62,7 @@ import { ThreadPollView } from './ThreadPoll';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { HeartIcon } from './HeartIcon';
+import { VideoPlayerModal } from './VideoPlayerModal';
 import { EventTicket } from './EventTicket';
 import { ContentReportModal } from './ContentReportModal';
 import { CommunityPreviewSheet } from './CommunityPreviewSheet';
@@ -1704,7 +1705,8 @@ function showcaseMediaForPost(post: CommunityShowcase): MediaEntry[] {
  * carousel with a counter, rather than a cropped tile grid. Tapping an image
  * opens the app's own lightbox — the same one the community chat uses — never
  * the system browser, so images stay inside the app. Showcase videos play
- * inline — muted, looping — with a volume toggle as their only control.
+ * inline — muted, looping — with a volume toggle; tapping one opens the
+ * full player with transport controls and fullscreen rotation.
  */
 export function MediaCarousel({
   media,
@@ -1910,7 +1912,7 @@ export function MediaCarousel({
   );
 }
 
-/** Inline, muted, looping playback — the volume toggle is the only control. */
+/** Inline, muted, looping playback — tap opens the full player. */
 function InlineVideo({
   entry,
   style,
@@ -1924,6 +1926,7 @@ function InlineVideo({
     instance.play();
   });
   const [muted, setMuted] = useState(true);
+  const [showPlayer, setShowPlayer] = useState(false);
 
   const toggleMuted = () => {
     const next = !muted;
@@ -1942,6 +1945,15 @@ function InlineVideo({
         allowsFullscreen={false}
       />
       <Pressable
+        onPress={() => {
+          player.pause();
+          setShowPlayer(true);
+        }}
+        style={StyleSheet.absoluteFill}
+        accessibilityRole="button"
+        accessibilityLabel={entry.name ? `Open video ${entry.name}` : 'Open video'}
+      />
+      <Pressable
         onPress={toggleMuted}
         hitSlop={8}
         style={styles.videoMuteButton}
@@ -1950,6 +1962,16 @@ function InlineVideo({
       >
         <Feather name={muted ? 'volume-x' : 'volume-2'} size={16} color="#FFFFFF" />
       </Pressable>
+      {showPlayer ? (
+        <VideoPlayerModal
+          url={entry.url}
+          title={entry.name}
+          onClose={() => {
+            setShowPlayer(false);
+            player.play();
+          }}
+        />
+      ) : null}
     </View>
   );
 }
