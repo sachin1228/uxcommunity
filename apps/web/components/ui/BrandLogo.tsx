@@ -57,32 +57,22 @@ export function BrandLogo({
             <stop offset="100%" stopColor="#000000" stopOpacity="0.16" />
           </linearGradient>
 
-          <linearGradient id="uxc-bubble" x1="128" y1="47" x2="128" y2="181" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FFFFFF" />
-            <stop offset="72%" stopColor="#FCFCFC" />
-            <stop offset="100%" stopColor="#E8E9ED" />
-          </linearGradient>
-
-          <filter id="uxc-bubbleShadow" x="35" y="35" width="190" height="165" filterUnits="userSpaceOnUse">
-            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.25" />
-          </filter>
-
-          <clipPath id="uxc-iconClip">
+          <clipPath id="uxc-clip">
             <path d="M128 2 C77 2 44 8 25 26 C7 44 2 77 2 128 C2 179 7 212 26 230 C45 249 78 254 128 254 C178 254 211 249 230 230 C249 211 254 178 254 128 C254 77 249 44 230 26 C211 8 178 2 128 2Z" />
           </clipPath>
         </defs>
 
-        <g clipPath="url(#uxc-iconClip)">
+        <g clipPath="url(#uxc-clip)">
           <rect width="256" height="256" fill="url(#uxc-bg)" />
           <rect width="256" height="256" fill="url(#uxc-gloss)" />
           <rect width="256" height="256" fill="url(#uxc-depth)" />
         </g>
 
-        <path
-          d="M128 47 C85 47 52 70 52 106 C52 126 63 142 83 152 C84 162 81 170 75 177 C74 179 76 181 79 181 C93 180 104 174 111 167 C116 168 122 168 128 168 C171 168 204 145 204 106 C204 70 171 47 128 47Z"
-          fill="url(#uxc-bubble)"
-          filter="url(#uxc-bubbleShadow)"
-        />
+        <g transform="translate(49 49) scale(6.6)" fill="#FFFFFF">
+          <path
+            d="M16 4H8a7 7 0 0 0 0 14h4v4l8.16-5.39A6.78 6.78 0 0 0 23 11a7 7 0 0 0-7-7 M8 12.25A1.25 1.25 0 1 1 9.25 11 1.25 1.25 0 0 1 8 12.25 m4 0A1.25 1.25 0 1 1 13.25 11 1.25 1.25 0 0 1 12 12.25 m4 0A1.25 1.25 0 1 1 17.25 11 1.25 1.25 0 0 1 16 12.25"
+          />
+        </g>
       </svg>
       {!markOnly && <span className={wordmarkClassName}>uxcommunity</span>}
     </span>
