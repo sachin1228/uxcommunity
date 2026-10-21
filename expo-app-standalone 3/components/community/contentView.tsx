@@ -1519,7 +1519,7 @@ export function ContentOptionsMenu({
                 <Feather
                   name={saveAction.icon}
                   size={16}
-                  color={saved ? colors.accent : colors.foregroundMuted}
+                  color={saved ? colors.accent : colors.foreground}
                 />
                 <Text style={[styles.optionText, { color: saved ? colors.accent : colors.foreground }]}>
                   {saved ? 'Unsave' : 'Save'}
