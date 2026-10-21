@@ -560,8 +560,6 @@ export const MessageBubble = memo(function MessageBubble({
   /** Long-message collapse is owned here so a bubble tap can expand it too. */
   const [textExpanded, setTextExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
-  /** Press feedback for the full-row long-press target. */
-  const [rowPressed, setRowPressed] = useState(false);
   /** Collapsed width, captured before expanding so the tap cannot reflow the
    *  bubble wider (the collapsed text and the full text wrap differently). */
   const collapsedBubbleWidth = useRef<number | null>(null);
@@ -714,17 +712,17 @@ export const MessageBubble = memo(function MessageBubble({
         styles.row,
         isFirstInGroup ? styles.rowFirst : styles.rowCompact,
         flashStyle,
-        !isDeleted && (rowPressed || actionsOpen) ? styles.rowActive : null,
+        !isDeleted && actionsOpen ? styles.rowActive : null,
       ]}
     >
       {/* The whole row is the long-press target, so the timestamp column and
-          the empty half beside a short bubble open the action sheet too. */}
+          the empty half beside a short bubble open the action sheet too.
+          The tint is driven by the sheet, so it only appears once the press
+          has been held long enough to register — a plain tap stays clean. */}
       <Pressable
         disabled={isDeleted}
         onLongPress={handleLongPress}
         delayLongPress={350}
-        onPressIn={() => setRowPressed(true)}
-        onPressOut={() => setRowPressed(false)}
         accessible={false}
         style={[
           styles.rowPress,
@@ -821,8 +819,6 @@ export const MessageBubble = memo(function MessageBubble({
                 onPress={handlePress}
                 onLongPress={handleLongPress}
                 delayLongPress={350}
-                onPressIn={isDeleted ? undefined : () => setRowPressed(true)}
-                onPressOut={isDeleted ? undefined : () => setRowPressed(false)}
                 onLayout={(event) => {
                   const width = event.nativeEvent.layout.width;
                   if (!textExpanded && width > 0) collapsedBubbleWidth.current = width;
