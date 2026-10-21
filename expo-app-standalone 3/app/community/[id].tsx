@@ -1093,6 +1093,7 @@ export default function CommunityChat() {
             onLongPress={handleContentLongPress}
             onReaction={handleContentReaction}
             onAuthorPress={handleAuthorPress}
+            actionsOpen={selectedContent?.id === item.event.id}
           />
         );
       }
@@ -1135,6 +1136,7 @@ export default function CommunityChat() {
       initialUnreadCount,
       flashMessageId,
       selectedMessage?.id,
+      selectedContent?.id,
     ],
   );
 

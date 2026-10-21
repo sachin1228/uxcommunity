@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -43,6 +43,8 @@ interface Props {
   onReaction: (event: ChatContentEvent, emoji: string) => void;
   /** Opens the author's read-only member profile (avatar / header name tap). */
   onAuthorPress?: (userId: string) => void;
+  /** The action sheet is open for this card — keep the row tinted. */
+  actionsOpen?: boolean;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -140,8 +142,11 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   onLongPress,
   onReaction,
   onAuthorPress,
+  actionsOpen = false,
 }: Props) {
   const colors = useColors();
+  /** Press feedback for the full-row long-press target. */
+  const [rowPressed, setRowPressed] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
 
   const theme = CHAT_CONTENT_KIND_THEME[event.kind];
@@ -212,12 +217,39 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   const cardPressedBg = isOwn ? 'rgba(0, 0, 0, 0.30)' : colors.isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
 
   return (
-    <View style={[styles.row, !isOwn && styles.rowWithAvatar]}>
+    <View
+      style={[
+        styles.row,
+        !isOwn && styles.rowWithAvatar,
+        rowPressed || actionsOpen ? styles.rowActive : null,
+      ]}
+    >
+      {/* The whole row is the long-press target, so the empty half beside a
+          card opens the action sheet too. */}
+      <Pressable
+        onLongPress={() => {
+          hapticImpact();
+          onLongPress(event);
+        }}
+        delayLongPress={350}
+        onPressIn={() => setRowPressed(true)}
+        onPressOut={() => setRowPressed(false)}
+        accessible={false}
+        style={[
+          styles.rowPress,
+          { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
+        ]}
+      >
       {/* Avatar column — own notifications skip it, matching message bubbles */}
       {!isOwn && (
         <View style={styles.avatarCol}>
           <Pressable
             onPress={handleAuthorPress}
+            onLongPress={() => {
+              hapticImpact();
+              onLongPress(event);
+            }}
+            delayLongPress={350}
             disabled={!onAuthorPress}
             hitSlop={6}
             accessibilityRole="button"
@@ -244,6 +276,8 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
               onLongPress(event);
             }}
             delayLongPress={350}
+            onPressIn={() => setRowPressed(true)}
+            onPressOut={() => setRowPressed(false)}
             style={[
               styles.bubble,
               { backgroundColor: isOwn ? colors.chatOwnBubble : colors.surfaceRaised, shadowColor: '#000' },
@@ -283,6 +317,8 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 onLongPress(event);
               }}
               delayLongPress={350}
+              onPressIn={() => setRowPressed(true)}
+              onPressOut={() => setRowPressed(false)}
               accessibilityRole="button"
               accessibilityLabel={`${name} created ${withArticle(theme.label.toLowerCase())}: ${event.title || theme.label}`}
               style={({ pressed }) => [
@@ -392,6 +428,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
         {/* Reserve room for the pills that hang below the bubble */}
         {reactions.length > 0 && <View style={styles.reactionSpacer} />}
       </View>
+      </Pressable>
     </View>
   );
 });
@@ -401,13 +438,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'flex-end',
+    marginTop: 12,
+  },
+  rowPress: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     // Matches message rows: tighter avatar gutter on the left, original right
     // edge for own cards.
     paddingLeft: 10,
     paddingRight: 16,
     gap: 8,
-    marginTop: 12,
   },
+  rowActive: { backgroundColor: 'rgba(0, 98, 209, 0.12)' },
   rowWithAvatar: { justifyContent: 'flex-start' },
   avatarCol: { width: 28, flexShrink: 0 },
   contentCol: { flexShrink: 1, minWidth: 0 },
