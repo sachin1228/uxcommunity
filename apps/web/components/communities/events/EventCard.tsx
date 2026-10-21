@@ -780,7 +780,7 @@ export function EventCard({
             id={descriptionId}
             ref={descriptionRef}
             tabIndex={-1}
-            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
           >
             {renderWithLinks(description, false)}
           </p>
@@ -789,7 +789,7 @@ export function EventCard({
             id={descriptionId}
             ref={descriptionRef}
             tabIndex={-1}
-            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
           >
             {renderWithLinks(description, true)}
           </p>
@@ -820,7 +820,7 @@ export function EventCard({
               id={descriptionId}
               ref={descriptionRef}
               tabIndex={-1}
-              className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+              className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
             >
               {renderWithLinks(collapsedDescription, true)}
             </p>

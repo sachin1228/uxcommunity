@@ -351,7 +351,7 @@ export function ResourceCard({
         <>
             {/* Card body → opens the resource view; only the link-preview block below is an external link. */}
             {isDetail ? (
-              <h3 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
+              <h3 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground">
                 {renderWithLinks(body, false)}
               </h3>
             ) : bodyExpanded ? (
@@ -359,7 +359,7 @@ export function ResourceCard({
                 id={bodyId}
                 ref={bodyRef}
                 tabIndex={-1}
-                className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+                className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
               >
                 {renderWithLinks(body, true)}
               </h3>
@@ -390,7 +390,7 @@ export function ResourceCard({
                   id={bodyId}
                   ref={bodyRef}
                   tabIndex={-1}
-                  className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+                  className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-medium leading-snug text-foreground outline-none"
                 >
                   {renderWithLinks(collapsedBody, true)}
                 </h3>
