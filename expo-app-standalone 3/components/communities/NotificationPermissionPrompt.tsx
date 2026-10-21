@@ -1,15 +1,37 @@
 import React from 'react';
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
 /**
  * The chat list's "notifications are off" prompt, modelled on WhatsApp's:
- * a tinted banner with an inline "Turn on" link that opens a bottom sheet
- * explaining what is missed and offering a shortcut into the app's system
- * settings.
+ * a tinted banner with an inline "Turn on" link that deep-links into the
+ * app's notification settings, plus a launch sheet explaining what is missed.
  */
+
+/**
+ * Opens the OS notification settings for this app. Android 8+ has a dedicated
+ * screen (settings intent + package extra); iOS only offers the app's settings
+ * page, where notifications are the first section.
+ */
+export async function openNotificationSettings(): Promise<void> {
+  if (Platform.OS === 'android') {
+    const packageName = Constants.expoConfig?.android?.package;
+    if (packageName) {
+      try {
+        await Linking.sendIntent('android.settings.APP_NOTIFICATION_SETTINGS', [
+          { key: 'android.provider.extra.APP_PACKAGE', value: packageName },
+        ]);
+        return;
+      } catch {
+        /* fall through to the app info page */
+      }
+    }
+  }
+  await Linking.openSettings().catch(() => {});
+}
 
 const ACCENT = '#0062D1';
 
@@ -19,13 +41,7 @@ const BULLETS: Array<{ icon: React.ComponentProps<typeof Feather>['name']; label
   { icon: 'settings', label: 'Change this setting at any time' },
 ];
 
-export function NotificationPermissionBanner({
-  onEnable,
-  onDismiss,
-}: {
-  onEnable: () => void;
-  onDismiss: () => void;
-}) {
+export function NotificationPermissionBanner({ onDismiss }: { onDismiss: () => void }) {
   const colors = useColors();
   const background = colors.isDark ? 'rgba(0, 98, 209, 0.16)' : 'rgba(0, 98, 209, 0.08)';
   const border = colors.isDark ? 'rgba(82, 168, 255, 0.28)' : 'rgba(0, 98, 209, 0.22)';
@@ -41,7 +57,9 @@ export function NotificationPermissionBanner({
           Make sure you know when you have new messages.{' '}
           <Text
             style={[styles.noticeLink, { color: colors.link }]}
-            onPress={onEnable}
+            onPress={() => {
+              void openNotificationSettings();
+            }}
             accessibilityRole="link"
           >
             Turn on
@@ -73,7 +91,7 @@ export function NotificationPermissionSheet({
 
   const openSettings = () => {
     onClose();
-    void Linking.openSettings().catch(() => {});
+    void openNotificationSettings();
   };
 
   return (

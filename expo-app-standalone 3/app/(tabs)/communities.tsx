@@ -205,7 +205,6 @@ export default function CommunitiesScreen() {
 
       {notificationPermission === 'denied' && !notificationNoticeDismissed && (
         <NotificationPermissionBanner
-          onEnable={() => setNotificationPromptOpen(true)}
           onDismiss={() => setNotificationNoticeDismissed(true)}
         />
       )}
