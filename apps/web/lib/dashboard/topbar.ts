@@ -28,10 +28,10 @@ export interface SearchDestination {
 export const PAGE_DESTINATIONS: SearchDestination[] = [
   {
     id: "page:home",
-    label: "Home",
+    label: "Feed",
     href: "/dashboard",
     group: "page",
-    keywords: ["feed", "homepage", "dashboard"],
+    keywords: ["home", "homepage", "dashboard"],
   },
   {
     id: "page:communities",
@@ -53,13 +53,6 @@ export const PAGE_DESTINATIONS: SearchDestination[] = [
     href: "/dashboard/jobs",
     group: "page",
     keywords: ["hiring", "roles", "careers", "work"],
-  },
-  {
-    id: "page:events",
-    label: "Events",
-    href: "/dashboard/events",
-    group: "page",
-    keywords: ["calendar", "meetups", "workshops", "city"],
   },
   {
     id: "page:saved",

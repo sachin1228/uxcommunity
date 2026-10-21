@@ -16,7 +16,6 @@ export type FeedThread = Omit<CommunityThread, "community_id"> & { _type: "threa
  * The group-chat room behind an event, when one exists — what the feed's
  * event cards need to draw the Join/Open row (see EventChatPanel). Attached
  * by the feed route, which also says whether the viewer is already in it.
- * Same shape the city Events page attaches (see lib/events/service).
  */
 export type FeedEventChat = EventChatCardLink;
 

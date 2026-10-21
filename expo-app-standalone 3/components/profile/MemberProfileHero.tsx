@@ -2,7 +2,6 @@ import React from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { CompanyMark, CompanyVerifiedMark } from '@/components/companies/CompanyMark';
-import { DmChatIcon } from '@/components/DmChatIcon';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useColors } from '@/hooks/useColors';
 import type { ProfileCompany } from '@/lib/profile';
@@ -151,7 +150,7 @@ export function MemberProfileHero({
                 { backgroundColor: colors.chatOwnBubble, opacity: pressed ? 0.85 : 1 },
               ]}
             >
-              <DmChatIcon size={12} color="#FFFFFF" />
+              <Feather name="send" size={12} color="#FFFFFF" />
               <Text style={styles.messageChipText}>Message</Text>
             </Pressable>
 

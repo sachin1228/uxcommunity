@@ -65,7 +65,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
             showCommunityAttribution
             communityPreviewModal
             backHref="/dashboard"
-            backLabel="Home"
+            backLabel="Feed"
           />
         </div>
         <HomeRail userId={userId} />

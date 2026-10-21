@@ -18,10 +18,10 @@ export const HOME_FEED_SCOPES = ["all", "communities", "public"] as const;
 export type HomeFeedScope = (typeof HOME_FEED_SCOPES)[number];
 
 /** The scopes the dashboard switcher offers, in tab order. */
-export const HOME_FEED_TAB_SCOPES = ["public", "communities"] as const;
+export const HOME_FEED_TAB_SCOPES = ["communities", "public"] as const;
 
 /** The tab every session opens on when it has no stored choice. */
-export const DEFAULT_HOME_FEED_SCOPE: HomeFeedScope = "public";
+export const DEFAULT_HOME_FEED_SCOPE: HomeFeedScope = "communities";
 
 /** Scopes are stored per member so returning to the dashboard keeps the choice. */
 export const HOME_FEED_SCOPE_STORAGE_KEY = "uxcommunity:home-feed-scope";

@@ -392,10 +392,10 @@ export function ResourceCard({
               <div className="flex shrink-0 items-center gap-4">
                 <button type="button" onClick={handleSave} aria-label={displayedSaved ? "Unlike" : "Like"} aria-pressed={displayedSaved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
                   <HeartIcon size={16} active={displayedSaved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${displayedSaved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-                  <span className={`font-body text-sm font-semibold ${displayedSaved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
+                  <span className={`font-body text-sm font-medium ${displayedSaved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
                 </button>
                 {resource.allow_replies !== false && (
-                  <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+                  <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground-subtle transition-colors duration-150 hover:text-white">
                     <CommentIcon />
                     {resource.comment_count ?? 0}
                   </span>

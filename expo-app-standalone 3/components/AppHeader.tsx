@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/BrandLogo';
-import { DmChatIcon } from '@/components/DmChatIcon';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useDmUnread } from '@/hooks/useDmUnread';
@@ -77,7 +76,7 @@ export function AppHeader() {
           onPress={() => router.push('/messages')}
           style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.8 : 1 }]}
         >
-          <DmChatIcon size={20} color={colors.foreground} />
+          <Feather name="send" size={20} color={colors.foreground} />
           {dmUnread > 0 ? (
             <View
               style={[

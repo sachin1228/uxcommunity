@@ -96,8 +96,6 @@ export interface CommunityEvent extends BaseContent {
   host_timezone: string | null;
   /** The host zone's offset at the start — the fallback when the name can't resolve. */
   host_utc_offset_minutes?: number | null;
-  /** The city whose Events page lists the event. */
-  city_id?: string | null;
   /** The ticket's accent color; null on events created before the column. */
   accent_color?: string | null;
   is_online: boolean;

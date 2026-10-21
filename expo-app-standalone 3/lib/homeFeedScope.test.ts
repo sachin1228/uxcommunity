@@ -39,8 +39,8 @@ test('the default feed is one of the switcher tabs', () => {
   }
 });
 
-test('the tab order matches the web switcher — Public Posts first', () => {
-  assert.deepEqual([...HOME_FEED_TAB_SCOPES], ['public', 'communities']);
+test('the switcher lists Your Communities before Public Posts', () => {
+  assert.deepEqual([...HOME_FEED_TAB_SCOPES], ['communities', 'public']);
 });
 
 test('a stored tab choice is returned as-is', async () => {

@@ -43,9 +43,14 @@ const TAB_META: Record<ProfileActivityTab, { label: string; icon: LucideIcon }> 
   saved: { label: "Saved", icon: Bookmark },
 };
 
-// Derived from the scopes constant, so a new scope cannot ship without a tab
-// (and the Record above fails to type-check until it has one).
-export const PROFILE_ACTIVITY_TABS = PROFILE_FEED_SCOPES.map((value) => ({
+// The profile rail only offers the whole-author list plus the owner's saves.
+// Derived from the scopes constant, so a new scope cannot ship without an
+// explicit decision to expose it here.
+const PROFILE_TAB_VALUES = new Set<ProfileActivityTab>(["all", "saved"]);
+
+export const PROFILE_ACTIVITY_TABS = PROFILE_FEED_SCOPES.filter((value) =>
+  PROFILE_TAB_VALUES.has(value),
+).map((value) => ({
   value,
   ...TAB_META[value],
 }));
@@ -318,16 +323,21 @@ export function ProfileActivityScope({
 }
 
 /**
- * The activity tabs on the profile page: everything the member created, split
- * by card type, plus a Saved tab listing everything they saved — a card the
- * member did not author never appears outside Saved. Cards are the community
- * cards — rendered by the same components and persisted through the same API
- * routes as the homepage feed and the community tabs, so an edit here
- * immediately shows there (and vice versa) and always lands in the database.
+ * The activity tabs on the profile page: everything the member created (All),
+ * plus a Saved tab listing everything they saved — a card the member did not
+ * author never appears outside Saved. Cards are the community cards — rendered
+ * by the same components and persisted through the same API routes as the
+ * homepage feed and the community tabs, so an edit here immediately shows there
+ * (and vice versa) and always lands in the database.
  *
- * Pass `subject` to list another member's posts instead: same cards, same tabs
- * minus Saved, with the server listing only what the viewer may see.
+ * Pass `subject` to list another member's posts instead: the same cards with
+ * no tab rail at all — the profile lists their visible All feed directly.
  */
+/** Old links may name a retired tab — land them on All. */
+function visibleTab(value: ProfileFeedScope, hasSubject: boolean): ProfileActivityTab {
+  return value === "all" || (value === "saved" && !hasSubject) ? value : "all";
+}
+
 export function ProfileActivityFeed({
   currentUserId,
   initialTab = "all",
@@ -339,8 +349,8 @@ export function ProfileActivityFeed({
   basePath?: string;
   subject?: { id: string; name: string } | null;
 }) {
-  const [activeTab, setActiveTab] = useState<ProfileActivityTab>(
-    subject && initialTab === "saved" ? "all" : initialTab,
+  const [activeTab, setActiveTab] = useState<ProfileActivityTab>(() =>
+    visibleTab(initialTab, Boolean(subject)),
   );
   const tabs = subject
     ? PROFILE_ACTIVITY_TABS.filter((tab) => tab.value !== "saved")
@@ -365,10 +375,10 @@ export function ProfileActivityFeed({
       const match = /[?&]tab=([a-z]+)/.exec(window.location.search);
       const tab = match?.[1] ?? "all";
       if (!isProfileFeedScope(tab)) return;
-      if (subject && tab === "saved") return;
-      setActiveTab(tab);
-      if (event.state?.profileTab !== tab) {
-        window.history.replaceState({ profileTab: tab }, "");
+      const next = visibleTab(tab, Boolean(subject));
+      setActiveTab(next);
+      if (event.state?.profileTab !== next) {
+        window.history.replaceState({ profileTab: next }, "");
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -377,15 +387,14 @@ export function ProfileActivityFeed({
 
   return (
     <section aria-label={subject ? `${subject.name}'s activity` : "Your activity"} className="mt-2">
-      <nav
-        role="tablist"
-        aria-label={subject ? `${subject.name}'s posts` : "Your posts"}
-        className="overflow-x-auto border-b border-border"
-      >
-        {/* Centred via auto margins on a shrink-wrapped row — unlike
-            `justify-center`, an overflowing row keeps its first tabs reachable
-            when the strip has to scroll on narrow screens. */}
-        <div className="mx-auto flex w-max items-center gap-1 md:gap-3">
+      {!subject && (
+        <nav
+          role="tablist"
+          aria-label="Your posts"
+          className="border-b border-border"
+        >
+        {/* Full-width halves: each tab owns an equal share of the rail. */}
+        <div className="flex w-full items-center">
           {tabs.map(({ value, label, icon: Icon }) => (
             <button
               key={value}
@@ -393,7 +402,7 @@ export function ProfileActivityFeed({
               role="tab"
               aria-selected={activeTab === value}
               onClick={() => handleTabChange(value)}
-              className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
+              className={`flex flex-1 items-center justify-center border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
                 activeTab === value
                   ? "border-accent text-foreground"
                   : "border-transparent text-foreground-muted hover:text-foreground"
@@ -407,6 +416,7 @@ export function ProfileActivityFeed({
           ))}
         </div>
       </nav>
+      )}
 
       <div className="pt-4">
         <ProfileActivityScope key={activeTab} scope={activeTab} currentUserId={currentUserId} subject={subject} />

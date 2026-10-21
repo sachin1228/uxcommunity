@@ -241,7 +241,7 @@ export function ShowcaseCard({
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
               />
               <span
-                className={`font-body text-sm font-semibold ${
+                className={`font-body text-sm font-medium ${
                   post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >
@@ -250,7 +250,7 @@ export function ShowcaseCard({
             </button>
 
             {post.allow_replies !== false && (
-              <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+              <span className="inline-flex items-center gap-1.5 font-body text-sm font-medium text-foreground-subtle transition-colors duration-150 hover:text-white">
                 <CommentIcon />
                 {post.comment_count}
               </span>

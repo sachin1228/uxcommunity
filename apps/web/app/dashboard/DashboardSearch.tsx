@@ -5,9 +5,8 @@ import {
   Bell,
   Bookmark,
   Briefcase,
-  CalendarDays,
   Compass,
-  Home,
+  LayoutGrid,
   Library,
   Search,
   Settings,
@@ -37,11 +36,10 @@ import {
 
 /** Icon per quick link. Communities share one — they are one kind of place. */
 const ICONS: Record<string, typeof Search> = {
-  "/dashboard": Home,
+  "/dashboard": LayoutGrid,
   "/dashboard/communities": Compass,
   "/dashboard/library": Library,
   "/dashboard/jobs": Briefcase,
-  "/dashboard/events": CalendarDays,
   "/dashboard/saved": Bookmark,
   "/dashboard/notifications": Bell,
   "/dashboard/profile": UserCircle,

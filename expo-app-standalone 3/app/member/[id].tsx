@@ -2,12 +2,12 @@
  * A member's profile as other members see it — the mobile reading of the web
  * /dashboard/profile/[userId]: the read-only identity hero, the Message chip
  * that starts a DM (get-or-create, exactly like the web `?peer=` handoff), and
- * the activity tabs listing what they share that the viewer may see.
+ * the All activity feed listing what they share that the viewer may see — no
+ * tab rail.
  *
  * Blocking reshapes the screen the same way it reshapes the web page: the owner
  * blocking the viewer leaves only the neutral unavailable state; the viewer
- * blocking the owner leaves the identity plus the blocked notice, with no tabs
- * and no feed.
+ * blocking the owner leaves the identity plus the blocked notice, with no feed.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +16,6 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -30,7 +29,6 @@ import {
   ContentDetail,
   useContentActions,
 } from '@/components/community/contentView';
-import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { MemberProfileHero } from '@/components/profile/MemberProfileHero';
 import { useAuth } from '@/context/AuthContext';
@@ -53,16 +51,10 @@ import { getMemberProfile, type MemberProfile } from '@/lib/profile';
 /** The FlatList content's gutter — the dot band cancels it to run full-bleed. */
 const LIST_PADDING = 12;
 
-/** One activity tab per card scope a member's feed serves — the web order. */
-const TABS: { key: MemberFeedScope; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'thread', label: 'Threads' },
-  { key: 'showcase', label: 'Showcase' },
-  { key: 'resource', label: 'Resources' },
-  { key: 'event', label: 'Events' },
-];
+/** The server's one member feed — every authored kind, viewer-visible cards. */
+const MEMBER_FEED_SCOPE: MemberFeedScope = 'all';
 
-/** The web member feed's empty-state copy, per tab. */
+/** The web member feed's empty-state copy. */
 const EMPTY_STATE: Record<MemberFeedScope, { title: string; body: string }> = {
   all: {
     title: 'Nothing here yet',
@@ -86,19 +78,6 @@ const EMPTY_STATE: Record<MemberFeedScope, { title: string; body: string }> = {
   },
 };
 
-function TabIcon({ scope, color }: { scope: MemberFeedScope; color: string }) {
-  if (scope === 'all') return <Feather name="grid" size={14} color={color} />;
-  const kind =
-    scope === 'thread'
-      ? 'threads'
-      : scope === 'showcase'
-        ? 'showcase'
-        : scope === 'resource'
-          ? 'resources'
-          : 'events';
-  return <CommunityTabIcon tab={kind} size={14} color={color} />;
-}
-
 export default function MemberProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -111,8 +90,7 @@ export default function MemberProfileScreen() {
   const [memberLoading, setMemberLoading] = useState(true);
   const [memberError, setMemberError] = useState<string | null>(null);
 
-  const [scope, setScope] = useState<MemberFeedScope>('all');
-  const scopeRef = useRef<MemberFeedScope>('all');
+  const scopeRef = useRef<MemberFeedScope>(MEMBER_FEED_SCOPE);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -237,18 +215,6 @@ export default function MemberProfileScreen() {
     onGap: handlePollGap,
   });
 
-  const handleScopeChange = useCallback(
-    (next: MemberFeedScope) => {
-      if (next === scope) return;
-      setScope(next);
-      scopeRef.current = next;
-      setItems([]);
-      setSelected(null);
-      void loadFeed(next, 'initial');
-    },
-    [loadFeed, scope],
-  );
-
   // The comment count is the only route into a post's own page, where the
   // comments live under the post itself; the card body just double-tap likes.
   const openItem = useCallback(
@@ -335,37 +301,6 @@ export default function MemberProfileScreen() {
 
       {messageError ? (
         <Text style={[styles.messageError, { color: colors.destructive }]}>{messageError}</Text>
-      ) : null}
-
-      {/* The viewer's block reduces the profile to the identity card — the web
-          hides the tabs and feed the same way. */}
-      {!member?.blockedByMe && !member?.blockedViewer ? (
-        <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabs}
-          >
-            {TABS.map((tab) => {
-              const active = scope === tab.key;
-              const labelColor = active ? colors.foreground : colors.mutedForeground;
-              return (
-                <Pressable
-                  key={tab.key}
-                  onPress={() => handleScopeChange(tab.key)}
-                  style={[styles.tab, { borderBottomColor: active ? colors.accent : 'transparent' }]}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                >
-                  <View style={styles.tabInner}>
-                    <TabIcon scope={tab.key} color={labelColor} />
-                    <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
       ) : null}
     </View>
   );
@@ -478,10 +413,10 @@ export default function MemberProfileScreen() {
               <View style={styles.centerSmall}>
                 <Feather name="inbox" size={30} color={colors.foregroundSubtle} />
                 <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>
-                  {EMPTY_STATE[scope].title}
+                  {EMPTY_STATE[MEMBER_FEED_SCOPE].title}
                 </Text>
                 <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                  {EMPTY_STATE[scope].body}
+                  {EMPTY_STATE[MEMBER_FEED_SCOPE].body}
                 </Text>
               </View>
             )
@@ -531,22 +466,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 20,
   },
-  tabsShell: {
-    marginTop: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tabs: {
-    minWidth: '100%',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  tab: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    borderBottomWidth: 2,
-  },
-  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 10 },
-  tabText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
   list: { padding: LIST_PADDING, gap: 12, flexGrow: 1 },
   center: {
     flex: 1,

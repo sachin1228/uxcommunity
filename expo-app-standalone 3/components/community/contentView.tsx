@@ -19,6 +19,7 @@ import { useIsFocused } from '@react-navigation/native';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
@@ -958,7 +959,6 @@ export function ContentActionRow({
         <Action
           icon="message-circle"
           label={String(commentCount)}
-          compact
           accessibilityLabel="Comments"
           onPress={() => {
             hapticSelection();
@@ -1922,13 +1922,11 @@ function VideoThumb({
   );
 }
 
-function Action({ icon, label, active, activeColor = 'accent', compact = false, onPress, accessibilityLabel }: {
+function Action({ icon, label, active, activeColor = 'accent', onPress, accessibilityLabel }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   active?: boolean;
   activeColor?: 'like' | 'accent';
-  /** The web renders the comment count one step smaller than the like count. */
-  compact?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 }) {
@@ -1954,10 +1952,12 @@ function Action({ icon, label, active, activeColor = 'accent', compact = false, 
     >
       {icon === 'heart' ? (
         <HeartIcon size={iconSize} active={Boolean(active)} color={colors.foregroundSubtle} />
+      ) : icon === 'message-circle' ? (
+        <CommentGlyph size={iconSize} color={tint} />
       ) : (
         <Feather name={icon} size={iconSize} color={tint} />
       )}
-      <Text style={[styles.actionText, compact ? styles.actionTextCompact : null, { color: tint }]}>
+      <Text style={[styles.actionText, { color: tint }]}>
         {label}
       </Text>
     </Pressable>
@@ -2114,8 +2114,7 @@ const styles = StyleSheet.create({
   action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Web footer counts: font-body text-sm font-semibold; the comment count is
   // one step smaller (text-xs).
-  actionText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  actionTextCompact: { fontSize: 12 },
+  actionText: { fontFamily: 'Geist_500Medium', fontSize: 14 },
 
   carousel: {
     width: '100%',

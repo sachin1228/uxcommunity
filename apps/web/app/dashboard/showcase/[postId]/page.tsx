@@ -41,7 +41,7 @@ export default async function ShowcaseDetailPage({ params }: { params: Promise<{
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
       <div className="mx-auto w-full max-w-[40rem]">
-        <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} communityName={communityData?.name ?? "Community"} communityImage={communityDp.image_url} showCommunityAttribution communityPreviewModal backHref="/dashboard" backLabel="Home" />
+        <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} communityName={communityData?.name ?? "Community"} communityImage={communityDp.image_url} showCommunityAttribution communityPreviewModal backHref="/dashboard" backLabel="Feed" />
       </div>
         <HomeRail userId={userId} />
       </div>

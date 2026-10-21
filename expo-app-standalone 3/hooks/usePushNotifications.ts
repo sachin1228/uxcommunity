@@ -21,14 +21,14 @@ import {
 } from '@/lib/push';
 import { fetchNotificationSettings } from '@/lib/notificationSettings';
 
-/** Where a tap opens: the chat it came from, the event's room, or the city feed. */
+/** Where a tap opens: the chat it came from, the event's room, or the home feed. */
 function routeForPush(data: PushData): Href {
   if (data.type === 'community_message') {
     return { pathname: '/community/[id]', params: { id: data.communityId } };
   }
   return data.communityId
     ? { pathname: '/community/[id]', params: { id: data.communityId } }
-    : '/events';
+    : '/(tabs)';
 }
 
 export function usePushNotifications() {

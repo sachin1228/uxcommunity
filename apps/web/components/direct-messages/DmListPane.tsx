@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { ChevronLeft, Search } from "lucide-react";
+import { ChevronLeft, Search, Send } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { Spinner } from "@/components/ui/Spinner";
 import { fmtTimeAgo } from "@/components/communities/chat/chatUtils";
@@ -13,7 +13,6 @@ import {
 import { messagePreview } from "@/lib/direct-messages/preview-text";
 import { filterConversations } from "@/lib/direct-messages/search";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
-import { DmChatIcon } from "./DmChatIcon";
 
 /**
  * The conversation list pane. Rows follow the sidebar's vocabulary: avatar,
@@ -112,7 +111,7 @@ export const DmListPane = memo(function DmListPane({
           </div>
         ) : all.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            <DmChatIcon size={28} className="text-foreground-muted/60" />
+            <Send size={28} strokeWidth={1.75} className="text-foreground-muted/60" />
             <p className="font-body text-sm text-foreground-muted">No conversations yet.</p>
             <p className="font-body text-xs text-foreground-muted/70">
               Start one from any member profile.
