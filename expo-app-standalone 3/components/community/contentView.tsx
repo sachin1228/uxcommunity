@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
+  AppState,
   Easing,
   Image,
   Linking,
@@ -68,6 +69,7 @@ import { ContentReportModal } from './ContentReportModal';
 import { CommunityPreviewSheet } from './CommunityPreviewSheet';
 import { REPORT_CONTENT_TYPE_BY_KIND } from '@/lib/contentReports';
 import { eventShareUrl } from '@/lib/contentLinks';
+import { joinVideoPlayback, leaveVideoPlayback } from '@/lib/videoPlayback';
 
 /**
  * The community card, the card detail, and the optimistic interaction state
@@ -670,6 +672,10 @@ export interface ContentCardProps {
   onDelete?: (item: CommunityContent) => Promise<void> | void;
   /** Manager with this kind's moderation grant — offers Delete on others' cards. */
   canModerate?: boolean;
+  /** Card is on screen — its inline video may autoplay. */
+  videoActive?: boolean;
+  /** List position — the topmost active video owns playback. */
+  videoRank?: number;
 }
 
 export function ContentCard({
@@ -683,6 +689,8 @@ export function ContentCard({
   onEdit,
   onDelete,
   canModerate = false,
+  videoActive = true,
+  videoRank = 0,
 }: ContentCardProps) {
   const colors = useColors();
   const thread = kind === 'threads' ? item as CommunityThread : null;
@@ -842,6 +850,8 @@ export function ContentCard({
               avatarUrl: author?.avatar_url ?? null,
               createdAt: item.created_at,
             }}
+            videoActive={videoActive}
+            videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
           />
         ) : images.length ? (
@@ -852,6 +862,8 @@ export function ContentCard({
               avatarUrl: author?.avatar_url ?? null,
               createdAt: item.created_at,
             }}
+            videoActive={videoActive}
+            videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
           />
         ) : null}
@@ -1711,12 +1723,18 @@ function showcaseMediaForPost(post: CommunityShowcase): MediaEntry[] {
 export function MediaCarousel({
   media,
   owner,
+  /** The card is on screen and nothing covers it — the video may play. */
+  videoActive = true,
+  /** List position — the topmost active video owns playback. */
+  videoRank = 0,
   /** Double tap on a photo: like the post instead of opening the viewer. */
   onDoubleTap,
 }: {
   media: MediaEntry[];
   /** The poster — the lightbox header's name, avatar and date, as in chat. */
   owner: { name: string | null; avatarUrl: string | null; createdAt: string };
+  videoActive?: boolean;
+  videoRank?: number;
   onDoubleTap?: () => void;
 }) {
   const colors = useColors();
@@ -1810,6 +1828,8 @@ export function MediaCarousel({
       return (
         <InlineVideo
           entry={entry}
+          active={videoActive}
+          rank={videoRank}
           style={[
             styles.imageSingle,
             anchorRatio ? { aspectRatio: anchorRatio } : styles.imageSingleFallback,
@@ -1857,6 +1877,8 @@ export function MediaCarousel({
             <InlineVideo
               key={`${entry.url}-${mediaIndex}`}
               entry={entry}
+              active={videoActive && mediaIndex === index}
+              rank={videoRank}
               style={{ width: pageWidth, height: pageHeight }}
             />
           ) : (
@@ -1915,24 +1937,50 @@ export function MediaCarousel({
 /** Inline, muted, looping playback — tap opens the full player. */
 function InlineVideo({
   entry,
+  active,
+  rank,
   style,
 }: {
   entry: MediaEntry;
+  active: boolean;
+  rank: number;
   style: React.ComponentProps<typeof View>['style'];
 }) {
+  const focused = useIsFocused();
   const player = useVideoPlayer(entry.url, (instance) => {
     instance.loop = true;
     instance.muted = true;
-    instance.play();
   });
   const [muted, setMuted] = useState(true);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Playback follows the viewport, like the web player's IntersectionObserver.
+  // The coordinator lets only one of the on-screen videos run, so two
+  // soundtracks never overlap.
+  const wantsPlay = active && focused && appActive && !showPlayer;
+  useEffect(() => {
+    if (!wantsPlay) {
+      player.pause();
+      return;
+    }
+    const candidate = { rank, play: () => player.play(), pause: () => player.pause() };
+    joinVideoPlayback(candidate);
+    return () => leaveVideoPlayback(rank, candidate.pause);
+  }, [player, rank, wantsPlay]);
 
   const toggleMuted = () => {
     const next = !muted;
     player.muted = next;
     setMuted(next);
-    player.play();
+    if (wantsPlay) player.play();
   };
 
   return (
@@ -1945,10 +1993,7 @@ function InlineVideo({
         allowsFullscreen={false}
       />
       <Pressable
-        onPress={() => {
-          player.pause();
-          setShowPlayer(true);
-        }}
+        onPress={() => setShowPlayer(true)}
         style={StyleSheet.absoluteFill}
         accessibilityRole="button"
         accessibilityLabel={entry.name ? `Open video ${entry.name}` : 'Open video'}
@@ -1966,10 +2011,7 @@ function InlineVideo({
         <VideoPlayerModal
           url={entry.url}
           title={entry.name}
-          onClose={() => {
-            setShowPlayer(false);
-            player.play();
-          }}
+          onClose={() => setShowPlayer(false)}
         />
       ) : null}
     </View>

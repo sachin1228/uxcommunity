@@ -33,6 +33,7 @@ import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { MemberProfileHero } from '@/components/profile/MemberProfileHero';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useViewableKeys } from '@/hooks/useViewableKeys';
 import type { CommunityContent } from '@/lib/communityContent';
 import { createDmConversation, unblockUser } from '@/lib/dmApi';
 import {
@@ -98,6 +99,7 @@ export default function MemberProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
 
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
@@ -261,7 +263,7 @@ export default function MemberProfileScreen() {
   }, [memberId, unblocking]);
 
   const renderItem = useCallback(
-    ({ item }: { item: FeedItem }) => (
+    ({ item, index }: { item: FeedItem; index: number }) => (
       <ContentCard
         item={item}
         kind={feedItemKind(item)}
@@ -270,9 +272,11 @@ export default function MemberProfileScreen() {
         communityName={item.community_name}
         communityImage={item.community_image}
         onComments={openItem}
+        videoActive={!selected && visibleKeys.has(feedItemKey(item))}
+        videoRank={index}
       />
     ),
-    [actions, items, openItem, user?.id],
+    [actions, items, openItem, selected, user?.id, visibleKeys],
   );
 
   const body = member?.profile;
@@ -368,6 +372,8 @@ export default function MemberProfileScreen() {
           keyExtractor={feedItemKey}
           renderItem={renderItem}
           ListHeaderComponent={header}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}

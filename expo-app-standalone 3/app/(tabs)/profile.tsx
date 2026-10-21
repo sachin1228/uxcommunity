@@ -24,6 +24,7 @@ import { ContentDetail, ContentCard, useContentActions } from '@/components/comm
 import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useViewableKeys } from '@/hooks/useViewableKeys';
 import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent';
 import { chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
@@ -102,6 +103,7 @@ export default function ProfileScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
+  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   /** The activity row whose editor is open (owner-only; null when closed). */
   const [editing, setEditing] = useState<FeedItem | null>(null);
 
@@ -362,7 +364,7 @@ export default function ProfileScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: FeedItem }) => (
+    ({ item, index }: { item: FeedItem; index: number }) => (
       <ContentCard
         item={item}
         kind={feedItemKind(item)}
@@ -373,9 +375,11 @@ export default function ProfileScreen() {
         onComments={openItem}
         onEdit={editItem}
         onDelete={deleteItem}
+        videoActive={!selected && visibleKeys.has(feedItemKey(item))}
+        videoRank={index}
       />
     ),
-    [actions, deleteItem, editItem, openItem, user?.id],
+    [actions, deleteItem, editItem, openItem, selected, user?.id, visibleKeys],
   );
 
   const body = profile?.profile;
@@ -478,6 +482,8 @@ export default function ProfileScreen() {
           keyExtractor={feedItemKey}
           renderItem={renderItem}
           ListHeaderComponent={hero}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
