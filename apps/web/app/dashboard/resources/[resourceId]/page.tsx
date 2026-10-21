@@ -146,7 +146,7 @@ export default async function ResourceDetailPage({ params }: Props) {
             showCommunityAttribution
             communityPreviewModal
             backHref="/dashboard"
-            backLabel="Home"
+            backLabel="Feed"
           />
         </div>
         <HomeRail userId={userId} />

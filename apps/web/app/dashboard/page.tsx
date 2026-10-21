@@ -2,7 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { DashboardHome } from "./DashboardHome";
 import { HomeRail } from "./HomeRail";
 
-export const metadata = { title: "Home — uxcommunity" };
+export const metadata = { title: "Feed — uxcommunity" };
 
 export default async function DashboardPage() {
   const session = await getSession();

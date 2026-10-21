@@ -93,7 +93,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             showCommunityAttribution
             communityPreviewModal
             backHref="/dashboard"
-            backLabel="Home"
+            backLabel="Feed"
           />
         </div>
         <HomeRail userId={userId} />
