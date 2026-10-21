@@ -1458,7 +1458,9 @@ export default function CommunityChat() {
                 accessibilityState={{ selected: active }}
               >
                 <View style={styles.tabInner}>
-                  <Text style={[styles.tabText, { color: labelColor }]}>{tab.label}</Text>
+                  <Text numberOfLines={1} style={[styles.tabText, { color: labelColor }]}>
+                    {tab.label}
+                  </Text>
                   {/* Absolute-positioned over the tab's padding: the dot is
                       visible without reserving width, so no tab grows to
                       make room for it. */}
@@ -1696,11 +1698,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tabs: {
-    minWidth: '100%',
+    flexDirection: 'row',
+    gap: 4,
     paddingHorizontal: 12,
   },
   tab: {
-    minWidth: 82,
     height: 48,
     paddingHorizontal: 12,
     alignItems: 'center',
