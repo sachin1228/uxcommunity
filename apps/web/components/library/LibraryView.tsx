@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { BarChart3, Image as ImageIcon, LayoutGrid, Link2, MessagesSquare } from "lucide-react";
+import { BarChart3, Image as ImageIcon, LayoutGrid, Link2, MessagesSquare, type LucideIcon } from "lucide-react";
 import { CommunityFeedList } from "@/components/feeds/CommunityFeedList";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { filterChip } from "@/components/communities/filter-chip";
@@ -52,10 +52,10 @@ const RESOURCE_CHIPS: Chip[] = [
   }),
 ];
 
-const TABS: Array<{ value: LibraryKind; label: string }> = [
-  { value: "thread", label: "Threads" },
-  { value: "showcase", label: "Showcase" },
-  { value: "resource", label: "Resources" },
+const TABS: Array<{ value: LibraryKind; label: string; icon: LucideIcon }> = [
+  { value: "thread", label: "Threads", icon: MessagesSquare },
+  { value: "showcase", label: "Showcase", icon: ImageIcon },
+  { value: "resource", label: "Resources", icon: Link2 },
 ];
 
 const CHIPS: Record<LibraryKind, Chip[]> = {
@@ -143,6 +143,7 @@ export function LibraryView({
         >
           {TABS.map((tab) => {
             const active = kind === tab.value;
+            const Icon = tab.icon;
             return (
               <button
                 key={tab.value}
@@ -159,7 +160,10 @@ export function LibraryView({
                     : "border-transparent text-foreground-muted hover:text-foreground"
                 }`}
               >
-                {tab.label}
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                  {tab.label}
+                </span>
               </button>
             );
           })}
