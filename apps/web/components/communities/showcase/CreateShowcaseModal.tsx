@@ -403,7 +403,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                 />
                 <ToggleRow
                   title="Share publicly"
-                  description="Visible to everyone, not just community members."
+                  description="Visible to everyone on public feed, not just community members."
                   checked={isPublic}
                   onChange={setIsPublic}
                   icon={<Globe strokeWidth={2.5} size={15} />}

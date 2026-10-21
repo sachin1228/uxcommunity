@@ -1151,7 +1151,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
               label="Share publicly"
               description={
                 kind === 'threads' || isShowcase
-                  ? 'Visible to everyone, not just community members.'
+                  ? 'Visible to everyone on public feed, not just community members.'
                   : 'Also show this post in the public community feed.'
               }
               value={isPublic}

@@ -131,7 +131,7 @@ export function LibraryView({
           <div className="min-w-0">
             <h1 className="font-display text-xl font-semibold text-foreground">Library</h1>
             <p className="mt-1 max-w-2xl text-pretty font-body text-sm leading-5 text-foreground-muted">
-              Handpicked questions, discussions, polls, showcase work and resources from across the community.
+              Handpicked questions, discussions, polls, showcase work and resources curated from public posts across the community.
             </p>
           </div>
         </div>
