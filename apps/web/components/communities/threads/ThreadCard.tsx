@@ -629,7 +629,7 @@ export function ThreadCard({
                 }`}
               />
               <span
-                className={`font-body text-sm font-semibold ${
+                className={`font-body text-sm font-medium ${
                   thread.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >
@@ -638,7 +638,7 @@ export function ThreadCard({
             </button>
 
             {/* Comments */}
-            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-foreground-subtle transition-colors duration-150 hover:text-white">
+            <span className="inline-flex items-center gap-1.5 font-body font-medium text-sm text-foreground-subtle transition-colors duration-150 hover:text-white">
               <CommentIcon />
               {thread.comment_count}
             </span>
