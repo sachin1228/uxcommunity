@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -145,8 +145,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   actionsOpen = false,
 }: Props) {
   const colors = useColors();
-  /** Press feedback for the full-row long-press target. */
-  const [rowPressed, setRowPressed] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
 
   const theme = CHAT_CONTENT_KIND_THEME[event.kind];
@@ -221,19 +219,19 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
       style={[
         styles.row,
         !isOwn && styles.rowWithAvatar,
-        rowPressed || actionsOpen ? styles.rowActive : null,
+        actionsOpen ? styles.rowActive : null,
       ]}
     >
       {/* The whole row is the long-press target, so the empty half beside a
-          card opens the action sheet too. */}
+          card opens the action sheet too. The tint is driven by the sheet,
+          so it only appears once the press has been held long enough to
+          register — a plain tap stays clean. */}
       <Pressable
         onLongPress={() => {
           hapticImpact();
           onLongPress(event);
         }}
         delayLongPress={350}
-        onPressIn={() => setRowPressed(true)}
-        onPressOut={() => setRowPressed(false)}
         accessible={false}
         style={[
           styles.rowPress,
@@ -276,8 +274,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
               onLongPress(event);
             }}
             delayLongPress={350}
-            onPressIn={() => setRowPressed(true)}
-            onPressOut={() => setRowPressed(false)}
             style={[
               styles.bubble,
               { backgroundColor: isOwn ? colors.chatOwnBubble : colors.surfaceRaised, shadowColor: '#000' },
@@ -317,8 +313,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 onLongPress(event);
               }}
               delayLongPress={350}
-              onPressIn={() => setRowPressed(true)}
-              onPressOut={() => setRowPressed(false)}
               accessibilityRole="button"
               accessibilityLabel={`${name} created ${withArticle(theme.label.toLowerCase())}: ${event.title || theme.label}`}
               style={({ pressed }) => [
