@@ -21,6 +21,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DmIcon } from '@/components/DmIcon';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -226,7 +227,7 @@ export default function MessagesScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Feather name="send" size={30} color={colors.foregroundSubtle} />
+              <DmIcon size={28} color={colors.foregroundSubtle} />
               <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>
                 {query ? 'No conversations match' : 'No conversations yet'}
               </Text>
