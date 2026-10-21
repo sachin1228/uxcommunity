@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -55,6 +55,15 @@ export default function CommunitiesScreen() {
   const notificationPermission = useNotificationPermission();
   const [notificationPromptOpen, setNotificationPromptOpen] = useState(false);
   const [notificationNoticeDismissed, setNotificationNoticeDismissed] = useState(false);
+  const notificationPromptShownRef = useRef(false);
+
+  // Opening the app with notifications off should explain why, not wait for
+  // the banner link. Once per session; after that the banner carries it.
+  useEffect(() => {
+    if (notificationPermission !== 'denied' || notificationPromptShownRef.current) return;
+    notificationPromptShownRef.current = true;
+    setNotificationPromptOpen(true);
+  }, [notificationPermission]);
 
   /**
    * Hibernated rows: communities past the live socket window
