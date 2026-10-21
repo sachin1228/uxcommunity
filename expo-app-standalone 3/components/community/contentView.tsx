@@ -777,7 +777,7 @@ export function ContentCard({
       // The card is a gesture surface, not a single control: keep the inner
       // buttons and links as the accessible units.
       accessible={false}
-      style={[styles.card, { backgroundColor: colors.backgroundSubtle, borderColor: colors.border }]}
+      style={[styles.card, { backgroundColor: colors.backgroundSubtle }]}
     >
       <View style={styles.cardBody}>
         {/* Author meta — name and relative date on one line, the category as
@@ -2083,11 +2083,10 @@ function useImageAspectRatio(url?: string): number | null {
 }
 
 const styles = StyleSheet.create({
-  // Web thread card: rounded-xl border bg-background-subtle px-5 py-5 — a flat
-  // bordered card rather than a shadowed surface.
+  // Web thread card: rounded-xl bg-background-subtle px-5 py-5 — a flat
+  // surface with no outer outline rather than a shadowed card.
   card: {
     borderRadius: 12,
-    borderWidth: 1,
     overflow: 'hidden',
   },
   likeBurst: {
