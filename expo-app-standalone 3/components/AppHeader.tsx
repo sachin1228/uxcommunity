@@ -4,14 +4,15 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DmIcon } from '@/components/DmIcon';
+import { LimitsRing } from '@/components/LimitsRing';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useDmUnread } from '@/hooks/useDmUnread';
 import { useNotifications } from '@/hooks/useNotifications';
 
 /**
- * The workspace header — the brand on the left, the notifications bell and the
- * Messages entry on the right.
+ * The workspace header — the brand on the left, the creation-limits ring, the
+ * notifications bell and the Messages entry on the right.
  *
  * The DM icon mirrors the web topbar's button (right of the bell here, per the
  * mobile layout) and carries the same badge rule: the number of conversations
@@ -44,6 +45,8 @@ export function AppHeader() {
       </View>
 
       <View style={styles.actions}>
+        <LimitsRing />
+
         <Pressable
           accessibilityLabel={
             badge > 0 ? `Notifications, ${badge} unread` : 'Notifications'
