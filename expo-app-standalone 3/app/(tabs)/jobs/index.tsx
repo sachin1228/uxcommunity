@@ -215,59 +215,61 @@ export default function JobsTab() {
         </Pressable>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabStrip}
-        contentContainerStyle={styles.tabStripContent}
-      >
-        {tabs.map((item) => {
-          const active = tab === item.value;
-          return (
-            <Pressable
-              key={item.value}
-              onPress={() => openTab(item.value)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              style={[
-                styles.tab,
-                {
-                  borderBottomColor: active ? colors.foreground : 'transparent',
-                },
-              ]}
-            >
-              <Text
+      <View style={[styles.tabStrip, { borderBottomColor: colors.border }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabScroll}
+          contentContainerStyle={styles.tabStripContent}
+        >
+          {tabs.map((item) => {
+            const active = tab === item.value;
+            return (
+              <Pressable
+                key={item.value}
+                onPress={() => openTab(item.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
-                  styles.tabLabel,
-                  { color: active ? colors.foreground : colors.foregroundMuted },
+                  styles.tab,
+                  {
+                    borderBottomColor: active ? colors.accent : 'transparent',
+                  },
                 ]}
               >
-                {item.label}
-              </Text>
-              {item.chip !== null ? (
-                <View
+                <Text
                   style={[
-                    styles.tabChip,
-                    {
-                      backgroundColor:
-                        item.unseen || active ? colors.accentSoft : colors.surfaceRaised,
-                    },
+                    styles.tabLabel,
+                    { color: active ? colors.foreground : colors.foregroundMuted },
                   ]}
                 >
-                  <Text
+                  {item.label}
+                </Text>
+                {item.chip !== null ? (
+                  <View
                     style={[
-                      styles.tabChipText,
-                      { color: item.unseen || active ? colors.foreground : colors.foregroundMuted },
+                      styles.tabChip,
+                      {
+                        backgroundColor:
+                          item.unseen || active ? colors.accentSoft : colors.surfaceRaised,
+                      },
                     ]}
                   >
-                    {item.chip}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                    <Text
+                      style={[
+                        styles.tabChipText,
+                        { color: item.unseen || active ? colors.foreground : colors.foregroundMuted },
+                      ]}
+                    >
+                      {item.chip}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {browseList !== null && browseList.length > 0 ? (
         <View
@@ -472,7 +474,12 @@ const styles = StyleSheet.create({
   },
   postButtonText: { fontFamily: 'Geist_600SemiBold', fontSize: 12.5 },
 
-  tabStrip: { flexGrow: 0, marginTop: 6 },
+  tabStrip: {
+    flexGrow: 0,
+    marginTop: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tabScroll: { flexGrow: 0 },
   tabStripContent: { paddingHorizontal: 12, gap: 2 },
   tab: {
     flexDirection: 'row',
