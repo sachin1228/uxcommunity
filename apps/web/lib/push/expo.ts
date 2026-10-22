@@ -145,6 +145,12 @@ export interface ExpoPushMessage {
   badge?: number;
   /** Android requires the notification to target a channel; we use "messages". */
   channelId?: string;
+  /**
+   * Android-only extra that Expo forwards to FCM. `image` is loaded by the
+   * device and shown in the notification's large-icon slot, which is how a
+   * chat push wears the community's DP instead of the app icon.
+   */
+  richContent?: { image?: string };
   /** Delivered to the app so a tap can deep-link to the right screen. */
   data?: Record<string, unknown>;
   /** Collapse key — a newer message from the same chat replaces the older one. */

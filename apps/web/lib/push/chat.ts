@@ -450,11 +450,15 @@ export async function sendChatMessagePush(
   try {
     const communityResult = await db
       .from("communities")
-      .select("name")
+      .select("name, image_url")
       .eq("id", communityId)
       .maybeSingle();
     const communityName =
       (communityResult.data as { name?: string } | null)?.name ?? "New message";
+    // The shade's large-icon slot is the community's DP, like the sender
+    // avatar in a messaging app. A community without one keeps the app icon.
+    const communityImage =
+      (communityResult.data as { image_url?: string | null } | null)?.image_url ?? null;
 
     const body = `${senderName ?? "Someone"}: ${preview({ content, hasImage, isReply })}`;
     const deadTokens = new Set<string>();
@@ -610,6 +614,7 @@ export async function sendChatMessagePush(
             body,
             sound: audible ? "default" : null,
             channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
+            ...(communityImage ? { richContent: { image: communityImage } } : {}),
             badge: badges.get(userId) ?? 0,
             // One collapsed notification per chat, like WhatsApp's
             // per-conversation stack, so a busy community can't bury the
