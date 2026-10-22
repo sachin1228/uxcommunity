@@ -18,7 +18,7 @@ import {
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { prefetchCommunityRoute } from "@/lib/navigation/community-prefetch";
-import { useEventBrowserNotifications } from "@/lib/events/browser-notifications";
+import { useInAppBrowserNotifications } from "@/lib/notifications-browser";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
 interface Props {
@@ -50,10 +50,11 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
     router,
   } = useSidebarCommunities(userId);
 
-  // Desktop OS notifications for the event moments. Mounted only on the
-  // desktop sidebar: the native app owns reminders on a phone, and a second
-  // mobile-web subscription would raise both at once.
-  useEventBrowserNotifications(mobile ? null : userId);
+  // Desktop OS notifications for every bell row (likes, comments, events,
+  // jobs, reports, join requests). Mounted only on the desktop sidebar: the
+  // native app owns pushes on a phone, and a second mobile-web subscription
+  // would raise both at once.
+  useInAppBrowserNotifications(mobile ? null : userId);
 
   const sorted = [...communities].sort(compareByRecentActivity);
 

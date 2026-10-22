@@ -71,8 +71,31 @@ export interface EventLifecyclePushData {
   href?: string;
 }
 
+/** A direct message from another member. */
+export interface DirectMessagePushData {
+  type: 'dm_message';
+  conversationId: string;
+  messageId: string;
+  /** True when the server chose not to buzz for this one. */
+  silent?: boolean;
+}
+
+/** A new row in the in-app notifications list (like, comment, job, …). */
+export interface AppNotificationPushData {
+  type: 'app_notification';
+  notificationId: string;
+  /** The row's NotificationType, for future routing without a list fetch. */
+  notificationType?: string;
+  href?: string;
+  silent?: boolean;
+}
+
 /** Every push this app understands; anything else is ignored on tap. */
-export type PushData = CommunityMessagePushData | EventLifecyclePushData;
+export type PushData =
+  | CommunityMessagePushData
+  | EventLifecyclePushData
+  | DirectMessagePushData
+  | AppNotificationPushData;
 
 /** What we last observed about this device's push registration. */
 export interface PushDiagnostics {
@@ -260,6 +283,12 @@ export function pushDataFrom(
   }
   if (data.type === 'event_lifecycle' && (data as EventLifecyclePushData).eventId) {
     return data as EventLifecyclePushData;
+  }
+  if (data.type === 'dm_message' && (data as DirectMessagePushData).conversationId) {
+    return data as DirectMessagePushData;
+  }
+  if (data.type === 'app_notification' && (data as AppNotificationPushData).notificationId) {
+    return data as AppNotificationPushData;
   }
   return null;
 }

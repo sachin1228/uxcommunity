@@ -227,7 +227,7 @@ export default function NotificationSettingsScreen() {
             <Row
               colors={colors}
               label="Mute at night"
-              description={`Chats stay silent between these times, in your own timezone (${deviceTimeZone()}). Messages still arrive and still count as unread — they just do not make a noise.`}
+              description={`Chats and updates stay silent between these times, in your own timezone (${deviceTimeZone()}). They still arrive — they just do not make a noise.`}
             >
               <Switch
                 value={preferences.quietHoursEnabled}

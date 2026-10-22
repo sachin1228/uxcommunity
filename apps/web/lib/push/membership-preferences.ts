@@ -1,6 +1,6 @@
 /**
- * Preference policy for the community-update push — the accepted-join-request
- * notice.
+ * Preference policy for non-chat pushes: the accepted-join-request notice and
+ * every in-app activity row (likes, comments, job matches, reports …).
  *
  * WHY THIS IS ITS OWN MODULE
  *   `push/membership.ts` sends the push, so it imports Next's `after()` and the

@@ -4,6 +4,7 @@ import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { notificationRealtimeEvent } from "@/lib/notifications-realtime";
+import { sendActivityPush } from "@/lib/push/activity";
 import { logEvent } from "@/lib/observability/log";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -219,10 +220,25 @@ export async function createNotification(
   const created = data?.[0] ?? null;
   if (created) {
     // `inserted` decides insert vs update: a deduplicated event must not emit a
-    // second insert, which would double the client's unread badge.
+    // second insert, which would double the client's unread badge. It also
+    // decides the push: the second like on the same unread thread updates the
+    // bell row silently instead of buzzing the phone again.
     void publishRealtimeBatch([
       notificationRealtimeEvent(created, realtimeRooms.notifications(input.userId)),
     ]);
+  }
+
+  if (created && (created as { inserted?: boolean }).inserted) {
+    // Types that already have their own push (event lifecycle, join accepted)
+    // are skipped inside sendActivityPush.
+    await sendActivityPush({
+      userId: input.userId,
+      notificationId: (created as { id: string }).id,
+      notificationType: input.type,
+      title,
+      body,
+      href,
+    });
   }
 
   return { ok: true };
