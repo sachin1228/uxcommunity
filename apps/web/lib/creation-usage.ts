@@ -125,29 +125,33 @@ export async function loadCreationUsage(
       row.limit_count,
     ])
   );
-  const limitFor = (kind: BudgetKind, fallback: number) =>
-    configured.get(kind) ?? fallback;
+  const limitFor = (kind: BudgetKind) => configured.get(kind) ?? null;
 
   const dmCount: number | null = dmRow.error ? null : ((dmRow.data?.count as number | undefined) ?? 0);
 
-  const entries: Array<[BudgetKind, number | null, number]> = [
+  // No guessed numbers: a budget whose row is missing from creation_limits is
+  // left out, so the panel never shows what the database is not enforcing.
+  const entries: Array<[BudgetKind, number | null, number | null]> = [
     [
       "posts_daily",
       threads === null || showcase === null || resources === null
         ? null
         : threads + showcase + resources,
-      limitFor("posts_daily", 3),
+      limitFor("posts_daily"),
     ],
-    ["events_monthly", events, limitFor("events_monthly", 5)],
-    ["jobs_monthly", jobs, limitFor("jobs_monthly", 3)],
-    ["dms_monthly", dmCount, limitFor("dms_monthly", 5)],
-    ["communities_total", owned, limitFor("communities_total", 5)],
-    ["community_joins", slots.memberships, limitFor("community_joins", 10)],
+    ["events_monthly", events, limitFor("events_monthly")],
+    ["jobs_monthly", jobs, limitFor("jobs_monthly")],
+    ["dms_monthly", dmCount, limitFor("dms_monthly")],
+    ["communities_total", owned, limitFor("communities_total")],
+    ["community_joins", slots.memberships, limitFor("community_joins")],
   ];
 
   return {
     limits: entries
-      .filter((entry): entry is [BudgetKind, number, number] => entry[1] !== null)
+      .filter(
+        (entry): entry is [BudgetKind, number, number] =>
+          entry[1] !== null && entry[2] !== null
+      )
       .map(([kind, used, limit]) => ({ kind, used, limit })),
     pendingJoinRequests: slots.pendingRequests,
   };
