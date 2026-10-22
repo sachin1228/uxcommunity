@@ -118,6 +118,10 @@ export default function RootLayout() {
                     name="settings/connected-accounts"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
+                  <Stack.Screen
+                    name="settings/job-profile"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
                   <Stack.Screen name="+not-found" />
                 </Stack>
               </AuthProvider>
