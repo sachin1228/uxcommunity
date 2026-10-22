@@ -50,13 +50,12 @@ export async function GET() {
   const db = createServiceClient();
 
   const [preferencesResult, mutedResult, badges] = await Promise.all([
-    db
-      .from("notification_preferences")
-      .select(
-        "chat_push_enabled, community_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, email_job_updates, email_community_activity, email_product_news",
-      )
-      .eq("user_id", userId)
-      .maybeSingle(),
+    // `*` rather than a column list: a preference column whose migration has
+    // not been applied yet (community_push_enabled was one) makes PostgREST
+    // reject the whole select, and the defaults below then answer for a row
+    // that was never read — the app shows switches on while the server has
+    // them off.
+    db.from("notification_preferences").select("*").eq("user_id", userId).maybeSingle(),
     db
       .from("community_members")
       .select("community_id")
@@ -64,6 +63,10 @@ export async function GET() {
       .eq("notifications_muted", true),
     loadUnreadMessageTotals([userId]),
   ]);
+
+  if (preferencesResult.error) {
+    console.error("[push] preferences read failed", preferencesResult.error);
+  }
 
   const row = preferencesResult.data as Record<string, unknown> | null;
 
