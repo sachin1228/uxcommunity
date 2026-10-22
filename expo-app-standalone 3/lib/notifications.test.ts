@@ -204,7 +204,11 @@ test("a notification's href walks to the app route that can open it", () => {
     contentKind: 'events',
     contentId: 'e-1',
   });
-  assert.deepEqual(notificationHrefToRoute('/dashboard/jobs/j-1'), { kind: 'jobs' });
+  assert.deepEqual(notificationHrefToRoute('/dashboard/jobs/j-1'), {
+    kind: 'job',
+    jobId: 'j-1',
+  });
+  assert.deepEqual(notificationHrefToRoute('/dashboard/jobs'), { kind: 'jobs' });
   assert.deepEqual(notificationHrefToRoute('/dashboard/events/e-1'), { kind: 'feed' });
 });
 

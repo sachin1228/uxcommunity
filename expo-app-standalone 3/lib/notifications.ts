@@ -291,6 +291,9 @@ export type NotificationRoute =
     }
   /** A city event with no community of its own — the home feed lists it. */
   | { kind: 'feed' }
+  /** One job posting, opened on its own screen. */
+  | { kind: 'job'; jobId: string }
+  /** The jobs board — an href that named no posting. */
   | { kind: 'jobs' }
   | { kind: 'none' };
 
@@ -322,7 +325,9 @@ export function notificationHrefToRoute(href: string): NotificationRoute {
 
   if (section === 'events' && id) return { kind: 'feed' };
 
-  if (section === 'jobs' && id) return { kind: 'jobs' };
+  if (section === 'jobs' && id) return { kind: 'job', jobId: id };
+
+  if (section === 'jobs') return { kind: 'jobs' };
 
   return { kind: 'none' };
 }

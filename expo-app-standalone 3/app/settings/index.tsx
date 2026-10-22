@@ -11,14 +11,16 @@ import { hapticSelection } from '@/lib/haptics';
  * Settings — the first level of the drill-down, the mobile reading of the web
  * /dashboard/settings index: one row per category, each opening its own page,
  * so a page carries only the settings the member came for.
- *
- * The web list also has a Job profile row (portfolio + saved resumes); it
- * lands on mobile together with resume uploads, so the row is left out rather
- * than shipped half-alive.
  */
 
 const ROWS: {
-  href: '/settings/profile' | '/settings/account' | '/settings/notifications' | '/settings/email' | '/settings/connected-accounts';
+  href:
+    | '/settings/profile'
+    | '/settings/account'
+    | '/settings/notifications'
+    | '/settings/email'
+    | '/settings/connected-accounts'
+    | '/settings/job-profile';
   label: string;
   description: string;
   icon: React.ComponentProps<typeof Feather>['name'];
@@ -28,6 +30,12 @@ const ROWS: {
     label: 'Profile',
     description: 'Your name, role and city.',
     icon: 'user',
+  },
+  {
+    href: '/settings/job-profile',
+    label: 'Job profile',
+    description: 'Your portfolio link and saved resumes.',
+    icon: 'briefcase',
   },
   {
     href: '/settings/account',

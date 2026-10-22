@@ -86,6 +86,9 @@ function ClassicTabLayout() {
   const insets = useSafeAreaInsets();
   const bottomInset = isWeb ? 0 : insets.bottom;
   const pathname = usePathname();
+  // Posting screens live in the Jobs tab's own stack; the bar steps aside so
+  // they read as full pages, and returns with the board.
+  const hideTabBar = pathname !== '/jobs' && pathname.startsWith('/jobs');
 
   // The rule lives on the button now, so the item carries no border and
   // nothing about the layout changes with the selection.
@@ -99,15 +102,17 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
-        tabBarStyle: {
-          position: 'absolute',
-          backgroundColor: isIOS ? 'transparent' : colors.background,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          elevation: 0,
-          height: isWeb ? 84 : 56 + bottomInset,
-          paddingBottom: bottomInset,
-        },
+        tabBarStyle: hideTabBar
+          ? { display: 'none' }
+          : {
+              position: 'absolute',
+              backgroundColor: isIOS ? 'transparent' : colors.background,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              elevation: 0,
+              height: isWeb ? 84 : 56 + bottomInset,
+              paddingBottom: bottomInset,
+            },
         tabBarLabelStyle: {
           fontSize: 13,
         },

@@ -162,6 +162,8 @@ export default function NotificationsScreen() {
             ? `?contentKind=${route.contentKind}&contentId=${route.contentId}`
             : '';
         router.push(`/community/${route.communityId}${query}`);
+      } else if (route.kind === 'job') {
+        router.push(`/jobs/${route.jobId}`);
       } else if (route.kind === 'jobs') {
         router.push('/jobs');
       } else if (route.kind === 'feed') {
