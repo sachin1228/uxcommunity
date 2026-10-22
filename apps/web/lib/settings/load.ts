@@ -16,9 +16,12 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { clockHHMM, type EmailPreferences, type PushPreferences } from "./preferences";
 import type { SavedResume } from "./resumes";
 
-/** Every column the two preference shapes read, in one select. */
-const PREFERENCE_COLUMNS =
-  "chat_push_enabled, community_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, email_job_updates, email_community_activity, email_product_news";
+/**
+ * Every column the two preference shapes read. `*` rather than a list: a
+ * column whose migration is still pending must not fail the whole select and
+ * silently render the defaults for a row that exists.
+ */
+const PREFERENCE_COLUMNS = "*";
 
 export interface AccountSummary {
   /** The account email; falls back to the session's when the row is missing. */
@@ -67,11 +70,13 @@ export async function loadAccount(
 export async function loadNotificationPreferences(
   userId: string,
 ): Promise<NotificationPreferences> {
-  const { data } = await createServiceClient()
+  const { data, error } = await createServiceClient()
     .from("notification_preferences")
     .select(PREFERENCE_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (error) console.error("[settings] preferences read failed", error);
 
   return {
     push: {

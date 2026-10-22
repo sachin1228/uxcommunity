@@ -58,8 +58,14 @@ export default function CommunitiesScreen() {
   const notificationPromptShownRef = useRef(false);
 
   // Opening the app with notifications off should explain why, not wait for
-  // the banner link. Once per session; after that the banner carries it.
+  // the banner link. Once per session; after that the banner carries it. If the
+  // member grants permission while the sheet is open (the OS prompt or system
+  // settings), it has nothing left to explain.
   useEffect(() => {
+    if (notificationPermission === 'granted') {
+      setNotificationPromptOpen(false);
+      return;
+    }
     if (notificationPermission !== 'denied' || notificationPromptShownRef.current) return;
     notificationPromptShownRef.current = true;
     setNotificationPromptOpen(true);

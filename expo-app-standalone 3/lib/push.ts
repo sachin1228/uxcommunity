@@ -311,6 +311,13 @@ export async function ensureNotificationChannels(): Promise<void> {
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
 
 let permissionStatus: NotificationPermissionStatus = 'undetermined';
+/**
+ * Android 13+ reports `denied` for an app that has never asked, and while the
+ * OS prompt is still on screen. That is not a denial to explain — treating it
+ * as one made the chat list open its "notifications are off" sheet behind the
+ * system dialog. A denial only counts once a request has actually settled.
+ */
+let permissionRequestSettled = false;
 const permissionListeners = new Set<(status: NotificationPermissionStatus) => void>();
 
 function setPermissionStatus(status: string): void {
@@ -329,8 +336,11 @@ export function getNotificationPermissionStatus(): NotificationPermissionStatus 
 /** Re-reads the OS permission (foreground, return from Settings). */
 export async function refreshNotificationPermissionStatus(): Promise<NotificationPermissionStatus> {
   try {
-    const { status } = await Notifications.getPermissionsAsync();
-    setPermissionStatus(status);
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    // A denied-but-askable answer before registration's request has settled is
+    // the pre-prompt state, not a decision the member made.
+    const prePrompt = status === 'denied' && canAskAgain === true && !permissionRequestSettled;
+    setPermissionStatus(prePrompt ? 'undetermined' : status);
   } catch {
     /* keep the last known value */
   }
@@ -366,6 +376,9 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       const requested = await Notifications.requestPermissionsAsync();
       status = requested.status;
     }
+    // The member has now answered (or the OS refused to ask), so a denial is
+    // real and may be surfaced as an explanation.
+    permissionRequestSettled = true;
     setPermissionStatus(status);
 
     diagnostics = { ...diagnostics, permission: status, checkedAt: Date.now() };
