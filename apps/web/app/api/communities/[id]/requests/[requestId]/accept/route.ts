@@ -46,7 +46,7 @@ export async function POST(
     );
 
   if (memberErr) {
-    // The requester may have filled their 7 slots while the request waited —
+    // The requester may have filled their join slots while the request waited —
     // the acceptance is refused (not forced through) and the manager reads
     // why. The request stays pending for a retry after they free a slot.
     const limited = creationLimitFromError(memberErr);
