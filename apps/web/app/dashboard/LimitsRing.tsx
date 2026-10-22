@@ -31,7 +31,7 @@ const LABELS: Record<string, { label: string; freedBy: string }> = {
   posts_daily: { label: "Posts today", freedBy: "Delete a post to write another" },
   events_monthly: { label: "Events this month", freedBy: "Delete an event to host another" },
   jobs_monthly: { label: "Job posts this month", freedBy: "Delete a posting to add another" },
-  dms_monthly: { label: "New chats this month", freedBy: "Chats already started stay open" },
+  dms_monthly: { label: "New DMs this month", freedBy: "DMs already started stay open" },
   communities_total: { label: "Your communities", freedBy: "Delete one to create another" },
   community_joins: { label: "Communities joined", freedBy: "Leave one to join another" },
 };
