@@ -176,7 +176,7 @@ export async function POST(request: Request) {
         console.error("[community-create] failed-membership image cleanup error:", cleanupError);
       }
     }
-    // The creator cannot be in more than 7 communities — creating their own
+    // The creator cannot already be at the join cap — creating their own
     // community at the cap rolls back to the join-limit answer, not a 500.
     const limited = creationLimitFromError(memberError);
     if (limited) {

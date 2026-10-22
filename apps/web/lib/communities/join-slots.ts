@@ -6,12 +6,13 @@ import { CREATION_LIMIT_MESSAGES } from "@/lib/creation-limits";
  * The standing membership cap. The referee is the database — the
  * community_joins row in public.creation_limits plus the membership trigger
  * (supabase/migrations/20261013120000_creation_limits.sql, refined by
- * 20261014140000_creation_limits_live_slots.sql). This mirror exists only
+ * 20261014140000_creation_limits_live_slots.sql and set to 10 by
+ * 20261022190000_creation_limits_refund.sql). This mirror exists only
  * for the paths that must look before they write: the join-request
  * pre-checks, and auto-join slicing its groups down to the remaining slots.
  * Keep JOIN_LIMIT and the live predicate in sync with those migrations.
  */
-export const JOIN_LIMIT = 7;
+export const JOIN_LIMIT = 10;
 
 type Db = ReturnType<typeof createServiceClient>;
 
@@ -71,7 +72,7 @@ export function isCapFull(slots: JoinSlots): boolean {
  * The refusal copy says what the member's slots actually are — "6 in, 1
  * pending" reads as exactly that instead of the generic line. The pending
  * flavour only appears when pending requests are part of the reason; the
- * plain seven-joined case keeps the standing copy (CREATION_LIMIT_MESSAGES).
+ * plain all-joined case keeps the standing copy (CREATION_LIMIT_MESSAGES).
  */
 function pendingDetail(slots: JoinSlots, subject: "you" | "they"): string {
   const requests = `${slots.pendingRequests} join request${slots.pendingRequests === 1 ? "" : "s"}`;

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { jobPostSchema } from "@/lib/jobs/validation";
 import { deferJobMatchNotifications } from "@/lib/jobs/notifications";
 import { createJobPost, type CreateJobFailureCode } from "@/lib/jobs/service";
+import { CREATION_LIMIT_MESSAGES } from "@/lib/creation-limits";
 
 const STATUS_FOR_FAILURE: Record<CreateJobFailureCode, number> = {
   unknown_user: 401,
@@ -29,7 +30,7 @@ const MESSAGE_FOR_FAILURE: Partial<Record<CreateJobFailureCode, string>> = {
   company_not_verified:
     "A job can only be posted for a company you have verified with a work email.",
   company_inactive: "That company is no longer active.",
-  monthly_limit_reached: "You can post one job per month. Try again next month.",
+  monthly_limit_reached: CREATION_LIMIT_MESSAGES.jobs_monthly,
   not_installed: "Jobs are not available right now.",
 };
 
