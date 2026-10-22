@@ -285,7 +285,7 @@ function RichContent({
   }
 
   const textColor = isOwn ? colors.chatOwnBubbleForeground : colors.foreground;
-  const mentionColor = isOwn ? colors.chatMentionOwn : colors.chatMention;
+  const mentionColor = isOwn ? colors.chatOwnBubbleForeground : colors.chatMention;
   const linkColor = isOwn ? colors.chatOwnBubbleForeground : colors.chatMention;
 
   const openUrl = useCallback((url: string) => {
