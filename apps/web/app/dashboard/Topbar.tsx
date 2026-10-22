@@ -8,6 +8,7 @@ import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { DashboardSearch } from "./DashboardSearch";
 import { NotificationBell } from "./NotificationBell";
+import { LimitsRing } from "./LimitsRing";
 import { DmTopbarButton } from "@/components/direct-messages/DmTopbarButton";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { isApplePlatform } from "@/lib/dashboard/topbar";
@@ -122,6 +123,7 @@ export function Topbar({ userId, user }: Props) {
           right edge at every width. */}
       <div className="order-4 flex min-w-0 items-center gap-2">
         <DmTopbarButton userId={userId} />
+        <LimitsRing />
         <NotificationBell userId={userId} />
         <ProfileDropdown name={user.name} email={user.email} avatarUrl={user.avatarUrl} />
       </div>
