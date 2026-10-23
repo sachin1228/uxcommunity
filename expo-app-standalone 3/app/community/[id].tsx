@@ -1063,9 +1063,11 @@ export default function CommunityChat() {
       if (item.kind === 'date') {
         return (
           <View style={styles.dateDivider}>
+            <View style={[styles.dateLine, { backgroundColor: colors.border }]} />
             <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
               {item.label}
             </Text>
+            <View style={[styles.dateLine, { backgroundColor: colors.border }]} />
           </View>
         );
       }
@@ -1845,12 +1847,15 @@ const styles = StyleSheet.create({
     // the oldest — the reverse of the non-inverted list this replaces.
     paddingBottom: 4,
   },
+  /** Day label between two hairline rules — the unread divider's shape. */
   dateDivider: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
-  /** Plain centered day label — no pill behind it. */
+  dateLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dateLabel: {
     fontSize: 12,
     fontFamily: 'Geist_500Medium',
