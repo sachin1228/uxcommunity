@@ -185,46 +185,45 @@ export function ContentNotificationBubble({
   return (
     <div
       data-content-id={event.id}
-      className={`group flex w-full items-start gap-2 px-5 mt-2 ${
-        isMe ? "justify-end" : "justify-start"
-      }`}
+      className="group flex w-full items-start justify-start gap-2 px-5 mt-2"
     >
-      {/* Avatar column — own notifications skip it, matching message bubbles */}
-      {!isMe && (
-        <div className="w-7 shrink-0 mt-0.5">
-          {sender && (
-            <Link
-              href={profileHref(event.user_id)}
-              title={senderName}
-              className="block w-fit rounded-full transition-opacity hover:opacity-85"
-            >
-              <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
-            </Link>
-          )}
-        </div>
-      )}
+      {/* Avatar rail — every author hangs off the left, own cards included,
+          matching the message bubbles beside them. */}
+      <div className="w-7 shrink-0 mt-0.5">
+        {event.user_id ? (
+          <Link
+            href={profileHref(event.user_id)}
+            title={senderName}
+            className="block w-fit rounded-full transition-opacity hover:opacity-85"
+          >
+            <ChatAvatar name={senderName} url={sender?.avatar_url ?? null} size={7} />
+          </Link>
+        ) : (
+          <ChatAvatar name={senderName} url={sender?.avatar_url ?? null} size={7} />
+        )}
+      </div>
 
       {/* Bubble column — bubble + hover actions live in one inner row, exactly
           like MessageBubble: actions sit to the RIGHT of other members'
           bubbles and to the LEFT of own (right-aligned) bubbles. */}
       <div className="min-w-0 max-w-[65%]">
-        <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
+        <div className="flex items-center gap-1">
           <div className="relative min-w-0">
         <div
-          className={`relative select-none rounded-[10px] px-3 pt-2 pb-1.5 shadow-sm ${
+          className={`relative select-none rounded-[10px] rounded-tl-none px-3 pt-2 pb-1.5 shadow-sm ${
             isMe
-              ? "rounded-tr-none bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
-              : "rounded-tl-none bg-surface-raised"
+              ? "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
+              : "bg-surface-raised"
           }`}
         >
           <MessageBubbleTail
-            side={isMe ? "right" : "left"}
+            side="left"
             className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
           />
 
           {/* Header line — "You created a showcase" */}
           <p
-            className={`font-body text-[11px] mb-1.5 ${
+            className={`flex flex-wrap items-baseline gap-x-1.5 font-body text-[11px] mb-1.5 ${
               isMe ? "text-accent-foreground" : "text-foreground-muted"
             }`}
           >
@@ -240,6 +239,13 @@ export function ContentNotificationBubble({
               </Link>
             )}
             {` created ${withArticle(theme.label.toLowerCase())}`}
+            <span
+              className={`shrink-0 font-body text-[10px] ${
+                isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
+              }`}
+            >
+              {fmtTime(event.created_at)}
+            </span>
           </p>
 
           {/* Card — a Next <Link>: a raw anchor would force a full page reload
@@ -341,10 +347,10 @@ export function ContentNotificationBubble({
             </div>
           </Link>
 
-          {/* Bottom row: the discussion sits bottom-LEFT of the bubble, the
-              timestamp bottom-right, exactly like a message bubble's footer. */}
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {commentCount > 0 && (
+          {/* Discussion count under the card — the time lives in the header
+              now, once per bubble. */}
+          {commentCount > 0 && (
+            <div className="flex items-center gap-1.5 mt-0.5">
               <span
                 className={`flex items-center gap-1 font-body text-[10px] leading-none ${
                   isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
@@ -354,15 +360,8 @@ export function ContentNotificationBubble({
                 <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
                 <span className="shrink-0">{commentCount}</span>
               </span>
-            )}
-            <span
-              className={`ml-auto shrink-0 font-mono text-[10px] ${
-                isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"
-              }`}
-            >
-              {fmtTime(event.created_at)}
-            </span>
-          </div>
+            </div>
+          )}
 
           {/* Reaction pills overlap the bubble's bottom edge, like messages */}
           <NotificationReactionPills

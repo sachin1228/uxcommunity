@@ -206,7 +206,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
   // sizes itself to content — the event title truncated to two characters and
   // the thread card lost its text column entirely. The explicit width gives
   // the column real room and keeps every card the same, scannable size.
-  const rowAvailableWidth = screenWidth - 32 - (isOwn ? 0 : 36);
+  const rowAvailableWidth = screenWidth - 32 - 36;
   const bubbleWidth = Math.min(Math.floor(rowAvailableWidth * 0.85), 420);
 
   // Own bubble: translucent media card on the blue; other: the raised surface.
@@ -218,7 +218,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
     <View
       style={[
         styles.row,
-        !isOwn && styles.rowWithAvatar,
         actionsOpen ? styles.rowActive : null,
       ]}
     >
@@ -233,14 +232,11 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
         }}
         delayLongPress={350}
         accessible={false}
-        style={[
-          styles.rowPress,
-          { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
-        ]}
+        style={styles.rowPress}
       >
-      {/* Avatar column — own notifications skip it, matching message bubbles */}
-      {!isOwn && (
-        <View style={styles.avatarCol}>
+      {/* Avatar rail — every author hangs off the left, own cards included,
+          matching the message bubbles beside them. */}
+      <View style={styles.avatarCol}>
           <Pressable
             onPress={handleAuthorPress}
             onLongPress={() => {
@@ -259,8 +255,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
               size={28}
             />
           </Pressable>
-        </View>
-      )}
+      </View>
 
       <View style={[styles.contentCol, { width: bubbleWidth }]}>
         <View style={styles.bubbleWrap}>
@@ -277,11 +272,11 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
             style={[
               styles.bubble,
               { backgroundColor: isOwn ? colors.chatOwnBubble : colors.surfaceRaised, shadowColor: '#000' },
-              isOwn ? styles.bubbleOwn : styles.bubbleOther,
+              styles.bubbleOther,
             ]}
           >
             <MessageBubbleTail
-              side={isOwn ? 'right' : 'left'}
+              side="left"
               color={isOwn ? colors.chatOwnBubble : colors.surfaceRaised}
             />
 
@@ -303,6 +298,14 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 </Text>
               )}
               {` created ${withArticle(theme.label.toLowerCase())}`}
+              <Text
+                style={[
+                  styles.headerTime,
+                  { color: mutedColor, opacity: isOwn ? 0.6 : 1 },
+                ]}
+              >
+                {`  ${fmtTime(event.created_at)}`}
+              </Text>
             </Text>
 
             {/* Card — opens the item on its own community tab */}
@@ -404,9 +407,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                   </Text>
                 </View>
               )}
-              <Text style={[styles.time, { color: mutedColor, opacity: isOwn ? 0.7 : 1 }]}>
-                {fmtTime(event.created_at)}
-              </Text>
             </View>
 
             {/* Reaction pills overlap the bubble's bottom edge, like messages */}
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     marginTop: 12,
   },
   rowPress: {
@@ -445,7 +445,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowActive: { backgroundColor: 'rgba(0, 98, 209, 0.12)' },
-  rowWithAvatar: { justifyContent: 'flex-start' },
   avatarCol: { width: 28, flexShrink: 0 },
   contentCol: { flexShrink: 1, minWidth: 0 },
   bubbleWrap: { position: 'relative', minWidth: 0 },
@@ -460,11 +459,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  bubbleOwn: { borderTopRightRadius: 0 },
   bubbleOther: { borderTopLeftRadius: 0 },
 
   header: { fontSize: 11, lineHeight: 15, marginBottom: 6 },
   headerName: { fontFamily: 'Geist_600SemiBold' },
+  /** Time rides in the header row, once per card — no footer timestamp. */
+  headerTime: { fontSize: 10, fontFamily: 'Geist_500Medium' },
 
   card: {
     flexDirection: 'row',
@@ -525,7 +525,6 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   commentRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   commentText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
-  time: { marginLeft: 'auto', fontSize: 10, fontFamily: 'Geist_400Regular' },
 
   reactionPills: {
     position: 'absolute',
