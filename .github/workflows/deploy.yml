@@ -65,6 +65,32 @@ jobs:
               exit 1
             fi
           done
+
+          # FCM_SERVICE_ACCOUNT is a JSON document. A secret expression inside
+          # a `run:` script is interpolated as shell SOURCE, so a JSON secret's
+          # double quotes are parsed away and newlines end the command. That is
+          # how the value reaching the Worker became
+          # `{type:service_account,...}` — invalid JSON, so the server silently
+          # fell back to Expo for every chat push and those notifications lost
+          # the community DP / sender photo. Validate the shape here (before the
+          # build) and pass the value through `env:` where it is stored, not
+          # parsed (see "Set FCM service account secret").
+          node -e '
+            const raw = process.env.FCM_SERVICE_ACCOUNT;
+            let account;
+            try {
+              account = JSON.parse(raw);
+            } catch {
+              console.error("::error::FCM_SERVICE_ACCOUNT is not valid JSON. Paste the service-account file as-is; multi-line JSON is fine.");
+              process.exit(1);
+            }
+            for (const key of ["project_id", "client_email", "private_key"]) {
+              if (!account[key]) {
+                console.error(`::error::FCM_SERVICE_ACCOUNT is missing ${key}.`);
+                process.exit(1);
+              }
+            }
+          '
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -375,6 +401,15 @@ jobs:
       # multiple lines; .dev.vars is dotenv, so it is pushed straight from the
       # repository secret instead. `printf` preserves the value exactly (no
       # trailing newline invented by echo) and the worker parses it as JSON.
+      #
+      # The value MUST come through `env:`. Interpolating a secret expression
+      # into the script makes the shell parse its JSON quotes as syntax: every
+      # `"` disappears and every newline ends the command, so the Worker was
+      # given invalid JSON and quietly used Expo for chat pushes (no community
+      # DP / sender photo). An environment variable's value is stored, never
+      # parsed, so it survives byte for byte.
       - name: Set FCM service account secret
         working-directory: apps/web
-        run: printf '%s' "${{ secrets.FCM_SERVICE_ACCOUNT }}" | npx wrangler secret put FCM_SERVICE_ACCOUNT
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: printf '%s' "$FCM_SERVICE_ACCOUNT" | npx wrangler secret put FCM_SERVICE_ACCOUNT
