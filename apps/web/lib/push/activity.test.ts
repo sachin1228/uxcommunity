@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import {
   activityFcmData,
   activityIcon,
@@ -77,6 +78,8 @@ test("an activity FCM payload carries the resolved avatar and type glyph", () =>
   assert.equal(data.personName, "John");
   assert.equal(data.silent, "0");
   assert.equal(data.timestamp, "1234");
+  assert.equal(data.avatarInitials, nameInitials("John"));
+  assert.equal(data.avatarColor, avatarBackground("John"));
 });
 
 test("job matches use the briefcase glyph; unknown types fall back to the bell", () => {

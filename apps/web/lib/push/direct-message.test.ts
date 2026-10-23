@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import {
   directMessageFcmData,
   directMessagePushMessages,
@@ -120,4 +121,23 @@ test("the direct-FCM DM payload carries the sender photo and conversation", () =
   assert.equal(data.imageUrl, "https://media.example/john.webp");
   assert.equal(data.silent, "0");
   assert.equal(data.timestamp, "1234");
+});
+
+test("a DM without a photo uses the app's exact initials and palette color", () => {
+  const data = directMessageFcmData({
+    conversationId: "dm-1",
+    messageId: "m-1",
+    senderId: "u-2",
+    senderName: "sundar pichai",
+    senderAvatarUrl: null,
+    content: "hi man",
+    hasImage: false,
+    isReply: false,
+    audible: true,
+    timestamp: 1234,
+  });
+
+  assert.equal(data.avatarInitials, "SP");
+  assert.equal(data.avatarColor, avatarBackground("sundar pichai"));
+  assert.equal(data.avatarInitials, nameInitials("sundar pichai"));
 });

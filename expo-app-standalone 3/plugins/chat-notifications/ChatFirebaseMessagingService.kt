@@ -156,11 +156,15 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     ensureChannels(context)
 
-    // Photo first; otherwise a type glyph (activity) or initials. Every
-    // notification gets an identity in the avatar slot, even without an image.
-    val avatar = imageUrl?.let { download(it) } ?: when (mode) {
-      "activity" -> emojiAvatar(data["icon"].takeUnless { it.isNullOrBlank() } ?: "🔔")
-      else -> initialAvatar(title)
+    // Photo first; otherwise the same initials + palette color the app's
+    // PersonAvatar draws. Activity without a person/company/community (a
+    // report, a removal) keeps its type glyph instead.
+    val avatar = imageUrl?.let { download(it) } ?: when {
+      !data["avatarInitials"].isNullOrBlank() ->
+        initialAvatar(data["avatarInitials"], data["avatarColor"], title)
+      mode == "activity" ->
+        emojiAvatar(data["icon"].takeUnless { it.isNullOrBlank() } ?: "🔔")
+      else -> initialAvatar(null, data["avatarColor"], title)
     }
     val avatarIcon = IconCompat.createWithBitmap(avatar)
     val conversationPerson = Person.Builder()
@@ -258,37 +262,49 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     return "notifications"
   }
 
-  private val avatarColors = intArrayOf(
-    0xFF6D28D9.toInt(),
-    0xFF0E7490.toInt(),
-    0xFFB45309.toInt(),
-    0xFFBE185D.toInt(),
-    0xFF15803D.toInt(),
-  )
-
-  private fun initialAvatar(name: String): Bitmap {
+  private fun initialAvatar(
+    initials: String?,
+    colorHex: String?,
+    fallbackName: String,
+  ): Bitmap {
     val size = 192
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-      color = avatarColors[(name.hashCode() and Int.MAX_VALUE) % avatarColors.size]
+    val backgroundColor = try {
+      Color.parseColor(colorHex ?: "#1a73e8")
+    } catch (_: Exception) {
+      Color.parseColor("#1a73e8")
     }
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = backgroundColor }
     canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-    val letter = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    val text = initials?.takeUnless { it.isBlank() } ?: defaultInitials(fallbackName)
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.WHITE
-      textSize = size * 0.42f
+      textSize = size * if (text.length > 1) 0.36f else 0.42f
       textAlign = Paint.Align.CENTER
       typeface = Typeface.DEFAULT_BOLD
     }
     val metrics = textPaint.fontMetrics
     canvas.drawText(
-      letter,
+      text,
       size / 2f,
       size / 2f - (metrics.ascent + metrics.descent) / 2f,
       textPaint,
     )
     return bitmap
+  }
+
+  /** The app's nameInitials(): first letter of first and last words. */
+  private fun defaultInitials(name: String): String {
+    val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (words.isEmpty()) return "U"
+    val first = words.first().firstOrNull()?.uppercaseChar() ?: 'U'
+    val last = if (words.size > 1) words.last().firstOrNull()?.uppercaseChar() else null
+    return buildString {
+      append(first)
+      if (last != null) append(last)
+    }
   }
 
   private fun emojiAvatar(icon: String): Bitmap {

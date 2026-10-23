@@ -11,6 +11,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/service";
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import { logEvent } from "@/lib/observability/log";
 import { sendExpoPushBatches, timeoutSignal, type ExpoPushMessage } from "./expo";
 import {
@@ -138,6 +139,11 @@ export function directMessageFcmData(input: {
     channelId: input.audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
   };
   if (input.senderAvatarUrl) data.imageUrl = input.senderAvatarUrl;
+  // The app's PersonAvatar fallback, byte for byte: "sundar pichai" → SP on
+  // the same deterministic palette color in the notification.
+  const identityName = input.senderName?.trim() || title;
+  data.avatarInitials = nameInitials(identityName);
+  data.avatarColor = avatarBackground(identityName);
   return data;
 }
 

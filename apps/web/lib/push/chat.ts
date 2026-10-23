@@ -1,3 +1,4 @@
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   redactPushTokens,
@@ -723,6 +724,8 @@ export async function sendChatMessagePush(
             channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
           };
           if (communityImage) directData.imageUrl = communityImage;
+          directData.avatarInitials = nameInitials(communityName);
+          directData.avatarColor = avatarBackground(communityName);
 
           for (const token of userFcmTokens) {
             fcmMessages.push({

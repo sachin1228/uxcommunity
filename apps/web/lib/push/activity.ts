@@ -19,6 +19,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/service";
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import { logEvent } from "@/lib/observability/log";
 import {
   sendExpoPushBatches,
@@ -149,6 +150,13 @@ export function activityFcmData(input: ActivityPushInput): Record<string, string
     channelId: input.audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
   };
   if (input.imageUrl) data.imageUrl = input.imageUrl;
+  // Same fallback the app's PersonAvatar draws: the name's initials on the
+  // deterministic Google-palette color (lib/avatar.ts). Activity without a
+  // person/company/community (reports, removals) keeps its type glyph instead.
+  if (input.personName) {
+    data.avatarInitials = nameInitials(input.personName);
+    data.avatarColor = avatarBackground(input.personName);
+  }
   return data;
 }
 
