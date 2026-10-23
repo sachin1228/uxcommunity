@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
@@ -32,6 +33,13 @@ import {
 } from '@/lib/homeFeedScope';
 import { readStoredHomeFeedScope, storeHomeFeedScope } from '@/lib/homeFeedScopeStore';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
+import {
+  fetchScreenData,
+  peekScreenData,
+  readScreenData,
+  writeScreenData,
+} from '@/lib/screenDataCacheStore';
+import { mergeUniquePage, SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
 
 /**
  * Home — the cross-community feed, with the web dashboard's two filters:
@@ -166,11 +174,36 @@ function FeedScopePill({
   );
 }
 
+interface HomeFeedSnapshot {
+  items: FeedItem[];
+  hasMore: boolean;
+}
+
+function homeFeedCacheKey(scope: HomeFeedScope): string {
+  return `home-feed:${scope}`;
+}
+
 export default function HomeTab() {
+  const { user, sessionEpoch } = useAuth();
+  const userId = user?.id ?? null;
+  return (
+    <HomeTabSession
+      key={`${userId ?? 'signed-out'}:${sessionEpoch}`}
+      userId={userId}
+      sessionEpoch={sessionEpoch}
+    />
+  );
+}
+
+function HomeTabSession({
+  userId,
+  sessionEpoch,
+}: {
+  userId: string | null;
+  sessionEpoch: number;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const actions = useContentActions();
 
   const [scope, setScope] = useState<HomeFeedScope>(DEFAULT_HOME_FEED_SCOPE);
   /** The live source — load callbacks compare against it to drop stale pages. */
@@ -186,31 +219,137 @@ export default function HomeTab() {
   /** The feed row whose editor is open (owner-only; null when closed). */
   const [editing, setEditing] = useState<FeedItem | null>(null);
 
+  const requestSequenceRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const itemsRef = useRef(items);
+  const hasMoreRef = useRef(hasMore);
+  itemsRef.current = items;
+  hasMoreRef.current = hasMore;
+  const cacheReadyScopeRef = useRef<string | null>(null);
+  const cacheSessionKey = `${userId ?? ''}:${sessionEpoch}`;
+
+  const commitFeed = useCallback(
+    (targetScope: HomeFeedScope, nextItems: FeedItem[], nextHasMore: boolean, persist = true) => {
+      itemsRef.current = nextItems;
+      hasMoreRef.current = nextHasMore;
+      setItems(nextItems);
+      setHasMore(nextHasMore);
+      if (persist && userId && cacheReadyScopeRef.current === `${cacheSessionKey}:${targetScope}`) {
+        void writeScreenData(
+          userId,
+          homeFeedCacheKey(targetScope),
+          sessionEpoch,
+          { items: nextItems, hasMore: nextHasMore },
+          SCREEN_CACHE_TTL_MS.homeFeed,
+        );
+      }
+    },
+    [cacheSessionKey, sessionEpoch, userId],
+  );
+
+  const persistCardMutation = useCallback(
+    (source: CommunityContent, patch: Record<string, unknown>) => {
+      const targetScope = scopeRef.current;
+      const current = itemsRef.current;
+      const next = current.map((item) =>
+        item.id === source.id && item.community_id === source.community_id
+          ? { ...item, ...patch }
+          : item,
+      );
+      requestSequenceRef.current += 1;
+      setRefreshing(false);
+      commitFeed(targetScope, next, hasMoreRef.current);
+      setSelected((selectedItem) =>
+        selectedItem?.id === source.id && selectedItem.community_id === source.community_id
+          ? ({ ...selectedItem, ...patch } as FeedItem)
+          : selectedItem,
+      );
+    },
+    [commitFeed],
+  );
+
+  const actions = useContentActions(persistCardMutation);
+
   const resetActions = actions.reset;
 
   const load = useCallback(
     async (targetScope: HomeFeedScope, mode: 'initial' | 'refresh' = 'initial') => {
-      if (mode === 'initial') setLoading(true);
-      else setRefreshing(true);
+      if (!userId) {
+        setLoading(false);
+        setError('Sign in to load your feed.');
+        return;
+      }
+      const sequence = ++requestSequenceRef.current;
+      const cacheKey = homeFeedCacheKey(targetScope);
+      const cacheIdentity = `${cacheSessionKey}:${targetScope}`;
+      let paintedSnapshot = false;
+      let networkSucceeded = false;
+      const isCurrent = () =>
+        requestSequenceRef.current === sequence && scopeRef.current === targetScope;
+
+      if (mode === 'initial') {
+        setRefreshing(false);
+        const memory = peekScreenData<HomeFeedSnapshot>(
+          userId,
+          cacheKey,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.homeFeed,
+        );
+        if (memory) {
+          paintedSnapshot = true;
+          cacheReadyScopeRef.current = cacheIdentity;
+          commitFeed(targetScope, memory.data.items, memory.data.hasMore, false);
+          resetActions();
+          if (memory.isFresh) {
+            setError(null);
+            setLoading(false);
+            return;
+          }
+          setLoading(false);
+        } else {
+          setLoading(true);
+        }
+        void readScreenData<HomeFeedSnapshot>(
+          userId,
+          cacheKey,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.homeFeed,
+        ).then((snapshot) => {
+          if (!snapshot || networkSucceeded || paintedSnapshot || !isCurrent()) return;
+          paintedSnapshot = true;
+          cacheReadyScopeRef.current = cacheIdentity;
+          commitFeed(targetScope, snapshot.data.items, snapshot.data.hasMore, false);
+          resetActions();
+          setLoading(false);
+        });
+      } else {
+        setRefreshing(true);
+      }
       setError(null);
       try {
-        const page = await getHomeFeed(targetScope);
-        // A tab switch while this page was in flight owns the list now.
-        if (scopeRef.current !== targetScope) return;
-        setItems(page.items);
-        setHasMore(page.hasMore);
+        const result = await fetchScreenData(
+          userId,
+          cacheKey,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.homeFeed,
+          () => getHomeFeed(targetScope),
+        );
+        if (!result.accepted || !isCurrent()) return;
+        networkSucceeded = true;
+        cacheReadyScopeRef.current = cacheIdentity;
+        commitFeed(targetScope, result.data.items, result.data.hasMore);
         resetActions();
       } catch (e) {
-        if (scopeRef.current !== targetScope) return;
+        if (!isCurrent()) return;
         setError(e instanceof Error ? e.message : 'Failed to load your feed.');
       } finally {
-        if (scopeRef.current === targetScope) {
+        if (isCurrent()) {
           setLoading(false);
           setRefreshing(false);
         }
       }
     },
-    [resetActions],
+    [cacheSessionKey, commitFeed, resetActions, sessionEpoch, userId],
   );
 
   // Open on the remembered tab, defaulting to All posts. The first load waits
@@ -238,13 +377,12 @@ export default function HomeTab() {
       setScope(next);
       // Clear immediately: the old tab's cards must never linger under the new
       // tab's name while its page loads.
-      setItems([]);
+      commitFeed(next, [], true, false);
       setSelected(null);
-      setHasMore(true);
       void storeHomeFeedScope(next);
       void load(next, 'initial');
     },
-    [load],
+    [commitFeed, load],
   );
 
   // Poll tallies for the threads in this feed. Only communities with a visible
@@ -254,8 +392,14 @@ export default function HomeTab() {
 
   const handlePollEvent = useCallback(
     (event: ThreadPollEvent) => {
-      const me = user?.id ?? '';
-      setItems((current) => applyPollEventToFeed(current, event, me));
+      const me = userId ?? '';
+      requestSequenceRef.current += 1;
+      setRefreshing(false);
+      commitFeed(
+        scopeRef.current,
+        applyPollEventToFeed(itemsRef.current, event, me),
+        hasMoreRef.current,
+      );
       setSelected((current) => {
         if (!current || current.id !== event.threadId) return current;
         return applyPollEventToFeed([current], event, me)[0] ?? current;
@@ -269,7 +413,7 @@ export default function HomeTab() {
         mine: event.userId !== null && event.userId === me,
       });
     },
-    [applyPollUpdate, user?.id],
+    [applyPollUpdate, commitFeed, userId],
   );
 
   // A reconnected room missed events while it was down; settle from the API.
@@ -284,38 +428,39 @@ export default function HomeTab() {
   });
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || items.length === 0) return;
+    if (loadingMoreRef.current || !hasMoreRef.current || itemsRef.current.length === 0 || !userId) return;
     const target = scopeRef.current;
-    const last = items[items.length - 1];
+    const last = itemsRef.current[itemsRef.current.length - 1];
+    const sequence = requestSequenceRef.current;
     setLoadingMore(true);
+    loadingMoreRef.current = true;
     try {
       const page = await getHomeFeed(target, last.created_at);
-      if (scopeRef.current !== target) return;
-      setItems((current) => {
-        const seen = new Set(current.map(feedItemKey));
-        return [...current, ...page.items.filter((item) => !seen.has(feedItemKey(item)))];
-      });
-      setHasMore(page.hasMore);
+      if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
+      const next = mergeUniquePage(itemsRef.current, page.items, feedItemKey);
+      commitFeed(target, next, page.hasMore);
     } catch {
       // Leave the feed as-is; the user can pull to retry.
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, items, loadingMore]);
+  }, [commitFeed, userId]);
 
   // The comment count is the only route into a post's own page, where the
   // comments live under the post itself; the card body just double-tap likes.
   const openItem = useCallback((item: CommunityContent) => {
-    const match = items.find((entry) => entry.id === item.id);
+    const match = itemsRef.current.find((entry) => entry.id === item.id);
     setSelected(match ?? null);
-  }, [items]);
+  }, []);
 
   // Feed rows carry their singular `_type`; the editor and the delete endpoint
   // want the plural tab key. An update response also lacks the row's community
   // attribution, so the feed keeps its own copy of those fields.
   const replaceItem = useCallback((saved: CommunityContent) => {
-    setItems((current) =>
-      current.map((entry) =>
+    requestSequenceRef.current += 1;
+    setRefreshing(false);
+    const next = itemsRef.current.map((entry) =>
         entry.id === saved.id
           ? {
               ...entry,
@@ -325,8 +470,8 @@ export default function HomeTab() {
               community_image: entry.community_image,
             }
           : entry,
-      ),
-    );
+      );
+    commitFeed(scopeRef.current, next, hasMoreRef.current);
     setSelected((current) =>
       current && current.id === saved.id
         ? {
@@ -339,24 +484,28 @@ export default function HomeTab() {
         : current,
     );
     setEditing(null);
-  }, []);
+  }, [commitFeed]);
 
   const editItem = useCallback(
     (entry: CommunityContent) => {
-      const row = items.find((item) => item.id === entry.id);
+      const row = itemsRef.current.find((item) => item.id === entry.id);
       if (row) setEditing(row);
     },
-    [items],
+    [],
   );
 
   const deleteItem = useCallback(
     async (entry: CommunityContent) => {
-      const row = items.find((item) => item.id === entry.id);
+      const row = itemsRef.current.find((item) => item.id === entry.id);
       if (!row?.community_id) return;
       const kind = feedItemKind(row);
       await deleteCommunityContent(row.community_id, kind, row.id);
-      setItems((current) =>
-        current.filter((item) => !(item.id === row.id && item._type === row._type)),
+      requestSequenceRef.current += 1;
+      setRefreshing(false);
+      commitFeed(
+        scopeRef.current,
+        itemsRef.current.filter((item) => !(item.id === row.id && item._type === row._type)),
+        hasMoreRef.current,
       );
       setSelected((current) =>
         current?.id === row.id && current._type === row._type ? null : current,
@@ -370,7 +519,7 @@ export default function HomeTab() {
         contentKind: chatContentKindForTab(kind),
       });
     },
-    [items],
+    [commitFeed],
   );
 
   const renderItem = useCallback(
@@ -378,7 +527,7 @@ export default function HomeTab() {
       <ContentCard
         item={item}
         kind={feedItemKind(item)}
-        currentUserId={user?.id ?? ''}
+        currentUserId={userId ?? ''}
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
@@ -389,7 +538,18 @@ export default function HomeTab() {
         videoRank={index}
       />
     ),
-    [actions, deleteItem, editItem, openItem, selected, user?.id, visibleKeys],
+    [actions, deleteItem, editItem, openItem, selected, userId, visibleKeys],
+  );
+
+  const focusSeenRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusSeenRef.current) {
+        focusSeenRef.current = true;
+        return;
+      }
+      void load(scopeRef.current, 'refresh');
+    }, [load]),
   );
 
   return (
@@ -402,7 +562,7 @@ export default function HomeTab() {
           <View style={styles.center}>
             <ActivityIndicator color={colors.accent} />
           </View>
-        ) : error ? (
+        ) : error && items.length === 0 ? (
           <View style={styles.center}>
             <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
             <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t load your feed</Text>
@@ -441,17 +601,28 @@ export default function HomeTab() {
               ) : null
             }
             ListEmptyComponent={
-              <View style={styles.center}>
-                <Feather
-                  name={scope === 'communities' ? 'users' : 'layers'}
-                  size={32}
-                  color={colors.foregroundSubtle}
-                />
-                <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
-                <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                  {EMPTY_STATE_DESCRIPTION[scope]}
-                </Text>
-              </View>
+              error ? (
+                <View style={styles.center}>
+                  <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
+                  <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t refresh your feed</Text>
+                  <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
+                  <Pressable onPress={() => void load(scopeRef.current, 'refresh')} accessibilityRole="button">
+                    <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.center}>
+                  <Feather
+                    name={scope === 'communities' ? 'users' : 'layers'}
+                    size={32}
+                    color={colors.foregroundSubtle}
+                  />
+                  <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
+                  <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
+                    {EMPTY_STATE_DESCRIPTION[scope]}
+                  </Text>
+                </View>
+              )
             }
           />
         )}
@@ -465,7 +636,7 @@ export default function HomeTab() {
       <ContentDetail
         item={selected}
         kind={selected ? feedItemKind(selected) : 'threads'}
-        currentUserId={user?.id ?? ''}
+        currentUserId={userId ?? ''}
         actions={actions}
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}

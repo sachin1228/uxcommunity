@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityPreviewSheet } from '@/components/community/CommunityPreviewSheet';
@@ -30,6 +31,9 @@ import {
 import { getExploreCommunities, withdrawJoinRequest } from '@/lib/exploreCommunitiesApi';
 import { hapticSelection } from '@/lib/haptics';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { useAuth } from '@/context/AuthContext';
+import { fetchScreenData, peekScreenData, readScreenData, writeScreenData } from '@/lib/screenDataCacheStore';
+import { SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
 
 /**
  * Explore — the web browse page (`/dashboard/communities`) ported: every
@@ -73,11 +77,33 @@ interface Section {
   data: ExploreCommunity[];
 }
 
+const EXPLORE_CACHE_KEY = 'explore:communities';
+
 export default function ExploreTab() {
+  const { user, sessionEpoch } = useAuth();
+  const userId = user?.id ?? null;
+  return (
+    <ExploreTabSession
+      key={`${userId ?? 'signed-out'}:${sessionEpoch}`}
+      userId={userId}
+      sessionEpoch={sessionEpoch}
+    />
+  );
+}
+
+function ExploreTabSession({
+  userId,
+  sessionEpoch,
+}: {
+  userId: string | null;
+  sessionEpoch: number;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
   const [rows, setRows] = useState<ExploreCommunity[]>([]);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const [tab, setTab] = useState<ExploreTabValue>('all');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -87,24 +113,95 @@ export default function ExploreTab() {
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   /** The community whose join sheet is open — the sheet reads it live. */
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const requestSequenceRef = useRef(0);
+  const cacheReadyRef = useRef(false);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    if (mode === 'initial') setLoading(true);
-    else setRefreshing(true);
+    if (!userId) {
+      setLoading(false);
+      setError('Sign in to explore communities.');
+      return;
+    }
+    const sequence = ++requestSequenceRef.current;
+    const isCurrent = () => requestSequenceRef.current === sequence;
+    let cachedPainted = false;
+    let networkSucceeded = false;
+    if (mode === 'initial') {
+      setRefreshing(false);
+      const memory = peekScreenData<ExploreCommunity[]>(
+        userId,
+        EXPLORE_CACHE_KEY,
+        sessionEpoch,
+        SCREEN_CACHE_TTL_MS.explore,
+      );
+      if (memory) {
+        cachedPainted = true;
+        cacheReadyRef.current = true;
+        rowsRef.current = memory.data;
+        setRows(memory.data);
+        setLoading(false);
+        if (memory.isFresh) {
+          setError(null);
+          return;
+        }
+      } else {
+        setLoading(true);
+      }
+      void readScreenData<ExploreCommunity[]>(
+        userId,
+        EXPLORE_CACHE_KEY,
+        sessionEpoch,
+        SCREEN_CACHE_TTL_MS.explore,
+      ).then((snapshot) => {
+        if (!snapshot || cachedPainted || networkSucceeded || !isCurrent()) return;
+        cachedPainted = true;
+        cacheReadyRef.current = true;
+        rowsRef.current = snapshot.data;
+        setRows(snapshot.data);
+        setLoading(false);
+      });
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
     try {
-      setRows(await getExploreCommunities());
+      const result = await fetchScreenData(
+        userId,
+        EXPLORE_CACHE_KEY,
+        sessionEpoch,
+        SCREEN_CACHE_TTL_MS.explore,
+        getExploreCommunities,
+      );
+      if (!result.accepted || !isCurrent()) return;
+      networkSucceeded = true;
+      cacheReadyRef.current = true;
+      rowsRef.current = result.data;
+      setRows(result.data);
     } catch (e) {
+      if (!isCurrent()) return;
       setError(e instanceof Error ? e.message : "Couldn't load communities.");
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [sessionEpoch, userId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const focusSeenRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusSeenRef.current) {
+        focusSeenRef.current = true;
+        return;
+      }
+      void load('refresh');
+    }, [load]),
+  );
 
   const visible = useMemo(() => visibleExploreRows(rows, tab, query), [rows, tab, query]);
 
@@ -145,18 +242,27 @@ export default function ExploreTab() {
       setWithdrawError(null);
       try {
         await withdrawJoinRequest(community.id);
-        setRows((current) =>
-          current.map((row) =>
-            row.id === community.id ? { ...row, has_pending_request: false } : row,
-          ),
+        const next = rowsRef.current.map((row) =>
+          row.id === community.id ? { ...row, has_pending_request: false } : row,
         );
+        rowsRef.current = next;
+        setRows(next);
+        if (userId && cacheReadyRef.current) {
+          void writeScreenData(
+            userId,
+            EXPLORE_CACHE_KEY,
+            sessionEpoch,
+            next,
+            SCREEN_CACHE_TTL_MS.explore,
+          );
+        }
       } catch {
         setWithdrawError("Couldn't withdraw the request. Please try again.");
       } finally {
         setWithdrawingId(null);
       }
     },
-    [withdrawingId],
+    [sessionEpoch, userId, withdrawingId],
   );
 
   const isRequestsTab = tab === 'requests';
@@ -254,6 +360,12 @@ export default function ExploreTab() {
           <Text style={[styles.noticeText, { color: colors.destructive }]}>{withdrawError}</Text>
         </View>
       )}
+
+      {error && rows.length > 0 ? (
+        <View style={[styles.notice, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <Text style={[styles.noticeText, { color: colors.destructive }]}>{error}</Text>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.center}>

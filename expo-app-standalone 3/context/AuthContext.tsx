@@ -53,6 +53,7 @@ import {
   setDmConversationsActiveUser,
 } from '@/lib/dmConversationsCache';
 import { queryClient } from '@/lib/queryClient';
+import { activateScreenDataSession, clearScreenDataForUser } from '@/lib/screenDataCacheStore';
 import { resetReadManager } from '@/lib/readManager';
 import { resetRealtimeSession } from '@/lib/realtime';
 import { resetPushRegistrationState, unregisterStoredPushTokenAsync } from '@/lib/push';
@@ -71,6 +72,8 @@ import {
 
 interface AuthContextValue {
   user: User | null;
+  /** Changes on login, logout, or an expired-session teardown. */
+  sessionEpoch: number;
   isLoading: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -109,6 +112,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   /** Identity the realtime client was last told about (null = none). */
   const realtimeUserIdRef = useRef<string | null>(null);
   const userRef = useRef<User | null>(null);
@@ -126,11 +130,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const applyUser = useCallback((next: User | null) => {
     userRef.current = next;
     realtimeUserIdRef.current = next?.id ?? null;
+    activateScreenDataSession(next?.id ?? null, sessionClock.current());
     chatCache.activateUser(next?.id ?? null);
     setCommunitiesActiveUser(next?.id ?? null);
     setDmConversationsActiveUser(next?.id ?? null);
     setUser(next);
-  }, []);
+  }, [sessionClock]);
 
   /**
    * The epoch/owner a teardown belongs to. A delayed storage clear must not
@@ -163,7 +168,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (isCurrent()) await AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY);
         },
         clearCaches: async () => {
-          if (isCurrent()) await chatCache.clearAll(userId);
+          if (isCurrent()) {
+            await Promise.allSettled([
+              chatCache.clearAll(userId),
+              clearScreenDataForUser(userId),
+            ]);
+          }
         },
       };
     },
@@ -190,7 +200,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (isCurrent()) await AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY);
       },
       clearCaches: async () => {
-        if (isCurrent()) await chatCache.clearAll(cleanupUserIdRef.current);
+        if (isCurrent()) {
+          await Promise.allSettled([
+            chatCache.clearAll(cleanupUserIdRef.current),
+            clearScreenDataForUser(cleanupUserIdRef.current),
+          ]);
+        }
       },
     };
   }, [sessionClock]);
@@ -200,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       invalidateSession: () => {
         cleanupUserIdRef.current = userRef.current?.id ?? null;
         cleanupEpochRef.current = sessionClock.advance();
+        setSessionEpoch(cleanupEpochRef.current);
       },
       resetRealtime: resetRealtimeSession,
       markSignedOut: () => applyUser(null),
@@ -373,6 +389,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // They are reset only after the credentials are accepted so a failed
       // attempt does not disturb an identity that is still valid.
       const epoch = sessionClock.advance();
+      setSessionEpoch(epoch);
       loginInFlightRef.current = true;
       try {
         const { user: loggedInUser } = await apiLogin(email, password);
@@ -409,6 +426,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       invalidateSession: () => {
         cleanupUserIdRef.current = userRef.current?.id ?? null;
         cleanupEpochRef.current = sessionClock.advance();
+        setSessionEpoch(cleanupEpochRef.current);
       },
       resetRealtime: resetRealtimeSession,
       markSignedOut: () => applyUser(null),
@@ -429,7 +447,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAdmin, login, logout, refresh }}
+      value={{ user, sessionEpoch, isLoading, isAdmin, login, logout, refresh }}
     >
       {children}
     </AuthContext.Provider>
