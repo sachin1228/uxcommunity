@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { OptionPickerSheet, type PickerOption } from '@/components/settings/OptionPickerSheet';
 import { SaveStatus, type SaveState } from '@/components/settings/SaveStatus';
 import { ScreenHeader } from '@/components/settings/ScreenHeader';
@@ -524,11 +525,7 @@ function GroupRow({ group, colors, muted }: { group: OfficialGroup; colors: Retu
       {uri ? (
         <Image source={{ uri }} style={styles.groupImage} />
       ) : (
-        <View style={[styles.groupImage, styles.groupImageFallback, { backgroundColor: colors.surfaceRaised }]}>
-          <Text style={[styles.groupInitial, { color: colors.mutedForeground }]}>
-            {group.name[0]?.toUpperCase() ?? '?'}
-          </Text>
-        </View>
+        <CommunityIcon size={24} iconSize={12} />
       )}
       <Text
         style={[styles.groupName, { color: muted ? colors.foregroundSubtle : colors.foreground }]}
@@ -903,8 +900,6 @@ const styles = StyleSheet.create({
   },
   groupRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   groupImage: { width: 24, height: 24, borderRadius: 12 },
-  groupImageFallback: { alignItems: 'center', justifyContent: 'center' },
-  groupInitial: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   groupName: { flex: 1, fontSize: 13.5, fontFamily: 'Geist_400Regular' },
   errorBox: {
     borderWidth: StyleSheet.hairlineWidth,

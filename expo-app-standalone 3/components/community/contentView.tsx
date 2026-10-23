@@ -23,6 +23,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CommentGlyph } from '@/components/communities/CommentGlyph';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
@@ -1047,7 +1048,7 @@ export function ContentActionRow({
             {communityAvatar ? (
               <Image source={{ uri: communityAvatar }} style={styles.communityLabelAvatar} />
             ) : (
-              <View style={[styles.communityLabelAvatar, { backgroundColor: colors.surfaceRaised }]} />
+              <CommunityIcon size={16} iconSize={9} />
             )}
             <Text
               style={[styles.communityLabelName, { color: colors.foregroundMuted }]}

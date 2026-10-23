@@ -21,6 +21,7 @@ import {
 import { loadCommunityDetail, peekCommunityDetail } from '@/lib/communityDetailCache';
 import { peekCommunityRules, putCommunityRules } from '@/lib/communityRulesCache';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { MembersPanel } from '@/components/community/MembersPanel';
 import { ActivityPanel } from '@/components/community/ActivityPanel';
 import { communityNameBadges } from '@/lib/communityBadges';
@@ -387,11 +388,7 @@ function InfoHero({
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={[styles.heroAvatar, { borderColor: colors.border }]} />
         ) : (
-          <View style={[styles.heroAvatar, styles.heroAvatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-            <Text style={[styles.heroAvatarText, { color: colors.mutedForeground }]}>
-              {name.slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
+          <CommunityIcon size={96} />
         )}
         {heroBadges.verified && <VerifiedDpBadge dpSize={96} />}
       </View>
@@ -447,8 +444,6 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  heroAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  heroAvatarText: { fontSize: 34, fontFamily: 'Geist_600SemiBold' },
   heroNameRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

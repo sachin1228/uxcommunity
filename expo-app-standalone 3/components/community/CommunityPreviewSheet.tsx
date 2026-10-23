@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { communityNameBadges } from '@/lib/communityBadges';
-import { Initials } from '@/components/communities/CommunityRow';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { communityStore } from '@/lib/communityStore';
 import { type CommunityPreviewData } from '@/lib/communityPreviewData';
 import { getCommunityPreview, joinCommunity } from '@/lib/communityPreviewApi';
@@ -227,7 +227,7 @@ export function CommunityPreviewSheet({ visible, communityId, onClose }: Props) 
                   {imageUri ? (
                     <Image source={{ uri: imageUri }} style={styles.avatar} />
                   ) : (
-                    <Initials name={preview.name} size={64} colors={colors} />
+                    <CommunityIcon size={64} />
                   )}
                   {communityNameBadges(preview.type, preview.is_private).verified && (
                     <VerifiedDpBadge dpSize={64} />

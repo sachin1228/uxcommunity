@@ -11,6 +11,7 @@ import {
 } from '@/lib/communityPreview';
 import { isCommunityMuted } from '@/lib/communityMute';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { communityNameBadges } from '@/lib/communityBadges';
 
@@ -97,39 +98,6 @@ export function PinIcon({ size, color }: { size: number; color: string }) {
       <Path d="M12 17v5" />
       <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
     </Svg>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Avatar / Initials
-// ---------------------------------------------------------------------------
-
-/** A community's own face when it has no picture — exported for room previews. */
-export function Initials({
-  name,
-  size = 48,
-  colors,
-}: {
-  name: string;
-  size?: number;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const letters = name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-  return (
-    <View
-      style={[
-        styles.avatarBase,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primarySoft },
-      ]}
-    >
-      <Text style={[styles.avatarText, { color: colors.primary, fontSize: size * 0.38 }]}>
-        {letters}
-      </Text>
-    </View>
   );
 }
 
@@ -246,7 +214,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
               ]}
             />
           ) : (
-            <Initials name={community.name} colors={colors} />
+            <CommunityIcon size={48} />
           )}
           {badges.verified && <VerifiedDpBadge dpSize={48} />}
         </DpWithEventDate>
@@ -375,9 +343,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  avatarText: {
-    fontFamily: 'Geist_600SemiBold',
   },
   body: {
     flex: 1,
