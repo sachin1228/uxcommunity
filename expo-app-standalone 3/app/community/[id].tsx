@@ -67,6 +67,7 @@ import {
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { communityStore, type CommunityRowPatch } from '@/lib/communityStore';
+import { setActiveCommunityForNotifications } from '@/lib/chatNotificationState';
 import { loadCommunityDetail } from '@/lib/communityDetailCache';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -307,10 +308,14 @@ export default function CommunityChat() {
 
   // Track this as the active community so useCommunities won't increment
   // unread_count for incoming messages while we're looking at this chat.
+  // The native copy lets the Android FCM service skip this chat's notification
+  // while custom-rendering every other one.
   useEffect(() => {
     communityStore.activeCommunityId = id;
+    setActiveCommunityForNotifications(id);
     return () => {
       communityStore.activeCommunityId = null;
+      setActiveCommunityForNotifications(null);
     };
   }, [id]);
 

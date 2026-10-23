@@ -2076,6 +2076,32 @@ export type Database = {
           },
         ];
       };
+      fcm_tokens: {
+        Row: {
+          token: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          token: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          token?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fcm_tokens_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       push_tokens: {
         Row: {
           created_at: string;

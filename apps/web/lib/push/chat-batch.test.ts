@@ -24,7 +24,8 @@ import {
   sendChatMessagePush,
   type ChatPushDeps,
 } from "./chat";
-import type { ExpoPushDelivery, ExpoPushTicketRef } from "./expo";
+import type { ExpoPushDelivery, ExpoPushMessage, ExpoPushTicketRef } from "./expo";
+import type { FcmDataMessage } from "./fcm";
 import type { ReceiptProcessingReport } from "./receipts";
 
 /**
@@ -92,6 +93,11 @@ interface FakeState {
   /** Timed mutes: recipient id → notifications_muted_until deadline (ISO). */
   mutedUntil: Map<string, string>;
   tokens: Map<string, string[]>;
+  /** Expo tokens registered by iOS devices. */
+  iosTokens: Set<string>;
+  /** Raw Android FCM tokens, keyed by user. */
+  fcmTokens: Map<string, string[]>;
+  communityImage: string | null;
   prefs: Map<string, Record<string, unknown>>;
   throttle: Map<string, { window_started_at: string; sent_count: number }>;
   unread: Map<string, number>;
@@ -107,6 +113,9 @@ function fakeState(overrides: Partial<FakeState> = {}): FakeState {
     muted: new Set(),
     mutedUntil: new Map(),
     tokens: new Map(),
+    iosTokens: new Set(),
+    fcmTokens: new Map(),
+    communityImage: null,
     prefs: new Map(),
     throttle: new Map(),
     unread: new Map(),
@@ -139,7 +148,19 @@ function createFakeDb(state: FakeState) {
         }
         return {
           data: ids.flatMap((id) =>
-            (state.tokens.get(id) ?? []).map((token) => ({ token, user_id: id })),
+            (state.tokens.get(id) ?? []).map((token) => ({
+              token,
+              user_id: id,
+              platform: state.iosTokens.has(token) ? "ios" : "android",
+            })),
+          ),
+          error: null,
+        };
+      case "fcm_tokens":
+        if (ctx.op === "delete") return { data: null, error: null };
+        return {
+          data: ids.flatMap((id) =>
+            (state.fcmTokens.get(id) ?? []).map((token) => ({ token, user_id: id })),
           ),
           error: null,
         };
@@ -242,7 +263,7 @@ function createFakeDb(state: FakeState) {
       maybeSingle: async () => {
         calls.push({ table, op: ctx.op });
         return ctx.table === "communities"
-          ? { data: { name: state.communityName }, error: null }
+          ? { data: { name: state.communityName, image_url: state.communityImage }, error: null }
           : { data: null, error: null };
       },
       then: (resolvePromise: (value: unknown) => unknown, rejectPromise?: (reason: unknown) => unknown) => {
@@ -1005,4 +1026,119 @@ test("the receipt check is skipped when nothing was accepted or the step is off"
   }));
   assert.equal(none.receiptsChecked, 0);
   assert.equal(slept.length, 0);
+});
+
+// ── 8. Direct FCM for custom-rendered Android chats ─────────────────────────
+
+function fcmState() {
+  const androidUser = userId(1);
+  const olderUser = userId(2);
+  const state = fakeState({
+    communityName: "Designers",
+    communityImage: "https://media.example/dp.webp",
+    members: [androidUser, olderUser],
+    tokens: new Map([
+      [androidUser, ["expo-android", "expo-ios"]],
+      [olderUser, ["expo-older"]],
+    ]),
+    fcmTokens: new Map([[androidUser, ["fcm-1"]]]),
+    unread: new Map([
+      [androidUser, 5],
+      [olderUser, 6],
+    ]),
+  });
+  state.iosTokens.add("expo-ios");
+  return state;
+}
+
+async function withFcmConfigured<T>(run: () => Promise<T>): Promise<T> {
+  const previous = process.env.FCM_SERVICE_ACCOUNT;
+  process.env.FCM_SERVICE_ACCOUNT = JSON.stringify({
+    project_id: "demo",
+    client_email: "demo@example.com",
+    private_key: "not-used-in-these-tests",
+  });
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) delete process.env.FCM_SERVICE_ACCOUNT;
+    else process.env.FCM_SERVICE_ACCOUNT = previous;
+  }
+}
+
+test("Android FCM devices get the direct chat push; iOS and older builds stay on Expo", async () => {
+  await withFcmConfigured(async () => {
+    const state = fcmState();
+    const { db } = createFakeDb(state);
+    const expoMessages: ExpoPushMessage[] = [];
+    const fcmMessages: FcmDataMessage[] = [];
+
+    const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+      send: async (messages) => {
+        expoMessages.push(...messages);
+        return acceptAll(messages);
+      },
+      sendFcm: async (messages) => {
+        fcmMessages.push(...messages);
+        return {
+          requestError: null,
+          outcomes: messages.map((message) => ({
+            token: message.token,
+            ok: true,
+            deadToken: false,
+            error: null,
+          })),
+        };
+      },
+    }));
+
+    assert.deepEqual(expoMessages.map((message) => message.to).sort(), [
+      "expo-ios",
+      "expo-older",
+    ]);
+    assert.deepEqual(fcmMessages.map((message) => message.token), ["fcm-1"]);
+
+    const data = fcmMessages[0]!.data;
+    assert.equal(data.type, "community_message");
+    assert.equal(data.direct, "1");
+    assert.equal(data.communityName, "Designers");
+    assert.equal(data.senderName, "Arun");
+    assert.equal(data.message, "hello there");
+    assert.equal(data.imageUrl, "https://media.example/dp.webp");
+    assert.equal(data.silent, "0");
+    assert.equal(data.badge, "5");
+    assert.equal(report.deliveries, 3);
+  });
+});
+
+test("a provider-wide FCM failure falls back to Expo for the held-back device", async () => {
+  await withFcmConfigured(async () => {
+    const state = fcmState();
+    const { db } = createFakeDb(state);
+    const expoMessages: ExpoPushMessage[] = [];
+
+    const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+      send: async (messages) => {
+        expoMessages.push(...messages);
+        return acceptAll(messages);
+      },
+      sendFcm: async (messages) => ({
+        requestError: "auth_failed",
+        outcomes: messages.map((message) => ({
+          token: message.token,
+          ok: false,
+          deadToken: false,
+          error: "auth_failed",
+        })),
+      }),
+    }));
+
+    assert.deepEqual(expoMessages.map((message) => message.to).sort(), [
+      "expo-android",
+      "expo-ios",
+      "expo-older",
+    ]);
+    assert.equal(report.deliveries, 3);
+    assert.equal(report.failedTransient, 0);
+  });
 });

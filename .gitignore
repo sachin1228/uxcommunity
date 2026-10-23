@@ -54,6 +54,7 @@ yarn-error.log*
 .open-next/
 .wrangler/
 .dev.vars*
+.fcm-service-account.json
 
 # =========================
 # Supabase

@@ -46,6 +46,7 @@
           "defaultChannel": "messages"
         }
       ],
+      "./plugins/withChatNotifications",
       [
         "expo-media-library",
         {
