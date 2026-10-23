@@ -27,7 +27,8 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon-circle.png",
-        "backgroundColor": "#1D1F26"
+        "backgroundColor": "#1D1F26",
+        "monochromeImage": "./assets/images/adaptive-icon-monochrome.png"
       }
     },
     "web": {
