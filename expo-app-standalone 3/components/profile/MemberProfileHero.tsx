@@ -158,7 +158,7 @@ export function MemberProfileHero({
                 },
               ]}
             >
-              <DmIcon size={12} color="#FFFFFF" />
+              <DmIcon size={16} color="#FFFFFF" />
               <Text style={styles.messageChipText}>Message</Text>
             </Pressable>
 
@@ -175,7 +175,7 @@ export function MemberProfileHero({
                   },
                 ]}
               >
-                <Ionicons name="logo-linkedin" size={13} color={colors.foreground} />
+                <Ionicons name="logo-linkedin" size={16} color={colors.foreground} />
                 <Text style={[styles.secondaryChipText, { color: colors.foreground }]}>
                   LinkedIn
                 </Text>
@@ -195,7 +195,7 @@ export function MemberProfileHero({
                   },
                 ]}
               >
-                <Feather name="globe" size={13} color={colors.foreground} />
+                <Feather name="globe" size={16} color={colors.foreground} />
                 <Text style={[styles.secondaryChipText, { color: colors.foreground }]}>
                   Portfolio
                 </Text>
@@ -247,22 +247,22 @@ const styles = StyleSheet.create({
   messageChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
   },
-  messageChipText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Geist_600SemiBold' },
+  messageChipText: { color: '#FFFFFF', fontSize: 14, fontFamily: 'Geist_600SemiBold' },
   secondaryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
   },
-  secondaryChipText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  secondaryChipText: { fontSize: 14, fontFamily: 'Geist_500Medium' },
   blockedChip: {
     flexDirection: 'row',
     alignItems: 'center',
