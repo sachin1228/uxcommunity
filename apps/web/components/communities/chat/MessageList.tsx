@@ -313,7 +313,8 @@ export const MessageList = memo(function MessageList({
                 down with every prepend. */}
             {groupIdx === 0 && !hasMoreAbove && <DisappearingNotice />}
 
-            {/* Date divider */}
+            {/* Date divider — the day sits in a small raised pill in the middle
+                of the lane, the same shape the DM thread uses. */}
             {showDateDivider && (
               <div className="flex items-center justify-center py-3 px-5">
                 <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">

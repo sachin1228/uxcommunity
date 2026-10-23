@@ -167,7 +167,7 @@ export const DmMessageList = memo(function DmMessageList({
           <div key={group.date}>
             {showDateDivider && (
               <div className="flex items-center justify-center py-3 px-5">
-                <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
+                <span className="font-body text-xs font-medium text-foreground-muted">
                   {group.date}
                 </span>
               </div>
@@ -214,6 +214,7 @@ export const DmMessageList = memo(function DmMessageList({
                   canModerate={false}
                   moderationRole={null}
                   animate={animateIdsRef.current.has(msg.id)}
+                  variant="dm"
                 />
               );
             })}

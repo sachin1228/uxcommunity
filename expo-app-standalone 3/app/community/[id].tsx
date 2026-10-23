@@ -1855,6 +1855,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
   },
+  /** Centered day chip — a small raised pill, as the DM thread draws it. */
   datePill: {
     fontSize: 11,
     fontFamily: 'Geist_500Medium',
