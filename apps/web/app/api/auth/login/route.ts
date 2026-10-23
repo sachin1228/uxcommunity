@@ -13,7 +13,7 @@ type LoginUserRow = {
   email: string;
   password_hash: string;
   is_blocked: boolean;
-  designer_profiles: { id: string } | null;
+  designer_profiles: { id: string; avatar_url: string | null } | null;
 };
 
 export async function POST(request: NextRequest) {
@@ -87,12 +87,13 @@ export async function POST(request: NextRequest) {
   // is only acted on AFTER a successful password check below, so the response
   // does not leak which emails exist.
   //
-  // The profile's avatar_url is deliberately NOT selected: an uploaded picture
-  // is optional at signup, so it can never be part of the completeness check
-  // (see lib/auth/signup-status.ts).
+  // The profile's avatar_url is deliberately NOT used for the completeness
+  // check: an uploaded picture is optional at signup (see
+  // lib/auth/signup-status.ts). It rides the same embed only so the mobile
+  // client can paint the signed-in member without a second /me round trip.
   const { data: rawUser } = await db
     .from("users")
-    .select("id, name, email, password_hash, is_blocked, designer_profiles!user_id(id)")
+    .select("id, name, email, password_hash, is_blocked, designer_profiles!user_id(id, avatar_url)")
     .eq("email", normalizedEmail)
     .maybeSingle();
   const row = rawUser as unknown as LoginUserRow | null;
@@ -152,7 +153,21 @@ export async function POST(request: NextRequest) {
     role: "user",
   });
 
-  const response = NextResponse.json({ success: true, name: row.name });
+  const response = NextResponse.json({
+    success: true,
+    name: row.name,
+    // The same shape GET /api/auth/me returns. The mobile client used to make
+    // that extra round trip immediately after login; the login response
+    // already holds the trusted row it needs.
+    user: {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: "user",
+      profileComplete: !!profile,
+      avatar_url: profile?.avatar_url ?? null,
+    },
+  });
   setSessionCookie(response, token, request.nextUrl.hostname);
   return response;
 }

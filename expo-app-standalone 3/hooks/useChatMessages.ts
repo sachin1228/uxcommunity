@@ -83,33 +83,24 @@ export function useChatMessages(communityId: string) {
   /**
    * Cold start: paint the window the previous session ended on while the
    * bootstrap request is in flight. The fetch below merges over it, and the
-   * mount catch-up closes the gap — the same "local store first, sync after"
-   * order messaging apps use.
+   * open catch-up closes the gap — the same "local store first, sync after"
+   * order messaging apps use. The catch-up starts from the cached cursor in
+   * parallel with the bootstrap instead of waiting for it to settle.
    */
+  const [cacheHydrated, setCacheHydrated] = useState(false);
+  const openCatchUpRef = useRef(false);
+  /** When the open catch-up was requested — suppresses the connect echo. */
+  const openCatchUpAtRef = useRef(0);
   useEffect(() => {
-    const userId = user?.id;
-    if (!userId) return undefined;
-    let active = true;
-    void chatCache.loadCommunityMessages(userId, communityId).then((cached) => {
-      if (!active || !cached || cached.length === 0) return;
-      // Plain id-dedupe: unlike the catch-up merge this must never "confirm" an
-      // in-flight optimistic bubble, or an old cached row with the same text
-      // would remove the message the member just sent.
-      setMessages((prev) => {
-        const known = new Set(prev.map((message) => message.id));
-        const fresh = cached.filter((message) => !known.has(message.id));
-        return fresh.length > 0
-          ? [...prev, ...fresh].sort(compareChatTimeline)
-          : prev;
-      });
-    });
-    return () => {
-      active = false;
-    };
-  }, [communityId, user?.id]);
+    openCatchUpRef.current = false;
+    openCatchUpAtRef.current = 0;
+    setCacheHydrated(false);
+  }, [communityId]);
 
   const loadMore = useCallback(async () => {
-    if (isLoadingMore || !hasMore || messages.length === 0) return;
+    // A cached window makes the list long enough to fire `onEndReached` before
+    // the bootstrap page (and its `hasMore`) has settled.
+    if (isLoading || isLoadingMore || !hasMore || messages.length === 0) return;
     const oldest = messages[0]?.created_at;
     if (!oldest) return;
     setIsLoadingMore(true);
@@ -129,7 +120,7 @@ export function useChatMessages(communityId: string) {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [communityId, messages, isLoadingMore, hasMore]);
+  }, [communityId, messages, isLoading, isLoadingMore, hasMore]);
 
   /**
    * Catch up on anything this client is missing: published while the socket
@@ -154,10 +145,56 @@ export function useChatMessages(communityId: string) {
       if (missed.length === 0) return;
       setMessages((prev) => mergeCaughtUpMessages(prev, missed));
       // Whatever arrived while the socket was down is on screen now.
-      scheduleMarkRead(targetCommunityId, { patch: markRead });
+      scheduleMarkRead(targetCommunityId, {
+        skipIfUpdatedWithinMs: 10_000,
+        patch: markRead,
+      });
     });
   }, [communityId]);
   useEffect(() => () => catchUp.cancel(), [catchUp]);
+
+  /**
+   * One open-time catch-up, whichever side gets its cursor first: the disk
+   * window can start it while the bootstrap is still in flight, and a room
+   * with no cache starts it once the bootstrap page lands.
+   */
+  const requestOpenCatchUp = useCallback(() => {
+    if (openCatchUpRef.current) return;
+    openCatchUpRef.current = true;
+    openCatchUpAtRef.current = Date.now();
+    catchUp.schedule();
+  }, [catchUp]);
+
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId) {
+      setCacheHydrated(true);
+      return undefined;
+    }
+    let active = true;
+    void chatCache
+      .loadCommunityMessages(userId, communityId)
+      .then((cached) => {
+        if (!active || !cached || cached.length === 0) return;
+        // Plain id-dedupe: unlike the catch-up merge this must never "confirm"
+        // an in-flight optimistic bubble, or an old cached row with the same
+        // text would remove the message the member just sent.
+        setMessages((prev) => {
+          const known = new Set(prev.map((message) => message.id));
+          const fresh = cached.filter((message) => !known.has(message.id));
+          return fresh.length > 0
+            ? [...prev, ...fresh].sort(compareChatTimeline)
+            : prev;
+        });
+        requestOpenCatchUp();
+      })
+      .finally(() => {
+        if (active) setCacheHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [communityId, requestOpenCatchUp, user?.id]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -184,19 +221,24 @@ export function useChatMessages(communityId: string) {
       setHasMore(bootstrap.messages.length >= 50);
       // Opening the chat is a user action — its mark-read bypasses the
       // realtime cooldown so the badge always clears (see lib/readManager).
-      scheduleMarkRead(communityId, { bypassCooldown: true, patch: markRead });
+      // If the list tap just sent the same PATCH, this one falls away.
+      scheduleMarkRead(communityId, {
+        bypassCooldown: true,
+        skipIfUpdatedWithinMs: 10_000,
+        patch: markRead,
+      });
       // Close the gap between the snapshot and now on EVERY open, exactly like
       // the web chat's mount catch-up: this room's socket is often already
       // connected (the communities list keeps the live window's sockets
       // open), so mounting fires no status event and nothing else would ask
       // for what was published since the snapshot.
-      catchUp.schedule();
+      requestOpenCatchUp();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load messages');
     } finally {
       setIsLoading(false);
     }
-  }, [communityId, catchUp]);
+  }, [communityId, requestOpenCatchUp]);
 
   /** Optimistically append a sent message. */
   const appendMessage = useCallback((msg: Message) => {
@@ -236,6 +278,32 @@ export function useChatMessages(communityId: string) {
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m)));
   }, []);
 
+  /** The newest window waiting to be written to disk (see the effect below). */
+  const pendingSaveRef = useRef<{
+    userId: string;
+    communityId: string;
+    rows: Message[];
+  } | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    if (pending) {
+      void chatCache.saveCommunityMessages(
+        pending.userId,
+        pending.communityId,
+        pending.rows,
+      );
+    }
+  }, []);
+  // A room switch or a sign-out must not drop the last window on the floor.
+  useEffect(() => () => flushSave(), [communityId, user?.id, flushSave]);
+
   /**
    * Keep the shared bootstrap cache's message window current with what is on
    * screen — the mobile counterpart of the web chat's live msgCache. Leaving
@@ -248,8 +316,13 @@ export function useChatMessages(communityId: string) {
    * never resolve — and an empty window is never written, because the
    * bootstrap module deliberately refuses to serve one from cache (it would
    * only force the refetch this write exists to avoid).
+   *
+   * The disk write is throttled: a busy room changes state on every message,
+   * echo and reaction, and serializing the whole window each time is pure
+   * JavaScript work the UI can feel. The last state within the window wins.
    */
   useEffect(() => {
+    if (!cacheHydrated) return;
     if (windowCommunityRef.current !== communityId) return;
     const rows = messages.filter((message) => !message.id.startsWith('temp-'));
     if (rows.length === 0) return;
@@ -257,8 +330,22 @@ export function useChatMessages(communityId: string) {
     // Write-through to the persistent window: a process restart reads this
     // back on mount, so everything the member just saw survives the kill.
     const userId = user?.id;
-    if (userId) void chatCache.saveCommunityMessages(userId, communityId, rows);
-  }, [communityId, messages, user?.id]);
+    if (!userId) return;
+    pendingSaveRef.current = { userId, communityId, rows };
+    if (saveTimerRef.current) return;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending) {
+        void chatCache.saveCommunityMessages(
+          pending.userId,
+          pending.communityId,
+          pending.rows,
+        );
+      }
+    }, 500);
+  }, [cacheHydrated, communityId, messages, user?.id]);
 
   // Realtime subscription via Cloudflare singleton
   useEffect(() => {
@@ -528,7 +615,11 @@ export function useChatMessages(communityId: string) {
     // instead of waiting for the next remount.
     unsubscribes.push(
       realtimeClient.onRoomStatus(room, (connected) => {
-        if (connected) catchUp.schedule();
+        if (!connected) return;
+        // Mounting a chat opens its socket; that first "connected" is not a
+        // gap — the open catch-up is already covering it.
+        if (Date.now() - openCatchUpAtRef.current < 5_000) return;
+        catchUp.schedule();
       }),
     );
     // Coming back to the foreground probes the socket, but the probe takes up to

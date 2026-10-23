@@ -27,7 +27,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useDmTyping } from '@/hooks/useDmTyping';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
-import { getDmConversations } from '@/lib/dmApi';
+import {
+  loadDmConversations,
+  peekDmConversations,
+  seedDmConversationsFromDisk,
+} from '@/lib/dmConversationsCache';
+import { chatCache } from '@/lib/chatCacheStore';
 import {
   dmConversationPreview,
   dmTimestampLabel,
@@ -46,40 +51,120 @@ export default function MessagesScreen() {
   const userId = user?.id ?? null;
   const { typingByConversation } = useDmTyping(null);
 
-  const [conversations, setConversations] = useState<DmConversation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedConversations = useRef(peekDmConversations()).current;
+  const [conversations, setConversations] = useState<DmConversation[]>(
+    () => cachedConversations ?? [],
+  );
+  const [loading, setLoading] = useState(cachedConversations === null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusedOnceRef = useRef(false);
+  const userIdRef = useRef(userId);
+  const loadedForUserRef = useRef<string | null>(null);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
+    if (!userId) return;
     if (mode === 'initial') setLoading(true);
     if (mode === 'refresh') setRefreshing(true);
     if (mode !== 'silent') setError(null);
     try {
-      const rows = await getDmConversations();
+      const rows = await loadDmConversations({ fresh: true });
+      if (userIdRef.current !== userId) return;
+      loadedForUserRef.current = userId;
       setConversations(rows);
       if (mode !== 'silent') setError(null);
     } catch (e) {
+      if (userIdRef.current !== userId) return;
       if (mode !== 'silent') {
         setError(e instanceof Error ? e.message : 'Failed to load messages.');
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (userIdRef.current === userId) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [userId]);
 
-  useEffect(() => {
-    void load('initial');
-  }, [load]);
-
-  // A DM can arrive from anywhere; re-read on return and live over the room.
+  // The focus callback is the mount load too — a separate mount effect fired
+  // the same request a beat later, so every open cost two identical reads.
   useFocusEffect(
     useCallback(() => {
-      void load('silent');
+      void load(focusedOnceRef.current ? 'silent' : 'initial');
+      focusedOnceRef.current = true;
     }, [load]),
+  );
+
+  // Cold launch: paint the last conversation list while the live read lands.
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  const previousUserRef = useRef(userId);
+  useEffect(() => {
+    if (previousUserRef.current === userId) return;
+    previousUserRef.current = userId;
+    loadedForUserRef.current = null;
+    setConversations([]);
+    setError(null);
+    setQuery('');
+    setLoading(true);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    let active = true;
+    void chatCache.loadDmConversationList(userId).then((rows) => {
+      if (!active || !rows || rows.length === 0) return;
+      loadedForUserRef.current = userId;
+      if (!peekDmConversations()) seedDmConversationsFromDisk(rows);
+      setConversations((prev) => (prev.length > 0 ? prev : rows));
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  // Keep the disk snapshot current (throttled — the live page changes on
+  // every message preview and read).
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<DmConversation[] | null>(null);
+  useEffect(() => {
+    if (!userId || conversations.length === 0) return;
+    if (loadedForUserRef.current !== userId) return;
+    pendingSaveRef.current = conversations;
+    if (saveTimerRef.current) return;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending && loadedForUserRef.current === userId) {
+        void chatCache.saveDmConversationList(userId, pending);
+      }
+    }, 800);
+  }, [conversations, userId]);
+
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending && userId && loadedForUserRef.current === userId) {
+        void chatCache.saveDmConversationList(userId, pending);
+      }
+    },
+    [userId],
   );
 
   useEffect(() => {
@@ -167,11 +252,11 @@ export default function MessagesScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {loading ? (
+      {loading && conversations.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
-      ) : error ? (
+      ) : error && conversations.length === 0 ? (
         <View style={styles.center}>
           <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
           <Text style={[styles.stateTitle, { color: colors.foreground }]}>

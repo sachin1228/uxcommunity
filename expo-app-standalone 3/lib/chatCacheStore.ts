@@ -14,3 +14,8 @@ export const chatCache = createChatCache({
   getAllKeys: () => AsyncStorage.getAllKeys(),
   multiRemove: (keys) => AsyncStorage.multiRemove([...keys]),
 });
+
+// Writes are suspended until auth adopts an identity (`activateUser`), so no
+// screen can read or persist another account's data during a launch,
+// sign-out or account switch.
+chatCache.activateUser(null);

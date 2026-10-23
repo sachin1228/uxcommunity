@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,16 +11,34 @@ import {
   Geist_700Bold,
   useFonts,
 } from '@expo-google-fonts/geist';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
 import { useColors } from '@/hooks/useColors';
+import { queryClient } from '@/lib/queryClient';
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+/**
+ * The app-level session guard. The auth group only redirects a *signed-in*
+ * member; this closes the other direction, so an expired cookie leaves the
+ * tabs instead of a shell whose every request is rejected.
+ */
+function SessionGate({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const inAuth = segments[0] === '(auth)';
+
+  useEffect(() => {
+    if (isLoading || user || inAuth) return;
+    router.replace('/(auth)/login');
+  }, [inAuth, isLoading, router, user]);
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   // The native window background is driven by the design-system page colour
@@ -55,8 +73,9 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1, backgroundColor: bg }}>
             <KeyboardProvider>
               <AuthProvider>
-                <PushNotificationsBridge />
-                <Stack
+                <SessionGate>
+                  <PushNotificationsBridge />
+                  <Stack
                   screenOptions={{
                     headerShown: false,
                     contentStyle: { backgroundColor: bg },
@@ -124,6 +143,7 @@ export default function RootLayout() {
                   />
                   <Stack.Screen name="+not-found" />
                 </Stack>
+                </SessionGate>
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

@@ -11,6 +11,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { shouldApplySessionCookie } from './sessionLifecycle';
 
 const SESSION_COOKIE_NAME = 'uxcommunity_session';
 const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
@@ -31,8 +32,61 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
     new RegExp(`${SESSION_COOKIE_NAME}=([^;]+)`)
   );
   if (match?.[1]) {
+    // Most responses do not rotate the cookie; skip the storage write when
+    // the value is already the one in memory.
+    if (sessionToken === match[1]) return;
+    sessionToken = match[1];
+    // Every accepted rotation starts a new session generation. A request that
+    // was already in flight must not be allowed to apply its cookie or sign
+    // this new session out through a late 401.
+    sessionGeneration += 1;
     await AsyncStorage.setItem(SESSION_STORAGE_KEY, match[1]);
   }
+}
+
+// Every request needs the cookie, and every screen issues several. Reading it
+// from AsyncStorage each time put a native round trip in front of every fetch;
+// the value only changes when a response rotates it or the session is cleared.
+let sessionToken: string | null | undefined;
+let sessionTokenRead: Promise<string | null> | null = null;
+/**
+ * Bumped whenever the session identity is replaced (login dispatch, cookie
+ * rotation or clear). Requests capture it at dispatch so late responses can be
+ * associated with the session that actually sent them.
+ */
+let sessionGeneration = 0;
+
+const unauthorizedListeners = new Set<
+  (usedToken: string | null, usedGeneration: number) => void
+>();
+
+/**
+ * Fires when the API rejects the session (outside the login route, where a 401
+ * means "wrong password", not "signed out"). The listener also receives the
+ * cookie and generation the failed request used: a response that lands after
+ * the member has signed in again must not clear the new session.
+ */
+export function subscribeUnauthorized(
+  listener: (usedToken: string | null, usedGeneration: number) => void,
+): () => void {
+  unauthorizedListeners.add(listener);
+  return () => {
+    unauthorizedListeners.delete(listener);
+  };
+}
+
+function notifyUnauthorized(usedToken: string | null, usedGeneration: number): void {
+  unauthorizedListeners.forEach((listener) => listener(usedToken, usedGeneration));
+}
+
+/** The cookie currently held in memory (undefined = still loading). */
+export function peekSessionToken(): string | null | undefined {
+  return sessionToken;
+}
+
+/** The current session generation (see `sessionGeneration`). */
+export function peekSessionGeneration(): number {
+  return sessionGeneration;
 }
 
 /**
@@ -49,6 +103,7 @@ export async function apiFormUpload<T = unknown>(
   signal?: AbortSignal,
   method: 'POST' | 'PATCH' = 'POST'
 ): Promise<{ data: T; status: number }> {
+  const dispatchGeneration = sessionGeneration;
   const sessionToken = await getStoredSession();
   const cookieHeader = sessionToken
     ? `${SESSION_COOKIE_NAME}=${sessionToken}`
@@ -67,7 +122,9 @@ export async function apiFormUpload<T = unknown>(
   });
 
   const setCookie = response.headers.get('set-cookie');
-  if (setCookie) await saveSessionCookie(setCookie);
+  if (setCookie && shouldApplySessionCookie(dispatchGeneration, sessionGeneration)) {
+    await saveSessionCookie(setCookie);
+  }
 
   let data: T;
   const contentType = response.headers.get('content-type') ?? '';
@@ -78,6 +135,9 @@ export async function apiFormUpload<T = unknown>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && path !== '/api/auth/login') {
+      notifyUnauthorized(sessionToken, dispatchGeneration);
+    }
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & { status: number; data: unknown };
@@ -91,6 +151,9 @@ export async function apiFormUpload<T = unknown>(
 
 /** Clear a persisted session (on logout or 401). */
 export async function clearSession(): Promise<void> {
+  sessionToken = null;
+  sessionTokenRead = null;
+  sessionGeneration += 1;
   await AsyncStorage.multiRemove([
     SESSION_STORAGE_KEY,
     LEGACY_SESSION_STORAGE_KEY,
@@ -99,16 +162,38 @@ export async function clearSession(): Promise<void> {
 
 /** Retrieve the stored session token (or null). */
 export async function getStoredSession(): Promise<string | null> {
-  const current = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
-  if (current) return current;
+  if (sessionToken !== undefined) return sessionToken;
+  if (sessionTokenRead) return sessionTokenRead;
 
-  const legacy = await AsyncStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
-  if (legacy) {
-    await AsyncStorage.setItem(SESSION_STORAGE_KEY, legacy);
-    return legacy;
-  }
+  const startedGeneration = sessionGeneration;
+  const request = (async () => {
+    const current = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+    // A sign-out/login replaced the session while the native read was in
+    // flight. Return the value to the request that needed it, but never cache
+    // or migrate it into the new session.
+    if (sessionGeneration !== startedGeneration) return current;
+    if (current) {
+      sessionToken = current;
+      return current;
+    }
 
-  return null;
+    const legacy = await AsyncStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
+    if (sessionGeneration !== startedGeneration) return legacy;
+    if (legacy) {
+      await AsyncStorage.setItem(SESSION_STORAGE_KEY, legacy);
+      sessionToken = legacy;
+      return legacy;
+    }
+
+    sessionToken = null;
+    return null;
+  })();
+
+  const tracked = request.finally(() => {
+    if (sessionTokenRead === tracked) sessionTokenRead = null;
+  });
+  sessionTokenRead = tracked;
+  return tracked;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +210,11 @@ export async function apiFetch<T = unknown>(
   options: FetchOptions = {}
 ): Promise<{ data: T; status: number }> {
   const { body, headers: extraHeaders = {}, signal, ...rest } = options;
+
+  // A login attempt supersedes every in-flight response from the previous
+  // session, including another login attempt.
+  if (path === '/api/auth/login') sessionGeneration += 1;
+  const dispatchGeneration = sessionGeneration;
 
   const sessionToken = await getStoredSession();
   const cookieHeader = sessionToken
@@ -144,10 +234,10 @@ export async function apiFetch<T = unknown>(
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     ...(signal ? { signal } : {}),
   });
-
-  // Capture session cookie on responses that set one
+  // Capture session cookie on responses that set one. A late response from an
+  // older session must not overwrite the cookie of a newer login.
   const setCookie = response.headers.get('set-cookie');
-  if (setCookie) {
+  if (setCookie && shouldApplySessionCookie(dispatchGeneration, sessionGeneration)) {
     await saveSessionCookie(setCookie);
   }
 
@@ -160,6 +250,9 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && path !== '/api/auth/login') {
+      notifyUnauthorized(sessionToken, dispatchGeneration);
+    }
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & {

@@ -50,13 +50,17 @@ import { chatCache } from '@/lib/chatCacheStore';
 import {
   answerDmRequest,
   blockUser,
-  getDmConversations,
   getDmMessages,
   getDmMessagesAfter,
   markDmRead,
   setDmMessageReaction,
   unblockUser,
 } from '@/lib/dmApi';
+import {
+  loadDmConversations,
+  peekDmConversation,
+  putDmConversation,
+} from '@/lib/dmConversationsCache';
 import {
   dmComposerState,
   isUnstartedRequest,
@@ -77,6 +81,7 @@ import {
 } from '@/lib/chat';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
+import { createDmReadCoalescer } from '@/lib/dmReadCoalescer';
 
 const MARK_READ_THROTTLE_MS = 2_000;
 const CATCH_UP_DEBOUNCE_MS = 600;
@@ -155,7 +160,9 @@ export default function DmThreadScreen() {
   const peerName = params.name ?? 'Member';
   const peerId = params.peerId ?? null;
 
-  const [conversation, setConversation] = useState<DmConversation | null>(null);
+  const [conversation, setConversation] = useState<DmConversation | null>(() =>
+    peekDmConversation(conversationId),
+  );
   const [messages, setMessages] = useState<DmMessage[]>([]);
   const messagesRef = useRef<DmMessage[]>([]);
   useEffect(() => {
@@ -169,6 +176,8 @@ export default function DmThreadScreen() {
     let active = true;
     void chatCache.loadDmMessages(userId, conversationId).then((cached) => {
       if (!active || !cached || cached.length === 0) return;
+      dataUserIdRef.current = userId;
+      dataConversationRef.current = conversationId;
       setMessages((current) => {
         const known = new Set(current.map((message) => message.id));
         const fresh = cached.filter((message) => !known.has(message.id));
@@ -181,11 +190,82 @@ export default function DmThreadScreen() {
   }, [conversationId, userId]);
 
   // Write-through: a relaunch reads this window back on mount, and edits /
-  // deletes / reactions applied while open are reflected in it.
+  // deletes / reactions applied while open are reflected in it. Throttled —
+  // serializing the whole window on every echo/reaction is JS work the UI can
+  // feel, and only the last state in the window matters.
   useEffect(() => {
     if (!userId || !conversationId || messages.length === 0) return;
-    void chatCache.saveDmMessages(userId, conversationId, messages);
+    if (dataUserIdRef.current !== userId) return;
+    if (dataConversationRef.current !== conversationId) return;
+    pendingSaveRef.current = { userId, conversationId, messages };
+    if (saveTimerRef.current) return;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (
+        pending &&
+        dataUserIdRef.current === pending.userId &&
+        dataConversationRef.current === pending.conversationId
+      ) {
+        void chatCache.saveDmMessages(
+          pending.userId,
+          pending.conversationId,
+          pending.messages,
+        );
+      }
+    }, 500);
   }, [conversationId, messages, userId]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (
+        pending &&
+        dataUserIdRef.current === pending.userId &&
+        dataConversationRef.current === pending.conversationId
+      ) {
+        void chatCache.saveDmMessages(
+          pending.userId,
+          pending.conversationId,
+          pending.messages,
+        );
+      }
+    };
+  }, []);
+
+  // A different member now owns the session: drop the previous thread before
+  // its rows can be written under the new account.
+  const previousUserRef = useRef(userId);
+  useEffect(() => {
+    if (previousUserRef.current === userId) return;
+    previousUserRef.current = userId;
+    dataUserIdRef.current = null;
+    dataConversationRef.current = null;
+    setConversation(null);
+    setMessages([]);
+    setInitialUnread(null);
+    setError(null);
+    setHasMore(true);
+    setLoading(true);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, [userId]);
+
+  // Keep the shared metadata copy current (request accepted, blocked, etc.)
+  // so the next open paints the right footer without a metadata request.
+  useEffect(() => {
+    if (!conversation || dataUserIdRef.current !== userId) return;
+    putDmConversation(conversation);
+  }, [conversation, userId]);
 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -220,9 +300,20 @@ export default function DmThreadScreen() {
   );
 
   const loadingMoreRef = useRef(false);
-  const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastMarkedRef = useRef<string | null>(null);
-  const lastMarkCallRef = useRef(0);
+  /** Guards a page/metadata response that settles after the route changed. */
+  const conversationIdRef = useRef(conversationId);
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+  /** Which member the current rows belong to (account-switch guard). */
+  const dataUserIdRef = useRef<string | null>(null);
+  /** Which conversation the current rows belong to (route-reuse guard). */
+  const dataConversationRef = useRef<string | null>(null);
+  /** The identity on screen now, readable by in-flight callbacks. */
+  const currentUserIdRef = useRef(userId);
+  useEffect(() => {
+    currentUserIdRef.current = userId;
+  }, [userId]);
   const initialScrollDoneRef = useRef(false);
   const atBottomRef = useRef(true);
   const listRef = useRef<FlatList<ThreadRow>>(null);
@@ -230,6 +321,15 @@ export default function DmThreadScreen() {
   const rowsRef = useRef<ThreadRow[]>([]);
   const reactionIntentRef = useRef(new Map<string, ReactionIntent>());
   const catchUpDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** When the first page last settled — suppresses the mount's connect echo. */
+  const lastLoadedAtRef = useRef(0);
+  /** The newest window waiting to be written to disk (see the write-through). */
+  const pendingSaveRef = useRef<{
+    userId: string;
+    conversationId: string;
+    messages: DmMessage[];
+  } | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { typingUsers, notifyTyping } = useDmTyping(conversationId ?? null);
 
@@ -270,17 +370,55 @@ export default function DmThreadScreen() {
     [conversationId, params.avatar, peerId, peerName],
   );
 
+  // A reused route instance (same component, new id) must not paint the
+  // previous thread while the new page is in flight.
+  const previousConversationRef = useRef(conversationId);
+  useEffect(() => {
+    if (previousConversationRef.current === conversationId) return;
+    previousConversationRef.current = conversationId;
+    dataUserIdRef.current = null;
+    dataConversationRef.current = null;
+    setMessages([]);
+    setConversation(peekDmConversation(conversationId));
+    setInitialUnread(null);
+    setHasMore(true);
+    setError(null);
+    setLoading(true);
+    initialScrollDoneRef.current = false;
+    setInitialPositionResolved(false);
+    atBottomRef.current = true;
+    setAtBottom(true);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, [conversationId]);
+
   const load = useCallback(async () => {
     if (!conversationId) return;
+    const targetId = conversationId;
+    const ownerId = userId;
+    if (!ownerId) return;
     setLoading(true);
     setError(null);
     try {
       const [page, conversations] = await Promise.all([
-        getDmMessages(conversationId),
-        getDmConversations().catch(() => [] as DmConversation[]),
+        getDmMessages(targetId),
+        // Metadata the list screen already fetched is reused for a short
+        // window; a cold deep link still asks the server. A failed refresh
+        // must not blank a thread whose last copy is already on screen.
+        loadDmConversations().catch(() => [] as DmConversation[]),
       ]);
+      // The route or the account changed while the page was in flight.
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
       const found =
-        conversations.find((row) => row.id === conversationId) ?? synthesizeConversation();
+        conversations.find((row) => row.id === targetId) ??
+        peekDmConversation(targetId) ??
+        synthesizeConversation();
+      dataUserIdRef.current = ownerId;
+      dataConversationRef.current = targetId;
       // Merge over the cached/hydrated window: the server page wins row by
       // row (edits, deletes, reactions), while the older rows already on
       // screen stay reachable above it.
@@ -291,6 +429,10 @@ export default function DmThreadScreen() {
       });
       setHasMore(page.hasMore);
       setConversation(found);
+      lastLoadedAtRef.current = Date.now();
+      if (found && conversations.some((row) => row.id === targetId)) {
+        putDmConversation(found);
+      }
 
       // Snapshot the unread boundary before this open marks everything read.
       setInitialUnread(null);
@@ -305,11 +447,15 @@ export default function DmThreadScreen() {
         }
       }
     } catch (e) {
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
       setError(e instanceof Error ? e.message : 'Failed to load this conversation.');
     } finally {
-      setLoading(false);
+      if (conversationIdRef.current === targetId && currentUserIdRef.current === ownerId) {
+        setLoading(false);
+      }
     }
-  }, [conversationId, synthesizeConversation]);
+  }, [conversationId, synthesizeConversation, userId]);
 
   useEffect(() => {
     void load();
@@ -373,7 +519,26 @@ export default function DmThreadScreen() {
     },
   });
 
-  // ── Read marking: newest real (non-temp) message, throttled ──────────────
+  // ── Read marking: newest real (non-temp) message, coalesced ──────────────
+  // One trailing PATCH carries the newest id seen, so a cache paint + page
+  // merge + send in one open cannot mark an already-stale message three times.
+  const readCoalescer = useMemo(
+    () =>
+      createDmReadCoalescer({
+        throttleMs: MARK_READ_THROTTLE_MS,
+        send: (messageId) => {
+          void markDmRead(conversationId, messageId)
+            .then(() => signalDmListChanged())
+            .catch(() => {
+              /* the next message or open retries */
+            });
+        },
+      }),
+    [conversationId, userId],
+  );
+
+  useEffect(() => () => readCoalescer.cancel(), [readCoalescer, userId]);
+
   const markReadNow = useCallback(
     (force = false) => {
       if (!conversationId) return;
@@ -381,82 +546,63 @@ export default function DmThreadScreen() {
         messages.filter((message) => !message.id.startsWith('temp-')),
       );
       if (!newest) return;
-      if (lastMarkedRef.current === newest) return;
-
-      const fire = () => {
-        lastMarkedRef.current = newest;
-        lastMarkCallRef.current = Date.now();
-        void markDmRead(conversationId, newest)
-          .then(() => signalDmListChanged())
-          .catch(() => {
-            /* the next message or open retries */
-          });
-      };
-
-      if (force || Date.now() - lastMarkCallRef.current > MARK_READ_THROTTLE_MS) {
-        fire();
-      } else if (!markReadTimerRef.current) {
-        markReadTimerRef.current = setTimeout(() => {
-          markReadTimerRef.current = null;
-          fire();
-        }, MARK_READ_THROTTLE_MS);
-      }
+      readCoalescer.request(newest, force);
     },
-    [conversationId, messages],
+    [conversationId, messages, readCoalescer],
   );
 
   useEffect(() => {
     markReadNow();
   }, [markReadNow]);
 
-  useEffect(() => {
-    return () => {
-      if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
-    };
-  }, []);
-
   // ── Catch-up after a reconnect (missed events are recovered via ?after=) ──
   const catchUp = useCallback(async () => {
     if (!conversationId) return;
+    const targetId = conversationId;
+    const ownerId = userId;
+    if (!ownerId) return;
     try {
-      const conversations = await getDmConversations().catch(() => [] as DmConversation[]);
-      const found = conversations.find((row) => row.id === conversationId);
-      if (found) setConversation(found);
-
       const current = messagesRef.current;
       const newestReal = [...current]
         .reverse()
         .find((message) => !message.id.startsWith('temp-'));
 
-      if (!newestReal) {
-        const page = await getDmMessages(conversationId);
-        setMessages((existing) => {
-          const seen = new Set(existing.map((message) => message.id));
-          return sortMessages([
-            ...existing,
-            ...page.messages.filter((message) => !seen.has(message.id)),
-          ]);
-        });
-        return;
+      // One round trip instead of metadata-then-messages: the conversation
+      // row's fresh state (request/block, unread) and the gap page are
+      // independent reads of the same moment.
+      const [conversations, fetched] = await Promise.all([
+        loadDmConversations({ fresh: true }).catch(() => [] as DmConversation[]),
+        newestReal
+          ? getDmMessagesAfter(targetId, {
+              createdAt: newestReal.created_at,
+              id: newestReal.id,
+            })
+          : getDmMessages(targetId).then((page) => page.messages),
+      ]);
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
+
+      const found =
+        conversations.find((row) => row.id === targetId) ??
+        peekDmConversation(targetId);
+      if (found) {
+        setConversation(found);
+        putDmConversation(found);
       }
 
-      const newer = await getDmMessagesAfter(conversationId, {
-        createdAt: newestReal.created_at,
-        id: newestReal.id,
-      });
-      if (newer.length === 0) return;
+      if (fetched.length === 0) return;
       setMessages((existing) => {
         const seen = new Set(existing.map((message) => message.id));
         return sortMessages([
           ...existing,
-          ...newer.filter((message) => !seen.has(message.id)),
+          ...fetched.filter((message) => !seen.has(message.id)),
         ]);
       });
       if (atBottomRef.current) setTimeout(() => scrollToLatest(true), 40);
     } catch {
       /* the next reconnect or open retries */
     }
-  }, [conversationId, scrollToLatest]);
+  }, [conversationId, scrollToLatest, userId]);
 
   const scheduleCatchUp = useCallback(() => {
     if (catchUpDebounceRef.current) clearTimeout(catchUpDebounceRef.current);
@@ -682,7 +828,9 @@ export default function DmThreadScreen() {
     );
 
     const unsubscribeStatus = realtimeClient.onRoomStatus(room, (connected) => {
-      if (connected) scheduleCatchUp();
+      // Mounting the thread opens its socket right after the page request;
+      // that first connect is not a gap the page did not already cover.
+      if (connected && Date.now() - lastLoadedAtRef.current > 5_000) scheduleCatchUp();
     });
 
     return () => {
@@ -697,15 +845,23 @@ export default function DmThreadScreen() {
 
   // ── Pagination (older pages) ──────────────────────────────────────────────
   const loadMore = useCallback(async () => {
-    if (loadingMoreRef.current || !hasMore || messages.length === 0 || !conversationId) return;
+    // A cached window plus the page still in flight used to let the inverted
+    // list's first `onEndReached` ask for an older page before `hasMore` was
+    // known — one extra history request on every open.
+    if (loading || loadingMoreRef.current || !hasMore || messages.length === 0 || !conversationId) return;
+    const targetId = conversationId;
+    const ownerId = userId;
+    if (!ownerId) return;
     loadingMoreRef.current = true;
     setLoadingMore(true);
     const oldest = messages[0];
     try {
-      const page = await getDmMessages(conversationId, {
+      const page = await getDmMessages(targetId, {
         createdAt: oldest.created_at,
         id: oldest.id,
       });
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
       setMessages((current) => {
         const seen = new Set(current.map((message) => message.id));
         return [
@@ -720,7 +876,7 @@ export default function DmThreadScreen() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [conversationId, hasMore, messages]);
+  }, [conversationId, hasMore, loading, messages, userId]);
 
   // ── Reactions (optimistic, server-confirmed) ──────────────────────────────
   const handleReaction = useCallback(
@@ -984,11 +1140,11 @@ export default function DmThreadScreen() {
     [conversation, userId],
   );
   /**
-   * A cached thread paints before the conversation row lands, but the footer
-   * must not: request/block state is unknown until then, and the ready
-   * composer would let a reply bypass an unanswered message request.
+   * A cached thread paints before the conversation row lands, and the cached
+   * row carries the last known request/block state — enough to show the
+   * composer immediately while the fresh page reconciles behind it.
    */
-  const composerReady = !loading && !!conversation;
+  const composerReady = !!conversation;
   const unstarted = conversation ? isUnstartedRequest(conversation) : false;
   const displayPeerName = conversation?.peer.name ?? peerName;
   const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);

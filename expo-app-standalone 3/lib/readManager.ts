@@ -106,10 +106,22 @@ export function resetReadManager(): void {
  * Request that a community be marked read. Calls within the debounce window
  * collapse into one PATCH; `bypassCooldown` is set by user opens so reopening
  * a chat always clears the badge.
+ *
+ * `skipIfUpdatedWithinMs` lets the chat's open-time mark fall away when the
+ * list tap just sent the same PATCH — opening a room was two requests, one
+ * from each side, for the same watermark.
  */
 export function scheduleMarkRead(
   communityId: string,
-  { bypassCooldown = false, patch }: { bypassCooldown?: boolean; patch: MarkReadPatch },
+  {
+    bypassCooldown = false,
+    skipIfUpdatedWithinMs = 0,
+    patch,
+  }: {
+    bypassCooldown?: boolean;
+    skipIfUpdatedWithinMs?: number;
+    patch: MarkReadPatch;
+  },
 ): void {
   ensureState(communityId);
 
@@ -119,17 +131,29 @@ export function scheduleMarkRead(
     communityId,
     setTimeout(() => {
       debounceTimers.delete(communityId);
-      fireMarkRead(communityId, { bypassCooldown, patch });
+      fireMarkRead(communityId, { bypassCooldown, skipIfUpdatedWithinMs, patch });
     }, readManagerConfig.debounceMs),
   );
 }
 
 function fireMarkRead(
   communityId: string,
-  { bypassCooldown, patch }: { bypassCooldown: boolean; patch: MarkReadPatch },
+  {
+    bypassCooldown,
+    skipIfUpdatedWithinMs,
+    patch,
+  }: { bypassCooldown: boolean; skipIfUpdatedWithinMs: number; patch: MarkReadPatch },
 ): void {
   const state = states.get(communityId);
   if (!state) return;
+
+  if (
+    skipIfUpdatedWithinMs > 0 &&
+    state.lastUpdatedAt !== null &&
+    Date.now() - state.lastUpdatedAt < skipIfUpdatedWithinMs
+  ) {
+    return;
+  }
 
   // Never stack a second PATCH while one is in flight; activity that arrived
   // meanwhile schedules exactly one follow-up.
@@ -153,7 +177,7 @@ function fireMarkRead(
       current.failures = 0;
       if (current.followUpPending) {
         current.followUpPending = false;
-        scheduleMarkRead(communityId, { patch });
+        scheduleMarkRead(communityId, { skipIfUpdatedWithinMs: 0, patch });
       }
     })
     .catch(() => {
@@ -166,7 +190,11 @@ function fireMarkRead(
         current.failures += 1;
         current.retryTimer = setTimeout(() => {
           current.retryTimer = null;
-          fireMarkRead(communityId, { bypassCooldown: true, patch });
+          fireMarkRead(communityId, {
+            bypassCooldown: true,
+            skipIfUpdatedWithinMs: 0,
+            patch,
+          });
         }, readManagerConfig.retryMs * current.failures);
       }
     });

@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import Svg, { Circle } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { apiFetch } from '@/lib/api';
@@ -48,20 +49,18 @@ export function LimitsRing() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
-  const [payload, setPayload] = useState<Payload | null>(null);
 
-  const load = useCallback(async () => {
-    try {
+  // The header mounts on every tab. One shared query means the first tab
+  // reads the budgets and the rest paint from cache; a manual open refetches.
+  const { data: payload, refetch } = useQuery<Payload>({
+    queryKey: ['creation-limits'],
+    queryFn: async () => {
       const { data } = await apiFetch<Payload>('/api/limits');
-      setPayload(data);
-    } catch {
-      // The header stays up; the ring simply has nothing to report.
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+      return data;
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
 
   const rows = (payload?.limits ?? [])
     .filter((row) => LABELS[row.kind])
@@ -86,7 +85,7 @@ export function LimitsRing() {
         hitSlop={6}
         onPress={() => {
           setOpen(true);
-          void load();
+          void refetch();
         }}
         style={({ pressed }) => [styles.trigger, { opacity: pressed ? 0.8 : 1 }]}
       >

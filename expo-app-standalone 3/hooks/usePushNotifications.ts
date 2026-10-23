@@ -9,10 +9,14 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import {
+  getLastPushRegistrationStatus,
+  getObservedDeviceToken,
+  isPushRegistrationRetryable,
   pushDataFrom,
   registerBadgeRefresh,
   registerForPushNotificationsAsync,
@@ -20,10 +24,52 @@ import {
 } from '@/lib/push';
 import { routeForPush } from '@/lib/pushRoutes';
 import { fetchNotificationSettings } from '@/lib/notificationSettings';
+import {
+  isNewDeviceToken,
+  shouldHandleTokenEvent,
+  shouldRetryPushRegistrationOnForeground,
+} from '@/lib/pushRegistrationGate';
+import { createPushRotationFollowUp } from '@/lib/pushRotationFollowUp';
 
 export function usePushNotifications() {
   const { user } = useAuth();
   const registeredForRef = useRef<string | null>(null);
+  const registrationRef = useRef<Promise<string | null> | null>(null);
+  const lastRegistrationAtRef = useRef(0);
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+
+  const register = useCallback(() => {
+    if (registrationRef.current) return registrationRef.current;
+    const run = registerForPushNotificationsAsync().finally(() => {
+      // A sign-in/out may have started a newer registration while this one
+      // was settling; only the current one may clear the slot.
+      if (registrationRef.current === run) {
+        registrationRef.current = null;
+        lastRegistrationAtRef.current = Date.now();
+      }
+    });
+    registrationRef.current = run;
+    return run;
+  }, []);
+
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user?.id]);
+
+  // A token rotation that lands while the old token's registration is still
+  // in flight gets one bounded follow-up after that request settles, rather
+  // than waiting for the next foreground or launch.
+  const rotationFollowUp = useRef(
+    createPushRotationFollowUp(() => userIdRef.current !== null),
+  ).current;
+
+  // A registration belongs to the session that started it. Clearing the slot
+  // on identity change lets the next member register immediately; the push
+  // coordinator's epoch abandons the old work server-side.
+  useEffect(() => {
+    registrationRef.current = null;
+    lastRegistrationAtRef.current = 0;
+  }, [user?.id]);
 
   // Presentation rules only need to be set once per process.
   useEffect(() => {
@@ -57,18 +103,56 @@ export function usePushNotifications() {
     if (registeredForRef.current === user.id) return;
     registeredForRef.current = user.id;
 
-    void registerForPushNotificationsAsync();
-  }, [user?.id]);
+    void register();
+  }, [user?.id, register]);
 
   // FCM tokens rotate (reinstall, restore, Play services reset). Re-register
   // so the server's direct-chat token never goes stale.
   useEffect(() => {
     if (!user?.id) return;
-    const subscription = Notifications.addPushTokenListener(() => {
-      void registerForPushNotificationsAsync();
+    const subscription = Notifications.addPushTokenListener((deviceToken) => {
+      // A real rotation is honoured even inside the cooldown; the echo from
+      // our own token read carries the token we just observed and is not.
+      const rotated = isNewDeviceToken(getObservedDeviceToken(), deviceToken?.data);
+      if (rotated) {
+        rotationFollowUp.schedule(registrationRef.current, () => {
+          if (userIdRef.current) void register();
+        });
+        return;
+      }
+      if (
+        !shouldHandleTokenEvent({
+          now: Date.now(),
+          inFlight: registrationRef.current !== null,
+          lastRegistrationAt: lastRegistrationAtRef.current,
+        })
+      ) {
+        return;
+      }
+      void register();
     });
     return () => subscription.remove();
-  }, [user?.id]);
+  }, [user?.id, register, rotationFollowUp]);
+
+  // Transient failures (Expo/OS or the API unreachable at launch) retry on a
+  // deliberate foreground, never in a timer loop. A denied permission is an
+  // answer, not a failure, and is left for the settings screen.
+  useEffect(() => {
+    if (!user?.id) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      if (
+        !shouldRetryPushRegistrationOnForeground(
+          getLastPushRegistrationStatus(),
+          isPushRegistrationRetryable(),
+        )
+      ) {
+        return;
+      }
+      void register();
+    });
+    return () => subscription.remove();
+  }, [user?.id, register]);
 
   // Badge and muted communities: on sign-in, and again every time the app
   // comes back to the foreground.

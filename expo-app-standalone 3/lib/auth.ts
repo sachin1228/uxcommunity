@@ -2,8 +2,8 @@
  * Auth API helpers — thin wrappers around the web app's auth endpoints.
  */
 
-import { apiFetch, clearSession } from './api';
-
+import { apiFetch } from './api';
+import { loginWith } from './loginFlow';
 export interface User {
   id: string;
   name: string;
@@ -17,6 +17,8 @@ export interface LoginResult {
   success: true;
   name?: string;
   redirect?: string; // "/admin" for admin users
+  /** Present on current servers; older ones only returned the redirect. */
+  user?: User;
 }
 
 // ---------------------------------------------------------------------------
@@ -27,17 +29,16 @@ export async function login(
   email: string,
   password: string
 ): Promise<{ user: User | null; isAdmin: boolean }> {
-  const { data } = await apiFetch<LoginResult>('/api/auth/login', {
-    method: 'POST',
-    body: { email, password },
-  });
-
-  // After login the session cookie is already persisted by apiFetch.
-  // Fetch the full user object.
-  const isAdmin = data.redirect === '/admin';
-  const me = await getMe();
-
-  return { user: me, isAdmin };
+  // After login the session cookie is already persisted by apiFetch. A
+  // current server returns the trusted user row with the response; the extra
+  // /me is only the fallback for an older deployment (and for the env admin
+  // account, whose session has no profile row of its own).
+  return loginWith(
+    (path, options) => apiFetch<LoginResult>(path, options),
+    getMe,
+    email,
+    password
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -45,11 +46,10 @@ export async function login(
 // ---------------------------------------------------------------------------
 
 export async function logout(): Promise<void> {
-  try {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
-  } finally {
-    await clearSession();
-  }
+  // Local session teardown belongs to AuthContext's bounded logout sequence.
+  // Keeping a clearSession() in this finally would let a late logout response
+  // erase the cookie of a newer login that superseded it.
+  await apiFetch('/api/auth/logout', { method: 'POST' });
 }
 
 // ---------------------------------------------------------------------------
