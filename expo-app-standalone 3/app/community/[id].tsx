@@ -75,6 +75,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
+import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
@@ -137,6 +138,13 @@ export default function CommunityChat() {
   const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused, {
     bottom: COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET,
   });
+  /**
+   * The message list waits for the push animation to finish. Its first rows —
+   * and the cached window behind them — are the most expensive thing this
+   * screen mounts, and creating them while the native slide runs is what made
+   * the open stutter (see hooks/useScreenTransitionSettled).
+   */
+  const listSettled = useScreenTransitionSettled();
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -702,6 +710,10 @@ export default function CommunityChat() {
   // re-position the reader.
   useEffect(() => {
     if (error) return;
+    // The list is not mounted before the transition settles (see listSettled),
+    // and this anchor is one-shot: running it against an unmounted list would
+    // burn its only chance.
+    if (!listSettled) return;
     if (!initialPositionReady || isLoading || !contentEventsReady) return;
     if (initialScrollDoneRef.current) return;
     initialScrollDoneRef.current = true;
@@ -743,6 +755,7 @@ export default function CommunityChat() {
     firstUnreadId,
     rows,
     error,
+    listSettled,
   ]);
 
   const handleScroll = useCallback(
@@ -1199,7 +1212,7 @@ export default function CommunityChat() {
         </View>
       )}
 
-      {isLoading && messages.length === 0 && (
+      {(!listSettled || (isLoading && messages.length === 0)) && (
         <View style={styles.center}>
           {/* The UI accent, like every other loading state in the app — the
               own-bubble blue reads at ~3.5:1 against the chat background in the
@@ -1208,13 +1221,13 @@ export default function CommunityChat() {
         </View>
       )}
 
-      {!isLoading && error && messages.length === 0 && (
+      {listSettled && !isLoading && error && messages.length === 0 && (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
         </View>
       )}
 
-      {(messages.length > 0 || (!isLoading && !error)) && (
+      {listSettled && (messages.length > 0 || (!isLoading && !error)) && (
         <FlatList
           ref={listRef}
           inverted
@@ -1512,7 +1525,9 @@ export default function CommunityChat() {
               onSelect={(emoji) => chatComposerRef.current?.insertEmoji(emoji)}
               height={imeLayout.panelHeight}
               animatedStyle={imeLayout.panelStyle}
-              showContent
+              // The grid is ~170 cells (340 native views): mount it when the
+              // panel opens, not with every chat open.
+              showContent={imeLayout.panelOpen}
               interactive={imeLayout.panelInteractive}
             />
 
