@@ -32,6 +32,7 @@ import {
   createPushRegistrationCoordinator,
   type PushTokenPair,
 } from './pushRegistrationCoordinator';
+import { settleAbandonedRegistration } from './pushRegistrationState';
 
 /** Where this device's Expo push token is remembered for logout cleanup. */
 const PUSH_TOKEN_KEY = '@push/expo_token';
@@ -529,20 +530,55 @@ async function noteAlreadyRegistered({ token }: PushTokenPair): Promise<void> {
   await persistDiagnostics();
 }
 
+/**
+ * Settles the state left behind by a registration that was dropped mid-flight
+ * (sign-out or an account switch).
+ *
+ * `acquirePushTokenPair` records "registering" before it asks the OS for a
+ * token, and only a POST — which an abandoned run never reaches — used to move
+ * that marker on. Without this the marker stayed on disk after the session
+ * ended, so the next sign-in opened the settings screen on "registering" for a
+ * registration nobody was running. "unknown" is the truthful state: this
+ * session has not registered yet.
+ *
+ * A status that has already settled is left alone — it belongs to a newer
+ * attempt, which may have run to completion while the old one finished.
+ */
+async function noteRegistrationAbandoned(): Promise<void> {
+  if (!clearAbandonedRegistration()) return;
+  await persistDiagnostics();
+}
+
+/** Applies the settlement rule; false when there was nothing to settle. */
+function clearAbandonedRegistration(): boolean {
+  const settled = settleAbandonedRegistration(diagnostics, Date.now());
+  if (!settled) return false;
+  diagnostics = settled;
+  lastFailureRetryable = false;
+  return true;
+}
+
 // One coordinator for the process: it shares in-flight work, skips an
 // unchanged token pair and abandons work from a replaced account.
 const pushRegistration = createPushRegistrationCoordinator({
   acquire: acquirePushTokenPair,
   post: postPushTokenPair,
   onAlreadyRegistered: noteAlreadyRegistered,
+  onAbandoned: noteRegistrationAbandoned,
 });
 
 /**
  * The tokens belong to the device, but the server rows belong to the account:
  * a new sign-in must register them again even when the pair has not changed.
+ *
+ * The "registering" marker is settled here as well as in the coordinator:
+ * a dropped token request can hang (Expo's token fetch has no timeout), and
+ * then the abandonment hook never runs — the marker must not survive the
+ * session that was writing it.
  */
 export function resetPushRegistrationState(): void {
   pushRegistration.reset();
+  if (clearAbandonedRegistration()) void persistDiagnostics();
 }
 
 /** Latest in-memory registration status (the settings screen reads details). */
@@ -696,7 +732,7 @@ export async function unregisterStoredPushTokenAsync(options?: {
   // POST was already on the wire, let it settle briefly so the DELETE below
   // is the last write for this token.
   const pending = pushRegistration.pending();
-  pushRegistration.reset();
+  resetPushRegistrationState();
   if (pending) {
     await Promise.race([
       pending.catch(() => {}),
