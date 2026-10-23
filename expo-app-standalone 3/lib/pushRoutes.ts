@@ -12,7 +12,15 @@ export function routeForPush(data: PushData): Href {
     return { pathname: '/community/[id]', params: { id: data.communityId } };
   }
   if (data.type === 'dm_message') {
-    return { pathname: '/messages/[id]', params: { id: data.conversationId } };
+    return {
+      pathname: '/messages/[id]',
+      params: {
+        id: data.conversationId,
+        ...(data.senderName ? { name: data.senderName } : {}),
+        ...(data.senderAvatarUrl ? { avatar: data.senderAvatarUrl } : {}),
+        ...(data.senderId ? { peerId: data.senderId } : {}),
+      },
+    };
   }
   if (data.type === 'app_notification') {
     return '/notifications';

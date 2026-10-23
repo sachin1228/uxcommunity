@@ -59,7 +59,7 @@ jobs:
             RESEND_API_KEY EMAIL_FROM GIPHY_API_KEY \
             R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
             R2_BUCKET_NAME R2_PUBLIC_URL \
-            ADMIN_EMAIL ADMIN_PASSWORD; do
+            ADMIN_EMAIL ADMIN_PASSWORD FCM_SERVICE_ACCOUNT; do
             if [ -z "${!name}" ]; then
               echo "::error::Missing GitHub secret: $name"
               exit 1
@@ -86,6 +86,7 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
 
       # A wrong guard here would block a HEALTHY deploy, so its helpers are
       # pinned down before it is allowed to gate one — same rule as the
@@ -369,3 +370,11 @@ jobs:
       - name: Set web worker secrets
         working-directory: apps/web
         run: npx wrangler secret bulk .dev.vars --name uxcommunity-web
+
+      # The Firebase service-account JSON keeps its private key across
+      # multiple lines; .dev.vars is dotenv, so it is pushed straight from the
+      # repository secret instead. `printf` preserves the value exactly (no
+      # trailing newline invented by echo) and the worker parses it as JSON.
+      - name: Set FCM service account secret
+        working-directory: apps/web
+        run: printf '%s' "${{ secrets.FCM_SERVICE_ACCOUNT }}" | npx wrangler secret put FCM_SERVICE_ACCOUNT

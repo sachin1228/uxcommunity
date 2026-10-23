@@ -238,6 +238,10 @@ export async function createNotification(
       title,
       body,
       href,
+      actorId: input.actorId,
+      communityId,
+      entityType: input.entityType,
+      entityId: input.entityId,
     });
   }
 

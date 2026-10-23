@@ -2076,6 +2076,136 @@ export type Database = {
           },
         ];
       };
+      companies: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_active: boolean;
+          logo_url: string | null;
+          name: string;
+          slug: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          logo_url?: string | null;
+          name: string;
+          slug: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          logo_url?: string | null;
+          name?: string;
+          slug?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      job_posts: {
+        Row: {
+          city_id: string;
+          company_id: string;
+          created_at: string;
+          description: string;
+          employment_type: string;
+          experience_level: string;
+          id: string;
+          job_title: string;
+          kind: string;
+          poster_id: string;
+          requirements: string[];
+          responsibilities: string[];
+          salary: string | null;
+          sector_id: string;
+          skills: string[];
+          title: string;
+          website: string | null;
+          work_mode: string;
+        };
+        Insert: {
+          city_id: string;
+          company_id: string;
+          created_at?: string;
+          description: string;
+          employment_type: string;
+          experience_level: string;
+          id?: string;
+          job_title: string;
+          kind: string;
+          poster_id: string;
+          requirements?: string[];
+          responsibilities?: string[];
+          salary?: string | null;
+          sector_id: string;
+          skills?: string[];
+          title: string;
+          website?: string | null;
+          work_mode: string;
+        };
+        Update: {
+          city_id?: string;
+          company_id?: string;
+          created_at?: string;
+          description?: string;
+          employment_type?: string;
+          experience_level?: string;
+          id?: string;
+          job_title?: string;
+          kind?: string;
+          poster_id?: string;
+          requirements?: string[];
+          responsibilities?: string[];
+          salary?: string | null;
+          sector_id?: string;
+          skills?: string[];
+          title?: string;
+          website?: string | null;
+          work_mode?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "job_posts_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fcm_tokens: {
+        Row: {
+          token: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          token: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          token?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fcm_tokens_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       push_tokens: {
         Row: {
           created_at: string;

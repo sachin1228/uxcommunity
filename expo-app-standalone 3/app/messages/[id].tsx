@@ -43,6 +43,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
+import { setActiveDmConversationForNotifications } from '@/lib/chatNotificationState';
 import { useDmSend } from '@/hooks/useDmSend';
 import { useDmTyping } from '@/hooks/useDmTyping';
 import { chatCache } from '@/lib/chatCacheStore';
@@ -316,9 +317,16 @@ export default function DmThreadScreen() {
 
   // While this thread is open the badge must not bump for its own messages.
   useEffect(() => {
-    setDmActiveConversation(conversationId ?? null);
-    return () => setDmActiveConversation(null);
-  }, [conversationId]);
+    const activeId = isFocused ? (conversationId ?? null) : null;
+    setDmActiveConversation(activeId);
+    // Native twin: the Android FCM service skips this conversation's push
+    // while it is the screen on top.
+    setActiveDmConversationForNotifications(activeId);
+    return () => {
+      setDmActiveConversation(null);
+      setActiveDmConversationForNotifications(null);
+    };
+  }, [conversationId, isFocused]);
 
   // ── Send / edit / delete ──────────────────────────────────────────────────
   const scrollToLatest = useCallback((animated = true) => {

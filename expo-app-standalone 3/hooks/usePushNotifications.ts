@@ -60,6 +60,16 @@ export function usePushNotifications() {
     void registerForPushNotificationsAsync();
   }, [user?.id]);
 
+  // FCM tokens rotate (reinstall, restore, Play services reset). Re-register
+  // so the server's direct-chat token never goes stale.
+  useEffect(() => {
+    if (!user?.id) return;
+    const subscription = Notifications.addPushTokenListener(() => {
+      void registerForPushNotificationsAsync();
+    });
+    return () => subscription.remove();
+  }, [user?.id]);
+
   // Badge and muted communities: on sign-in, and again every time the app
   // comes back to the foreground.
   useEffect(() => {

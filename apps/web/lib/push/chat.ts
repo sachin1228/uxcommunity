@@ -1,11 +1,19 @@
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   redactPushTokens,
   sendExpoPushBatches,
+  timeoutSignal,
   type ExpoPushDelivery,
   type ExpoPushMessage,
   type ExpoPushTicketRef,
 } from "./expo";
+import {
+  isFcmConfigured,
+  sendFcmDataMessages,
+  type FcmDataMessage,
+  type FcmDeliveryReport,
+} from "./fcm";
 import { processExpoPushReceipts, type ReceiptProcessingReport } from "./receipts";
 import { loadUnreadMessageTotals, type UntypedRpc } from "./unread-totals";
 import {
@@ -296,6 +304,8 @@ export interface ChatPushDeps {
    * exactly what happened instead of assuming success.
    */
   send?: (messages: ExpoPushMessage[], options: { deadline: number }) => Promise<ExpoPushDelivery>;
+  /** Direct-FCM sender, injectable so tests never touch Google. */
+  sendFcm?: (messages: FcmDataMessage[]) => Promise<FcmDeliveryReport>;
   /** Wall clock used for the audible budget and quiet hours. */
   now?: () => Date;
   /** Monotonic-ish milliseconds used for the delivery budget. */
@@ -399,6 +409,16 @@ export async function sendChatMessagePush(
   const send =
     deps.send ??
     ((messages, options) => sendExpoPushBatches(messages, { deadline: options.deadline }));
+  const sendFcm =
+    deps.sendFcm ??
+    ((messages: FcmDataMessage[]) =>
+      sendFcmDataMessages(messages, {
+        fetch: (input, init) =>
+          globalThis.fetch(input, {
+            ...init,
+            ...(timeoutSignal(8_000) ? { signal: timeoutSignal(8_000) } : {}),
+          }),
+      }));
   const now = deps.now ?? (() => new Date());
   const clock = deps.clock ?? (() => Date.now());
   const sleep =
@@ -454,13 +474,17 @@ export async function sendChatMessagePush(
   try {
     const communityResult = await db
       .from("communities")
-      .select("name")
+      .select("name, image_url")
       .eq("id", communityId)
       .maybeSingle();
     const communityName =
       (communityResult.data as { name?: string } | null)?.name ?? "New message";
+    // The DP the direct-FCM renderer puts in the notification's avatar slot.
+    const communityImage =
+      (communityResult.data as { image_url?: string | null } | null)?.image_url ?? null;
 
-    const body = `${senderName ?? "Someone"}: ${messagePushPreview({ content, hasImage, isReply })}`;
+    const previewText = messagePushPreview({ content, hasImage, isReply });
+    const body = `${senderName ?? "Someone"}: ${previewText}`;
     const deadTokens = new Set<string>();
     // Ticket IDs Expo accepted this fan-out with, kept only for as long as this
     // call runs: a receipt is looked up from them at the end (see
@@ -510,21 +534,58 @@ export async function sendChatMessagePush(
       // preference, throttle and badge reads are only issued for members that
       // can actually be reached. A member with no tokens is not a recipient in
       // any observable sense, so this is a pure reduction in work.
-      const tokensResult = await db
-        .from("push_tokens")
-        .select("token, user_id")
-        .in("user_id", recipientIds);
+      //
+      // Android devices that registered their raw FCM token get the chat as a
+      // data-only FCM message and draw it natively (community DP on the left).
+      // Their Expo token stays for iOS-style/DM/activity pushes but is skipped
+      // for chat to avoid a second, standard-shaped notification.
+      const directChat = isFcmConfigured();
+      const [tokensResult, fcmResult] = await Promise.all([
+        db
+          .from("push_tokens")
+          .select("token, user_id, platform")
+          .in("user_id", recipientIds),
+        directChat
+          ? db.from("fcm_tokens").select("token, user_id").in("user_id", recipientIds)
+          : Promise.resolve({ data: [] as { token: string; user_id: string }[], error: null }),
+      ]);
 
-      const tokensByUser = new Map<string, string[]>();
-      for (const row of (tokensResult.data ?? []) as { token: string; user_id: string }[]) {
+      const tokensByUser = new Map<string, { token: string; platform: string }[]>();
+      for (const row of (tokensResult.data ?? []) as {
+        token: string;
+        user_id: string;
+        platform?: string;
+      }[]) {
         if (!row.token) continue;
         const list = tokensByUser.get(row.user_id) ?? [];
-        list.push(row.token);
+        list.push({ token: row.token, platform: row.platform ?? "android" });
         tokensByUser.set(row.user_id, list);
       }
-      if (tokensByUser.size === 0) continue;
 
-      const reachableIds = [...tokensByUser.keys()];
+      const fcmTokensByUser = new Map<string, string[]>();
+      let fcmEnabled = directChat;
+      if (fcmResult.error) {
+        // The FCM token migration may not be applied yet: chat falls back to
+        // Expo, which still works, just with the standard notification layout.
+        fcmEnabled = false;
+        logEvent("warn", {
+          event: "push.fcm_tokens_unreadable",
+          error: describeError(fcmResult.error),
+        });
+      } else {
+        for (const row of (fcmResult.data ?? []) as { token: string; user_id: string }[]) {
+          if (!row.token) continue;
+          const list = fcmTokensByUser.get(row.user_id) ?? [];
+          list.push(row.token);
+          fcmTokensByUser.set(row.user_id, list);
+        }
+      }
+
+      if (tokensByUser.size === 0 && fcmTokensByUser.size === 0) continue;
+
+      const reachableIds = [
+        ...new Set([...tokensByUser.keys(), ...fcmTokensByUser.keys()]),
+      ];
       report.reachable += reachableIds.length;
 
       // Three independent reads of the same (bounded) recipient set.
@@ -565,6 +626,11 @@ export async function sendChatMessagePush(
 
       const nowDate = now();
       const messages: ExpoPushMessage[] = [];
+      const fcmMessages: FcmDataMessage[] = [];
+      // Expo messages for Android devices that a direct FCM send covers. Held
+      // back so a provider-wide FCM failure (auth/outage) can still deliver the
+      // standard notification instead of losing the chat.
+      const fallbackExpo: ExpoPushMessage[] = [];
       const throttleUpserts: {
         user_id: string;
         community_id: string;
@@ -573,8 +639,9 @@ export async function sendChatMessagePush(
       }[] = [];
 
       for (const userId of reachableIds) {
-        const userTokens = tokensByUser.get(userId);
-        if (!userTokens || userTokens.length === 0) continue;
+        const userTokens = tokensByUser.get(userId) ?? [];
+        const userFcmTokens = fcmEnabled ? (fcmTokensByUser.get(userId) ?? []) : [];
+        if (userTokens.length === 0 && userFcmTokens.length === 0) continue;
 
         const userPreferences = preferences.get(userId);
         // No row means defaults, which have chat push on.
@@ -607,26 +674,67 @@ export async function sendChatMessagePush(
           });
         }
 
-        for (const token of userTokens) {
-          messages.push({
-            to: token,
-            title: communityName,
-            body,
-            sound: audible ? "default" : null,
+        const badge = badges.get(userId) ?? 0;
+        const expoMessage: ExpoPushMessage = {
+          to: "",
+          title: communityName,
+          body,
+          sound: audible ? "default" : null,
+          channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
+          badge,
+          // One collapsed notification per chat, like WhatsApp's
+          // per-conversation stack, so a busy community can't bury the
+          // notification shade.
+          collapseId: `community-${communityId}`,
+          data: {
+            type: "community_message",
+            communityId,
+            messageId,
+            badge,
+            silent: !audible,
+          },
+        };
+
+        for (const { token, platform } of userTokens) {
+          const message = { ...expoMessage, to: token };
+          // The direct-FCM token already covers this Android device. iOS and
+          // older builds (no FCM token) keep the Expo transport.
+          if (userFcmTokens.length > 0 && platform !== "ios") {
+            fallbackExpo.push(message);
+          } else {
+            messages.push(message);
+          }
+        }
+
+        if (userFcmTokens.length > 0) {
+          const directData: Record<string, string> = {
+            type: "community_message",
+            direct: "1",
+            communityId,
+            communityName,
+            senderName: senderName ?? "Someone",
+            message: previewText,
+            // Title for the foreground fallback through Expo's JS handler;
+            // the native renderer uses communityName + senderName itself.
+            title: `${senderName ?? "Someone"} · ${communityName}`,
+            silent: audible ? "0" : "1",
+            badge: String(badge),
+            messageId,
+            timestamp: String(nowDate.getTime()),
             channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
-            badge: badges.get(userId) ?? 0,
-            // One collapsed notification per chat, like WhatsApp's
-            // per-conversation stack, so a busy community can't bury the
-            // notification shade.
-            collapseId: `community-${communityId}`,
-            data: {
-              type: "community_message",
-              communityId,
-              messageId,
-              badge: badges.get(userId) ?? 0,
-              silent: !audible,
-            },
-          });
+          };
+          if (communityImage) directData.imageUrl = communityImage;
+          directData.avatarInitials = nameInitials(communityName);
+          directData.avatarColor = avatarBackground(communityName);
+
+          for (const token of userFcmTokens) {
+            fcmMessages.push({
+              token,
+              collapseKey: `community-${communityId}`,
+              data: directData,
+              ttlSeconds: 3600,
+            });
+          }
         }
       }
 
@@ -676,6 +784,77 @@ export async function sendChatMessagePush(
         if (failedChunks >= maxConsecutiveFailedChunks) {
           report.truncated = "error";
           break;
+        }
+      }
+
+      // Direct FCM for Android devices with a raw token. A provider-wide
+      // failure (bad credentials, FCM outage) falls back to the Expo transport
+      // for exactly the devices whose Expo message was held back — losing a
+      // chat is worse than the standard notification shape.
+      if (fcmMessages.length > 0) {
+        const fcmReport = await sendFcm(fcmMessages);
+
+        const fcmDelivered = fcmReport.outcomes.filter((outcome) => outcome.ok).length;
+        const deadFcmTokens = fcmReport.outcomes
+          .filter((outcome) => !outcome.ok && outcome.deadToken)
+          .map((outcome) => outcome.token);
+        const useFallback =
+          Boolean(fcmReport.requestError) && fcmDelivered === 0 && fallbackExpo.length > 0;
+
+        if (useFallback) {
+          // Provider-wide failure: the held-back Expo messages replace the FCM
+          // attempt entirely, so its failures are not double-counted.
+          providerError = fcmReport.requestError;
+          try {
+            const fallback = await send(fallbackExpo, { deadline });
+            report.deliveries += fallback.delivered;
+            report.failedPermanent += fallback.permanentFailures;
+            report.failedTransient += fallback.transientFailures;
+            if (fallback.providerError) providerError = fallback.providerError;
+            for (const token of fallback.deadTokens) deadTokens.add(token);
+            for (const ref of fallback.receiptRefs) acceptedTickets.push(ref);
+          } catch (error) {
+            report.failedTransient += fallbackExpo.length;
+            logEvent("error", {
+              event: "push.fcm_fallback_failed",
+              community_id: communityId,
+              recipients: fallbackExpo.length,
+              error: describeError(error),
+            });
+          }
+        } else {
+          report.deliveries += fcmDelivered;
+          for (const outcome of fcmReport.outcomes) {
+            if (outcome.ok) continue;
+            if (outcome.deadToken) report.failedPermanent += 1;
+            else report.failedTransient += 1;
+          }
+          if (fcmReport.requestError) providerError = fcmReport.requestError;
+        }
+
+        if (deadFcmTokens.length > 0) {
+          try {
+            await db.from("fcm_tokens").delete().in("token", deadFcmTokens);
+          } catch (error) {
+            logEvent("warn", {
+              event: "push.fcm_dead_token_cleanup_failed",
+              error: describeError(error),
+            });
+          }
+        }
+      } else if (fallbackExpo.length > 0) {
+        // Defensive: held-back Expo messages should always accompany FCM
+        // messages, but never drop them if that invariant is broken.
+        try {
+          const fallback = await send(fallbackExpo, { deadline });
+          report.deliveries += fallback.delivered;
+          report.failedPermanent += fallback.permanentFailures;
+          report.failedTransient += fallback.transientFailures;
+          if (fallback.providerError) providerError = fallback.providerError;
+          for (const token of fallback.deadTokens) deadTokens.add(token);
+          for (const ref of fallback.receiptRefs) acceptedTickets.push(ref);
+        } catch {
+          report.failedTransient += fallbackExpo.length;
         }
       }
 

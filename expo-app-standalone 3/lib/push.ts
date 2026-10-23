@@ -32,6 +32,9 @@ import { communityStore } from './communityStore';
 /** Where this device's Expo push token is remembered for logout cleanup. */
 const PUSH_TOKEN_KEY = '@push/expo_token';
 
+/** Raw FCM token (Android) — the direct-chat-push channel, for logout cleanup. */
+const FCM_TOKEN_KEY = '@push/fcm_token';
+
 /** Last registration outcome, so the settings screen can explain a failure. */
 const PUSH_STATE_KEY = '@push/last_state';
 
@@ -76,6 +79,9 @@ export interface DirectMessagePushData {
   type: 'dm_message';
   conversationId: string;
   messageId: string;
+  senderId?: string;
+  senderName?: string | null;
+  senderAvatarUrl?: string | null;
   /** True when the server chose not to buzz for this one. */
   silent?: boolean;
 }
@@ -449,11 +455,32 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       return null;
     }
 
+    // Android's raw FCM token is what the server uses to send a data-only
+    // chat push the app can draw itself (community DP on the left). Expo's
+    // token stays registered for iOS, DMs, activity and every fallback.
+    let fcmToken: string | null = null;
+    if (Platform.OS === 'android') {
+      const probe = await probeDeviceToken();
+      fcmToken = probe.token;
+      diagnostics = {
+        ...diagnostics,
+        deviceToken: probe.token,
+        deviceTokenError: probe.error,
+      };
+    }
+
     await AsyncStorage.setItem(PUSH_TOKEN_KEY, token).catch(() => {});
+    if (fcmToken) {
+      await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken).catch(() => {});
+    }
 
     await apiFetch('/api/push/register', {
       method: 'POST',
-      body: { token, platform: Platform.OS },
+      body: {
+        token,
+        platform: Platform.OS,
+        ...(fcmToken ? { fcmToken } : {}),
+      },
     });
 
     diagnostics = {
@@ -581,14 +608,20 @@ export async function clearAppBadgeAsync(): Promise<void> {
  */
 export async function unregisterStoredPushTokenAsync(): Promise<void> {
   try {
-    const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+    const [token, fcmToken] = await Promise.all([
+      AsyncStorage.getItem(PUSH_TOKEN_KEY),
+      AsyncStorage.getItem(FCM_TOKEN_KEY),
+    ]);
     if (token) {
-      await apiFetch('/api/push/register', { method: 'DELETE', body: { token } });
+      await apiFetch('/api/push/register', {
+        method: 'DELETE',
+        body: { token, ...(fcmToken ? { fcmToken } : {}) },
+      });
     }
   } catch {
     /* best-effort — a stale token is re-pointed on the next login anyway */
   } finally {
-    await AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
+    await AsyncStorage.multiRemove([PUSH_TOKEN_KEY, FCM_TOKEN_KEY]).catch(() => {});
     await clearAppBadgeAsync();
   }
 }
