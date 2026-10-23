@@ -5,8 +5,8 @@
  * to draw it (community DP on the left). Expo Push delivers a `notification`
  * payload, which Android's system renderer displays in the background before
  * any app code runs — its layout cannot be changed. A data-only message goes
- * to the app's `FirebaseMessagingService` instead, where the custom builder
- * runs (see the Android ChatFirebaseMessagingService).
+ * to the app's Android FCM service instead, where the custom notification
+ * builder runs (plugins/chat-notifications/ChatFirebaseMessagingService.kt).
  *
  * Auth: FCM v1 wants a Google OAuth token. The service-account JSON is a
  * secret (`FCM_SERVICE_ACCOUNT`, the whole file as one string); we sign a JWT
