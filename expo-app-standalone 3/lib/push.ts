@@ -33,6 +33,7 @@ import {
   type PushTokenPair,
 } from './pushRegistrationCoordinator';
 import { settleAbandonedRegistration } from './pushRegistrationState';
+import { timedOutMessage, withTimeout } from './withTimeout';
 
 /** Where this device's Expo push token is remembered for logout cleanup. */
 const PUSH_TOKEN_KEY = '@push/expo_token';
@@ -142,6 +143,13 @@ const EMPTY_DIAGNOSTICS: PushDiagnostics = {
 };
 
 /**
+ * Expo's token endpoint is a network round trip. Bounded like the OS probe
+ * below: a request the network swallowed would otherwise leave registration
+ * in flight for the life of the process, blocking every later retry.
+ */
+const EXPO_TOKEN_TIMEOUT_MS = 15_000;
+
+/**
  * Mints the underlying device token. On Android this is an FCM token, which
  * cannot be produced without a Firebase configuration in the build — the
  * failure this surfaces is the whole reason the settings screen has a
@@ -152,12 +160,11 @@ async function probeDeviceToken(
   timeoutMs = 8000,
 ): Promise<{ token: string | null; error: string | null }> {
   try {
-    const result = await Promise.race([
+    const result = await withTimeout(
       Notifications.getDevicePushTokenAsync(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`timed out after ${timeoutMs / 1000}s`)), timeoutMs),
-      ),
-    ]);
+      timeoutMs,
+      timedOutMessage(timeoutMs),
+    );
     const token = typeof result?.data === 'string' ? result.data : null;
     return { token, error: token ? null : 'The OS returned no device token.' };
   } catch (error) {
@@ -183,7 +190,7 @@ function describeError(error: unknown): string {
   if (/FirebaseApp|FCM|google-services|Default FirebaseApp/i.test(message)) {
     return `${message} — Android push needs an FCM (Firebase) project wired into the build. See the setup notes in the settings screen.`;
   }
-  if (/network|fetch|timeout/i.test(message)) {
+  if (/network|fetch|timeout|timed out/i.test(message)) {
     return `${message} — the device could not reach Expo's push service.`;
   }
   return message;
@@ -450,7 +457,11 @@ async function acquirePushTokenPair(): Promise<PushTokenPair | null> {
   diagnostics = { ...diagnostics, status: 'registering' };
   await persistDiagnostics();
 
-  const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+  const { data: token } = await withTimeout(
+    Notifications.getExpoPushTokenAsync({ projectId }),
+    EXPO_TOKEN_TIMEOUT_MS,
+    `Expo push token request ${timedOutMessage(EXPO_TOKEN_TIMEOUT_MS)}`,
+  );
   if (!token) {
     diagnostics = {
       ...diagnostics,
