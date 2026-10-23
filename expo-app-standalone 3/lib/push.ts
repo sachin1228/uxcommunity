@@ -660,9 +660,13 @@ export async function clearAppBadgeAsync(): Promise<void> {
  * Detaches this device on logout so the next person to sign in on the phone
  * does not receive the previous account's messages.
  *
- * Must run while the session cookie is still valid — logout clears it.
+ * Must run while the session cookie is still valid — logout clears it. If the
+ * caller's session is replaced before this settles, `shouldClear` prevents the
+ * late local cleanup from deleting the next member's freshly stored token.
  */
-export async function unregisterStoredPushTokenAsync(): Promise<void> {
+export async function unregisterStoredPushTokenAsync(options?: {
+  shouldClear?: () => boolean;
+}): Promise<void> {
   // Abandon any in-flight registration from this account before the device
   // token is detached: a late acquire/post must not re-associate it. If a
   // POST was already on the wire, let it settle briefly so the DELETE below
@@ -689,8 +693,11 @@ export async function unregisterStoredPushTokenAsync(): Promise<void> {
   } catch {
     /* best-effort — a stale token is re-pointed on the next login anyway */
   } finally {
-    await AsyncStorage.multiRemove([PUSH_TOKEN_KEY, FCM_TOKEN_KEY]).catch(() => {});
-    await clearAppBadgeAsync();
+    const canClear = !options?.shouldClear || options.shouldClear();
+    if (canClear) {
+      await AsyncStorage.multiRemove([PUSH_TOKEN_KEY, FCM_TOKEN_KEY]).catch(() => {});
+      await clearAppBadgeAsync();
+    }
   }
 }
 

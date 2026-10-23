@@ -2,9 +2,8 @@
  * Auth API helpers — thin wrappers around the web app's auth endpoints.
  */
 
-import { apiFetch, clearSession } from './api';
+import { apiFetch } from './api';
 import { loginWith } from './loginFlow';
-
 export interface User {
   id: string;
   name: string;
@@ -47,11 +46,10 @@ export async function login(
 // ---------------------------------------------------------------------------
 
 export async function logout(): Promise<void> {
-  try {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
-  } finally {
-    await clearSession();
-  }
+  // Local session teardown belongs to AuthContext's bounded logout sequence.
+  // Keeping a clearSession() in this finally would let a late logout response
+  // erase the cookie of a newer login that superseded it.
+  await apiFetch('/api/auth/logout', { method: 'POST' });
 }
 
 // ---------------------------------------------------------------------------

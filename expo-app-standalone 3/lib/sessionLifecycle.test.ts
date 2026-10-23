@@ -8,6 +8,7 @@ import {
   isUnauthorizedForCurrentSession,
   performLogout,
   settleWithin,
+  shouldApplySessionCookie,
   type LogoutSteps,
   type SignOutSteps,
 } from './sessionLifecycle';
@@ -56,11 +57,33 @@ test('a late validation is not current after sign-out or account replacement', (
 });
 
 test('a stale 401 from the previous cookie is ignored', () => {
-  assert.equal(isUnauthorizedForCurrentSession('token-a', 'token-b'), false);
-  assert.equal(isUnauthorizedForCurrentSession('token-a', null), false);
-  assert.equal(isUnauthorizedForCurrentSession('token-a', undefined), false);
-  assert.equal(isUnauthorizedForCurrentSession(null, 'token-b'), false);
-  assert.equal(isUnauthorizedForCurrentSession('token-b', 'token-b'), true);
+  // User A's request is dispatched with token A / generation 1.
+  const usedToken = 'token-a';
+  const usedGeneration = 1;
+
+  // User A signs out, then User B signs in (generation advances).
+  const currentToken = 'token-b';
+  const currentGeneration = 2;
+  assert.equal(
+    isUnauthorizedForCurrentSession(usedToken, usedGeneration, currentToken, currentGeneration),
+    false,
+  );
+
+  // A request with no session cannot clear a later one either.
+  assert.equal(
+    isUnauthorizedForCurrentSession(null, 1, currentToken, currentGeneration),
+    false,
+  );
+
+  // A current request's 401 is authoritative.
+  assert.equal(
+    isUnauthorizedForCurrentSession(currentToken, currentGeneration, currentToken, currentGeneration),
+    true,
+  );
+
+  // A newer response cannot apply its Set-Cookie over the new session.
+  assert.equal(shouldApplySessionCookie(usedGeneration, currentGeneration), false);
+  assert.equal(shouldApplySessionCookie(currentGeneration, currentGeneration), true);
 });
 
 test('expired-session teardown gates the identity before async clears', async () => {
@@ -264,4 +287,26 @@ test('a hung storage teardown cannot hold logout or re-login forever', async () 
     'clearSession',
     'clearMemberState',
   ]);
+});
+
+test('a late logout response cannot clear or rotate a newer login cookie', () => {
+  const logoutDispatch = { token: 'token-a', generation: 3 };
+  const newLogin = { token: 'token-b', generation: 4 };
+
+  // 401 from the old logout request after B signed in: ignored.
+  assert.equal(
+    isUnauthorizedForCurrentSession(
+      logoutDispatch.token,
+      logoutDispatch.generation,
+      newLogin.token,
+      newLogin.generation,
+    ),
+    false,
+  );
+
+  // Set-Cookie on the old logout response: not applied over B's cookie.
+  assert.equal(
+    shouldApplySessionCookie(logoutDispatch.generation, newLogin.generation),
+    false,
+  );
 });

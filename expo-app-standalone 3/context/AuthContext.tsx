@@ -29,6 +29,7 @@ import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth'
 import {
   clearSession,
   getStoredSession,
+  peekSessionGeneration,
   peekSessionToken,
   subscribeUnauthorized,
 } from '@/lib/api';
@@ -336,7 +337,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // belonging to an older cookie is ignored: it must not clear a newer login.
   useEffect(
     () =>
-      subscribeUnauthorized((usedToken) => {
+      subscribeUnauthorized((usedToken, usedGeneration) => {
         if (
           !userRef.current ||
           loginInFlightRef.current ||
@@ -344,7 +345,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ) {
           return;
         }
-        if (!isUnauthorizedForCurrentSession(usedToken, peekSessionToken())) return;
+        if (
+          !isUnauthorizedForCurrentSession(
+            usedToken,
+            usedGeneration,
+            peekSessionToken(),
+            peekSessionGeneration(),
+          )
+        ) {
+          return;
+        }
         void clearAndSignOut();
       }),
     [clearAndSignOut],
@@ -402,7 +412,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       resetRealtime: resetRealtimeSession,
       markSignedOut: () => applyUser(null),
-      unregisterPush: unregisterStoredPushTokenAsync,
+      unregisterPush: () =>
+        unregisterStoredPushTokenAsync({
+          shouldClear: () => sessionClock.isCurrent(cleanupEpochRef.current),
+        }),
       logoutRequest: apiLogout,
       clearSession,
       clearMemberState: () => clearMemberScopedState(clearSteps),

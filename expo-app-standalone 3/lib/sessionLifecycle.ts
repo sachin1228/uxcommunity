@@ -28,15 +28,34 @@ export function createSessionEpochClock(): SessionEpochClock {
 }
 
 /**
- * A 401 only means "this session ended" when the request used the cookie the
- * app still holds. A response from a request sent under the previous account
- * arrives with an old token and must be ignored.
+ * A 401 only means "this session ended" when the request used the session
+ * generation and cookie the app still holds. A response from a request sent
+ * under a previous account must be ignored even if its cookie value happens to
+ * match (or is null).
  */
 export function isUnauthorizedForCurrentSession(
   usedToken: string | null,
+  usedGeneration: number,
   currentToken: string | null | undefined,
+  currentGeneration: number,
 ): boolean {
-  return currentToken !== undefined && usedToken === currentToken;
+  return (
+    currentToken !== undefined &&
+    usedGeneration === currentGeneration &&
+    usedToken === currentToken
+  );
+}
+
+/**
+ * A response may only rotate the stored cookie if no newer sign-in/sign-out
+ * happened while it was in flight. Otherwise a late logout response could
+ * overwrite the next member's cookie with an expiry/old value.
+ */
+export function shouldApplySessionCookie(
+  dispatchGeneration: number,
+  currentGeneration: number,
+): boolean {
+  return dispatchGeneration === currentGeneration;
 }
 
 export interface MemberStateClearSteps {
