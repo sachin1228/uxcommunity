@@ -96,6 +96,7 @@
     "test:event-timezone": "tsx --test \"expo-app-standalone 3/lib/eventTimezone.test.ts\"",
     "test:mobile-realtime": "tsx --test \"expo-app-standalone 3/lib/realtimeCore.test.ts\" \"expo-app-standalone 3/lib/realtimeCatchUp.test.ts\" \"expo-app-standalone 3/lib/realtimeWindow.test.ts\" \"expo-app-standalone 3/lib/realtimeScale.test.ts\" \"expo-app-standalone 3/lib/realtimeAuth.test.ts\"",
     "test:mobile-cache": "tsx --test \"expo-app-standalone 3/lib/nameCache.test.ts\"",
+    "test:mobile-screen-cache": "tsx --test \"expo-app-standalone 3/lib/screenDataCache.test.ts\" \"expo-app-standalone 3/lib/profileCache.test.ts\"",
     "test:mobile-bootstrap": "tsx --test \"expo-app-standalone 3/lib/communityBootstrap.test.ts\"",
     "test:mobile-chat-cache": "tsx --test \"expo-app-standalone 3/lib/chatCache.test.ts\"",
     "test:mobile-chat-content": "tsx --test \"expo-app-standalone 3/lib/chatContentEvents.test.ts\" \"expo-app-standalone 3/lib/readManager.test.ts\"",

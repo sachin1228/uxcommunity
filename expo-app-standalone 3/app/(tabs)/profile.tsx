@@ -34,6 +34,15 @@ import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
+import { fetchScreenData, peekScreenData, readScreenData, writeScreenData } from '@/lib/screenDataCacheStore';
+import { mergeUniquePage, SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
+import {
+  ownProfileCacheSnapshot,
+  ownProfileFromCache,
+  ownProfileFromServer,
+  type OwnProfileSnapshot,
+  type OwnProfileView,
+} from '@/lib/profileCache';
 
 /**
  * Profile — the member's own profile, mirroring the web /dashboard/profile:
@@ -82,16 +91,48 @@ const EMPTY_STATE: Record<ProfileFeedScope, { title: string; body: string }> = {
   },
 };
 
+interface ProfileFeedSnapshot {
+  items: FeedItem[];
+  hasMore: boolean;
+}
+
+const OWN_PROFILE_CACHE_KEY = 'own-profile:hero';
+
+function profileFeedCacheKey(scope: ProfileFeedScope): string {
+  return `profile-feed:${scope}`;
+}
+
 export default function ProfileScreen() {
+  const { user, sessionEpoch } = useAuth();
+  const userId = user?.id ?? null;
+  return (
+    <ProfileTabSession
+      key={`${userId ?? 'signed-out'}:${sessionEpoch}`}
+      userId={userId}
+      sessionEpoch={sessionEpoch}
+    />
+  );
+}
+
+function ProfileTabSession({
+  userId,
+  sessionEpoch,
+}: {
+  userId: string | null;
+  sessionEpoch: number;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const actions = useContentActions();
 
   // ── Hero data ──
-  const [profile, setProfile] = useState<OwnProfile | null>(null);
+  const [profile, setProfile] = useState<OwnProfileView | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+  const profileSequenceRef = useRef(0);
+  const profileCacheReadyRef = useRef(false);
 
   // ── Activity feed ──
   const [scope, setScope] = useState<ProfileFeedScope>('all');
@@ -106,6 +147,14 @@ export default function ProfileScreen() {
   const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   /** The activity row whose editor is open (owner-only; null when closed). */
   const [editing, setEditing] = useState<FeedItem | null>(null);
+  const itemsRef = useRef(items);
+  const hasMoreRef = useRef(hasMore);
+  const requestSequenceRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const readyScopeRef = useRef<string | null>(null);
+  const cacheSessionKey = `${userId ?? ''}:${sessionEpoch}`;
+  itemsRef.current = items;
+  hasMoreRef.current = hasMore;
 
   // ── Hero edit flows ──
   const [avatarPick, setAvatarPick] = useState<PreparedImage | null>(null);
@@ -117,39 +166,174 @@ export default function ProfileScreen() {
   // ── Header menu ──
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const commitProfile = useCallback((next: OwnProfileView, persist = true) => {
+    profileRef.current = next;
+    setProfile(next);
+    if (persist && userId && profileCacheReadyRef.current) {
+      const safeSnapshot = ownProfileCacheSnapshot(next);
+      void writeScreenData(
+        userId,
+        OWN_PROFILE_CACHE_KEY,
+        sessionEpoch,
+        safeSnapshot,
+        SCREEN_CACHE_TTL_MS.ownProfile,
+      );
+    }
+  }, [sessionEpoch, userId]);
+
+  const commitFeed = useCallback(
+    (targetScope: ProfileFeedScope, nextItems: FeedItem[], nextHasMore: boolean, persist = true) => {
+      itemsRef.current = nextItems;
+      hasMoreRef.current = nextHasMore;
+      setItems(nextItems);
+      setHasMore(nextHasMore);
+      if (persist && userId && readyScopeRef.current === `${cacheSessionKey}:${targetScope}`) {
+        void writeScreenData(
+          userId,
+          profileFeedCacheKey(targetScope),
+          sessionEpoch,
+          { items: nextItems, hasMore: nextHasMore },
+          SCREEN_CACHE_TTL_MS.profileFeed,
+        );
+      }
+    },
+    [cacheSessionKey, sessionEpoch, userId],
+  );
+
+  const persistCardMutation = useCallback(
+    (source: CommunityContent, patch: Record<string, unknown>) => {
+      requestSequenceRef.current += 1;
+      setRefreshing(false);
+      const next = itemsRef.current.map((item) =>
+        item.id === source.id && item.community_id === source.community_id
+          ? { ...item, ...patch }
+          : item,
+      );
+      commitFeed(scopeRef.current, next, hasMoreRef.current);
+      setSelected((selectedItem) =>
+        selectedItem?.id === source.id && selectedItem.community_id === source.community_id
+          ? ({ ...selectedItem, ...patch } as FeedItem)
+          : selectedItem,
+      );
+    },
+    [commitFeed],
+  );
+
+  const actions = useContentActions(persistCardMutation);
   const resetActions = actions.reset;
 
   const loadProfile = useCallback(async () => {
+    if (!userId) return;
+    const sequence = ++profileSequenceRef.current;
+    let cachedPainted = false;
+    let networkSucceeded = false;
+    const isCurrent = () => profileSequenceRef.current === sequence;
+    const memory = peekScreenData<OwnProfileSnapshot>(
+      userId,
+      OWN_PROFILE_CACHE_KEY,
+      sessionEpoch,
+      SCREEN_CACHE_TTL_MS.ownProfile,
+    );
+    if (memory) {
+      cachedPainted = true;
+      profileCacheReadyRef.current = true;
+      commitProfile(ownProfileFromCache(memory.data), false);
+    }
+    void readScreenData<OwnProfileSnapshot>(
+      userId,
+      OWN_PROFILE_CACHE_KEY,
+      sessionEpoch,
+      SCREEN_CACHE_TTL_MS.ownProfile,
+    ).then((snapshot) => {
+      if (!snapshot || cachedPainted || networkSucceeded || !isCurrent()) return;
+      cachedPainted = true;
+      profileCacheReadyRef.current = true;
+      commitProfile(ownProfileFromCache(snapshot.data), false);
+    });
     try {
-      setProfile(await getOwnProfile());
+      const result = await fetchScreenData(
+        userId,
+        OWN_PROFILE_CACHE_KEY,
+        sessionEpoch,
+        SCREEN_CACHE_TTL_MS.ownProfile,
+        getOwnProfile,
+        ownProfileCacheSnapshot,
+      );
+      if (!result.accepted || !isCurrent()) return;
+      networkSucceeded = true;
+      profileCacheReadyRef.current = true;
+      commitProfile(ownProfileFromServer(result.data));
       setProfileError(null);
     } catch {
-      setProfileError('Couldn\u2019t load your profile. Pull to retry.');
+      if (isCurrent()) setProfileError('Couldn\u2019t load your profile. Pull to retry.');
     }
-  }, []);
+  }, [commitProfile, sessionEpoch, userId]);
 
   const loadFeed = useCallback(
     async (targetScope: ProfileFeedScope, mode: 'initial' | 'refresh') => {
-      if (mode === 'initial') setFeedLoading(true);
-      else setRefreshing(true);
+      if (!userId) {
+        setFeedLoading(false);
+        setFeedError('Sign in to load your posts.');
+        return;
+      }
+      const sequence = ++requestSequenceRef.current;
+      const cacheKey = profileFeedCacheKey(targetScope);
+      const cacheIdentity = `${cacheSessionKey}:${targetScope}`;
+      let cachedPainted = false;
+      let networkSucceeded = false;
+      const isCurrent = () => requestSequenceRef.current === sequence && scopeRef.current === targetScope;
+      if (mode === 'initial') {
+        setRefreshing(false);
+        const memory = peekScreenData<ProfileFeedSnapshot>(userId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.profileFeed);
+        if (memory) {
+          cachedPainted = true;
+          readyScopeRef.current = cacheIdentity;
+          commitFeed(targetScope, memory.data.items, memory.data.hasMore, false);
+          setFeedLoading(false);
+          resetActions();
+          if (memory.isFresh) {
+            setFeedError(null);
+            return;
+          }
+        } else {
+          setFeedLoading(true);
+        }
+        void readScreenData<ProfileFeedSnapshot>(userId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.profileFeed).then((snapshot) => {
+          if (!snapshot || cachedPainted || networkSucceeded || !isCurrent()) return;
+          cachedPainted = true;
+          readyScopeRef.current = cacheIdentity;
+          commitFeed(targetScope, snapshot.data.items, snapshot.data.hasMore, false);
+          resetActions();
+          setFeedLoading(false);
+        });
+      } else {
+        setRefreshing(true);
+      }
       setFeedError(null);
       try {
-        const page = await getProfileFeed(targetScope);
-        if (scopeRef.current !== targetScope) return;
-        setItems(page.items);
-        setHasMore(page.hasMore);
+        const result = await fetchScreenData(
+          userId,
+          cacheKey,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.profileFeed,
+          () => getProfileFeed(targetScope),
+        );
+        if (!result.accepted || !isCurrent()) return;
+        networkSucceeded = true;
+        readyScopeRef.current = cacheIdentity;
+        commitFeed(targetScope, result.data.items, result.data.hasMore);
         resetActions();
       } catch (e) {
-        if (scopeRef.current !== targetScope) return;
+        if (!isCurrent()) return;
         setFeedError(e instanceof Error ? e.message : 'Failed to load your posts.');
       } finally {
-        if (scopeRef.current === targetScope) {
+        if (isCurrent()) {
           setFeedLoading(false);
           setRefreshing(false);
         }
       }
     },
-    [resetActions],
+    [cacheSessionKey, commitFeed, resetActions, sessionEpoch, userId],
   );
 
   // Refetch the hero (an identity edit happened in Settings, a company may be
@@ -165,24 +349,23 @@ export default function ProfileScreen() {
   );
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || feedLoading || !hasMore || items.length === 0) return;
+    if (loadingMoreRef.current || feedLoading || !hasMoreRef.current || itemsRef.current.length === 0 || !userId) return;
     const target = scopeRef.current;
-    const last = items[items.length - 1];
+    const last = itemsRef.current[itemsRef.current.length - 1];
+    const sequence = requestSequenceRef.current;
     setLoadingMore(true);
+    loadingMoreRef.current = true;
     try {
       const page = await getProfileFeed(target, last.created_at);
-      if (scopeRef.current !== target) return;
-      setItems((current) => {
-        const seen = new Set(current.map(feedItemKey));
-        return [...current, ...page.items.filter((item) => !seen.has(feedItemKey(item)))];
-      });
-      setHasMore(page.hasMore);
+      if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
+      commitFeed(target, mergeUniquePage(itemsRef.current, page.items, feedItemKey), page.hasMore);
     } catch {
       // Leave the feed as-is; the user can pull to retry.
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [feedLoading, hasMore, items, loadingMore]);
+  }, [commitFeed, feedLoading, userId]);
 
   // Poll tallies for the threads in this feed. Only communities with a visible
   // poll are subscribed — a feed of plain posts opens no sockets.
@@ -191,8 +374,14 @@ export default function ProfileScreen() {
 
   const handlePollEvent = useCallback(
     (event: ThreadPollEvent) => {
-      const me = user?.id ?? '';
-      setItems((current) => applyPollEventToFeed(current, event, me));
+      const me = userId ?? '';
+      requestSequenceRef.current += 1;
+      setRefreshing(false);
+      commitFeed(
+        scopeRef.current,
+        applyPollEventToFeed(itemsRef.current, event, me),
+        hasMoreRef.current,
+      );
       setSelected((current) => {
         if (!current || current.id !== event.threadId) return current;
         return applyPollEventToFeed([current], event, me)[0] ?? current;
@@ -206,7 +395,7 @@ export default function ProfileScreen() {
         mine: event.userId !== null && event.userId === me,
       });
     },
-    [applyPollUpdate, user?.id],
+    [applyPollUpdate, commitFeed, userId],
   );
 
   // A reconnected room missed events while it was down; settle from the API.
@@ -223,30 +412,32 @@ export default function ProfileScreen() {
   const handleScopeChange = useCallback(
     (next: ProfileFeedScope) => {
       if (next === scope) return;
+      requestSequenceRef.current += 1;
       setScope(next);
       scopeRef.current = next;
-      setItems([]);
+      commitFeed(next, [], true, false);
       setSelected(null);
       void loadFeed(next, 'initial');
     },
-    [loadFeed, scope],
+    [commitFeed, loadFeed, scope],
   );
 
   // The comment count is the only route into a post's own page, where the
   // comments live under the post itself; the card body just double-tap likes.
   const openItem = useCallback(
     (item: CommunityContent) => {
-      const match = items.find((entry) => entry.id === item.id);
+      const match = itemsRef.current.find((entry) => entry.id === item.id);
       setSelected(match ?? null);
     },
-    [items],
+    [],
   );
 
   // An edit response carries the post's own fields, not the feed row's
   // `_type` / community attribution — keep the row's copy of those.
   const replaceItem = useCallback((saved: CommunityContent) => {
-    setItems((current) =>
-      current.map((entry) =>
+    requestSequenceRef.current += 1;
+    setRefreshing(false);
+    const next = itemsRef.current.map((entry) =>
         entry.id === saved.id
           ? {
               ...entry,
@@ -256,8 +447,8 @@ export default function ProfileScreen() {
               community_image: entry.community_image,
             }
           : entry,
-      ),
-    );
+      );
+    commitFeed(scopeRef.current, next, hasMoreRef.current);
     setSelected((current) =>
       current && current.id === saved.id
         ? {
@@ -270,24 +461,28 @@ export default function ProfileScreen() {
         : current,
     );
     setEditing(null);
-  }, []);
+  }, [commitFeed]);
 
   const editItem = useCallback(
     (entry: CommunityContent) => {
-      const row = items.find((item) => item.id === entry.id);
+      const row = itemsRef.current.find((item) => item.id === entry.id);
       if (row) setEditing(row);
     },
-    [items],
+    [],
   );
 
   const deleteItem = useCallback(
     async (entry: CommunityContent) => {
-      const row = items.find((item) => item.id === entry.id);
+      const row = itemsRef.current.find((item) => item.id === entry.id);
       if (!row?.community_id) return;
       const kind = feedItemKind(row);
       await deleteCommunityContent(row.community_id, kind, row.id);
-      setItems((current) =>
-        current.filter((item) => !(item.id === row.id && item._type === row._type)),
+      requestSequenceRef.current += 1;
+      setRefreshing(false);
+      commitFeed(
+        scopeRef.current,
+        itemsRef.current.filter((item) => !(item.id === row.id && item._type === row._type)),
+        hasMoreRef.current,
       );
       setSelected((current) =>
         current?.id === row.id && current._type === row._type ? null : current,
@@ -299,7 +494,7 @@ export default function ProfileScreen() {
         contentKind: chatContentKindForTab(kind),
       });
     },
-    [items],
+    [commitFeed],
   );
 
   // ── Change picture — the OS library sheet is the file chooser, then the
@@ -339,11 +534,10 @@ export default function ProfileScreen() {
     setAvatarError(null);
     try {
       const avatarUrl = await uploadAvatar(avatarPick);
-      setProfile((current) =>
-        current?.profile
-          ? { ...current, profile: { ...current.profile, avatar_url: avatarUrl } }
-          : current,
-      );
+      const current = profileRef.current;
+      if (current?.profile) {
+        commitProfile({ ...current, profile: { ...current.profile, avatar_url: avatarUrl } });
+      }
       setAvatarPick(null);
     } catch (e) {
       // A server rejection carries its own copy; anything else is the wire.
@@ -354,21 +548,22 @@ export default function ProfileScreen() {
     } finally {
       setAvatarSaving(false);
     }
-  }, [avatarPick, avatarSaving]);
+  }, [avatarPick, avatarSaving, commitProfile]);
 
   const handleLinkSaved = useCallback((field: 'linkedin_url' | 'portfolio_url', url: string) => {
-    setProfile((current) =>
-      current?.profile ? { ...current, profile: { ...current.profile, [field]: url || null } } : current,
-    );
+    const current = profileRef.current;
+    if (current?.profile) {
+      commitProfile({ ...current, profile: { ...current.profile, [field]: url || null } });
+    }
     setLinkModal(null);
-  }, []);
+  }, [commitProfile]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: FeedItem; index: number }) => (
       <ContentCard
         item={item}
         kind={feedItemKind(item)}
-        currentUserId={user?.id ?? ''}
+        currentUserId={userId ?? ''}
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
@@ -379,7 +574,7 @@ export default function ProfileScreen() {
         videoRank={index}
       />
     ),
-    [actions, deleteItem, editItem, openItem, selected, user?.id, visibleKeys],
+    [actions, deleteItem, editItem, openItem, selected, userId, visibleKeys],
   );
 
   const body = profile?.profile;
@@ -542,7 +737,7 @@ export default function ProfileScreen() {
       <ContentDetail
         item={selected}
         kind={selected ? feedItemKind(selected) : 'threads'}
-        currentUserId={user?.id ?? ''}
+        currentUserId={userId ?? ''}
         actions={actions}
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}

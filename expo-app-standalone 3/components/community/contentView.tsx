@@ -226,12 +226,19 @@ function serverPollState(thread: CommunityThread): PollViewState | null {
  * never overwrite a newer intent. The community is read from the item, which
  * lets the home feed mix posts from many communities in one list.
  */
-export function useContentActions(): ContentActionsApi {
+export function useContentActions(
+  onCacheMutation?: (item: CommunityContent, patch: Record<string, unknown>) => void,
+): ContentActionsApi {
   const [overrides, setOverrides] = useState<Record<string, ActionOverride>>({});
   const [pollOverrides, setPollOverrides] = useState<Record<string, PollViewState>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [lastError, setLastError] = useState<string | null>(null);
   const coalescersRef = useRef(new Map<string, BooleanIntentCoalescer>());
+  const onCacheMutationRef = useRef(onCacheMutation);
+
+  useEffect(() => {
+    onCacheMutationRef.current = onCacheMutation;
+  }, [onCacheMutation]);
 
   useEffect(() => {
     const coalescers = coalescersRef.current;
@@ -279,6 +286,11 @@ export function useContentActions(): ContentActionsApi {
                 [overrideKey]: { value: result.value, count: result.count },
               }));
             }
+            const patch: Record<string, unknown> = { [definition.field]: result.value };
+            if (definition.countField && typeof result.count === 'number') {
+              patch[definition.countField] = result.count;
+            }
+            onCacheMutationRef.current?.(item, patch);
             return result.value;
           },
           onError: (error) => {
@@ -388,6 +400,11 @@ export function useContentActions(): ContentActionsApi {
 
       try {
         const result = await voteOnThreadPoll(item.community_id, item.id, optionIndex);
+        onCacheMutationRef.current?.(item, {
+          poll_vote_counts: result.counts,
+          poll_user_vote: result.userVote,
+          poll_undo_used: result.undoUsed,
+        });
         setPollOverrides((state) => ({
           ...state,
           [key]: {
@@ -434,6 +451,11 @@ export function useContentActions(): ContentActionsApi {
 
       try {
         const result = await voteOnThreadPoll(item.community_id, item.id, null);
+        onCacheMutationRef.current?.(item, {
+          poll_vote_counts: result.counts,
+          poll_user_vote: result.userVote,
+          poll_undo_used: result.undoUsed,
+        });
         setPollOverrides((state) => ({
           ...state,
           [key]: {

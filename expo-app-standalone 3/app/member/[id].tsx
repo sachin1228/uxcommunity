@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -49,6 +49,14 @@ import {
   type MemberFeedScope,
 } from '@/lib/profileFeed';
 import { getMemberProfile, type MemberProfile } from '@/lib/profile';
+import {
+  fetchScreenData,
+  invalidateScreenData,
+  peekScreenData,
+  readScreenData,
+  writeScreenData,
+} from '@/lib/screenDataCacheStore';
+import { mergeUniquePage, SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
 
 /** The FlatList content's gutter — the dot band cancels it to run full-bleed. */
 const LIST_PADDING = 12;
@@ -80,17 +88,49 @@ const EMPTY_STATE: Record<MemberFeedScope, { title: string; body: string }> = {
   },
 };
 
+interface MemberFeedSnapshot {
+  items: FeedItem[];
+  hasMore: boolean;
+}
+
+function memberFeedCacheKey(memberId: string): string {
+  return `member-feed:${memberId}:all`;
+}
+
 export default function MemberProfileScreen() {
+  const { user, sessionEpoch } = useAuth();
+  const { id: memberId } = useLocalSearchParams<{ id: string }>();
+  const viewerId = user?.id ?? null;
+  return (
+    <MemberProfileSession
+      key={`${viewerId ?? 'signed-out'}:${sessionEpoch}:${memberId ?? ''}`}
+      viewerId={viewerId}
+      sessionEpoch={sessionEpoch}
+      memberId={memberId}
+    />
+  );
+}
+
+function MemberProfileSession({
+  viewerId,
+  sessionEpoch,
+  memberId,
+}: {
+  viewerId: string | null;
+  sessionEpoch: number;
+  memberId?: string;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
-  const { id: memberId } = useLocalSearchParams<{ id: string }>();
-  const actions = useContentActions();
 
   const [member, setMember] = useState<MemberProfile | null>(null);
+  const memberRef = useRef<MemberProfile | null>(null);
+  memberRef.current = member;
+  const [memberAuthoritative, setMemberAuthoritative] = useState(false);
   const [memberLoading, setMemberLoading] = useState(true);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const memberRequestRef = useRef(0);
 
   const scopeRef = useRef<MemberFeedScope>(MEMBER_FEED_SCOPE);
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -101,86 +141,181 @@ export default function MemberProfileScreen() {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
   const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
+  const itemsRef = useRef(items);
+  const hasMoreRef = useRef(hasMore);
+  const feedRequestRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const feedReadyRef = useRef(false);
+  itemsRef.current = items;
+  hasMoreRef.current = hasMore;
 
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
   const [unblocking, setUnblocking] = useState(false);
 
+  const commitFeed = useCallback((nextItems: FeedItem[], nextHasMore: boolean, persist = true) => {
+    itemsRef.current = nextItems;
+    hasMoreRef.current = nextHasMore;
+    setItems(nextItems);
+    setHasMore(nextHasMore);
+    if (persist && viewerId && memberId && feedReadyRef.current) {
+      void writeScreenData(
+        viewerId,
+        memberFeedCacheKey(memberId),
+        sessionEpoch,
+        { items: nextItems, hasMore: nextHasMore },
+        SCREEN_CACHE_TTL_MS.memberFeed,
+      );
+    }
+  }, [memberId, sessionEpoch, viewerId]);
+
+  const persistCardMutation = useCallback(
+    (source: CommunityContent, patch: Record<string, unknown>) => {
+      feedRequestRef.current += 1;
+      const next = itemsRef.current.map((item) =>
+        item.id === source.id && item.community_id === source.community_id
+          ? { ...item, ...patch }
+          : item,
+      );
+      commitFeed(next, hasMoreRef.current);
+      setSelected((selectedItem) =>
+        selectedItem?.id === source.id && selectedItem.community_id === source.community_id
+          ? ({ ...selectedItem, ...patch } as FeedItem)
+          : selectedItem,
+      );
+    },
+    [commitFeed],
+  );
+  const actions = useContentActions(persistCardMutation);
   const resetActions = actions.reset;
 
   const loadMember = useCallback(async () => {
-    if (!memberId) return;
+    if (!memberId || !viewerId) return;
+    const sequence = ++memberRequestRef.current;
+    const isCurrent = () => memberRequestRef.current === sequence;
+    setMemberAuthoritative(false);
     setMemberLoading(true);
+    setMessageError(null);
+    // The API may omit the entire profile when its owner blocked this viewer.
+    // Hide any prior projection while authorization is rechecked; cached
+    // profile content must never stand in for that server decision.
+    memberRef.current = null;
+    setMember(null);
     try {
-      setMember(await getMemberProfile(memberId));
+      const result = await getMemberProfile(memberId);
+      if (!isCurrent()) return;
+      memberRef.current = result;
+      setMember(result);
+      setMemberAuthoritative(true);
       setMemberError(null);
+      if (result.blockedViewer || result.blockedByMe) {
+        void invalidateScreenData(viewerId, memberFeedCacheKey(memberId));
+      }
     } catch (e) {
+      if (!isCurrent()) return;
       setMemberError(e instanceof Error ? e.message : 'Couldn\u2019t load this profile.');
     } finally {
-      setMemberLoading(false);
+      if (isCurrent()) setMemberLoading(false);
     }
-  }, [memberId]);
+  }, [memberId, sessionEpoch, viewerId]);
 
   const loadFeed = useCallback(
     async (targetScope: MemberFeedScope, mode: 'initial' | 'refresh') => {
       if (!memberId) return;
-      if (mode === 'initial') setFeedLoading(true);
-      else setRefreshing(true);
+      if (!viewerId || !memberAuthoritative || member?.blockedViewer || member?.blockedByMe) return;
+      const sequence = ++feedRequestRef.current;
+      const isCurrent = () => feedRequestRef.current === sequence && scopeRef.current === targetScope;
+      let cachedPainted = false;
+      let networkSucceeded = false;
+      const cacheKey = memberFeedCacheKey(memberId);
+      if (mode === 'refresh') setRefreshing(true);
       setFeedError(null);
+      if (mode === 'initial') {
+        setRefreshing(false);
+        const memory = peekScreenData<MemberFeedSnapshot>(viewerId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.memberFeed);
+        if (memory) {
+          cachedPainted = true;
+          feedReadyRef.current = true;
+          commitFeed(memory.data.items, memory.data.hasMore, false);
+          setFeedLoading(false);
+          resetActions();
+          if (memory.isFresh) {
+            setFeedError(null);
+            return;
+          }
+        } else {
+          setFeedLoading(true);
+        }
+        void readScreenData<MemberFeedSnapshot>(viewerId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.memberFeed).then((snapshot) => {
+          if (!snapshot || cachedPainted || networkSucceeded || !isCurrent()) return;
+          cachedPainted = true;
+          feedReadyRef.current = true;
+          commitFeed(snapshot.data.items, snapshot.data.hasMore, false);
+          resetActions();
+          setFeedLoading(false);
+        });
+      }
       try {
-        const page = await getProfileFeed(targetScope, undefined, memberId);
-        if (scopeRef.current !== targetScope) return;
-        setItems(page.items);
-        setHasMore(page.hasMore);
+        const result = await fetchScreenData(
+          viewerId,
+          cacheKey,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.memberFeed,
+          () => getProfileFeed(targetScope, undefined, memberId),
+        );
+        if (!result.accepted || !isCurrent()) return;
+        networkSucceeded = true;
+        feedReadyRef.current = true;
+        commitFeed(result.data.items, result.data.hasMore);
         resetActions();
       } catch (e) {
-        if (scopeRef.current !== targetScope) return;
+        if (!isCurrent()) return;
         setFeedError(e instanceof Error ? e.message : 'Failed to load this feed.');
       } finally {
-        if (scopeRef.current === targetScope) {
+        if (isCurrent()) {
           setFeedLoading(false);
           setRefreshing(false);
         }
       }
     },
-    [memberId, resetActions],
+    [commitFeed, member?.blockedByMe, member?.blockedViewer, memberAuthoritative, memberId, resetActions, sessionEpoch, viewerId],
   );
 
+  // Activity can hydrate from cache only after this viewer/member block
+  // relationship has been confirmed by the API.
   useEffect(() => {
-    setItems([]);
-    setMember(null);
-    void loadMember();
-  }, [loadMember]);
-
-  // The feed waits for the identity: a blocked pair has no activity to show.
-  useEffect(() => {
-    if (!member || member.blockedViewer) return;
+    if (!member || !memberAuthoritative || member.blockedViewer) return;
     if (member.blockedByMe) {
       setFeedLoading(false);
       return;
     }
     void loadFeed(scopeRef.current, 'initial');
-  }, [member, loadFeed]);
+  }, [member, memberAuthoritative, loadFeed]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMember();
+    }, [loadMember]),
+  );
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || feedLoading || !hasMore || items.length === 0 || !memberId) return;
+    if (loadingMoreRef.current || feedLoading || !hasMoreRef.current || itemsRef.current.length === 0 || !memberId || !viewerId || !memberAuthoritative) return;
     const target = scopeRef.current;
-    const last = items[items.length - 1];
+    const last = itemsRef.current[itemsRef.current.length - 1];
+    const sequence = feedRequestRef.current;
     setLoadingMore(true);
+    loadingMoreRef.current = true;
     try {
       const page = await getProfileFeed(target, last.created_at, memberId);
-      if (scopeRef.current !== target) return;
-      setItems((current) => {
-        const seen = new Set(current.map(feedItemKey));
-        return [...current, ...page.items.filter((item) => !seen.has(feedItemKey(item)))];
-      });
-      setHasMore(page.hasMore);
+      if (scopeRef.current !== target || feedRequestRef.current !== sequence) return;
+      commitFeed(mergeUniquePage(itemsRef.current, page.items, feedItemKey), page.hasMore);
     } catch {
       // Leave the feed as-is; the member can pull to retry.
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [feedLoading, hasMore, items, loadingMore, memberId]);
+  }, [commitFeed, feedLoading, memberAuthoritative, memberId, viewerId]);
 
   // Poll tallies for the threads in this member's feed. Only communities with a
   // visible poll are subscribed — a feed of plain posts opens no sockets.
@@ -189,8 +324,12 @@ export default function MemberProfileScreen() {
 
   const handlePollEvent = useCallback(
     (event: ThreadPollEvent) => {
-      const me = user?.id ?? '';
-      setItems((current) => applyPollEventToFeed(current, event, me));
+      const me = viewerId ?? '';
+      feedRequestRef.current += 1;
+      commitFeed(
+        applyPollEventToFeed(itemsRef.current, event, me),
+        hasMoreRef.current,
+      );
       setSelected((current) => {
         if (!current || current.id !== event.threadId) return current;
         return applyPollEventToFeed([current], event, me)[0] ?? current;
@@ -204,7 +343,7 @@ export default function MemberProfileScreen() {
         mine: event.userId !== null && event.userId === me,
       });
     },
-    [applyPollUpdate, user?.id],
+    [applyPollUpdate, commitFeed, viewerId],
   );
 
   // A reconnected room missed events while it was down; settle from the API.
@@ -222,10 +361,10 @@ export default function MemberProfileScreen() {
   // comments live under the post itself; the card body just double-tap likes.
   const openItem = useCallback(
     (item: CommunityContent) => {
-      const match = items.find((entry) => entry.id === item.id);
+      const match = itemsRef.current.find((entry) => entry.id === item.id);
       setSelected(match ?? null);
     },
-    [items],
+    [],
   );
 
   const openMessage = useCallback(async () => {
@@ -257,7 +396,11 @@ export default function MemberProfileScreen() {
     setUnblocking(true);
     try {
       await unblockUser(memberId);
-      setMember((current) => (current ? { ...current, blockedByMe: false } : current));
+      setMember((current) => {
+        const next = current ? { ...current, blockedByMe: false } : current;
+        memberRef.current = next;
+        return next;
+      });
     } catch {
       setMessageError('The block could not be removed. Please try again.');
     } finally {
@@ -270,7 +413,7 @@ export default function MemberProfileScreen() {
       <ContentCard
         item={item}
         kind={feedItemKind(item)}
-        currentUserId={user?.id ?? ''}
+        currentUserId={viewerId ?? ''}
         actions={actions}
         communityName={item.community_name}
         communityImage={item.community_image}
@@ -279,7 +422,7 @@ export default function MemberProfileScreen() {
         videoRank={index}
       />
     ),
-    [actions, items, openItem, selected, user?.id, visibleKeys],
+    [actions, items, openItem, selected, viewerId, visibleKeys],
   );
 
   const body = member?.profile;
@@ -304,7 +447,12 @@ export default function MemberProfileScreen() {
         onMessage={() => void openMessage()}
         onUnblock={() => void handleUnblock()}
         unblocking={unblocking}
+        actionsDisabled={!memberAuthoritative}
       />
+
+      {memberError && member ? (
+        <Text style={[styles.messageError, { color: colors.destructive }]}>{memberError}</Text>
+      ) : null}
 
       {messageError ? (
         <Text style={[styles.messageError, { color: colors.destructive }]}>{messageError}</Text>
@@ -312,8 +460,8 @@ export default function MemberProfileScreen() {
     </View>
   );
 
-  const unavailable = member?.blockedViewer;
-  const showFeed = Boolean(member) && !member?.blockedViewer && !member?.blockedByMe;
+  const unavailable = memberAuthoritative && member?.blockedViewer;
+  const showFeed = memberAuthoritative && Boolean(member) && !member?.blockedViewer && !member?.blockedByMe;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -383,11 +531,8 @@ export default function MemberProfileScreen() {
           refreshControl={
             showFeed ? (
               <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  void loadMember();
-                  void loadFeed(scopeRef.current, 'refresh');
-                }}
+                refreshing={refreshing || memberLoading}
+                onRefresh={() => void loadMember()}
                 tintColor={colors.foregroundMuted}
               />
             ) : undefined
@@ -400,7 +545,11 @@ export default function MemberProfileScreen() {
             ) : null
           }
           ListEmptyComponent={
-            !showFeed ? null : feedLoading ? (
+            !memberAuthoritative ? (
+              <View style={styles.centerSmall}>
+                <ActivityIndicator color={colors.foregroundMuted} />
+              </View>
+            ) : !showFeed ? null : feedLoading ? (
               <View style={styles.centerSmall}>
                 <ActivityIndicator color={colors.accent} />
               </View>
@@ -436,7 +585,7 @@ export default function MemberProfileScreen() {
       <ContentDetail
         item={selected}
         kind={selected ? feedItemKind(selected) : 'threads'}
-        currentUserId={user?.id ?? ''}
+        currentUserId={viewerId ?? ''}
         actions={actions}
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}

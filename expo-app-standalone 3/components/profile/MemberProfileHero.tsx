@@ -28,6 +28,8 @@ interface Props {
   onMessage: () => void;
   onUnblock: () => void;
   unblocking?: boolean;
+  /** Disable member actions until the server confirms profile access. */
+  actionsDisabled?: boolean;
 }
 
 function externalUrl(value: string | null | undefined): string | null {
@@ -55,6 +57,7 @@ export function MemberProfileHero({
   onMessage,
   onUnblock,
   unblocking,
+  actionsDisabled = false,
 }: Props) {
   const colors = useColors();
   const linkedin = externalUrl(linkedinUrl);
@@ -125,7 +128,7 @@ export function MemberProfileHero({
             </View>
             <Pressable
               accessibilityRole="button"
-              disabled={unblocking}
+              disabled={unblocking || actionsDisabled}
               onPress={onUnblock}
               style={({ pressed }) => [
                 styles.secondaryChip,
@@ -145,10 +148,14 @@ export function MemberProfileHero({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Message ${name}`}
+              disabled={actionsDisabled}
               onPress={onMessage}
               style={({ pressed }) => [
                 styles.messageChip,
-                { backgroundColor: colors.chatOwnBubble, opacity: pressed ? 0.85 : 1 },
+                {
+                  backgroundColor: colors.chatOwnBubble,
+                  opacity: actionsDisabled ? 0.5 : pressed ? 0.85 : 1,
+                },
               ]}
             >
               <DmIcon size={12} color="#FFFFFF" />

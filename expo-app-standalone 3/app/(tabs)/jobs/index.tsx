@@ -31,10 +31,19 @@ import {
   newestInstant,
   readJobTabSeen,
 } from '@/lib/jobTabSeen';
+import { fetchScreenData, peekScreenData, readScreenData, writeScreenData } from '@/lib/screenDataCacheStore';
+import { mergeUniquePage, SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
 
 /** The two browse tabs; the other two carry a standing count instead. */
 type BrowseKind = JobKind;
 type Tab = BrowseKind | 'applied' | 'posts';
+
+interface JobsSnapshot {
+  jobs: JobPost[];
+  hasMore: boolean;
+}
+
+const JOBS_CACHE_KEY = 'jobs:feed';
 
 /**
  * The jobs board — the web `/dashboard/jobs` port.
@@ -50,10 +59,27 @@ type Tab = BrowseKind | 'applied' | 'posts';
  * the member last opened the tab, with the cut-off stored per account.
  */
 export default function JobsTab() {
+  const { user, sessionEpoch } = useAuth();
+  const userId = user?.id ?? null;
+  return (
+    <JobsTabSession
+      key={`${userId ?? 'signed-out'}:${sessionEpoch}`}
+      userId={userId}
+      sessionEpoch={sessionEpoch}
+    />
+  );
+}
+
+function JobsTabSession({
+  userId,
+  sessionEpoch,
+}: {
+  userId: string | null;
+  sessionEpoch: number;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
 
   const [jobs, setJobs] = useState<JobPost[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -66,24 +92,99 @@ export default function JobsTab() {
   const [newCounts, setNewCounts] = useState<Record<BrowseKind, number> | null>(null);
   const countedRef = useRef(false);
   const focusedOnceRef = useRef(false);
+  const requestSequenceRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const jobsRef = useRef(jobs);
+  const hasMoreRef = useRef(hasMore);
+  const cacheReadyRef = useRef(false);
+  jobsRef.current = jobs;
+  hasMoreRef.current = hasMore;
+
+  const commitJobs = useCallback((nextJobs: JobPost[], nextHasMore: boolean, persist = true) => {
+    jobsRef.current = nextJobs;
+    hasMoreRef.current = nextHasMore;
+    setJobs(nextJobs);
+    setHasMore(nextHasMore);
+    if (persist && userId && cacheReadyRef.current) {
+      void writeScreenData(
+        userId,
+        JOBS_CACHE_KEY,
+        sessionEpoch,
+        { jobs: nextJobs, hasMore: nextHasMore },
+        SCREEN_CACHE_TTL_MS.jobs,
+      );
+    }
+  }, [sessionEpoch, userId]);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh' | 'silent') => {
-      if (mode === 'initial') setLoading(true);
+      if (!userId) {
+        setLoading(false);
+        setError('Sign in to load jobs.');
+        return;
+      }
+      const sequence = ++requestSequenceRef.current;
+      const isCurrent = () => requestSequenceRef.current === sequence;
+      let cachePainted = false;
+      let networkSucceeded = false;
+      if (mode === 'initial') {
+        setRefreshing(false);
+        const memory = peekScreenData<JobsSnapshot>(
+          userId,
+          JOBS_CACHE_KEY,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.jobs,
+        );
+        if (memory) {
+          cachePainted = true;
+          cacheReadyRef.current = true;
+          commitJobs(memory.data.jobs, memory.data.hasMore, false);
+          setLoading(false);
+          if (memory.isFresh) {
+            setError(null);
+            return;
+          }
+        } else {
+          setLoading(true);
+        }
+        void readScreenData<JobsSnapshot>(
+          userId,
+          JOBS_CACHE_KEY,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.jobs,
+        ).then((snapshot) => {
+          if (!snapshot || cachePainted || networkSucceeded || !isCurrent()) return;
+          cachePainted = true;
+          cacheReadyRef.current = true;
+          commitJobs(snapshot.data.jobs, snapshot.data.hasMore, false);
+          setLoading(false);
+        });
+      }
       if (mode === 'refresh') setRefreshing(true);
       setError(null);
       try {
-        const page = await fetchJobFeed();
-        setJobs(page.jobs);
-        setHasMore(page.has_more);
+        const result = await fetchScreenData(
+          userId,
+          JOBS_CACHE_KEY,
+          sessionEpoch,
+          SCREEN_CACHE_TTL_MS.jobs,
+          () => fetchJobFeed(),
+        );
+        if (!result.accepted || !isCurrent()) return;
+        networkSucceeded = true;
+        cacheReadyRef.current = true;
+        commitJobs(result.data.jobs, result.data.has_more);
       } catch (cause) {
+        if (!isCurrent()) return;
         setError(jobErrorMessage(cause, "Couldn't load jobs. Check your connection and try again."));
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (isCurrent()) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [],
+    [commitJobs, sessionEpoch, userId],
   );
 
   useEffect(() => {
@@ -121,18 +222,18 @@ export default function JobsTab() {
   // The badges are counted once on arrival from the stored cut-off; the tab
   // the board opens on is being looked at right now, so it is marked seen.
   useEffect(() => {
-    if (countedRef.current || loading || !user?.id) return;
+    if (countedRef.current || loading || !userId) return;
     countedRef.current = true;
 
     void (async () => {
-      const seen = await readJobTabSeen(user.id);
+      const seen = await readJobTabSeen(userId);
       setNewCounts({
         hiring: countNewSince(hiringJobs, seen.hiring),
         referral: countNewSince(referralJobs, seen.referral),
       });
-      await markJobTabSeen(user.id, 'hiring', newestInstant(hiringJobs));
+      await markJobTabSeen(userId, 'hiring', newestInstant(hiringJobs));
     })();
-  }, [loading, user?.id, hiringJobs, referralJobs]);
+  }, [loading, userId, hiringJobs, referralJobs]);
 
   const browseList = tab === 'hiring' ? hiringJobs : tab === 'referral' ? referralJobs : null;
   const query = search.trim().toLowerCase();
@@ -152,10 +253,10 @@ export default function JobsTab() {
   const openTab = (next: Tab) => {
     hapticSelection();
     setTab(next);
-    if ((next === 'hiring' || next === 'referral') && user?.id) {
+    if ((next === 'hiring' || next === 'referral') && userId) {
       setNewCounts((counts) => (counts ? { ...counts, [next]: 0 } : counts));
       void markJobTabSeen(
-        user.id,
+        userId,
         next,
         newestInstant(next === 'hiring' ? hiringJobs : referralJobs),
       );
@@ -163,22 +264,22 @@ export default function JobsTab() {
   };
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || jobs.length === 0) return;
-    const last = jobs[jobs.length - 1];
+    if (loadingMoreRef.current || !hasMoreRef.current || jobsRef.current.length === 0 || !userId) return;
+    const sequence = requestSequenceRef.current;
+    const last = jobsRef.current[jobsRef.current.length - 1];
     setLoadingMore(true);
+    loadingMoreRef.current = true;
     try {
       const page = await fetchJobFeed({ createdAt: last.created_at, id: last.id });
-      setJobs((previous) => {
-        const ids = new Set(previous.map((job) => job.id));
-        return [...previous, ...page.jobs.filter((job) => !ids.has(job.id))];
-      });
-      setHasMore(page.has_more);
+      if (requestSequenceRef.current !== sequence) return;
+      commitJobs(mergeUniquePage(jobsRef.current, page.jobs, (job) => job.id), page.has_more);
     } catch {
       // Network error — leave the board as it is.
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, jobs, loadingMore]);
+  }, [commitJobs, userId]);
 
   const newBadge = (count: number | undefined) =>
     count && count > 0 ? `${count} new` : null;
