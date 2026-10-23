@@ -39,6 +39,8 @@ interface Props {
   onSend: (text: string, pendingImage?: PendingImage) => void;
   onTypingChange: (text: string) => void;
   disabled?: boolean;
+  /** Keeps typing possible while the send action must wait (e.g. a pending conversation id). */
+  sendBlocked?: boolean;
   error?: string | null;
   leadingAccessory?: React.ReactNode;
   imeLayout: ChatImeLayout;
@@ -50,6 +52,7 @@ export const DmComposer = forwardRef<ChatComposerHandle, Props>(function DmCompo
   onSend,
   onTypingChange,
   disabled,
+  sendBlocked,
   error,
   leadingAccessory,
   imeLayout,
@@ -65,7 +68,7 @@ export const DmComposer = forwardRef<ChatComposerHandle, Props>(function DmCompo
   const emojiPanelOpen = imeLayout.panelOpen;
 
   const overLimit = text.length > MAX_MESSAGE_CHARS;
-  const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled;
+  const canSend = (!!text.trim() || !!pendingImage) && !overLimit && !disabled && !sendBlocked;
 
 
   function handleChangeText(value: string) {

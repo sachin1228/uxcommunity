@@ -23,6 +23,8 @@ export interface DmConversationsCache {
   setActiveUser(userId: string | null): void;
   peek(): DmConversation[] | null;
   peekOne(conversationId: string): DmConversation | null;
+  /** The thread with a member, for opening it before the create call answers. */
+  peekOneForPeer(peerId: string): DmConversation | null;
   put(conversation: DmConversation): void;
   seedFromDisk(rows: DmConversation[]): void;
   clear(): void;
@@ -64,6 +66,11 @@ export function createDmConversationsCache({
       activeUserId === null
         ? null
         : snapshot?.find((row) => row.id === conversationId) ?? null,
+
+    peekOneForPeer: (peerId) =>
+      activeUserId === null
+        ? null
+        : snapshot?.find((row) => row.peer.id === peerId) ?? null,
 
     put(conversation) {
       if (activeUserId === null || !snapshot) return;
@@ -152,6 +159,14 @@ export function peekDmConversations(): DmConversation[] | null {
 
 export function peekDmConversation(conversationId: string): DmConversation | null {
   return dmConversations.peekOne(conversationId);
+}
+
+/**
+ * The conversation with a member when this device already knows it. A profile
+ * can push the thread with this id and skip the create-or-get round trip.
+ */
+export function peekDmConversationForPeer(peerId: string): DmConversation | null {
+  return dmConversations.peekOneForPeer(peerId);
 }
 
 /** Keep the shared copy in step with a screen's live conversation state. */

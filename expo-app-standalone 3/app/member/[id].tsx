@@ -35,8 +35,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useViewableKeys } from '@/hooks/useViewableKeys';
 import type { CommunityContent } from '@/lib/communityContent';
-import { createDmConversation, unblockUser } from '@/lib/dmApi';
-import { putDmConversation } from '@/lib/dmConversationsCache';
+import { PENDING_DM_CONVERSATION_ID } from '@/lib/dm';
+import { unblockUser } from '@/lib/dmApi';
+import { peekDmConversationForPeer } from '@/lib/dmConversationsCache';
 import {
   applyPollEventToFeed,
   feedPollCommunityIds,
@@ -149,9 +150,10 @@ function MemberProfileSession({
   itemsRef.current = items;
   hasMoreRef.current = hasMore;
 
-  const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
   const [unblocking, setUnblocking] = useState(false);
+  /** Guards a second push while the first tap's transition is starting. */
+  const navigatingToMessagesRef = useRef(false);
 
   const commitFeed = useCallback((nextItems: FeedItem[], nextHasMore: boolean, persist = true) => {
     itemsRef.current = nextItems;
@@ -294,6 +296,7 @@ function MemberProfileSession({
 
   useFocusEffect(
     useCallback(() => {
+      navigatingToMessagesRef.current = false;
       void loadMember();
     }, [loadMember]),
   );
@@ -367,29 +370,27 @@ function MemberProfileSession({
     [],
   );
 
-  const openMessage = useCallback(async () => {
-    if (messaging || !memberId) return;
-    setMessaging(true);
-    setMessageError(null);
-    try {
-      const conversation = await createDmConversation(memberId);
-      // The thread screen opens next; its metadata is already in hand.
-      putDmConversation(conversation);
-      router.push({
-        pathname: '/messages/[id]',
-        params: {
-          id: conversation.id,
-          name: conversation.peer.name,
-          avatar: conversation.peer.avatar_url ?? '',
-          peerId: conversation.peer.id,
-        },
-      });
-    } catch (e) {
-      setMessageError(e instanceof Error ? e.message : 'Could not open messages.');
-    } finally {
-      setMessaging(false);
+  const openMessage = useCallback(() => {
+    if (!memberId || navigatingToMessagesRef.current) return;
+    if (memberId === viewerId) {
+      setMessageError('You cannot message yourself.');
+      return;
     }
-  }, [memberId, messaging, router]);
+    navigatingToMessagesRef.current = true;
+    setMessageError(null);
+    // Push the thread now — the id the server would mint comes back there.
+    // Waiting on create-or-get here put 2-3s of dead time on the tap.
+    const existing = peekDmConversationForPeer(memberId);
+    router.push({
+      pathname: '/messages/[id]',
+      params: {
+        id: existing?.id ?? PENDING_DM_CONVERSATION_ID,
+        name: member?.user?.name ?? 'Member',
+        avatar: member?.profile?.avatar_url ?? '',
+        peerId: memberId,
+      },
+    });
+  }, [member, memberId, router, viewerId]);
 
   const handleUnblock = useCallback(async () => {
     if (unblocking || !memberId) return;

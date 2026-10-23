@@ -86,6 +86,13 @@ export interface DmMessage {
 /** Matches the server's DM_MESSAGE_PAGE_SIZE. */
 export const DM_MESSAGE_PAGE_SIZE = 50;
 
+/**
+ * The route id a profile uses before the server has issued the conversation's
+ * real id. The thread creates the conversation and adopts the id when it
+ * answers, so a Message tap never waits on the API to open.
+ */
+export const PENDING_DM_CONVERSATION_ID = 'new';
+
 // ---------------------------------------------------------------------------
 // Request lifecycle
 // ---------------------------------------------------------------------------
