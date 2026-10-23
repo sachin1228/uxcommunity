@@ -163,6 +163,17 @@ async function probeDeviceToken(
 let diagnostics: PushDiagnostics = { ...EMPTY_DIAGNOSTICS };
 let mutedCommunities = new Set<string>();
 let hydrated = false;
+/** The Expo + FCM token pair the server accepted last in this process. */
+let registeredSignature: string | null = null;
+let registrationInFlight: Promise<string | null> | null = null;
+
+/**
+ * The tokens belong to the device, but the server rows belong to the account:
+ * a new sign-in must register them again even when the pair has not changed.
+ */
+export function resetPushRegistrationState(): void {
+  registeredSignature = null;
+}
 
 function isGranted(status: string): boolean {
   return status === 'granted';
@@ -402,6 +413,18 @@ export function subscribeNotificationPermissionStatus(
  * offer a Settings shortcut after a denial without waiting for a refetch.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  // Expo's token listener fires while a registration reads the device token,
+  // so an unguarded listener can keep re-entering this function and POSTing
+  // forever. One registration at a time, and a repeated read of the same
+  // tokens is a no-op rather than another round trip.
+  if (registrationInFlight) return registrationInFlight;
+  registrationInFlight = registerForPushNotificationsOnce().finally(() => {
+    registrationInFlight = null;
+  });
+  return registrationInFlight;
+}
+
+async function registerForPushNotificationsOnce(): Promise<string | null> {
   try {
     await ensureNotificationChannels();
 
@@ -474,6 +497,14 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken).catch(() => {});
     }
 
+    // A token listener callback (or a second caller) that arrives after this
+    // device is already registered with the same pair has nothing to post.
+    const signature = `${token}|${fcmToken ?? ''}`;
+    if (signature === registeredSignature) {
+      diagnostics = { ...diagnostics, status: 'registered', token, error: null };
+      return token;
+    }
+
     await apiFetch('/api/push/register', {
       method: 'POST',
       body: {
@@ -482,6 +513,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         ...(fcmToken ? { fcmToken } : {}),
       },
     });
+    registeredSignature = signature;
 
     diagnostics = {
       ...diagnostics,
@@ -622,6 +654,7 @@ export async function unregisterStoredPushTokenAsync(): Promise<void> {
     /* best-effort — a stale token is re-pointed on the next login anyway */
   } finally {
     await AsyncStorage.multiRemove([PUSH_TOKEN_KEY, FCM_TOKEN_KEY]).catch(() => {});
+    registeredSignature = null;
     await clearAppBadgeAsync();
   }
 }

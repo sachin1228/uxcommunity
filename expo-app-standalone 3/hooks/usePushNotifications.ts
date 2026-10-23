@@ -20,10 +20,23 @@ import {
 } from '@/lib/push';
 import { routeForPush } from '@/lib/pushRoutes';
 import { fetchNotificationSettings } from '@/lib/notificationSettings';
+import { shouldHandleTokenEvent } from '@/lib/pushRegistrationGate';
 
 export function usePushNotifications() {
   const { user } = useAuth();
   const registeredForRef = useRef<string | null>(null);
+  const registrationRef = useRef<Promise<string | null> | null>(null);
+  const lastRegistrationAtRef = useRef(0);
+
+  const register = useCallback(() => {
+    if (registrationRef.current) return registrationRef.current;
+    const run = registerForPushNotificationsAsync().finally(() => {
+      registrationRef.current = null;
+      lastRegistrationAtRef.current = Date.now();
+    });
+    registrationRef.current = run;
+    return run;
+  }, []);
 
   // Presentation rules only need to be set once per process.
   useEffect(() => {
@@ -57,18 +70,27 @@ export function usePushNotifications() {
     if (registeredForRef.current === user.id) return;
     registeredForRef.current = user.id;
 
-    void registerForPushNotificationsAsync();
-  }, [user?.id]);
+    void register();
+  }, [user?.id, register]);
 
   // FCM tokens rotate (reinstall, restore, Play services reset). Re-register
   // so the server's direct-chat token never goes stale.
   useEffect(() => {
     if (!user?.id) return;
     const subscription = Notifications.addPushTokenListener(() => {
-      void registerForPushNotificationsAsync();
+      if (
+        !shouldHandleTokenEvent({
+          now: Date.now(),
+          inFlight: registrationRef.current !== null,
+          lastRegistrationAt: lastRegistrationAtRef.current,
+        })
+      ) {
+        return;
+      }
+      void register();
     });
     return () => subscription.remove();
-  }, [user?.id]);
+  }, [user?.id, register]);
 
   // Badge and muted communities: on sign-in, and again every time the app
   // comes back to the foreground.

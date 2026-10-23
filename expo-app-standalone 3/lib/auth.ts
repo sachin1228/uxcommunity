@@ -17,6 +17,8 @@ export interface LoginResult {
   success: true;
   name?: string;
   redirect?: string; // "/admin" for admin users
+  /** Present on current servers; older ones only returned the redirect. */
+  user?: User;
 }
 
 // ---------------------------------------------------------------------------
@@ -32,10 +34,12 @@ export async function login(
     body: { email, password },
   });
 
-  // After login the session cookie is already persisted by apiFetch.
-  // Fetch the full user object.
+  // After login the session cookie is already persisted by apiFetch. Newer
+  // servers return the trusted user row with it; the extra /me is only the
+  // fallback for an older deployment (and for the env admin account, whose
+  // session has no profile row of its own).
   const isAdmin = data.redirect === '/admin';
-  const me = await getMe();
+  const me = data.user ?? (await getMe());
 
   return { user: me, isAdmin };
 }

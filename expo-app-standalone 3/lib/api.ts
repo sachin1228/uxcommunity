@@ -31,8 +31,36 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
     new RegExp(`${SESSION_COOKIE_NAME}=([^;]+)`)
   );
   if (match?.[1]) {
+    // Most responses do not rotate the cookie; skip the storage write when
+    // the value is already the one in memory.
+    if (sessionToken === match[1]) return;
+    sessionToken = match[1];
     await AsyncStorage.setItem(SESSION_STORAGE_KEY, match[1]);
   }
+}
+
+// Every request needs the cookie, and every screen issues several. Reading it
+// from AsyncStorage each time put a native round trip in front of every fetch;
+// the value only changes when a response rotates it or the session is cleared.
+let sessionToken: string | null | undefined;
+let sessionTokenRead: Promise<string | null> | null = null;
+
+const unauthorizedListeners = new Set<() => void>();
+
+/**
+ * Fires when the API rejects the session (outside the login route, where a 401
+ * means "wrong password", not "signed out"). The auth provider listens so an
+ * expired cookie can never leave the app showing a signed-in shell.
+ */
+export function subscribeUnauthorized(listener: () => void): () => void {
+  unauthorizedListeners.add(listener);
+  return () => {
+    unauthorizedListeners.delete(listener);
+  };
+}
+
+function notifyUnauthorized(): void {
+  unauthorizedListeners.forEach((listener) => listener());
 }
 
 /**
@@ -78,6 +106,7 @@ export async function apiFormUpload<T = unknown>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && path !== '/api/auth/login') notifyUnauthorized();
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & { status: number; data: unknown };
@@ -91,6 +120,8 @@ export async function apiFormUpload<T = unknown>(
 
 /** Clear a persisted session (on logout or 401). */
 export async function clearSession(): Promise<void> {
+  sessionToken = null;
+  sessionTokenRead = null;
   await AsyncStorage.multiRemove([
     SESSION_STORAGE_KEY,
     LEGACY_SESSION_STORAGE_KEY,
@@ -99,16 +130,30 @@ export async function clearSession(): Promise<void> {
 
 /** Retrieve the stored session token (or null). */
 export async function getStoredSession(): Promise<string | null> {
-  const current = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
-  if (current) return current;
+  if (sessionToken !== undefined) return sessionToken;
+  if (sessionTokenRead) return sessionTokenRead;
 
-  const legacy = await AsyncStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
-  if (legacy) {
-    await AsyncStorage.setItem(SESSION_STORAGE_KEY, legacy);
-    return legacy;
-  }
+  sessionTokenRead = (async () => {
+    const current = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+    if (current) {
+      sessionToken = current;
+      return current;
+    }
 
-  return null;
+    const legacy = await AsyncStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
+    if (legacy) {
+      await AsyncStorage.setItem(SESSION_STORAGE_KEY, legacy);
+      sessionToken = legacy;
+      return legacy;
+    }
+
+    sessionToken = null;
+    return null;
+  })().finally(() => {
+    sessionTokenRead = null;
+  });
+
+  return sessionTokenRead;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +205,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && path !== '/api/auth/login') notifyUnauthorized();
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & {
