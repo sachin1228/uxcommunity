@@ -461,12 +461,9 @@ function MessageHeader({
       {editedAt && (
         <span className={`font-body text-[10px] ${metaClass}`}>edited</span>
       )}
-      {isMe && status === "sending" && (
-        <Clock strokeWidth={2.5} size={10} className={`self-center ${metaClass} animate-pulse`} />
-      )}
-      {isMe && (status === "sent" || !status) && (
-        <CheckCheck strokeWidth={2.5} size={11} className={`self-center ${metaClass}`} />
-      )}
+      {/* Community chat shows the day/time only — no delivery ticks or sending
+          spinner beside it; a failed send keeps its "!" as the last signal
+          before the retry button. */}
       {isMe && status === "failed" && (
         <span className={`text-[10px] ${onPage ? "text-red-400" : "text-red-200"}`}>!</span>
       )}
