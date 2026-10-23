@@ -36,3 +36,15 @@ export function isNewDeviceToken(
     eventToken !== observedDeviceToken
   );
 }
+
+/**
+ * A foreground retry is for transient failures only. A denied permission or a
+ * missing project/config is an answer; retrying it on every foreground would
+ * be a timer-like loop with no chance of success.
+ */
+export function shouldRetryPushRegistrationOnForeground(
+  status: string,
+  retryable: boolean,
+): boolean {
+  return status === 'error' && retryable;
+}

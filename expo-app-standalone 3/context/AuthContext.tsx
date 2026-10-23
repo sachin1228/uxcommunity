@@ -20,6 +20,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -94,18 +95,6 @@ async function persistUser(user: User | null): Promise<void> {
   }
 }
 
-/** Every store that is scoped to the signed-in member. */
-const memberClearSteps: MemberStateClearSteps = {
-  clearQueries: () => queryClient.clear(),
-  clearLists: () => {
-    clearCommunitiesSnapshot();
-    clearDmConversationsCache();
-  },
-  resetReads: resetReadManager,
-  clearSnapshot: () => AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY),
-  clearCaches: () => chatCache.clearAll(),
-};
-
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
@@ -142,15 +131,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(next);
   }, []);
 
+  /**
+   * The epoch/owner a teardown belongs to. A delayed storage clear must not
+   * touch the next session: every step checks this before acting, and the
+   * chat cache clear is scoped to the member being signed out.
+   */
+  const cleanupEpochRef = useRef(0);
+  const cleanupUserIdRef = useRef<string | null>(null);
+  /**
+   * A per-operation clear for an identity switch. It owns its epoch and user
+   * id, so concurrent cleanup work cannot overwrite another operation's guard
+   * through shared refs.
+   */
+  const makeClearSteps = useCallback(
+    (epoch: number, userId: string | null): MemberStateClearSteps => {
+      const isCurrent = () => sessionClock.isCurrent(epoch);
+      return {
+        clearQueries: () => {
+          if (isCurrent()) queryClient.clear();
+        },
+        clearLists: () => {
+          if (!isCurrent()) return;
+          clearCommunitiesSnapshot();
+          clearDmConversationsCache();
+        },
+        resetReads: () => {
+          if (isCurrent()) resetReadManager();
+        },
+        clearSnapshot: async () => {
+          if (isCurrent()) await AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        },
+        clearCaches: async () => {
+          if (isCurrent()) await chatCache.clearAll(userId);
+        },
+      };
+    },
+    [sessionClock],
+  );
+
+  // The sign-out coordinator and explicit logout are single-flight, so one
+  // ref pair is enough for their delayed storage work.
+  const clearSteps = useMemo<MemberStateClearSteps>(() => {
+    const isCurrent = () => sessionClock.isCurrent(cleanupEpochRef.current);
+    return {
+      clearQueries: () => {
+        if (isCurrent()) queryClient.clear();
+      },
+      clearLists: () => {
+        if (!isCurrent()) return;
+        clearCommunitiesSnapshot();
+        clearDmConversationsCache();
+      },
+      resetReads: () => {
+        if (isCurrent()) resetReadManager();
+      },
+      clearSnapshot: async () => {
+        if (isCurrent()) await AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY);
+      },
+      clearCaches: async () => {
+        if (isCurrent()) await chatCache.clearAll(cleanupUserIdRef.current);
+      },
+    };
+  }, [sessionClock]);
+
   const [signOut] = useState(() =>
     createSignOutCoordinator({
       invalidateSession: () => {
-        sessionClock.advance();
+        cleanupUserIdRef.current = userRef.current?.id ?? null;
+        cleanupEpochRef.current = sessionClock.advance();
       },
       resetRealtime: resetRealtimeSession,
       markSignedOut: () => applyUser(null),
       clearSession,
-      ...memberClearSteps,
+      ...clearSteps,
     }),
   );
 
@@ -206,13 +259,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (previous?.id !== decision.user.id) {
       // A different account now owns the cookie: in-memory list/query caches
-      // still hold the previous member's rows.
-      await clearMemberScopedState(memberClearSteps);
+      // still hold the previous member's rows. The epoch/owner guards keep a
+      // delayed clear from touching the identity that wins the race.
+      await clearMemberScopedState(makeClearSteps(epoch, previous?.id ?? null));
+      if (!sessionClock.isCurrent(epoch)) return;
       resetRealtimeSession();
     }
     applyUser(decision.user);
     if (decision.persistUser) await persistUser(decision.user);
-  }, [applyUser, clearAndSignOut, sessionClock]);
+  }, [applyUser, clearAndSignOut, makeClearSteps, sessionClock]);
 
   // Restore the last snapshot at once, then validate the cookie behind it.
   useEffect(() => {
@@ -254,7 +309,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (cached && decision.user.id !== cached.id) {
             // The cookie now belongs to another member than the snapshot; the
             // new session stays, only the previous member's caches go.
-            await clearMemberScopedState(memberClearSteps);
+            await clearMemberScopedState(makeClearSteps(epoch, cached.id));
+            if (!active || !sessionClock.isCurrent(epoch)) return;
             resetRealtimeSession();
           }
           applyUser(decision.user);
@@ -272,7 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [applyUser, clearAndSignOut, sessionClock]);
+  }, [applyUser, clearAndSignOut, makeClearSteps, sessionClock]);
 
   // Any API call rejected with 401 means the cookie no longer represents a
   // session (expired, revoked, cleared elsewhere). End the local session so
@@ -324,7 +380,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (previousId && previousId !== loggedInUser.id) {
           // Account switch without an explicit sign-out (e.g. an expired
           // session): the previous member's local windows must not leak.
-          await clearMemberScopedState(memberClearSteps);
+          await clearMemberScopedState(makeClearSteps(epoch, previousId));
+          if (!sessionClock.isCurrent(epoch)) return;
         }
         applyUser(loggedInUser);
         await persistUser(loggedInUser);
@@ -332,7 +389,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginInFlightRef.current = false;
       }
     },
-    [applyUser, clearAndSignOut, sessionClock],
+    [applyUser, clearAndSignOut, makeClearSteps, sessionClock],
   );
 
   const logout = useCallback(() => {
@@ -340,21 +397,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const run = performLogout({
       invalidateSession: () => {
-        sessionClock.advance();
+        cleanupUserIdRef.current = userRef.current?.id ?? null;
+        cleanupEpochRef.current = sessionClock.advance();
       },
       resetRealtime: resetRealtimeSession,
       markSignedOut: () => applyUser(null),
       unregisterPush: unregisterStoredPushTokenAsync,
       logoutRequest: apiLogout,
       clearSession,
-      clearMemberState: () => clearMemberScopedState(memberClearSteps),
+      clearMemberState: () => clearMemberScopedState(clearSteps),
     }).finally(() => {
       if (logoutInFlightRef.current === run) logoutInFlightRef.current = null;
     });
 
     logoutInFlightRef.current = run;
     return run;
-  }, [applyUser, sessionClock]);
+  }, [applyUser, clearSteps, sessionClock]);
 
   return (
     <AuthContext.Provider

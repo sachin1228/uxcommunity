@@ -27,13 +27,16 @@ import { fetchNotificationSettings } from '@/lib/notificationSettings';
 import {
   isNewDeviceToken,
   shouldHandleTokenEvent,
+  shouldRetryPushRegistrationOnForeground,
 } from '@/lib/pushRegistrationGate';
+import { createPushRotationFollowUp } from '@/lib/pushRotationFollowUp';
 
 export function usePushNotifications() {
   const { user } = useAuth();
   const registeredForRef = useRef<string | null>(null);
   const registrationRef = useRef<Promise<string | null> | null>(null);
   const lastRegistrationAtRef = useRef(0);
+  const userIdRef = useRef<string | null>(user?.id ?? null);
 
   const register = useCallback(() => {
     if (registrationRef.current) return registrationRef.current;
@@ -48,6 +51,17 @@ export function usePushNotifications() {
     registrationRef.current = run;
     return run;
   }, []);
+
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user?.id]);
+
+  // A token rotation that lands while the old token's registration is still
+  // in flight gets one bounded follow-up after that request settles, rather
+  // than waiting for the next foreground or launch.
+  const rotationFollowUp = useRef(
+    createPushRotationFollowUp(() => userIdRef.current !== null),
+  ).current;
 
   // A registration belongs to the session that started it. Clearing the slot
   // on identity change lets the next member register immediately; the push
@@ -100,8 +114,13 @@ export function usePushNotifications() {
       // A real rotation is honoured even inside the cooldown; the echo from
       // our own token read carries the token we just observed and is not.
       const rotated = isNewDeviceToken(getObservedDeviceToken(), deviceToken?.data);
+      if (rotated) {
+        rotationFollowUp.schedule(registrationRef.current, () => {
+          if (userIdRef.current) void register();
+        });
+        return;
+      }
       if (
-        !rotated &&
         !shouldHandleTokenEvent({
           now: Date.now(),
           inFlight: registrationRef.current !== null,
@@ -113,7 +132,7 @@ export function usePushNotifications() {
       void register();
     });
     return () => subscription.remove();
-  }, [user?.id, register]);
+  }, [user?.id, register, rotationFollowUp]);
 
   // Transient failures (Expo/OS or the API unreachable at launch) retry on a
   // deliberate foreground, never in a timer loop. A denied permission is an
@@ -122,8 +141,14 @@ export function usePushNotifications() {
     if (!user?.id) return;
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
-      if (getLastPushRegistrationStatus() !== 'error') return;
-      if (!isPushRegistrationRetryable()) return;
+      if (
+        !shouldRetryPushRegistrationOnForeground(
+          getLastPushRegistrationStatus(),
+          isPushRegistrationRetryable(),
+        )
+      ) {
+        return;
+      }
       void register();
     });
     return () => subscription.remove();

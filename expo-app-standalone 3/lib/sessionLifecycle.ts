@@ -114,12 +114,14 @@ export interface LogoutTimeouts {
   unregisterPush: number;
   logoutRequest: number;
   clearSession: number;
+  clearMemberState: number;
 }
 
 export const LOGOUT_STEP_TIMEOUTS: LogoutTimeouts = {
   unregisterPush: 2_500,
   logoutRequest: 4_000,
   clearSession: 1_500,
+  clearMemberState: 2_500,
 };
 
 /**
@@ -168,5 +170,8 @@ export async function performLogout(
   await settle(steps.unregisterPush(), timeouts.unregisterPush);
   await settle(steps.logoutRequest(), timeouts.logoutRequest);
   await settle(steps.clearSession(), timeouts.clearSession);
-  await steps.clearMemberState();
+  // A hung native storage read must not hold the login screen forever. The
+  // caller's cache steps are epoch-scoped, so late work cannot clear a newer
+  // session's state.
+  await settle(steps.clearMemberState(), timeouts.clearMemberState);
 }

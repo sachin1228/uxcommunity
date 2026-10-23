@@ -565,3 +565,41 @@ test('a new member does not inherit the previous active scope', async () => {
   );
   assert.equal(await cache.loadCommunityList('user-a'), null);
 });
+
+test('a scoped sign-out clear cannot erase the next member’s cache', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  cache.activateUser('user-a');
+  await cache.saveCommunityList('user-a', [communityRow('a-list')]);
+
+  cache.activateUser('user-b');
+  await cache.saveCommunityList('user-b', [communityRow('b-list')]);
+  await cache.saveCommunityMessages('user-b', 'community-b', [message('b-msg')]);
+
+  // Delayed cleanup for A runs after B is already the active member.
+  await cache.clearAll('user-a');
+
+  assert.equal(await cache.loadCommunityList('user-a'), null);
+  assert.deepEqual(
+    (await cache.loadCommunityList('user-b'))?.map((row) => row.id),
+    ['b-list'],
+  );
+  assert.deepEqual(
+    (await cache.loadCommunityMessages('user-b', 'community-b'))?.map((row) => row.id),
+    ['b-msg'],
+  );
+});
+
+test('an unscoped clear still removes every member’s cache', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  cache.activateUser('user-a');
+  await cache.saveCommunityList('user-a', [communityRow('a')]);
+  cache.activateUser('user-b');
+  await cache.saveCommunityList('user-b', [communityRow('b')]);
+
+  await cache.clearAll();
+
+  assert.equal(await cache.loadCommunityList('user-a'), null);
+  assert.equal(await cache.loadCommunityList('user-b'), null);
+});

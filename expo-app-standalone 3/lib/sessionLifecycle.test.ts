@@ -237,3 +237,31 @@ test('settleWithin resolves with the step or the timeout', async () => {
   assert.equal(resolved, true);
   await settleWithin(new Promise<void>(() => {}), 5);
 });
+
+test('a hung storage teardown cannot hold logout or re-login forever', async () => {
+  const calls: string[] = [];
+  const never = new Promise<void>(() => {});
+  const steps: LogoutSteps = {
+    invalidateSession: () => void calls.push('invalidateSession'),
+    resetRealtime: () => void calls.push('resetRealtime'),
+    markSignedOut: () => void calls.push('markSignedOut'),
+    unregisterPush: async () => void calls.push('unregisterPush'),
+    logoutRequest: async () => void calls.push('logoutRequest'),
+    clearSession: async () => void calls.push('clearSession'),
+    clearMemberState: () => {
+      calls.push('clearMemberState');
+      return never;
+    },
+  };
+
+  await performLogout(steps, { timeouts: { clearMemberState: 10 } });
+  assert.deepEqual(calls, [
+    'invalidateSession',
+    'resetRealtime',
+    'markSignedOut',
+    'unregisterPush',
+    'logoutRequest',
+    'clearSession',
+    'clearMemberState',
+  ]);
+});

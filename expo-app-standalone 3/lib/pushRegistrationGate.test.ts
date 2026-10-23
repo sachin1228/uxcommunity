@@ -5,6 +5,7 @@ import {
   TOKEN_EVENT_COOLDOWN_MS,
   isNewDeviceToken,
   shouldHandleTokenEvent,
+  shouldRetryPushRegistrationOnForeground,
 } from './pushRegistrationGate';
 
 test('a token event is ignored while a registration is in flight', () => {
@@ -62,4 +63,13 @@ test('a changed device token bypasses the cooldown decision', () => {
   assert.equal(isNewDeviceToken('fcm-a', 'fcm-b'), true);
   assert.equal(isNewDeviceToken(null, 'fcm-a'), true);
   assert.equal(isNewDeviceToken('fcm-a', ''), false);
+});
+
+
+test('only transient registration errors retry on foreground', () => {
+  assert.equal(shouldRetryPushRegistrationOnForeground('error', true), true);
+  assert.equal(shouldRetryPushRegistrationOnForeground('error', false), false);
+  assert.equal(shouldRetryPushRegistrationOnForeground('denied', true), false);
+  assert.equal(shouldRetryPushRegistrationOnForeground('registered', false), false);
+  assert.equal(shouldRetryPushRegistrationOnForeground('registering', false), false);
 });

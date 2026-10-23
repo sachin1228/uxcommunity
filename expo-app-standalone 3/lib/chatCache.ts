@@ -213,7 +213,7 @@ export interface ChatCache {
   loadDmConversationList(userId: string): Promise<DmConversation[] | null>;
   saveDmConversationList(userId: string, rows: readonly DmConversation[]): Promise<void>;
   /** Drop every room window (sign-out). Best effort — never throws. */
-  clearAll(): Promise<void>;
+  clearAll(userId?: string | null): Promise<void>;
 }
 
 export function createChatCache(
@@ -553,15 +553,18 @@ export function createChatCache(
       );
     },
 
-    async clearAll() {
-      // Stop every queued/new write first: an unmounting screen from the
-      // previous account must not resurrect a window after this sweep.
-      activeUserId = null;
-      indexes.clear();
+    async clearAll(userId) {
+      // Scoped sign-out clears only that member's keys: a delayed cleanup must
+      // never delete a newly signed-in member's freshly written cache.
+      const scoped = typeof userId === 'string' && userId.length > 0;
+      if (!scoped || activeUserId === userId) activeUserId = null;
+      if (scoped) indexes.delete(userId);
+      else indexes.clear();
       if (!storage.getAllKeys || !storage.multiRemove) return;
       try {
+        const prefix = scoped ? `${CACHE_PREFIX}/u/${part(userId)}/` : `${CACHE_PREFIX}/`;
         const keys = (await storage.getAllKeys()).filter((key) =>
-          key.startsWith(`${CACHE_PREFIX}/`),
+          key.startsWith(prefix),
         );
         if (keys.length > 0) await storage.multiRemove(keys);
       } catch {
