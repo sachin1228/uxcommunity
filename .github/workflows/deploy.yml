@@ -102,6 +102,13 @@ jobs:
       - name: Unit-test the service credential guard
         run: node --test scripts/verify-service-credentials.test.mjs
 
+      # The FCM key decides whether Android chat notifications can draw the
+      # community DP at all: without it every chat falls back to Expo's generic
+      # layout, which looks like a working push with the avatar missing. Its
+      # failure branches are pinned down before it is allowed to gate a deploy.
+      - name: Unit-test the FCM credential guard
+        run: node --test scripts/verify-fcm-credentials.test.mjs
+
       # Fail in seconds, naming the secret that is wrong, instead of after a
       # full OpenNext build on a symptom from the deepest layer of the stack.
       # On 2026-10-08 the credential stopped being accepted and surfaced here:
@@ -265,6 +272,21 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
         run: node scripts/verify-r2-credentials.mjs
 
+      # ── The Firebase key Android chat notifications are drawn with ───────
+      # Chat pushes are data-only FCM messages so the app can draw the
+      # community DP / sender photo itself. When this key is missing, malformed
+      # (double-escaped newlines), from another Firebase project, or revoked,
+      # nothing errors: chat silently falls back to Expo, whose notification
+      # shows the app icon where the DP should be. This exchanges a signed JWT
+      # for an access token — the same call the Worker makes per message — so a
+      # dead key fails here, naming the secret, instead of as a missing avatar
+      # on a member's phone. Passed from the repository secret so it proves the
+      # value the deploy is about to push.
+      - name: Verify FCM push credentials
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: node scripts/verify-fcm-credentials.mjs
+
       # ── The other secrets the deploy is about to push ───────────────────
       # The R2 outage on 2026-10-09 was one credential dying unnoticed. The
       # audit that followed found the same blind spot on every other secret
@@ -373,8 +395,20 @@ jobs:
 
       # The Firebase service-account JSON keeps its private key across
       # multiple lines; .dev.vars is dotenv, so it is pushed straight from the
-      # repository secret instead. `printf` preserves the value exactly (no
-      # trailing newline invented by echo) and the worker parses it as JSON.
+      # repository secret instead.
+      #
+      # The value travels through `env:`, NOT through `${{ }}` inside the shell
+      # command. `run:` interpolates the secret into the script TEXT before bash
+      # sees it, so a JSON secret pasted inside double quotes lost every quote
+      # (`{"project_id":"x"}` became `{project_id: x}`) and the Worker stored
+      # something `JSON.parse` rejects — which is a silent downgrade: no error,
+      # every Android chat push falls back to Expo's generic layout, and the
+      # community DP stops appearing. An `env:` value is handed to the process
+      # verbatim, and `printf '%s'` keeps it byte-for-byte (no trailing newline
+      # from `echo`). scripts/verify-fcm-credentials.mjs fails the run if this
+      # ever goes back to being interpolated.
       - name: Set FCM service account secret
         working-directory: apps/web
-        run: printf '%s' "${{ secrets.FCM_SERVICE_ACCOUNT }}" | npx wrangler secret put FCM_SERVICE_ACCOUNT
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: printf '%s' "$FCM_SERVICE_ACCOUNT" | npx wrangler secret put FCM_SERVICE_ACCOUNT

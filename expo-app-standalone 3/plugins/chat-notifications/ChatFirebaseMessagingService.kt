@@ -7,6 +7,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -34,7 +35,7 @@ import kotlin.concurrent.thread
  *
  * Expo's push transport sends a `notification` payload, which Android's system
  * renderer displays before app code runs — its layout cannot become a
- * WhatsApp-style conversation with the community DP in the avatar slot. The
+ * WhatsApp-style conversation with the sender's profile picture in the avatar slot. The
  * server therefore sends chat messages as data-only FCM messages
  * (`direct=1`); this service builds the notification itself.
  *
@@ -50,6 +51,13 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     /** Only the direct transport carries these; Expo pushes never do. */
     private const val DIRECT_KEY = "direct"
+
+    /**
+     * What was last published for each conversation shortcut. Separate from
+     * [ChatNotificationStateModule.PREFS], which JS owns and writes on screen
+     * focus — nothing here may race with that.
+     */
+    private const val SHORTCUT_PREFS = "uxcommunity_notification_shortcuts"
   }
 
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -136,6 +144,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       else -> data["message"].takeUnless { it.isNullOrBlank() } ?: "Sent a message"
     }
     val imageUrl = data["imageUrl"]
+    val avatarUrl = data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() } ?: imageUrl
     val silent = data["silent"] == "1"
     val badge = data["badge"]?.toIntOrNull()
     val timestamp = data["timestamp"]?.toLongOrNull() ?: System.currentTimeMillis()
@@ -156,10 +165,9 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     ensureChannels(context)
 
-    // Photo first; otherwise the same initials + palette color the app's
-    // PersonAvatar draws. Activity without a person/company/community (a
-    // report, a removal) keeps its type glyph instead.
-    val avatar = imageUrl?.let { download(it) } ?: when {
+    // Prefer the message author's profile photo. Community or activity art
+    // remains the fallback for older payloads and senders without a photo.
+    val avatar = avatarUrl?.let { download(it) } ?: when {
       !data["avatarInitials"].isNullOrBlank() ->
         initialAvatar(data["avatarInitials"], data["avatarColor"], title)
       mode == "activity" ->
@@ -211,6 +219,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       .setStyle(
         NotificationCompat.MessagingStyle(Person.Builder().setName("You").build())
           .setConversationTitle(title)
+          .setGroupConversation(mode == "community")
           .addMessage(messageText, timestamp, senderPerson),
       )
       .setCategory(
@@ -225,23 +234,30 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     if (badge != null && badge > 0) builder.setNumber(badge)
 
-    // Conversation notifications take their avatar from a long-lived shortcut.
-    // If the shortcut cannot be published (limit, OEM policy) the notification
-    // still shows the avatar as its large icon.
-    try {
-      val shortcut = ShortcutInfoCompat.Builder(context, conversationKey)
-        .setShortLabel(title.take(40))
-        .setLongLabel(title)
-        .setIcon(avatarIcon)
-        .setPerson(conversationPerson)
-        .setLongLived(true)
-        .setCategories(setOf("android.shortcut.conversation"))
-        .setIntent(contentIntent)
-        .build()
-      ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+    // Conversation notifications take their avatar from a long-lived shortcut:
+    // the shade draws that shortcut's person icon in the left slot, and no
+    // notification API can place a picture there directly.
+    //
+    // Android rations shortcut publishes (a handful per day, per package), and
+    // every push — including the second message of a conversation that already
+    // has its shortcut — spends one. A busy chat therefore exhausts the quota
+    // and every *new* conversation is drawn with the app icon instead of its
+    // DP, with no error anywhere. Publishing only when what is drawn actually
+    // changed keeps the quota for the conversations that need it.
+    val avatarSignature = avatarUrl
+      ?: "init:${data["avatarInitials"] ?: ""}:${data["avatarColor"] ?: ""}:${data["icon"] ?: ""}"
+    if (
+      publishConversationShortcut(
+        context = context,
+        conversationKey = conversationKey,
+        title = title,
+        signature = "$title|$avatarSignature",
+        icon = avatarIcon,
+        person = conversationPerson,
+        intent = contentIntent,
+      )
+    ) {
       builder.setShortcutId(conversationKey)
-    } catch (_: Exception) {
-      // Best effort; the large icon is still the avatar.
     }
 
     NotificationManagerCompat.from(context).notify(
@@ -249,6 +265,77 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       builder.build(),
     )
   }
+
+  /**
+   * Keeps the conversation's shortcut in step with what the shade draws, and
+   * reports whether a shortcut with that id exists afterwards — the caller may
+   * only name a shortcut it can actually point at.
+   *
+   * An unchanged conversation is a no-op: its published signature matches and
+   * the shortcut is still installed. Everything else tries one publish, and a
+   * refused publish (quota, OEM policy) is remembered as "not published" so a
+   * later message retries instead of assuming the avatar is there.
+   */
+  private fun publishConversationShortcut(
+    context: Context,
+    conversationKey: String,
+    title: String,
+    signature: String,
+    icon: IconCompat,
+    person: Person,
+    intent: Intent,
+  ): Boolean {
+    val prefs = shortcutPrefs(context)
+    val key = shortcutSignatureKey(conversationKey)
+    if (prefs.getString(key, null) == signature && shortcutExists(context, conversationKey)) {
+      return true
+    }
+
+    return try {
+      val shortcut = ShortcutInfoCompat.Builder(context, conversationKey)
+        .setShortLabel(title.take(40))
+        .setLongLabel(title)
+        .setIcon(icon)
+        .setPerson(person)
+        .setLongLived(true)
+        .setCategories(setOf("android.shortcut.conversation"))
+        .setIntent(intent)
+        .build()
+      // The compat push reports whether the platform accepted it; the lookup
+      // then proves the shortcut is really there, because a throttle silently
+      // drops publishes on some builds instead of returning false.
+      val pushed = ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+      val available = shortcutExists(context, conversationKey)
+      if (available) {
+        // Only a publish that took effect is remembered as up to date, so a
+        // refused update is retried on the next message instead of leaving a
+        // stale avatar in place forever.
+        val editor = prefs.edit()
+        if (pushed) editor.putString(key, signature) else editor.remove(key)
+        editor.apply()
+      }
+      // A shortcut that exists but could not be refreshed still carries the
+      // conversation's previous DP — better than the app icon.
+      available
+    } catch (_: Exception) {
+      false
+    }
+  }
+
+  /** A notification must only name a shortcut the system can resolve. */
+  private fun shortcutExists(context: Context, shortcutId: String): Boolean {
+    return try {
+      ShortcutManagerCompat.getShortcuts(context, ShortcutManagerCompat.FLAG_MATCH_DYNAMIC)
+        .any { it.id == shortcutId }
+    } catch (_: Exception) {
+      false
+    }
+  }
+
+  private fun shortcutPrefs(context: Context): SharedPreferences =
+    context.getSharedPreferences(SHORTCUT_PREFS, Context.MODE_PRIVATE)
+
+  private fun shortcutSignatureKey(conversationKey: String) = "signature:$conversationKey"
 
   private fun activityDeepLink(href: String?): String {
     val segments = href?.let { Uri.parse(it).pathSegments } ?: emptyList()

@@ -159,6 +159,13 @@ jobs:
       - name: Unit-test the R2 media credential guard
         run: node --test scripts/verify-r2-credentials.test.mjs
 
+      # Same rule again: the FCM guard decides whether a deploy proceeds, and
+      # a dead push key does not fail anything — it silently turns every
+      # Android chat notification back into the generic app icon. A mistake in
+      # the guard has to be caught here, not while releasing.
+      - name: Unit-test the FCM credential guard
+        run: node --test scripts/verify-fcm-credentials.test.mjs
+
   lint:
     name: ESLint (advisory)
     runs-on: ubuntu-latest
