@@ -1117,21 +1117,32 @@ test("a provider-wide FCM failure falls back to Expo for the held-back device", 
     const { db } = createFakeDb(state);
     const expoMessages: ExpoPushMessage[] = [];
 
-    const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
-      send: async (messages) => {
-        expoMessages.push(...messages);
-        return acceptAll(messages);
-      },
-      sendFcm: async (messages) => ({
-        requestError: "auth_failed",
-        outcomes: messages.map((message) => ({
-          token: message.token,
-          ok: false,
-          deadToken: false,
-          error: "auth_failed",
-        })),
-      }),
-    }));
+    // The fallback notification arrives without the community DP, which is
+    // indistinguishable from a working push unless the reason is logged.
+    const logged: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => logged.push(args.map(String).join(" "));
+
+    let report;
+    try {
+      report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
+        send: async (messages) => {
+          expoMessages.push(...messages);
+          return acceptAll(messages);
+        },
+        sendFcm: async (messages) => ({
+          requestError: "auth_failed",
+          outcomes: messages.map((message) => ({
+            token: message.token,
+            ok: false,
+            deadToken: false,
+            error: "auth_failed",
+          })),
+        }),
+      }));
+    } finally {
+      console.warn = originalWarn;
+    }
 
     assert.deepEqual(expoMessages.map((message) => message.to).sort(), [
       "expo-android",
@@ -1140,5 +1151,10 @@ test("a provider-wide FCM failure falls back to Expo for the held-back device", 
     ]);
     assert.equal(report.deliveries, 3);
     assert.equal(report.failedTransient, 0);
+
+    const fallback = logged.find((line) => line.includes("push.fcm_fallback"));
+    assert.ok(fallback, "the downgraded notification names why the DP is missing");
+    assert.ok(fallback.includes("auth_failed"));
+    assert.equal(fallback.includes("fcm-1"), false, "the log never carries a device token");
   });
 });

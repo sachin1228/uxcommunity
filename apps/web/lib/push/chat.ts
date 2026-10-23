@@ -28,6 +28,15 @@ import {
 import { logEvent } from "@/lib/observability/log";
 
 /**
+ * Chat notifications are only drawn by the app (community DP in the avatar
+ * slot) over the direct-FCM transport. Without it every chat push falls back
+ * to Expo's generic layout, which looks like a working notification with the
+ * picture missing — so the one thing that explains a vanished DP is the one
+ * thing that used to be silent. Warn once per isolate, not per message.
+ */
+let warnedDirectTransportOff = false;
+
+/**
  * The notification-preference policy (quiet hours, audible budget, channels and
  * defaults) lives in ./preferences.ts and is re-exported here so the existing
  * importers — the push settings route and `chat.test.ts` — keep working
@@ -540,6 +549,14 @@ export async function sendChatMessagePush(
       // Their Expo token stays for iOS-style/DM/activity pushes but is skipped
       // for chat to avoid a second, standard-shaped notification.
       const directChat = isFcmConfigured();
+      if (!directChat && !warnedDirectTransportOff) {
+        warnedDirectTransportOff = true;
+        logEvent("warn", {
+          event: "push.direct_fcm_disabled",
+          reason: "FCM_SERVICE_ACCOUNT is missing or unparsable",
+          impact: "chat pushes use Expo's generic layout (no avatar)",
+        });
+      }
       const [tokensResult, fcmResult] = await Promise.all([
         db
           .from("push_tokens")
@@ -803,8 +820,15 @@ export async function sendChatMessagePush(
 
         if (useFallback) {
           // Provider-wide failure: the held-back Expo messages replace the FCM
-          // attempt entirely, so its failures are not double-counted.
+          // attempt entirely, so its failures are not double-counted. The
+          // notification still arrives — without the DP — so say why.
           providerError = fcmReport.requestError;
+          logEvent("warn", {
+            event: "push.fcm_fallback",
+            community_id: communityId,
+            devices: fallbackExpo.length,
+            provider: redactPushTokens(fcmReport.requestError ?? ""),
+          });
           try {
             const fallback = await send(fallbackExpo, { deadline });
             report.deliveries += fallback.delivered;
