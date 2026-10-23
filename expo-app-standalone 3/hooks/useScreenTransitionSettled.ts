@@ -3,8 +3,9 @@ import { useNavigation } from 'expo-router';
 
 /**
  * How long a native push takes, plus a frame of slack. Android never reports
- * the end of it — react-native-screens' `onAppear`, which native-stack turns
- * into `transitionEnd`, is iOS-only — so this is the only signal there.
+ * the end of one: react-native-screens only emits its appear callback on iOS,
+ * where native-stack turns it into `transitionEnd`. The timer is the only
+ * signal on Android.
  */
 const SETTLE_FALLBACK_MS = 340;
 
