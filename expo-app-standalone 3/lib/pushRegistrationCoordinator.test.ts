@@ -42,6 +42,50 @@ test('repeated token events with the same pair post exactly once', async () => {
   assert.equal(coordinator.registeredSignature(), 'expo-a|fcm-a');
 });
 
+test('a skipped repeat reports the pair so the caller can settle on registered', async () => {
+  let posted = 0;
+  const skipped: PushTokenPair[] = [];
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: async () => tokens('expo-a'),
+    post: async () => {
+      posted += 1;
+    },
+    onAlreadyRegistered: async (pair) => {
+      skipped.push(pair);
+    },
+  });
+
+  await coordinator.register();
+  await coordinator.register();
+  await coordinator.register();
+
+  // Only the repeats are reported; the first registration was a real POST.
+  assert.equal(posted, 1);
+  assert.deepEqual(skipped, [tokens('expo-a'), tokens('expo-a')]);
+});
+
+test('a pair is only reported as already registered after a successful post', async () => {
+  let attempts = 0;
+  const skipped: string[] = [];
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: async () => tokens('expo-a'),
+    post: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('network down');
+    },
+    onAlreadyRegistered: ({ token }) => {
+      skipped.push(token);
+    },
+  });
+
+  await assert.rejects(coordinator.register(), /network down/);
+  // Nothing was posted, so this attempt must post rather than skip.
+  await coordinator.register();
+  await coordinator.register();
+
+  assert.deepEqual(skipped, ['expo-a']);
+});
+
 test('concurrent callers share one acquire and one post', async () => {
   const pending = deferred<PushTokenPair | null>();
   let acquired = 0;
@@ -130,6 +174,100 @@ test('sign-out abandons a token read that finishes late', async () => {
   newAcquire.resolve(tokens('expo-new'));
   assert.equal(await newRun, 'expo-new');
   assert.deepEqual(posted, ['expo-new']);
+});
+
+test('a token read abandoned by sign-out is reported so the caller can settle', async () => {
+  const acquire = deferred<PushTokenPair | null>();
+  const abandoned: (PushTokenPair | null)[] = [];
+  let posted = 0;
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: () => acquire.promise,
+    post: async () => {
+      posted += 1;
+    },
+    onAbandoned: (pair) => {
+      abandoned.push(pair);
+    },
+  });
+
+  const run = coordinator.register();
+  coordinator.reset(); // sign-out while the token request is on the wire
+  acquire.resolve(tokens('expo-old'));
+
+  assert.equal(await run, null);
+  // The caller recorded "registering" before this read and will never post,
+  // so the pair has to come back to it.
+  assert.deepEqual(abandoned, [tokens('expo-old')]);
+  assert.equal(posted, 0);
+  assert.equal(coordinator.registeredSignature(), null);
+});
+
+test('an abandoned run that acquired nothing reports null', async () => {
+  const acquire = deferred<PushTokenPair | null>();
+  const abandoned: (PushTokenPair | null)[] = [];
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: () => acquire.promise,
+    post: async () => {},
+    onAbandoned: (pair) => {
+      abandoned.push(pair);
+    },
+  });
+
+  const run = coordinator.register();
+  coordinator.reset();
+  acquire.resolve(null);
+
+  assert.equal(await run, null);
+  // Nothing was recorded for this run; the caller must not settle a state of
+  // its own on top of the refusal `acquire` recorded.
+  assert.deepEqual(abandoned, [null]);
+});
+
+test('a completed run is never reported as abandoned', async () => {
+  const abandoned: unknown[] = [];
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: async () => tokens('expo-a'),
+    post: async () => {},
+    onAbandoned: (pair) => {
+      abandoned.push(pair);
+    },
+  });
+
+  await coordinator.register();
+  await coordinator.register(); // deduped, still not an abandonment
+  coordinator.reset();
+
+  assert.deepEqual(abandoned, []);
+});
+
+test('a post that lands after the switch is reported as abandoned', async () => {
+  const firstPost = deferred<void>();
+  const started = deferred<void>();
+  const abandoned: (PushTokenPair | null)[] = [];
+  let attempt = 0;
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: async () => tokens(attempt++ === 0 ? 'expo-old' : 'expo-new'),
+    post: async (pair) => {
+      if (pair.token !== 'expo-old') return;
+      started.resolve();
+      await firstPost.promise;
+    },
+    onAbandoned: (pair) => {
+      abandoned.push(pair);
+    },
+  });
+
+  const oldRun = coordinator.register();
+  await started.promise;
+  coordinator.reset();
+  const newRun = coordinator.register();
+  firstPost.resolve();
+
+  await oldRun;
+  await newRun;
+  // The old account's POST wrote its own outcome; the caller has to undo it.
+  assert.deepEqual(abandoned, [tokens('expo-old')]);
+  assert.equal(coordinator.registeredSignature(), 'expo-new|fcm-a');
 });
 
 test('a post that belongs to the old account is not recorded after a switch', async () => {

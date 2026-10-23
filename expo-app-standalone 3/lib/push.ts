@@ -32,6 +32,8 @@ import {
   createPushRegistrationCoordinator,
   type PushTokenPair,
 } from './pushRegistrationCoordinator';
+import { settleAbandonedRegistration } from './pushRegistrationState';
+import { timedOutMessage, withTimeout } from './withTimeout';
 
 /** Where this device's Expo push token is remembered for logout cleanup. */
 const PUSH_TOKEN_KEY = '@push/expo_token';
@@ -141,6 +143,20 @@ const EMPTY_DIAGNOSTICS: PushDiagnostics = {
 };
 
 /**
+ * Expo's token endpoint is a network round trip. Bounded like the OS probe
+ * below: a request the network swallowed would otherwise leave registration
+ * in flight for the life of the process, blocking every later retry.
+ */
+const EXPO_TOKEN_TIMEOUT_MS = 15_000;
+
+/**
+ * Posting the pair is the other network step of registration. It is our own
+ * API rather than Expo's, so the deadline is shorter — and a stalled response
+ * would equally keep the coordinator's in-flight slot occupied.
+ */
+const REGISTER_POST_TIMEOUT_MS = 10_000;
+
+/**
  * Mints the underlying device token. On Android this is an FCM token, which
  * cannot be produced without a Firebase configuration in the build — the
  * failure this surfaces is the whole reason the settings screen has a
@@ -151,12 +167,11 @@ async function probeDeviceToken(
   timeoutMs = 8000,
 ): Promise<{ token: string | null; error: string | null }> {
   try {
-    const result = await Promise.race([
+    const result = await withTimeout(
       Notifications.getDevicePushTokenAsync(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`timed out after ${timeoutMs / 1000}s`)), timeoutMs),
-      ),
-    ]);
+      timeoutMs,
+      timedOutMessage(timeoutMs),
+    );
     const token = typeof result?.data === 'string' ? result.data : null;
     return { token, error: token ? null : 'The OS returned no device token.' };
   } catch (error) {
@@ -182,14 +197,34 @@ function describeError(error: unknown): string {
   if (/FirebaseApp|FCM|google-services|Default FirebaseApp/i.test(message)) {
     return `${message} — Android push needs an FCM (Firebase) project wired into the build. See the setup notes in the settings screen.`;
   }
-  if (/network|fetch|timeout/i.test(message)) {
+  if (/network|fetch|timeout|timed out/i.test(message)) {
     return `${message} — the device could not reach Expo's push service.`;
   }
   return message;
 }
 
+const diagnosticsListeners = new Set<(state: PushDiagnostics) => void>();
+
 async function persistDiagnostics(): Promise<void> {
   await AsyncStorage.setItem(PUSH_STATE_KEY, JSON.stringify(diagnostics)).catch(() => {});
+  // After the write, so a listener that also reads the snapshot sees exactly
+  // what was saved.
+  for (const listener of diagnosticsListeners) listener(diagnostics);
+}
+
+/**
+ * Subscribes to registration changes — every recorded status, permission or
+ * error. The settings screen needs this to replace a "registering" label when
+ * the registration finishes while the screen is open; reading only on mount
+ * left the old label up until the member left and came back.
+ */
+export function subscribePushDiagnostics(
+  listener: (state: PushDiagnostics) => void,
+): () => void {
+  diagnosticsListeners.add(listener);
+  return () => {
+    diagnosticsListeners.delete(listener);
+  };
 }
 
 /** Latest registration outcome. Reads the persisted copy on first call. */
@@ -449,7 +484,11 @@ async function acquirePushTokenPair(): Promise<PushTokenPair | null> {
   diagnostics = { ...diagnostics, status: 'registering' };
   await persistDiagnostics();
 
-  const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+  const { data: token } = await withTimeout(
+    Notifications.getExpoPushTokenAsync({ projectId }),
+    EXPO_TOKEN_TIMEOUT_MS,
+    `Expo push token request ${timedOutMessage(EXPO_TOKEN_TIMEOUT_MS)}`,
+  );
   if (!token) {
     diagnostics = {
       ...diagnostics,
@@ -486,14 +525,18 @@ async function postPushTokenPair({ token, fcmToken }: PushTokenPair): Promise<vo
     await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken).catch(() => {});
   }
 
-  await apiFetch('/api/push/register', {
-    method: 'POST',
-    body: {
-      token,
-      platform: Platform.OS,
-      ...(fcmToken ? { fcmToken } : {}),
-    },
-  });
+  await withTimeout(
+    apiFetch('/api/push/register', {
+      method: 'POST',
+      body: {
+        token,
+        platform: Platform.OS,
+        ...(fcmToken ? { fcmToken } : {}),
+      },
+    }),
+    REGISTER_POST_TIMEOUT_MS,
+    `Registering this device did not finish within ${REGISTER_POST_TIMEOUT_MS / 1000}s`,
+  );
 
   diagnostics = {
     ...diagnostics,
@@ -506,19 +549,78 @@ async function postPushTokenPair({ token, fcmToken }: PushTokenPair): Promise<vo
   await persistDiagnostics();
 }
 
+/**
+ * Settles the state when the coordinator skips a POST for a pair this session
+ * already registered.
+ *
+ * `acquirePushTokenPair` writes "registering" before the coordinator decides,
+ * and only `postPushTokenPair` used to move it on — so a repeat registration
+ * (the token listener, or a foreground retry) left the settings screen saying
+ * "registering" indefinitely while the server already had the tokens. A
+ * skipped pair is by definition one this process posted successfully, so
+ * restoring "registered" is the truthful state.
+ */
+async function noteAlreadyRegistered({ token }: PushTokenPair): Promise<void> {
+  diagnostics = {
+    ...diagnostics,
+    status: 'registered',
+    token,
+    error: null,
+    checkedAt: Date.now(),
+  };
+  lastFailureRetryable = false;
+  await persistDiagnostics();
+}
+
+/**
+ * Settles the state left behind by a registration that was dropped mid-flight
+ * (sign-out or an account switch).
+ *
+ * `acquirePushTokenPair` records "registering" before it asks the OS for a
+ * token, and only a POST — which an abandoned run never reaches — used to move
+ * that marker on. Without this the marker stayed on disk after the session
+ * ended, so the next sign-in opened the settings screen on "registering" for a
+ * registration nobody was running. "unknown" is the truthful state: this
+ * session has not registered yet.
+ *
+ * A status that has already settled is left alone — it belongs to a newer
+ * attempt, which may have run to completion while the old one finished.
+ */
+async function noteRegistrationAbandoned(): Promise<void> {
+  if (!clearAbandonedRegistration()) return;
+  await persistDiagnostics();
+}
+
+/** Applies the settlement rule; false when there was nothing to settle. */
+function clearAbandonedRegistration(): boolean {
+  const settled = settleAbandonedRegistration(diagnostics, Date.now());
+  if (!settled) return false;
+  diagnostics = settled;
+  lastFailureRetryable = false;
+  return true;
+}
+
 // One coordinator for the process: it shares in-flight work, skips an
 // unchanged token pair and abandons work from a replaced account.
 const pushRegistration = createPushRegistrationCoordinator({
   acquire: acquirePushTokenPair,
   post: postPushTokenPair,
+  onAlreadyRegistered: noteAlreadyRegistered,
+  onAbandoned: noteRegistrationAbandoned,
 });
 
 /**
  * The tokens belong to the device, but the server rows belong to the account:
  * a new sign-in must register them again even when the pair has not changed.
+ *
+ * The "registering" marker is settled here as well as in the coordinator:
+ * a dropped token request can hang (Expo's token fetch has no timeout), and
+ * then the abandonment hook never runs — the marker must not survive the
+ * session that was writing it.
  */
 export function resetPushRegistrationState(): void {
   pushRegistration.reset();
+  if (clearAbandonedRegistration()) void persistDiagnostics();
 }
 
 /** Latest in-memory registration status (the settings screen reads details). */
@@ -672,7 +774,7 @@ export async function unregisterStoredPushTokenAsync(options?: {
   // POST was already on the wire, let it settle briefly so the DELETE below
   // is the last write for this token.
   const pending = pushRegistration.pending();
-  pushRegistration.reset();
+  resetPushRegistrationState();
   if (pending) {
     await Promise.race([
       pending.catch(() => {}),

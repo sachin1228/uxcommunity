@@ -96,6 +96,15 @@ jobs:
       - name: Run mobile content action tests
         run: npm run test:mobile-content-actions
 
+      # Blocking. Push registration decides whether a member's device receives
+      # anything at all, and its failure modes are silent: a token echo that
+      # re-posts forever, a skipped post that leaves the settings screen on
+      # "registering", a request with no deadline that blocks every retry. The
+      # state machine, the settlement rule and the deadline helper import no
+      # React Native, so they run here like the suites above.
+      - name: Run mobile push tests
+        run: npm run test:mobile-push
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest
