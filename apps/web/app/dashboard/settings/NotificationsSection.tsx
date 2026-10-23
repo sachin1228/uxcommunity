@@ -98,8 +98,8 @@ export function NotificationsSection({ initial }: NotificationsSectionProps) {
           onChange={(checked) => void save({ chatPushEnabled: checked })}
         />
         <ToggleRow
-          title="Community updates"
-          description="Get push alerts when an owner accepts your request to join."
+          title="Activity updates"
+          description="Get push alerts for likes, comments, job matches and other activity."
           checked={prefs.communityPushEnabled}
           onChange={(checked) => void save({ communityPushEnabled: checked })}
         />
@@ -112,7 +112,7 @@ export function NotificationsSection({ initial }: NotificationsSectionProps) {
         <div>
           <ToggleRow
             title="Quiet hours"
-            description="Hold chat pushes overnight."
+            description="Hold chat and activity pushes overnight."
             checked={prefs.quietHoursEnabled}
             onChange={(checked) => saveQuietHours({ quietHoursEnabled: checked })}
           />

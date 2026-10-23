@@ -10,26 +10,16 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import {
   pushDataFrom,
   registerBadgeRefresh,
   registerForPushNotificationsAsync,
   registerNotificationHandler,
-  type PushData,
 } from '@/lib/push';
+import { routeForPush } from '@/lib/pushRoutes';
 import { fetchNotificationSettings } from '@/lib/notificationSettings';
-
-/** Where a tap opens: the chat it came from, the event's room, or the home feed. */
-function routeForPush(data: PushData): Href {
-  if (data.type === 'community_message') {
-    return { pathname: '/community/[id]', params: { id: data.communityId } };
-  }
-  return data.communityId
-    ? { pathname: '/community/[id]', params: { id: data.communityId } }
-    : '/(tabs)';
-}
 
 export function usePushNotifications() {
   const { user } = useAuth();

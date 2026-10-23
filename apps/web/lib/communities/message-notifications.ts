@@ -170,6 +170,51 @@ export async function notifyIncomingCommunityMessage(
   }
 }
 
+export interface IncomingDirectMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string | null;
+  content: string;
+  hasImage: boolean;
+  isReply: boolean;
+}
+
+/**
+ * The DM twin of `notifyIncomingCommunityMessage`: same permission, sound and
+ * seen-set, but the title is the sender and the tap opens the conversation.
+ */
+export function notifyIncomingDirectMessage(
+  userId: string,
+  message: IncomingDirectMessage,
+) {
+  if (message.senderId === userId || !markMessageNotificationSeen(message.id)) return;
+  const preferences = readMessageNotificationPreferences(userId);
+  const attentionAway = document.visibilityState === "hidden" || !document.hasFocus();
+  if (preferences.sound && attentionAway) void playMessageSound();
+
+  const permission = typeof Notification === "undefined"
+    ? "unsupported"
+    : Notification.permission;
+  if (!shouldShowBrowserNotification(preferences, permission, attentionAway)) return;
+
+  try {
+    const notification = new Notification(message.senderName?.trim() || "New message", {
+      body: formatMessageNotificationPreview(message),
+      tag: `dm-message-${message.id}`,
+    });
+    notification.onclick = () => {
+      window.focus();
+      // A native Notification callback runs outside React, so a full navigation is intentional.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/dashboard/messages?peer=${encodeURIComponent(message.senderId)}`);
+      notification.close();
+    };
+  } catch {
+    // Native notifications are best-effort and must not interrupt realtime chat.
+  }
+}
+
 export function useMessageNotificationPreferences(userId: string) {
   const [preferences, setPreferences] = useState<MessageNotificationPreferences>(() =>
     readMessageNotificationPreferences(userId),

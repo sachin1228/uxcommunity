@@ -5,28 +5,24 @@ import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 
 /**
- * Desktop browser notifications for event lifecycle rows.
+ * Desktop browser notifications for every in-app notification row.
  *
- * The in-app bell already listens to the notifications room, but only while
- * the tab is visible — exactly when a desktop notification is not needed. This
- * hook keeps its own subscription for as long as the dashboard is mounted
- * (the same way the sidebar's chat rooms stay connected in a background tab)
- * and raises the OS notification only when the page is hidden or another
- * window has focus.
+ * The bell only refreshes while its tab is visible — exactly when a desktop
+ * notification is not needed. This hook keeps its own subscription to the
+ * notifications room for as long as the dashboard is mounted (the same way
+ * the sidebar's chat rooms stay connected in a background tab) and raises the
+ * OS notification only when the page is hidden or another window has focus.
  *
- * Only the three lifecycle types qualify: engagement notifications keep their
- * existing in-app-only behaviour. The browser permission is the one the
- * sidebar's notification prompt already asks for; there is nothing new to
- * grant here.
+ * Rows cover the whole bell: likes, comments and replies, event activity,
+ * job matches, accepted join requests, report outcomes and removals. Chat
+ * messages and DMs are not notification rows and have their own browser
+ * notifications (see lib/communities/message-notifications).
+ *
+ * The permission is the one the sidebar's notification prompt already asks
+ * for; there is nothing new to grant here.
  */
 
-const EVENT_BROWSER_TYPES: ReadonlySet<string> = new Set([
-  "event_reminder",
-  "event_live",
-  "event_ended",
-]);
-
-interface EventNotificationRow {
+interface InAppNotificationRow {
   id: string;
   type: string;
   title: string;
@@ -37,7 +33,7 @@ interface EventNotificationRow {
 }
 
 /** The rule, isolated so it is testable without a DOM. */
-export function shouldShowEventBrowserNotification(
+export function shouldShowInAppBrowserNotification(
   permission: NotificationPermission | "unsupported",
   attentionAway: boolean,
 ): boolean {
@@ -46,11 +42,11 @@ export function shouldShowEventBrowserNotification(
 
 /**
  * One key per distinct notification state. An aggregated row bumps its
- * `created_at` and swaps its title, so the live/ended update is a new key and
- * the same row read on another device is not.
+ * `created_at` and swaps its title, so a new event is a new key and the same
+ * row read on another device is not.
  */
-export function eventBrowserNotificationKey(
-  row: Pick<EventNotificationRow, "id" | "title" | "created_at">,
+export function inAppBrowserNotificationKey(
+  row: Pick<InAppNotificationRow, "id" | "title" | "created_at">,
 ): string {
   return `${row.id}|${row.title}|${row.created_at}`;
 }
@@ -59,19 +55,18 @@ function attentionAway(): boolean {
   return document.visibilityState === "hidden" || !document.hasFocus();
 }
 
-function show(row: Partial<EventNotificationRow> | null | undefined, seen: Set<string>): void {
+function show(row: Partial<InAppNotificationRow> | null | undefined, seen: Set<string>): void {
   if (
     !row ||
     typeof row.id !== "string" ||
     typeof row.type !== "string" ||
-    !EVENT_BROWSER_TYPES.has(row.type) ||
     row.read_at ||
     typeof row.title !== "string"
   ) {
     return;
   }
 
-  const key = eventBrowserNotificationKey(row as EventNotificationRow);
+  const key = inAppBrowserNotificationKey(row as InAppNotificationRow);
   if (seen.has(key)) return;
   seen.add(key);
   if (seen.size > 200) {
@@ -81,12 +76,12 @@ function show(row: Partial<EventNotificationRow> | null | undefined, seen: Set<s
 
   const permission =
     typeof Notification === "undefined" ? "unsupported" : Notification.permission;
-  if (!shouldShowEventBrowserNotification(permission, attentionAway())) return;
+  if (!shouldShowInAppBrowserNotification(permission, attentionAway())) return;
 
   try {
     const notification = new Notification(row.title, {
       body: row.body ?? "",
-      tag: `event-notification-${row.id}`,
+      tag: `in-app-notification-${row.id}`,
     });
     notification.onclick = () => {
       window.focus();
@@ -101,7 +96,7 @@ function show(row: Partial<EventNotificationRow> | null | undefined, seen: Set<s
   }
 }
 
-export function useEventBrowserNotifications(userId: string | null | undefined): void {
+export function useInAppBrowserNotifications(userId: string | null | undefined): void {
   useEffect(() => {
     if (!userId) return;
 
@@ -113,10 +108,10 @@ export function useEventBrowserNotifications(userId: string | null | undefined):
     const unsubRoom = realtimeClient.subscribe(room);
 
     const offInsert = realtimeClient.on(room, "insert", (data) => {
-      show(data as Partial<EventNotificationRow>, seen);
+      show(data as Partial<InAppNotificationRow>, seen);
     });
     const offUpdate = realtimeClient.on(room, "update", (data) => {
-      const payload = data as { next?: Partial<EventNotificationRow> };
+      const payload = data as { next?: Partial<InAppNotificationRow> };
       show(payload.next, seen);
     });
 

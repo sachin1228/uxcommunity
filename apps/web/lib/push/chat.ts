@@ -169,7 +169,11 @@ const TOKEN_DELETE_CHUNK = 200;
  * same whether it arrives as a browser notification or as a push. It lives in
  * a "use client" module, so it cannot be imported here.
  */
-function preview(message: { content: string | null; hasImage: boolean; isReply: boolean }): string {
+export function messagePushPreview(message: {
+  content: string | null;
+  hasImage: boolean;
+  isReply: boolean;
+}): string {
   const normalized = (message.content ?? "").replace(/\s+/g, " ").trim();
   if (!normalized) {
     if (message.hasImage) return "Sent a photo";
@@ -456,7 +460,7 @@ export async function sendChatMessagePush(
     const communityName =
       (communityResult.data as { name?: string } | null)?.name ?? "New message";
 
-    const body = `${senderName ?? "Someone"}: ${preview({ content, hasImage, isReply })}`;
+    const body = `${senderName ?? "Someone"}: ${messagePushPreview({ content, hasImage, isReply })}`;
     const deadTokens = new Set<string>();
     // Ticket IDs Expo accepted this fan-out with, kept only for as long as this
     // call runs: a receipt is looked up from them at the end (see

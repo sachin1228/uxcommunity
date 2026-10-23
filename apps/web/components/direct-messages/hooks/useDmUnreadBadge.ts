@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
+import { notifyIncomingDirectMessage } from "@/lib/communities/message-notifications";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import {
@@ -27,7 +27,6 @@ const STALE_MS = 30_000;
  */
 export function useDmUnreadBadge(userId: string) {
   initRequestCache(userId);
-  const isVisible = useDocumentVisible();
   const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [count, setCount] = useState(
@@ -72,8 +71,12 @@ export function useDmUnreadBadge(userId: string) {
   // wasn't already counted, which the badge cannot know from the bare number —
   // so refetch (debounced, so a burst costs one round trip) instead of
   // bumping. Reading a conversation invalidates the cache and refetches too.
+  //
+  // This subscription deliberately stays open while the tab is hidden: it is
+  // what raises the DM browser notification (the bell's room does the same
+  // for activity rows). Only the attention-away check in the helper decides
+  // whether the OS should interrupt.
   useEffect(() => {
-    if (!isVisible) return;
     const room = realtimeRooms.dm(userId);
 
     realtimeClient.init({ id: userId, name: null, avatar: null });
@@ -81,9 +84,30 @@ export function useDmUnreadBadge(userId: string) {
     realtimeClient.connect();
 
     const unsub = realtimeClient.on(room, "dm-message", (data) => {
-      const row = data as { conversation_id?: string; user_id?: string } | null;
+      const row = data as {
+        id?: string;
+        conversation_id?: string;
+        user_id?: string;
+        sender_name?: string | null;
+        content?: string | null;
+        image_url?: string | null;
+        reply_to_id?: string | null;
+      } | null;
       if (!row?.conversation_id || !row.user_id) return;
       if (row.user_id === userId) return;
+
+      if (row.id) {
+        notifyIncomingDirectMessage(userId, {
+          id: row.id,
+          conversationId: row.conversation_id,
+          senderId: row.user_id,
+          senderName: row.sender_name ?? null,
+          content: row.content ?? "",
+          hasImage: !!row.image_url,
+          isReply: !!row.reply_to_id,
+        });
+      }
+
       if (isActivelyReading(row.conversation_id)) return;
 
       if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
@@ -100,7 +124,7 @@ export function useDmUnreadBadge(userId: string) {
       unsub();
       unsubRoom();
     };
-  }, [userId, isVisible]);
+  }, [userId]);
 
   return count;
 }

@@ -13,6 +13,7 @@ import {
 } from "@/lib/direct-messages/server";
 import { isAllowedDmImageUrl } from "@/lib/direct-messages/assets";
 import { publishDmEvent } from "@/lib/direct-messages/publish";
+import { sendDirectMessagePush } from "@/lib/push/direct-message";
 import type { DmRequestState } from "@/lib/direct-messages/types";
 
 const MAX_CONTENT_CHARS = 2000;
@@ -398,6 +399,19 @@ export async function POST(
           },
         });
       }
+
+      // The recipient's phone, not just their other open tab. Best-effort:
+      // the helper swallows and logs its own failures, so a push can never
+      // turn a committed message into an error for the sender.
+      await sendDirectMessagePush({
+        recipientId: dmPeerId(conversation, userId),
+        conversationId,
+        messageId: inserted.id,
+        senderName,
+        content: inserted.content,
+        hasImage: !!inserted.image_url,
+        isReply: !!inserted.reply_to_id,
+      });
     } catch (err) {
       console.error("[POST dm message] realtime publish error:", err);
     }
