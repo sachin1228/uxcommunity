@@ -506,11 +506,35 @@ async function postPushTokenPair({ token, fcmToken }: PushTokenPair): Promise<vo
   await persistDiagnostics();
 }
 
+/**
+ * Settles the state when the coordinator skips a POST for a pair this session
+ * already registered.
+ *
+ * `acquirePushTokenPair` writes "registering" before the coordinator decides,
+ * and only `postPushTokenPair` used to move it on — so a repeat registration
+ * (the token listener, or a foreground retry) left the settings screen saying
+ * "registering" indefinitely while the server already had the tokens. A
+ * skipped pair is by definition one this process posted successfully, so
+ * restoring "registered" is the truthful state.
+ */
+async function noteAlreadyRegistered({ token }: PushTokenPair): Promise<void> {
+  diagnostics = {
+    ...diagnostics,
+    status: 'registered',
+    token,
+    error: null,
+    checkedAt: Date.now(),
+  };
+  lastFailureRetryable = false;
+  await persistDiagnostics();
+}
+
 // One coordinator for the process: it shares in-flight work, skips an
 // unchanged token pair and abandons work from a replaced account.
 const pushRegistration = createPushRegistrationCoordinator({
   acquire: acquirePushTokenPair,
   post: postPushTokenPair,
+  onAlreadyRegistered: noteAlreadyRegistered,
 });
 
 /**

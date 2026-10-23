@@ -7,7 +7,9 @@
  * This coordinator makes the rules explicit:
  *
  *   - one acquire/post at a time per session epoch (callers share the promise)
- *   - the same Expo+FCM token pair is posted at most once per epoch
+ *   - the same Expo+FCM token pair is posted at most once per epoch; a skipped
+ *     post is reported through `onAlreadyRegistered` (see its note), so a
+ *     caller that recorded "registering" can settle on "registered"
  *   - `reset()` (sign-in/out, account switch) abandons in-flight work: a late
  *     acquire/post from the old account can never be recorded or retried
  *
@@ -25,6 +27,16 @@ export interface PushRegistrationDependencies {
   acquire(): Promise<PushTokenPair | null>;
   /** Posts one token pair for the current session. */
   post(tokens: PushTokenPair): Promise<void>;
+  /**
+   * Called instead of `post` when this session already posted the same pair.
+   *
+   * The caller's acquisition step has just reported "registering", and no POST
+   * will follow — so without this the recorded state would stay there until
+   * the process ends even though the device is registered. Kept out of the
+   * coordinator so the state machine stays free of storage and diagnostics;
+   * it must not change the outcome of `register()`.
+   */
+  onAlreadyRegistered?(tokens: PushTokenPair): void | Promise<void>;
 }
 
 export interface PushRegistrationCoordinator {
@@ -44,6 +56,7 @@ function signatureOf(tokens: PushTokenPair): string {
 export function createPushRegistrationCoordinator({
   acquire,
   post,
+  onAlreadyRegistered,
 }: PushRegistrationDependencies): PushRegistrationCoordinator {
   let epoch = 0;
   let inFlight: { epoch: number; promise: Promise<string | null> } | null = null;
@@ -66,6 +79,8 @@ export function createPushRegistrationCoordinator({
         // Do not remember a post that belongs to the previous account.
         if (startedEpoch !== epoch) return null;
         registered = nextSignature;
+      } else {
+        await onAlreadyRegistered?.(tokens);
       }
       return tokens.token;
     })().finally(() => {

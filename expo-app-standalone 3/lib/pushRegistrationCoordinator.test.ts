@@ -42,6 +42,50 @@ test('repeated token events with the same pair post exactly once', async () => {
   assert.equal(coordinator.registeredSignature(), 'expo-a|fcm-a');
 });
 
+test('a skipped repeat reports the pair so the caller can settle on registered', async () => {
+  let posted = 0;
+  const skipped: PushTokenPair[] = [];
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: async () => tokens('expo-a'),
+    post: async () => {
+      posted += 1;
+    },
+    onAlreadyRegistered: async (pair) => {
+      skipped.push(pair);
+    },
+  });
+
+  await coordinator.register();
+  await coordinator.register();
+  await coordinator.register();
+
+  // Only the repeats are reported; the first registration was a real POST.
+  assert.equal(posted, 1);
+  assert.deepEqual(skipped, [tokens('expo-a'), tokens('expo-a')]);
+});
+
+test('a pair is only reported as already registered after a successful post', async () => {
+  let attempts = 0;
+  const skipped: string[] = [];
+  const coordinator = createPushRegistrationCoordinator({
+    acquire: async () => tokens('expo-a'),
+    post: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('network down');
+    },
+    onAlreadyRegistered: ({ token }) => {
+      skipped.push(token);
+    },
+  });
+
+  await assert.rejects(coordinator.register(), /network down/);
+  // Nothing was posted, so this attempt must post rather than skip.
+  await coordinator.register();
+  await coordinator.register();
+
+  assert.deepEqual(skipped, ['expo-a']);
+});
+
 test('concurrent callers share one acquire and one post', async () => {
   const pending = deferred<PushTokenPair | null>();
   let acquired = 0;
