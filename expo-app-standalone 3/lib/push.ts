@@ -150,6 +150,13 @@ const EMPTY_DIAGNOSTICS: PushDiagnostics = {
 const EXPO_TOKEN_TIMEOUT_MS = 15_000;
 
 /**
+ * Posting the pair is the other network step of registration. It is our own
+ * API rather than Expo's, so the deadline is shorter — and a stalled response
+ * would equally keep the coordinator's in-flight slot occupied.
+ */
+const REGISTER_POST_TIMEOUT_MS = 10_000;
+
+/**
  * Mints the underlying device token. On Android this is an FCM token, which
  * cannot be produced without a Firebase configuration in the build — the
  * failure this surfaces is the whole reason the settings screen has a
@@ -498,14 +505,18 @@ async function postPushTokenPair({ token, fcmToken }: PushTokenPair): Promise<vo
     await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken).catch(() => {});
   }
 
-  await apiFetch('/api/push/register', {
-    method: 'POST',
-    body: {
-      token,
-      platform: Platform.OS,
-      ...(fcmToken ? { fcmToken } : {}),
-    },
-  });
+  await withTimeout(
+    apiFetch('/api/push/register', {
+      method: 'POST',
+      body: {
+        token,
+        platform: Platform.OS,
+        ...(fcmToken ? { fcmToken } : {}),
+      },
+    }),
+    REGISTER_POST_TIMEOUT_MS,
+    `Registering this device did not finish within ${REGISTER_POST_TIMEOUT_MS / 1000}s`,
+  );
 
   diagnostics = {
     ...diagnostics,
