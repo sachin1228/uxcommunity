@@ -1063,11 +1063,14 @@ export default function CommunityChat() {
       if (item.kind === 'date') {
         return (
           <View style={styles.dateDivider}>
-            <View style={[styles.dateLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
+            <Text
+              style={[
+                styles.datePill,
+                { color: colors.mutedForeground, backgroundColor: colors.surfaceRaised },
+              ]}
+            >
               {item.label}
             </Text>
-            <View style={[styles.dateLine, { backgroundColor: colors.border }]} />
           </View>
         );
       }
@@ -1847,19 +1850,24 @@ const styles = StyleSheet.create({
     // the oldest — the reverse of the non-inverted list this replaces.
     paddingBottom: 4,
   },
-  /** Day label between two hairline rules — the unread divider's shape. */
   dateDivider: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
-  /** Hairline rules flanking the day — the unread divider's border, softened. */
-  dateLine: { flex: 1, height: StyleSheet.hairlineWidth, opacity: 0.5 },
-  dateLabel: {
-    fontSize: 12,
+  /** Centered day chip — a small raised pill, as the DM thread draws it. */
+  datePill: {
+    fontSize: 11,
     fontFamily: 'Geist_500Medium',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
   },
   unreadDivider: {
     flexDirection: 'row',
