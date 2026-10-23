@@ -313,15 +313,16 @@ export const MessageList = memo(function MessageList({
                 down with every prepend. */}
             {groupIdx === 0 && !hasMoreAbove && <DisappearingNotice />}
 
-            {/* Date divider — the day sits between two hairline rules, the same
-                shape as the unread divider, without a pill behind it. */}
+            {/* Date divider — the day sits between two hairline rules drawn in
+                the unread divider's border colour, softened so they read as a
+                whisper rather than a line across the room. */}
             {showDateDivider && (
               <div className="flex items-center gap-3 py-3 px-5">
-                <div className="flex-1 border-t border-border" />
+                <div className="flex-1 border-t border-border opacity-50" />
                 <span className="font-body text-xs font-medium text-foreground-muted whitespace-nowrap">
                   {group.date}
                 </span>
-                <div className="flex-1 border-t border-border" />
+                <div className="flex-1 border-t border-border opacity-50" />
               </div>
             )}
 

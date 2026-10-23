@@ -1855,7 +1855,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  dateLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  /** Hairline rules flanking the day — the unread divider's border, softened. */
+  dateLine: { flex: 1, height: StyleSheet.hairlineWidth, opacity: 0.5 },
   dateLabel: {
     fontSize: 12,
     fontFamily: 'Geist_500Medium',
