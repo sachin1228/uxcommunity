@@ -232,10 +232,14 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
         }}
         delayLongPress={350}
         accessible={false}
-        style={styles.rowPress}
+        style={[
+          styles.rowPress,
+          { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
+        ]}
       >
-      {/* Avatar rail — every author hangs off the left, own cards included,
-          matching the message bubbles beside them. */}
+      {/* Avatar rail — other members only; your own cards sit on the right
+          with no avatar, matching your own message bubbles. */}
+      {!isOwn && (
       <View style={styles.avatarCol}>
           <Pressable
             onPress={handleAuthorPress}
@@ -256,6 +260,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
             />
           </Pressable>
       </View>
+      )}
 
       <View style={[styles.contentCol, { width: bubbleWidth }]}>
         <View style={styles.bubbleWrap}>
@@ -272,11 +277,11 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
             style={[
               styles.bubble,
               { backgroundColor: isOwn ? colors.chatOwnBubble : colors.surfaceRaised, shadowColor: '#000' },
-              styles.bubbleOther,
+              isOwn ? styles.bubbleOwn : styles.bubbleOther,
             ]}
           >
             <MessageBubbleTail
-              side="left"
+              side={isOwn ? 'right' : 'left'}
               color={isOwn ? colors.chatOwnBubble : colors.surfaceRaised}
             />
 
@@ -459,6 +464,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   bubbleOther: { borderTopLeftRadius: 0 },
+  bubbleOwn: { borderTopRightRadius: 0 },
 
   headerRow: {
     flexDirection: 'row',

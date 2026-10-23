@@ -185,10 +185,13 @@ export function ContentNotificationBubble({
   return (
     <div
       data-content-id={event.id}
-      className="group flex w-full items-start justify-start gap-2 px-5 mt-2"
+      className={`group flex w-full items-start gap-2 px-5 mt-2 ${
+        isMe ? "justify-end" : "justify-start"
+      }`}
     >
-      {/* Avatar rail — every author hangs off the left, own cards included,
-          matching the message bubbles beside them. */}
+      {/* Avatar rail — other members only; your own cards sit on the right
+          with no avatar, matching your own message bubbles. */}
+      {!isMe && (
       <div className="w-7 shrink-0 mt-0.5">
         {event.user_id ? (
           <Link
@@ -202,22 +205,25 @@ export function ContentNotificationBubble({
           <ChatAvatar name={senderName} url={sender?.avatar_url ?? null} size={7} />
         )}
       </div>
+      )}
 
       {/* Bubble column — bubble + hover actions live in one inner row, exactly
           like MessageBubble: actions sit to the RIGHT of other members'
           bubbles and to the LEFT of own (right-aligned) bubbles. */}
       <div className="min-w-0 max-w-[65%]">
-        <div className="flex items-center gap-1">
+        <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
           <div className="relative min-w-0">
         <div
-          className={`relative select-none rounded-[10px] rounded-tl-none px-3 pt-2 pb-3 shadow-sm ${
+          className={`relative select-none rounded-[10px] px-3 pt-2 pb-3 shadow-sm ${
+            isMe ? "rounded-tr-none" : "rounded-tl-none"
+          } ${
             isMe
               ? "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
               : "bg-surface-raised"
           }`}
         >
           <MessageBubbleTail
-            side="left"
+            side={isMe ? "right" : "left"}
             className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
           />
 

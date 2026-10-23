@@ -510,7 +510,8 @@ function DeletedBubble({
   /** Community layout: tail/rounding on the left and the time in the header. */
   leftRail?: boolean;
 }) {
-  const alignRight = !leftRail && isMe;
+  // Same sides as a live bubble: others left, your own right (no avatar).
+  const alignRight = isMe;
   return (
     // Stacked exactly like a live bubble — header row, message row — so a
     // deleted message keeps the shape of the conversation around it instead of
@@ -650,7 +651,10 @@ export const MessageBubble = memo(function MessageBubble({
   // Community rooms read as one column (every bubble on the avatar rail, own
   // included); direct messages keep the two-sided layout.
   const leftRail = variant === "community";
-  const alignRight = !leftRail && isMe;
+  // Your own bubbles keep the right side of the room in both variants —
+  // they just lose the avatar. Community still puts the name + time in the
+  // header (and shows no delivery ticks); DMs keep the footer timestamp.
+  const alignRight = isMe;
 
   // Long-press (touch) opens the same menu as the hover "more" button —
   // touch users had no way to reach reply/copy/delete/reactions at all.
@@ -708,10 +712,10 @@ export const MessageBubble = memo(function MessageBubble({
           alignRight ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
       >
-        {/* Avatar rail — every author hangs off the left, own messages
-            included (community chat is one column, like a group thread).
-            Direct messages hide it for your own bubbles, as before. */}
-        {(leftRail || !isMe) && (
+        {/* Avatar rail — other members hang off the left; your own bubbles
+            are right-aligned and carry no avatar (the header already says
+            "You"). */}
+        {!isMe && (
         <div className="w-7 shrink-0">
           {showHeader && (
             msg.user_id ? (

@@ -656,10 +656,11 @@ export const MessageBubble = memo(function MessageBubble({
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
 
-  // Community rooms read as one column (every bubble on the avatar rail, own
-  // included); direct messages keep the two-sided layout.
+  // Other members hang off the left avatar rail; your own bubbles keep the
+  // right side of the room in both variants — just without an avatar. Community
+  // still puts the name + time in the header and shows no delivery ticks.
   const leftRail = variant === 'community';
-  const alignRight = !leftRail && isOwn;
+  const alignRight = isOwn;
   /** Long-message collapse is owned here so a bubble tap can expand it too. */
   const [textExpanded, setTextExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
@@ -832,10 +833,9 @@ export const MessageBubble = memo(function MessageBubble({
           { justifyContent: alignRight ? 'flex-end' : 'flex-start' },
         ]}
       >
-      {/* Avatar rail — every author hangs off the left, own messages
-          included (community chat is one column, like a group thread).
-          Direct messages hide it for your own bubbles, as before. */}
-      {(leftRail || !isOwn) && (
+      {/* Avatar rail — other members only; your own bubbles are right-aligned
+          and carry no avatar (the header already says "You"). */}
+      {!isOwn && (
         <View style={styles.avatarCol}>
           {showHeader && (
             <Pressable
