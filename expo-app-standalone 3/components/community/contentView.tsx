@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -715,11 +716,20 @@ export function ContentCard({
   videoRank = 0,
 }: ContentCardProps) {
   const colors = useColors();
+  const router = useRouter();
   const thread = kind === 'threads' ? item as CommunityThread : null;
   const event = kind === 'events' ? item as CommunityEvent : null;
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const showcase = kind === 'showcase' ? item as CommunityShowcase : null;
   const author = contentAuthor(item);
+  // The web `PostAuthorMeta` links the avatar and name whenever the API
+  // hydrated the author — the card itself has no route of its own.
+  const authorProfileId = author ? item.user_id : null;
+  const openAuthorProfile = useCallback(() => {
+    if (!authorProfileId || authorProfileId === currentUserId) return;
+    hapticSelection();
+    router.push({ pathname: '/member/[id]', params: { id: authorProfileId } });
+  }, [authorProfileId, currentUserId, router]);
   const images = (thread?.attachments ?? [])
     .filter((attachment) => attachment.type.startsWith('image/'));
   const showcaseMedia = showcase ? showcaseMediaForPost(showcase) : [];
@@ -805,12 +815,28 @@ export function ContentCard({
         {/* Author meta — name and relative date on one line, the category as
             the muted second line, exactly like the web `PostAuthorMeta`. */}
         <View style={styles.authorRow}>
-          <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
+          <Pressable
+            onPress={openAuthorProfile}
+            disabled={!authorProfileId || authorProfileId === currentUserId}
+            hitSlop={6}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${author?.name ?? 'the author'}'s profile`}
+          >
+            <PersonAvatar name={author?.name} url={author?.avatar_url} size={40} />
+          </Pressable>
           <View style={styles.authorCopy}>
             <View style={styles.authorLine}>
-              <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
-                {author?.name ?? 'Community member'}
-              </Text>
+              <Pressable
+                onPress={openAuthorProfile}
+                disabled={!authorProfileId || authorProfileId === currentUserId}
+                hitSlop={6}
+                style={styles.authorNamePress}
+                accessibilityRole="link"
+              >
+                <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
+                  {author?.name ?? 'Community member'}
+                </Text>
+              </Pressable>
               <Text style={[styles.meta, { color: colors.foregroundSubtle }]} numberOfLines={1}>
                 {formatRelativeDate(item.created_at)}
               </Text>
@@ -2157,6 +2183,7 @@ const styles = StyleSheet.create({
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   authorCopy: { flex: 1 },
   authorLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  authorNamePress: { flexShrink: 1 },
   author: { flexShrink: 1, fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   meta: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
   secondaryLabel: { fontSize: 11, fontFamily: 'Geist_600SemiBold', marginTop: 1 },
