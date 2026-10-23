@@ -45,22 +45,30 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
 let sessionToken: string | null | undefined;
 let sessionTokenRead: Promise<string | null> | null = null;
 
-const unauthorizedListeners = new Set<() => void>();
+const unauthorizedListeners = new Set<(usedToken: string | null) => void>();
 
 /**
  * Fires when the API rejects the session (outside the login route, where a 401
- * means "wrong password", not "signed out"). The auth provider listens so an
- * expired cookie can never leave the app showing a signed-in shell.
+ * means "wrong password", not "signed out"). The listener also receives the
+ * cookie the failed request used: a response that lands after the member has
+ * signed in again must not clear the new session.
  */
-export function subscribeUnauthorized(listener: () => void): () => void {
+export function subscribeUnauthorized(
+  listener: (usedToken: string | null) => void,
+): () => void {
   unauthorizedListeners.add(listener);
   return () => {
     unauthorizedListeners.delete(listener);
   };
 }
 
-function notifyUnauthorized(): void {
-  unauthorizedListeners.forEach((listener) => listener());
+function notifyUnauthorized(usedToken: string | null): void {
+  unauthorizedListeners.forEach((listener) => listener(usedToken));
+}
+
+/** The cookie currently held in memory (undefined = still loading). */
+export function peekSessionToken(): string | null | undefined {
+  return sessionToken;
 }
 
 /**
@@ -106,7 +114,7 @@ export async function apiFormUpload<T = unknown>(
   }
 
   if (!response.ok) {
-    if (response.status === 401 && path !== '/api/auth/login') notifyUnauthorized();
+    if (response.status === 401 && path !== '/api/auth/login') notifyUnauthorized(sessionToken);
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & { status: number; data: unknown };
@@ -189,7 +197,6 @@ export async function apiFetch<T = unknown>(
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     ...(signal ? { signal } : {}),
   });
-
   // Capture session cookie on responses that set one
   const setCookie = response.headers.get('set-cookie');
   if (setCookie) {
@@ -205,7 +212,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!response.ok) {
-    if (response.status === 401 && path !== '/api/auth/login') notifyUnauthorized();
+    if (response.status === 401 && path !== '/api/auth/login') notifyUnauthorized(sessionToken);
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & {

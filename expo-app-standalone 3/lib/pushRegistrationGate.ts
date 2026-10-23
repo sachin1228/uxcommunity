@@ -19,3 +19,20 @@ export function shouldHandleTokenEvent({
   if (inFlight) return false;
   return now - lastRegistrationAt >= TOKEN_EVENT_COOLDOWN_MS;
 }
+
+/**
+ * A genuine FCM/APNs rotation must not be swallowed by the cooldown above.
+ * The event carries the new device token; comparing it with the last token the
+ * registration read tells a real rotation apart from the echo our own read
+ * produces.
+ */
+export function isNewDeviceToken(
+  observedDeviceToken: string | null,
+  eventToken: unknown,
+): boolean {
+  return (
+    typeof eventToken === 'string' &&
+    eventToken.length > 0 &&
+    eventToken !== observedDeviceToken
+  );
+}

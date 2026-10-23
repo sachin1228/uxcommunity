@@ -61,24 +61,32 @@ export default function MessagesScreen() {
   const [query, setQuery] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedOnceRef = useRef(false);
+  const userIdRef = useRef(userId);
+  const loadedForUserRef = useRef<string | null>(null);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
+    if (!userId) return;
     if (mode === 'initial') setLoading(true);
     if (mode === 'refresh') setRefreshing(true);
     if (mode !== 'silent') setError(null);
     try {
       const rows = await loadDmConversations({ fresh: true });
+      if (userIdRef.current !== userId) return;
+      loadedForUserRef.current = userId;
       setConversations(rows);
       if (mode !== 'silent') setError(null);
     } catch (e) {
+      if (userIdRef.current !== userId) return;
       if (mode !== 'silent') {
         setError(e instanceof Error ? e.message : 'Failed to load messages.');
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (userIdRef.current === userId) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [userId]);
 
   // The focus callback is the mount load too — a separate mount effect fired
   // the same request a beat later, so every open cost two identical reads.
@@ -91,10 +99,31 @@ export default function MessagesScreen() {
 
   // Cold launch: paint the last conversation list while the live read lands.
   useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  const previousUserRef = useRef(userId);
+  useEffect(() => {
+    if (previousUserRef.current === userId) return;
+    previousUserRef.current = userId;
+    loadedForUserRef.current = null;
+    setConversations([]);
+    setError(null);
+    setQuery('');
+    setLoading(true);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, [userId]);
+
+  useEffect(() => {
     if (!userId) return undefined;
     let active = true;
     void chatCache.loadDmConversationList(userId).then((rows) => {
       if (!active || !rows || rows.length === 0) return;
+      loadedForUserRef.current = userId;
       if (!peekDmConversations()) seedDmConversationsFromDisk(rows);
       setConversations((prev) => (prev.length > 0 ? prev : rows));
       setLoading(false);
@@ -110,13 +139,16 @@ export default function MessagesScreen() {
   const pendingSaveRef = useRef<DmConversation[] | null>(null);
   useEffect(() => {
     if (!userId || conversations.length === 0) return;
+    if (loadedForUserRef.current !== userId) return;
     pendingSaveRef.current = conversations;
     if (saveTimerRef.current) return;
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
-      if (pending) void chatCache.saveDmConversationList(userId, pending);
+      if (pending && loadedForUserRef.current === userId) {
+        void chatCache.saveDmConversationList(userId, pending);
+      }
     }, 800);
   }, [conversations, userId]);
 
@@ -128,7 +160,9 @@ export default function MessagesScreen() {
       }
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
-      if (pending && userId) void chatCache.saveDmConversationList(userId, pending);
+      if (pending && userId && loadedForUserRef.current === userId) {
+        void chatCache.saveDmConversationList(userId, pending);
+      }
     },
     [userId],
   );

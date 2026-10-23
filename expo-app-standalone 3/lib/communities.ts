@@ -147,14 +147,32 @@ export const COMMUNITIES_LIST_STALE_MS = 60_000;
 let communitiesSnapshot: Community[] | null = null;
 let communitiesFetchedAt = 0;
 let communitiesInFlight: Promise<Community[]> | null = null;
+/**
+ * The member this shared copy belongs to. A page fetched for the previous
+ * account can settle late; an epoch bump makes it un-storable, so the next
+ * member never sees it.
+ */
+let communitiesActiveUserId: string | null | undefined;
+let communitiesEpoch = 0;
+
+export function setCommunitiesActiveUser(userId: string | null): void {
+  if (communitiesActiveUserId === userId) return;
+  communitiesActiveUserId = userId;
+  communitiesEpoch += 1;
+  communitiesSnapshot = null;
+  communitiesFetchedAt = 0;
+  // A new request starts for the new member; the old one is gated by epoch.
+  communitiesInFlight = null;
+}
 
 /** The last list this process received, synchronously (for first paint). */
 export function peekCommunitiesSnapshot(): Community[] | null {
-  return communitiesSnapshot;
+  return communitiesActiveUserId === null ? null : communitiesSnapshot;
 }
 
 /** Keep the shared copy in step with the list screen's live state. */
 export function putCommunitiesSnapshot(rows: Community[]): void {
+  if (communitiesActiveUserId === null) return;
   communitiesSnapshot = rows;
   communitiesFetchedAt = Date.now();
 }
@@ -164,7 +182,7 @@ export function putCommunitiesSnapshot(rows: Community[]): void {
  * fresh read, or a chat header could keep a stale list for the whole window.
  */
 export function seedCommunitiesSnapshotFromDisk(rows: Community[]): void {
-  if (communitiesSnapshot) return;
+  if (communitiesActiveUserId === null || communitiesSnapshot) return;
   communitiesSnapshot = rows;
   communitiesFetchedAt = 0;
 }
@@ -173,7 +191,7 @@ export function patchCommunitiesSnapshot(
   communityId: string,
   patch: Partial<Community> | ((row: Community) => Community),
 ): void {
-  if (!communitiesSnapshot) return;
+  if (communitiesActiveUserId === null || !communitiesSnapshot) return;
   communitiesSnapshot = communitiesSnapshot.map((row) => {
     if (row.id !== communityId) return row;
     return typeof patch === 'function' ? patch(row) : { ...row, ...patch };
@@ -181,11 +199,13 @@ export function patchCommunitiesSnapshot(
 }
 
 export function removeFromCommunitiesSnapshot(communityId: string): void {
-  if (!communitiesSnapshot) return;
+  if (communitiesActiveUserId === null || !communitiesSnapshot) return;
   communitiesSnapshot = communitiesSnapshot.filter((row) => row.id !== communityId);
 }
 
 export function clearCommunitiesSnapshot(): void {
+  communitiesActiveUserId = null;
+  communitiesEpoch += 1;
   communitiesSnapshot = null;
   communitiesFetchedAt = 0;
   communitiesInFlight = null;
@@ -194,6 +214,9 @@ export function clearCommunitiesSnapshot(): void {
 export async function getCommunities(
   options: { fresh?: boolean } = {},
 ): Promise<Community[]> {
+  // A stale screen during sign-out has no member to read for.
+  if (communitiesActiveUserId === null) return [];
+
   if (
     !options.fresh &&
     communitiesSnapshot &&
@@ -203,6 +226,7 @@ export async function getCommunities(
   }
   if (communitiesInFlight) return communitiesInFlight;
 
+  const startedEpoch = communitiesEpoch;
   const request = apiFetch<{ communities: Community[] }>('/api/communities')
     .then(({ data }) => {
       // The API returns `message_count` as the server-computed unread-message
@@ -219,11 +243,13 @@ export async function getCommunities(
         unread_content_count: c.unread_content_count ?? 0,
         last_content: c.last_content ?? null,
       }));
-      putCommunitiesSnapshot(rows);
+      // A late page from the previous account must not repopulate the shared
+      // copy for the new one.
+      if (startedEpoch === communitiesEpoch) putCommunitiesSnapshot(rows);
       return rows;
     })
     .finally(() => {
-      communitiesInFlight = null;
+      if (communitiesInFlight === request) communitiesInFlight = null;
     });
 
   communitiesInFlight = request;

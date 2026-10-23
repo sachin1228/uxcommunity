@@ -28,6 +28,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
 import { apiFetch } from './api';
 import { communityStore } from './communityStore';
+import {
+  createPushRegistrationCoordinator,
+  type PushTokenPair,
+} from './pushRegistrationCoordinator';
 
 /** Where this device's Expo push token is remembered for logout cleanup. */
 const PUSH_TOKEN_KEY = '@push/expo_token';
@@ -163,17 +167,10 @@ async function probeDeviceToken(
 let diagnostics: PushDiagnostics = { ...EMPTY_DIAGNOSTICS };
 let mutedCommunities = new Set<string>();
 let hydrated = false;
-/** The Expo + FCM token pair the server accepted last in this process. */
-let registeredSignature: string | null = null;
-let registrationInFlight: Promise<string | null> | null = null;
-
-/**
- * The tokens belong to the device, but the server rows belong to the account:
- * a new sign-in must register them again even when the pair has not changed.
- */
-export function resetPushRegistrationState(): void {
-  registeredSignature = null;
-}
+/** The last raw device token this process read (rotation comparison). */
+let observedDeviceToken: string | null = null;
+/** True only for failures a later foreground can plausibly fix. */
+let lastFailureRetryable = false;
 
 function isGranted(status: string): boolean {
   return status === 'granted';
@@ -404,6 +401,142 @@ export function subscribeNotificationPermissionStatus(
 }
 
 /**
+ * Reads this device's notification permission and tokens. Returns null when
+ * permission was denied or the project cannot mint a token; those outcomes are
+ * already described in the diagnostics.
+ */
+async function acquirePushTokenPair(): Promise<PushTokenPair | null> {
+  await ensureNotificationChannels();
+
+  const existing = await Notifications.getPermissionsAsync();
+  let status: string = existing.status;
+  if (!isGranted(status)) {
+    const requested = await Notifications.requestPermissionsAsync();
+    status = requested.status;
+  }
+  // The member has now answered (or the OS refused to ask), so a denial is
+  // real and may be surfaced as an explanation.
+  permissionRequestSettled = true;
+  setPermissionStatus(status);
+
+  diagnostics = { ...diagnostics, permission: status, checkedAt: Date.now() };
+
+  if (!isGranted(status)) {
+    diagnostics = {
+      ...diagnostics,
+      status: 'denied',
+      error: 'Notifications are turned off for this app in system settings.',
+    };
+    lastFailureRetryable = false;
+    await persistDiagnostics();
+    return null;
+  }
+
+  const projectId =
+    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ??
+    Constants.easConfig?.projectId;
+  if (!projectId) {
+    diagnostics = {
+      ...diagnostics,
+      status: 'error',
+      error: 'No EAS projectId in app.json — Expo cannot mint a push token without it.',
+    };
+    lastFailureRetryable = false;
+    await persistDiagnostics();
+    return null;
+  }
+
+  diagnostics = { ...diagnostics, status: 'registering' };
+  await persistDiagnostics();
+
+  const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+  if (!token) {
+    diagnostics = {
+      ...diagnostics,
+      status: 'error',
+      error: 'Expo returned an empty push token.',
+    };
+    lastFailureRetryable = false;
+    await persistDiagnostics();
+    return null;
+  }
+
+  // Android's raw FCM token is what the server uses to send a data-only
+  // chat push the app can draw itself (community DP on the left). Expo's
+  // token stays registered for iOS, DMs, activity and every fallback.
+  let fcmToken: string | null = null;
+  if (Platform.OS === 'android') {
+    const probe = await probeDeviceToken();
+    fcmToken = probe.token;
+    if (probe.token) observedDeviceToken = probe.token;
+    diagnostics = {
+      ...diagnostics,
+      deviceToken: probe.token,
+      deviceTokenError: probe.error,
+    };
+  }
+
+  return { token, fcmToken };
+}
+
+/** Posts one token pair for the current session and records the outcome. */
+async function postPushTokenPair({ token, fcmToken }: PushTokenPair): Promise<void> {
+  await AsyncStorage.setItem(PUSH_TOKEN_KEY, token).catch(() => {});
+  if (fcmToken) {
+    await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken).catch(() => {});
+  }
+
+  await apiFetch('/api/push/register', {
+    method: 'POST',
+    body: {
+      token,
+      platform: Platform.OS,
+      ...(fcmToken ? { fcmToken } : {}),
+    },
+  });
+
+  diagnostics = {
+    ...diagnostics,
+    status: 'registered',
+    token,
+    error: null,
+    checkedAt: Date.now(),
+  };
+  lastFailureRetryable = false;
+  await persistDiagnostics();
+}
+
+// One coordinator for the process: it shares in-flight work, skips an
+// unchanged token pair and abandons work from a replaced account.
+const pushRegistration = createPushRegistrationCoordinator({
+  acquire: acquirePushTokenPair,
+  post: postPushTokenPair,
+});
+
+/**
+ * The tokens belong to the device, but the server rows belong to the account:
+ * a new sign-in must register them again even when the pair has not changed.
+ */
+export function resetPushRegistrationState(): void {
+  pushRegistration.reset();
+}
+
+/** Latest in-memory registration status (the settings screen reads details). */
+export function getLastPushRegistrationStatus(): PushDiagnostics['status'] {
+  return diagnostics.status;
+}
+
+/** Whether a foreground retry could plausibly succeed (not a denial/config). */
+export function isPushRegistrationRetryable(): boolean {
+  return lastFailureRetryable;
+}
+
+/** The raw device token the last registration read, for rotation detection. */
+export function getObservedDeviceToken(): string | null {
+  return observedDeviceToken;
+}
+
+/**
  * Asks for notification permission and registers this device's Expo push
  * token with the API. Returns the token, or null when the member declined (or
  * anything else went wrong) — push is a nice-to-have, never a blocker. The
@@ -413,118 +546,8 @@ export function subscribeNotificationPermissionStatus(
  * offer a Settings shortcut after a denial without waiting for a refetch.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  // Expo's token listener fires while a registration reads the device token,
-  // so an unguarded listener can keep re-entering this function and POSTing
-  // forever. One registration at a time, and a repeated read of the same
-  // tokens is a no-op rather than another round trip.
-  if (registrationInFlight) return registrationInFlight;
-  registrationInFlight = registerForPushNotificationsOnce().finally(() => {
-    registrationInFlight = null;
-  });
-  return registrationInFlight;
-}
-
-async function registerForPushNotificationsOnce(): Promise<string | null> {
   try {
-    await ensureNotificationChannels();
-
-    const existing = await Notifications.getPermissionsAsync();
-    let status: string = existing.status;
-    if (!isGranted(status)) {
-      const requested = await Notifications.requestPermissionsAsync();
-      status = requested.status;
-    }
-    // The member has now answered (or the OS refused to ask), so a denial is
-    // real and may be surfaced as an explanation.
-    permissionRequestSettled = true;
-    setPermissionStatus(status);
-
-    diagnostics = { ...diagnostics, permission: status, checkedAt: Date.now() };
-
-    if (!isGranted(status)) {
-      diagnostics = {
-        ...diagnostics,
-        status: 'denied',
-        error: 'Notifications are turned off for this app in system settings.',
-      };
-      await persistDiagnostics();
-      return null;
-    }
-
-    const projectId =
-      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ??
-      Constants.easConfig?.projectId;
-    if (!projectId) {
-      diagnostics = {
-        ...diagnostics,
-        status: 'error',
-        error: 'No EAS projectId in app.json — Expo cannot mint a push token without it.',
-      };
-      await persistDiagnostics();
-      return null;
-    }
-
-    diagnostics = { ...diagnostics, status: 'registering' };
-    await persistDiagnostics();
-
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
-    if (!token) {
-      diagnostics = {
-        ...diagnostics,
-        status: 'error',
-        error: 'Expo returned an empty push token.',
-      };
-      await persistDiagnostics();
-      return null;
-    }
-
-    // Android's raw FCM token is what the server uses to send a data-only
-    // chat push the app can draw itself (community DP on the left). Expo's
-    // token stays registered for iOS, DMs, activity and every fallback.
-    let fcmToken: string | null = null;
-    if (Platform.OS === 'android') {
-      const probe = await probeDeviceToken();
-      fcmToken = probe.token;
-      diagnostics = {
-        ...diagnostics,
-        deviceToken: probe.token,
-        deviceTokenError: probe.error,
-      };
-    }
-
-    await AsyncStorage.setItem(PUSH_TOKEN_KEY, token).catch(() => {});
-    if (fcmToken) {
-      await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken).catch(() => {});
-    }
-
-    // A token listener callback (or a second caller) that arrives after this
-    // device is already registered with the same pair has nothing to post.
-    const signature = `${token}|${fcmToken ?? ''}`;
-    if (signature === registeredSignature) {
-      diagnostics = { ...diagnostics, status: 'registered', token, error: null };
-      return token;
-    }
-
-    await apiFetch('/api/push/register', {
-      method: 'POST',
-      body: {
-        token,
-        platform: Platform.OS,
-        ...(fcmToken ? { fcmToken } : {}),
-      },
-    });
-    registeredSignature = signature;
-
-    diagnostics = {
-      ...diagnostics,
-      status: 'registered',
-      token,
-      error: null,
-      checkedAt: Date.now(),
-    };
-    await persistDiagnostics();
-
-    return token;
+    return await pushRegistration.register();
   } catch (error) {
     diagnostics = {
       ...diagnostics,
@@ -533,6 +556,7 @@ async function registerForPushNotificationsOnce(): Promise<string | null> {
       error: describeError(error),
       checkedAt: Date.now(),
     };
+    lastFailureRetryable = true;
     await persistDiagnostics();
     console.warn('[push] registration failed', error);
     return null;
@@ -639,6 +663,18 @@ export async function clearAppBadgeAsync(): Promise<void> {
  * Must run while the session cookie is still valid — logout clears it.
  */
 export async function unregisterStoredPushTokenAsync(): Promise<void> {
+  // Abandon any in-flight registration from this account before the device
+  // token is detached: a late acquire/post must not re-associate it. If a
+  // POST was already on the wire, let it settle briefly so the DELETE below
+  // is the last write for this token.
+  const pending = pushRegistration.pending();
+  pushRegistration.reset();
+  if (pending) {
+    await Promise.race([
+      pending.catch(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
+    ]);
+  }
   try {
     const [token, fcmToken] = await Promise.all([
       AsyncStorage.getItem(PUSH_TOKEN_KEY),
@@ -654,7 +690,6 @@ export async function unregisterStoredPushTokenAsync(): Promise<void> {
     /* best-effort — a stale token is re-pointed on the next login anyway */
   } finally {
     await AsyncStorage.multiRemove([PUSH_TOKEN_KEY, FCM_TOKEN_KEY]).catch(() => {});
-    registeredSignature = null;
     await clearAppBadgeAsync();
   }
 }

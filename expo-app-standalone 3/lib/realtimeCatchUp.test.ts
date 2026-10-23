@@ -32,6 +32,7 @@ interface Row extends CaughtUpMessage {
   user_id: string;
   id: string;
   status?: 'sending' | 'sent' | 'failed';
+  reactions?: Array<{ emoji: string; user_ids: string[] }>;
 }
 
 function row(id: string, created_at: string, extra: Partial<Row> = {}): Row {
@@ -327,4 +328,64 @@ test('the cursor is undefined until the server has given us a message', () => {
     undefined,
     'a chat that has only ever sent optimistically has no gap to ask for',
   );
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// B. Parallel open: bootstrap snapshot vs cached cursor catch-up
+// ══════════════════════════════════════════════════════════════════════════
+
+test('catch-up and bootstrap merge in either order without a gap or duplicate', () => {
+  const cached = [row('m1', '2026-09-27T10:00:00Z'), row('m2', '2026-09-27T10:01:00Z')];
+  const bootstrap = [row('m1', '2026-09-27T10:00:00Z'), row('m2', '2026-09-27T10:01:00Z')];
+  const gap = [row('m3', '2026-09-27T10:02:00Z')];
+
+  const catchUpFirst = mergeCaughtUpMessages(
+    mergeCaughtUpMessages(cached, gap),
+    bootstrap,
+  );
+  const bootstrapFirst = mergeCaughtUpMessages(
+    mergeCaughtUpMessages(cached, bootstrap),
+    gap,
+  );
+
+  assert.deepEqual(
+    catchUpFirst.map((message) => message.id),
+    ['m1', 'm2', 'm3'],
+  );
+  assert.deepEqual(
+    bootstrapFirst.map((message) => message.id),
+    ['m1', 'm2', 'm3'],
+  );
+});
+
+test('a message delivered by both realtime and catch-up appears once', () => {
+  const current = [row('m1', '2026-09-27T10:00:00Z')];
+  const fromCatchUp = [row('m2', '2026-09-27T10:01:00Z')];
+  const alsoRealtime = [row('m2', '2026-09-27T10:01:00Z')];
+
+  const once = mergeCaughtUpMessages(mergeCaughtUpMessages(current, alsoRealtime), fromCatchUp);
+  assert.deepEqual(once.map((message) => message.id), ['m1', 'm2']);
+});
+
+test('messages arriving during pagination stay in timeline order', () => {
+  // The hook prepends an older page, then the open catch-up adds the newest.
+  const olderPage = [row('m1', '2026-09-27T10:00:00Z'), row('m2', '2026-09-27T10:01:00Z')];
+  const window = [row('m3', '2026-09-27T10:02:00Z'), row('m4', '2026-09-27T10:03:00Z')];
+  const newest = [row('m5', '2026-09-27T10:04:00Z')];
+
+  const merged = mergeCaughtUpMessages([...olderPage, ...window], newest);
+  assert.deepEqual(merged.map((message) => message.id), ['m1', 'm2', 'm3', 'm4', 'm5']);
+});
+
+test('an existing row keeps its newer edit/reactions when a page repeats its id', () => {
+  const edited = row('m1', '2026-09-27T10:00:00Z', {
+    content: 'edited text',
+    reactions: [{ emoji: '👍', user_ids: ['u2'] }],
+  });
+  const stalePage = [row('m1', '2026-09-27T10:00:00Z', { content: 'old text' })];
+
+  const merged = mergeCaughtUpMessages([edited], stalePage);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].content, 'edited text');
+  assert.deepEqual(merged[0].reactions, [{ emoji: '👍', user_ids: ['u2'] }]);
 });

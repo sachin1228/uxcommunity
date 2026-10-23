@@ -509,3 +509,59 @@ test('sign-out clears the persisted lists too', async () => {
   assert.equal(await cache.loadCommunityList('user-a'), null);
   assert.equal(await cache.loadDmConversationList('user-a'), null);
 });
+
+// ── Active-member isolation ─────────────────────────────────────────────────
+
+test('only the active member can read or write the cache', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  cache.activateUser('user-a');
+
+  await cache.saveCommunityMessages('user-a', 'community-a', [message('mine')]);
+  await cache.saveCommunityMessages('user-b', 'community-a', [message('theirs')]);
+  await cache.saveCommunityList('user-b', [communityRow('other-list')]);
+
+  assert.deepEqual(
+    (await cache.loadCommunityMessages('user-a', 'community-a'))?.map((row) => row.id),
+    ['mine'],
+  );
+  assert.equal(await cache.loadCommunityMessages('user-b', 'community-a'), null);
+  assert.equal(await cache.loadCommunityList('user-b'), null);
+});
+
+test('a write queued before sign-out cannot land after the sweep', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  cache.activateUser('user-a');
+
+  const pending = cache.saveCommunityMessages('user-a', 'community-a', [message('late')]);
+  // The sign-out owner change happens before the queued storage operation runs.
+  cache.activateUser(null);
+  await cache.clearAll();
+  await pending;
+
+  assert.equal(
+    [...storage.entries.keys()].some((key) => key.includes('/community/')),
+    false,
+  );
+  assert.equal(await cache.loadCommunityMessages('user-a', 'community-a'), null);
+});
+
+test('a new member does not inherit the previous active scope', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  cache.activateUser('user-a');
+  await cache.saveCommunityList('user-a', [communityRow('a')]);
+
+  await cache.clearAll(); // sign-out
+  await cache.saveCommunityList('user-a', [communityRow('late')]);
+  assert.equal(await cache.loadCommunityList('user-a'), null);
+
+  cache.activateUser('user-b');
+  await cache.saveCommunityList('user-b', [communityRow('b')]);
+  assert.deepEqual(
+    (await cache.loadCommunityList('user-b'))?.map((row) => row.id),
+    ['b'],
+  );
+  assert.equal(await cache.loadCommunityList('user-a'), null);
+});

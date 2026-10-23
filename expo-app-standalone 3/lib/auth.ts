@@ -3,6 +3,7 @@
  */
 
 import { apiFetch, clearSession } from './api';
+import { loginWith } from './loginFlow';
 
 export interface User {
   id: string;
@@ -29,19 +30,16 @@ export async function login(
   email: string,
   password: string
 ): Promise<{ user: User | null; isAdmin: boolean }> {
-  const { data } = await apiFetch<LoginResult>('/api/auth/login', {
-    method: 'POST',
-    body: { email, password },
-  });
-
-  // After login the session cookie is already persisted by apiFetch. Newer
-  // servers return the trusted user row with it; the extra /me is only the
-  // fallback for an older deployment (and for the env admin account, whose
-  // session has no profile row of its own).
-  const isAdmin = data.redirect === '/admin';
-  const me = data.user ?? (await getMe());
-
-  return { user: me, isAdmin };
+  // After login the session cookie is already persisted by apiFetch. A
+  // current server returns the trusted user row with the response; the extra
+  // /me is only the fallback for an older deployment (and for the env admin
+  // account, whose session has no profile row of its own).
+  return loginWith(
+    (path, options) => apiFetch<LoginResult>(path, options),
+    getMe,
+    email,
+    password
+  );
 }
 
 // ---------------------------------------------------------------------------

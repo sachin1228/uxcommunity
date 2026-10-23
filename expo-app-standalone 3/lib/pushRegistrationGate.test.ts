@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   TOKEN_EVENT_COOLDOWN_MS,
+  isNewDeviceToken,
   shouldHandleTokenEvent,
 } from './pushRegistrationGate';
 
@@ -49,4 +50,16 @@ test('a genuine rotation after the cooldown is honoured', () => {
     }),
     true,
   );
+});
+
+test('the echo of our own device-token read is not a rotation', () => {
+  assert.equal(isNewDeviceToken('fcm-a', 'fcm-a'), false);
+  assert.equal(isNewDeviceToken('fcm-a', null), false);
+  assert.equal(isNewDeviceToken('fcm-a', 42), false);
+});
+
+test('a changed device token bypasses the cooldown decision', () => {
+  assert.equal(isNewDeviceToken('fcm-a', 'fcm-b'), true);
+  assert.equal(isNewDeviceToken(null, 'fcm-a'), true);
+  assert.equal(isNewDeviceToken('fcm-a', ''), false);
 });

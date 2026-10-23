@@ -109,6 +109,12 @@ export function useCommunities() {
   const reconcileRef   = useRef(false);
   /** When the list last came back from the server (reconnect freshness gate). */
   const lastListFetchRef = useRef(0);
+  /** The identity the current rows belong to; stale responses are dropped. */
+  const userIdRef = useRef(userId);
+  const loadedForUserRef = useRef<string | null>(null);
+  /** The newest rows waiting to be written to disk. */
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<Community[] | null>(null);
   /** Latest visible list, so markCommunityRead can sum unread without a re-render. */
   const communitiesRef = useRef<Community[]>([]);
   /**
@@ -142,26 +148,34 @@ export function useCommunities() {
 
   // ── Initial load ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
+    if (!userId) return;
     try {
       const data = await getCommunities({ fresh: true });
+      if (userIdRef.current !== userId) return;
       lastListFetchRef.current = Date.now();
+      loadedForUserRef.current = userId;
       setCommunities(sortByLastActivity(data));
       setError(null);
     } catch (e) {
+      if (userIdRef.current !== userId) return;
       setError(e instanceof Error ? e.message : 'Failed to load communities');
     } finally {
-      setIsLoading(false);
+      if (userIdRef.current === userId) setIsLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   // ── Background reconciliation — mirrors web's revalidateUnreadCounts ───────
   const reconcile = useCallback(async () => {
-    if (reconcileRef.current) return;
+    if (reconcileRef.current || !userId) return;
     reconcileRef.current = true;
     const generation = ++reconcileGenerationRef.current;
     try {
       const fresh = await getCommunities({ fresh: true });
+      // The account changed while the page was in flight; those rows belong
+      // to the previous member and must not enter this list.
+      if (userIdRef.current !== userId) return;
       lastListFetchRef.current = Date.now();
+      loadedForUserRef.current = userId;
       setCommunities((prev) => {
         const prevMap = new Map(prev.map((c) => [c.id, c]));
         const activeId = communityStore.activeCommunityId;
@@ -195,7 +209,7 @@ export function useCommunities() {
     } finally {
       reconcileRef.current = false;
     }
-  }, []);
+  }, [userId]);
 
   /**
    * List catch-up after a realtime gap.
@@ -688,6 +702,29 @@ export function useCommunities() {
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  // A different identity owns the tab now: drop the previous member's rows
+  // before this render's load can be mistaken for theirs. The warm snapshot
+  // may paint the new member's list, never the old one.
+  const previousUserRef = useRef(userId);
+  useEffect(() => {
+    if (previousUserRef.current === userId) return;
+    previousUserRef.current = userId;
+    loadedForUserRef.current = null;
+    setCommunities([]);
+    setError(null);
+    setTyping({});
+    setIsLoading(true);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, [userId]);
+
   useEffect(() => { load(); }, [load]);
 
   // Cold launch: the last list this member saw paints the tab while the live
@@ -699,6 +736,7 @@ export function useCommunities() {
     void chatCache.loadCommunityList(userId).then((rows) => {
       if (!active || !rows || rows.length === 0) return;
       const sorted = sortByLastActivity(rows);
+      loadedForUserRef.current = userId;
       // The auth provider hydrates the shared snapshot in parallel; seed what
       // it may not have reached yet, but never replace a live network page.
       if (!peekCommunitiesSnapshot()) seedCommunitiesSnapshotFromDisk(sorted);
@@ -713,22 +751,23 @@ export function useCommunities() {
   // The chat header and deep links read the same list; keep the shared copy
   // equal to what the member sees so opening a room never re-downloads it.
   useEffect(() => {
-    if (!isLoading) putCommunitiesSnapshot(communities);
-  }, [communities, isLoading]);
+    if (isLoading || !userId || loadedForUserRef.current !== userId) return;
+    putCommunitiesSnapshot(communities);
+  }, [communities, isLoading, userId]);
 
   // Persist the list for the next launch — throttled, because realtime moves
   // rows and previews far more often than a disk snapshot is useful.
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<Community[] | null>(null);
   useEffect(() => {
-    if (!userId || isLoading) return;
+    if (!userId || isLoading || loadedForUserRef.current !== userId) return;
     pendingSaveRef.current = communities;
     if (saveTimerRef.current) return;
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
-      if (pending) void chatCache.saveCommunityList(userId, pending);
+      if (pending && loadedForUserRef.current === userId) {
+        void chatCache.saveCommunityList(userId, pending);
+      }
     }, 800);
   }, [communities, isLoading, userId]);
 
@@ -740,7 +779,11 @@ export function useCommunities() {
       }
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
-      if (pending && userId) void chatCache.saveCommunityList(userId, pending);
+      // A sign-out clears the cache owner first; this is a second guard for
+      // the unmount that races the sweep.
+      if (pending && userId && loadedForUserRef.current === userId) {
+        void chatCache.saveCommunityList(userId, pending);
+      }
     },
     [userId],
   );

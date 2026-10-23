@@ -192,6 +192,11 @@ function prepareWindow<T extends TimedRow>(
 }
 
 export interface ChatCache {
+  /**
+   * The member whose data may be read/written. `undefined` keeps the cache
+   * unscoped (unit tests / tooling); the app sets a real id or null.
+   */
+  activateUser(userId: string | null): void;
   loadCommunityMessages(userId: string, communityId: string): Promise<Message[] | null>;
   saveCommunityMessages(userId: string, communityId: string, messages: readonly Message[]): Promise<void>;
   loadCommunityEvents(userId: string, communityId: string): Promise<ChatContentEvent[] | null>;
@@ -218,6 +223,17 @@ export function createChatCache(
   const now = options.now ?? Date.now;
   const maxCachedWindows = Math.max(1, options.maxCachedWindows ?? MAX_CACHED_WINDOWS);
 
+  /**
+   * The signed-in owner of this cache. Until auth adopts an identity (and
+   * immediately after sign-out) nothing may be read or written: an unmounting
+   * screen from the previous account must not repopulate the cache after the
+   * sign-out sweep.
+   */
+  let activeUserId: string | null | undefined;
+  function isUserActive(userId: string): boolean {
+    return activeUserId === undefined || (activeUserId !== null && userId === activeUserId);
+  }
+
   // AsyncStorage has no ordering guarantee across concurrent setItem calls,
   // and live chats change state in bursts (send + echo + reactions). Chain the
   // writes per key so the last state observed is the last state persisted.
@@ -232,6 +248,14 @@ export function createChatCache(
     return next.finally(() => {
       if (writes.get(key) === next) writes.delete(key);
     });
+  }
+
+  function writeIfActive(
+    userId: string,
+    key: string,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    return write(key, () => (isUserActive(userId) ? operation() : Promise.resolve()));
   }
 
   // ── Per-member window index (recency for eviction) ─────────────────────
@@ -276,6 +300,7 @@ export function createChatCache(
     const next = previous
       .catch(() => {})
       .then(async () => {
+        if (!isUserActive(userId)) return;
         const index = await readUserIndex(userId);
         if (!mutate(index)) return;
 
@@ -350,10 +375,11 @@ export function createChatCache(
     limit: number,
     retention: boolean,
   ): Promise<void> {
+    if (!isUserActive(userId)) return Promise.resolve();
     const prepared = prepareWindow(rows, limit, now(), retention);
     if (prepared.length === 0) {
       return Promise.all([
-        write(key, () => storage.removeItem(key)),
+        writeIfActive(userId, key, () => storage.removeItem(key)),
         dropWindow(userId, key),
       ]).then(() => {});
     }
@@ -369,7 +395,7 @@ export function createChatCache(
       return Promise.resolve();
     }
     return Promise.all([
-      write(key, () => storage.setItem(key, serialized)),
+      writeIfActive(userId, key, () => storage.setItem(key, serialized)),
       touchWindow(userId, key),
     ]).then(() => {});
   }
@@ -405,13 +431,15 @@ export function createChatCache(
   }
 
   function saveList<T extends { id: string }>(
+    userId: string,
     key: string,
     rows: readonly T[],
     limit: number,
   ): Promise<void> {
+    if (!isUserActive(userId)) return Promise.resolve();
     const prepared = rows.slice(0, limit);
     if (prepared.length === 0) {
-      return write(key, () => storage.removeItem(key));
+      return writeIfActive(userId, key, () => storage.removeItem(key));
     }
     let serialized: string;
     try {
@@ -419,12 +447,16 @@ export function createChatCache(
     } catch {
       return Promise.resolve();
     }
-    return write(key, () => storage.setItem(key, serialized));
+    return writeIfActive(userId, key, () => storage.setItem(key, serialized));
   }
 
   return {
+    activateUser(userId) {
+      activeUserId = userId;
+    },
+
     loadCommunityMessages(userId, communityId) {
-      if (!userId || !communityId) return Promise.resolve(null);
+      if (!userId || !communityId || !isUserActive(userId)) return Promise.resolve(null);
       return readWindow(
         communityMessagesCacheKey(userId, communityId),
         COMMUNITY_MESSAGE_CACHE_LIMIT,
@@ -445,7 +477,7 @@ export function createChatCache(
     },
 
     loadCommunityEvents(userId, communityId) {
-      if (!userId || !communityId) return Promise.resolve(null);
+      if (!userId || !communityId || !isUserActive(userId)) return Promise.resolve(null);
       return readWindow(
         communityEventsCacheKey(userId, communityId),
         COMMUNITY_EVENT_CACHE_LIMIT,
@@ -468,7 +500,7 @@ export function createChatCache(
     },
 
     loadDmMessages(userId, conversationId) {
-      if (!userId || !conversationId) return Promise.resolve(null);
+      if (!userId || !conversationId || !isUserActive(userId)) return Promise.resolve(null);
       return readWindow(
         dmMessagesCacheKey(userId, conversationId),
         DM_MESSAGE_CACHE_LIMIT,
@@ -489,7 +521,7 @@ export function createChatCache(
     },
 
     loadCommunityList(userId) {
-      if (!userId) return Promise.resolve(null);
+      if (!userId || !isUserActive(userId)) return Promise.resolve(null);
       return readList(
         communityListCacheKey(userId),
         COMMUNITY_LIST_CACHE_LIMIT,
@@ -499,11 +531,11 @@ export function createChatCache(
 
     saveCommunityList(userId, rows) {
       if (!userId) return Promise.resolve();
-      return saveList(communityListCacheKey(userId), rows, COMMUNITY_LIST_CACHE_LIMIT);
+      return saveList(userId, communityListCacheKey(userId), rows, COMMUNITY_LIST_CACHE_LIMIT);
     },
 
     loadDmConversationList(userId) {
-      if (!userId) return Promise.resolve(null);
+      if (!userId || !isUserActive(userId)) return Promise.resolve(null);
       return readList(
         dmConversationListCacheKey(userId),
         DM_CONVERSATION_LIST_CACHE_LIMIT,
@@ -514,6 +546,7 @@ export function createChatCache(
     saveDmConversationList(userId, rows) {
       if (!userId) return Promise.resolve();
       return saveList(
+        userId,
         dmConversationListCacheKey(userId),
         rows,
         DM_CONVERSATION_LIST_CACHE_LIMIT,
@@ -521,6 +554,9 @@ export function createChatCache(
     },
 
     async clearAll() {
+      // Stop every queued/new write first: an unmounting screen from the
+      // previous account must not resurrect a window after this sweep.
+      activeUserId = null;
       indexes.clear();
       if (!storage.getAllKeys || !storage.multiRemove) return;
       try {

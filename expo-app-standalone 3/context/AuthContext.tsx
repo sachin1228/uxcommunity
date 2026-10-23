@@ -28,6 +28,7 @@ import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth'
 import {
   clearSession,
   getStoredSession,
+  peekSessionToken,
   subscribeUnauthorized,
 } from '@/lib/api';
 import {
@@ -41,16 +42,26 @@ import {
   clearCommunitiesSnapshot,
   peekCommunitiesSnapshot,
   seedCommunitiesSnapshotFromDisk,
+  setCommunitiesActiveUser,
 } from '@/lib/communities';
 import {
   clearDmConversationsCache,
   peekDmConversations,
   seedDmConversationsFromDisk,
+  setDmConversationsActiveUser,
 } from '@/lib/dmConversationsCache';
 import { queryClient } from '@/lib/queryClient';
 import { resetReadManager } from '@/lib/readManager';
 import { resetRealtimeSession } from '@/lib/realtime';
 import { resetPushRegistrationState, unregisterStoredPushTokenAsync } from '@/lib/push';
+import {
+  clearMemberScopedState,
+  createSessionEpochClock,
+  createSignOutCoordinator,
+  isUnauthorizedForCurrentSession,
+  performLogout,
+  type MemberStateClearSteps,
+} from '@/lib/sessionLifecycle';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,17 +94,17 @@ async function persistUser(user: User | null): Promise<void> {
   }
 }
 
-/** Everything tied to the signed-in identity, dropped on sign-out/expiry. */
-async function clearMemberState(): Promise<void> {
-  queryClient.clear();
-  clearCommunitiesSnapshot();
-  clearDmConversationsCache();
-  resetReadManager();
-  await Promise.allSettled([
-    AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY),
-    chatCache.clearAll(),
-  ]);
-}
+/** Every store that is scoped to the signed-in member. */
+const memberClearSteps: MemberStateClearSteps = {
+  clearQueries: () => queryClient.clear(),
+  clearLists: () => {
+    clearCommunitiesSnapshot();
+    clearDmConversationsCache();
+  },
+  resetReads: resetReadManager,
+  clearSnapshot: () => AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY),
+  clearCaches: () => chatCache.clearAll(),
+};
 
 // ---------------------------------------------------------------------------
 // Context
@@ -111,19 +122,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** Identity the realtime client was last told about (null = none). */
   const realtimeUserIdRef = useRef<string | null>(null);
   const userRef = useRef<User | null>(null);
-  const clearingRef = useRef(false);
-  /**
-   * Bumped by sign-in/out. A validation request that settles after the
-   * session it was checking has been replaced must not resurrect it.
-   */
-  const sessionEpochRef = useRef(0);
+  const loginInFlightRef = useRef(false);
+  const logoutInFlightRef = useRef<Promise<void> | null>(null);
+  /** Invalidates validation work that belongs to a replaced session. */
+  const sessionClock = useRef(createSessionEpochClock()).current;
 
   const isAdmin = user?.role === 'admin';
 
-  useEffect(() => {
-    userRef.current = user;
-    realtimeUserIdRef.current = user?.id ?? null;
-  }, [user]);
+  /**
+   * Every identity change goes through here, so the refs, the chat-cache
+   * owner and React state can never disagree inside the same tick.
+   */
+  const applyUser = useCallback((next: User | null) => {
+    userRef.current = next;
+    realtimeUserIdRef.current = next?.id ?? null;
+    chatCache.activateUser(next?.id ?? null);
+    setCommunitiesActiveUser(next?.id ?? null);
+    setDmConversationsActiveUser(next?.id ?? null);
+    setUser(next);
+  }, []);
+
+  const [signOut] = useState(() =>
+    createSignOutCoordinator({
+      invalidateSession: () => {
+        sessionClock.advance();
+      },
+      resetRealtime: resetRealtimeSession,
+      markSignedOut: () => applyUser(null),
+      clearSession,
+      ...memberClearSteps,
+    }),
+  );
+
+  const clearAndSignOut = useCallback(() => signOut.signOut(), [signOut]);
 
   // Warm the two list snapshots as soon as an identity exists. Screens mount
   // on the next frame, and a notification/push deep-link can open a thread
@@ -151,22 +182,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id]);
 
-  const clearAndSignOut = useCallback(async () => {
-    if (clearingRef.current) return;
-    clearingRef.current = true;
-    sessionEpochRef.current += 1;
-    try {
-      resetRealtimeSession();
-      await clearSession();
-      await clearMemberState();
-      setUser(null);
-    } finally {
-      clearingRef.current = false;
-    }
-  }, []);
-
   const refresh = useCallback(async () => {
-    const epoch = sessionEpochRef.current;
+    const epoch = sessionClock.current();
     let probe: SessionProbe;
     try {
       const me = await getMe();
@@ -177,23 +194,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       probe = isUnauthorizedError(error) ? { kind: 'unauthorized' } : { kind: 'offline' };
     }
     // Signed out (or signed in as someone else) while this was in flight.
-    if (epoch !== sessionEpochRef.current) return;
+    if (!sessionClock.isCurrent(epoch)) return;
 
-    const decision = resolveSessionRestore(userRef.current, probe);
+    const previous = userRef.current;
+    const decision = resolveSessionRestore(previous, probe);
     if (decision.clearMemberState) {
       await clearAndSignOut();
       return;
     }
     if (!decision.user) return;
-    if (decision.user.id !== realtimeUserIdRef.current) resetRealtimeSession();
-    // A different account now owns the cookie: in-memory list/query caches
-    // still hold the previous member's rows.
-    if (userRef.current && decision.user.id !== userRef.current.id) {
-      await clearMemberState();
+
+    if (previous?.id !== decision.user.id) {
+      // A different account now owns the cookie: in-memory list/query caches
+      // still hold the previous member's rows.
+      await clearMemberScopedState(memberClearSteps);
+      resetRealtimeSession();
     }
-    setUser(decision.user);
+    applyUser(decision.user);
     if (decision.persistUser) await persistUser(decision.user);
-  }, [clearAndSignOut]);
+  }, [applyUser, clearAndSignOut, sessionClock]);
 
   // Restore the last snapshot at once, then validate the cookie behind it.
   useEffect(() => {
@@ -211,13 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.getItem(AUTH_USER_STORAGE_KEY).catch(() => null),
       );
       if (cached && active) {
-        realtimeUserIdRef.current = cached.id;
-        setUser(cached);
+        applyUser(cached);
         // The shell can render now; the request below only reconciles it.
         setIsLoading(false);
       }
 
-      const epoch = sessionEpochRef.current;
+      const epoch = sessionClock.current();
       try {
         let probe: SessionProbe;
         try {
@@ -227,21 +245,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           probe = isUnauthorizedError(error) ? { kind: 'unauthorized' } : { kind: 'offline' };
         }
         // A sign-out (or a different sign-in) superseded this validation.
-        if (!active || epoch !== sessionEpochRef.current) return;
+        if (!active || !sessionClock.isCurrent(epoch)) return;
 
         const decision = resolveSessionRestore(cached, probe);
         if (decision.clearMemberState) {
           await clearAndSignOut();
         } else if (decision.user) {
-          if (decision.user.id !== realtimeUserIdRef.current) resetRealtimeSession();
           if (cached && decision.user.id !== cached.id) {
-            // The cookie now belongs to another member than the snapshot.
-            await clearMemberState();
+            // The cookie now belongs to another member than the snapshot; the
+            // new session stays, only the previous member's caches go.
+            await clearMemberScopedState(memberClearSteps);
+            resetRealtimeSession();
           }
-          setUser(decision.user);
+          applyUser(decision.user);
           if (decision.persistUser) await persistUser(decision.user);
         } else {
-          setUser(null);
+          applyUser(null);
         }
       } finally {
         if (active) {
@@ -253,58 +272,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [clearAndSignOut]);
+  }, [applyUser, clearAndSignOut, sessionClock]);
 
   // Any API call rejected with 401 means the cookie no longer represents a
   // session (expired, revoked, cleared elsewhere). End the local session so
-  // the next screen cannot look signed-in while every request fails.
+  // the next screen cannot look signed-in while every request fails. A 401
+  // belonging to an older cookie is ignored: it must not clear a newer login.
   useEffect(
     () =>
-      subscribeUnauthorized(() => {
-        if (!userRef.current) return;
+      subscribeUnauthorized((usedToken) => {
+        if (
+          !userRef.current ||
+          loginInFlightRef.current ||
+          logoutInFlightRef.current
+        ) {
+          return;
+        }
+        if (!isUnauthorizedForCurrentSession(usedToken, peekSessionToken())) return;
         void clearAndSignOut();
       }),
     [clearAndSignOut],
   );
 
-  const login = useCallback(async (email: string, password: string) => {
-    // A previous account's sockets can still be open (an expired session never
-    // called logout), and every hook would otherwise keep sharing them.
-    resetRealtimeSession();
-    resetPushRegistrationState();
-    sessionEpochRef.current += 1;
-    const { user: loggedInUser } = await apiLogin(email, password);
-    if (!loggedInUser) {
-      setUser(null);
-      return;
-    }
+  const login = useCallback(
+    async (email: string, password: string) => {
+      // The sign-out screen is visible before its push detach / server logout
+      // finish; a quick re-login must not overlap that clear, or the old
+      // logout could wipe the new cookie.
+      const pendingLogout = logoutInFlightRef.current;
+      if (pendingLogout) await pendingLogout.catch(() => {});
 
-    const previousId = userRef.current?.id ?? null;
-    if (previousId && previousId !== loggedInUser.id) {
-      // Account switch without an explicit sign-out (e.g. an expired session):
-      // the previous member's local windows and query cache must not leak.
-      await clearMemberState();
-    }
-    setUser(loggedInUser);
-    await persistUser(loggedInUser);
-  }, []);
+      // A previous account's sockets can still be open (an expired session
+      // never called logout), and every hook would otherwise keep sharing them.
+      // They are reset only after the credentials are accepted so a failed
+      // attempt does not disturb an identity that is still valid.
+      const epoch = sessionClock.advance();
+      loginInFlightRef.current = true;
+      try {
+        const { user: loggedInUser } = await apiLogin(email, password);
+        // A sign-out or a newer sign-in replaced this attempt while the
+        // request was in flight; its identity must not win.
+        if (!sessionClock.isCurrent(epoch)) return;
+        if (!loggedInUser) {
+          await clearAndSignOut();
+          throw new Error('Your profile could not be loaded. Please try again.');
+        }
 
-  const logout = useCallback(async () => {
-    // Close every socket, cancel its reconnect and forget the signed-in
-    // identity before anything else — a reconnect timer that outlived logout
-    // would bring the previous account's realtime state back.
-    resetRealtimeSession();
-    sessionEpochRef.current += 1;
-    // Detach this device before the session cookie is cleared, otherwise the
-    // next person to sign in here keeps receiving the previous account's pushes.
-    await unregisterStoredPushTokenAsync();
-    await apiLogout();
-    // The cached windows are the member's messages — a shared device must not
-    // keep them after sign-out (the next account cannot read them anyway:
-    // keys are user-scoped, but they should not linger on disk).
-    await clearMemberState();
-    setUser(null);
-  }, []);
+        resetRealtimeSession();
+        resetPushRegistrationState();
+        const previousId = userRef.current?.id ?? null;
+        if (previousId && previousId !== loggedInUser.id) {
+          // Account switch without an explicit sign-out (e.g. an expired
+          // session): the previous member's local windows must not leak.
+          await clearMemberScopedState(memberClearSteps);
+        }
+        applyUser(loggedInUser);
+        await persistUser(loggedInUser);
+      } finally {
+        loginInFlightRef.current = false;
+      }
+    },
+    [applyUser, clearAndSignOut, sessionClock],
+  );
+
+  const logout = useCallback(() => {
+    if (logoutInFlightRef.current) return logoutInFlightRef.current;
+
+    const run = performLogout({
+      invalidateSession: () => {
+        sessionClock.advance();
+      },
+      resetRealtime: resetRealtimeSession,
+      markSignedOut: () => applyUser(null),
+      unregisterPush: unregisterStoredPushTokenAsync,
+      logoutRequest: apiLogout,
+      clearSession,
+      clearMemberState: () => clearMemberScopedState(memberClearSteps),
+    }).finally(() => {
+      if (logoutInFlightRef.current === run) logoutInFlightRef.current = null;
+    });
+
+    logoutInFlightRef.current = run;
+    return run;
+  }, [applyUser, sessionClock]);
 
   return (
     <AuthContext.Provider
