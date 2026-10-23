@@ -36,6 +36,7 @@ import { useColors } from '@/hooks/useColors';
 import { useViewableKeys } from '@/hooks/useViewableKeys';
 import type { CommunityContent } from '@/lib/communityContent';
 import { createDmConversation, unblockUser } from '@/lib/dmApi';
+import { putDmConversation } from '@/lib/dmConversationsCache';
 import {
   applyPollEventToFeed,
   feedPollCommunityIds,
@@ -233,6 +234,8 @@ export default function MemberProfileScreen() {
     setMessageError(null);
     try {
       const conversation = await createDmConversation(memberId);
+      // The thread screen opens next; its metadata is already in hand.
+      putDmConversation(conversation);
       router.push({
         pathname: '/messages/[id]',
         params: {

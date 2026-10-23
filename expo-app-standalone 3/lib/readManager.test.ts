@@ -111,3 +111,44 @@ test('settled states are bounded — old communities are evicted past the cap', 
   assert.ok(getReadState('b'));
   assert.ok(getReadState('c'));
 });
+
+test('a chat open does not repeat a mark the list tap just sent', async () => {
+  readManagerConfig.debounceMs = 5;
+  readManagerConfig.cooldownMs = 60_000;
+  const { calls, patch } = patchCounter();
+
+  // The list row zeroes the badge and schedules the read (user open).
+  scheduleMarkRead('c1', { bypassCooldown: true, patch });
+  await delay(30);
+  assert.equal(calls.length, 1);
+
+  // The chat's own open-time mark lands after its bootstrap settles; the
+  // 10s window recognises the PATCH above and skips the duplicate.
+  scheduleMarkRead('c1', {
+    bypassCooldown: true,
+    skipIfUpdatedWithinMs: 10_000,
+    patch,
+  });
+  await delay(30);
+  assert.equal(calls.length, 1);
+});
+
+test('the skip window does not block a later catch-up mark', async () => {
+  readManagerConfig.debounceMs = 5;
+  readManagerConfig.cooldownMs = 60_000;
+  const { calls, patch } = patchCounter();
+
+  scheduleMarkRead('c1', { bypassCooldown: true, patch });
+  await delay(30);
+  const state = getReadState('c1');
+  assert.ok(state);
+  state.lastUpdatedAt = Date.now() - 11_000;
+
+  scheduleMarkRead('c1', {
+    bypassCooldown: true,
+    skipIfUpdatedWithinMs: 10_000,
+    patch,
+  });
+  await delay(30);
+  assert.equal(calls.length, 2);
+});

@@ -25,9 +25,9 @@ import {
   dmMessagesCacheKey,
   type ChatCacheStorage,
 } from './chatCache';
-import type { Message } from './communities';
+import type { Community, Message } from './communities';
 import type { ChatContentEvent } from './chatContentEvents';
-import type { DmMessage } from './dm';
+import type { DmConversation, DmMessage } from './dm';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.parse('2026-10-18T12:00:00Z');
@@ -394,4 +394,118 @@ test('the last write wins when saves arrive back to back', async () => {
     (await cache.loadCommunityMessages('user-a', 'community-a'))?.map((row) => row.id),
     ['newer'],
   );
+});
+
+// ── List snapshots ─────────────────────────────────────────────────────────
+
+function communityRow(id: string, ownerId: string | null = 'user-a'): Community {
+  return {
+    id,
+    name: `community ${id}`,
+    type: 'group',
+    image_url: null,
+    reference_name: null,
+    is_private: false,
+    enabled_tabs: ['chat', 'threads'],
+    owner_id: ownerId as unknown as string,
+    member_count: 3,
+    message_count: 0,
+    unread_count: 1,
+    last_read_at: null,
+    joined_at: at(10),
+    is_archived: false,
+    last_message: null,
+    last_content: null,
+    lastReaction: null,
+  };
+}
+
+function conversationRow(id: string): DmConversation {
+  return {
+    id,
+    peer: { id: `peer-${id}`, name: `Peer ${id}`, avatar_url: null },
+    last_message: null,
+    unread_count: 0,
+    my_last_read_at: null,
+    last_message_at: null,
+    last_reaction: null,
+    request_state: 'accepted',
+    requested_by: null,
+    blocked_by_me: false,
+  };
+}
+
+test('the communities list round-trips, owner-less group chats included', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+
+  await cache.saveCommunityList('user-a', [
+    communityRow('c1'),
+    communityRow('c2', null),
+  ]);
+
+  const loaded = await cache.loadCommunityList('user-a');
+  assert.deepEqual(loaded?.map((row) => row.id), ['c1', 'c2']);
+});
+
+test('list snapshots are scoped per member', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+
+  await cache.saveCommunityList('user-a', [communityRow('mine')]);
+  await cache.saveCommunityList('user-b', [communityRow('theirs')]);
+  await cache.saveDmConversationList('user-a', [conversationRow('mine')]);
+
+  assert.deepEqual(
+    (await cache.loadCommunityList('user-a'))?.map((row) => row.id),
+    ['mine'],
+  );
+  assert.deepEqual(
+    (await cache.loadCommunityList('user-b'))?.map((row) => row.id),
+    ['theirs'],
+  );
+  assert.equal(await cache.loadDmConversationList('user-b'), null);
+});
+
+test('a list snapshot is not an offline database — it ages out', async () => {
+  const storage = memoryStorage();
+  await cacheOn(storage).saveCommunityList('user-a', [communityRow('c1')]);
+
+  const later = createChatCache(storage, { now: () => NOW + 8 * DAY_MS });
+  assert.equal(await later.loadCommunityList('user-a'), null);
+});
+
+test('malformed list rows are dropped instead of crashing the screen', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  await cache.saveCommunityList('user-a', [communityRow('ok')]);
+
+  const key = [...storage.entries.keys()].find((entry) => entry.includes('/list/communities'));
+  assert.ok(key);
+  storage.entries.set(
+    key!,
+    JSON.stringify({
+      version: 1,
+      savedAt: NOW,
+      rows: [
+        { id: 'broken', name: 42 },
+        communityRow('good'),
+      ],
+    }),
+  );
+
+  const loaded = await cache.loadCommunityList('user-a');
+  assert.deepEqual(loaded?.map((row) => row.id), ['good']);
+});
+
+test('sign-out clears the persisted lists too', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+  await cache.saveCommunityList('user-a', [communityRow('c1')]);
+  await cache.saveDmConversationList('user-a', [conversationRow('d1')]);
+
+  await cache.clearAll();
+
+  assert.equal(await cache.loadCommunityList('user-a'), null);
+  assert.equal(await cache.loadDmConversationList('user-a'), null);
 });

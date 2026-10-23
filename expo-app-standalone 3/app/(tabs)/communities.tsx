@@ -221,7 +221,7 @@ export default function CommunitiesScreen() {
         </View>
       )}
 
-      {!isLoading && error && (
+      {!isLoading && error && communities.length === 0 && (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
           <Pressable onPress={reload} style={[styles.retryButton, { borderColor: colors.border }]}>
@@ -240,7 +240,7 @@ export default function CommunitiesScreen() {
         </View>
       )}
 
-      {!isLoading && !error && communities.length > 0 && (
+      {!isLoading && communities.length > 0 && (
         <FlatList
           data={visible}
           renderItem={renderItem}

@@ -42,6 +42,7 @@ import {
   setContentEventReaction,
   deleteMessage,
   getCommunities,
+  peekCommunitiesSnapshot,
   type Community,
   type CommunityDetailRow,
   type CommunityMuteDuration,
@@ -145,7 +146,9 @@ export default function CommunityChat() {
    * (mute state, event dates), while the route params only carry the display
    * snapshot taken when the list row was tapped.
    */
-  const [resolved, setResolved] = useState<Community | null>(null);
+  const [resolved, setResolved] = useState<Community | null>(
+    () => peekCommunitiesSnapshot()?.find((row) => row.id === id) ?? null,
+  );
   /**
    * The signed-in member's role and grants — the server read model's copy,
    * which the ⋯ menu reads to decide whether settings and management actions

@@ -29,7 +29,18 @@ import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { createCatchUpScheduler } from '@/lib/realtimeCatchUp';
 import { selectLiveCommunityIds } from '@/lib/realtimeWindow';
 import { createNameCache } from '@/lib/nameCache';
-import { getCommunities, markRead, Community, LastContent, LastMessage, LastReaction } from '@/lib/communities';
+import {
+  getCommunities,
+  markRead,
+  peekCommunitiesSnapshot,
+  putCommunitiesSnapshot,
+  seedCommunitiesSnapshotFromDisk,
+  Community,
+  LastContent,
+  LastMessage,
+  LastReaction,
+} from '@/lib/communities';
+import { chatCache } from '@/lib/chatCacheStore';
 import { communityStore } from '@/lib/communityStore';
 import { bubbleToTop, expiredPinIds, sortByLastActivity } from '@/lib/sidebarOrder';
 import { mergeContentActivity } from '@/lib/sidebarMerge';
@@ -73,8 +84,12 @@ function reactionSnippet(content: string | null | undefined, hasImage: boolean):
 
 export function useCommunities() {
   const { user } = useAuth();
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const userId = user?.id ?? null;
+  const cached = useRef(peekCommunitiesSnapshot()).current;
+  const [communities, setCommunities] = useState<Community[]>(() =>
+    cached ? sortByLastActivity(cached) : [],
+  );
+  const [isLoading, setIsLoading] = useState(cached === null);
   const [error, setError] = useState<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
   /**
@@ -92,6 +107,8 @@ export function useCommunities() {
    */
   const resolvedNames  = useRef(createNameCache());
   const reconcileRef   = useRef(false);
+  /** When the list last came back from the server (reconnect freshness gate). */
+  const lastListFetchRef = useRef(0);
   /** Latest visible list, so markCommunityRead can sum unread without a re-render. */
   const communitiesRef = useRef<Community[]>([]);
   /**
@@ -126,8 +143,10 @@ export function useCommunities() {
   // ── Initial load ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
-      const data = await getCommunities();
+      const data = await getCommunities({ fresh: true });
+      lastListFetchRef.current = Date.now();
       setCommunities(sortByLastActivity(data));
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load communities');
     } finally {
@@ -141,7 +160,8 @@ export function useCommunities() {
     reconcileRef.current = true;
     const generation = ++reconcileGenerationRef.current;
     try {
-      const fresh = await getCommunities();
+      const fresh = await getCommunities({ fresh: true });
+      lastListFetchRef.current = Date.now();
       setCommunities((prev) => {
         const prevMap = new Map(prev.map((c) => [c.id, c]));
         const activeId = communityStore.activeCommunityId;
@@ -244,7 +264,12 @@ export function useCommunities() {
         // for the next foreground.
         unsubscribesRef.current.push(
           realtimeClient.onRoomStatus(room, (connected) => {
-            if (connected) listCatchUp.schedule();
+            // Opening a room connects a socket immediately after the list was
+            // read; that first status event is not a gap worth another full
+            // list fetch. Foreground and longer-lived reconnects still land.
+            if (connected && Date.now() - lastListFetchRef.current > 5_000) {
+              listCatchUp.schedule();
+            }
           }),
         );
 
@@ -665,6 +690,61 @@ export function useCommunities() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Cold launch: the last list this member saw paints the tab while the live
+  // read is in flight. It is seeded as display-only (no freshness claim), so
+  // a chat opened in the meantime still revalidates through the same request.
+  useEffect(() => {
+    if (!userId) return undefined;
+    let active = true;
+    void chatCache.loadCommunityList(userId).then((rows) => {
+      if (!active || !rows || rows.length === 0) return;
+      const sorted = sortByLastActivity(rows);
+      // The auth provider hydrates the shared snapshot in parallel; seed what
+      // it may not have reached yet, but never replace a live network page.
+      if (!peekCommunitiesSnapshot()) seedCommunitiesSnapshotFromDisk(sorted);
+      setCommunities((prev) => (prev.length > 0 ? prev : sorted));
+      setIsLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  // The chat header and deep links read the same list; keep the shared copy
+  // equal to what the member sees so opening a room never re-downloads it.
+  useEffect(() => {
+    if (!isLoading) putCommunitiesSnapshot(communities);
+  }, [communities, isLoading]);
+
+  // Persist the list for the next launch — throttled, because realtime moves
+  // rows and previews far more often than a disk snapshot is useful.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<Community[] | null>(null);
+  useEffect(() => {
+    if (!userId || isLoading) return;
+    pendingSaveRef.current = communities;
+    if (saveTimerRef.current) return;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending) void chatCache.saveCommunityList(userId, pending);
+    }, 800);
+  }, [communities, isLoading, userId]);
+
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending && userId) void chatCache.saveCommunityList(userId, pending);
+    },
+    [userId],
+  );
+
   useEffect(() => {
     communitiesRef.current = communities.filter((c) => !c.is_archived);
   }, [communities]);
@@ -844,9 +924,16 @@ export function useCommunities() {
     );
     void setAppBadgeCountAsync(remaining);
 
-    markRead(communityId)
-      .then(() => syncBadgeFromServer())
-      .catch(() => {});
+    // Route through the shared read manager: the chat's own open-time mark
+    // then sees this PATCH and skips the duplicate. The badge refresh follows
+    // the server's acknowledgement, as before.
+    scheduleMarkRead(communityId, {
+      bypassCooldown: true,
+      patch: async (id) => {
+        await markRead(id);
+        await syncBadgeFromServer();
+      },
+    });
   }, []);
 
   /** Call on leaving a community chat (unmount). */
