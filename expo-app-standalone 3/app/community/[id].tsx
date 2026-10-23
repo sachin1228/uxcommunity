@@ -1063,12 +1063,7 @@ export default function CommunityChat() {
       if (item.kind === 'date') {
         return (
           <View style={styles.dateDivider}>
-            <Text
-              style={[
-                styles.datePill,
-                { color: colors.mutedForeground, backgroundColor: colors.surfaceRaised },
-              ]}
-            >
+            <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
               {item.label}
             </Text>
           </View>
@@ -1855,18 +1850,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
   },
-  datePill: {
-    fontSize: 11,
+  /** Plain centered day label — no pill behind it. */
+  dateLabel: {
+    fontSize: 12,
     fontFamily: 'Geist_500Medium',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
   },
   unreadDivider: {
     flexDirection: 'row',

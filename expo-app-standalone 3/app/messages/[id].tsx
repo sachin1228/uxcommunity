@@ -1277,15 +1277,7 @@ export default function DmThreadScreen() {
                   if (item.kind === 'date') {
                     return (
                       <View style={styles.dateDivider}>
-                        <Text
-                          style={[
-                            styles.datePill,
-                            {
-                              color: colors.mutedForeground,
-                              backgroundColor: colors.surfaceRaised,
-                            },
-                          ]}
-                        >
+                        <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
                           {item.label}
                         </Text>
                       </View>
@@ -1752,13 +1744,10 @@ const styles = StyleSheet.create({
   retry: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
   list: { paddingVertical: 12, flexGrow: 1 },
   dateDivider: { alignItems: 'center', paddingVertical: 10 },
-  datePill: {
+  /** Plain centered day label — no pill behind it. */
+  dateLabel: {
     fontFamily: 'Geist_500Medium',
-    fontSize: 11,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 3,
-    overflow: 'hidden',
+    fontSize: 12,
   },
   unreadDivider: {
     flexDirection: 'row',
