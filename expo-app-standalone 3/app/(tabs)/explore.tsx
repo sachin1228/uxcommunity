@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityPreviewSheet } from '@/components/community/CommunityPreviewSheet';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
-import { Initials } from '@/components/communities/CommunityRow';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { communityNameBadges } from '@/lib/communityBadges';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -492,7 +492,7 @@ function ExploreCard({
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.avatar} />
             ) : (
-              <Initials name={community.name} size={40} colors={colors} />
+              <CommunityIcon size={40} />
             )}
             {communityNameBadges(community.type, community.is_private).verified && (
               <VerifiedDpBadge dpSize={40} />

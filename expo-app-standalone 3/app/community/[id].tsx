@@ -31,6 +31,7 @@ import { CommunityMenu, type CommunityConfirmAction } from '@/components/communi
 import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
 import { CommunityTabIcon } from '@/components/community/TabIcons';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
 import { useCommunityTabDots } from '@/hooks/useCommunityTabDots';
 import { useOnlinePresence } from '@/hooks/useOnlinePresence';
@@ -1295,7 +1296,7 @@ export default function CommunityChat() {
                 {communityImage ? (
                   <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
                 ) : (
-                  <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceRaised }]} />
+                  <CommunityIcon size={48} />
                 )}
                 <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                   Welcome to{' '}
@@ -1356,17 +1357,7 @@ export default function CommunityChat() {
                 style={[styles.headerAvatar, { borderColor: colors.border }]}
               />
             ) : (
-              <View
-                style={[
-                  styles.headerAvatar,
-                  styles.headerAvatarFallback,
-                  { backgroundColor: colors.surfaceRaised },
-                ]}
-              >
-                <Text style={[styles.headerAvatarText, { color: colors.mutedForeground }]}>
-                  {communityName.slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
+              <CommunityIcon size={40} />
             )}
             {headerBadges.verified && <VerifiedDpBadge dpSize={40} />}
           </DpWithEventDate>
@@ -1771,14 +1762,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
-  },
-  headerAvatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerAvatarText: {
-    fontSize: 16,
-    fontFamily: 'Geist_600SemiBold',
   },
   headerTitleRow: {
     flexDirection: 'row',

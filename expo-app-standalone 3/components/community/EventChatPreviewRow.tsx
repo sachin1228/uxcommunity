@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
 import { DpWithEventDate } from '@/components/communities/DpWithEventDate';
-import { Initials, PinIcon } from '@/components/communities/CommunityRow';
+import { CommunityIcon } from '@/components/communities/CommunityIcon';
+import { PinIcon } from '@/components/communities/CommunityRow';
 import { eventChatName } from '@/lib/eventChatRules';
 
 /**
@@ -46,7 +47,7 @@ export function EventChatPreviewRow({
             accessibilityIgnoresInvertColors
           />
         ) : (
-          <Initials name={roomName} size={36} colors={colors} />
+          <CommunityIcon size={36} />
         )}
       </DpWithEventDate>
 
