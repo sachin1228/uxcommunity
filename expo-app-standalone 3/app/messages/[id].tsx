@@ -42,6 +42,7 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
+import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
 import { setActiveDmConversationForNotifications } from '@/lib/chatNotificationState';
 import { useDmSend } from '@/hooks/useDmSend';
@@ -148,6 +149,12 @@ export default function DmThreadScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const imeLayout = useChatImeLayout(isFocused);
+  /**
+   * The thread waits for the push animation to finish before it mounts its
+   * rows — creating them mid-slide is what made the open stutter (see
+   * hooks/useScreenTransitionSettled).
+   */
+  const listSettled = useScreenTransitionSettled();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const params = useLocalSearchParams<{
@@ -1017,7 +1024,10 @@ export default function DmThreadScreen() {
   // otherwise (the web's useDmScrollAndUnread anchor). One-shot — later
   // messages never move the reader.
   useEffect(() => {
-    if (loading || error || initialScrollDoneRef.current) return;
+    // The list is not mounted before the transition settles (see listSettled),
+    // and this anchor is one-shot: running it against an unmounted list would
+    // burn its only chance.
+    if (!listSettled || loading || error || initialScrollDoneRef.current) return;
     initialScrollDoneRef.current = true;
 
     if (messages.length === 0) {
@@ -1043,7 +1053,7 @@ export default function DmThreadScreen() {
       // One more frame lets the native scroll commit before the list paints.
       requestAnimationFrame(() => setInitialPositionResolved(true));
     });
-  }, [loading, error, initialUnread, messages.length, rows]);
+  }, [loading, error, initialUnread, messages.length, rows, listSettled]);
 
   // ── Images / lightbox ─────────────────────────────────────────────────────
   const lightboxImages = useMemo<LightboxImage[]>(
@@ -1225,124 +1235,130 @@ export default function DmThreadScreen() {
         <>
           <View style={styles.flex}>
             <View style={styles.flex}>
-            <FlatList
-              ref={listRef}
-              inverted
-              data={rows}
-              keyExtractor={(row) => row.key}
-              // A cached window paints at once; the anchor runs when the page
-              // request settles and may move it to the unread divider.
-              style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
-              contentContainerStyle={styles.list}
-              keyboardDismissMode="on-drag"
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-              onScroll={(event) => {
-                const next = event.nativeEvent.contentOffset.y <= 24;
-                atBottomRef.current = next;
-                setAtBottom((current) => (current === next ? current : next));
-              }}
-              scrollEventThrottle={32}
-              onScrollBeginDrag={imeLayout.closePanel}
-              onEndReached={() => void loadMore()}
-              onEndReachedThreshold={0.3}
-              onScrollToIndexFailed={(info) => {
-                listRef.current?.scrollToOffset({
-                  offset: Math.max(0, info.averageItemLength * info.index),
-                  animated: true,
-                });
-                setTimeout(() => {
-                  try {
-                    listRef.current?.scrollToIndex({
-                      index: info.index,
-                      animated: true,
-                      viewPosition: 0.5,
-                    });
-                  } catch {
-                    /* the member can scroll */
+            {listSettled ? (
+              <FlatList
+                ref={listRef}
+                inverted
+                data={rows}
+                keyExtractor={(row) => row.key}
+                // A cached window paints at once; the anchor runs when the page
+                // request settles and may move it to the unread divider.
+                style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
+                contentContainerStyle={styles.list}
+                keyboardDismissMode="on-drag"
+                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                onScroll={(event) => {
+                  const next = event.nativeEvent.contentOffset.y <= 24;
+                  atBottomRef.current = next;
+                  setAtBottom((current) => (current === next ? current : next));
+                }}
+                scrollEventThrottle={32}
+                onScrollBeginDrag={imeLayout.closePanel}
+                onEndReached={() => void loadMore()}
+                onEndReachedThreshold={0.3}
+                onScrollToIndexFailed={(info) => {
+                  listRef.current?.scrollToOffset({
+                    offset: Math.max(0, info.averageItemLength * info.index),
+                    animated: true,
+                  });
+                  setTimeout(() => {
+                    try {
+                      listRef.current?.scrollToIndex({
+                        index: info.index,
+                        animated: true,
+                        viewPosition: 0.5,
+                      });
+                    } catch {
+                      /* the member can scroll */
+                    }
+                  }, 120);
+                }}
+                renderItem={({ item }) => {
+                  if (item.kind === 'date') {
+                    return (
+                      <View style={styles.dateDivider}>
+                        <Text
+                          style={[
+                            styles.datePill,
+                            {
+                              color: colors.mutedForeground,
+                              backgroundColor: colors.surfaceRaised,
+                            },
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </View>
+                    );
                   }
-                }, 120);
-              }}
-              renderItem={({ item }) => {
-                if (item.kind === 'date') {
+                  if (item.kind === 'unread') {
+                    return (
+                      <View style={styles.unreadDivider}>
+                        <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+                        <Text
+                          style={[
+                            styles.unreadPill,
+                            {
+                              color: colors.mutedForeground,
+                              backgroundColor: colors.surfaceRaised,
+                              borderColor: colors.border,
+                            },
+                          ]}
+                        >
+                          {item.count} unread message{item.count === 1 ? '' : 's'}
+                        </Text>
+                        <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+                      </View>
+                    );
+                  }
                   return (
-                    <View style={styles.dateDivider}>
-                      <Text
-                        style={[
-                          styles.datePill,
-                          {
-                            color: colors.mutedForeground,
-                            backgroundColor: colors.surfaceRaised,
-                          },
-                        ]}
-                      >
-                        {item.label}
-                      </Text>
-                    </View>
+                    <MessageBubble
+                      message={item.msg}
+                      isOwn={item.msg.user_id === userId}
+                      isSameAuthor={item.isSameAuthor}
+                      currentUserId={userId ?? ''}
+                      onLongPress={setSelectedMessage}
+                      onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
+                      onAuthorPress={openPeerProfile}
+                      onImagePress={handleImagePress}
+                      onCancel={handleCancel}
+                      onRetry={handleRetry}
+                      onReplyPress={handleReplyPress}
+                      onSwipeReply={handleReply}
+                      highlighted={flashMessageId === item.msg.id}
+                      actionsOpen={selectedMessage?.id === item.msg.id}
+                    />
                   );
-                }
-                if (item.kind === 'unread') {
-                  return (
-                    <View style={styles.unreadDivider}>
-                      <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
-                      <Text
-                        style={[
-                          styles.unreadPill,
-                          {
-                            color: colors.mutedForeground,
-                            backgroundColor: colors.surfaceRaised,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        {item.count} unread message{item.count === 1 ? '' : 's'}
-                      </Text>
-                      <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+                }}
+                ListFooterComponent={
+                  loadingMore ? (
+                    <View style={styles.moreSpinner}>
+                      <ActivityIndicator size="small" color={colors.foregroundMuted} />
                     </View>
-                  );
+                  ) : null
                 }
-                return (
-                  <MessageBubble
-                    message={item.msg}
-                    isOwn={item.msg.user_id === userId}
-                    isSameAuthor={item.isSameAuthor}
-                    currentUserId={userId ?? ''}
-                    onLongPress={setSelectedMessage}
-                    onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
-                    onAuthorPress={openPeerProfile}
-                    onImagePress={handleImagePress}
-                    onCancel={handleCancel}
-                    onRetry={handleRetry}
-                    onReplyPress={handleReplyPress}
-                    onSwipeReply={handleReply}
-                    highlighted={flashMessageId === item.msg.id}
-                    actionsOpen={selectedMessage?.id === item.msg.id}
-                  />
-                );
-              }}
-              ListFooterComponent={
-                loadingMore ? (
-                  <View style={styles.moreSpinner}>
-                    <ActivityIndicator size="small" color={colors.foregroundMuted} />
-                  </View>
-                ) : null
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyThread}>
-                  <PersonAvatar
-                    name={displayPeerName}
-                    url={displayPeerAvatar}
-                    size={48}
-                  />
-                  <Text style={[styles.stateBody, { color: colors.foregroundMuted }]}>
-                    Say hi to{' '}
-                    <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
-                      {displayPeerName}
+                ListEmptyComponent={
+                  <View style={styles.emptyThread}>
+                    <PersonAvatar
+                      name={displayPeerName}
+                      url={displayPeerAvatar}
+                      size={48}
+                    />
+                    <Text style={[styles.stateBody, { color: colors.foregroundMuted }]}>
+                      Say hi to{' '}
+                      <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                        {displayPeerName}
+                      </Text>
+                      .
                     </Text>
-                    .
-                  </Text>
-                </View>
-              }
-            />
+                  </View>
+                }
+              />
+            ) : (
+              <View style={styles.center}>
+                <ActivityIndicator color={colors.accent} />
+              </View>
+            )}
 
             <Animated.View
               pointerEvents="none"
@@ -1369,7 +1385,9 @@ export default function DmThreadScreen() {
             onSelect={(emoji) => dmComposerRef.current?.insertEmoji(emoji)}
             height={imeLayout.panelHeight}
             animatedStyle={imeLayout.panelStyle}
-            showContent
+            // The grid is ~170 cells (340 native views): mount it when the
+            // panel opens, not with every thread open.
+            showContent={imeLayout.panelOpen}
             interactive={imeLayout.panelInteractive}
           />
 
