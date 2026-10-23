@@ -189,7 +189,7 @@ export function ProfileHero({
             },
           ]}
         >
-          <Ionicons name="logo-linkedin" size={15} color={linkedin ? colors.foreground : colors.mutedForeground} />
+          <Ionicons name="logo-linkedin" size={17} color={linkedin ? colors.foreground : colors.mutedForeground} />
         </Pressable>
 
         <Pressable
@@ -206,7 +206,7 @@ export function ProfileHero({
             },
           ]}
         >
-          <Feather name="globe" size={15} color={portfolio ? colors.foreground : colors.mutedForeground} />
+          <Feather name="globe" size={17} color={portfolio ? colors.foreground : colors.mutedForeground} />
         </Pressable>
       </View>
 
@@ -271,11 +271,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   addCompanyLabel: { fontSize: 12, fontFamily: 'Geist_400Regular' },
-  circlesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  circlesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
   linkCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
