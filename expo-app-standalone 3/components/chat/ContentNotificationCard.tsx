@@ -282,6 +282,7 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
 
             {/* Header line — "You created a showcase". Someone else's name is
                 tappable and opens their profile, like the web card's Link. */}
+            <View style={styles.headerRow}>
             <Text style={[styles.header, { color: mutedColor }]}>
               {isOwn ? (
                 <Text style={styles.headerName}>{name}</Text>
@@ -307,6 +308,17 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
                 {`  ${fmtTime(event.created_at)}`}
               </Text>
             </Text>
+            {commentCount > 0 && (
+              <View style={styles.commentRow}>
+                <ContentIcon name="message-circle" size={10} color={mutedColor} />
+                <Text
+                  style={[styles.commentText, { color: mutedColor, opacity: mutedOpacity }]}
+                >
+                  {commentCount}
+                </Text>
+              </View>
+            )}
+            </View>
 
             {/* Card — opens the item on its own community tab */}
             <Pressable
@@ -396,19 +408,6 @@ export const ContentNotificationCard = memo(function ContentNotificationCard({
               </View>
             </Pressable>
 
-            {/* Bottom row: the discussion sits bottom-LEFT of the bubble, the
-                timestamp bottom-right, exactly like a message bubble's footer. */}
-            <View style={styles.footer}>
-              {commentCount > 0 && (
-                <View style={styles.commentRow}>
-                  <ContentIcon name="message-circle" size={10} color={mutedColor} />
-                  <Text style={[styles.commentText, { color: mutedColor, opacity: mutedOpacity }]}>
-                    {commentCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-
             {/* Reaction pills overlap the bubble's bottom edge, like messages */}
             <ContentReactionPills
               reactions={reactions}
@@ -453,7 +452,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingTop: 8,
-    paddingBottom: 6,
+    paddingBottom: 12,
     shadowOpacity: 0.05,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
@@ -461,7 +460,13 @@ const styles = StyleSheet.create({
   },
   bubbleOther: { borderTopLeftRadius: 0 },
 
-  header: { fontSize: 11, lineHeight: 15, marginBottom: 6 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  header: { fontSize: 11, lineHeight: 15, flexShrink: 1 },
   headerName: { fontFamily: 'Geist_600SemiBold' },
   /** Time rides in the header row, once per card — no footer timestamp. */
   headerTime: { fontSize: 10, fontFamily: 'Geist_500Medium' },
@@ -522,8 +527,7 @@ const styles = StyleSheet.create({
   goingText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
   chevronCol: { justifyContent: 'center', paddingRight: 10 },
 
-  footer: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  commentRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  commentRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' },
   commentText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
 
   reactionPills: {

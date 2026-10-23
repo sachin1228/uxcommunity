@@ -210,7 +210,7 @@ export function ContentNotificationBubble({
         <div className="flex items-center gap-1">
           <div className="relative min-w-0">
         <div
-          className={`relative select-none rounded-[10px] rounded-tl-none px-3 pt-2 pb-1.5 shadow-sm ${
+          className={`relative select-none rounded-[10px] rounded-tl-none px-3 pt-2 pb-3 shadow-sm ${
             isMe
               ? "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
               : "bg-surface-raised"
@@ -222,8 +222,9 @@ export function ContentNotificationBubble({
           />
 
           {/* Header line — "You created a showcase" */}
+          <div className="mb-1.5 flex items-baseline gap-1.5">
           <p
-            className={`flex flex-wrap items-baseline gap-x-1.5 font-body text-[11px] mb-1.5 ${
+            className={`min-w-0 flex flex-wrap items-baseline gap-x-1.5 font-body text-[11px] ${
               isMe ? "text-accent-foreground" : "text-foreground-muted"
             }`}
           >
@@ -247,6 +248,18 @@ export function ContentNotificationBubble({
               {fmtTime(event.created_at)}
             </span>
           </p>
+          {commentCount > 0 && (
+            <span
+              className={`ml-auto flex shrink-0 items-center gap-1 font-body text-[10px] leading-none ${
+                isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
+              }`}
+              title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
+            >
+              <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
+              <span className="shrink-0">{commentCount}</span>
+            </span>
+          )}
+          </div>
 
           {/* Card — a Next <Link>: a raw anchor would force a full page reload
               and throw away every module-level client cache. */}
@@ -347,21 +360,7 @@ export function ContentNotificationBubble({
             </div>
           </Link>
 
-          {/* Discussion count under the card — the time lives in the header
-              now, once per bubble. */}
-          {commentCount > 0 && (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span
-                className={`flex items-center gap-1 font-body text-[10px] leading-none ${
-                  isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
-                }`}
-                title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
-              >
-                <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
-                <span className="shrink-0">{commentCount}</span>
-              </span>
-            </div>
-          )}
+          {/* The discussion count rides at the far right of the header row. */}
 
           {/* Reaction pills overlap the bubble's bottom edge, like messages */}
           <NotificationReactionPills
