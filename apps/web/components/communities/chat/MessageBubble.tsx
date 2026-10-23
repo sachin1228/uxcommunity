@@ -41,6 +41,12 @@ interface MessageBubbleProps {
   moderationRole?: MessageDeletedByRole | null;
   /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
   animate?: boolean;
+  /**
+   * "community" — one left-aligned column: every bubble, own included, hangs
+   * off the avatar rail, and the timestamp rides in the name row once per run.
+   * "dm" — the classic two-sided layout (own messages right, time in a footer).
+   */
+  variant?: "dm" | "community";
 }
 
 const EMOJI_MESSAGE_SIZE = 48;
@@ -178,6 +184,56 @@ function ReactionPills({
 }
 
 /** Image rendered inside a message bubble. */
+/**
+ * Per-bubble timestamp footer — the classic layout's home for the time, still
+ * used by direct messages. Community chat has no footer: its timestamp lives
+ * in the name row that opens a run of messages.
+ */
+function BubbleTime({
+  createdAt,
+  status,
+  editedAt,
+  isMe,
+  onPage = false,
+  className = "",
+}: {
+  createdAt: string;
+  status?: CachedMessage["status"];
+  editedAt?: string | null;
+  isMe: boolean;
+  /** No bubble behind the row (emoji-only messages) — use page-toned colors. */
+  onPage?: boolean;
+  className?: string;
+}) {
+  const timeClass = onPage
+    ? "text-foreground-muted/70"
+    : isMe
+      ? "text-accent-foreground opacity-60"
+      : "text-foreground-muted";
+  const editedClass = onPage
+    ? "text-foreground-muted/60"
+    : isMe
+      ? "text-accent-foreground opacity-50"
+      : "text-foreground-muted";
+  return (
+    <div className={`flex items-center justify-end gap-1 mt-0 ${className}`}>
+      {editedAt && (
+        <span className={`font-body text-[10px] ${editedClass}`}>edited</span>
+      )}
+      <span className={`text-[10px] ${timeClass}`}>{fmtTime(createdAt)}</span>
+      {isMe && status === "sending" && (
+        <Clock strokeWidth={2.5} size={10} className={`${timeClass} animate-pulse`} />
+      )}
+      {isMe && (status === "sent" || !status) && (
+        <CheckCheck strokeWidth={2.5} size={11} className={timeClass} />
+      )}
+      {isMe && status === "failed" && (
+        <span className={`text-[10px] ${onPage ? "text-red-400" : "text-red-200"}`}>!</span>
+      )}
+    </div>
+  );
+}
+
 function BubbleImage({
   url, isMe, uploading, onCancel, standalone = false, createdAt, status, onClick,
 }: {
@@ -186,6 +242,7 @@ function BubbleImage({
   uploading?: boolean;
   onCancel?: () => void;
   standalone?: boolean;
+  /** DM layout only: the time rides on the image instead of in a footer. */
   createdAt?: string;
   status?: CachedMessage["status"];
   /** Opens the image in the full-screen viewer. */
@@ -357,6 +414,67 @@ function SenderName({
 }
 
 /**
+ * The name + time row that opens a sender's run of messages.
+ *
+ * Community chat is a single left-aligned column — every bubble, including
+ * your own, hangs off the avatar rail — so the timestamp lives here, once per
+ * run, instead of in a footer on every bubble. Own messages say "You" and
+ * carry their delivery state beside the time, because the footer they used to
+ * live in is gone.
+ */
+function MessageHeader({
+  name,
+  userId,
+  href,
+  isMe,
+  createdAt,
+  status,
+  editedAt,
+  onPage = false,
+  className = "",
+}: {
+  name: string;
+  userId: string | null;
+  href?: string | null;
+  isMe: boolean;
+  createdAt: string;
+  status?: CachedMessage["status"];
+  editedAt?: string | null;
+  /** No bubble behind the row (emoji-only messages) — use page-toned colors. */
+  onPage?: boolean;
+  className?: string;
+}) {
+  const ownNameClass = onPage ? "text-foreground" : "text-accent-foreground";
+  const metaClass = onPage
+    ? "text-foreground-muted"
+    : isMe
+      ? "text-accent-foreground opacity-60"
+      : "text-foreground-muted";
+  return (
+    <div className={`mb-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0 ${className}`}>
+      {isMe ? (
+        <p className={`font-body text-xs font-semibold leading-4 ${ownNameClass}`}>You</p>
+      ) : (
+        <SenderName name={name} userId={userId} href={href} />
+      )}
+      <span className={`text-[10px] ${metaClass}`}>{fmtTime(createdAt)}</span>
+      {editedAt && (
+        <span className={`font-body text-[10px] ${metaClass}`}>edited</span>
+      )}
+      {isMe && status === "sending" && (
+        <Clock strokeWidth={2.5} size={10} className={`self-center ${metaClass} animate-pulse`} />
+      )}
+      {isMe && (status === "sent" || !status) && (
+        <CheckCheck strokeWidth={2.5} size={11} className={`self-center ${metaClass}`} />
+      )}
+      {isMe && status === "failed" && (
+        <span className={`text-[10px] ${onPage ? "text-red-400" : "text-red-200"}`}>!</span>
+      )}
+    </div>
+  );
+}
+
+/**
  * Tombstone copy. Author deletes keep the WhatsApp-style "deleted"; a manager
  * removing someone else's message is attributed Reddit-style ("removed by a
  * moderator"), so members can tell moderation from a friend's own cleanup.
@@ -381,6 +499,7 @@ function DeletedBubble({
   showHeader,
   senderName,
   senderId,
+  leftRail = true,
 }: {
   isMe: boolean;
   /** Tombstone copy from deletedMessageText — attributed when a manager acted. */
@@ -391,13 +510,16 @@ function DeletedBubble({
   showHeader: boolean;
   senderName?: string | null;
   senderId?: string | null;
+  /** Community layout: tail/rounding on the left and the time in the header. */
+  leftRail?: boolean;
 }) {
+  const alignRight = !leftRail && isMe;
   return (
-    // Stacked exactly like a live bubble — name row, message row, time row — so
-    // a deleted message keeps the shape of the conversation around it instead of
+    // Stacked exactly like a live bubble — header row, message row — so a
+    // deleted message keeps the shape of the conversation around it instead of
     // cramming the sender, the placeholder and the timestamp onto one line.
     <div
-      className={`relative w-fit select-none rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
+      className={`relative w-fit select-none rounded-[10px] ${isFirstInGroup ? (alignRight ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
@@ -405,17 +527,27 @@ function DeletedBubble({
     >
       {isFirstInGroup && (
         <MessageBubbleTail
-          side={isMe ? "right" : "left"}
+          side={alignRight ? "right" : "left"}
           className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
         />
       )}
-      {!isMe && showHeader && senderName && (
-        <SenderName
-          name={senderName}
-          userId={senderId ?? null}
-          href={senderId ? profileHref(senderId) : null}
-        />
-      )}
+      {leftRail
+        ? showHeader && (isMe || senderName) && (
+            <MessageHeader
+              name={senderName ?? "Member"}
+              userId={senderId ?? null}
+              href={!isMe && senderId ? profileHref(senderId) : null}
+              isMe={isMe}
+              createdAt={createdAt}
+            />
+          )
+        : !isMe && showHeader && senderName && (
+            <SenderName
+              name={senderName}
+              userId={senderId ?? null}
+              href={senderId ? profileHref(senderId) : null}
+            />
+          )}
       <div className="flex items-center gap-1.5">
         <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
         {/* leading-6 matches the live message text row, so a deleted placeholder
@@ -424,11 +556,13 @@ function DeletedBubble({
           {text}
         </span>
       </div>
-      <div className="mt-0 flex items-center justify-end gap-1">
-        <span className={`text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
-          {fmtTime(createdAt)}
-        </span>
-      </div>
+      {!leftRail && (
+        <BubbleTime
+          createdAt={createdAt}
+          status={undefined}
+          isMe={isMe}
+        />
+      )}
     </div>
   );
 }
@@ -459,6 +593,7 @@ export const MessageBubble = memo(function MessageBubble({
   canModerate = false,
   moderationRole = null,
   animate = false,
+  variant = "community",
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -514,8 +649,11 @@ export const MessageBubble = memo(function MessageBubble({
     onDelete(msg.id, deleteAsRole);
   };
 
-  // ── Unified layout: own messages right-aligned, others left-aligned ──
   const showHeader = !isSameAuthor || isFirstUnread;
+  // Community rooms read as one column (every bubble on the avatar rail, own
+  // included); direct messages keep the two-sided layout.
+  const leftRail = variant === "community";
+  const alignRight = !leftRail && isMe;
 
   // Long-press (touch) opens the same menu as the hover "more" button —
   // touch users had no way to reach reply/copy/delete/reactions at all.
@@ -570,26 +708,36 @@ export const MessageBubble = memo(function MessageBubble({
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
         className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${
-          isMe ? "justify-end" : "justify-start"
+          alignRight ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
       >
-        {/* Avatar column — hidden for own messages */}
-        {!isMe && (
-          <div className="w-7 shrink-0">
-            {showHeader && sender && (
-              msg.user_id ? (
-                <Link
-                  href={profileHref(msg.user_id)}
-                  title={sender.name}
-                  className="block w-fit rounded-full transition-opacity hover:opacity-85"
-                >
-                  <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
-                </Link>
-              ) : (
-                <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
-              )
-            )}
-          </div>
+        {/* Avatar rail — every author hangs off the left, own messages
+            included (community chat is one column, like a group thread).
+            Direct messages hide it for your own bubbles, as before. */}
+        {(leftRail || !isMe) && (
+        <div className="w-7 shrink-0">
+          {showHeader && (
+            msg.user_id ? (
+              <Link
+                href={profileHref(msg.user_id)}
+                title={sender?.name ?? (isMe ? "You" : "Member")}
+                className="block w-fit rounded-full transition-opacity hover:opacity-85"
+              >
+                <ChatAvatar
+                  name={sender?.name ?? (isMe ? "You" : "Member")}
+                  url={sender?.avatar_url ?? null}
+                  size={7}
+                />
+              </Link>
+            ) : (
+              <ChatAvatar
+                name={sender?.name ?? (isMe ? "You" : "Member")}
+                url={sender?.avatar_url ?? null}
+                size={7}
+              />
+            )
+          )}
+        </div>
         )}
 
         {/* Content column */}
@@ -603,15 +751,31 @@ export const MessageBubble = memo(function MessageBubble({
               showHeader={showHeader}
               senderName={sender?.name}
               senderId={msg.user_id}
+              leftRail={leftRail}
             />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
-            <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
+            <div className={`flex items-center gap-1 ${alignRight ? "flex-row-reverse" : ""}`}>
               <div
                 className={`relative ${animate ? "chat-bubble-in" : ""}`}
-                data-side={isMe ? "right" : "left"}
+                data-side={alignRight ? "right" : "left"}
               >
                 <div className="flex flex-col items-start select-none">
+                  {/* Emoji-only messages have no bubble behind them, so the
+                      name row sits straight on the chat background. */}
+                  {leftRail && showHeader && (
+                    <MessageHeader
+                      name={sender?.name ?? "Member"}
+                      userId={msg.user_id}
+                      href={!isMe && msg.user_id ? profileHref(msg.user_id) : null}
+                      isMe={isMe}
+                      createdAt={msg.created_at}
+                      status={msg.status}
+                      editedAt={msg.edited_at}
+                      onPage
+                      className="mb-1"
+                    />
+                  )}
                   {/* One row, never wrapped — 2–3 emoji stay big and side by
                       side, each animating on its own. */}
                   <div className="flex flex-nowrap items-center gap-0.5">
@@ -624,23 +788,15 @@ export const MessageBubble = memo(function MessageBubble({
                       />
                     ))}
                   </div>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {msg.edited_at && (
-                      <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
-                    )}
-                    <span className="text-[10px] text-foreground-muted/70">
-                      {fmtTime(msg.created_at)}
-                    </span>
-                    {isMe && msg.status === "sending" && (
-                      <Clock strokeWidth={2.5} size={10} className="text-foreground-muted/60 animate-pulse" />
-                    )}
-                    {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck strokeWidth={2.5} size={11} className="text-foreground-muted/70" />
-                    )}
-                    {isMe && msg.status === "failed" && (
-                      <span className="text-[10px] text-red-400">!</span>
-                    )}
-                  </div>
+                  {!leftRail && (
+                    <BubbleTime
+                      createdAt={msg.created_at}
+                      status={msg.status}
+                      editedAt={msg.edited_at}
+                      isMe={isMe}
+                      onPage
+                    />
+                  )}
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
@@ -664,17 +820,17 @@ export const MessageBubble = memo(function MessageBubble({
             </div>
           ) : (
             /* ── Normal bubble ── */
-            <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
+            <div className={`flex items-center gap-1 ${alignRight ? "flex-row-reverse" : ""}`}>
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
                   {/* Entrance animation lives on this wrapper (not the bubble) so the
                       bubble's own state classes (e.g. failed) stay intact. */}
               <div
                 className={`relative min-w-0 ${animate ? "chat-bubble-in" : ""}`}
-                data-side={isMe ? "right" : "left"}
+                data-side={alignRight ? "right" : "left"}
               >
                 <div
                   className={`relative select-none rounded-[10px] ${
-                    isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""
+                    isFirstInGroup ? (alignRight ? "rounded-tr-none" : "rounded-tl-none") : ""
                   } shadow-sm ${
                     isMe
                       ? msg.status === "failed"
@@ -689,7 +845,7 @@ export const MessageBubble = memo(function MessageBubble({
                 >
                   {isFirstInGroup && (
                     <MessageBubbleTail
-                      side={isMe ? "right" : "left"}
+                      side={alignRight ? "right" : "left"}
                       className={isMe
                         ? msg.status === "failed"
                           ? "text-red-500/80"
@@ -697,24 +853,38 @@ export const MessageBubble = memo(function MessageBubble({
                         : "text-surface-raised"}
                     />
                   )}
-                  {/* Sender name inside the bubble, WhatsApp-style — colored per
-                      user (own messages skip it, matching WhatsApp). On media
-                      bubbles the name carries its own padding since the bubble
-                      only wraps the image with a thin frame. */}
-                  {!isMe && showHeader && sender && (
-                    <SenderName
-                      name={sender.name}
-                      userId={msg.user_id}
-                      href={msg.user_id ? profileHref(msg.user_id) : null}
-                      className={imageUrl ? "mb-1 pl-1" : ""}
-                    />
-                  )}
+                  {/* Name + time, once per run of messages — own bubbles
+                      included (they say "You" and carry the delivery state
+                      beside the timestamp). On media bubbles the header keeps
+                      its own padding since the bubble only wraps the image
+                      with a thin frame. */}
+                  {leftRail
+                    ? showHeader && (isMe || sender) && (
+                        <MessageHeader
+                          name={sender?.name ?? "Member"}
+                          userId={msg.user_id}
+                          href={!isMe && msg.user_id ? profileHref(msg.user_id) : null}
+                          isMe={isMe}
+                          createdAt={msg.created_at}
+                          status={msg.status}
+                          editedAt={msg.edited_at}
+                          className={imageUrl ? "mb-1 pl-1" : ""}
+                        />
+                      )
+                    : !isMe && showHeader && sender && (
+                        <SenderName
+                          name={sender.name}
+                          userId={msg.user_id}
+                          href={msg.user_id ? profileHref(msg.user_id) : null}
+                          className={imageUrl ? "mb-1 pl-1" : ""}
+                        />
+                      )}
                   {replyTo && (
                     <ReplyBubble
                       reply={replyTo}
                       isMe={isMe}
                       onReplyClick={onReplyClick}
-                      topGap={!isMe && showHeader && !!sender}
+                      topGap={leftRail ? showHeader : !alignRight && showHeader && !!sender}
                     />
                   )}
                   {!replyTo && replyToContent && (
@@ -722,7 +892,7 @@ export const MessageBubble = memo(function MessageBubble({
                       reply={replyToContent}
                       isMe={isMe}
                       onReplyClick={onReplyClick}
-                      topGap={!isMe && showHeader && !!sender}
+                      topGap={leftRail ? showHeader : !alignRight && showHeader && !!sender}
                     />
                   )}
                   {imageUrl && (
@@ -731,8 +901,8 @@ export const MessageBubble = memo(function MessageBubble({
                       isMe={isMe}
                       uploading={uploading}
                       standalone={imageOnly}
-                      createdAt={msg.created_at}
-                      status={msg.status}
+                      createdAt={leftRail ? undefined : msg.created_at}
+                      status={leftRail ? undefined : msg.status}
                       onCancel={() => onCancelSend(msg.id)}
                       onClick={() => onImageClick(imageUrl)}
                     />
@@ -748,28 +918,14 @@ export const MessageBubble = memo(function MessageBubble({
                       />
                     </div>
                   )}
-                  {!imageOnly && (
-                    <div className={`flex items-center ml-4 justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
-                      {msg.edited_at && (
-                        <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
-                          edited
-                        </span>
-                      )}
-                      <span className={`text-[10px] ${
-                        isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
-                      }`}>
-                        {fmtTime(msg.created_at)}
-                      </span>
-                      {isMe && msg.status === "sending" && (
-                        <Clock strokeWidth={2.5} size={10} className="text-accent-foreground opacity-60 animate-pulse" />
-                      )}
-                      {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck strokeWidth={2.5} size={11} className="text-accent-foreground opacity-70" />
-                      )}
-                      {isMe && msg.status === "failed" && (
-                        <span className="text-[10px] text-red-200">!</span>
-                      )}
-                    </div>
+                  {!leftRail && !imageOnly && (
+                    <BubbleTime
+                      createdAt={msg.created_at}
+                      status={msg.status}
+                      editedAt={msg.edited_at}
+                      isMe={isMe}
+                      className={imageUrl ? "pr-1" : ""}
+                    />
                   )}
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />

@@ -1327,6 +1327,7 @@ export default function DmThreadScreen() {
                       onSwipeReply={handleReply}
                       highlighted={flashMessageId === item.msg.id}
                       actionsOpen={selectedMessage?.id === item.msg.id}
+                      variant="dm"
                     />
                   );
                 }}

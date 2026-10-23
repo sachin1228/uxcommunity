@@ -59,6 +59,12 @@ interface Props {
   highlighted?: boolean;
   /** The action sheet is open for this message — keep the row tinted. */
   actionsOpen?: boolean;
+  /**
+   * 'community' — one left-aligned column: every bubble, own included, hangs
+   * off the avatar rail and the timestamp rides in the name row once per run.
+   * 'dm' — the classic two-sided layout (own right, time in a footer).
+   */
+  variant?: 'community' | 'dm';
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -528,6 +534,103 @@ function TimeRow({
   );
 }
 
+/**
+ * The name + time row that opens a run of messages.
+ *
+ * Community chat is one left-aligned column, so the timestamp lives here —
+ * once per run — instead of in a footer under every bubble. Own messages say
+ * "You" and keep their delivery state beside the time. Direct messages render
+ * the name alone here, exactly as before.
+ */
+function BubbleHeader({
+  message,
+  isOwn,
+  withTime,
+  onPage = false,
+  senderName,
+  senderColor,
+  colors,
+  media = false,
+  onAuthorPress,
+  onLongPress,
+}: {
+  message: Message;
+  isOwn: boolean;
+  withTime: boolean;
+  /** No bubble behind the row (emoji-only messages) — page-toned colors. */
+  onPage?: boolean;
+  senderName: string;
+  senderColor: string;
+  colors: Palette;
+  media?: boolean;
+  onAuthorPress?: () => void;
+  onLongPress: () => void;
+}) {
+  const ownText = colors.chatOwnBubbleForeground;
+  const nameColor = isOwn ? (onPage ? colors.foreground : ownText) : senderColor;
+  const timeColor = isOwn
+    ? onPage
+      ? colors.mutedForeground
+      : ownText
+    : colors.mutedForeground;
+  const timeOpacity = isOwn && !onPage ? 0.6 : 1;
+  const status = message.status;
+
+  const nameNode = (
+    <Text style={[styles.headerName, { color: nameColor }]}>
+      {isOwn ? 'You' : senderName}
+    </Text>
+  );
+
+  return (
+    <View style={[styles.headerRow, media ? styles.headerOnMedia : null]}>
+      {isOwn ? (
+        nameNode
+      ) : (
+        <Pressable
+          onPress={onAuthorPress}
+          onLongPress={onLongPress}
+          delayLongPress={350}
+          disabled={!onAuthorPress}
+          hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${senderName}'s profile`}
+        >
+          {nameNode}
+        </Pressable>
+      )}
+      {withTime && (
+        <Fragment>
+          <Text style={[styles.headerTime, { color: timeColor, opacity: timeOpacity }]}>
+            {fmtTime(message.created_at)}
+          </Text>
+          {!!message.edited_at && (
+            <Text
+              style={[
+                styles.headerTime,
+                { color: timeColor, opacity: isOwn && !onPage ? 0.5 : 1 },
+              ]}
+            >
+              edited
+            </Text>
+          )}
+          {isOwn && status === 'sending' && (
+            <View style={styles.statusSlot}>
+              <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
+            </View>
+          )}
+          {isOwn && (status === 'sent' || !status) && (
+            <CheckCheckIcon size={12} color={timeColor} opacity={0.7} />
+          )}
+          {isOwn && status === 'failed' && (
+            <Text style={[styles.headerTime, { color: colors.destructive }]}>!</Text>
+          )}
+        </Fragment>
+      )}
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -554,9 +657,15 @@ export const MessageBubble = memo(function MessageBubble({
   onSwipeReply,
   highlighted = false,
   actionsOpen = false,
+  variant = 'community',
 }: Props) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Community rooms read as one column (every bubble on the avatar rail, own
+  // included); direct messages keep the two-sided layout.
+  const leftRail = variant === 'community';
+  const alignRight = !leftRail && isOwn;
   /** Long-message collapse is owned here so a bubble tap can expand it too. */
   const [textExpanded, setTextExpanded] = useState(false);
   const [textTruncated, setTextTruncated] = useState(false);
@@ -618,20 +727,20 @@ export const MessageBubble = memo(function MessageBubble({
         // Capture claims the drag even while a child Pressable holds the touch.
         onMoveShouldSetPanResponderCapture: (_, g) => {
           if (!swipeEnabled) return false;
-          const outward = isOwn ? -g.dx : g.dx;
+          const outward = alignRight ? -g.dx : g.dx;
           return outward > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
         },
         onPanResponderMove: (_, g) => {
-          const outward = Math.max(0, isOwn ? -g.dx : g.dx);
+          const outward = Math.max(0, alignRight ? -g.dx : g.dx);
           const travel = Math.min(outward, SWIPE_TRAVEL);
-          swipeX.setValue(isOwn ? -travel : travel);
+          swipeX.setValue(alignRight ? -travel : travel);
           swipeProgress.setValue(Math.min(outward / SWIPE_THRESHOLD, 1));
           const crossed = outward >= SWIPE_THRESHOLD;
           if (crossed && !swipeCrossed.current) hapticSelection();
           swipeCrossed.current = crossed;
         },
         onPanResponderRelease: (_, g) => {
-          const outward = Math.max(0, isOwn ? -g.dx : g.dx);
+          const outward = Math.max(0, alignRight ? -g.dx : g.dx);
           if (outward >= SWIPE_THRESHOLD) {
             hapticImpact();
             onSwipeReply?.(message);
@@ -641,7 +750,7 @@ export const MessageBubble = memo(function MessageBubble({
         onPanResponderTerminate: resetSwipe,
         onPanResponderTerminationRequest: () => false,
       }),
-    [isOwn, message, onSwipeReply, resetSwipe, swipeEnabled, swipeProgress, swipeX],
+    [alignRight, message, onSwipeReply, resetSwipe, swipeEnabled, swipeProgress, swipeX],
   );
 
   const sender = message.users;
@@ -726,11 +835,13 @@ export const MessageBubble = memo(function MessageBubble({
         accessible={false}
         style={[
           styles.rowPress,
-          { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
+          { justifyContent: alignRight ? 'flex-end' : 'flex-start' },
         ]}
       >
-      {/* Avatar column — hidden for own messages (web parity) */}
-      {!isOwn && (
+      {/* Avatar rail — every author hangs off the left, own messages
+          included (community chat is one column, like a group thread).
+          Direct messages hide it for your own bubbles, as before. */}
+      {(leftRail || !isOwn) && (
         <View style={styles.avatarCol}>
           {showHeader && (
             <Pressable
@@ -754,7 +865,7 @@ export const MessageBubble = memo(function MessageBubble({
           pointerEvents="none"
           style={[
             styles.swipeReplyCue,
-            isOwn ? styles.swipeReplyCueOwn : styles.swipeReplyCueOther,
+            alignRight ? styles.swipeReplyCueOwn : styles.swipeReplyCueOther,
             {
               opacity: swipeProgress,
               transform: [
@@ -769,7 +880,7 @@ export const MessageBubble = memo(function MessageBubble({
           ]}
         >
           <Ionicons
-            name={isOwn ? 'arrow-redo' : 'arrow-undo'}
+            name={alignRight ? 'arrow-redo' : 'arrow-undo'}
             size={20}
             color={colors.mutedForeground}
           />
@@ -788,13 +899,26 @@ export const MessageBubble = memo(function MessageBubble({
           <View
             style={[
               styles.bubbleRow,
-              isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther,
+              alignRight ? styles.bubbleRowOwn : styles.bubbleRowOther,
             ]}
           >
             <View style={styles.bubbleWrap}>
               <View style={styles.emojiWrap}>
+                {leftRail && showHeader && (
+                  <BubbleHeader
+                    message={message}
+                    isOwn={isOwn}
+                    withTime
+                    onPage
+                    senderName={senderName}
+                    senderColor={senderColor}
+                    colors={colors}
+                    onAuthorPress={onAuthorPress ? handleAuthorPress : undefined}
+                    onLongPress={handleLongPress}
+                  />
+                )}
                 <Text style={styles.bigEmoji}>{message.content}</Text>
-                <TimeRow message={message} isOwn={isOwn} colors={colors} />
+                {!leftRail && <TimeRow message={message} isOwn={isOwn} colors={colors} />}
               </View>
               <ReactionPills
                 reactions={reactions}
@@ -809,7 +933,7 @@ export const MessageBubble = memo(function MessageBubble({
           <View
             style={[
               styles.bubbleRow,
-              isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther,
+              alignRight ? styles.bubbleRowOwn : styles.bubbleRowOther,
             ]}
           >
             {failed && <RetryIndicator onRetry={() => onRetry?.(message.id)} colors={colors} />}
@@ -831,32 +955,30 @@ export const MessageBubble = memo(function MessageBubble({
                     shadowColor: '#000',
                   },
                   isFirstInGroup &&
-                    (isOwn ? styles.bubbleFirstOwn : styles.bubbleFirstOther),
+                    (alignRight ? styles.bubbleFirstOwn : styles.bubbleFirstOther),
                   textExpanded && expandedBubbleWidth ? { width: expandedBubbleWidth } : null,
                 ]}
               >
-                {isFirstInGroup && <MessageBubbleTail side={isOwn ? 'right' : 'left'} color={tailColor} />}
+                {isFirstInGroup && (
+                  <MessageBubbleTail side={alignRight ? 'right' : 'left'} color={tailColor} />
+                )}
 
-                {/* Sender name inside the bubble, WhatsApp-style. Own messages
-                    skip it, matching WhatsApp and the web app. Tapping it (or
-                    the avatar) opens the sender's profile. */}
-                {!isOwn && showHeader && !isDeleted && (
-                  <Pressable
-                    onPress={handleAuthorPress}
+                {/* Name (and, in community rooms, the time) once per run.
+                    Tapping the name — or the avatar — opens the sender's
+                    profile. Own messages say "You"; direct messages still
+                    keep the time in the footer below the bubble. */}
+                {showHeader && (leftRail || (!isOwn && !isDeleted)) && (
+                  <BubbleHeader
+                    message={message}
+                    isOwn={isOwn}
+                    withTime={leftRail}
+                    senderName={senderName}
+                    senderColor={senderColor}
+                    colors={colors}
+                    media={!!imageUrl}
+                    onAuthorPress={onAuthorPress ? handleAuthorPress : undefined}
                     onLongPress={handleLongPress}
-                    delayLongPress={350}
-                    disabled={!onAuthorPress}
-                    hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`View ${senderName}'s profile`}
-                    style={styles.senderNamePressable}
-                  >
-                    <Text
-                      style={[styles.senderName, { color: senderColor }, imageUrl ? styles.nameOnMedia : null]}
-                    >
-                      {senderName}
-                    </Text>
-                  </Pressable>
+                  />
                 )}
 
                 {isDeleted ? (
@@ -872,16 +994,18 @@ export const MessageBubble = memo(function MessageBubble({
                         {isOwn ? 'You deleted this message' : 'This message was deleted'}
                       </Text>
                     </View>
-                    <View style={styles.timeRow}>
-                      <Text
-                        style={[
-                          styles.timeText,
-                          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.6 : 1 },
-                        ]}
-                      >
-                        {fmtTime(message.created_at)}
-                      </Text>
-                    </View>
+                    {!leftRail && (
+                      <View style={styles.timeRow}>
+                        <Text
+                          style={[
+                            styles.timeText,
+                            { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.6 : 1 },
+                          ]}
+                        >
+                          {fmtTime(message.created_at)}
+                        </Text>
+                      </View>
+                    )}
                   </Fragment>
                 ) : (
                   <Fragment>
@@ -891,7 +1015,7 @@ export const MessageBubble = memo(function MessageBubble({
                         isOwn={isOwn}
                         colors={colors}
                         onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
-                        topGap={!isOwn && showHeader}
+                        topGap={leftRail ? showHeader : !alignRight && showHeader}
                       />
                     )}
 
@@ -905,7 +1029,7 @@ export const MessageBubble = memo(function MessageBubble({
                             ? () => onContentReplyPress(replyToContent.id)
                             : undefined
                         }
-                        topGap={!isOwn && showHeader}
+                        topGap={leftRail ? showHeader : !alignRight && showHeader}
                       />
                     )}
 
@@ -916,7 +1040,7 @@ export const MessageBubble = memo(function MessageBubble({
                         standalone={imageOnly}
                         dimmed={uploading || failed}
                         createdAt={message.created_at}
-                        showStatus={!uploading && !failed}
+                        showStatus={!uploading && !failed && !leftRail}
                         onPress={() => onImagePress?.(imageUrl)}
                         onLongPress={handleLongPress}
                       />
@@ -935,7 +1059,7 @@ export const MessageBubble = memo(function MessageBubble({
                       </View>
                     )}
 
-                    {!imageOnly && (
+                    {!imageOnly && !leftRail && (
                       <View style={imageUrl ? styles.timeRowOnMedia : null}>
                         <TimeRow message={message} isOwn={isOwn} colors={colors} />
                       </View>
@@ -1031,15 +1155,12 @@ const styles = StyleSheet.create({
   // Media bubbles keep a thin frame around the image (WhatsApp-style).
   bubbleMedia: { padding: 4 },
 
-  senderName: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'Geist_600SemiBold',
-    marginBottom: 2,
-  },
-  /** Constrains the tap target to the name itself, not the bubble's width. */
-  senderNamePressable: { alignSelf: 'flex-start' },
-  nameOnMedia: { marginBottom: 4, paddingLeft: 4 },
+  /** Name + time row that opens a run of messages (community layout). */
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  headerName: { fontSize: 12, lineHeight: 16, fontFamily: 'Geist_600SemiBold' },
+  headerTime: { fontSize: 10, lineHeight: 14, fontFamily: 'Geist_500Medium' },
+  /** Media bubbles wrap the image with a thin frame — give the row its own inset. */
+  headerOnMedia: { marginBottom: 4, paddingLeft: 4, paddingRight: 4 },
 
   content: {
     fontSize: 15.5,

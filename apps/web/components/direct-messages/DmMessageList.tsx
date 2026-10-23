@@ -214,6 +214,7 @@ export const DmMessageList = memo(function DmMessageList({
                   canModerate={false}
                   moderationRole={null}
                   animate={animateIdsRef.current.has(msg.id)}
+                  variant="dm"
                 />
               );
             })}
