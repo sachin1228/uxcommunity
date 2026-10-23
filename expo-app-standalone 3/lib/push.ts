@@ -203,8 +203,28 @@ function describeError(error: unknown): string {
   return message;
 }
 
+const diagnosticsListeners = new Set<(state: PushDiagnostics) => void>();
+
 async function persistDiagnostics(): Promise<void> {
   await AsyncStorage.setItem(PUSH_STATE_KEY, JSON.stringify(diagnostics)).catch(() => {});
+  // After the write, so a listener that also reads the snapshot sees exactly
+  // what was saved.
+  for (const listener of diagnosticsListeners) listener(diagnostics);
+}
+
+/**
+ * Subscribes to registration changes — every recorded status, permission or
+ * error. The settings screen needs this to replace a "registering" label when
+ * the registration finishes while the screen is open; reading only on mount
+ * left the old label up until the member left and came back.
+ */
+export function subscribePushDiagnostics(
+  listener: (state: PushDiagnostics) => void,
+): () => void {
+  diagnosticsListeners.add(listener);
+  return () => {
+    diagnosticsListeners.delete(listener);
+  };
 }
 
 /** Latest registration outcome. Reads the persisted copy on first call. */

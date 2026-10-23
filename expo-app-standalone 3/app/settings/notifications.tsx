@@ -37,6 +37,7 @@ import {
   registerForPushNotificationsAsync,
   sendServerPushTestAsync,
   sendTestNotificationAsync,
+  subscribePushDiagnostics,
 } from '@/lib/push';
 
 /** Every selectable quiet-hours boundary, on the half hour. */
@@ -86,6 +87,11 @@ export default function NotificationSettingsScreen() {
   useEffect(() => {
     void refreshDiagnostics();
   }, [refreshDiagnostics]);
+
+  // A registration that finishes while this screen is open has to replace the
+  // "registering" label itself. Refreshing only on mount left it on screen —
+  // with a Retry button — until the member navigated away and back.
+  useEffect(() => subscribePushDiagnostics(setDiagnostics), []);
 
   /**
    * Re-runs registration from scratch. The root layout only registers once per
