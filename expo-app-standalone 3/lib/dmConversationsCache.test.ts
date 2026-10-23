@@ -141,6 +141,17 @@ test('a seeded disk snapshot is never treated as fresh', async () => {
   assert.equal(cache.peekOne('server')?.id, 'server');
 });
 
+test('a peer lookup finds the conversation the shared page already holds', async () => {
+  const cache = createDmConversationsCache({
+    load: async () => [conversation('c1'), conversation('c2')],
+  });
+  cache.setActiveUser('user-a');
+  await cache.load();
+
+  assert.equal(cache.peekOneForPeer('peer-c2')?.id, 'c2');
+  assert.equal(cache.peekOneForPeer('peer-missing'), null);
+});
+
 test('clear drops the page and any local mutation markers', async () => {
   let loads = 0;
   const cache = createDmConversationsCache({
@@ -173,6 +184,7 @@ test('no active member sees or writes the shared page', async () => {
 
   assert.equal(cache.peek(), null);
   assert.equal(cache.peekOne('disk'), null);
+  assert.equal(cache.peekOneForPeer('peer-disk'), null);
   assert.deepEqual(await cache.load(), []);
   assert.equal(loads, 0);
 });

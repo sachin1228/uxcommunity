@@ -51,6 +51,7 @@ import { chatCache } from '@/lib/chatCacheStore';
 import {
   answerDmRequest,
   blockUser,
+  createDmConversation,
   getDmMessages,
   getDmMessagesAfter,
   markDmRead,
@@ -66,6 +67,7 @@ import {
   dmComposerState,
   isUnstartedRequest,
   newestMessageAt,
+  PENDING_DM_CONVERSATION_ID,
   requestHintForPeer,
   type DmConversation,
   type DmMessage,
@@ -116,6 +118,31 @@ function sortMessages(messages: DmMessage[]): DmMessage[] {
   });
 }
 
+/**
+ * A thread with no server row yet, built from the route's peer — what a
+ * profile pushes while the create-or-get request is still in flight.
+ */
+function unstartedConversation(
+  id: string,
+  peerId: string,
+  name: string,
+  avatarUrl: string | null,
+): DmConversation {
+  return {
+    id,
+    peer: { id: peerId, name, avatar_url: avatarUrl },
+    last_message: null,
+    unread_count: 0,
+    my_last_read_at: null,
+    last_message_at: null,
+    last_reaction: null,
+    // Nothing has been sent: the next message becomes the request.
+    request_state: 'pending',
+    requested_by: null,
+    blocked_by_me: false,
+  };
+}
+
 /** The realtime row, shaped like a history row (the bubble contract). */
 function messageFromRealtime(payload: RealtimeDmPayload): DmMessage {
   return {
@@ -163,12 +190,23 @@ export default function DmThreadScreen() {
     avatar?: string;
     peerId?: string;
   }>();
-  const conversationId = params.id;
+  const routeConversationId = params.id;
+  /**
+   * The id this screen is actually reading. A profile pushes the pending
+   * placeholder; the create call swaps in the real id locally (and in the
+   * route) so the thread never waits on the navigation state to settle.
+   */
+  const [conversationId, setConversationId] = useState(routeConversationId);
   const peerName = params.name ?? 'Member';
   const peerId = params.peerId ?? null;
+  /** A profile pushed this screen before the conversation had a server id. */
+  const isPendingConversation = conversationId === PENDING_DM_CONVERSATION_ID;
 
   const [conversation, setConversation] = useState<DmConversation | null>(() =>
-    peekDmConversation(conversationId),
+    peekDmConversation(conversationId) ??
+    (isPendingConversation && peerId
+      ? unstartedConversation(conversationId, peerId, peerName, params.avatar || null)
+      : null),
   );
   const [messages, setMessages] = useState<DmMessage[]>([]);
   const messagesRef = useRef<DmMessage[]>([]);
@@ -359,20 +397,7 @@ export default function DmThreadScreen() {
   const synthesizeConversation = useCallback(
     (): DmConversation | null => {
       if (!peerId) return null;
-      return {
-        id: conversationId,
-        peer: { id: peerId, name: peerName, avatar_url: params.avatar || null },
-        last_message: null,
-        unread_count: 0,
-        my_last_read_at: null,
-        last_message_at: null,
-        last_reaction: null,
-        // A conversation kept out of the list has no message yet: the next
-        // message becomes the request.
-        request_state: 'pending',
-        requested_by: null,
-        blocked_by_me: false,
-      };
+      return unstartedConversation(conversationId, peerId, peerName, params.avatar || null);
     },
     [conversationId, params.avatar, peerId, peerName],
   );
@@ -380,6 +405,9 @@ export default function DmThreadScreen() {
   // A reused route instance (same component, new id) must not paint the
   // previous thread while the new page is in flight.
   const previousConversationRef = useRef(conversationId);
+  useEffect(() => {
+    setConversationId(routeConversationId);
+  }, [routeConversationId]);
   useEffect(() => {
     if (previousConversationRef.current === conversationId) return;
     previousConversationRef.current = conversationId;
@@ -403,7 +431,7 @@ export default function DmThreadScreen() {
   }, [conversationId]);
 
   const load = useCallback(async () => {
-    if (!conversationId) return;
+    if (!conversationId || isPendingConversation) return;
     const targetId = conversationId;
     const ownerId = userId;
     if (!ownerId) return;
@@ -462,7 +490,46 @@ export default function DmThreadScreen() {
         setLoading(false);
       }
     }
-  }, [conversationId, synthesizeConversation, userId]);
+  }, [conversationId, isPendingConversation, synthesizeConversation, userId]);
+
+  // A profile opens this screen before the conversation's id exists. Create
+  // it here, then adopt the id: the create-or-get round trip runs behind the
+  // push instead of in front of it, so the tap opens the thread at once.
+  const [createAttempt, setCreateAttempt] = useState(0);
+  useEffect(() => {
+    if (!isPendingConversation) return undefined;
+    if (!peerId || !userId) {
+      setError('This conversation could not be opened.');
+      setLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setError(null);
+    setLoading(false);
+    void createDmConversation(peerId)
+      .then((created) => {
+        if (!active || currentUserIdRef.current !== userId) return;
+        // The id swap is this open's own transition, not a reused route:
+        // mark it so the route-change effect does not reset the thread.
+        previousConversationRef.current = created.id;
+        putDmConversation(created);
+        setConversation(created);
+        setConversationId(created.id);
+        router.setParams({ id: created.id });
+      })
+      .catch((e) => {
+        if (!active) return;
+        setLoading(false);
+        setError(e instanceof Error ? e.message : 'Could not open this conversation.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [createAttempt, isPendingConversation, peerId, router, userId]);
+
+  const retryConversation = useCallback(() => {
+    setCreateAttempt((attempt) => attempt + 1);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -621,7 +688,7 @@ export default function DmThreadScreen() {
 
   // ── Realtime: messages, requests, edits, deletes, reactions ───────────────
   useEffect(() => {
-    if (!userId || !conversationId) return;
+    if (!userId || !conversationId || isPendingConversation) return;
 
     realtimeClient.init({ id: userId, name: user?.name ?? null, avatar: null });
     const room = realtimeRooms.dm(userId);
@@ -848,7 +915,7 @@ export default function DmThreadScreen() {
         catchUpDebounceRef.current = null;
       }
     };
-  }, [userId, user?.name, conversationId, scheduleCatchUp, scrollToLatest]);
+  }, [userId, user?.name, conversationId, isPendingConversation, scheduleCatchUp, scrollToLatest]);
 
   // ── Pagination (older pages) ──────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -1152,9 +1219,19 @@ export default function DmThreadScreen() {
   /**
    * A cached thread paints before the conversation row lands, and the cached
    * row carries the last known request/block state — enough to show the
-   * composer immediately while the fresh page reconciles behind it.
+   * composer immediately while the fresh page reconciles behind it. A pending
+   * thread has a peer-built row too, so its composer is typed into at once;
+   * only sending waits for the create-or-get answer.
    */
   const composerReady = !!conversation;
+  /**
+   * A conversation made on this open has no history: its empty state is the
+   * answer, so the first page request must not swap it for a spinner.
+   */
+  const awaitingFirstPage =
+    loading &&
+    messages.length === 0 &&
+    (!conversation || conversation.last_message_at !== null);
   const unstarted = conversation ? isUnstartedRequest(conversation) : false;
   const displayPeerName = conversation?.peer.name ?? peerName;
   const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);
@@ -1216,7 +1293,7 @@ export default function DmThreadScreen() {
         </Pressable>
       </View>
 
-      {loading && messages.length === 0 ? (
+      {awaitingFirstPage ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -1227,7 +1304,13 @@ export default function DmThreadScreen() {
             Couldn&apos;t load conversation
           </Text>
           <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
-          <Pressable onPress={() => void load()} accessibilityRole="button">
+          <Pressable
+            onPress={() => {
+              if (isPendingConversation) retryConversation();
+              else void load();
+            }}
+            accessibilityRole="button"
+          >
             <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
           </Pressable>
         </View>
@@ -1493,6 +1576,7 @@ export default function DmThreadScreen() {
             ) : (
               <DmComposer
                 ref={dmComposerRef}
+                sendBlocked={isPendingConversation}
                 leadingAccessory={unstarted ? (
                   <View style={styles.preSendHint}>
                     <Feather name="info" size={12} color={colors.foregroundMuted} />
@@ -1507,7 +1591,10 @@ export default function DmThreadScreen() {
                   handleSend(text, pendingImage, replyTo);
                   setReplyTo(null);
                 }}
-                onTypingChange={(text) => notifyTyping(text.length > 0)}
+                onTypingChange={(text) => {
+                  // There is no conversation to pulse until the id lands.
+                  if (!isPendingConversation) notifyTyping(text.length > 0);
+                }}
                 disabled={unstarted && sending}
                 error={sendError}
                 imeLayout={imeLayout}
