@@ -9,6 +9,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Process
@@ -51,23 +55,32 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
     val data = remoteMessage.data
     val communityId = data["communityId"]
-    val isDirectChat =
-      data[DIRECT_KEY] == "1" && data["type"] == "community_message" && !communityId.isNullOrBlank()
+    val conversationId = data["conversationId"]
+    val direct = data[DIRECT_KEY] == "1"
+    val mode = when {
+      direct && data["type"] == "community_message" && !communityId.isNullOrBlank() -> "community"
+      direct && data["type"] == "dm_message" && !conversationId.isNullOrBlank() -> "dm"
+      direct && data["type"] == "app_notification" && !data["notificationId"].isNullOrBlank() -> "activity"
+      else -> null
+    }
 
-    if (!isDirectChat) {
-      // Expo pushes (DMs, activity, events) keep their existing path.
+    if (mode == null) {
+      // Expo pushes (older builds, iOS-only paths) keep their existing path.
       super.onMessageReceived(remoteMessage)
       return
     }
 
-    // The chat already on screen gets no notification. The pref is written by
-    // JS when a community screen mounts and cleared when it leaves; the
+    // The conversation already on screen gets no notification. The prefs are
+    // written by JS when the screen is focused and cleared when it leaves; the
     // foreground check keeps a stale value from suppressing while backgrounded.
-    if (isAppInForeground() && communityId == activeCommunityId()) return
+    if (isAppInForeground()) {
+      if (mode == "community" && communityId == activeCommunityId()) return
+      if (mode == "dm" && conversationId == activeDmConversationId()) return
+    }
 
     thread(name = "uxcommunity-chat-notification") {
       try {
-        postChatNotification(data)
+        postDirectNotification(data, mode)
       } catch (_: Exception) {
         // A notification must never crash the FCM service. The message row is
         // already durable and the app catches up when opened.
@@ -76,9 +89,17 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
   }
 
   private fun activeCommunityId(): String? {
+    return readState(ChatNotificationStateModule.ACTIVE_COMMUNITY_KEY)
+  }
+
+  private fun activeDmConversationId(): String? {
+    return readState(ChatNotificationStateModule.ACTIVE_DM_CONVERSATION_KEY)
+  }
+
+  private fun readState(key: String): String? {
     return try {
       getSharedPreferences(ChatNotificationStateModule.PREFS, Context.MODE_PRIVATE)
-        .getString(ChatNotificationStateModule.ACTIVE_COMMUNITY_KEY, null)
+        .getString(key, null)
     } catch (_: Exception) {
       null
     }
@@ -96,38 +117,81 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     }
   }
 
-  private fun postChatNotification(data: Map<String, String>) {
+  private fun postDirectNotification(data: Map<String, String>, mode: String) {
     val context = applicationContext
     if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
 
-    val communityId = data["communityId"] ?: return
-    val communityName = data["communityName"] ?: data["title"] ?: "New message"
-    val senderName = data["senderName"] ?: "Someone"
-    val messageText = data["message"].takeUnless { it.isNullOrBlank() } ?: "Sent a message"
+    val conversationId = data["conversationId"]
+    val communityId = data["communityId"]
+    val notificationId = data["notificationId"]
+    val personName = data["personName"] ?: "uxcommunity"
+    val senderName = data["senderName"] ?: personName
+    val title = when (mode) {
+      "dm" -> data["title"].takeUnless { it.isNullOrBlank() } ?: senderName
+      "activity" -> data["title"].takeUnless { it.isNullOrBlank() } ?: "uxcommunity"
+      else -> data["communityName"] ?: data["title"] ?: "New message"
+    }
+    val messageText = when (mode) {
+      "activity" -> (data["body"] ?: data["message"]).takeUnless { it.isNullOrBlank() } ?: "New activity"
+      else -> data["message"].takeUnless { it.isNullOrBlank() } ?: "Sent a message"
+    }
     val imageUrl = data["imageUrl"]
     val silent = data["silent"] == "1"
     val badge = data["badge"]?.toIntOrNull()
     val timestamp = data["timestamp"]?.toLongOrNull() ?: System.currentTimeMillis()
 
+    // The identity used for the notification id, the shortcut and the collapse
+    // slot: one per community, one per DM, one per activity row.
+    val conversationKey = when (mode) {
+      "dm" -> "dm-${conversationId ?: return}"
+      "activity" -> "activity-${notificationId ?: return}"
+      else -> "community-${communityId ?: return}"
+    }
+    val deepLinkPath = when (mode) {
+      "dm" -> "messages/$conversationId"
+      "activity" -> activityDeepLink(data["href"])
+      else -> "community/$communityId"
+    }
+    val messagePerson = if (mode == "activity") personName else senderName
+
     ensureChannels(context)
 
-    val avatar = imageUrl?.let { download(it) }
-    val avatarIcon = avatar?.let { IconCompat.createWithBitmap(it) }
-    val communityPerson = Person.Builder()
-      .setName(communityName)
-      .apply { if (avatarIcon != null) setIcon(avatarIcon) }
+    // Photo first; otherwise a type glyph (activity) or initials. Every
+    // notification gets an identity in the avatar slot, even without an image.
+    val avatar = imageUrl?.let { download(it) } ?: when (mode) {
+      "activity" -> emojiAvatar(data["icon"].takeUnless { it.isNullOrBlank() } ?: "🔔")
+      else -> initialAvatar(title)
+    }
+    val avatarIcon = IconCompat.createWithBitmap(avatar)
+    val conversationPerson = Person.Builder()
+      .setName(title)
+      .setIcon(avatarIcon)
       .build()
     val senderPerson = Person.Builder()
-      .setName(senderName)
-      .apply { if (avatarIcon != null) setIcon(avatarIcon) }
+      .setName(messagePerson)
+      .setIcon(avatarIcon)
       .build()
 
-    val deepLink = Uri.parse("uxcommunity:///community/$communityId")
-    val contentIntent = Intent(Intent.ACTION_VIEW, deepLink, context, MainActivity::class.java)
-      .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    val deepLink = if (mode == "dm") {
+      // The DM screen needs the peer snapshot to paint before its fetch; a
+      // conversation id alone lands on the "Member" placeholder.
+      Uri.parse("uxcommunity:///messages/${Uri.encode(conversationId)}").buildUpon()
+        .appendQueryParameter("peerId", data["senderId"] ?: "")
+        .appendQueryParameter("name", data["senderName"] ?: "")
+        .appendQueryParameter("avatar", imageUrl ?: "")
+        .build()
+    } else {
+      Uri.parse("uxcommunity:///$deepLinkPath")
+    }
+    val contentIntent = Intent(
+      Intent.ACTION_VIEW,
+      deepLink,
+      context,
+      MainActivity::class.java,
+    ).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     val pendingIntent = PendingIntent.getActivity(
       context,
-      communityId.hashCode(),
+      conversationKey.hashCode(),
       contentIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
@@ -138,48 +202,114 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     )
       .setSmallIcon(R.drawable.notification_icon)
       .setColor(ContextCompat.getColor(context, R.color.notification_icon_color))
-      .setContentTitle(communityName)
-      .setContentText("$senderName: $messageText")
+      .setContentTitle(title)
+      .setContentText("$messagePerson: $messageText")
       .setStyle(
         NotificationCompat.MessagingStyle(Person.Builder().setName("You").build())
-          .setConversationTitle(communityName)
+          .setConversationTitle(title)
           .addMessage(messageText, timestamp, senderPerson),
       )
-      .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+      .setCategory(
+        if (mode == "activity") NotificationCompat.CATEGORY_SOCIAL
+        else NotificationCompat.CATEGORY_MESSAGE,
+      )
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setAutoCancel(true)
       .setOnlyAlertOnce(silent)
       .setContentIntent(pendingIntent)
+      .setLargeIcon(avatar)
 
-    if (avatar != null) builder.setLargeIcon(avatar)
     if (badge != null && badge > 0) builder.setNumber(badge)
 
     // Conversation notifications take their avatar from a long-lived shortcut.
     // If the shortcut cannot be published (limit, OEM policy) the notification
-    // still shows the DP as its large icon.
-    val shortcutId = "community-$communityId"
-    if (avatarIcon != null) {
-      try {
-        val shortcut = ShortcutInfoCompat.Builder(context, shortcutId)
-          .setShortLabel(communityName.take(40))
-          .setLongLabel(communityName)
-          .setIcon(avatarIcon)
-          .setPerson(communityPerson)
-          .setLongLived(true)
-          .setCategories(setOf("android.shortcut.conversation"))
-          .setIntent(contentIntent)
-          .build()
-        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
-        builder.setShortcutId(shortcutId)
-      } catch (_: Exception) {
-        // Best effort; the large icon is still the community DP.
-      }
+    // still shows the avatar as its large icon.
+    try {
+      val shortcut = ShortcutInfoCompat.Builder(context, conversationKey)
+        .setShortLabel(title.take(40))
+        .setLongLabel(title)
+        .setIcon(avatarIcon)
+        .setPerson(conversationPerson)
+        .setLongLived(true)
+        .setCategories(setOf("android.shortcut.conversation"))
+        .setIntent(contentIntent)
+        .build()
+      ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+      builder.setShortcutId(conversationKey)
+    } catch (_: Exception) {
+      // Best effort; the large icon is still the avatar.
     }
 
     NotificationManagerCompat.from(context).notify(
-      communityId.hashCode(),
+      conversationKey.hashCode(),
       builder.build(),
     )
+  }
+
+  private fun activityDeepLink(href: String?): String {
+    val segments = href?.let { Uri.parse(it).pathSegments } ?: emptyList()
+    val dashboard = segments.indexOf("dashboard")
+    if (dashboard >= 0) {
+      val section = segments.getOrNull(dashboard + 1)
+      val id = segments.getOrNull(dashboard + 2)
+      if (section == "communities" && !id.isNullOrBlank()) return "community/$id"
+      if (section == "jobs" && !id.isNullOrBlank()) return "jobs/$id"
+    }
+    return "notifications"
+  }
+
+  private val avatarColors = intArrayOf(
+    0xFF6D28D9.toInt(),
+    0xFF0E7490.toInt(),
+    0xFFB45309.toInt(),
+    0xFFBE185D.toInt(),
+    0xFF15803D.toInt(),
+  )
+
+  private fun initialAvatar(name: String): Bitmap {
+    val size = 192
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = avatarColors[(name.hashCode() and Int.MAX_VALUE) % avatarColors.size]
+    }
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+    val letter = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = Color.WHITE
+      textSize = size * 0.42f
+      textAlign = Paint.Align.CENTER
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val metrics = textPaint.fontMetrics
+    canvas.drawText(
+      letter,
+      size / 2f,
+      size / 2f - (metrics.ascent + metrics.descent) / 2f,
+      textPaint,
+    )
+    return bitmap
+  }
+
+  private fun emojiAvatar(icon: String): Bitmap {
+    val size = 192
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      textSize = size * 0.5f
+      textAlign = Paint.Align.CENTER
+      color = Color.BLACK
+    }
+    val metrics = textPaint.fontMetrics
+    canvas.drawText(
+      icon,
+      size / 2f,
+      size / 2f - (metrics.ascent + metrics.descent) / 2f,
+      textPaint,
+    )
+    return bitmap
   }
 
   private fun ensureChannels(context: Context) {

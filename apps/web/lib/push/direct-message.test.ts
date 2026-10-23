@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  directMessageFcmData,
   directMessagePushMessages,
   directMessagePushPlan,
   type DirectMessagePreferences,
@@ -53,7 +54,9 @@ test("a DM push wears the sender, the preview and a per-conversation collapse id
   const [message] = directMessagePushMessages(["ExpoPushToken[one]"], {
     conversationId: "dm-1",
     messageId: "m-1",
+    senderId: "u-2",
     senderName: "John",
+    senderAvatarUrl: "https://media.example/john.webp",
     content: "Hi there",
     hasImage: false,
     isReply: false,
@@ -69,6 +72,9 @@ test("a DM push wears the sender, the preview and a per-conversation collapse id
     type: "dm_message",
     conversationId: "dm-1",
     messageId: "m-1",
+    senderId: "u-2",
+    senderName: "John",
+    senderAvatarUrl: "https://media.example/john.webp",
     silent: false,
   });
 });
@@ -77,7 +83,9 @@ test("an image-only DM previews as a photo", () => {
   const [message] = directMessagePushMessages(["ExpoPushToken[one]"], {
     conversationId: "dm-1",
     messageId: "m-2",
+    senderId: "u-2",
     senderName: null,
+    senderAvatarUrl: null,
     content: "",
     hasImage: true,
     isReply: false,
@@ -87,4 +95,29 @@ test("an image-only DM previews as a photo", () => {
   assert.equal(message.title, "New message");
   assert.equal(message.body, "Sent a photo");
   assert.equal(message.channelId, "messages-silent");
+});
+
+test("the direct-FCM DM payload carries the sender photo and conversation", () => {
+  const data = directMessageFcmData({
+    conversationId: "dm-1",
+    messageId: "m-1",
+    senderId: "u-2",
+    senderName: "John",
+    senderAvatarUrl: "https://media.example/john.webp",
+    content: "Hi there",
+    hasImage: false,
+    isReply: false,
+    audible: true,
+    timestamp: 1234,
+  });
+
+  assert.equal(data.type, "dm_message");
+  assert.equal(data.direct, "1");
+  assert.equal(data.conversationId, "dm-1");
+  assert.equal(data.senderId, "u-2");
+  assert.equal(data.title, "John");
+  assert.equal(data.message, "Hi there");
+  assert.equal(data.imageUrl, "https://media.example/john.webp");
+  assert.equal(data.silent, "0");
+  assert.equal(data.timestamp, "1234");
 });

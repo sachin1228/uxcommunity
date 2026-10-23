@@ -79,6 +79,9 @@ export interface DirectMessagePushData {
   type: 'dm_message';
   conversationId: string;
   messageId: string;
+  senderId?: string;
+  senderName?: string | null;
+  senderAvatarUrl?: string | null;
   /** True when the server chose not to buzz for this one. */
   silent?: boolean;
 }

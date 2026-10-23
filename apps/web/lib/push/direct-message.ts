@@ -12,7 +12,12 @@
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/observability/log";
-import { sendExpoPushBatches, type ExpoPushMessage } from "./expo";
+import { sendExpoPushBatches, timeoutSignal, type ExpoPushMessage } from "./expo";
+import {
+  isFcmConfigured,
+  sendFcmDataMessages,
+  type FcmDataMessage,
+} from "./fcm";
 import { messagePushPreview } from "./chat";
 import {
   AUDIBLE_CHANNEL_ID,
@@ -47,7 +52,9 @@ export function directMessagePushPlan(
 export interface DirectMessagePushInput {
   conversationId: string;
   messageId: string;
+  senderId: string;
   senderName: string | null;
+  senderAvatarUrl: string | null;
   content: string | null;
   hasImage: boolean;
   isReply: boolean;
@@ -79,6 +86,9 @@ export function directMessagePushMessages(
       type: "dm_message",
       conversationId: input.conversationId,
       messageId: input.messageId,
+      senderId: input.senderId,
+      senderName: input.senderName ?? "Someone",
+      senderAvatarUrl: input.senderAvatarUrl,
       silent: !input.audible,
     },
   }));
@@ -88,43 +98,149 @@ interface DirectMessagePushParams {
   recipientId: string;
   conversationId: string;
   messageId: string;
+  senderId: string;
   senderName: string | null;
+  senderAvatarUrl: string | null;
   content: string | null;
   hasImage: boolean;
   isReply: boolean;
+}
+
+/** The direct-FCM payload: enough for the native service to draw the DM. */
+export function directMessageFcmData(input: {
+  conversationId: string;
+  messageId: string;
+  senderId: string;
+  senderName: string | null;
+  senderAvatarUrl: string | null;
+  content: string | null;
+  hasImage: boolean;
+  isReply: boolean;
+  audible: boolean;
+  timestamp: number;
+}): Record<string, string> {
+  const title = input.senderName?.trim() || "New message";
+  const data: Record<string, string> = {
+    type: "dm_message",
+    direct: "1",
+    conversationId: input.conversationId,
+    messageId: input.messageId,
+    senderId: input.senderId,
+    senderName: input.senderName ?? "Someone",
+    message: messagePushPreview({
+      content: input.content,
+      hasImage: input.hasImage,
+      isReply: input.isReply,
+    }),
+    title,
+    silent: input.audible ? "0" : "1",
+    timestamp: String(input.timestamp),
+    channelId: input.audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
+  };
+  if (input.senderAvatarUrl) data.imageUrl = input.senderAvatarUrl;
+  return data;
 }
 
 /** The device half of a DM. Best-effort; never throws into the send route. */
 export async function sendDirectMessagePush(params: DirectMessagePushParams): Promise<void> {
   try {
     const db = createServiceClient();
-    const [{ data: tokenRows }, { data: preferenceRow }] = await Promise.all([
-      db.from("push_tokens").select("token").eq("user_id", params.recipientId),
+    const fcmConfigured = isFcmConfigured();
+    const [tokenResult, preferenceResult] = await Promise.all([
+      db
+        .from("push_tokens")
+        .select("token, platform")
+        .eq("user_id", params.recipientId),
       db
         .from("notification_preferences")
         .select("*")
         .eq("user_id", params.recipientId)
         .maybeSingle(),
     ]);
+    let fcmRows: { data: { token: string }[] | null; error: unknown } = {
+      data: [],
+      error: null,
+    };
+    if (fcmConfigured) {
+      fcmRows = (await db
+        .from("fcm_tokens")
+        .select("token")
+        .eq("user_id", params.recipientId)) as unknown as typeof fcmRows;
+    }
 
-    const tokens = ((tokenRows ?? []) as { token: string }[])
-      .map((row) => row.token)
-      .filter(Boolean);
-    if (tokens.length === 0) return;
+    const expoTokens = ((tokenResult.data ?? []) as { token: string; platform?: string }[])
+      .filter((row) => Boolean(row.token))
+      .map((row) => ({ token: row.token, platform: row.platform ?? "android" }));
+    const fcmTokens = fcmRows.error
+      ? []
+      : (fcmRows.data ?? []).map((row) => row.token).filter(Boolean);
+    if (expoTokens.length === 0 && fcmTokens.length === 0) return;
 
     const plan = directMessagePushPlan(
-      (preferenceRow as DirectMessagePreferences | null) ?? undefined,
+      (preferenceResult.data as DirectMessagePreferences | null) ?? undefined,
       new Date(),
     );
     if (!plan.send) return;
 
-    const delivery = await sendExpoPushBatches(
-      directMessagePushMessages(tokens, { ...params, audible: plan.audible }),
-      { deadline: Date.now() + 8_000 },
-    );
+    const direct = fcmConfigured && fcmTokens.length > 0;
+    // Direct-FCM devices draw their own notification; their Expo token is held
+    // back for a provider-wide fallback only. iOS always uses Expo.
+    const expoNow = direct
+      ? expoTokens.filter((row) => row.platform === "ios")
+      : expoTokens;
+    const expoFallback = direct
+      ? expoTokens.filter((row) => row.platform !== "ios")
+      : [];
 
-    if (delivery.deadTokens.length > 0) {
-      await db.from("push_tokens").delete().in("token", delivery.deadTokens);
+    const sendExpo = async (tokens: { token: string }[]) => {
+      if (tokens.length === 0) return null;
+      const delivery = await sendExpoPushBatches(
+        directMessagePushMessages(
+          tokens.map((row) => row.token),
+          { ...params, audible: plan.audible },
+        ),
+        { deadline: Date.now() + 8_000 },
+      );
+      if (delivery.deadTokens.length > 0) {
+        await db.from("push_tokens").delete().in("token", delivery.deadTokens);
+      }
+      return delivery;
+    };
+
+    await sendExpo(expoNow);
+
+    if (direct) {
+      const fcmMessages: FcmDataMessage[] = fcmTokens.map((token) => ({
+        token,
+        collapseKey: `dm-${params.conversationId}`,
+        data: directMessageFcmData({
+          ...params,
+          audible: plan.audible,
+          timestamp: Date.now(),
+        }),
+        ttlSeconds: 3600,
+      }));
+      const report = await sendFcmDataMessages(fcmMessages, {
+        fetch: (input, init) =>
+          globalThis.fetch(input, {
+            ...init,
+            ...(timeoutSignal(8_000) ? { signal: timeoutSignal(8_000) } : {}),
+          }),
+      });
+      const delivered = report.outcomes.filter((outcome) => outcome.ok).length;
+      const dead = report.outcomes
+        .filter((outcome) => !outcome.ok && outcome.deadToken)
+        .map((outcome) => outcome.token);
+
+      // Provider-wide failure: fall back to the held-back Expo messages, so a
+      // bad FCM key never turns into "DMs don't notify".
+      if (report.requestError && delivered === 0 && expoFallback.length > 0) {
+        await sendExpo(expoFallback);
+      }
+
+      if (dead.length > 0) {
+        await db.from("fcm_tokens").delete().in("token", dead);
+      }
     }
   } catch (error) {
     logEvent("error", {

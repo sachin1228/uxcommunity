@@ -2,6 +2,7 @@ import { NativeModules, Platform } from 'react-native';
 
 interface ChatNotificationStateNative {
   setActiveCommunity(communityId: string | null): void;
+  setActiveDmConversation(conversationId: string | null): void;
 }
 
 /**
@@ -17,6 +18,14 @@ const nativeModule =
 export function setActiveCommunityForNotifications(communityId: string | null): void {
   try {
     nativeModule?.setActiveCommunity(communityId);
+  } catch {
+    /* A build without the native module still works, it just cannot suppress. */
+  }
+}
+
+export function setActiveDmConversationForNotifications(conversationId: string | null): void {
+  try {
+    nativeModule?.setActiveDmConversation(conversationId);
   } catch {
     /* A build without the native module still works, it just cannot suppress. */
   }

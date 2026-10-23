@@ -27,8 +27,18 @@ class ChatNotificationStateModule(
       .apply()
   }
 
+  @ReactMethod
+  fun setActiveDmConversation(conversationId: String?) {
+    reactApplicationContext
+      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      .edit()
+      .putString(ACTIVE_DM_CONVERSATION_KEY, conversationId)
+      .apply()
+  }
+
   companion object {
     const val PREFS = "chat_notifications"
     const val ACTIVE_COMMUNITY_KEY = "active_community"
+    const val ACTIVE_DM_CONVERSATION_KEY = "active_dm_conversation"
   }
 }
