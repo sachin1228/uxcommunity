@@ -398,6 +398,8 @@ export async function sendChatMessagePush(
     messageId: string;
     senderId: string;
     senderName: string | null;
+    /** The sender's profile photo, for the notification's message row. */
+    senderAvatarUrl?: string | null;
     content: string | null;
     hasImage: boolean;
     isReply: boolean;
@@ -409,6 +411,7 @@ export async function sendChatMessagePush(
     messageId,
     senderId,
     senderName,
+    senderAvatarUrl = null,
     content,
     hasImage,
     isReply,
@@ -494,6 +497,11 @@ export async function sendChatMessagePush(
 
     const previewText = messagePushPreview({ content, hasImage, isReply });
     const body = `${senderName ?? "Someone"}: ${previewText}`;
+    // The message row wears the person who spoke, never the community: their
+    // photo when there is one, otherwise the app's initials + palette pair.
+    const senderIdentity = senderName?.trim() || "Someone";
+    const senderInitials = nameInitials(senderIdentity);
+    const senderColor = avatarBackground(senderIdentity);
     const deadTokens = new Set<string>();
     // Ticket IDs Expo accepted this fan-out with, kept only for as long as this
     // call runs: a receipt is looked up from them at the end (see
@@ -739,8 +747,11 @@ export async function sendChatMessagePush(
             messageId,
             timestamp: String(nowDate.getTime()),
             channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
+            senderAvatarInitials: senderInitials,
+            senderAvatarColor: senderColor,
           };
           if (communityImage) directData.imageUrl = communityImage;
+          if (senderAvatarUrl) directData.senderAvatarUrl = senderAvatarUrl;
           directData.avatarInitials = nameInitials(communityName);
           directData.avatarColor = avatarBackground(communityName);
 

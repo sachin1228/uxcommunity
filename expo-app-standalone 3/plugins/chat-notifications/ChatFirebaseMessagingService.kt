@@ -144,7 +144,6 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       else -> data["message"].takeUnless { it.isNullOrBlank() } ?: "Sent a message"
     }
     val imageUrl = data["imageUrl"]
-    val avatarUrl = data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() } ?: imageUrl
     val silent = data["silent"] == "1"
     val badge = data["badge"]?.toIntOrNull()
     val timestamp = data["timestamp"]?.toLongOrNull() ?: System.currentTimeMillis()
@@ -165,23 +164,36 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     ensureChannels(context)
 
-    // Prefer the message author's profile photo. Community or activity art
-    // remains the fallback for older payloads and senders without a photo.
-    val avatar = avatarUrl?.let { download(it) } ?: when {
+    // Two identities meet in a chat notification: the conversation on the left
+    // (the community's DP, or the DM peer) and the member who spoke on the
+    // message row. They are the same picture only in a DM.
+    val conversationAvatar = imageUrl?.let { download(it) } ?: when {
       !data["avatarInitials"].isNullOrBlank() ->
         initialAvatar(data["avatarInitials"], data["avatarColor"], title)
       mode == "activity" ->
         emojiAvatar(data["icon"].takeUnless { it.isNullOrBlank() } ?: "🔔")
       else -> initialAvatar(null, data["avatarColor"], title)
     }
-    val avatarIcon = IconCompat.createWithBitmap(avatar)
+    val senderAvatar = if (mode == "activity") {
+      // An activity row has one identity; the type glyph is its avatar.
+      conversationAvatar
+    } else {
+      data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() }?.let { download(it) }
+        ?: initialAvatar(
+          data["senderAvatarInitials"].takeUnless { it.isNullOrBlank() },
+          data["senderAvatarColor"] ?: data["avatarColor"],
+          messagePerson,
+        )
+    }
+    val conversationIcon = IconCompat.createWithBitmap(conversationAvatar)
+    val senderIcon = IconCompat.createWithBitmap(senderAvatar)
     val conversationPerson = Person.Builder()
       .setName(title)
-      .setIcon(avatarIcon)
+      .setIcon(conversationIcon)
       .build()
     val senderPerson = Person.Builder()
       .setName(messagePerson)
-      .setIcon(avatarIcon)
+      .setIcon(senderIcon)
       .build()
 
     val deepLink = if (mode == "dm") {
@@ -230,7 +242,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       .setAutoCancel(true)
       .setOnlyAlertOnce(silent)
       .setContentIntent(pendingIntent)
-      .setLargeIcon(avatar)
+      .setLargeIcon(conversationAvatar)
 
     if (badge != null && badge > 0) builder.setNumber(badge)
 
@@ -244,7 +256,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     // and every *new* conversation is drawn with the app icon instead of its
     // DP, with no error anywhere. Publishing only when what is drawn actually
     // changed keeps the quota for the conversations that need it.
-    val avatarSignature = avatarUrl
+    val avatarSignature = imageUrl
       ?: "init:${data["avatarInitials"] ?: ""}:${data["avatarColor"] ?: ""}:${data["icon"] ?: ""}"
     if (
       publishConversationShortcut(
@@ -252,7 +264,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
         conversationKey = conversationKey,
         title = title,
         signature = "$title|$avatarSignature",
-        icon = avatarIcon,
+        icon = conversationIcon,
         person = conversationPerson,
         intent = contentIntent,
       )

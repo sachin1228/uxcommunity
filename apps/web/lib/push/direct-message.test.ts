@@ -119,6 +119,7 @@ test("the direct-FCM DM payload carries the sender photo and conversation", () =
   assert.equal(data.title, "John");
   assert.equal(data.message, "Hi there");
   assert.equal(data.imageUrl, "https://media.example/john.webp");
+  assert.equal(data.senderAvatarUrl, "https://media.example/john.webp");
   assert.equal(data.silent, "0");
   assert.equal(data.timestamp, "1234");
 });
@@ -140,4 +141,7 @@ test("a DM without a photo uses the app's exact initials and palette color", () 
   assert.equal(data.avatarInitials, "SP");
   assert.equal(data.avatarColor, avatarBackground("sundar pichai"));
   assert.equal(data.avatarInitials, nameInitials("sundar pichai"));
+  assert.equal(data.senderAvatarInitials, "SP");
+  assert.equal(data.senderAvatarColor, avatarBackground("sundar pichai"));
+  assert.equal(data.senderAvatarUrl, undefined);
 });

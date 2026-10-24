@@ -115,6 +115,7 @@ export async function announceNewChatMessage(
     messageId: inserted.id,
     senderId: inserted.user_id,
     senderName,
+    senderAvatarUrl,
     content: inserted.content ?? null,
     hasImage: !!inserted.image_url,
     isReply: !!inserted.reply_to_id,
