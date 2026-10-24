@@ -13,6 +13,7 @@ import {
 } from 'react-native';import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@/context/AuthContext';
 import { Message, Reaction } from '@/lib/communities';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { PersonAvatar } from '@/components/PersonAvatar';
@@ -538,9 +539,10 @@ function TimeRow({
  * The name + time row that opens a run of messages.
  *
  * Community chat is one left-aligned column, so the timestamp lives here —
- * once per run — instead of in a footer under every bubble. Own messages say
- * "You" and keep their delivery state beside the time. Direct messages render
- * the name alone here, exactly as before.
+ * once per run — instead of in a footer under every bubble. Own messages wear
+ * the member's own name (or the DM's "You" label) and keep their delivery
+ * state beside the time. Direct messages render the name alone here, exactly
+ * as before.
  */
 function BubbleHeader({
   message,
@@ -548,6 +550,7 @@ function BubbleHeader({
   withTime,
   onPage = false,
   senderName,
+  ownLabel,
   senderColor,
   colors,
   media = false,
@@ -560,6 +563,8 @@ function BubbleHeader({
   /** No bubble behind the row (emoji-only messages) — page-toned colors. */
   onPage?: boolean;
   senderName: string;
+  /** Community rooms print the member's own name; DMs keep the "You" label. */
+  ownLabel?: string;
   senderColor: string;
   colors: Palette;
   media?: boolean;
@@ -578,7 +583,7 @@ function BubbleHeader({
 
   const nameNode = (
     <Text style={[styles.headerName, { color: nameColor }]}>
-      {isOwn ? 'You' : senderName}
+      {isOwn ? (ownLabel ?? 'You') : senderName}
     </Text>
   );
 
@@ -654,6 +659,7 @@ export const MessageBubble = memo(function MessageBubble({
   variant = 'community',
 }: Props) {
   const colors = useColors();
+  const { user: signedInUser } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
 
   // Community rooms read as one column (every bubble on the avatar rail, own
@@ -748,7 +754,14 @@ export const MessageBubble = memo(function MessageBubble({
   );
 
   const sender = message.users;
-  const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
+  // Rows cached before their author was hydrated (an old echo, or a window
+  // written by an earlier build) have no `users` at all. Your own row can
+  // always answer from the signed-in identity, so the avatar rail never falls
+  // back to the literal "You" placeholder.
+  const senderName =
+    sender?.name ?? (isOwn ? signedInUser?.name ?? 'You' : 'Unknown');
+  const senderAvatarUrl =
+    sender?.avatar_url ?? (isOwn ? signedInUser?.avatar_url ?? null : null);
   const reactions = message.reactions ?? [];
   const replyTo = message.reply_to ?? null;
   const replyToContent = message.reply_to_content ?? null;
@@ -847,7 +860,7 @@ export const MessageBubble = memo(function MessageBubble({
               accessibilityRole="button"
               accessibilityLabel={`View ${senderName}'s profile`}
             >
-              <PersonAvatar name={senderName} url={sender?.avatar_url ?? null} size={28} />
+              <PersonAvatar name={senderName} url={senderAvatarUrl} size={28} />
             </Pressable>
           )}
         </View>
@@ -905,6 +918,7 @@ export const MessageBubble = memo(function MessageBubble({
                     withTime
                     onPage
                     senderName={senderName}
+                    ownLabel={variant === 'community' ? senderName : undefined}
                     senderColor={senderColor}
                     colors={colors}
                     onAuthorPress={onAuthorPress ? handleAuthorPress : undefined}
@@ -959,14 +973,16 @@ export const MessageBubble = memo(function MessageBubble({
 
                 {/* Name (and, in community rooms, the time) once per run.
                     Tapping the name — or the avatar — opens the sender's
-                    profile. Own messages say "You"; direct messages still
-                    keep the time in the footer below the bubble. */}
+                    profile. Own messages wear the member's own name in a
+                    community room; direct messages keep the "You" label and
+                    still keep the time in the footer below the bubble. */}
                 {showHeader && (leftRail || (!isOwn && !isDeleted)) && (
                   <BubbleHeader
                     message={message}
                     isOwn={isOwn}
                     withTime={leftRail}
                     senderName={senderName}
+                    ownLabel={variant === 'community' ? senderName : undefined}
                     senderColor={senderColor}
                     colors={colors}
                     media={!!imageUrl}
