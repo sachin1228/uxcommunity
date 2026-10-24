@@ -14,7 +14,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { AccountSideMenu } from '@/components/AccountSideMenu';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
@@ -32,6 +31,7 @@ import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
+import { hapticSelection } from '@/lib/haptics';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
 import { fetchScreenData, peekScreenData, readScreenData, writeScreenData } from '@/lib/screenDataCacheStore';
@@ -163,8 +163,11 @@ function ProfileTabSession({
   const [linkModal, setLinkModal] = useState<'linkedin' | 'portfolio' | null>(null);
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
 
-  // ── Header menu ──
-  const [menuOpen, setMenuOpen] = useState(false);
+  // ── Header settings shortcut ──
+  const openSettings = useCallback(() => {
+    hapticSelection();
+    router.push('/settings');
+  }, [router]);
 
   const commitProfile = useCallback((next: OwnProfileView, persist = true) => {
     profileRef.current = next;
@@ -651,12 +654,12 @@ function ProfileTabSession({
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Menu"
+          accessibilityLabel="Settings"
           hitSlop={10}
-          onPress={() => setMenuOpen(true)}
-          style={styles.menuButton}
+          onPress={openSettings}
+          style={styles.settingsButton}
         >
-          <Feather name="menu" size={22} color={colors.foreground} />
+          <Feather name="settings" size={22} color={colors.foreground} />
         </Pressable>
       </View>
 
@@ -787,8 +790,6 @@ function ProfileTabSession({
           onClose={() => setCompanyModalOpen(false)}
         />
       ) : null}
-
-      <AccountSideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -803,7 +804,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  menuButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  settingsButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Geist_600SemiBold' },
   heroWrap: { marginBottom: 4 },
   heroDots: {
