@@ -606,7 +606,6 @@ function ProfileTabSession({
           onAddLinkedIn={() => setLinkModal('linkedin')}
           onAddPortfolio={() => setLinkModal('portfolio')}
           onAddCompany={() => setCompanyModalOpen(true)}
-          onEdit={() => router.push('/settings/profile')}
         />
       </View>
 
