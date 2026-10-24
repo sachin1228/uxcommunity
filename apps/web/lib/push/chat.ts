@@ -342,6 +342,233 @@ export interface ChatPushDeps {
    * database is not asked, and pass false to pin the pre-migration behaviour.
    */
   muteUntilColumns?: boolean;
+  /**
+   * Reads the message route started before it inserted the row, so the four
+   * sequential round trips in front of the first push overlap the sender's own
+   * insert instead of following it. Absent when the route could not start them
+   * (or a caller other than the chat route is pushing); the fan-out then reads
+   * everything itself, exactly as before.
+   */
+  warmup?: ChatPushWarmup;
+}
+
+/** A PostgREST read reduced to what the fan-out actually inspects. */
+export interface ChatPushRead<T> {
+  data: T | null;
+  error: unknown;
+}
+
+/** One keyset page of recipients. `nextCursor === null` ends the walk. */
+export interface ChatPushRecipientPage {
+  ids: string[];
+  nextCursor: string | null;
+}
+
+/**
+ * The fan-out reads that do not depend on the message being announced.
+ *
+ * Everything here is keyed by the community and the sender: who is a recipient,
+ * which devices those recipients own, their notification preferences and how
+ * much of the audible budget they have spent this window. None of it changes
+ * because the row was inserted a moment later, which is the whole point — the
+ * message route starts these reads before its insert and the fan-out awaits
+ * them in `after()` (see `warmChatPushTargets`).
+ *
+ * The badge count is deliberately NOT here: it is the recipient's total unread
+ * across every community, so it has to be read after the insert or it would be
+ * one message short.
+ *
+ * Each entry is a promise of the same `{ data, error }` shape the fan-out would
+ * have read itself, so consuming a warm read is indistinguishable from issuing
+ * one — including its error handling. A promise that rejects is treated as "no
+ * warm read": the fan-out falls back to reading it itself.
+ */
+export interface ChatPushWarmup {
+  communityId: string;
+  senderId: string;
+  /** `null` when the read itself failed — the consumer reads it again. */
+  header: Promise<ChatPushRead<{ name?: string; image_url?: string | null }> | null>;
+  muteUntilColumns: Promise<boolean | null>;
+  firstPage: Promise<ChatPushRecipientPage | null>;
+  tokenReads: Promise<{
+    tokens: ChatPushRead<{ token: string; user_id: string; platform?: string }[]>;
+    fcm: ChatPushRead<{ token: string; user_id: string }[]>;
+    preferences: ChatPushRead<PreferencesRow[]>;
+  } | null>;
+  throttle: Promise<
+    ChatPushRead<{ user_id: string; window_started_at: string; sent_count: number }[]> | null
+  >;
+}
+
+/**
+ * One keyset page of recipients, muted members and the sender excluded in SQL.
+ *
+ * The mute is part of "is this a recipient at all": filtering in the database
+ * keeps the page full instead of returning muted rows that get discarded here,
+ * and an expired timed mute is never rewritten — the cutoff comparison is what
+ * ends it.
+ */
+async function readRecipientPage(
+  db: ServiceClient,
+  params: {
+    communityId: string;
+    senderId: string;
+    cursor: string;
+    limit: number;
+    muteUntilColumns: boolean;
+    muteCutoff: string;
+  },
+): Promise<ChatPushRecipientPage> {
+  let page = db
+    .from("community_members")
+    .select("user_id")
+    .eq("community_id", params.communityId)
+    .neq("user_id", params.senderId)
+    .eq("notifications_muted", false);
+  if (params.muteUntilColumns) {
+    page = page.or(
+      `notifications_muted_until.is.null,notifications_muted_until.lte.${params.muteCutoff}`,
+    );
+  }
+  const result = await page
+    .order("user_id", { ascending: true })
+    .gt("user_id", params.cursor)
+    .limit(params.limit);
+
+  const rows = (result.data ?? []) as { user_id: string }[];
+  const ids = rows.map((row) => row.user_id).filter(Boolean);
+  return {
+    ids,
+    // A short page is the end of the membership; a full one continues from its
+    // last id. Deciding that here keeps the cursor rule in one place.
+    nextCursor: ids.length < params.limit ? null : ids[ids.length - 1]!,
+  };
+}
+
+/**
+ * Starts the fan-out's message-independent reads for the first chunk.
+ *
+ * Called by the message route as soon as the body is known to be well formed and
+ * BEFORE the insert, so the four round trips in front of the first device push
+ * (community header, recipients, tokens/preferences, throttle) run while the
+ * sender is still waiting for its own insert instead of after the response.
+ * Measured on production, that prefix was 1.36 s of the 1.6 s fan-out.
+ *
+ * Safe to abandon: every promise is bounded work on one page, and the consumer
+ * treats a missing/rejected read as "not warm" and reads it itself. Nothing here
+ * touches the message row, so a send that later fails to insert has only cost a
+ * few reads.
+ */
+export function warmChatPushTargets(
+  params: { communityId: string; senderId: string },
+  deps: ChatPushDeps = {},
+): ChatPushWarmup {
+  const db = deps.db ?? createServiceClient();
+  const now = deps.now ?? (() => new Date());
+  const chunkSize = Math.max(1, deps.chunkSize ?? PUSH_RECIPIENT_CHUNK);
+  // Same second-precision cutoff the fan-out computes, so the warm page and a
+  // cold one filter timed mutes identically.
+  const muteCutoff = new Date(now().getTime()).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const directChat = isFcmConfigured();
+
+  const header = (async () => {
+    const result = await db
+      .from("communities")
+      .select("name, image_url")
+      .eq("id", params.communityId)
+      .maybeSingle();
+    return {
+      data: result.data as { name?: string; image_url?: string | null } | null,
+      error: result.error,
+    };
+  })();
+
+  const muteUntilColumns =
+    deps.muteUntilColumns !== undefined
+      ? Promise.resolve(deps.muteUntilColumns)
+      : canFilterMuteUntil(db);
+
+  const firstPage = muteUntilColumns.then((muted) =>
+    readRecipientPage(db, {
+      communityId: params.communityId,
+      senderId: params.senderId,
+      cursor: MIN_UUID,
+      limit: chunkSize,
+      muteUntilColumns: muted,
+      muteCutoff,
+    }),
+  );
+
+  const tokenReads = firstPage.then(async (page) => {
+    if (page.ids.length === 0) {
+      return {
+        tokens: { data: [] as { token: string; user_id: string; platform?: string }[], error: null },
+        fcm: { data: [] as { token: string; user_id: string }[], error: null },
+        preferences: { data: [] as PreferencesRow[], error: null },
+      };
+    }
+    const [tokens, fcm, preferences] = await Promise.all([
+      db.from("push_tokens").select("token, user_id, platform").in("user_id", page.ids),
+      directChat
+        ? db.from("fcm_tokens").select("token, user_id").in("user_id", page.ids)
+        : Promise.resolve({ data: [] as { token: string; user_id: string }[], error: null }),
+      db
+        .from("notification_preferences")
+        .select(
+          "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
+        )
+        .in("user_id", page.ids),
+    ]);
+    return {
+      tokens: {
+        data: (tokens.data ?? null) as { token: string; user_id: string; platform?: string }[] | null,
+        error: tokens.error,
+      },
+      fcm: {
+        data: (fcm.data ?? null) as { token: string; user_id: string }[] | null,
+        error: fcm.error,
+      },
+      preferences: {
+        data: (preferences.data ?? null) as PreferencesRow[] | null,
+        error: preferences.error,
+      },
+    };
+  });
+
+  // A warm read that rejects must never surface as an unhandled rejection (the
+  // route may have abandoned it on an early return) and must never look like
+  // "no recipients": `null` means "not warm, read it yourself".
+  const settled = <T>(promise: Promise<T>): Promise<T | null> => promise.catch(() => null);
+
+  const throttle = tokenReads.then(async ({ tokens, fcm }) => {
+    const reachable = new Set<string>();
+    for (const row of (tokens.data ?? []) as { user_id: string }[]) reachable.add(row.user_id);
+    for (const row of (fcm.data ?? []) as { user_id: string }[]) reachable.add(row.user_id);
+    if (reachable.size === 0) {
+      return { data: [] as { user_id: string; window_started_at: string; sent_count: number }[], error: null };
+    }
+    const result = await db
+      .from("push_throttle")
+      .select("user_id, window_started_at, sent_count")
+      .eq("community_id", params.communityId)
+      .in("user_id", [...reachable]);
+    return {
+      data: (result.data ?? null) as
+        | { user_id: string; window_started_at: string; sent_count: number }[]
+        | null,
+      error: result.error,
+    };
+  });
+
+  return {
+    communityId: params.communityId,
+    senderId: params.senderId,
+    header: settled(header),
+    muteUntilColumns: settled(muteUntilColumns),
+    firstPage: settled(firstPage),
+    tokenReads: settled(tokenReads),
+    throttle: settled(throttle),
+  };
 }
 
 /**
@@ -458,6 +685,13 @@ export async function sendChatMessagePush(
     clock() +
     Math.max(1, deps.timeBudgetMs ?? envLimit("PUSH_TIME_BUDGET_MS", PUSH_TIME_BUDGET_MS, 1));
 
+  // Reads the message route started before its insert, if they belong to this
+  // community and sender; anything else is ignored rather than trusted.
+  const warm =
+    deps.warmup && deps.warmup.communityId === communityId && deps.warmup.senderId === senderId
+      ? deps.warmup
+      : null;
+
   // Timed mutes: whether the deadline column exists, and the instant the
   // recipient query compares it against. The cutoff is second-precision (no
   // fractional digits) so the PostgREST `.or()` value stays plain.
@@ -486,16 +720,41 @@ export async function sendChatMessagePush(
     // The community's header and the mute-column probe are independent reads —
     // and on a cold connection the *second* one to start is free, so they share
     // a round trip instead of queueing two Supabase RTs in front of the fan-out.
-    const [communityResult, muteUntilColumns] = await Promise.all([
-      db
+    // When the route warmed them before its insert, this is already resolved: a
+    // rejected or missing warm read just means it is read here instead.
+    type HeaderRead = ChatPushRead<{ name?: string; image_url?: string | null }>;
+    const readHeader = async (): Promise<HeaderRead> => {
+      const result = await db
         .from("communities")
         .select("name, image_url")
         .eq("id", communityId)
-        .maybeSingle(),
-      deps.muteUntilColumns !== undefined
-        ? Promise.resolve(deps.muteUntilColumns)
-        : canFilterMuteUntil(db),
-    ]);
+        .maybeSingle();
+      return {
+        data: result.data as { name?: string; image_url?: string | null } | null,
+        error: result.error,
+      };
+    };
+    let communityResult: HeaderRead;
+    let muteUntilColumns: boolean;
+    if (warm) {
+      const [warmHeader, warmMute] = await Promise.all([
+        warm.header.catch(() => null),
+        deps.muteUntilColumns !== undefined
+          ? Promise.resolve(deps.muteUntilColumns)
+          : warm.muteUntilColumns.catch(() => null),
+      ]);
+      communityResult = warmHeader ?? (await readHeader());
+      muteUntilColumns = warmMute ?? (await canFilterMuteUntil(db));
+    } else {
+      const [header, muted] = await Promise.all([
+        readHeader(),
+        deps.muteUntilColumns !== undefined
+          ? Promise.resolve(deps.muteUntilColumns)
+          : canFilterMuteUntil(db),
+      ]);
+      communityResult = header;
+      muteUntilColumns = muted;
+    }
     const communityName =
       (communityResult.data as { name?: string } | null)?.name ?? "New message";
     // The DP the direct-FCM renderer puts in the notification's avatar slot.
@@ -516,41 +775,33 @@ export async function sendChatMessagePush(
     // ticket store is the queue this design deliberately does not have.
     const acceptedTickets: ExpoPushTicketRef[] = [];
 
-    let cursor = MIN_UUID;
+    let cursor: string = MIN_UUID;
+    // Only the first page can be warm; once it has been taken (or rejected) the
+    // rest of the membership is read here, page by page.
+    let warmPagePending = warm !== null;
     for (;;) {
       if (clock() > deadline) {
         report.truncated = "time";
         break;
       }
 
-      // Keyset page of recipients. Muted memberships are excluded in SQL —
-      // the mute is part of "is this a recipient at all", and filtering in the
-      // database keeps the page full instead of returning muted rows that get
-      // discarded client-side. A timed mute whose deadline is still ahead is
-      // as muted as the forever flag; an expired one is never rewritten —
-      // the comparison below is what ends those mutes.
-      let recipientPage = db
-        .from("community_members")
-        .select("user_id")
-        .eq("community_id", communityId)
-        .neq("user_id", senderId)
-        .eq("notifications_muted", false);
-      if (muteUntilColumns) {
-        recipientPage = recipientPage.or(
-          `notifications_muted_until.is.null,notifications_muted_until.lte.${muteCutoff}`,
-        );
-      }
-      const membersResult = await recipientPage
-        .order("user_id", { ascending: true })
-        .gt("user_id", cursor)
-        .limit(chunkSize);
+      const warmPage = warmPagePending ? await warm!.firstPage.catch(() => null) : null;
+      warmPagePending = false;
+      const page =
+        warmPage ??
+        (await readRecipientPage(db, {
+          communityId,
+          senderId,
+          cursor,
+          limit: chunkSize,
+          muteUntilColumns,
+          muteCutoff,
+        }));
+      const usedWarmPage = warmPage !== null;
 
-      const memberRows = (membersResult.data ?? []) as { user_id: string }[];
-      if (memberRows.length === 0) break;
-
-      const recipientIds = memberRows.map((row) => row.user_id).filter(Boolean);
+      const recipientIds = page.ids;
       if (recipientIds.length === 0) break;
-      cursor = recipientIds[recipientIds.length - 1]!;
+      cursor = page.nextCursor ?? recipientIds[recipientIds.length - 1]!;
       report.chunks += 1;
       report.scanned += recipientIds.length;
 
@@ -574,23 +825,34 @@ export async function sendChatMessagePush(
       // Preferences are read for the whole page alongside the tokens: they are
       // keyed by the same recipient ids and only the token presence decides who
       // is actually reachable, so waiting for the tokens first bought nothing
-      // but another round trip. `throttle`/`badges` still wait, because the
-      // badge RPC is scoped to the reachable subset.
-      const [tokensResult, fcmResult, preferencesResult] = await Promise.all([
-        db
-          .from("push_tokens")
-          .select("token, user_id, platform")
-          .in("user_id", recipientIds),
-        directChat
-          ? db.from("fcm_tokens").select("token, user_id").in("user_id", recipientIds)
-          : Promise.resolve({ data: [] as { token: string; user_id: string }[], error: null }),
-        db
-          .from("notification_preferences")
-          .select(
-            "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
-          )
-          .in("user_id", recipientIds),
-      ]);
+      // but another round trip. `badges` still waits, because the badge RPC is
+      // scoped to the reachable subset.
+      type TokenRead = ChatPushRead<{ token: string; user_id: string; platform?: string }[]>;
+      type FcmTokenRead = ChatPushRead<{ token: string; user_id: string }[]>;
+      type PrefRead = ChatPushRead<PreferencesRow[]>;
+      let tokensResult: TokenRead;
+      let fcmResult: FcmTokenRead;
+      let preferencesResult: PrefRead;
+      const warmTokenReads = usedWarmPage ? await warm!.tokenReads.catch(() => null) : null;
+      if (warmTokenReads) {
+        ({ tokens: tokensResult, fcm: fcmResult, preferences: preferencesResult } = warmTokenReads);
+      } else {
+        [tokensResult, fcmResult, preferencesResult] = await Promise.all([
+          db
+            .from("push_tokens")
+            .select("token, user_id, platform")
+            .in("user_id", recipientIds) as unknown as Promise<TokenRead>,
+          (directChat
+            ? db.from("fcm_tokens").select("token, user_id").in("user_id", recipientIds)
+            : Promise.resolve({ data: [] as { token: string; user_id: string }[], error: null })) as unknown as Promise<FcmTokenRead>,
+          db
+            .from("notification_preferences")
+            .select(
+              "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
+            )
+            .in("user_id", recipientIds) as unknown as Promise<PrefRead>,
+        ]);
+      }
 
       const tokensByUser = new Map<string, { token: string; platform: string }[]>();
       for (const row of (tokensResult.data ?? []) as {
@@ -630,13 +892,23 @@ export async function sendChatMessagePush(
       ];
       report.reachable += reachableIds.length;
 
-      // The remaining independent reads of the reachable subset.
+      // The remaining independent reads of the reachable subset. The throttle
+      // row does not depend on the message, so a warm read covers it; the badge
+      // does — this message counts as unread until it is read — so that read
+      // always happens here, after the insert.
+      const warmThrottle = usedWarmPage ? await warm!.throttle.catch(() => null) : null;
+      type ThrottleRead = ChatPushRead<{
+        user_id: string;
+        window_started_at: string;
+        sent_count: number;
+      }[]>;
       const [throttleResult, badges] = await Promise.all([
-        db
-          .from("push_throttle")
-          .select("user_id, window_started_at, sent_count")
-          .eq("community_id", communityId)
-          .in("user_id", reachableIds),
+        warmThrottle ??
+          (db
+            .from("push_throttle")
+            .select("user_id, window_started_at, sent_count")
+            .eq("community_id", communityId)
+            .in("user_id", reachableIds) as unknown as Promise<ThrottleRead>),
         // Total *unread* messages across all communities, not just this one, so
         // the icon badge matches what the app shows. Computed server-side
         // because a push can land while the app is closed.
@@ -777,35 +1049,49 @@ export async function sendChatMessagePush(
         }
       }
 
+      // Enforce the ceiling per chunk so the whole device list never has to be
+      // resident, and remember that delivery was cut short. Decided before
+      // either provider is called, so a truncated chunk is never half-sent.
+      let batch: ExpoPushMessage[] = [];
       if (messages.length > 0) {
-        // Enforce the ceiling per chunk so the whole device list never has to
-        // be resident, and remember that delivery was cut short.
         const remaining = maxDeliveries - report.deliveries - report.failedPermanent - report.failedTransient;
         if (remaining <= 0) {
           report.truncated = "deliveries";
           break;
         }
-        const batch = messages.length > remaining ? messages.slice(0, remaining) : messages;
+        batch = messages.length > remaining ? messages.slice(0, remaining) : messages;
         if (batch.length < messages.length) report.truncated = "deliveries";
+      }
 
-        let delivery: ExpoPushDelivery | null = null;
-        try {
-          delivery = await send(batch, { deadline });
-        } catch (error) {
-          // The provider sender accounts for every message it accepted; a throw
-          // means this whole chunk is in an unknown state. It is counted as a
-          // transient failure rather than as delivered, and the loop continues
-          // so that one bad chunk cannot discard the recipients behind it.
-          logEvent("error", {
-            event: "push.chunk_delivery_failed",
-            community_id: communityId,
-            recipients: batch.length,
-            error: describeError(error),
-          });
-          report.failedTransient += batch.length;
-          delivery = null;
-        }
+      // Expo and direct FCM address disjoint devices — an Android device with a
+      // raw token has its Expo message held back for the provider-wide fallback
+      // below — so waiting for Expo's whole batch before starting FCM only
+      // delayed the group FCM covers. Both are started here and awaited once.
+      const expoDelivery =
+        batch.length > 0
+          ? send(batch, { deadline }).catch((error) => {
+              // The provider sender accounts for every message it accepted; a
+              // throw means this whole chunk is in an unknown state. It is
+              // counted as a transient failure rather than as delivered, and the
+              // loop continues so that one bad chunk cannot discard the
+              // recipients behind it.
+              logEvent("error", {
+                event: "push.chunk_delivery_failed",
+                community_id: communityId,
+                recipients: batch.length,
+                error: describeError(error),
+              });
+              return null;
+            })
+          : Promise.resolve(null);
+      const directDelivery = fcmMessages.length > 0 ? sendFcm(fcmMessages) : Promise.resolve(null);
+      const [delivery, fcmReport] = await Promise.all([expoDelivery, directDelivery]);
 
+      /** Set when this chunk exhausted the provider, so the loop stops after it
+       *  has accounted for the FCM outcomes it already started. */
+      let stopAfterChunk = false;
+
+      if (batch.length > 0) {
         if (delivery) {
           report.deliveries += delivery.delivered;
           report.failedPermanent += delivery.permanentFailures;
@@ -813,6 +1099,8 @@ export async function sendChatMessagePush(
           if (delivery.providerError) providerError = delivery.providerError;
           for (const token of delivery.deadTokens) deadTokens.add(token);
           for (const ref of delivery.receiptRefs) acceptedTickets.push(ref);
+        } else {
+          report.failedTransient += batch.length;
         }
 
         // A chunk that reached nobody for a transient reason is a hint that the
@@ -822,7 +1110,7 @@ export async function sendChatMessagePush(
         failedChunks = reachedNobody ? failedChunks + 1 : 0;
         if (failedChunks >= maxConsecutiveFailedChunks) {
           report.truncated = "error";
-          break;
+          stopAfterChunk = true;
         }
       }
 
@@ -830,9 +1118,7 @@ export async function sendChatMessagePush(
       // failure (bad credentials, FCM outage) falls back to the Expo transport
       // for exactly the devices whose Expo message was held back — losing a
       // chat is worse than the standard notification shape.
-      if (fcmMessages.length > 0) {
-        const fcmReport = await sendFcm(fcmMessages);
-
+      if (fcmReport) {
         const fcmDelivered = fcmReport.outcomes.filter((outcome) => outcome.ok).length;
         const deadFcmTokens = fcmReport.outcomes
           .filter((outcome) => !outcome.ok && outcome.deadToken)
@@ -920,8 +1206,9 @@ export async function sendChatMessagePush(
         }
       }
 
+      if (stopAfterChunk) break;
       if (report.truncated === "deliveries") break;
-      if (memberRows.length < chunkSize) break;
+      if (page.nextCursor === null) break;
     }
 
     // Receipts, before the pruning below so both kinds of dead token are removed

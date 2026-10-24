@@ -23,6 +23,7 @@ import {
   AUDIBLE_CHANNEL_ID,
   SILENT_CHANNEL_ID,
   sendChatMessagePush,
+  warmChatPushTargets,
   type ChatPushDeps,
 } from "./chat";
 import type { ExpoPushDelivery, ExpoPushMessage, ExpoPushTicketRef } from "./expo";
@@ -1166,5 +1167,188 @@ test("a provider-wide FCM failure falls back to Expo for the held-back device", 
     assert.ok(fallback, "the downgraded notification names why the DP is missing");
     assert.ok(fallback.includes("auth_failed"));
     assert.equal(fallback.includes("fcm-1"), false, "the log never carries a device token");
+  });
+});
+
+// ── 9. Warm reads overlap the sender's insert ───────────────────────────────
+
+/**
+ * The route starts the fan-out's message-independent reads before its insert
+ * (see `warmChatPushTargets`), so the four sequential round trips that used to
+ * follow the insert now run beside it. What must stay true: the warm reads are
+ * actually used (no duplicate queries), the badge is still read after the
+ * insert, and a warmup that failed is replaced by fresh reads rather than
+ * mistaken for "no recipients".
+ */
+test("a warmup's page, devices and throttle are reused instead of read again", async () => {
+  const first = userId(1);
+  const second = userId(2);
+  const state = fakeState({
+    members: [first, second],
+    tokens: new Map([
+      [first, ["expo-a"]],
+      [second, ["expo-b"]],
+    ]),
+    unread: new Map([
+      [first, 3],
+      [second, 4],
+    ]),
+  });
+  const { db, calls } = createFakeDb(state);
+
+  const warmup = warmChatPushTargets(
+    { communityId: BASE_PARAMS.communityId, senderId: SENDER },
+    deps(db),
+  );
+  // Let the warmup finish, then count only what the send itself reads.
+  await Promise.all([
+    warmup.header,
+    warmup.muteUntilColumns,
+    warmup.firstPage,
+    warmup.tokenReads,
+    warmup.throttle,
+  ]);
+  calls.length = 0;
+
+  const delivered: string[] = [];
+  const report = await sendChatMessagePush(
+    BASE_PARAMS,
+    deps(db, {
+      warmup,
+      send: async (messages) => {
+        delivered.push(...messages.map((message) => message.to));
+        return acceptAll(messages);
+      },
+    }),
+  );
+
+  assert.deepEqual(delivered.sort(), ["expo-a", "expo-b"]);
+  const read = (table: string) => calls.filter((call) => call.table === table && call.op === "select").length;
+  assert.equal(read("community_members"), 0, "the warm recipient page is reused");
+  assert.equal(read("push_tokens"), 0, "the warm device read is reused");
+  assert.equal(read("push_throttle"), 0, "the warm throttle read is reused");
+  assert.equal(read("communities"), 0, "the warm header is reused");
+  assert.equal(
+    calls.filter((call) => call.table === "rpc").length,
+    1,
+    "the badge is still read — after the insert, so it counts this message",
+  );
+  assert.equal(report.deliveries, 2);
+  assert.equal(report.complete, true);
+});
+
+test("a warmup that failed is replaced by fresh reads, not read as no recipients", async () => {
+  const first = userId(1);
+  const state = fakeState({
+    members: [first],
+    tokens: new Map([[first, ["expo-a"]]]),
+  });
+  const { db, calls } = createFakeDb(state);
+
+  const failed = (): Promise<never> => {
+    const rejected = Promise.reject<never>(new Error("warmup abandoned"));
+    // The fan-out only consumes the reads it needs; an unconsumed rejected warm
+    // read is handled by `warmChatPushTargets`' own settle wrapper in production.
+    rejected.catch(() => {});
+    return rejected;
+  };
+  const warmup = {
+    communityId: BASE_PARAMS.communityId,
+    senderId: SENDER,
+    header: failed(),
+    muteUntilColumns: failed(),
+    firstPage: failed(),
+    tokenReads: failed(),
+    throttle: failed(),
+  };
+
+  const delivered: string[] = [];
+  const report = await sendChatMessagePush(
+    BASE_PARAMS,
+    deps(db, {
+      warmup: warmup as never,
+      send: async (messages) => {
+        delivered.push(...messages.map((message) => message.to));
+        return acceptAll(messages);
+      },
+    }),
+  );
+
+  assert.deepEqual(delivered, ["expo-a"]);
+  assert.equal(report.deliveries, 1);
+  const memberReads = calls.filter((call) => call.table === "community_members").length;
+  assert.equal(memberReads, 1, "the page is read here instead");
+});
+
+test("a warmup for another community or sender is ignored", async () => {
+  const first = userId(1);
+  const state = fakeState({ members: [first], tokens: new Map([[first, ["expo-a"]]]) });
+  const { db, calls } = createFakeDb(state);
+
+  const warmup = warmChatPushTargets(
+    { communityId: "99999999-0000-0000-0000-000000000009", senderId: SENDER },
+    deps(db),
+  );
+  await warmup.firstPage;
+  calls.length = 0;
+
+  const report = await sendChatMessagePush(
+    BASE_PARAMS,
+    deps(db, { warmup, send: async (messages) => acceptAll(messages) }),
+  );
+
+  assert.equal(report.deliveries, 1);
+  assert.equal(
+    calls.filter((call) => call.table === "community_members").length,
+    1,
+    "the mismatched warmup is not trusted for this community",
+  );
+});
+
+test("Expo and FCM are in flight together instead of one after the other", async () => {
+  await withFcmConfigured(async () => {
+    const state = fcmState();
+    const { db } = createFakeDb(state);
+
+    const started: string[] = [];
+    let releaseExpo: () => void = () => {};
+    const expoGate = new Promise<void>((resolve) => {
+      releaseExpo = resolve;
+    });
+
+    const run = sendChatMessagePush(
+      BASE_PARAMS,
+      deps(db, {
+        send: async (messages) => {
+          started.push("expo");
+          await expoGate;
+          return acceptAll(messages);
+        },
+        sendFcm: async (messages) => {
+          started.push("fcm");
+          // Only a concurrent fan-out reaches this while Expo is still open.
+          releaseExpo();
+          return {
+            requestError: null,
+            outcomes: messages.map((message) => ({
+              token: message.token,
+              ok: true,
+              deadToken: false,
+              error: null,
+            })),
+          };
+        },
+      }),
+    );
+
+    const report = await Promise.race([
+      run,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("FCM waited for Expo to finish")), 2_000),
+      ),
+    ]);
+
+    assert.deepEqual(started, ["expo", "fcm"]);
+    assert.equal(report.deliveries, 3);
   });
 });
