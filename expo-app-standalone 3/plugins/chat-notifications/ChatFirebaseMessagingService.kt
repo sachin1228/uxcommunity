@@ -10,9 +10,12 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -29,7 +32,9 @@ import com.google.firebase.messaging.RemoteMessage
 import expo.modules.notifications.service.ExpoFirebaseMessagingService
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlin.concurrent.thread
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /**
  * Android chat pushes, drawn by the app.
@@ -56,6 +61,34 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     /** Decoded conversation avatars kept across pushes (one per conversation). */
     private const val AVATAR_CACHE_ENTRIES = 12
     private val avatarCache = LruCache<String, Bitmap>(AVATAR_CACHE_ENTRIES)
+
+    /** The square every avatar bitmap is drawn into, in pixels. */
+    private const val AVATAR_SIZE = 192
+
+    /**
+     * Rows a conversation notification keeps. A push carries one message, so
+     * each post appends its own row to the rows already in the shade; the
+     * oldest fall off after this many, matching the platform's MessagingStyle
+     * ceiling without dumping an entire backlog into the notification.
+     */
+    private const val MAX_MESSAGES = 5
+
+    /**
+     * Notification work runs one push at a time. Every post reads the
+     * conversation's currently posted MessagingStyle to append to its history;
+     * two pushes racing would each read the same rows and one would be lost.
+     *
+     * The worker times out once the bursts stop: an idle non-daemon thread
+     * would keep the FCM process resident long after the last notification.
+     */
+    private val notificationExecutor = ThreadPoolExecutor(
+      1,
+      1,
+      30L,
+      TimeUnit.SECONDS,
+      LinkedBlockingQueue(),
+    ) { runnable -> Thread(runnable, "uxcommunity-chat-notification") }
+      .apply { allowCoreThreadTimeOut(true) }
 
     /**
      * What was last published for each conversation shortcut. Separate from
@@ -102,7 +135,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       if (mode == "dm" && conversationId == activeDmConversationId()) return
     }
 
-    thread(name = "uxcommunity-chat-notification") {
+    notificationExecutor.execute {
       try {
         postDirectNotification(data, mode)
       } catch (_: Exception) {
@@ -245,6 +278,21 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
+    val newMessage = NotificationCompat.MessagingStyle.Message(messageText, timestamp, senderPerson)
+    val messages = if (mode == "activity") {
+      // An activity row is its own conversation; repeating it would just
+      // duplicate the same row.
+      listOf(newMessage)
+    } else {
+      (previousMessages(context, conversationKey).filterNot { it.sameAs(newMessage) } + newMessage)
+        .sortedBy { it.timestamp }
+        .takeLast(MAX_MESSAGES)
+    }
+    val style = NotificationCompat.MessagingStyle(Person.Builder().setName("You").build())
+      .setConversationTitle(title)
+      .setGroupConversation(mode == "community")
+    for (message in messages) style.addMessage(message)
+
     val builder = NotificationCompat.Builder(
       context,
       if (silent) CHANNEL_SILENT else CHANNEL_AUDIBLE,
@@ -253,12 +301,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       .setColor(ContextCompat.getColor(context, R.color.notification_icon_color))
       .setContentTitle(title)
       .setContentText("$messagePerson: $messageText")
-      .setStyle(
-        NotificationCompat.MessagingStyle(Person.Builder().setName("You").build())
-          .setConversationTitle(title)
-          .setGroupConversation(mode == "community")
-          .addMessage(messageText, timestamp, senderPerson),
-      )
+      .setStyle(style)
       .setCategory(
         if (mode == "activity") NotificationCompat.CATEGORY_SOCIAL
         else NotificationCompat.CATEGORY_MESSAGE,
@@ -304,6 +347,53 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       conversationKey.hashCode(),
       builder.build(),
     )
+  }
+
+  /**
+   * The messages already on this conversation's notification, oldest first.
+   *
+   * A push carries one message, so the rows before it are read back from the
+   * notification they were posted into — the shade is the only store. Reading
+   * the live notification (rather than persisting a history) also means a
+   * cleared conversation starts fresh with the next message, and rows the
+   * member dismissed never reappear.
+   */
+  private fun previousMessages(
+    context: Context,
+    conversationKey: String,
+  ): List<NotificationCompat.MessagingStyle.Message> {
+    return try {
+      val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      val posted = manager.activeNotifications.firstOrNull {
+        it.id == conversationKey.hashCode() && it.tag == null
+      }?.notification ?: return emptyList()
+      val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted)
+        ?: return emptyList()
+      style.messages.mapNotNull { message ->
+        val text = message.text?.toString() ?: return@mapNotNull null
+        val name = message.person?.name?.toString() ?: return@mapNotNull null
+        // Icons are dropped from history rows: the shade does not draw one per
+        // message, and five parceled bitmaps would bloat the notification's
+        // extras only to be discarded by the system.
+        NotificationCompat.MessagingStyle.Message(
+          text,
+          message.timestamp,
+          Person.Builder().setName(name).build(),
+        )
+      }
+    } catch (_: Exception) {
+      // A missing or unreadable notification simply means no history yet.
+      emptyList()
+    }
+  }
+
+  /** A repeated push (FCM delivery is at-least-once) must not add a row twice. */
+  private fun NotificationCompat.MessagingStyle.Message.sameAs(
+    other: NotificationCompat.MessagingStyle.Message,
+  ): Boolean {
+    return timestamp == other.timestamp &&
+      text?.toString() == other.text?.toString() &&
+      person?.name?.toString() == other.person?.name?.toString()
   }
 
   /**
@@ -389,12 +479,45 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     return "notifications"
   }
 
+  /**
+   * Bakes the avatar's circle into the bitmap.
+   *
+   * SystemUI masks notification icons into a circle on some Android releases
+   * and draws a photo-shaped square on others — Android 14 shows the large
+   * icon square when a conversation falls back to it — and nothing in the
+   * notification API chooses the shape. Cropping here means the DP is round on
+   * every release; everything outside the circle is transparent, so a system
+   * that does mask it again finds no corners to remove.
+   */
+  private fun circularAvatar(source: Bitmap): Bitmap {
+    val bitmap = Bitmap.createBitmap(AVATAR_SIZE, AVATAR_SIZE, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+    // Centre-crop the source's shorter edge, then draw it through a circle.
+    val side = minOf(source.width, source.height).coerceAtLeast(1)
+    val scale = AVATAR_SIZE.toFloat() / side
+    val shader = BitmapShader(source, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+      setLocalMatrix(
+        Matrix().apply {
+          setScale(scale, scale)
+          postTranslate(
+            (AVATAR_SIZE - source.width * scale) / 2f,
+            (AVATAR_SIZE - source.height * scale) / 2f,
+          )
+        },
+      )
+    }
+    paint.shader = shader
+    canvas.drawCircle(AVATAR_SIZE / 2f, AVATAR_SIZE / 2f, AVATAR_SIZE / 2f, paint)
+    return bitmap
+  }
+
   private fun initialAvatar(
     initials: String?,
     colorHex: String?,
     fallbackName: String,
   ): Bitmap {
-    val size = 192
+    val size = AVATAR_SIZE
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val backgroundColor = try {
@@ -446,7 +569,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
   }
 
   private fun emojiAvatar(icon: String): Bitmap {
-    val size = 192
+    val size = AVATAR_SIZE
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
@@ -520,7 +643,13 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       connection.instanceFollowRedirects = true
       try {
         if (connection.responseCode !in 200..299) return null
-        connection.inputStream.use { BitmapFactory.decodeStream(it) }
+        connection.inputStream.use { stream ->
+          val decoded = BitmapFactory.decodeStream(stream) ?: return null
+          val avatar = circularAvatar(decoded)
+          // The cache keeps the small circular copy, not the full-size photo.
+          decoded.recycle()
+          avatar
+        }
       } finally {
         connection.disconnect()
       }
