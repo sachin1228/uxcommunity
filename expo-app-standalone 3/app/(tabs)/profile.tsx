@@ -14,7 +14,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { AccountSideMenu } from '@/components/AccountSideMenu';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
@@ -32,6 +31,7 @@ import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from
 import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
+import { hapticSelection } from '@/lib/haptics';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
 import { fetchScreenData, peekScreenData, readScreenData, writeScreenData } from '@/lib/screenDataCacheStore';
@@ -163,8 +163,11 @@ function ProfileTabSession({
   const [linkModal, setLinkModal] = useState<'linkedin' | 'portfolio' | null>(null);
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
 
-  // ── Header menu ──
-  const [menuOpen, setMenuOpen] = useState(false);
+  // ── Header settings shortcut ──
+  const openSettings = useCallback(() => {
+    hapticSelection();
+    router.push('/settings');
+  }, [router]);
 
   const commitProfile = useCallback((next: OwnProfileView, persist = true) => {
     profileRef.current = next;
@@ -638,27 +641,24 @@ function ProfileTabSession({
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
-      <View
-        style={[
-          styles.header,
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Settings"
+        hitSlop={6}
+        onPress={openSettings}
+        style={({ pressed }) => [
+          styles.settingsButton,
           {
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-            paddingTop: insets.top + 8,
+            top: insets.top + 3,
+            backgroundColor: colors.surfaceRaised,
+            borderColor: colors.border,
+            opacity: pressed ? 0.8 : 1,
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Menu"
-          hitSlop={10}
-          onPress={() => setMenuOpen(true)}
-          style={styles.menuButton}
-        >
-          <Feather name="menu" size={22} color={colors.foreground} />
-        </Pressable>
-      </View>
+        <Feather name="settings" size={22} color={colors.foreground} />
+      </Pressable>
 
       {profileError && !profile ? (
         <View style={styles.center}>
@@ -679,7 +679,10 @@ function ProfileTabSession({
           ListHeaderComponent={hero}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
+          contentContainerStyle={[
+            styles.list,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
+          ]}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
           refreshControl={
@@ -787,24 +790,23 @@ function ProfileTabSession({
           onClose={() => setCompanyModalOpen(false)}
         />
       ) : null}
-
-      <AccountSideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row',
+  settingsButton: {
+    position: 'absolute',
+    right: 11,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
+    zIndex: 5,
   },
-  menuButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Geist_600SemiBold' },
   heroWrap: { marginBottom: 4 },
   heroDots: {
     position: 'absolute',
