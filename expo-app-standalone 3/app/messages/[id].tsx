@@ -1053,9 +1053,10 @@ export default function DmThreadScreen() {
   );
 
   // ── Rows: day dividers interleaved with the timeline ─────────────────────
-  // A row object is what the `PureComponent` cell compares, so rebuilding all
-  // rows on every message would re-render every mounted bubble. Reuse the
-  // previous object when the message and its group flag are unchanged.
+  // The list's cell renderer only skips a re-render when the row object keeps
+  // its identity, so rebuilding all rows on every message would re-render
+  // every mounted bubble. Reuse the previous object when the message and its
+  // group flag are unchanged.
   const rowCacheRef = useRef(new Map<string, ThreadRow>());
   const rows = useMemo<ThreadRow[]>(() => {
     const out: ThreadRow[] = [];

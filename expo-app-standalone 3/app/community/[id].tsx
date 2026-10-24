@@ -659,10 +659,10 @@ export default function CommunityChat() {
   // same merge the web MessageList builds), so a card sits among the messages
   // of its moment. A card also breaks the "same author" run — the message
   // after one starts a fresh bubble group, exactly like the web list.
-  // Rows are handed to a `PureComponent` cell renderer, which re-renders when
-  // a row object changes identity. Rebuilding every row on each message or
-  // page would therefore re-render every mounted bubble; reuse the previous
-  // object when the message and its group flag are unchanged.
+  // The list's cell renderer only skips a re-render when the row object keeps
+  // its identity. Rebuilding every row on each message or page would therefore
+  // re-render every mounted bubble; reuse the previous object when the message
+  // and its group flag are unchanged.
   const rowCacheRef = useRef(new Map<string, ChatRow>());
 
   const rows = useMemo<ChatRow[]>(() => {
