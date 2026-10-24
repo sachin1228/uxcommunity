@@ -17,6 +17,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Process
+import android.util.LruCache
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
@@ -51,6 +52,10 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     /** Only the direct transport carries these; Expo pushes never do. */
     private const val DIRECT_KEY = "direct"
+
+    /** Decoded conversation avatars kept across pushes (one per conversation). */
+    private const val AVATAR_CACHE_ENTRIES = 12
+    private val avatarCache = LruCache<String, Bitmap>(AVATAR_CACHE_ENTRIES)
 
     /**
      * What was last published for each conversation shortcut. Separate from
@@ -177,8 +182,17 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     // Two identities meet in a chat notification: the conversation on the left
     // (the community's DP, or the DM peer) and the member who spoke on the
-    // message row. They are the same picture only in a DM.
-    val conversationAvatar = imageUrl?.let { download(it) } ?: when {
+    // message row. In a DM the payload carries the same URL for both slots, so
+    // the picture is fetched once; only the community layout has two images.
+    val conversationUrl = imageUrl?.takeUnless { it.isNullOrBlank() }
+    val senderUrl = data["senderAvatarUrl"]?.takeUnless { it.isNullOrBlank() }
+    val conversationPhoto = conversationUrl?.let { downloadCached(it) }
+    val senderPhoto = when {
+      senderUrl == null -> null
+      senderUrl == conversationUrl -> conversationPhoto
+      else -> downloadCached(senderUrl)
+    }
+    val conversationAvatar = conversationPhoto ?: when {
       !data["avatarInitials"].isNullOrBlank() ->
         initialAvatar(data["avatarInitials"], data["avatarColor"], title)
       mode == "activity" ->
@@ -190,12 +204,11 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       conversationAvatar
     } else {
       val senderColor = data["senderAvatarColor"] ?: avatarBackground(messagePerson)
-      data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() }?.let { download(it) }
-        ?: initialAvatar(
-          data["senderAvatarInitials"].takeUnless { it.isNullOrBlank() },
-          senderColor,
-          messagePerson,
-        )
+      senderPhoto ?: initialAvatar(
+        data["senderAvatarInitials"].takeUnless { it.isNullOrBlank() },
+        senderColor,
+        messagePerson,
+      )
     }
     val conversationIcon = IconCompat.createWithBitmap(conversationAvatar)
     val senderIcon = IconCompat.createWithBitmap(senderAvatar)
@@ -254,6 +267,9 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       .setAutoCancel(true)
       .setOnlyAlertOnce(silent)
       .setContentIntent(pendingIntent)
+      // The shade should show when the message was sent, not when this device
+      // finished drawing it (the payload timestamp is the server's send time).
+      .setWhen(timestamp)
       .setLargeIcon(conversationAvatar)
 
     if (badge != null && badge > 0) builder.setNumber(badge)
@@ -479,12 +495,28 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     )
   }
 
+  /**
+   * [download] with a small LRU in front of it.
+   *
+   * The service runs a thread per message and a busy conversation re-sends the
+   * same sender's picture on every push; without this each notification paid a
+   * fresh origin round trip (measured 0.4–0.6 s) before it could be drawn.
+   */
+  private fun downloadCached(imageUrl: String): Bitmap? {
+    avatarCache.get(imageUrl)?.let { return it }
+    val bitmap = download(imageUrl) ?: return null
+    avatarCache.put(imageUrl, bitmap)
+    return bitmap
+  }
+
   /** Small, bounded fetch; a failed avatar just means no large icon. */
   private fun download(imageUrl: String): Bitmap? {
     return try {
       val connection = URL(imageUrl).openConnection() as HttpURLConnection
-      connection.connectTimeout = 5_000
-      connection.readTimeout = 5_000
+      // The notification waits on this: a slow origin must cost a placeholder
+      // avatar, not seconds of an empty tray.
+      connection.connectTimeout = 2_000
+      connection.readTimeout = 2_000
       connection.instanceFollowRedirects = true
       try {
         if (connection.responseCode !in 200..299) return null

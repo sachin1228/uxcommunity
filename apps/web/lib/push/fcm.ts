@@ -17,9 +17,14 @@
  * builds. Nothing here logs a token or a message body.
  */
 
+import { timeoutSignal } from "./expo";
+
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const FCM_ENDPOINT = "https://fcm.googleapis.com/v1/projects";
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+
+/** Hard ceiling on the OAuth exchange, so a hung Google socket cannot stall a push. */
+const TOKEN_TIMEOUT_MS = 10_000;
 
 export interface FcmServiceAccount {
   project_id: string;
@@ -126,7 +131,81 @@ function pemToPkcs8(pem: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-let cachedToken: { accessToken: string; expiresAt: number; clientEmail: string } | null = null;
+interface CachedAccessToken {
+  accessToken: string;
+  expiresAt: number;
+}
+
+/** Per-isolate cache — free, but an isolate only lives as long as traffic keeps it warm. */
+let cachedToken: (CachedAccessToken & { clientEmail: string }) | null = null;
+
+/**
+ * Colo-wide cache of the minted access token, via the Workers Cache API.
+ *
+ * The mint is a Google round trip (~200–400 ms) that every cold isolate used to
+ * pay before it could send the first push. The cache entry lives on this zone
+ * only and is never served to a client request (nothing reads this path — it
+ * exists purely as a cache key), so the token stays inside the same trust
+ * boundary as `FCM_SERVICE_ACCOUNT`. Outside Workers (`caches` undefined, e.g.
+ * `next dev` or the node test runner) every call is a no-op.
+ */
+interface SharedTokenCache {
+  match(key: string): Promise<Response | undefined>;
+  put(key: string, response: Response): Promise<void>;
+}
+
+function sharedTokenCache(): SharedTokenCache | null {
+  const store = (globalThis as unknown as { caches?: { default?: SharedTokenCache } }).caches;
+  return store?.default ?? null;
+}
+
+function sharedTokenKey(clientEmail: string): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.uxcommunity.in";
+  const root = (() => {
+    try {
+      return new URL("/__internal/fcm-access-token", base).toString();
+    } catch {
+      return "https://app.uxcommunity.in/__internal/fcm-access-token";
+    }
+  })();
+  return `${root}/${encodeURIComponent(clientEmail)}`;
+}
+
+async function readSharedToken(clientEmail: string, nowMs: number): Promise<CachedAccessToken | null> {
+  try {
+    const cache = sharedTokenCache();
+    if (!cache) return null;
+    const response = await cache.match(sharedTokenKey(clientEmail));
+    if (!response) return null;
+    const value = (await response.json()) as Partial<CachedAccessToken> | null;
+    if (!value?.accessToken || typeof value.expiresAt !== "number") return null;
+    if (value.expiresAt - nowMs <= 60_000) return null;
+    return { accessToken: value.accessToken, expiresAt: value.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+async function writeSharedToken(clientEmail: string, token: CachedAccessToken): Promise<void> {
+  try {
+    const cache = sharedTokenCache();
+    if (!cache) return;
+    // Stop a minute early: a token that expires mid-flight is a failed send.
+    const maxAge = Math.floor((token.expiresAt - Date.now() - 60_000) / 1000);
+    if (maxAge < 60) return;
+    await cache.put(
+      sharedTokenKey(clientEmail),
+      new Response(JSON.stringify(token), {
+        headers: {
+          "content-type": "application/json",
+          "cache-control": `max-age=${maxAge}`,
+        },
+      }),
+    );
+  } catch {
+    // The in-isolate cache still works; the shared one is an optimisation.
+  }
+}
 
 async function mintAccessToken(
   account: FcmServiceAccount,
@@ -139,6 +218,12 @@ async function mintAccessToken(
     cachedToken.expiresAt - nowMs > 60_000
   ) {
     return cachedToken.accessToken;
+  }
+
+  const shared = await readSharedToken(account.client_email, nowMs);
+  if (shared) {
+    cachedToken = { ...shared, clientEmail: account.client_email };
+    return shared.accessToken;
   }
 
   const now = Math.floor(nowMs / 1000);
@@ -166,6 +251,7 @@ async function mintAccessToken(
   );
   const assertion = `${header}.${claims}.${toBase64Url(new Uint8Array(signature))}`;
 
+  const signal = timeoutSignal(TOKEN_TIMEOUT_MS);
   const response = await fetchImpl(account.token_uri ?? TOKEN_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -173,6 +259,7 @@ async function mintAccessToken(
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion,
     }),
+    ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
     throw new Error(`FCM OAuth ${response.status}`);
@@ -188,6 +275,10 @@ async function mintAccessToken(
     clientEmail: account.client_email,
     expiresAt: nowMs + Math.max(60, payload.expires_in ?? 3600) * 1000,
   };
+  await writeSharedToken(account.client_email, {
+    accessToken: cachedToken.accessToken,
+    expiresAt: cachedToken.expiresAt,
+  });
   return cachedToken.accessToken;
 }
 

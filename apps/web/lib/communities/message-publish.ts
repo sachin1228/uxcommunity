@@ -87,7 +87,10 @@ export async function announceNewChatMessage(
     }
   }
 
-  await publishChatEvent({
+  // The live event and the device fan-out are independent; start both at once.
+  // The push used to wait for the realtime POST (and its retries) to finish,
+  // which is a round trip of pure delay on every background notification.
+  const publish = publishChatEvent({
     communityId,
     topic: "message",
     data: {
@@ -110,14 +113,17 @@ export async function announceNewChatMessage(
     },
   });
 
-  await sendChatMessagePush({
-    communityId,
-    messageId: inserted.id,
-    senderId: inserted.user_id,
-    senderName,
-    senderAvatarUrl,
-    content: inserted.content ?? null,
-    hasImage: !!inserted.image_url,
-    isReply: !!inserted.reply_to_id,
-  });
+  await Promise.all([
+    publish,
+    sendChatMessagePush({
+      communityId,
+      messageId: inserted.id,
+      senderId: inserted.user_id,
+      senderName,
+      senderAvatarUrl,
+      content: inserted.content ?? null,
+      hasImage: !!inserted.image_url,
+      isReply: !!inserted.reply_to_id,
+    }),
+  ]);
 }

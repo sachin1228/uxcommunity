@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { requireSession } from "@/lib/auth/session";
+import { assertUserActive, requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient, type ServiceClient } from "@/lib/supabase/service";
 import { createServerTimer } from "@/lib/server-timing";
@@ -129,7 +129,13 @@ export async function POST(
 
   let session;
   try {
-    session = await timer.measure("auth", () => requireSession("user"));
+    // Liveness is still verified on this write — just not *in front of* every
+    // other read. `activeCheck` runs alongside the conversation/profile reads
+    // and is awaited before the insert, which removes a cold-isolate DB round
+    // trip from the send path without weakening the guard.
+    session = await timer.measure("auth", () =>
+      requireSession("user", { verifyActive: false }),
+    );
   } catch (e) {
     return e as Response;
   }
@@ -137,6 +143,13 @@ export async function POST(
   const { id: conversationId } = await params;
 
   const db = createServiceClient();
+
+  // Resolved to the error (a Response) instead of left rejecting, so an
+  // inactive member is answered wherever this is awaited.
+  const activeCheck = assertUserActive(userId).then(
+    () => null,
+    (error: unknown) => error,
+  );
 
   const [rateResult, access, senderProfileResult] = await Promise.all([
     timer.measure("rate_limits", () =>
@@ -176,43 +189,15 @@ export async function POST(
   }
   const conversation = access.conversation;
 
-  // ── Send gates: blocks + the request lifecycle ─────────────────────────
-  // The insert trigger enforces all of these atomically; these pre-checks
-  // exist so the member reads a sentence instead of a generic 500.
-  if (await loadDmBlockEitherWay(db, userId, dmPeerId(conversation, userId))) {
-    return NextResponse.json(
-      { error: "You can't send messages to this member." },
-      { status: 403 },
-    );
-  }
-
-  const requestState = normalizeDmRequestState(conversation.request_state);
-  if (requestState === "rejected") {
-    return NextResponse.json(
-      { error: "This message request was declined." },
-      { status: 403 },
-    );
-  }
-  if (requestState === "pending" && conversation.requested_by === userId) {
-    // The requester holds exactly one message until the request is answered.
-    const { count } = await db
-      .from("dm_messages")
-      .select("id", { count: "exact", head: true })
-      .eq("conversation_id", conversationId)
-      .eq("user_id", userId);
-    if ((count ?? 0) >= 1) {
-      return NextResponse.json(
-        { error: "You can send one message until your request is accepted." },
-        { status: 403 },
-      );
-    }
-  }
-
   const senderName =
     (senderProfileResult[0]?.data as { name?: string } | null)?.name ?? null;
   const senderAvatarUrl =
     (senderProfileResult[1]?.data as { avatar_url?: string | null } | null)?.avatar_url ?? null;
 
+  const requestState = normalizeDmRequestState(conversation.request_state);
+
+  // Parse the body before the database gates: the reply anchor it may carry is
+  // then read in the same round trip as the block check and the request count.
   const parsed = parseSendBody(await req.json().catch(() => null));
   if (!parsed.ok) {
     if (parsed.reason === "empty") {
@@ -235,18 +220,62 @@ export async function POST(
     return NextResponse.json({ error: "Invalid image URL." }, { status: 422 });
   }
 
-  // An anchor that turns out not to exist in this conversation is silently
-  // dropped rather than failing the send (same posture as the community chat).
-  let replyToIdValid: string | null = null;
-  if (replyToId) {
-    const { data: parent } = await db
-      .from("dm_messages")
-      .select("id")
-      .eq("id", replyToId)
-      .eq("conversation_id", conversationId)
-      .maybeSingle();
-    if (parent) replyToIdValid = replyToId;
+  // ── Send gates: blocks + the request lifecycle ─────────────────────────
+  // The insert trigger enforces all of these atomically; these pre-checks
+  // exist so the member reads a sentence instead of a generic 500. They are
+  // independent, so they share one round trip instead of three.
+  const peerId = dmPeerId(conversation, userId);
+  const [blocked, pendingCount, replyToIdValid] = await Promise.all([
+    loadDmBlockEitherWay(db, userId, peerId),
+    requestState === "pending" && conversation.requested_by === userId
+      ? (async () => {
+          // The requester holds exactly one message until the request is answered.
+          const { count } = await db
+            .from("dm_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("conversation_id", conversationId)
+            .eq("user_id", userId);
+          return count ?? 0;
+        })()
+      : Promise.resolve(0),
+    // An anchor that turns out not to exist in this conversation is silently
+    // dropped rather than failing the send (same posture as the community chat).
+    replyToId
+      ? (async () => {
+          const { data: parent } = await db
+            .from("dm_messages")
+            .select("id")
+            .eq("id", replyToId)
+            .eq("conversation_id", conversationId)
+            .maybeSingle();
+          return parent ? replyToId : null;
+        })()
+      : Promise.resolve(null),
+  ]);
+
+  if (blocked) {
+    return NextResponse.json(
+      { error: "You can't send messages to this member." },
+      { status: 403 },
+    );
   }
+  if (requestState === "rejected") {
+    return NextResponse.json(
+      { error: "This message request was declined." },
+      { status: 403 },
+    );
+  }
+  if (pendingCount >= 1) {
+    return NextResponse.json(
+      { error: "You can send one message until your request is accepted." },
+      { status: 403 },
+    );
+  }
+
+  // The write must never happen for a member who was blocked or deleted while
+  // the checks above were in flight.
+  const inactive = await activeCheck;
+  if (inactive) return inactive as Response;
 
   const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
@@ -336,11 +365,15 @@ export async function POST(
 
   // The trigger may have moved the request state on this insert — the first
   // message defines the requester, and the recipient replying is an implicit
-  // acceptance — so read it back: the response tells the sender's client, and
-  // a change fans out to the other member below.
-  const finalState = await readRequestState(db, conversationId);
+  // acceptance. Both transitions start from `pending`; `accepted` is terminal,
+  // so the common send answers from the row it already has instead of paying
+  // another round trip to learn nothing changed.
+  const finalState =
+    requestState === "accepted"
+      ? { request_state: requestState, requested_by: conversation.requested_by }
+      : await readRequestState(db, conversationId);
   const requestStateChanged =
-    finalState.request_state !== normalizeDmRequestState(conversation.request_state) ||
+    finalState.request_state !== requestState ||
     finalState.requested_by !== conversation.requested_by;
 
   // Fire-and-forget: the DB row is the source of truth; a missed event is
@@ -367,53 +400,61 @@ export async function POST(
         }
       }
 
-      await publishDmEvent({
-        participants: dmParticipants(conversation),
-        topic: "dm-message",
-        data: {
-          id: inserted.id,
-          conversation_id: conversationId,
-          participants: dmParticipants(conversation),
-          user_id: inserted.user_id,
-          sender_name: senderName,
-          sender_avatar_url: senderAvatarUrl,
-          content: inserted.content ?? "",
-          created_at: inserted.created_at,
-          reply_to_id: inserted.reply_to_id ?? null,
-          reply_sender_name: replySenderName,
-          reply_sender_id: replySenderId,
-          image_url: inserted.image_url ?? null,
-        },
-      });
+      const participants = dmParticipants(conversation);
 
-      // The request state moved with this message (first message / implicit
-      // accept) — both clients patch their conversation from it.
-      if (requestStateChanged) {
-        await publishDmEvent({
-          participants: dmParticipants(conversation),
-          topic: "dm-request-update",
+      // Realtime and the device push are independent, and so is the request
+      // state event: start all three together. Awaiting the publish first put
+      // its HTTP round trip (with up to three retries) in front of every push,
+      // which is how a slow realtime service became a late notification. Both
+      // helpers swallow and log their own failures, so one cannot fail the
+      // other; allSettled keeps the invocation alive until each settles.
+      await Promise.allSettled([
+        publishDmEvent({
+          participants,
+          topic: "dm-message",
           data: {
+            id: inserted.id,
             conversation_id: conversationId,
-            request_state: finalState.request_state,
-            requested_by: finalState.requested_by,
+            participants,
+            user_id: inserted.user_id,
+            sender_name: senderName,
+            sender_avatar_url: senderAvatarUrl,
+            content: inserted.content ?? "",
+            created_at: inserted.created_at,
+            reply_to_id: inserted.reply_to_id ?? null,
+            reply_sender_name: replySenderName,
+            reply_sender_id: replySenderId,
+            image_url: inserted.image_url ?? null,
           },
-        });
-      }
+        }),
 
-      // The recipient's phone, not just their other open tab. Best-effort:
-      // the helper swallows and logs its own failures, so a push can never
-      // turn a committed message into an error for the sender.
-      await sendDirectMessagePush({
-        recipientId: dmPeerId(conversation, userId),
-        conversationId,
-        messageId: inserted.id,
-        senderId: userId,
-        senderName,
-        senderAvatarUrl,
-        content: inserted.content,
-        hasImage: !!inserted.image_url,
-        isReply: !!inserted.reply_to_id,
-      });
+        // The recipient's phone, not just their other open tab.
+        sendDirectMessagePush({
+          recipientId: dmPeerId(conversation, userId),
+          conversationId,
+          messageId: inserted.id,
+          senderId: userId,
+          senderName,
+          senderAvatarUrl,
+          content: inserted.content,
+          hasImage: !!inserted.image_url,
+          isReply: !!inserted.reply_to_id,
+        }),
+
+        // The request state moved with this message (first message / implicit
+        // accept) — both clients patch their conversation from it.
+        requestStateChanged
+          ? publishDmEvent({
+              participants,
+              topic: "dm-request-update",
+              data: {
+                conversation_id: conversationId,
+                request_state: finalState.request_state,
+                requested_by: finalState.requested_by,
+              },
+            })
+          : Promise.resolve(),
+      ]);
     } catch (err) {
       console.error("[POST dm message] realtime publish error:", err);
     }

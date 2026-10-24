@@ -125,8 +125,12 @@ export function clearSessionCookie(res: NextResponse, host?: string) {
  * Checks the DB to confirm the user still exists and isn't blocked.
  * Used in API routes to guard against deleted/blocked users who still hold
  * a valid JWT (sessions are stateless, so we must verify liveness explicitly).
+ *
+ * Exported for routes that must run the check but not in front of every other
+ * read: start it early, await it before the write (`requireSession` with
+ * `verifyActive: false` keeps it out of the auth path).
  */
-async function assertUserActive(userId: string): Promise<void> {
+export async function assertUserActive(userId: string): Promise<void> {
   const checkedAt = activeUserChecks.get(userId);
   if (checkedAt && Date.now() - checkedAt < USER_LIVENESS_TTL_MS) return;
 

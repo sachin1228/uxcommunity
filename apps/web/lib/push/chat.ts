@@ -461,7 +461,6 @@ export async function sendChatMessagePush(
   // Timed mutes: whether the deadline column exists, and the instant the
   // recipient query compares it against. The cutoff is second-precision (no
   // fractional digits) so the PostgREST `.or()` value stays plain.
-  const muteUntilColumns = deps.muteUntilColumns ?? (await canFilterMuteUntil(db));
   const muteCutoff = new Date(now().getTime()).toISOString().replace(/\.\d{3}Z$/, "Z");
 
   const report: ChatPushReport = {
@@ -484,11 +483,19 @@ export async function sendChatMessagePush(
   let providerError: string | null = null;
 
   try {
-    const communityResult = await db
-      .from("communities")
-      .select("name, image_url")
-      .eq("id", communityId)
-      .maybeSingle();
+    // The community's header and the mute-column probe are independent reads —
+    // and on a cold connection the *second* one to start is free, so they share
+    // a round trip instead of queueing two Supabase RTs in front of the fan-out.
+    const [communityResult, muteUntilColumns] = await Promise.all([
+      db
+        .from("communities")
+        .select("name, image_url")
+        .eq("id", communityId)
+        .maybeSingle(),
+      deps.muteUntilColumns !== undefined
+        ? Promise.resolve(deps.muteUntilColumns)
+        : canFilterMuteUntil(db),
+    ]);
     const communityName =
       (communityResult.data as { name?: string } | null)?.name ?? "New message";
     // The DP the direct-FCM renderer puts in the notification's avatar slot.
@@ -547,10 +554,9 @@ export async function sendChatMessagePush(
       report.chunks += 1;
       report.scanned += recipientIds.length;
 
-      // Tokens first: without a device there is nothing to send, so the
-      // preference, throttle and badge reads are only issued for members that
-      // can actually be reached. A member with no tokens is not a recipient in
-      // any observable sense, so this is a pure reduction in work.
+      // Tokens decide who is reachable; the throttle and badge reads are only
+      // issued for that subset. Preferences ride along with the tokens (same
+      // ids, same query count) and are ignored for members with no device.
       //
       // Android devices that registered their raw FCM token get the chat as a
       // data-only FCM message and draw it natively (community DP on the left).
@@ -565,7 +571,12 @@ export async function sendChatMessagePush(
           impact: "chat pushes use Expo's generic layout (no avatar)",
         });
       }
-      const [tokensResult, fcmResult] = await Promise.all([
+      // Preferences are read for the whole page alongside the tokens: they are
+      // keyed by the same recipient ids and only the token presence decides who
+      // is actually reachable, so waiting for the tokens first bought nothing
+      // but another round trip. `throttle`/`badges` still wait, because the
+      // badge RPC is scoped to the reachable subset.
+      const [tokensResult, fcmResult, preferencesResult] = await Promise.all([
         db
           .from("push_tokens")
           .select("token, user_id, platform")
@@ -573,6 +584,12 @@ export async function sendChatMessagePush(
         directChat
           ? db.from("fcm_tokens").select("token, user_id").in("user_id", recipientIds)
           : Promise.resolve({ data: [] as { token: string; user_id: string }[], error: null }),
+        db
+          .from("notification_preferences")
+          .select(
+            "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
+          )
+          .in("user_id", recipientIds),
       ]);
 
       const tokensByUser = new Map<string, { token: string; platform: string }[]>();
@@ -613,14 +630,8 @@ export async function sendChatMessagePush(
       ];
       report.reachable += reachableIds.length;
 
-      // Three independent reads of the same (bounded) recipient set.
-      const [preferencesResult, throttleResult, badges] = await Promise.all([
-        db
-          .from("notification_preferences")
-          .select(
-            "user_id, chat_push_enabled, chat_sound, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone",
-          )
-          .in("user_id", reachableIds),
+      // The remaining independent reads of the reachable subset.
+      const [throttleResult, badges] = await Promise.all([
         db
           .from("push_throttle")
           .select("user_id, window_started_at, sent_count")
