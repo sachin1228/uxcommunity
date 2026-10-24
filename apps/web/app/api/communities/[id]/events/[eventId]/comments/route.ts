@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
-import { isPublicContentScope } from "@/lib/content-scope";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
+import { loadEventForViewer } from "@/lib/communities/event-access";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
@@ -18,13 +18,19 @@ export async function GET(
 
   const { id: communityId, eventId } = await params;
   const db = createServiceClient();
-  const publicScope = isPublicContentScope(communityId);
-  let eventQuery = db.from("community_events").select("id, is_public").eq("id", eventId);
-  eventQuery = publicScope
-    ? eventQuery.eq("is_public", true).is("community_id", null)
-    : eventQuery.eq("community_id", communityId);
-  const { data: event } = await eventQuery.maybeSingle();
-  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  const access = await loadEventForViewer<{ id: string; is_public: boolean }>(
+    db,
+    communityId,
+    eventId,
+    session.userId!,
+    "id, is_public",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
 
   const { data, error } = await db
     .from("event_comments")
@@ -55,18 +61,26 @@ export async function POST(
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
 
-  // Verify event exists in this community
-  const publicScope = isPublicContentScope(communityId);
-  let eventQuery = db
-    .from("community_events")
-    .select("id, user_id, title")
-    .eq("id", eventId);
-  eventQuery = publicScope
-    ? eventQuery.eq("is_public", true).is("community_id", null)
-    : eventQuery.eq("community_id", communityId);
-  const { data: event } = await eventQuery.maybeSingle();
-
-  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  // Verify the caller may see this event (public, or a community member).
+  const access = await loadEventForViewer<{
+    id: string;
+    user_id: string;
+    title: string;
+    is_public: boolean;
+  }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    "id, user_id, title, is_public",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
+  const event = access.event;
 
   let body: { body?: unknown; image_url?: unknown; parent_id?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }

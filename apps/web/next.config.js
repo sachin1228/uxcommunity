@@ -60,6 +60,19 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Baseline hardening for every route. CSP stays separate: the app
+        // still needs inline Next bootstrap styles/scripts, so a policy has to
+        // be built and tested deliberately rather than dropped in here.
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+        ],
+      },
+      {
         source: "/emoji/:path*",
         headers: [
           {

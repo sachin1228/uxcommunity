@@ -6,6 +6,7 @@ import { sendWelcomeEmail } from "@/lib/email";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
@@ -28,7 +29,7 @@ function safeSignupError(error: { code?: string; message?: string }) {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
   const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600);
   if (!rateLimitResult.success) {
     return NextResponse.json(

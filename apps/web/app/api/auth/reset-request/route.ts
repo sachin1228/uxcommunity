@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { z } from "zod";
 
 const schema = z.object({
@@ -9,7 +10,7 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
   const rl = await rateLimit(`reset-request:${ip}`, 5, 3600); // 5 per hour per IP
   if (!rl.success) {
     return NextResponse.json(

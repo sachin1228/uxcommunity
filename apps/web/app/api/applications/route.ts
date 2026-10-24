@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { applicationSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5 submissions per IP per hour
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
   const rl = await rateLimit(`apply:${ip}`, 5, 3600);
   if (!rl.success) {
     return NextResponse.json(

@@ -59,21 +59,33 @@ export interface GlobalRequestRateLimitResult {
 }
 
 /**
+ * The client address for rate-limit keys.
+ *
+ * Cloudflare's `cf-connecting-ip` is the only header the edge sets itself.
+ * `x-forwarded-for` is client-supplied and may be prepended, so it is only a
+ * fallback for local/self-hosted runs — never the first choice behind the edge.
+ */
+export function getRequestClientIp(
+  request: Pick<NextRequest, "headers">
+): string {
+  const forwardedIp =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip");
+
+  return forwardedIp || "unknown";
+}
+
+/**
  * Prefer an authenticated user key so users behind the same NAT are isolated.
- * For public pages, use the first address from the trusted proxy headers.
+ * For public pages, use the trusted client address.
  */
 export function getGlobalRequestKey(
   request: Pick<NextRequest, "headers">,
   userId?: string | null
 ): string {
   if (userId) return `user:${userId}`;
-
-  const forwardedIp =
-    request.headers.get("cf-connecting-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request.headers.get("x-real-ip");
-
-  return `ip:${forwardedIp || "unknown"}`;
+  return `ip:${getRequestClientIp(request)}`;
 }
 
 export async function checkGlobalRequestRateLimit(

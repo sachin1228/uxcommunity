@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { isPublicContentScope } from "@/lib/content-scope";
+import { loadEventForViewer } from "@/lib/communities/event-access";
 import {
   attachCommentReactions,
   isCommentReaction,
@@ -27,7 +27,6 @@ export async function POST(
   const { id: communityId, eventId, commentId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
-  const publicScope = isPublicContentScope(communityId);
 
   const limit = await rateLimit(`comment-reaction:event:${userId}:60s`, 60, 60);
   if (!limit.success) {
@@ -51,12 +50,19 @@ export async function POST(
   if (!comment) return NextResponse.json({ error: "Comment not found." }, { status: 404 });
 
   // Event-level access: same rules as reading its comments.
-  let eventQuery = db.from("community_events").select("id").eq("id", eventId);
-  eventQuery = publicScope
-    ? eventQuery.eq("is_public", true).is("community_id", null)
-    : eventQuery.eq("community_id", communityId);
-  const { data: event } = await eventQuery.maybeSingle();
-  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  const access = await loadEventForViewer<{ id: string; is_public: boolean }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    "id, is_public",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
 
   try {
     await toggleCommentReaction({ db, commentId, userId, emoji, kind: "events" });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendCompanyVerificationEmail } from "@/lib/email";
 import {
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getRequestClientIp(request);
 
   // Sending mail is the expensive part, so both the member and the caller IP
   // are limited. The per-member window is the effective one for a member

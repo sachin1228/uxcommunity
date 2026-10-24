@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword } from "@/lib/auth/password";
 import { z } from "zod";
 
@@ -20,7 +21,7 @@ const schema = z
   });
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
   const rl = await rateLimit(`reset-confirm:${ip}`, 10, 3600);
   if (!rl.success) {
     return NextResponse.json(

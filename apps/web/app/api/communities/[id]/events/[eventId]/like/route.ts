@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { requireSession } from "@/lib/auth/session";
-import { isPublicContentScope } from "@/lib/content-scope";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
-
-async function eventExists(db: ReturnType<typeof createServiceClient>, communityId: string, eventId: string) {
-  let query = db.from("community_events").select("id").eq("id", eventId);
-  query = isPublicContentScope(communityId)
-    ? query.eq("is_public", true).is("community_id", null)
-    : query.eq("community_id", communityId);
-  const { data, error } = await query.maybeSingle();
-  return { exists: Boolean(data), error };
-}
+import { loadEventForViewer } from "@/lib/communities/event-access";
 
 export async function POST(
   request: NextRequest,
@@ -30,9 +21,19 @@ export async function POST(
   const { id: communityId, eventId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
-  const lookup = await eventExists(db, communityId, eventId);
-  if (lookup.error) return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
-  if (!lookup.exists) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  const access = await loadEventForViewer<{ id: string; is_public: boolean }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    "id, is_public",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
 
   const mutation = body.liked
     ? await db.from("event_likes").upsert(
