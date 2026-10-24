@@ -346,21 +346,26 @@ At the measured 340 ms per hop that is ~1.36 s — the whole stage minus the FCM
 | The push starts **before** the reply-author lookups (two sequential reads) instead of after them | [message-publish.ts](apps/web/lib/communities/message-publish.ts) |
 | The header read shares a round trip with the recipient page instead of queueing ahead of it | [chat.ts](apps/web/lib/push/chat.ts) |
 
-### Projected effect
+### Measured effect (2026-10-24, production)
 
-The prefix (4 hops ≈ 1.36 s) now overlaps the sender path (~0.7 s once liveness is out of it), so only its tail and the badge remain on the notification's path. The badge is deliberately **not** warmed: it counts this message as unread, so reading it before the insert would report one message too few.
+The branch was deployed to `uxcommunity-web`, measured with the §14 probe, rolled back to the previous version, measured again, and redeployed — same probe, same community, same emulator, interleaved on the same afternoon.
 
-| Stage | Before (measured) | After (projected) |
-|---|---|---|
-| client → Worker (India ↔ MRS) | 0.98 s | 0.98 s — no code change moves it (§13 item 1 does) |
-| Worker: auth + reads + insert | 1.06 s | ≈ 0.70 s (−0.36 s: liveness parallel) |
-| insert → posted | 1.53 s | ≈ 1.2 s (prefix shares the insert's wait; badge 0.34 + FCM ≈ 0.20 + device 0.35) |
-| **total** | **3.57 s** | **≈ 2.8–2.9 s** |
+The prefix (4 hops ≈ 1.36 s) now runs beside the sender path instead of behind it, and only its tail plus the badge remain on the notification's path. The badge is deliberately **not** warmed: it counts this message as unread, so reading it before the insert would report one message too few.
 
-The saving is real but bounded by physics: the fan-out prefix is ~1 s of database round trips and only the part that overlaps the sender's own work disappears, so the four hops no longer start *after* the response but roughly one insert earlier. Transport overlap (Expo was waiting for FCM to be started) and the now-parallel liveness check make up the rest. Getting the remaining seconds needs fewer or faster hops, not more concurrency:
+| Stage | Before (n=18) | After (n=23) | Change |
+|---|---|---|---|
+| tap send → notification posted | **4.34 s** median (mean 4.64) | **3.47 s** median (mean 3.79) | **−0.88 s (−20%)** |
+| Worker request (`Server-Timing` total) | 1.15 s median | 0.81 s median | −0.34 s |
+| post-commit fan-out + delivery | ≈1.5 s | ≈1.2 s | ≈−0.3 s |
+
+The end-to-end gain is larger than the Worker gain because the fan-out no longer sits entirely behind the response: part of it now runs while the sender is still waiting for its own insert.
+
+Conditions: production Worker, Android emulator, the 8-member community of §14, the same probe on both arms. The emulator's FCM connection degrades after a few minutes in the background (messages arrive 30–45 s late or not at all until it is reset with an airplane-mode toggle); samples taken in that state were discarded, and both arms were measured only while delivery was healthy. Per-sample spread stays wide (3.2–7.3 s) because a cold isolate adds 0.7–2.5 s to the Worker, which is why the medians use 18 and 23 samples rather than a handful.
+
+Smart Placement is deployed but still reports `cf-placement: local-MRS` on every probe — analysis needs traffic from several locations and up to ~15 minutes — so the "faster hops" half of the plan is **not** included in these numbers.
+
+Getting the remaining seconds needs fewer or faster hops, not more concurrency:
 
 - **Fewer hops** — the fan-out still makes 4 sequential requests. One `chat_push_targets(community, sender, cursor, limit)` RPC (the `send_dm_message` pattern in §6) would return page + devices + preferences + throttle in one statement batch, and the badge in a second. That is ~0.7 s off the prefix before any infrastructure change.
-- **Faster hops** — §13 item 1 (Smart Placement, now configured) turns each 340 ms hop into a near-local one; the same send should then land near **1.5–1.7 s**: ~1 s of client network, ~0.1 s of hops, ~0.2 s FCM, ~0.35 s device.
-
-This is arithmetic on measured hops, not a re-measurement: the branch is not deployed, and re-running the §14 probe after deploy is what confirms it.
-4. There is still no push-latency telemetry (`push.sent` with timings, device `posted_at`), so §12 can only be proven by re-running the method in §3 after a deploy.
+- **Faster hops** — §13 item 1 turns each 340 ms hop into a near-local one; with that in place the same send should land near **1.5–1.7 s**: ~1 s of client network, ~0.1 s of hops, ~0.2 s FCM, ~0.35 s device.
+- **Telemetry** — there is still no `push.sent` / device `posted_at` event, so this table can only be reproduced by re-running the §14 probe.
