@@ -137,8 +137,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   badgeText: {
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 14,
     fontFamily: 'Geist_600SemiBold',
     color: '#FFFFFF',
   },
