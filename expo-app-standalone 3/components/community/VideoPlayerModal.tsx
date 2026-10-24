@@ -40,7 +40,7 @@ export function VideoPlayerModal({
           style={styles.video}
           nativeControls
           contentFit="contain"
-          allowsFullscreen
+          fullscreenOptions={{ enable: true }}
         />
         <Pressable
           onPress={onClose}
