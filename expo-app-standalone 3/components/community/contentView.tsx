@@ -31,10 +31,13 @@ import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEvent } from 'expo';
 import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
+import { useImageAspectRatio } from '@/hooks/useImageAspectRatio';
+import { rememberImageAspectRatio } from '@/lib/imageAspectRatio';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
 import {
@@ -1960,6 +1963,9 @@ export function MediaCarousel({
             contentFit="contain"
             cachePolicy="memory-disk"
             recyclingKey={entry.url}
+            onLoad={({ source }) => {
+              rememberImageAspectRatio(entry.url, source.width, source.height);
+            }}
           />
         </Pressable>
         {viewer}
@@ -2006,6 +2012,9 @@ export function MediaCarousel({
                 contentFit="contain"
                 cachePolicy="memory-disk"
                 recyclingKey={entry.url}
+                onLoad={({ source }) => {
+                  rememberImageAspectRatio(entry.url, source.width, source.height);
+                }}
               />
             </Pressable>
           ),
@@ -2050,6 +2059,13 @@ export function MediaCarousel({
   );
 }
 
+/**
+ * How long the inline player survives after its card leaves the viewport.
+ * Viewability flips at the 60% mark, so the pull-to-refresh bounce and scroll
+ * jitter would otherwise tear the native player down and rebuild it mid-scroll.
+ */
+const INLINE_PLAYER_UNMOUNT_GRACE_MS = 1200;
+
 /** Inline, muted, looping playback — tap opens the full player. */
 function InlineVideo({
   entry,
@@ -2067,25 +2083,45 @@ function InlineVideo({
   // Only the card the member is actually looking at allocates a native
   // player. Every other mounted video card shows its poster (or a glyph), so
   // scrolling a feed full of videos no longer keeps one decoder alive per row.
-  const showInlinePlayer = active && !showPlayer;
+  // The player lingers briefly after the card leaves the viewport, paused, so
+  // a threshold bounce doesn't rebuild it.
+  const [playerMounted, setPlayerMounted] = useState(active);
+  useEffect(() => {
+    if (active) {
+      setPlayerMounted(true);
+      return;
+    }
+    const timer = setTimeout(() => setPlayerMounted(false), INLINE_PLAYER_UNMOUNT_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [active]);
+
+  const showInlinePlayer = playerMounted && !showPlayer;
+  const poster = entry.poster;
 
   return (
     <View style={[styles.videoThumb, style]}>
-      {showInlinePlayer ? (
-        <InlineVideoPlayer entry={entry} rank={rank} muted={muted} />
-      ) : entry.poster ? (
+      {/* The poster is a permanent backdrop: the player fades in over it on
+          its first decoded frame, so a card is never a black hole while the
+          video loads or reloads. */}
+      {poster ? (
         <ExpoImage
-          source={{ uri: entry.poster }}
+          source={{ uri: poster }}
           style={styles.threadImage}
           contentFit="cover"
           cachePolicy="memory-disk"
-          recyclingKey={entry.poster}
+          recyclingKey={poster}
+          onLoad={({ source }) => {
+            rememberImageAspectRatio(poster, source.width, source.height);
+          }}
         />
       ) : (
         <View style={[styles.threadImage, styles.videoPosterFallback]}>
           <Feather name="video" size={24} color="rgba(255, 255, 255, 0.72)" />
         </View>
       )}
+      {showInlinePlayer ? (
+        <InlineVideoPlayer entry={entry} active={active} rank={rank} muted={muted} />
+      ) : null}
       <Pressable
         onPress={() => setShowPlayer(true)}
         style={StyleSheet.absoluteFill}
@@ -2115,10 +2151,12 @@ function InlineVideo({
 /** The native player, mounted only while its card owns inline playback. */
 function InlineVideoPlayer({
   entry,
+  active,
   rank,
   muted,
 }: {
   entry: MediaEntry;
+  active: boolean;
   rank: number;
   muted: boolean;
 }) {
@@ -2127,7 +2165,11 @@ function InlineVideoPlayer({
     instance.loop = true;
     instance.muted = muted;
   });
+  const { status } = useEvent(player, 'statusChange', { status: player.status });
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  // Starts invisible: the poster behind it stays visible until the player has
+  // a decoded frame, so activation never flashes black.
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -2140,10 +2182,19 @@ function InlineVideoPlayer({
     player.muted = muted;
   }, [muted, player]);
 
+  useEffect(() => {
+    if (status !== 'readyToPlay') return;
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 140,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity, status]);
+
   // Playback follows the viewport, like the web player's IntersectionObserver.
   // The coordinator lets only one of the on-screen videos run, so two
   // soundtracks never overlap.
-  const wantsPlay = focused && appActive;
+  const wantsPlay = active && focused && appActive;
   useEffect(() => {
     if (!wantsPlay) {
       player.pause();
@@ -2155,13 +2206,18 @@ function InlineVideoPlayer({
   }, [player, rank, wantsPlay]);
 
   return (
-    <VideoView
-      player={player}
-      style={styles.threadImage}
-      nativeControls={false}
-      contentFit="cover"
-      fullscreenOptions={{ enable: false }}
-    />
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
+      <VideoView
+        player={player}
+        // TextureView composites in the normal hierarchy, so the fade over
+        // the poster actually works (a SurfaceView punches a black hole).
+        surfaceType="textureView"
+        style={styles.threadImage}
+        nativeControls={false}
+        contentFit="cover"
+        fullscreenOptions={{ enable: false }}
+      />
+    </Animated.View>
   );
 }
 
@@ -2205,28 +2261,6 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       </Text>
     </Pressable>
   );
-}
-
-/**
- * Natural aspect ratio of a remote image, or null while it is unknown.
- * Used by `MediaCarousel` so a single attachment is never cropped.
- */
-function useImageAspectRatio(url?: string): number | null {
-  const [ratio, setRatio] = useState<number | null>(null);
-  useEffect(() => {
-    setRatio(null);
-    if (!url) return;
-    let active = true;
-    RNImage.getSize(
-      url,
-      (width, height) => {
-        if (active && width > 0 && height > 0) setRatio(width / height);
-      },
-      () => undefined,
-    );
-    return () => { active = false; };
-  }, [url]);
-  return ratio;
 }
 
 const styles = StyleSheet.create({

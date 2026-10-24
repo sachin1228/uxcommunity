@@ -311,6 +311,7 @@ function HomeTabSession({
           paintedSnapshot = true;
           cacheReadyScopeRef.current = cacheIdentity;
           commitFeed(targetScope, memory.data.items, memory.data.hasMore, false);
+          prefetchFeedImages(memory.data.items);
           resetActions();
           if (memory.isFresh) {
             setError(null);
@@ -331,6 +332,7 @@ function HomeTabSession({
           paintedSnapshot = true;
           cacheReadyScopeRef.current = cacheIdentity;
           commitFeed(targetScope, snapshot.data.items, snapshot.data.hasMore, false);
+          prefetchFeedImages(snapshot.data.items);
           resetActions();
           setLoading(false);
         });
