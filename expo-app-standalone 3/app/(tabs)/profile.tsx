@@ -652,7 +652,7 @@ function ProfileTabSession({
         style={({ pressed }) => [
           styles.settingsButton,
           {
-            top: insets.top + 3,
+            top: insets.top + 16,
             backgroundColor: colors.surfaceRaised,
             borderColor: colors.border,
             opacity: pressed ? 0.8 : 1,
