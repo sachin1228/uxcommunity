@@ -13,6 +13,7 @@ import {
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
+import { CHAT_LIST_PERFORMANCE } from '@/lib/homeFeed';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useChatContentEvents } from '@/hooks/useChatContentEvents';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
@@ -1235,6 +1236,10 @@ export default function CommunityChat() {
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          initialNumToRender={CHAT_LIST_PERFORMANCE.initialNumToRender}
+          maxToRenderPerBatch={CHAT_LIST_PERFORMANCE.maxToRenderPerBatch}
+          windowSize={CHAT_LIST_PERFORMANCE.windowSize}
+          updateCellsBatchingPeriod={CHAT_LIST_PERFORMANCE.updateCellsBatchingPeriod}
           // A cached window is already the right thing to look at: show it at
           // once and let the bootstrap anchor it when the network settles (the
           // inverted list starts at offset 0 = the newest row).

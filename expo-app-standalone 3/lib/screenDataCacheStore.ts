@@ -59,6 +59,33 @@ export function writeScreenData<T>(
   return screenDataCache.write(ownerId, key, epoch, data, ttlMs);
 }
 
+const pendingWrites = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Coalesce rapid snapshot writes (a like, then a poll vote, then a save)
+ * into one AsyncStorage round-trip per key. The in-memory snapshot is only
+ * written when the timer fires; this cache is a first-paint hint, so losing a
+ * sub-second-old write on a hard kill costs nothing the next fetch does not
+ * restore. `writeScreenData` stays available for writes that must land now.
+ */
+export function writeScreenDataDebounced<T>(
+  ownerId: string | null,
+  key: string,
+  epoch: number,
+  data: T,
+  ttlMs: number,
+  delayMs = 600,
+): void {
+  const identity = `${ownerId ?? ''}\u0000${key}`;
+  const existing = pendingWrites.get(identity);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    pendingWrites.delete(identity);
+    void screenDataCache.write(ownerId, key, epoch, data, ttlMs);
+  }, delayMs);
+  pendingWrites.set(identity, timer);
+}
+
 export function clearScreenDataForUser(ownerId: string | null): Promise<void> {
   return screenDataCache.clearOwner(ownerId);
 }

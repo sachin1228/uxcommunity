@@ -18,7 +18,7 @@ import {
 export const dynamic = "force-dynamic";
 
 // The home feed is read by every user on every dashboard visit. Recomputing it
-// per request runs ~30 × ~6 correlated count subqueries in get_home_feed_page,
+// per request runs ~12 × ~6 correlated count subqueries in get_home_feed_page,
 // which is heavy for the free-tier micro compute and the 5GB egress budget.
 // unstable_cache dedupes identical (user, cursor) reads for 10s, collapsing N
 // concurrent page loads into a single DB round-trip. 10s is short enough that

@@ -1,11 +1,19 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
   AppState,
   Easing,
-  Image,
+  Image as RNImage,
   Linking,
   Modal,
   Pressable,
@@ -16,6 +24,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import ReanimatedAnimated from 'react-native-reanimated';
@@ -518,7 +527,13 @@ export function useContentActions(
     setCommentCounts({});
   }, []);
 
-  return {
+  const clearError = useCallback(() => setLastError(null), []);
+
+  // Memoized as one API object: a fresh literal every render used to make every
+  // memoized card look stale, so a pull-to-refresh or a selection change
+  // re-rendered every mounted card even though no interaction state moved.
+  // The functions below only change when optimistic state or the error does.
+  return useMemo<ContentActionsApi>(() => ({
     action,
     isActive,
     countFor,
@@ -527,13 +542,28 @@ export function useContentActions(
     applyResult,
     reset,
     lastError,
-    clearError: useCallback(() => setLastError(null), []),
+    clearError,
     pollState,
     votePoll,
     undoPoll,
     resetPoll,
     applyPollUpdate,
-  };
+  }), [
+    action,
+    applyPollUpdate,
+    applyResult,
+    clearError,
+    commentCountFor,
+    countFor,
+    isActive,
+    lastError,
+    pollState,
+    reset,
+    resetPoll,
+    setCommentCount,
+    undoPoll,
+    votePoll,
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,7 +682,7 @@ function ResourcePreviewTile({
           {faviconFailed ? (
             <Feather name="globe" size={11} color={colors.foregroundSubtle} />
           ) : (
-            <Image
+            <RNImage
               source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=32` }}
               style={styles.previewTileFavicon}
               onError={() => setFaviconFailed(true)}
@@ -667,10 +697,12 @@ function ResourcePreviewTile({
         </View>
       </View>
       {data.image ? (
-        <Image
+        <ExpoImage
           source={{ uri: data.image }}
           style={[styles.previewTileImage, { backgroundColor: colors.surface }]}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={data.image}
         />
       ) : null}
     </Pressable>
@@ -680,6 +712,28 @@ function ResourcePreviewTile({
 // ---------------------------------------------------------------------------
 // Card
 // ---------------------------------------------------------------------------
+
+/**
+ * Feed screens flip this off while a card detail covers the list, so the
+ * inline videos underneath stop instead of playing behind the modal. Kept in
+ * context rather than in `renderItem`'s props: selection changes should
+ * re-render the cards, not recreate the list's render function.
+ */
+const ContentPlaybackContext = createContext(true);
+
+export function ContentPlaybackProvider({
+  enabled,
+  children,
+}: {
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <ContentPlaybackContext.Provider value={enabled}>
+      {children}
+    </ContentPlaybackContext.Provider>
+  );
+}
 
 export interface ContentCardProps {
   item: CommunityContent;
@@ -702,7 +756,7 @@ export interface ContentCardProps {
   videoRank?: number;
 }
 
-export function ContentCard({
+export const ContentCard = React.memo(function ContentCard({
   item,
   kind,
   currentUserId,
@@ -717,6 +771,7 @@ export function ContentCard({
   videoRank = 0,
 }: ContentCardProps) {
   const colors = useColors();
+  const playbackEnabled = useContext(ContentPlaybackContext);
   const router = useRouter();
   const thread = kind === 'threads' ? item as CommunityThread : null;
   const event = kind === 'events' ? item as CommunityEvent : null;
@@ -899,7 +954,7 @@ export function ContentCard({
               avatarUrl: author?.avatar_url ?? null,
               createdAt: item.created_at,
             }}
-            videoActive={videoActive}
+            videoActive={playbackEnabled && videoActive}
             videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
           />
@@ -911,7 +966,7 @@ export function ContentCard({
               avatarUrl: author?.avatar_url ?? null,
               createdAt: item.created_at,
             }}
-            videoActive={videoActive}
+            videoActive={playbackEnabled && videoActive}
             videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
           />
@@ -963,7 +1018,7 @@ export function ContentCard({
       </Animated.View>
     </Pressable>
   );
-}
+});
 
 export function ContentActionRow({
   item,
@@ -1046,7 +1101,7 @@ export function ContentActionRow({
               posted in
             </Text>
             {communityAvatar ? (
-              <Image source={{ uri: communityAvatar }} style={styles.communityLabelAvatar} />
+              <RNImage source={{ uri: communityAvatar }} style={styles.communityLabelAvatar} />
             ) : (
               <CommunityIcon size={16} iconSize={9} />
             )}
@@ -1899,7 +1954,13 @@ export function MediaCarousel({
           accessibilityRole="button"
           accessibilityLabel="Open image"
         >
-          <Image source={{ uri: entry.url }} style={styles.threadImage} resizeMode="contain" />
+          <ExpoImage
+            source={{ uri: entry.url }}
+            style={styles.threadImage}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            recyclingKey={entry.url}
+          />
         </Pressable>
         {viewer}
       </>
@@ -1939,7 +2000,13 @@ export function MediaCarousel({
               accessibilityLabel={`Open image ${mediaIndex + 1} of ${media.length}`}
             >
               {/* Contain, not cover: the web never crops a thread image. */}
-              <Image source={{ uri: entry.url }} style={styles.threadImage} resizeMode="contain" />
+              <ExpoImage
+                source={{ uri: entry.url }}
+                style={styles.threadImage}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                recyclingKey={entry.url}
+              />
             </Pressable>
           ),
         )}
@@ -1995,52 +2062,30 @@ function InlineVideo({
   rank: number;
   style: React.ComponentProps<typeof View>['style'];
 }) {
-  const focused = useIsFocused();
-  const player = useVideoPlayer(entry.url, (instance) => {
-    instance.loop = true;
-    instance.muted = true;
-  });
   const [muted, setMuted] = useState(true);
   const [showPlayer, setShowPlayer] = useState(false);
-  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      setAppActive(state === 'active');
-    });
-    return () => subscription.remove();
-  }, []);
-
-  // Playback follows the viewport, like the web player's IntersectionObserver.
-  // The coordinator lets only one of the on-screen videos run, so two
-  // soundtracks never overlap.
-  const wantsPlay = active && focused && appActive && !showPlayer;
-  useEffect(() => {
-    if (!wantsPlay) {
-      player.pause();
-      return;
-    }
-    const candidate = { rank, play: () => player.play(), pause: () => player.pause() };
-    joinVideoPlayback(candidate);
-    return () => leaveVideoPlayback(rank, candidate.pause);
-  }, [player, rank, wantsPlay]);
-
-  const toggleMuted = () => {
-    const next = !muted;
-    player.muted = next;
-    setMuted(next);
-    if (wantsPlay) player.play();
-  };
+  // Only the card the member is actually looking at allocates a native
+  // player. Every other mounted video card shows its poster (or a glyph), so
+  // scrolling a feed full of videos no longer keeps one decoder alive per row.
+  const showInlinePlayer = active && !showPlayer;
 
   return (
     <View style={[styles.videoThumb, style]}>
-      <VideoView
-        player={player}
-        style={styles.threadImage}
-        nativeControls={false}
-        contentFit="cover"
-        fullscreenOptions={{ enable: false }}
-      />
+      {showInlinePlayer ? (
+        <InlineVideoPlayer entry={entry} rank={rank} muted={muted} />
+      ) : entry.poster ? (
+        <ExpoImage
+          source={{ uri: entry.poster }}
+          style={styles.threadImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={entry.poster}
+        />
+      ) : (
+        <View style={[styles.threadImage, styles.videoPosterFallback]}>
+          <Feather name="video" size={24} color="rgba(255, 255, 255, 0.72)" />
+        </View>
+      )}
       <Pressable
         onPress={() => setShowPlayer(true)}
         style={StyleSheet.absoluteFill}
@@ -2048,7 +2093,7 @@ function InlineVideo({
         accessibilityLabel={entry.name ? `Open video ${entry.name}` : 'Open video'}
       />
       <Pressable
-        onPress={toggleMuted}
+        onPress={() => setMuted((current) => !current)}
         hitSlop={8}
         style={styles.videoMuteButton}
         accessibilityRole="button"
@@ -2064,6 +2109,59 @@ function InlineVideo({
         />
       ) : null}
     </View>
+  );
+}
+
+/** The native player, mounted only while its card owns inline playback. */
+function InlineVideoPlayer({
+  entry,
+  rank,
+  muted,
+}: {
+  entry: MediaEntry;
+  rank: number;
+  muted: boolean;
+}) {
+  const focused = useIsFocused();
+  const player = useVideoPlayer(entry.url, (instance) => {
+    instance.loop = true;
+    instance.muted = muted;
+  });
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    player.muted = muted;
+  }, [muted, player]);
+
+  // Playback follows the viewport, like the web player's IntersectionObserver.
+  // The coordinator lets only one of the on-screen videos run, so two
+  // soundtracks never overlap.
+  const wantsPlay = focused && appActive;
+  useEffect(() => {
+    if (!wantsPlay) {
+      player.pause();
+      return;
+    }
+    const candidate = { rank, play: () => player.play(), pause: () => player.pause() };
+    joinVideoPlayback(candidate);
+    return () => leaveVideoPlayback(rank, candidate.pause);
+  }, [player, rank, wantsPlay]);
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.threadImage}
+      nativeControls={false}
+      contentFit="cover"
+      fullscreenOptions={{ enable: false }}
+    />
   );
 }
 
@@ -2119,7 +2217,7 @@ function useImageAspectRatio(url?: string): number | null {
     setRatio(null);
     if (!url) return;
     let active = true;
-    Image.getSize(
+    RNImage.getSize(
       url,
       (width, height) => {
         if (active && width > 0 && height > 0) setRatio(width / height);
@@ -2319,6 +2417,11 @@ const styles = StyleSheet.create({
   },
   imageSingleFallback: { height: 220 },
   threadImage: { width: '100%', height: '100%' },
+  videoPosterFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
   videoThumb: {
     overflow: 'hidden',
     alignItems: 'center',

@@ -41,6 +41,7 @@ import { DmReportModal } from '@/components/dm/DmReportModal';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { CHAT_LIST_PERFORMANCE } from '@/lib/homeFeed';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
@@ -1239,6 +1240,69 @@ export default function DmThreadScreen() {
   const rejectedByMe =
     conversation?.request_state === 'rejected' && conversation.requested_by !== userId;
 
+  const renderItem = useCallback(({ item }: { item: ThreadRow }) => {
+    if (item.kind === 'date') {
+      return (
+        <View style={styles.dateDivider}>
+          <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
+            {item.label}
+          </Text>
+        </View>
+      );
+    }
+    if (item.kind === 'unread') {
+      return (
+        <View style={styles.unreadDivider}>
+          <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+          <Text
+            style={[
+              styles.unreadPill,
+              {
+                color: colors.mutedForeground,
+                backgroundColor: colors.surfaceRaised,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            {item.count} unread message{item.count === 1 ? '' : 's'}
+          </Text>
+          <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+        </View>
+      );
+    }
+    return (
+      <MessageBubble
+        message={item.msg}
+        isOwn={item.msg.user_id === userId}
+        isSameAuthor={item.isSameAuthor}
+        currentUserId={userId ?? ''}
+        onLongPress={setSelectedMessage}
+        onReactionPress={handleReaction}
+        onAuthorPress={openPeerProfile}
+        onImagePress={handleImagePress}
+        onCancel={handleCancel}
+        onRetry={handleRetry}
+        onReplyPress={handleReplyPress}
+        onSwipeReply={handleReply}
+        highlighted={flashMessageId === item.msg.id}
+        actionsOpen={selectedMessage?.id === item.msg.id}
+        variant="dm"
+      />
+    );
+  }, [
+    colors,
+    flashMessageId,
+    handleCancel,
+    handleImagePress,
+    handleReaction,
+    handleReply,
+    handleReplyPress,
+    handleRetry,
+    openPeerProfile,
+    selectedMessage?.id,
+    userId,
+  ]);
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
@@ -1356,56 +1420,11 @@ export default function DmThreadScreen() {
                     }
                   }, 120);
                 }}
-                renderItem={({ item }) => {
-                  if (item.kind === 'date') {
-                    return (
-                      <View style={styles.dateDivider}>
-                        <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
-                          {item.label}
-                        </Text>
-                      </View>
-                    );
-                  }
-                  if (item.kind === 'unread') {
-                    return (
-                      <View style={styles.unreadDivider}>
-                        <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
-                        <Text
-                          style={[
-                            styles.unreadPill,
-                            {
-                              color: colors.mutedForeground,
-                              backgroundColor: colors.surfaceRaised,
-                              borderColor: colors.border,
-                            },
-                          ]}
-                        >
-                          {item.count} unread message{item.count === 1 ? '' : 's'}
-                        </Text>
-                        <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
-                      </View>
-                    );
-                  }
-                  return (
-                    <MessageBubble
-                      message={item.msg}
-                      isOwn={item.msg.user_id === userId}
-                      isSameAuthor={item.isSameAuthor}
-                      currentUserId={userId ?? ''}
-                      onLongPress={setSelectedMessage}
-                      onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
-                      onAuthorPress={openPeerProfile}
-                      onImagePress={handleImagePress}
-                      onCancel={handleCancel}
-                      onRetry={handleRetry}
-                      onReplyPress={handleReplyPress}
-                      onSwipeReply={handleReply}
-                      highlighted={flashMessageId === item.msg.id}
-                      actionsOpen={selectedMessage?.id === item.msg.id}
-                      variant="dm"
-                    />
-                  );
-                }}
+                renderItem={renderItem}
+                initialNumToRender={CHAT_LIST_PERFORMANCE.initialNumToRender}
+                maxToRenderPerBatch={CHAT_LIST_PERFORMANCE.maxToRenderPerBatch}
+                windowSize={CHAT_LIST_PERFORMANCE.windowSize}
+                updateCellsBatchingPeriod={CHAT_LIST_PERFORMANCE.updateCellsBatchingPeriod}
                 ListFooterComponent={
                   loadingMore ? (
                     <View style={styles.moreSpinner}>

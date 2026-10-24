@@ -16,10 +16,16 @@ import {
 } from '@/lib/communityContent';
 import { communityStore } from '@/lib/communityStore';
 import { chatContentEventFromCreated, chatContentKindForTab } from '@/lib/chatContentEvents';
+import { FEED_LIST_PERFORMANCE } from '@/lib/homeFeed';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { CommunityContentEditor } from './CommunityContentEditor';
 import { EventGroupCreatedModal } from './EventGroupCreatedModal';
-import { ContentCard, ContentDetail, useContentActions } from './contentView';
+import {
+  ContentDetail,
+  ContentPlaybackProvider,
+  useContentActions,
+} from './contentView';
+import { ContentCardRow } from './ContentCardRow';
 
 interface Props {
   communityId: string;
@@ -49,7 +55,7 @@ export function CommunityContentView({
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);
-  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
+  const { viewableStore, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   // A new event arrives with its own group chat, and the creator is in it —
   // the notice says so before they go looking for the room.
   const [createdChat, setCreatedChat] = useState<CommunityEvent | null>(null);
@@ -137,6 +143,30 @@ export function CommunityContentView({
   // comments live under the post itself.
   const openItem = useCallback((item: CommunityContent) => setSelected(item), []);
 
+  const openEditor = useCallback((item: CommunityContent) => {
+    setEditing(item);
+    setEditorVisible(true);
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: CommunityContent; index: number }) => (
+      <ContentCardRow
+        item={item}
+        itemKey={item.id}
+        kind={kind}
+        currentUserId={currentUserId}
+        actions={actions}
+        viewableStore={viewableStore}
+        videoRank={index}
+        onComments={openItem}
+        onEdit={openEditor}
+        onDelete={remove}
+        canModerate={canModerate}
+      />
+    ),
+    [actions, canModerate, currentUserId, kind, openEditor, openItem, remove, viewableStore],
+  );
+
   if (query.isLoading) return <Centered><ActivityIndicator color={colors.accent} /></Centered>;
 
   if (query.isError) {
@@ -158,52 +188,45 @@ export function CommunityContentView({
 
   return (
     <View style={styles.root}>
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <ContentCard
-            item={item}
-            kind={kind}
-            currentUserId={currentUserId}
-            actions={actions}
-            onComments={openItem}
-            onEdit={(entry) => { setEditing(entry); setEditorVisible(true); }}
-            onDelete={remove}
-            canModerate={canModerate}
-            videoActive={!selected && visibleKeys.has(item.id)}
-            videoRank={index}
-          />
-        )}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 112 }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={query.isRefetching}
-            onRefresh={query.refetch}
-            tintColor={colors.foregroundMuted}
-          />
-        }
-        ListEmptyComponent={
-          <Centered>
-            <Feather
-              name={
-                kind === 'threads' ? 'message-square'
-                  : kind === 'events' ? 'calendar'
-                    : kind === 'showcase' ? 'image'
-                      : 'bookmark'
-              }
-              size={32}
-              color={colors.foregroundSubtle}
+      <ContentPlaybackProvider enabled={!selected}>
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          initialNumToRender={FEED_LIST_PERFORMANCE.initialNumToRender}
+          maxToRenderPerBatch={FEED_LIST_PERFORMANCE.maxToRenderPerBatch}
+          windowSize={FEED_LIST_PERFORMANCE.windowSize}
+          updateCellsBatchingPeriod={FEED_LIST_PERFORMANCE.updateCellsBatchingPeriod}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 112 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={query.isRefetching}
+              onRefresh={query.refetch}
+              tintColor={colors.foregroundMuted}
             />
-            <Text style={[styles.stateTitle, { color: colors.foreground }]}>No {kind} yet</Text>
-            <Text style={[styles.stateBody, { color: colors.foregroundMuted }]}>
-              Be the first to add one for this community.
-            </Text>
-          </Centered>
-        }
-      />
+          }
+          ListEmptyComponent={
+            <Centered>
+              <Feather
+                name={
+                  kind === 'threads' ? 'message-square'
+                    : kind === 'events' ? 'calendar'
+                      : kind === 'showcase' ? 'image'
+                        : 'bookmark'
+                }
+                size={32}
+                color={colors.foregroundSubtle}
+              />
+              <Text style={[styles.stateTitle, { color: colors.foreground }]}>No {kind} yet</Text>
+              <Text style={[styles.stateBody, { color: colors.foregroundMuted }]}>
+                Be the first to add one for this community.
+              </Text>
+            </Centered>
+          }
+        />
+      </ContentPlaybackProvider>
 
       <Pressable
         onPress={() => { setEditing(null); setEditorVisible(true); }}

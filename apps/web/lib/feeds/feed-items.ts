@@ -6,7 +6,14 @@ import type { Json } from "@/lib/supabase/performance-rpcs";
  * same client components, so the guard, the defaults and the page size live
  * here — a change to the feed contract can never apply to only one of them.
  */
-export const FEED_PAGE_SIZE = 30;
+/**
+ * Cards per feed page. Kept deliberately small: every card mounts its own
+ * engagement controls and media, so a 30-card page made the first paint (and
+ * every "load more") far heavier than the ~4 cards a viewport actually shows.
+ * The feed loads the next page from a sentinel before the reader reaches the
+ * bottom, so this is a render budget, not a scroll limit.
+ */
+export const FEED_PAGE_SIZE = 12;
 
 export type FeedCardObject = { [key: string]: Json | undefined };
 
