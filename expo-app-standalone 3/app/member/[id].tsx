@@ -470,6 +470,15 @@ function MemberProfileSession({
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
+      {/* Keep scrolled content out of the Android status-bar area. */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.statusBarBackdrop,
+          { height: insets.top, backgroundColor: colors.background },
+        ]}
+      />
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back"
@@ -598,6 +607,13 @@ function MemberProfileSession({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  statusBarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 4,
+  },
   backButton: {
     position: 'absolute',
     left: 11,
