@@ -31,7 +31,6 @@ import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEventListener } from 'expo';
 import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { useColors } from '@/hooks/useColors';
@@ -2106,31 +2105,58 @@ function InlineVideo({
 
   const showInlinePlayer = playerMounted && !showPlayer;
   const poster = entry.poster;
+  // The surface renders black between mount and its first presented frame.
+  // The poster cover sits *above* the player and only fades once
+  // `onFirstFrameRender` says a real frame is on screen, so that black is
+  // never visible — not on first play, and not after the player remounts
+  // when the member scrolls back to a paused video.
+  const posterOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!playerMounted) posterOpacity.setValue(1);
+  }, [playerMounted, posterOpacity]);
+  const coverFirstFrame = useCallback(() => {
+    Animated.timing(posterOpacity, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [posterOpacity]);
 
   return (
     <View style={[styles.videoThumb, style]}>
-      {/* The poster is a permanent backdrop: the player fades in over it on
-          its first decoded frame, so a card is never a black hole while the
-          video loads or reloads. */}
-      {poster ? (
-        <ExpoImage
-          source={{ uri: poster }}
-          style={styles.threadImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={poster}
-          onLoad={({ source }) => {
-            rememberImageAspectRatio(poster, source.width, source.height);
-          }}
-        />
-      ) : (
-        <View style={[styles.threadImage, styles.videoPosterFallback]}>
-          <Feather name="video" size={24} color="rgba(255, 255, 255, 0.72)" />
-        </View>
-      )}
       {showInlinePlayer ? (
-        <InlineVideoPlayer entry={entry} active={active} rank={rank} muted={muted} />
+        <InlineVideoPlayer
+          entry={entry}
+          active={active}
+          rank={rank}
+          muted={muted}
+          onFirstFrame={coverFirstFrame}
+        />
       ) : null}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: '#000000', opacity: posterOpacity },
+        ]}
+      >
+        {poster ? (
+          <ExpoImage
+            source={{ uri: poster }}
+            style={styles.threadImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={poster}
+            onLoad={({ source }) => {
+              rememberImageAspectRatio(poster, source.width, source.height);
+            }}
+          />
+        ) : (
+          <View style={[styles.threadImage, styles.videoPosterFallback]}>
+            <Feather name="video" size={24} color="rgba(255, 255, 255, 0.72)" />
+          </View>
+        )}
+      </Animated.View>
       <Pressable
         onPress={() => setShowPlayer(true)}
         style={StyleSheet.absoluteFill}
@@ -2149,6 +2175,7 @@ function InlineVideo({
       {showPlayer ? (
         <VideoPlayerModal
           url={entry.url}
+          poster={entry.poster}
           title={entry.name}
           onClose={() => setShowPlayer(false)}
         />
@@ -2163,38 +2190,20 @@ function InlineVideoPlayer({
   active,
   rank,
   muted,
+  onFirstFrame,
 }: {
   entry: MediaEntry;
   active: boolean;
   rank: number;
   muted: boolean;
+  onFirstFrame: () => void;
 }) {
   const focused = useIsFocused();
   const player = useVideoPlayer(entry.url, (instance) => {
     instance.loop = true;
     instance.muted = muted;
-    // Fires ten times a second once playback is actually moving — the signal
-    // that the decoder is presenting frames, not just that a source loaded.
-    instance.timeUpdateEventInterval = 0.1;
   });
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
-  // Starts invisible: the poster behind it stays visible until real frames
-  // are being presented. `readyToPlay` is too early — the surface can fade in
-  // over the poster while still black, which reads as a flash before the
-  // video starts.
-  const opacity = useRef(new Animated.Value(0)).current;
-  const revealed = useRef(false);
-  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-    // Two ticks of real playback — not just a loaded source — so the surface
-    // definitely has decoded frames before it is allowed to cover the poster.
-    if (revealed.current || currentTime < 0.2) return;
-    revealed.current = true;
-    Animated.timing(opacity, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  });
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -2222,18 +2231,25 @@ function InlineVideoPlayer({
   }, [player, rank, wantsPlay]);
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <VideoView
         player={player}
-        // TextureView composites in the normal hierarchy, so the fade over
-        // the poster actually works (a SurfaceView punches a black hole).
+        // TextureView composites in the normal hierarchy, so the poster above
+        // it can cover the surface completely (a SurfaceView punches a black
+        // hole through the hierarchy instead).
         surfaceType="textureView"
         style={styles.threadImage}
         nativeControls={false}
         contentFit="cover"
         fullscreenOptions={{ enable: false }}
+        // Explicit: Android's default ExoPlayer shutter is black. The poster
+        // cover is what hides the load, not the shutter.
+        useExoShutter={false}
+        // The authoritative “a frame is on screen” signal — the cover fades
+        // only when this fires. Time-based guesses still showed black first.
+        onFirstFrameRender={onFirstFrame}
       />
-    </Animated.View>
+    </View>
   );
 }
 
