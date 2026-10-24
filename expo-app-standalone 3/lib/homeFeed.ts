@@ -99,7 +99,28 @@ export function prefetchFeedImages(items: FeedItem[]): void {
   if (urls.length) {
     void Image.prefetch(urls, 'memory-disk');
   }
-  prefetchImageAspectRatios(ratioUrls);
+  void prefetchImageAspectRatios(ratioUrls);
+}
+
+/** A slow image should not hold the page back forever. */
+const MEDIA_RATIO_WARM_TIMEOUT_MS = 2500;
+
+/**
+ * Measure every cover a page will draw. Called before a refreshed or appended
+ * page is committed, so its cards mount at their final height instead of
+ * growing after the list is already on screen.
+ */
+export async function warmFeedMediaRatios(items: FeedItem[]): Promise<void> {
+  const urls = items.flatMap(feedItemMediaUrls);
+  if (!urls.length) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    prefetchImageAspectRatios(urls),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, MEDIA_RATIO_WARM_TIMEOUT_MS);
+    }),
+  ]);
+  if (timer) clearTimeout(timer);
 }
 
 export type FeedItemType = 'thread' | 'event' | 'resource' | 'showcase';

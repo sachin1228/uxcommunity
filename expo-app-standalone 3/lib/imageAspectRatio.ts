@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image, type ImageRef } from 'expo-image';
 
 /**
@@ -5,11 +6,45 @@ import { Image, type ImageRef } from 'expo-image';
  * mount window and comes back would otherwise measure its image from scratch,
  * starting at the fallback height and jumping to the natural one when the
  * size lands — the layout shift felt while scrolling back up a feed.
+ *
+ * The map is persisted so a cold start paints cached feed images at their
+ * final height too, before any measurement can finish.
  */
 const ratios = new Map<string, number>();
 const inFlight = new Map<string, Promise<number | null>>();
 /** Old feed pages never scroll back this far; keep the map from growing forever. */
 const MAX_CACHED_RATIOS = 500;
+const STORAGE_KEY = 'ux:image-aspect-ratios:v1';
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function persistSoon(): void {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const entries = [...ratios.entries()].slice(-MAX_CACHED_RATIOS);
+    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries)).catch(() => undefined);
+  }, 1000);
+}
+
+function hydrate(): void {
+  void AsyncStorage.getItem(STORAGE_KEY)
+    .then((raw) => {
+      if (!raw) return;
+      const stored = JSON.parse(raw) as unknown;
+      if (!Array.isArray(stored)) return;
+      for (const entry of stored) {
+        if (!Array.isArray(entry)) continue;
+        const [url, ratio] = entry as [unknown, unknown];
+        if (typeof url === 'string' && typeof ratio === 'number' && ratio > 0 && !ratios.has(url)) {
+          ratios.set(url, ratio);
+        }
+      }
+    })
+    .catch(() => undefined);
+}
+
+hydrate();
 
 export function cachedImageAspectRatio(url?: string | null): number | null {
   return url ? ratios.get(url) ?? null : null;
@@ -24,6 +59,7 @@ export function rememberImageAspectRatio(url: string, width: number, height: num
     if (oldest === undefined) break;
     ratios.delete(oldest);
   }
+  persistSoon();
 }
 
 /**
@@ -54,11 +90,15 @@ export function loadImageAspectRatio(url: string): Promise<number | null> {
  * Warm the ratios for a page's media before its cards mount, three at a time
  * so the prefetch does not starve the images the member can already see.
  */
-export function prefetchImageAspectRatios(urls: Array<string | null | undefined>): void {
+export async function prefetchImageAspectRatios(
+  urls: Array<string | null | undefined>,
+): Promise<void> {
   const queue = [...new Set(urls.filter((url): url is string => Boolean(url)))]
     .filter((url) => !cachedImageAspectRatio(url));
   const run = async () => {
     while (queue.length) await loadImageAspectRatio(queue.shift()!);
   };
-  for (let worker = 0; worker < Math.min(3, queue.length); worker += 1) void run();
+  await Promise.all(
+    Array.from({ length: Math.min(3, queue.length) }, run),
+  );
 }

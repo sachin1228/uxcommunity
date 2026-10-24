@@ -36,6 +36,7 @@ import {
   feedItemKind,
   getHomeFeed,
   prefetchFeedImages,
+  warmFeedMediaRatios,
   type FeedItem,
 } from '@/lib/homeFeed';
 import {
@@ -309,6 +310,10 @@ function HomeTabSession({
         );
         if (memory) {
           paintedSnapshot = true;
+          // Cached cards mount with the same final heights the network path
+          // gets: measure the page's covers before the list is painted.
+          await warmFeedMediaRatios(memory.data.items);
+          if (!isCurrent()) return;
           cacheReadyScopeRef.current = cacheIdentity;
           commitFeed(targetScope, memory.data.items, memory.data.hasMore, false);
           prefetchFeedImages(memory.data.items);
@@ -327,9 +332,11 @@ function HomeTabSession({
           cacheKey,
           sessionEpoch,
           SCREEN_CACHE_TTL_MS.homeFeed,
-        ).then((snapshot) => {
+        ).then(async (snapshot) => {
           if (!snapshot || networkSucceeded || paintedSnapshot || !isCurrent()) return;
           paintedSnapshot = true;
+          await warmFeedMediaRatios(snapshot.data.items);
+          if (!isCurrent()) return;
           cacheReadyScopeRef.current = cacheIdentity;
           commitFeed(targetScope, snapshot.data.items, snapshot.data.hasMore, false);
           prefetchFeedImages(snapshot.data.items);
@@ -350,6 +357,10 @@ function HomeTabSession({
         );
         if (!result.accepted || !isCurrent()) return;
         networkSucceeded = true;
+        // Measure the page's covers before swapping it in: refreshed and
+        // first-load cards then keep their final height from the first frame.
+        await warmFeedMediaRatios(result.data.items);
+        if (!isCurrent()) return;
         cacheReadyScopeRef.current = cacheIdentity;
         commitFeed(targetScope, result.data.items, result.data.hasMore);
         prefetchFeedImages(result.data.items);
@@ -452,8 +463,15 @@ function HomeTabSession({
     try {
       const page = await getHomeFeed(target, last.created_at);
       if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
+      // Measure the page's covers before its cards mount: appending rows whose
+      // images still resolve later grows the list under the reader's finger.
+      await warmFeedMediaRatios(page.items);
+      if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
       const next = mergeUniquePage(itemsRef.current, page.items, feedItemKey);
-      commitFeed(target, next, page.hasMore);
+      // A page that added nothing cannot grow the list; asking again would
+      // only spin the footer loader forever (e.g. cursor ties at the boundary).
+      const grew = next.length > itemsRef.current.length;
+      commitFeed(target, next, page.hasMore && grew);
     } catch {
       // Leave the feed as-is; the user can pull to retry.
     } finally {
@@ -615,11 +633,14 @@ function HomeTabSession({
                 />
               }
               ListFooterComponent={
-                loadingMore ? (
-                  <View style={styles.footer}>
+                // The footer keeps its height whether or not the spinner is
+                // up, so starting a page never nudges the list under a reader
+                // parked at the bottom.
+                <View style={styles.footer}>
+                  {loadingMore ? (
                     <ActivityIndicator size="small" color={colors.foregroundMuted} />
-                  </View>
-                ) : null
+                  ) : null}
+                </View>
               }
               ListEmptyComponent={
                 error ? (
@@ -732,5 +753,5 @@ const styles = StyleSheet.create({
   stateTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 16 },
   stateBody: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   retry: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  footer: { paddingVertical: 20, alignItems: 'center' },
+  footer: { height: 56, alignItems: 'center', justifyContent: 'center' },
 });
