@@ -58,6 +58,17 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
      * focus — nothing here may race with that.
      */
     private const val SHORTCUT_PREFS = "uxcommunity_notification_shortcuts"
+
+    /**
+     * Byte-identical to the Google-palette list in apps/web/lib/avatar.ts.
+     * Server payloads carry the resolved sender colour; this copy is the
+     * fallback for payloads that predate it, so an initials avatar is never
+     * drawn in the community's colour.
+     */
+    private val AVATAR_BACKGROUNDS = arrayOf(
+      "#1a73e8", "#d93025", "#188038", "#b06000", "#9334e6", "#00838f",
+      "#c5221f", "#3949ab", "#ad1457", "#00695c", "#6a1b9a", "#455a64",
+    )
   }
 
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -144,7 +155,6 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       else -> data["message"].takeUnless { it.isNullOrBlank() } ?: "Sent a message"
     }
     val imageUrl = data["imageUrl"]
-    val avatarUrl = data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() } ?: imageUrl
     val silent = data["silent"] == "1"
     val badge = data["badge"]?.toIntOrNull()
     val timestamp = data["timestamp"]?.toLongOrNull() ?: System.currentTimeMillis()
@@ -165,23 +175,37 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
     ensureChannels(context)
 
-    // Prefer the message author's profile photo. Community or activity art
-    // remains the fallback for older payloads and senders without a photo.
-    val avatar = avatarUrl?.let { download(it) } ?: when {
+    // Two identities meet in a chat notification: the conversation on the left
+    // (the community's DP, or the DM peer) and the member who spoke on the
+    // message row. They are the same picture only in a DM.
+    val conversationAvatar = imageUrl?.let { download(it) } ?: when {
       !data["avatarInitials"].isNullOrBlank() ->
         initialAvatar(data["avatarInitials"], data["avatarColor"], title)
       mode == "activity" ->
         emojiAvatar(data["icon"].takeUnless { it.isNullOrBlank() } ?: "🔔")
       else -> initialAvatar(null, data["avatarColor"], title)
     }
-    val avatarIcon = IconCompat.createWithBitmap(avatar)
+    val senderAvatar = if (mode == "activity") {
+      // An activity row has one identity; the type glyph is its avatar.
+      conversationAvatar
+    } else {
+      val senderColor = data["senderAvatarColor"] ?: avatarBackground(messagePerson)
+      data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() }?.let { download(it) }
+        ?: initialAvatar(
+          data["senderAvatarInitials"].takeUnless { it.isNullOrBlank() },
+          senderColor,
+          messagePerson,
+        )
+    }
+    val conversationIcon = IconCompat.createWithBitmap(conversationAvatar)
+    val senderIcon = IconCompat.createWithBitmap(senderAvatar)
     val conversationPerson = Person.Builder()
       .setName(title)
-      .setIcon(avatarIcon)
+      .setIcon(conversationIcon)
       .build()
     val senderPerson = Person.Builder()
       .setName(messagePerson)
-      .setIcon(avatarIcon)
+      .setIcon(senderIcon)
       .build()
 
     val deepLink = if (mode == "dm") {
@@ -230,7 +254,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       .setAutoCancel(true)
       .setOnlyAlertOnce(silent)
       .setContentIntent(pendingIntent)
-      .setLargeIcon(avatar)
+      .setLargeIcon(conversationAvatar)
 
     if (badge != null && badge > 0) builder.setNumber(badge)
 
@@ -244,7 +268,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     // and every *new* conversation is drawn with the app icon instead of its
     // DP, with no error anywhere. Publishing only when what is drawn actually
     // changed keeps the quota for the conversations that need it.
-    val avatarSignature = avatarUrl
+    val avatarSignature = imageUrl
       ?: "init:${data["avatarInitials"] ?: ""}:${data["avatarColor"] ?: ""}:${data["icon"] ?: ""}"
     if (
       publishConversationShortcut(
@@ -252,7 +276,7 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
         conversationKey = conversationKey,
         title = title,
         signature = "$title|$avatarSignature",
-        icon = avatarIcon,
+        icon = conversationIcon,
         person = conversationPerson,
         intent = contentIntent,
       )
@@ -392,6 +416,17 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       append(first)
       if (last != null) append(last)
     }
+  }
+
+  /** The app's avatarBackground(): FNV-1a over the trimmed lowercase name. */
+  private fun avatarBackground(name: String): String {
+    var hash = 0x811c9dc5.toInt()
+    for (char in name.trim().lowercase()) {
+      hash = hash xor char.code
+      hash *= 0x01000193
+    }
+    val unsigned = hash.toLong() and 0xFFFFFFFFL
+    return AVATAR_BACKGROUNDS[(unsigned % AVATAR_BACKGROUNDS.size).toInt()]
   }
 
   private fun emojiAvatar(icon: String): Bitmap {

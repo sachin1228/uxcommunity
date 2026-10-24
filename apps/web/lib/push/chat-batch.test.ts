@@ -18,6 +18,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { avatarBackground } from "@/lib/avatar";
 import {
   AUDIBLE_CHANNEL_ID,
   SILENT_CHANNEL_ID,
@@ -1073,24 +1074,27 @@ test("Android FCM devices get the direct chat push; iOS and older builds stay on
     const expoMessages: ExpoPushMessage[] = [];
     const fcmMessages: FcmDataMessage[] = [];
 
-    const report = await sendChatMessagePush(BASE_PARAMS, deps(db, {
-      send: async (messages) => {
-        expoMessages.push(...messages);
-        return acceptAll(messages);
-      },
-      sendFcm: async (messages) => {
-        fcmMessages.push(...messages);
-        return {
-          requestError: null,
-          outcomes: messages.map((message) => ({
-            token: message.token,
-            ok: true,
-            deadToken: false,
-            error: null,
-          })),
-        };
-      },
-    }));
+    const report = await sendChatMessagePush(
+      { ...BASE_PARAMS, senderAvatarUrl: "https://media.example/arun.webp" },
+      deps(db, {
+        send: async (messages) => {
+          expoMessages.push(...messages);
+          return acceptAll(messages);
+        },
+        sendFcm: async (messages) => {
+          fcmMessages.push(...messages);
+          return {
+            requestError: null,
+            outcomes: messages.map((message) => ({
+              token: message.token,
+              ok: true,
+              deadToken: false,
+              error: null,
+            })),
+          };
+        },
+      }),
+    );
 
     assert.deepEqual(expoMessages.map((message) => message.to).sort(), [
       "expo-ios",
@@ -1105,6 +1109,12 @@ test("Android FCM devices get the direct chat push; iOS and older builds stay on
     assert.equal(data.senderName, "Arun");
     assert.equal(data.message, "hello there");
     assert.equal(data.imageUrl, "https://media.example/dp.webp");
+    // The message row wears the sender, not the community DP: the photo is
+    // theirs, and so are the initials/color drawn when the download fails.
+    assert.equal(data.senderAvatarUrl, "https://media.example/arun.webp");
+    assert.equal(data.senderAvatarInitials, "A");
+    assert.equal(data.senderAvatarColor, avatarBackground("Arun"));
+    assert.equal(data.avatarInitials, "D");
     assert.equal(data.silent, "0");
     assert.equal(data.badge, "5");
     assert.equal(report.deliveries, 3);

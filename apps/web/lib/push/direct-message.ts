@@ -138,12 +138,19 @@ export function directMessageFcmData(input: {
     timestamp: String(input.timestamp),
     channelId: input.audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
   };
-  if (input.senderAvatarUrl) data.imageUrl = input.senderAvatarUrl;
+  if (input.senderAvatarUrl) {
+    data.imageUrl = input.senderAvatarUrl;
+    data.senderAvatarUrl = input.senderAvatarUrl;
+  }
   // The app's PersonAvatar fallback, byte for byte: "sundar pichai" → SP on
   // the same deterministic palette color in the notification.
   const identityName = input.senderName?.trim() || title;
   data.avatarInitials = nameInitials(identityName);
   data.avatarColor = avatarBackground(identityName);
+  // Explicit sender identity: a DM draws the peer in both slots, but the
+  // renderer reads these for the message row the same way a community push does.
+  data.senderAvatarInitials = data.avatarInitials;
+  data.senderAvatarColor = data.avatarColor;
   return data;
 }
 
