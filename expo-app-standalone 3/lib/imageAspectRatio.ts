@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image, type ImageRef } from 'expo-image';
+import { Image as RNImage } from 'react-native';
 
 /**
  * Measured image aspect ratios, keyed by URL. A card that leaves the list's
@@ -67,6 +68,20 @@ export function rememberImageAspectRatio(url: string, width: number, height: num
  * card renders from, so warming the ratio is not a second download. Resolves
  * null when the image cannot be loaded; the card then measures on mount.
  */
+/** Second opinion through RN's own image pipeline when expo-image fails. */
+function measureWithFresco(url: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    RNImage.getSize(
+      url,
+      (width, height) => {
+        rememberImageAspectRatio(url, width, height);
+        resolve(cachedImageAspectRatio(url));
+      },
+      () => resolve(null),
+    );
+  });
+}
+
 export function loadImageAspectRatio(url: string): Promise<number | null> {
   const cached = cachedImageAspectRatio(url);
   if (cached) return Promise.resolve(cached);
@@ -78,7 +93,7 @@ export function loadImageAspectRatio(url: string): Promise<number | null> {
       image.release();
       return cachedImageAspectRatio(url);
     })
-    .catch(() => null)
+    .catch(() => measureWithFresco(url))
     .finally(() => {
       inFlight.delete(url);
     });

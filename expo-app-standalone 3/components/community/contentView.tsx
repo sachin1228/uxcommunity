@@ -37,7 +37,7 @@ import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { useImageAspectRatio } from '@/hooks/useImageAspectRatio';
-import { rememberImageAspectRatio } from '@/lib/imageAspectRatio';
+import { cachedImageAspectRatio, rememberImageAspectRatio } from '@/lib/imageAspectRatio';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
 import {
@@ -960,6 +960,7 @@ export const ContentCard = React.memo(function ContentCard({
             videoActive={playbackEnabled && videoActive}
             videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
+            holdLayout
           />
         ) : images.length ? (
           <MediaCarousel
@@ -972,6 +973,7 @@ export const ContentCard = React.memo(function ContentCard({
             videoActive={playbackEnabled && videoActive}
             videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
+            holdLayout
           />
         ) : null}
 
@@ -1836,6 +1838,8 @@ export function MediaCarousel({
   videoRank = 0,
   /** Double tap on a photo: like the post instead of opening the viewer. */
   onDoubleTap,
+  /** Feed cards latch their mount height so a late image never resizes them. */
+  holdLayout = false,
 }: {
   media: MediaEntry[];
   /** The poster — the lightbox header's name, avatar and date, as in chat. */
@@ -1843,6 +1847,7 @@ export function MediaCarousel({
   videoActive?: boolean;
   videoRank?: number;
   onDoubleTap?: () => void;
+  holdLayout?: boolean;
 }) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
@@ -1859,9 +1864,13 @@ export function MediaCarousel({
   // `object-contain` does there. A video anchors on its poster, else 16:9.
   const anchor = media.find((entry) => !isVideoAttachment(entry))
     ?? media.find((entry) => Boolean(entry.poster));
-  const anchorRatio = useImageAspectRatio(
-    anchor ? (isVideoAttachment(anchor) ? anchor.poster : anchor.url) : undefined,
-  );
+  const anchorUrl = anchor ? (isVideoAttachment(anchor) ? anchor.poster : anchor.url) : undefined;
+  const measuredRatio = useImageAspectRatio(anchorUrl);
+  // A list card keeps the shape it mounted with; a cover that only arrives
+  // later must not re-flow the row (and everything below it) under a scroll.
+  // The next mount reads the ratio the image has cached by then.
+  const [latchedRatio] = useState(() => cachedImageAspectRatio(anchorUrl));
+  const anchorRatio = holdLayout ? latchedRatio : measuredRatio;
   // One page per item. Before the first layout pass the container's width is
   // unknown, so start from the screen width less the usual card gutter.
   const pageWidth = containerWidth || Math.max(1, screenWidth - 40);

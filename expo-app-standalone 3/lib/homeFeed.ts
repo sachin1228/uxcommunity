@@ -102,8 +102,11 @@ export function prefetchFeedImages(items: FeedItem[]): void {
   void prefetchImageAspectRatios(ratioUrls);
 }
 
-/** A slow image should not hold the page back forever. */
-const MEDIA_RATIO_WARM_TIMEOUT_MS = 2500;
+/**
+ * Safety valve only — a broken image must not block paging forever. Pages
+ * are fetched while still off screen, so the wait is not visible.
+ */
+const MEDIA_RATIO_WARM_TIMEOUT_MS = 8000;
 
 /**
  * Measure every cover a page will draw. Called before a refreshed or appended

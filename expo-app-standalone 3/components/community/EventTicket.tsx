@@ -14,8 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Circle, Line, Path, Svg } from 'react-native-svg';
 import { PersonAvatar } from '@/components/PersonAvatar';
-import { useImageAspectRatio } from '@/hooks/useImageAspectRatio';
-import { rememberImageAspectRatio } from '@/lib/imageAspectRatio';
+import { cachedImageAspectRatio, rememberImageAspectRatio } from '@/lib/imageAspectRatio';
 import { formatEventDate } from '@/lib/eventDate';
 import { formatEventTimeRange, hostScheduleForViewer } from '@/lib/eventDisplay';
 import type { CommunityEvent } from '@/lib/communityContent';
@@ -176,7 +175,10 @@ export function EventTicket({
   const full = event.max_attendees !== null && count >= event.max_attendees && !rsvped;
   const spotsLeft = event.max_attendees !== null ? event.max_attendees - count : null;
 
-  const posterRatio = useImageAspectRatio(event.cover_image_url);
+  // Latched for this ticket's lifetime: a cover measured after mount would
+  // resize the whole card under the reader. An unknown cover keeps the crop
+  // band until the ticket next mounts, when the cached ratio is already there.
+  const [posterRatio] = useState(() => cachedImageAspectRatio(event.cover_image_url));
 
   // The perforation is drawn over the seam between the body and the stub, so
   // it needs that seam's y and the ticket's outer width. Both land after the

@@ -442,10 +442,35 @@ function HomeTabSession({
     [applyPollUpdate, commitFeed, userId],
   );
 
-  // A reconnected room missed events while it was down; settle from the API.
+  // A reconnected room missed events while it was down; settle the tallies in
+  // place. Reloading the feed here instead would drop every page the reader
+  // has loaded and jump the list back to the top on each reconnect.
   const handlePollGap = useCallback(() => {
-    void load(scopeRef.current, 'refresh');
-  }, [load]);
+    const target = scopeRef.current;
+    const sequence = requestSequenceRef.current;
+    void (async () => {
+      try {
+        const page = await getHomeFeed(target);
+        if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
+        const fresh = new Map(page.items.map((item) => [feedItemKey(item), item]));
+        const next = itemsRef.current.map((item) => {
+          const updated = fresh.get(feedItemKey(item));
+          return updated
+            ? {
+                ...item,
+                ...updated,
+                _type: item._type,
+                community_name: item.community_name,
+                community_image: item.community_image,
+              }
+            : item;
+        });
+        commitFeed(target, next, hasMoreRef.current);
+      } catch {
+        // Tallies settle on the next realtime event or manual refresh.
+      }
+    })();
+  }, [commitFeed]);
 
   useThreadPollRealtime({
     communityIds: pollCommunityIds,
@@ -623,7 +648,7 @@ function HomeTabSession({
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={viewabilityConfig}
               onEndReached={loadMore}
-              onEndReachedThreshold={0.4}
+              onEndReachedThreshold={1.5}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
