@@ -435,21 +435,23 @@ function MemberProfileSession({
         <DotField />
       </View>
 
-      <MemberProfileHero
-        name={identityName}
-        avatarUrl={body?.avatar_url ?? null}
-        city={body?.cities?.name ?? null}
-        roleLabel={member?.roleLabel ?? null}
-        bio={body?.bio ?? ''}
-        company={member?.company ?? null}
-        linkedinUrl={body?.linkedin_url ?? ''}
-        portfolioUrl={body?.portfolio_url ?? ''}
-        blockedByMe={member?.blockedByMe ?? false}
-        onMessage={() => void openMessage()}
-        onUnblock={() => void handleUnblock()}
-        unblocking={unblocking}
-        actionsDisabled={!memberAuthoritative}
-      />
+      <View style={styles.heroTop}>
+        <MemberProfileHero
+          name={identityName}
+          avatarUrl={body?.avatar_url ?? null}
+          city={body?.cities?.name ?? null}
+          roleLabel={member?.roleLabel ?? null}
+          bio={body?.bio ?? ''}
+          company={member?.company ?? null}
+          linkedinUrl={body?.linkedin_url ?? ''}
+          portfolioUrl={body?.portfolio_url ?? ''}
+          blockedByMe={member?.blockedByMe ?? false}
+          onMessage={() => void openMessage()}
+          onUnblock={() => void handleUnblock()}
+          unblocking={unblocking}
+          actionsDisabled={!memberAuthoritative}
+        />
+      </View>
 
       {memberError && member ? (
         <Text style={[styles.messageError, { color: colors.destructive }]}>{memberError}</Text>
@@ -468,28 +470,32 @@ function MemberProfileSession({
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
+      {/* Keep scrolled content out of the Android status-bar area. */}
       <View
+        pointerEvents="none"
         style={[
-          styles.header,
+          styles.statusBarBackdrop,
+          { height: insets.top, backgroundColor: colors.background },
+        ]}
+      />
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        hitSlop={6}
+        onPress={() => router.back()}
+        style={({ pressed }) => [
+          styles.backButton,
           {
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-            paddingTop: insets.top + 8,
+            top: insets.top + 16,
+            backgroundColor: colors.surfaceRaised,
+            borderColor: colors.border,
+            opacity: pressed ? 0.8 : 1,
           },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={10}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Profile</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+        <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+      </Pressable>
 
       {memberLoading && !member ? (
         <View style={styles.center}>
@@ -526,7 +532,10 @@ function MemberProfileSession({
           ListHeaderComponent={header}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 96 }]}
+          contentContainerStyle={[
+            styles.list,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
+          ]}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
           refreshControl={
@@ -598,18 +607,27 @@ function MemberProfileSession({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  statusBarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 4,
   },
-  backButton: { padding: 2 },
-  headerTitle: { flex: 1, fontFamily: 'Geist_600SemiBold', fontSize: 17, textAlign: 'center' },
-  headerSpacer: { width: 26 },
+  backButton: {
+    position: 'absolute',
+    left: 11,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
   heroWrap: { marginBottom: 4 },
+  // Match the own-profile hero's breathing room now that the header is gone.
+  heroTop: { paddingTop: 32 },
   heroDots: {
     position: 'absolute',
     top: -LIST_PADDING,

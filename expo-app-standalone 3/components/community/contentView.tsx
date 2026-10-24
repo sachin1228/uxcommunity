@@ -2039,7 +2039,7 @@ function InlineVideo({
         style={styles.threadImage}
         nativeControls={false}
         contentFit="cover"
-        allowsFullscreen={false}
+        fullscreenOptions={{ enable: false }}
       />
       <Pressable
         onPress={() => setShowPlayer(true)}

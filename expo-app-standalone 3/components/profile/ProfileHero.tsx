@@ -8,10 +8,10 @@ import type { ProfileCompany } from '@/lib/profile';
 
 /**
  * The profile hero — the mobile reading of the web hero's own-profile
- * surface: the display picture (the only image), the name with Edit pinned to
- * the right edge, the role line ("Mid-Level Product Designer @ Figma"), the
- * city, the LinkedIn and portfolio circles, and the bio. No cover, no card
- * chrome; the hero sits directly on the page.
+ * surface: the display picture (the only image), the name, the role line
+ * ("Mid-Level Product Designer @ Figma"), the city, the LinkedIn and
+ * portfolio circles, and the bio. No cover, no card chrome; the hero sits
+ * directly on the page.
  *
  * Owner's surface only: the circles are hollow until a link is saved (they
  * open the add prompt), then live buttons out; with no workplace yet, the
@@ -32,7 +32,6 @@ interface Props {
   onAddPortfolio: () => void;
   /** Opens the "Where do you work?" picker. Omitted to hide the pill. */
   onAddCompany?: () => void;
-  onEdit: () => void;
 }
 
 /** Only http(s) survives — the `https://` prefix is added when left off. */
@@ -61,7 +60,6 @@ export function ProfileHero({
   onAddLinkedIn,
   onAddPortfolio,
   onAddCompany,
-  onEdit,
 }: Props) {
   const colors = useColors();
 
@@ -93,28 +91,13 @@ export function ProfileHero({
         </View>
       </Pressable>
 
-      {/* ── Name row — Edit pinned to the right edge, name stays centred ── */}
+      {/* ── Name — stays centred without the old Edit pill ── */}
       <View style={styles.nameRow}>
         <View style={styles.nameSide} />
         <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>
           {name}
         </Text>
-        <View style={[styles.nameSide, styles.editSide]}>
-          <Pressable
-            onPress={onEdit}
-            accessibilityRole="button"
-            accessibilityLabel="Edit profile"
-            style={({ pressed }) => [
-              styles.editPill,
-              {
-                borderColor: colors.border,
-                backgroundColor: pressed ? colors.surfaceRaised : 'transparent',
-              },
-            ]}
-          >
-            <Text style={[styles.editLabel, { color: colors.foreground }]}>Edit</Text>
-          </Pressable>
-        </View>
+        <View style={styles.nameSide} />
       </View>
 
       {/* ── Role line — seniority + designation, then "@ workplace", or the
@@ -234,7 +217,6 @@ const styles = StyleSheet.create({
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 12 },
   nameSide: { flex: 1 },
-  editSide: { alignItems: 'flex-end' },
   name: {
     fontSize: 23,
     fontFamily: 'Geist_700Bold',
@@ -242,13 +224,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
-  editPill: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  editLabel: { fontSize: 12, fontFamily: 'Geist_500Medium' },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',

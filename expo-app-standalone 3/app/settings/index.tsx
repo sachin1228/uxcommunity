@@ -1,9 +1,10 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/settings/ScreenHeader';
+import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticSelection } from '@/lib/haptics';
 
@@ -67,6 +68,25 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { logout } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    hapticSelection();
+    setSigningOut(true);
+    // logout() is best-effort on the wire and always clears the local session
+    // (realtime first, then the push token, then the cookie) — whatever it
+    // returns, the login screen is the right place to land next.
+    try {
+      await logout();
+    } catch {
+      /* the local session is cleared regardless */
+    } finally {
+      setSigningOut(false);
+      router.replace('/(auth)/login');
+    }
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -112,6 +132,45 @@ export default function SettingsScreen() {
             </View>
           ))}
         </View>
+
+        <View
+          style={[
+            styles.card,
+            styles.signOutCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Pressable
+            onPress={() => void handleSignOut()}
+            disabled={signingOut}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+            style={({ pressed }) => [
+              styles.row,
+              { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
+            ]}
+          >
+            <View
+              style={[
+                styles.iconCircle,
+                { borderColor: colors.border, backgroundColor: colors.background },
+              ]}
+            >
+              <Feather name="log-out" size={15} color={colors.destructive} />
+            </View>
+            <View style={styles.rowText}>
+              <Text style={[styles.rowLabel, { color: colors.destructive }]}>
+                {signingOut ? 'Signing out...' : 'Sign out'}
+              </Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                Sign out of your account on this device.
+              </Text>
+            </View>
+            {signingOut ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : null}
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );
@@ -125,6 +184,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
+  signOutCard: { marginTop: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
