@@ -307,7 +307,65 @@ Hop budget for the DM after-column: the sender path drops from 6 sequential remo
 
 ## 13. What is still open (infrastructure, not code)
 
-1. `app.uxcommunity.in` is answered from **MRS** for an Indian client while `supabase.co` lands in **BOM**; every DB hop costs 340 ms warm / 1 s cold and there are 4–9 of them. Fix the zone routing or enable Smart Placement, and co-locate the Supabase project.
+1. `app.uxcommunity.in` is answered from **MRS** for an Indian client while `supabase.co` lands in **BOM**; every DB hop costs 340 ms warm / 1 s cold and there are 4–9 of them. **Smart Placement is now enabled** in `apps/web/wrangler.toml` (`[placement] mode = "smart"`), which lets Cloudflare run the Worker near Supabase and forward the request there. It takes effect on the next deploy and up to ~15 minutes of traffic to analyse; check for `cf-placement: remote-…` on an API response (it reverts itself if the measured duration gets worse). Co-locating the Supabase project near the users would fix the hop rather than route around it.
 2. `media.uxcommunity.in` returns `cf-cache-status: DYNAMIC` despite `cache-control: immutable` — avatars are never edge-cached. A Cache Rule for the media host removes ~0.4–1 s from every notification (and every avatar in the app).
-3. The Upstash global rate limit in `middleware.ts` still costs ~0.2–0.4 s per request; the Workers Rate Limiting binding would remove the network hop without weakening the limit.
-4. There is still no push-latency telemetry (`push.sent` with timings, device `posted_at`), so §12 can only be proven by re-running the method in §3 after a deploy.
+3. The Upstash global rate limit in `middleware.ts` still costs ~0.2–0.4 s per request (measured 155–217 ms inside the community send route); the Workers Rate Limiting binding would remove the network hop without weakening the limit.
+4. `sendFcmDataMessages` keeps **6 requests in flight** per chunk. That is fine for a community of tens of members, but the stage grows with devices: 300 Android devices is ~50 rounds ≈ 5 s at ~100 ms each, and 1,000 devices exceeds a request's subrequest budget. Raising the concurrency (and/or moving large fan-outs to a Queue) is the next scaling lever.
+
+---
+
+## 14. Re-measured: community chat, after the DM fixes (2026-10-24)
+
+DM was re-measured and is fast; community chat was not, so the same probe was pointed at it: production, Android emulator, real accounts, 4 sends into "Product Designer" (8 members, 4 device tokens across 2 members). Device timestamps were normalised against a per-probe `adb shell date` reading, as in §3.
+
+| Stage (median of 4) | Measured |
+|---|---|
+| tap send → row committed | **1.06 s** (`Server-Timing`: auth 0.36, rate limits 0.18, membership 0.34, sender profile 0.35, insert 0.35) |
+| HTTP total seen by the sender | 1.64–2.36 s; ~0.96 s of that is the India → MRS network, outside the Worker |
+| row committed → notification posted | **1.60 s** |
+| **total** | **3.57 s** |
+
+The DM path projects 0.50 s for the same middle stage. The difference is the fan-out **prefix**: four sequential Supabase round trips before the first device is addressed.
+
+| Hop | What it reads |
+|---|---|
+| 1 | `communities` header (+ the mute-column probe on a cold isolate) |
+| 2 | `community_members` page |
+| 3 | `push_tokens` + `notification_preferences` + `fcm_tokens` |
+| 4 | `push_throttle` + `get_unread_message_totals` |
+
+At the measured 340 ms per hop that is ~1.36 s — the whole stage minus the FCM round trip. On top of it, Expo's batch was awaited before FCM's first request, so a community with iOS **and** Android devices paid two provider round trips in series. The `auth` stage also still sat in front of everything: `requireSession` awaited the liveness query before the route could issue its first read.
+
+## 15. What this change does for community chat
+
+| Change | Where |
+|---|---|
+| The message-independent fan-out reads (header, recipient page, devices/preferences, throttle) are **started before the insert** and consumed inside `after()` | [chat.ts](apps/web/lib/push/chat.ts) — `warmChatPushTargets` · [route.ts](apps/web/app/api/communities/[id]/messages/route.ts) |
+| Expo and direct-FCM sends are **in flight together** per chunk; the Expo fallback still follows an FCM provider-wide failure only | [chat.ts](apps/web/lib/push/chat.ts) |
+| Liveness starts at the top of the send and is awaited **before the insert**, not in front of every read | [route.ts](apps/web/app/api/communities/[id]/messages/route.ts) |
+| The push starts **before** the reply-author lookups (two sequential reads) instead of after them | [message-publish.ts](apps/web/lib/communities/message-publish.ts) |
+| The header read shares a round trip with the recipient page instead of queueing ahead of it | [chat.ts](apps/web/lib/push/chat.ts) |
+
+### Measured effect (2026-10-24, production)
+
+The branch was deployed to `uxcommunity-web`, measured with the §14 probe, rolled back to the previous version, measured again, and redeployed — same probe, same community, same emulator, interleaved on the same afternoon.
+
+The prefix (4 hops ≈ 1.36 s) now runs beside the sender path instead of behind it, and only its tail plus the badge remain on the notification's path. The badge is deliberately **not** warmed: it counts this message as unread, so reading it before the insert would report one message too few.
+
+| Stage | Before (n=18) | After (n=23) | Change |
+|---|---|---|---|
+| tap send → notification posted | **4.34 s** median (mean 4.64) | **3.47 s** median (mean 3.79) | **−0.88 s (−20%)** |
+| Worker request (`Server-Timing` total) | 1.15 s median | 0.81 s median | −0.34 s |
+| post-commit fan-out + delivery | ≈1.5 s | ≈1.2 s | ≈−0.3 s |
+
+The end-to-end gain is larger than the Worker gain because the fan-out no longer sits entirely behind the response: part of it now runs while the sender is still waiting for its own insert.
+
+Conditions: production Worker, Android emulator, the 8-member community of §14, the same probe on both arms. The emulator's FCM connection degrades after a few minutes in the background (messages arrive 30–45 s late or not at all until it is reset with an airplane-mode toggle); samples taken in that state were discarded, and both arms were measured only while delivery was healthy. Per-sample spread stays wide (3.2–7.3 s) because a cold isolate adds 0.7–2.5 s to the Worker, which is why the medians use 18 and 23 samples rather than a handful.
+
+Smart Placement is deployed but still reports `cf-placement: local-MRS` on every probe — analysis needs traffic from several locations and up to ~15 minutes — so the "faster hops" half of the plan is **not** included in these numbers.
+
+Getting the remaining seconds needs fewer or faster hops, not more concurrency:
+
+- **Fewer hops** — the fan-out still makes 4 sequential requests. One `chat_push_targets(community, sender, cursor, limit)` RPC (the `send_dm_message` pattern in §6) would return page + devices + preferences + throttle in one statement batch, and the badge in a second. That is ~0.7 s off the prefix before any infrastructure change.
+- **Faster hops** — §13 item 1 turns each 340 ms hop into a near-local one; with that in place the same send should land near **1.5–1.7 s**: ~1 s of client network, ~0.1 s of hops, ~0.2 s FCM, ~0.35 s device.
+- **Telemetry** — there is still no `push.sent` / device `posted_at` event, so this table can only be reproduced by re-running the §14 probe.

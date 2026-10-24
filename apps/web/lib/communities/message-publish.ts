@@ -27,7 +27,7 @@
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { publishChatEvent } from "@/lib/realtime/server";
-import { sendChatMessagePush } from "@/lib/push/chat";
+import { sendChatMessagePush, type ChatPushWarmup } from "@/lib/push/chat";
 
 /** The inserted row, as the message route's `select` returns it. */
 export interface InsertedChatMessage {
@@ -49,6 +49,12 @@ export interface NewChatMessageAnnouncement {
   /** Content-reply fields, already gated by the route (see the module doc). */
   replyContentKind: string | null;
   replyContentTitle: string | null;
+  /**
+   * Fan-out reads the route started before its insert (see
+   * `warmChatPushTargets`). Optional: without it the push reads everything
+   * itself, one round trip later.
+   */
+  pushWarmup?: ChatPushWarmup;
 }
 
 /**
@@ -63,6 +69,24 @@ export async function announceNewChatMessage(
 ): Promise<void> {
   const { communityId, inserted, senderName, senderAvatarUrl } = input;
   const db = createServiceClient();
+
+  // The device fan-out needs nothing from the reply lookup: who was replied to
+  // is a field on the realtime event, not a push input. Starting the push here
+  // rather than after the lookup keeps a reply's two sequential profile reads
+  // off the notification's path.
+  const push = sendChatMessagePush(
+    {
+      communityId,
+      messageId: inserted.id,
+      senderId: inserted.user_id,
+      senderName,
+      senderAvatarUrl,
+      content: inserted.content ?? null,
+      hasImage: !!inserted.image_url,
+      isReply: !!inserted.reply_to_id,
+    },
+    { warmup: input.pushWarmup },
+  );
 
   // The reply bubble shows who was replied to; the event carries the author's
   // id and name so a receiving client does not have to fetch either — the id
@@ -113,17 +137,5 @@ export async function announceNewChatMessage(
     },
   });
 
-  await Promise.all([
-    publish,
-    sendChatMessagePush({
-      communityId,
-      messageId: inserted.id,
-      senderId: inserted.user_id,
-      senderName,
-      senderAvatarUrl,
-      content: inserted.content ?? null,
-      hasImage: !!inserted.image_url,
-      isReply: !!inserted.reply_to_id,
-    }),
-  ]);
+  await Promise.all([publish, push]);
 }

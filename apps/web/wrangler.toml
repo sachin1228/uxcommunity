@@ -8,6 +8,21 @@ workers_dev = true
 
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
+# Every API route talks to Supabase, and each round trip is a full network hop:
+# measured from production, ONE query costs ~340 ms warm / ~1 s on a cold
+# connection and a chat send makes 5–9 of them. The Worker is answered from
+# Marseille (cf-ray …-MRS) while supabase.co resolves to Mumbai (BOM) for the
+# same client, so the Worker sits on the far side of the hop that dominates every
+# request. Smart Placement runs this Worker near the infrastructure it talks to
+# most and forwards the request there; Cloudflare reverts the placement by
+# itself if the measured request duration gets worse, and keeps 1% of requests
+# locally as a baseline.
+#
+# Verify after a deploy: `cf-placement: remote-…` on an API response once the
+# analysis finishes (up to ~15 minutes), instead of `local-…`.
+[placement]
+mode = "smart"
+
 # Lets the worker self-fetch for `next start` / SSR internals.
 [[services]]
 binding = "WORKER_SELF_REFERENCE"

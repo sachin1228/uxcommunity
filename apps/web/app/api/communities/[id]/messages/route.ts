@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { requireSession } from "@/lib/auth/session";
+import { assertUserActive, requireSession } from "@/lib/auth/session";
 import { loadCommunityMessagePage } from "@/lib/communities/read-models";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { contentTableFor } from "@/lib/communities/content-tables";
@@ -8,6 +8,7 @@ import { createServerTimer } from "@/lib/server-timing";
 import { createContentEventIdCache } from "@/lib/communities/content-event-ids";
 import { readMessageRequestBody } from "@/lib/communities/message-request";
 import { announceNewChatMessage } from "@/lib/communities/message-publish";
+import { warmChatPushTargets } from "@/lib/push/chat";
 
 /**
  * Ids of the community's recent content items (threads / showcase posts /
@@ -87,7 +88,13 @@ export async function POST(
 
   let session;
   try {
-    session = await timer.measure("auth", () => requireSession("user"));
+    // Liveness is still verified on this write — just not *in front of* every
+    // other read (the same shape the DM send route uses). `activeCheck` runs
+    // alongside the membership/profile reads and is awaited before the insert,
+    // so a cold isolate no longer pays a DB round trip before its first query.
+    session = await timer.measure("auth", () =>
+      requireSession("user", { verifyActive: false }),
+    );
   } catch (e) {
     return e as Response;
   }
@@ -95,6 +102,13 @@ export async function POST(
   const { id: communityId } = await params;
 
   const db = createServiceClient();
+
+  // Resolved to the error (a Response) instead of left rejecting, so an
+  // inactive member is answered wherever this is awaited.
+  const activeCheck = assertUserActive(userId).then(
+    () => null,
+    (error: unknown) => error,
+  );
 
   // Run the rate-limit checks (Redis) and the membership check (DB) in
   // parallel — they're independent lookups, so running them sequentially adds
@@ -175,6 +189,13 @@ export async function POST(
   let reply_to_id = parsed.value.replyToId;
   let replyContentTitle: string | null = null;
 
+  // The push fan-out's message-independent reads (community header, recipient
+  // page, their devices/preferences/throttle) start here, so they overlap the
+  // reply checks, the insert and the response instead of queueing four
+  // sequential round trips after it. They touch nothing this request writes, so
+  // a send that fails below has only cost a few reads.
+  const pushWarmup = warmChatPushTargets({ communityId, senderId: userId }, { db });
+
   // Validate reply_to_id belongs to this community (if provided)
   if (reply_to_id) {
     const { data: parent } = await db
@@ -234,6 +255,11 @@ export async function POST(
     }
   }
 
+  // The liveness check started at the top of the request is settled by now; it
+  // is awaited here, before the write, exactly as a serial check would have been.
+  const inactive = await activeCheck;
+  if (inactive) return inactive as Response;
+
   const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
       .from("community_messages")
@@ -278,6 +304,7 @@ export async function POST(
         senderAvatarUrl,
         replyContentKind: reply_to_content_id ? replyToContent!.kind : null,
         replyContentTitle: reply_to_content_id ? replyContentTitle : null,
+        pushWarmup,
       });
     } catch (err) {
       console.error("[POST message] realtime publish error:", err);
