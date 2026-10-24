@@ -31,7 +31,7 @@ import ReanimatedAnimated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEvent } from 'expo';
+import { useEventListener } from 'expo';
 import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { useColors } from '@/hooks/useColors';
@@ -2164,12 +2164,28 @@ function InlineVideoPlayer({
   const player = useVideoPlayer(entry.url, (instance) => {
     instance.loop = true;
     instance.muted = muted;
+    // Fires ten times a second once playback is actually moving — the signal
+    // that the decoder is presenting frames, not just that a source loaded.
+    instance.timeUpdateEventInterval = 0.1;
   });
-  const { status } = useEvent(player, 'statusChange', { status: player.status });
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
-  // Starts invisible: the poster behind it stays visible until the player has
-  // a decoded frame, so activation never flashes black.
+  // Starts invisible: the poster behind it stays visible until real frames
+  // are being presented. `readyToPlay` is too early — the surface can fade in
+  // over the poster while still black, which reads as a flash before the
+  // video starts.
   const opacity = useRef(new Animated.Value(0)).current;
+  const revealed = useRef(false);
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    // Two ticks of real playback — not just a loaded source — so the surface
+    // definitely has decoded frames before it is allowed to cover the poster.
+    if (revealed.current || currentTime < 0.2) return;
+    revealed.current = true;
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  });
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -2181,15 +2197,6 @@ function InlineVideoPlayer({
   useEffect(() => {
     player.muted = muted;
   }, [muted, player]);
-
-  useEffect(() => {
-    if (status !== 'readyToPlay') return;
-    Animated.timing(opacity, {
-      toValue: 1,
-      duration: 140,
-      useNativeDriver: true,
-    }).start();
-  }, [opacity, status]);
 
   // Playback follows the viewport, like the web player's IntersectionObserver.
   // The coordinator lets only one of the on-screen videos run, so two
