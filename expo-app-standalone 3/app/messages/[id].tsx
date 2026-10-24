@@ -1053,8 +1053,14 @@ export default function DmThreadScreen() {
   );
 
   // ── Rows: day dividers interleaved with the timeline ─────────────────────
+  // A row object is what the `PureComponent` cell compares, so rebuilding all
+  // rows on every message would re-render every mounted bubble. Reuse the
+  // previous object when the message and its group flag are unchanged.
+  const rowCacheRef = useRef(new Map<string, ThreadRow>());
   const rows = useMemo<ThreadRow[]>(() => {
     const out: ThreadRow[] = [];
+    const previousRows = rowCacheRef.current;
+    const nextRows = new Map<string, ThreadRow>();
     let currentDay: string | null = null;
     let previousUser: string | null = null;
 
@@ -1072,15 +1078,18 @@ export default function DmThreadScreen() {
           count: initialUnread.count,
         });
       }
-      out.push({
-        kind: 'message',
-        key: message.id,
-        msg: message,
-        isSameAuthor: previousUser === message.user_id,
-      });
+      const isSameAuthor = previousUser === message.user_id;
+      const cached = previousRows.get(message.id);
+      const row: ThreadRow =
+        cached && cached.kind === 'message' && cached.msg === message && cached.isSameAuthor === isSameAuthor
+          ? cached
+          : { kind: 'message', key: message.id, msg: message, isSameAuthor };
+      nextRows.set(message.id, row);
+      out.push(row);
       previousUser = message.user_id;
     }
 
+    rowCacheRef.current = nextRows;
     // The list is inverted; newest must sit at the bottom.
     return out.reverse();
   }, [messages, initialUnread]);
@@ -1138,12 +1147,17 @@ export default function DmThreadScreen() {
     [messages],
   );
 
+  const lightboxImagesRef = useRef<LightboxImage[]>([]);
+  useEffect(() => {
+    lightboxImagesRef.current = lightboxImages;
+  }, [lightboxImages]);
+
   const handleImagePress = useCallback(
     (url: string) => {
-      const index = lightboxImages.findIndex((image) => image.url === url);
+      const index = lightboxImagesRef.current.findIndex((image) => image.url === url);
       setImageIndex(index < 0 ? 0 : index);
     },
-    [lightboxImages],
+    [],
   );
 
   // ── Request answers + safety actions ──────────────────────────────────────

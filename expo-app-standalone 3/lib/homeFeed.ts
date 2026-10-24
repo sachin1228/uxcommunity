@@ -37,13 +37,15 @@ export const FEED_LIST_PERFORMANCE = {
 } as const;
 
 /**
- * The chat equivalent. Bubbles are lighter than cards, so a screenful and a
- * bit is safe up front; the mounted window stays a few screens instead of RN's
- * default ten.
+ * The chat equivalent. Bubbles are lighter than cards, but a page of 50 older
+ * messages mounts in batches: 8 at a time was enough work per batch to block
+ * the JS thread for ~0.5s on a software-rendered emulator. Four keeps each
+ * batch under the frame budget and lets scroll events interleave; eight fill
+ * the first screen without waiting for the rest of the page.
  */
 export const CHAT_LIST_PERFORMANCE = {
-  initialNumToRender: 12,
-  maxToRenderPerBatch: 8,
+  initialNumToRender: 8,
+  maxToRenderPerBatch: 4,
   windowSize: 11,
   updateCellsBatchingPeriod: 50,
 } as const;
