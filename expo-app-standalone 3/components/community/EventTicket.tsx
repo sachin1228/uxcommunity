@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Circle, Line, Path, Svg } from 'react-native-svg';
 import { PersonAvatar } from '@/components/PersonAvatar';
+import { cachedImageAspectRatio, rememberImageAspectRatio } from '@/lib/imageAspectRatio';
 import { formatEventDate } from '@/lib/eventDate';
 import { formatEventTimeRange, hostScheduleForViewer } from '@/lib/eventDisplay';
 import type { CommunityEvent } from '@/lib/communityContent';
@@ -174,8 +175,10 @@ export function EventTicket({
   const full = event.max_attendees !== null && count >= event.max_attendees && !rsvped;
   const spotsLeft = event.max_attendees !== null ? event.max_attendees - count : null;
 
-  const [posterRatio, setPosterRatio] = useState<number | null>(null);
-  useEffect(() => setPosterRatio(null), [event.cover_image_url]);
+  // Latched for this ticket's lifetime: a cover measured after mount would
+  // resize the whole card under the reader. An unknown cover keeps the crop
+  // band until the ticket next mounts, when the cached ratio is already there.
+  const [posterRatio] = useState(() => cachedImageAspectRatio(event.cover_image_url));
 
   // The perforation is drawn over the seam between the body and the stub, so
   // it needs that seam's y and the ticket's outer width. Both land after the
@@ -325,9 +328,8 @@ export function EventTicket({
                 style={[styles.poster, posterRatio ? { aspectRatio: posterRatio } : styles.posterFallback]}
                 contentFit="cover"
                 onLoad={(load) => {
-                  const width = load.source?.width ?? 0;
-                  const height = load.source?.height ?? 0;
-                  if (width > 0 && height > 0) setPosterRatio(width / height);
+                  const source = load.source;
+                  if (source) rememberImageAspectRatio(source.url, source.width, source.height);
                 }}
                 accessibilityLabel={event.title}
               />

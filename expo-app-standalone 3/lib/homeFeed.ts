@@ -12,6 +12,7 @@
 
 import { Image } from 'expo-image';
 import { apiFetch } from './api';
+import { prefetchImageAspectRatios } from './imageAspectRatio';
 import type { CommunityContent, ContentKind } from './communityContent';
 import type { HomeFeedScope } from './homeFeedScope';
 
@@ -53,30 +54,76 @@ export const CHAT_LIST_PERFORMANCE = {
 /** Only the first few images are worth warming before they scroll in. */
 const FEED_PREFETCH_LIMIT = 3;
 
+/** Every image a card can draw, in card order — the cover a feed scrolls to. */
+function feedItemMediaUrls(item: FeedItem): string[] {
+  if (item._type === 'thread' || item._type === 'showcase') {
+    const urls: string[] = [];
+    const attachments = (
+      item as { attachments?: Array<{ url: string; type?: string; poster?: string }> }
+    ).attachments;
+    for (const attachment of attachments ?? []) {
+      if (attachment.type?.startsWith('image/')) urls.push(attachment.url);
+      else if (attachment.type?.startsWith('video/') && attachment.poster) urls.push(attachment.poster);
+    }
+    const legacyCover = (item as { image_url?: string | null }).image_url;
+    if (!attachments?.length && legacyCover) urls.push(legacyCover);
+    return urls;
+  }
+  if (item._type === 'event') {
+    const cover = (item as { cover_image_url?: string | null }).cover_image_url;
+    return cover ? [cover] : [];
+  }
+  return [];
+}
+
 /**
  * Warm the memory/disk cache for the first few images in a fresh page. The
  * list renders four cards initially, so prefetching every attachment would
  * compete with the images the member can already see; three covers the next
  * card or two without turning a feed load into a bulk download.
+ *
+ * Measured aspect ratios for the whole page are warmed alongside it, so a
+ * card gets its final height the first time it mounts instead of jumping
+ * from the placeholder when the image size lands.
  */
 export function prefetchFeedImages(items: FeedItem[]): void {
   const urls: string[] = [];
+  const ratioUrls: string[] = [];
   for (const item of items) {
-    if (urls.length >= FEED_PREFETCH_LIMIT) break;
-    if (item._type === 'thread' || item._type === 'showcase') {
-      const attachments = (item as { attachments?: Array<{ url: string; type?: string }> }).attachments;
-      for (const attachment of attachments ?? []) {
-        if (attachment.type?.startsWith('image/')) urls.push(attachment.url);
-        if (urls.length >= FEED_PREFETCH_LIMIT) break;
-      }
-    } else if (item._type === 'event') {
-      const cover = (item as { cover_image_url?: string | null }).cover_image_url;
-      if (cover) urls.push(cover);
+    const media = feedItemMediaUrls(item);
+    ratioUrls.push(...media);
+    if (urls.length < FEED_PREFETCH_LIMIT) {
+      urls.push(...media.slice(0, FEED_PREFETCH_LIMIT - urls.length));
     }
   }
   if (urls.length) {
     void Image.prefetch(urls, 'memory-disk');
   }
+  void prefetchImageAspectRatios(ratioUrls);
+}
+
+/**
+ * Safety valve only — a broken image must not block paging forever. Pages
+ * are fetched while still off screen, so the wait is not visible.
+ */
+const MEDIA_RATIO_WARM_TIMEOUT_MS = 8000;
+
+/**
+ * Measure every cover a page will draw. Called before a refreshed or appended
+ * page is committed, so its cards mount at their final height instead of
+ * growing after the list is already on screen.
+ */
+export async function warmFeedMediaRatios(items: FeedItem[]): Promise<void> {
+  const urls = items.flatMap(feedItemMediaUrls);
+  if (!urls.length) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    prefetchImageAspectRatios(urls),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, MEDIA_RATIO_WARM_TIMEOUT_MS);
+    }),
+  ]);
+  if (timer) clearTimeout(timer);
 }
 
 export type FeedItemType = 'thread' | 'event' | 'resource' | 'showcase';

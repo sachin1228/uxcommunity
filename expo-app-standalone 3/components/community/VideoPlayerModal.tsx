@@ -1,6 +1,7 @@
-import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -14,10 +15,12 @@ import { useVideoPlayer, VideoView } from 'expo-video';
  */
 export function VideoPlayerModal({
   url,
+  poster,
   title,
   onClose,
 }: {
   url: string;
+  poster?: string | null;
   title?: string | null;
   onClose: () => void;
 }) {
@@ -25,6 +28,16 @@ export function VideoPlayerModal({
   const player = useVideoPlayer(url, (instance) => {
     instance.play();
   });
+  // The surface is black until it presents a frame; the poster stays over it
+  // until `onFirstFrameRender`, so opening the player never flashes black.
+  const coverOpacity = useRef(new Animated.Value(1)).current;
+  const coverFirstFrame = () => {
+    Animated.timing(coverOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <Modal
@@ -41,7 +54,22 @@ export function VideoPlayerModal({
           nativeControls
           contentFit="contain"
           fullscreenOptions={{ enable: true }}
+          useExoShutter={false}
+          onFirstFrameRender={coverFirstFrame}
         />
+        {poster ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { opacity: coverOpacity }]}
+          >
+            <Image
+              source={{ uri: poster }}
+              style={styles.cover}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
+          </Animated.View>
+        ) : null}
         <Pressable
           onPress={onClose}
           hitSlop={10}
@@ -67,6 +95,7 @@ export function VideoPlayerModal({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000000' },
   video: { flex: 1 },
+  cover: { flex: 1, backgroundColor: '#000000' },
   close: {
     position: 'absolute',
     left: 14,

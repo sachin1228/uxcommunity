@@ -49,6 +49,7 @@ import {
   feedItemKey,
   feedItemKind,
   prefetchFeedImages,
+  warmFeedMediaRatios,
   type FeedItem,
 } from '@/lib/homeFeed';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
@@ -244,6 +245,8 @@ function MemberProfileSession({
         const memory = peekScreenData<MemberFeedSnapshot>(viewerId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.memberFeed);
         if (memory) {
           cachedPainted = true;
+          await warmFeedMediaRatios(memory.data.items);
+          if (!isCurrent()) return;
           feedReadyRef.current = true;
           commitFeed(memory.data.items, memory.data.hasMore, false);
           setFeedLoading(false);
@@ -255,9 +258,11 @@ function MemberProfileSession({
         } else {
           setFeedLoading(true);
         }
-        void readScreenData<MemberFeedSnapshot>(viewerId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.memberFeed).then((snapshot) => {
+        void readScreenData<MemberFeedSnapshot>(viewerId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.memberFeed).then(async (snapshot) => {
           if (!snapshot || cachedPainted || networkSucceeded || !isCurrent()) return;
           cachedPainted = true;
+          await warmFeedMediaRatios(snapshot.data.items);
+          if (!isCurrent()) return;
           feedReadyRef.current = true;
           commitFeed(snapshot.data.items, snapshot.data.hasMore, false);
           resetActions();
@@ -274,6 +279,8 @@ function MemberProfileSession({
         );
         if (!result.accepted || !isCurrent()) return;
         networkSucceeded = true;
+        await warmFeedMediaRatios(result.data.items);
+        if (!isCurrent()) return;
         feedReadyRef.current = true;
         commitFeed(result.data.items, result.data.hasMore);
         prefetchFeedImages(result.data.items);
@@ -319,7 +326,11 @@ function MemberProfileSession({
     try {
       const page = await getProfileFeed(target, last.created_at, memberId);
       if (scopeRef.current !== target || feedRequestRef.current !== sequence) return;
-      commitFeed(mergeUniquePage(itemsRef.current, page.items, feedItemKey), page.hasMore);
+      await warmFeedMediaRatios(page.items);
+      if (scopeRef.current !== target || feedRequestRef.current !== sequence) return;
+      const next = mergeUniquePage(itemsRef.current, page.items, feedItemKey);
+      const grew = next.length > itemsRef.current.length;
+      commitFeed(next, page.hasMore && grew);
     } catch {
       // Leave the feed as-is; the member can pull to retry.
     } finally {
@@ -357,10 +368,34 @@ function MemberProfileSession({
     [applyPollUpdate, commitFeed, viewerId],
   );
 
-  // A reconnected room missed events while it was down; settle from the API.
+  // A reconnected room missed events while it was down; settle the tallies in
+  // place so a reconnect never truncates the pages already scrolled through.
   const handlePollGap = useCallback(() => {
-    void loadFeed(scopeRef.current, 'refresh');
-  }, [loadFeed]);
+    const target = scopeRef.current;
+    const sequence = feedRequestRef.current;
+    void (async () => {
+      try {
+        const page = await getProfileFeed(target, undefined, memberId);
+        if (scopeRef.current !== target || feedRequestRef.current !== sequence) return;
+        const fresh = new Map(page.items.map((item) => [feedItemKey(item), item]));
+        const next = itemsRef.current.map((item) => {
+          const updated = fresh.get(feedItemKey(item));
+          return updated
+            ? {
+                ...item,
+                ...updated,
+                _type: item._type,
+                community_name: item.community_name,
+                community_image: item.community_image,
+              }
+            : item;
+        });
+        commitFeed(next, hasMoreRef.current);
+      } catch {
+        // Tallies settle on the next realtime event or manual refresh.
+      }
+    })();
+  }, [commitFeed, memberId]);
 
   useThreadPollRealtime({
     communityIds: pollCommunityIds,
@@ -551,7 +586,7 @@ function MemberProfileSession({
               { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
             ]}
             onEndReached={loadMore}
-            onEndReachedThreshold={0.4}
+            onEndReachedThreshold={1.5}
             refreshControl={
               showFeed ? (
                 <RefreshControl
@@ -562,11 +597,11 @@ function MemberProfileSession({
               ) : undefined
             }
             ListFooterComponent={
-              loadingMore ? (
-                <View style={styles.footer}>
+              <View style={styles.footer}>
+                {loadingMore ? (
                   <ActivityIndicator size="small" color={colors.foregroundMuted} />
-                </View>
-              ) : null
+                ) : null}
+              </View>
             }
             ListEmptyComponent={
               !memberAuthoritative ? (
@@ -681,7 +716,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retry: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  footer: { paddingVertical: 16, alignItems: 'center' },
+  footer: { height: 56, alignItems: 'center', justifyContent: 'center' },
   lockCircle: {
     width: 56,
     height: 56,

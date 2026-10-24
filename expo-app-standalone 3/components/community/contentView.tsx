@@ -35,6 +35,8 @@ import { CommentGlyph } from '@/components/communities/CommentGlyph';
 import { CommunityIcon } from '@/components/communities/CommunityIcon';
 import { useColors } from '@/hooks/useColors';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
+import { useImageAspectRatio } from '@/hooks/useImageAspectRatio';
+import { cachedImageAspectRatio, rememberImageAspectRatio } from '@/lib/imageAspectRatio';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
 import {
@@ -957,6 +959,7 @@ export const ContentCard = React.memo(function ContentCard({
             videoActive={playbackEnabled && videoActive}
             videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
+            holdLayout
           />
         ) : images.length ? (
           <MediaCarousel
@@ -969,6 +972,7 @@ export const ContentCard = React.memo(function ContentCard({
             videoActive={playbackEnabled && videoActive}
             videoRank={videoRank}
             onDoubleTap={likeFromDoubleTap}
+            holdLayout
           />
         ) : null}
 
@@ -1833,6 +1837,8 @@ export function MediaCarousel({
   videoRank = 0,
   /** Double tap on a photo: like the post instead of opening the viewer. */
   onDoubleTap,
+  /** Feed cards latch their mount height so a late image never resizes them. */
+  holdLayout = false,
 }: {
   media: MediaEntry[];
   /** The poster — the lightbox header's name, avatar and date, as in chat. */
@@ -1840,6 +1846,7 @@ export function MediaCarousel({
   videoActive?: boolean;
   videoRank?: number;
   onDoubleTap?: () => void;
+  holdLayout?: boolean;
 }) {
   const colors = useColors();
   const { width: screenWidth } = useWindowDimensions();
@@ -1856,9 +1863,13 @@ export function MediaCarousel({
   // `object-contain` does there. A video anchors on its poster, else 16:9.
   const anchor = media.find((entry) => !isVideoAttachment(entry))
     ?? media.find((entry) => Boolean(entry.poster));
-  const anchorRatio = useImageAspectRatio(
-    anchor ? (isVideoAttachment(anchor) ? anchor.poster : anchor.url) : undefined,
-  );
+  const anchorUrl = anchor ? (isVideoAttachment(anchor) ? anchor.poster : anchor.url) : undefined;
+  const measuredRatio = useImageAspectRatio(anchorUrl);
+  // A list card keeps the shape it mounted with; a cover that only arrives
+  // later must not re-flow the row (and everything below it) under a scroll.
+  // The next mount reads the ratio the image has cached by then.
+  const [latchedRatio] = useState(() => cachedImageAspectRatio(anchorUrl));
+  const anchorRatio = holdLayout ? latchedRatio : measuredRatio;
   // One page per item. Before the first layout pass the container's width is
   // unknown, so start from the screen width less the usual card gutter.
   const pageWidth = containerWidth || Math.max(1, screenWidth - 40);
@@ -1960,6 +1971,9 @@ export function MediaCarousel({
             contentFit="contain"
             cachePolicy="memory-disk"
             recyclingKey={entry.url}
+            onLoad={({ source }) => {
+              rememberImageAspectRatio(entry.url, source.width, source.height);
+            }}
           />
         </Pressable>
         {viewer}
@@ -2006,6 +2020,9 @@ export function MediaCarousel({
                 contentFit="contain"
                 cachePolicy="memory-disk"
                 recyclingKey={entry.url}
+                onLoad={({ source }) => {
+                  rememberImageAspectRatio(entry.url, source.width, source.height);
+                }}
               />
             </Pressable>
           ),
@@ -2050,6 +2067,13 @@ export function MediaCarousel({
   );
 }
 
+/**
+ * How long the inline player survives after its card leaves the viewport.
+ * Viewability flips at the 60% mark, so the pull-to-refresh bounce and scroll
+ * jitter would otherwise tear the native player down and rebuild it mid-scroll.
+ */
+const INLINE_PLAYER_UNMOUNT_GRACE_MS = 1200;
+
 /** Inline, muted, looping playback — tap opens the full player. */
 function InlineVideo({
   entry,
@@ -2067,25 +2091,72 @@ function InlineVideo({
   // Only the card the member is actually looking at allocates a native
   // player. Every other mounted video card shows its poster (or a glyph), so
   // scrolling a feed full of videos no longer keeps one decoder alive per row.
-  const showInlinePlayer = active && !showPlayer;
+  // The player lingers briefly after the card leaves the viewport, paused, so
+  // a threshold bounce doesn't rebuild it.
+  const [playerMounted, setPlayerMounted] = useState(active);
+  useEffect(() => {
+    if (active) {
+      setPlayerMounted(true);
+      return;
+    }
+    const timer = setTimeout(() => setPlayerMounted(false), INLINE_PLAYER_UNMOUNT_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [active]);
+
+  const showInlinePlayer = playerMounted && !showPlayer;
+  const poster = entry.poster;
+  // The surface renders black between mount and its first presented frame.
+  // The poster cover sits *above* the player and only fades once
+  // `onFirstFrameRender` says a real frame is on screen, so that black is
+  // never visible — not on first play, and not after the player remounts
+  // when the member scrolls back to a paused video.
+  const posterOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!playerMounted) posterOpacity.setValue(1);
+  }, [playerMounted, posterOpacity]);
+  const coverFirstFrame = useCallback(() => {
+    Animated.timing(posterOpacity, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [posterOpacity]);
 
   return (
     <View style={[styles.videoThumb, style]}>
       {showInlinePlayer ? (
-        <InlineVideoPlayer entry={entry} rank={rank} muted={muted} />
-      ) : entry.poster ? (
-        <ExpoImage
-          source={{ uri: entry.poster }}
-          style={styles.threadImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={entry.poster}
+        <InlineVideoPlayer
+          entry={entry}
+          active={active}
+          rank={rank}
+          muted={muted}
+          onFirstFrame={coverFirstFrame}
         />
-      ) : (
-        <View style={[styles.threadImage, styles.videoPosterFallback]}>
-          <Feather name="video" size={24} color="rgba(255, 255, 255, 0.72)" />
-        </View>
-      )}
+      ) : null}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: '#000000', opacity: posterOpacity },
+        ]}
+      >
+        {poster ? (
+          <ExpoImage
+            source={{ uri: poster }}
+            style={styles.threadImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={poster}
+            onLoad={({ source }) => {
+              rememberImageAspectRatio(poster, source.width, source.height);
+            }}
+          />
+        ) : (
+          <View style={[styles.threadImage, styles.videoPosterFallback]}>
+            <Feather name="video" size={24} color="rgba(255, 255, 255, 0.72)" />
+          </View>
+        )}
+      </Animated.View>
       <Pressable
         onPress={() => setShowPlayer(true)}
         style={StyleSheet.absoluteFill}
@@ -2104,6 +2175,7 @@ function InlineVideo({
       {showPlayer ? (
         <VideoPlayerModal
           url={entry.url}
+          poster={entry.poster}
           title={entry.name}
           onClose={() => setShowPlayer(false)}
         />
@@ -2115,12 +2187,16 @@ function InlineVideo({
 /** The native player, mounted only while its card owns inline playback. */
 function InlineVideoPlayer({
   entry,
+  active,
   rank,
   muted,
+  onFirstFrame,
 }: {
   entry: MediaEntry;
+  active: boolean;
   rank: number;
   muted: boolean;
+  onFirstFrame: () => void;
 }) {
   const focused = useIsFocused();
   const player = useVideoPlayer(entry.url, (instance) => {
@@ -2143,7 +2219,7 @@ function InlineVideoPlayer({
   // Playback follows the viewport, like the web player's IntersectionObserver.
   // The coordinator lets only one of the on-screen videos run, so two
   // soundtracks never overlap.
-  const wantsPlay = focused && appActive;
+  const wantsPlay = active && focused && appActive;
   useEffect(() => {
     if (!wantsPlay) {
       player.pause();
@@ -2155,13 +2231,25 @@ function InlineVideoPlayer({
   }, [player, rank, wantsPlay]);
 
   return (
-    <VideoView
-      player={player}
-      style={styles.threadImage}
-      nativeControls={false}
-      contentFit="cover"
-      fullscreenOptions={{ enable: false }}
-    />
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <VideoView
+        player={player}
+        // TextureView composites in the normal hierarchy, so the poster above
+        // it can cover the surface completely (a SurfaceView punches a black
+        // hole through the hierarchy instead).
+        surfaceType="textureView"
+        style={styles.threadImage}
+        nativeControls={false}
+        contentFit="cover"
+        fullscreenOptions={{ enable: false }}
+        // Explicit: Android's default ExoPlayer shutter is black. The poster
+        // cover is what hides the load, not the shutter.
+        useExoShutter={false}
+        // The authoritative “a frame is on screen” signal — the cover fades
+        // only when this fires. Time-based guesses still showed black first.
+        onFirstFrameRender={onFirstFrame}
+      />
+    </View>
   );
 }
 
@@ -2205,28 +2293,6 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       </Text>
     </Pressable>
   );
-}
-
-/**
- * Natural aspect ratio of a remote image, or null while it is unknown.
- * Used by `MediaCarousel` so a single attachment is never cropped.
- */
-function useImageAspectRatio(url?: string): number | null {
-  const [ratio, setRatio] = useState<number | null>(null);
-  useEffect(() => {
-    setRatio(null);
-    if (!url) return;
-    let active = true;
-    RNImage.getSize(
-      url,
-      (width, height) => {
-        if (active && width > 0 && height > 0) setRatio(width / height);
-      },
-      () => undefined,
-    );
-    return () => { active = false; };
-  }, [url]);
-  return ratio;
 }
 
 const styles = StyleSheet.create({

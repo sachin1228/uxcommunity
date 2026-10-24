@@ -38,6 +38,7 @@ import {
   feedItemKey,
   feedItemKind,
   prefetchFeedImages,
+  warmFeedMediaRatios,
   type FeedItem,
 } from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
@@ -307,6 +308,8 @@ function ProfileTabSession({
         const memory = peekScreenData<ProfileFeedSnapshot>(userId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.profileFeed);
         if (memory) {
           cachedPainted = true;
+          await warmFeedMediaRatios(memory.data.items);
+          if (!isCurrent()) return;
           readyScopeRef.current = cacheIdentity;
           commitFeed(targetScope, memory.data.items, memory.data.hasMore, false);
           setFeedLoading(false);
@@ -318,9 +321,11 @@ function ProfileTabSession({
         } else {
           setFeedLoading(true);
         }
-        void readScreenData<ProfileFeedSnapshot>(userId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.profileFeed).then((snapshot) => {
+        void readScreenData<ProfileFeedSnapshot>(userId, cacheKey, sessionEpoch, SCREEN_CACHE_TTL_MS.profileFeed).then(async (snapshot) => {
           if (!snapshot || cachedPainted || networkSucceeded || !isCurrent()) return;
           cachedPainted = true;
+          await warmFeedMediaRatios(snapshot.data.items);
+          if (!isCurrent()) return;
           readyScopeRef.current = cacheIdentity;
           commitFeed(targetScope, snapshot.data.items, snapshot.data.hasMore, false);
           resetActions();
@@ -340,6 +345,8 @@ function ProfileTabSession({
         );
         if (!result.accepted || !isCurrent()) return;
         networkSucceeded = true;
+        await warmFeedMediaRatios(result.data.items);
+        if (!isCurrent()) return;
         readyScopeRef.current = cacheIdentity;
         commitFeed(targetScope, result.data.items, result.data.hasMore);
         prefetchFeedImages(result.data.items);
@@ -379,7 +386,11 @@ function ProfileTabSession({
     try {
       const page = await getProfileFeed(target, last.created_at);
       if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
-      commitFeed(target, mergeUniquePage(itemsRef.current, page.items, feedItemKey), page.hasMore);
+      await warmFeedMediaRatios(page.items);
+      if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
+      const next = mergeUniquePage(itemsRef.current, page.items, feedItemKey);
+      const grew = next.length > itemsRef.current.length;
+      commitFeed(target, next, page.hasMore && grew);
     } catch {
       // Leave the feed as-is; the user can pull to retry.
     } finally {
@@ -419,10 +430,34 @@ function ProfileTabSession({
     [applyPollUpdate, commitFeed, userId],
   );
 
-  // A reconnected room missed events while it was down; settle from the API.
+  // A reconnected room missed events while it was down; settle the tallies in
+  // place so a reconnect never truncates the pages already scrolled through.
   const handlePollGap = useCallback(() => {
-    void loadFeed(scopeRef.current, 'refresh');
-  }, [loadFeed]);
+    const target = scopeRef.current;
+    const sequence = requestSequenceRef.current;
+    void (async () => {
+      try {
+        const page = await getProfileFeed(target);
+        if (scopeRef.current !== target || requestSequenceRef.current !== sequence) return;
+        const fresh = new Map(page.items.map((item) => [feedItemKey(item), item]));
+        const next = itemsRef.current.map((item) => {
+          const updated = fresh.get(feedItemKey(item));
+          return updated
+            ? {
+                ...item,
+                ...updated,
+                _type: item._type,
+                community_name: item.community_name,
+                community_image: item.community_image,
+              }
+            : item;
+        });
+        commitFeed(target, next, hasMoreRef.current);
+      } catch {
+        // Tallies settle on the next realtime event or manual refresh.
+      }
+    })();
+  }, [commitFeed]);
 
   useThreadPollRealtime({
     communityIds: pollCommunityIds,
@@ -718,7 +753,7 @@ function ProfileTabSession({
               { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
             ]}
             onEndReached={loadMore}
-            onEndReachedThreshold={0.4}
+            onEndReachedThreshold={1.5}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -730,11 +765,11 @@ function ProfileTabSession({
               />
             }
             ListFooterComponent={
-              loadingMore ? (
-                <View style={styles.footer}>
+              <View style={styles.footer}>
+                {loadingMore ? (
                   <ActivityIndicator size="small" color={colors.foregroundMuted} />
-                </View>
-              ) : null
+                ) : null}
+              </View>
             }
             ListEmptyComponent={
               feedLoading ? (
@@ -905,5 +940,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retry: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  footer: { paddingVertical: 20, alignItems: 'center' },
+  footer: { height: 56, alignItems: 'center', justifyContent: 'center' },
 });
