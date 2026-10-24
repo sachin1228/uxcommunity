@@ -284,14 +284,26 @@ The plugin copy at `expo-app-standalone 3/plugins/chat-notifications/` is byte-i
 - `npm run test:push-budget` (17), `npm run test:push-fanout` (71), the four DM suites, and `direct-message.test.ts` (11, including three new tests: the three reads share one round trip, both transports start before either answers, the fallback still only follows an FCM failure) — all pass.
 - `./gradlew :app:compileDebugKotlin` — the Android service compiles.
 
-## 12. Expected result after deploy
+## 12. Before → after
 
-| | Before | After the server changes | After the Android build ships |
+**Before is measured** (§3–§4). **After is computed** by removing the round trips this branch removes, priced at the measured cost of a cold Supabase hop (340 ms warm, ~1 s cold; the medians below use 350 ms). It is a projection, not a re-measurement — the branch is not deployed.
+
+| | Before (measured) | After (projected) | Change |
 |---|---|---|---|
-| DM end-to-end | ≈ 4.2 s | ≈ 2.0–2.5 s | ≈ 1.6–2.0 s |
-| Community chat end-to-end | ≈ 5.5 s | ≈ 3.2–4.0 s | ≈ 2.8–3.5 s |
+| **DM** — sender → row committed | 2.27 s | ≈ 1.60 s | −0.67 s (state read removed, liveness no longer serial) |
+| **DM** — row → FCM accepted | 1.21 s | ≈ 0.50 s | −0.71 s (publish overlapped, one token batch, shared OAuth) |
+| **DM** — FCM → posted | 0.83 s | ≈ 0.45 s first / 0.25 s cached | −0.38 s (one avatar download, then LRU) |
+| **DM total** | **4.38 s** | **≈ 2.55 s** (2.35 s cached) | **−1.8 s** |
+| **Community** — sender → row committed | 1.90 s | 1.90 s | unchanged |
+| **Community** — row → FCM accepted | 1.93 s | ≈ 1.35 s | −0.58 s (publish overlapped, prefs merged; up to −0.9 s on a cold isolate where the mute probe is not cached) |
+| **Community** — FCM → posted | 0.81 s | ≈ 0.80 s first / 0.50 s cached | the community DP is a second image, cached after the first push |
+| **Community total** | **5.55 s** | **≈ 4.05 s** (3.75 s cached) | **−1.5 s** |
+
+A killed app process adds ~1.1 s to the device stage in both columns (1.94 s → ~1.6 s with one download).
 
 With §13 done (Worker + DB in one region near users, media actually cached) the same paths should land **under 1 s**, dominated by FCM delivery.
+
+Hop budget for the DM after-column: the sender path drops from 6 sequential remote hops to 5 (liveness parallel, state read skipped), the push from 4 to 2 (publish in parallel, one token query, shared OAuth), the device from 2 avatar fetches to 1.
 
 ## 13. What is still open (infrastructure, not code)
 
