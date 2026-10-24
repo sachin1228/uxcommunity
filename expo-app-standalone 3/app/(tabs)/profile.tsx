@@ -589,24 +589,26 @@ function ProfileTabSession({
         <DotField />
       </View>
 
-      <ProfileHero
-        name={profile?.user?.name ?? user?.name ?? ''}
-        // The session already carries the member's picture, so the hero shows
-        // the real DP from the first frame instead of a flash of initials
-        // while GET /api/profile is in flight.
-        avatarUrl={body?.avatar_url ?? user?.avatar_url ?? null}
-        city={body?.cities?.name ?? null}
-        roleLabel={profile?.roleLabel ?? null}
-        bio={body?.bio ?? ''}
-        company={profile?.company ?? null}
-        linkedinUrl={body?.linkedin_url ?? ''}
-        portfolioUrl={body?.portfolio_url ?? ''}
-        onPressAvatar={() => void handleChangePicture()}
-        onAddLinkedIn={() => setLinkModal('linkedin')}
-        onAddPortfolio={() => setLinkModal('portfolio')}
-        onAddCompany={() => setCompanyModalOpen(true)}
-        onEdit={() => router.push('/settings/profile')}
-      />
+      <View style={styles.heroTop}>
+        <ProfileHero
+          name={profile?.user?.name ?? user?.name ?? ''}
+          // The session already carries the member's picture, so the hero shows
+          // the real DP from the first frame instead of a flash of initials
+          // while GET /api/profile is in flight.
+          avatarUrl={body?.avatar_url ?? user?.avatar_url ?? null}
+          city={body?.cities?.name ?? null}
+          roleLabel={profile?.roleLabel ?? null}
+          bio={body?.bio ?? ''}
+          company={profile?.company ?? null}
+          linkedinUrl={body?.linkedin_url ?? ''}
+          portfolioUrl={body?.portfolio_url ?? ''}
+          onPressAvatar={() => void handleChangePicture()}
+          onAddLinkedIn={() => setLinkModal('linkedin')}
+          onAddPortfolio={() => setLinkModal('portfolio')}
+          onAddCompany={() => setCompanyModalOpen(true)}
+          onEdit={() => router.push('/settings/profile')}
+        />
+      </View>
 
       {/* ── Activity tabs — the app's underline vocabulary, web's tab set ── */}
       <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
@@ -808,6 +810,10 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   heroWrap: { marginBottom: 4 },
+  // Extra breathing room above the display picture now that the header is
+  // gone. The dotted backdrop is absolutely positioned, so it stays anchored
+  // to the top of the hero while the picture moves down.
+  heroTop: { paddingTop: 32 },
   heroDots: {
     position: 'absolute',
     // The list's own top gutter would leave a bare strip under the screen
