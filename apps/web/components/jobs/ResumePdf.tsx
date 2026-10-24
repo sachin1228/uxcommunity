@@ -27,15 +27,18 @@ export function ResumePdf({ url }: { url: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let loadingTask: { destroy: () => Promise<void> } | null = null;
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const loaded = await pdfjs.getDocument({ url }).promise;
-        if (cancelled) {
-          void loaded.destroy();
-          return;
-        }
+        // A resume is untrusted input. The viewer never installs PDF.js's
+        // scripting manager, and the pinned pdfjs-dist release is the one
+        // past GHSA-hq66-cqwq-w95j.
+        const task = pdfjs.getDocument({ url });
+        loadingTask = task;
+        const loaded = await task.promise;
+        if (cancelled) return;
         const firstPage = await loaded.getPage(1);
         baseWidthRef.current = firstPage.getViewport({ scale: 1 }).width;
         setNumPages(loaded.numPages);
@@ -46,14 +49,9 @@ export function ResumePdf({ url }: { url: string }) {
     })();
     return () => {
       cancelled = true;
+      void loadingTask?.destroy();
     };
   }, [url]);
-
-  useEffect(() => {
-    return () => {
-      void doc?.destroy();
-    };
-  }, [doc]);
 
   useEffect(() => {
     if (!doc) return;

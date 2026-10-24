@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
-import { isPublicContentScope } from "@/lib/content-scope";
+import { loadEventForViewer } from "@/lib/communities/event-access";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import {
@@ -26,7 +26,6 @@ export async function POST(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
-  const publicScope = isPublicContentScope(communityId);
 
   // The host's compulsory join questions, answered in the confirm modal (the
   // web app always sends them; older clients may not). Recorded with the
@@ -36,16 +35,28 @@ export async function POST(
     | null;
   const answers = joinAnswersPayload(body?.answers ?? {});
 
-  let eventQuery = db
-    .from("community_events")
-    .select("id, user_id, title, cover_image_url, is_public, community_id, max_attendees")
-    .eq("id", eventId);
-  eventQuery = publicScope
-    ? eventQuery.eq("is_public", true).is("community_id", null)
-    : eventQuery.eq("community_id", communityId);
-  const { data: event } = await eventQuery.maybeSingle();
-
-  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  const access = await loadEventForViewer<{
+    id: string;
+    user_id: string;
+    title: string;
+    cover_image_url: string | null;
+    is_public: boolean;
+    community_id: string | null;
+    max_attendees: number | null;
+  }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    "id, user_id, title, cover_image_url, is_public, community_id, max_attendees",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
+  const event = access.event;
 
   // Check if already RSVPed
   const { data: existing } = await db

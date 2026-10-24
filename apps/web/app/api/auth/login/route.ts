@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { loginSchema } from "@/lib/validations";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
 import { isSignupIncomplete } from "@/lib/auth/signup-status";
 
@@ -17,7 +18,7 @@ type LoginUserRow = {
 };
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
 
   let body: unknown;
   try {

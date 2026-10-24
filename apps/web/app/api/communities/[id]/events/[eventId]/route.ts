@@ -13,6 +13,7 @@ import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePr
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { syncEventChatCommunity } from "@/lib/communities/event-chat";
 import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/notifications";
+import { loadEventForViewer } from "@/lib/communities/event-access";
 import { removeCommunityContent, type RemoveContentResult } from "@/lib/communities/content-removal";
 import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
 import type { Database } from "@/lib/supabase/database.types";
@@ -27,21 +28,22 @@ export async function GET(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
-  const publicScope = isPublicContentScope(communityId);
 
-  let eventQuery = db
-    .from("community_events")
-    .select(EVENT_CARD_COLUMNS)
-    .eq("id", eventId);
-  eventQuery = publicScope
-    ? eventQuery.eq("is_public", true).is("community_id", null)
-    : eventQuery.eq("community_id", communityId);
-  const { data, error } = await eventQuery.maybeSingle();
+  const access = await loadEventForViewer<Record<string, unknown> & { is_public: boolean }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    EVENT_CARD_COLUMNS,
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Event not found." }, { status: 404 });
-
-  const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
+  const [enriched] = await enrichEventCards([access.event], userId);
   return NextResponse.json({ event: enriched });
 }
 
@@ -55,23 +57,33 @@ export async function PATCH(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
-  const publicScope = isPublicContentScope(communityId);
 
-  let existingQuery = db
-    .from("community_events")
-    // title and cover_image_url are fetched so the group chat sync can tell
-    // which rooms still wear the event's old clothes before this edit replaces
-    // them; cover_image_url is also what the R2 cleanup below needs. event_date
-    // is fetched so a move can be told from an untouched schedule (see the
-    // host-zone note below).
-    .select("id, user_id, title, cover_image_url, event_date")
-    .eq("id", eventId);
-  existingQuery = publicScope
-    ? existingQuery.eq("is_public", true).is("community_id", null)
-    : existingQuery.eq("community_id", communityId);
-  const { data: existing } = await existingQuery.maybeSingle();
-
-  if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  // title and cover_image_url are fetched so the group chat sync can tell
+  // which rooms still wear the event's old clothes before this edit replaces
+  // them; cover_image_url is also what the R2 cleanup below needs. event_date
+  // is fetched so a move can be told from an untouched schedule (see the
+  // host-zone note below).
+  const access = await loadEventForViewer<{
+    id: string;
+    user_id: string;
+    title: string;
+    cover_image_url: string | null;
+    event_date: string;
+    is_public: boolean;
+  }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    "id, user_id, title, cover_image_url, event_date, is_public",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
+  const existing = access.event;
   if (existing.user_id !== userId) return NextResponse.json({ error: "Not the event owner." }, { status: 403 });
 
   let body: Record<string, unknown>;
@@ -223,16 +235,25 @@ export async function DELETE(
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
 
-  let existingQuery = db
-    .from("community_events")
-    .select("id, user_id, title")
-    .eq("id", eventId);
-  existingQuery = publicScope
-    ? existingQuery.eq("is_public", true).is("community_id", null)
-    : existingQuery.eq("community_id", communityId);
-  const { data: existing } = await existingQuery.maybeSingle();
-
-  if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  const access = await loadEventForViewer<{
+    id: string;
+    user_id: string;
+    title: string;
+    is_public: boolean;
+  }>(
+    db,
+    communityId,
+    eventId,
+    userId,
+    "id, user_id, title, is_public",
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.status === 404 ? "Event not found." : "Not a member of this community." },
+      { status: access.status },
+    );
+  }
+  const existing = access.event;
 
   // Hosts delete their own events; managers holding "moderate events" may
   // delete anyone's. Public-scope content lives outside any community, so

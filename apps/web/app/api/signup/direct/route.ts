@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { directSignupStep1Schema } from "@/lib/validations";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { recordSignupAttempt } from "@/lib/signup-attempts";
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
   // Validation-only endpoint (checks the email, creates nothing), so the cap is
   // generous: it stops bot loops without ever punishing a human correcting typos.
   const rl = await rateLimit(`signup:step1:direct:v2:${ip}`, 60, 3600);

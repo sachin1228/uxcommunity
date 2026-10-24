@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -16,7 +17,7 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
  * own R2 bucket) when the account is created.
  */
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = getRequestClientIp(request);
   const rl = await rateLimit(`signup:picture:v2:${ip}`, 20, 3600);
   if (!rl.success) {
     return NextResponse.json(
