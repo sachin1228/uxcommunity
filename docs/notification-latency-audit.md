@@ -125,14 +125,14 @@ Every hop is sequential and each one is a network round trip to Supabase or Upst
 
 - `middleware.ts:53` — Upstash global rate limit on **every** request (~0.2–0.4 s, not even counted in the route's Server-Timing).
 - `session.ts:200` — `assertUserActive()` SELECTs `users` on every write request. Its 15 s cache (`activeUserChecks`) is per-isolate, so on a cold isolate it always runs (measured 0–1359 ms).
-- `route.ts:148` / `:152` — access query and sender profile (two more SELECTs) in parallel, but measured 342–1224 ms.
-- `route.ts:182` — separate block check.
-- `route.ts:251` — the insert.
-- `route.ts:341` — separate request-state read **after** the insert.
+- the access query and the sender profile — two more SELECTs, issued in parallel in `POST`, but measured 342–1224 ms.
+- a separate block check, its own round trip.
+- the insert.
+- a separate request-state read **after** the insert.
 
 A Cloudflare Worker that runs in Marseille talking to a Supabase project far enough away that a fresh connection costs ~1 s makes this the dominant term. The row exists 1.6–5.3 s after the sender taps send; the notification cannot be created before that.
 
-### B. The push is serialized behind the realtime publish and 3 more DB hops (~1.2 s) — `route.ts:370-419`, `apps/web/lib/push/direct-message.ts:162-181`
+### B. The push is serialized behind the realtime publish and 3 more DB hops (~1.2 s) — the send route's `after()` block, `apps/web/lib/push/direct-message.ts:162-181`
 - `after()` **awaits** `publishDmEvent()` (one HTTP call to `rt.uxcommunity.in`, up to 3 attempts × 3 s timeout — a hung realtime service delays the push by up to ~10 s) **and only then** starts the push.
 - The push reads `push_tokens` + `notification_preferences` in one round trip, then `fcm_tokens` **sequentially** — a direct-message has 6 push tokens/preference rows to read and pays 2 round trips.
 - On a cold isolate it also mints an FCM OAuth token first (`fcm.ts:131`), a Google round trip.
@@ -164,7 +164,7 @@ There is no `push.sent` event with a timestamp, no device-side "posted" telemetr
 
 | # | Change | Where | Expected |
 |---|---|---|---|
-| 1 | Start the push **in parallel with** `publishDmEvent` (`Promise.allSettled([publish, push])`), so a slow/retrying realtime publish can never delay the tray notification | `route.ts:348-419` | −0.1…−0.4 s, removes a ~10 s worst case |
+| 1 | Start the push **in parallel with** `publishDmEvent` (`Promise.allSettled([publish, push])`), so a slow/retrying realtime publish can never delay the tray notification | the send route's `after()` block | −0.1…−0.4 s, removes a ~10 s worst case |
 | 2 | Fold `fcm_tokens` into the existing `Promise.all` (or replace all three reads with one `dm_push_targets(user_id)` RPC) | `direct-message.ts:162-181` | −0.35…−1.0 s |
 | 3 | Send FCM first, then Expo for the iOS devices; don't await Expo before FCM | `direct-message.ts:223` | −0.1…−0.5 s for mixed-device members |
 | 4 | Cache the FCM access token in the Workers Cache API / KV keyed by `client_email` (50 min TTL) and add `AbortSignal.timeout` to the OAuth fetch | `fcm.ts:129-190` | −0.2…−0.4 s per cold isolate, removes a hang |
@@ -173,8 +173,8 @@ There is no `push.sent` event with a timestamp, no device-side "posted" telemetr
 
 | # | Change | Where | Expected |
 |---|---|---|---|
-| 5 | One `send_dm_message(conversation, user, content, image, reply, nonce)` RPC doing access + block + reply anchor + idempotent insert + request-state in one statement batch (the codebase already uses this pattern for `create_notification` and `load_dm_conversations`) | `route.ts:148-345`, new migration | −0.7…−1.4 s |
-| 6 | Return the sender's name/avatar from the same RPC (or a join) instead of two parallel SELECTs | `route.ts:152` | −0.3…−0.6 s on the slow path |
+| 5 | One `send_dm_message(conversation, user, content, image, reply, nonce)` RPC doing access + block + reply anchor + idempotent insert + request-state in one statement batch (the codebase already uses this pattern for `create_notification` and `load_dm_conversations`) | `POST` in the send route, new migration | −0.7…−1.4 s |
+| 6 | Return the sender's name/avatar from the same RPC (or a join) instead of two parallel SELECTs | `POST`'s sender-profile read | −0.3…−0.6 s on the slow path |
 | 7 | Drop the per-request `assertUserActive` DB check for writes: put a `status`/`session_version` claim in the JWT and invalidate on block/delete, or cache the check in KV (60 s) | `session.ts:129-200` | −0.35…−1.35 s on cold isolates |
 | 8 | Replace the Upstash global limit in `middleware.ts` (and the route's `rateLimit` calls) with the native Workers Rate Limiting binding (no network hop, runs in-colo) | `middleware.ts:53`, `lib/auth/rate-limit.ts` | −0.2…−0.5 s per request |
 
