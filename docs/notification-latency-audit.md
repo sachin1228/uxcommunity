@@ -292,14 +292,14 @@ The plugin copy at `expo-app-standalone 3/plugins/chat-notifications/` is byte-i
 |---|---|---|---|
 | **DM** — sender → row committed | 2.27 s | ≈ 1.60 s | −0.67 s (state read removed, liveness no longer serial) |
 | **DM** — row → FCM accepted | 1.21 s | ≈ 0.50 s | −0.71 s (publish overlapped, one token batch, shared OAuth) |
-| **DM** — FCM → posted | 0.83 s | ≈ 0.45 s first / 0.25 s cached | −0.38 s (one avatar download, then LRU) |
-| **DM total** | **4.38 s** | **≈ 2.55 s** (2.35 s cached) | **−1.8 s** |
+| **DM** — FCM → posted | 0.83 s | **0.35 s measured** on the rebuilt APK | −0.48 s (one avatar download, then the LRU) |
+| **DM total** | **4.38 s** | **≈ 2.45 s** | **−1.9 s** |
 | **Community** — sender → row committed | 1.90 s | 1.90 s | unchanged |
 | **Community** — row → FCM accepted | 1.93 s | ≈ 1.35 s | −0.58 s (publish overlapped, prefs merged; up to −0.9 s on a cold isolate where the mute probe is not cached) |
 | **Community** — FCM → posted | 0.81 s | ≈ 0.80 s first / 0.50 s cached | the community DP is a second image, cached after the first push |
 | **Community total** | **5.55 s** | **≈ 4.05 s** (3.75 s cached) | **−1.5 s** |
 
-A killed app process adds ~1.1 s to the device stage in both columns (1.94 s → ~1.6 s with one download).
+The Android row is no longer a projection: the rebuilt APK (same debug keystore, installed over the emulator build, **server unchanged**) measured **348, 351, 352, 376, 380 ms** from FCM send to posted — median **352 ms**, against 742–833 ms for the same sender before. A killed app process still adds ~1.1 s to the device stage (1.72 s on the first push after install).
 
 With §13 done (Worker + DB in one region near users, media actually cached) the same paths should land **under 1 s**, dominated by FCM delivery.
 
