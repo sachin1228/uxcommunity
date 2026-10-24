@@ -58,6 +58,17 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
      * focus — nothing here may race with that.
      */
     private const val SHORTCUT_PREFS = "uxcommunity_notification_shortcuts"
+
+    /**
+     * Byte-identical to the Google-palette list in apps/web/lib/avatar.ts.
+     * Server payloads carry the resolved sender colour; this copy is the
+     * fallback for payloads that predate it, so an initials avatar is never
+     * drawn in the community's colour.
+     */
+    private val AVATAR_BACKGROUNDS = arrayOf(
+      "#1a73e8", "#d93025", "#188038", "#b06000", "#9334e6", "#00838f",
+      "#c5221f", "#3949ab", "#ad1457", "#00695c", "#6a1b9a", "#455a64",
+    )
   }
 
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -178,10 +189,11 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       // An activity row has one identity; the type glyph is its avatar.
       conversationAvatar
     } else {
+      val senderColor = data["senderAvatarColor"] ?: avatarBackground(messagePerson)
       data["senderAvatarUrl"].takeUnless { it.isNullOrBlank() }?.let { download(it) }
         ?: initialAvatar(
           data["senderAvatarInitials"].takeUnless { it.isNullOrBlank() },
-          data["senderAvatarColor"] ?: data["avatarColor"],
+          senderColor,
           messagePerson,
         )
     }
@@ -404,6 +416,17 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       append(first)
       if (last != null) append(last)
     }
+  }
+
+  /** The app's avatarBackground(): FNV-1a over the trimmed lowercase name. */
+  private fun avatarBackground(name: String): String {
+    var hash = 0x811c9dc5.toInt()
+    for (char in name.trim().lowercase()) {
+      hash = hash xor char.code
+      hash *= 0x01000193
+    }
+    val unsigned = hash.toLong() and 0xFFFFFFFFL
+    return AVATAR_BACKGROUNDS[(unsigned % AVATAR_BACKGROUNDS.size).toInt()]
   }
 
   private fun emojiAvatar(icon: String): Bitmap {
