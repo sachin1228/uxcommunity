@@ -13,12 +13,19 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { avatarBackground, nameInitials } from "@/lib/avatar";
 import { logEvent } from "@/lib/observability/log";
-import { sendExpoPushBatches, timeoutSignal, type ExpoPushMessage } from "./expo";
+import {
+  sendExpoPushBatches,
+  timeoutSignal,
+  type ExpoPushDelivery,
+  type ExpoPushMessage,
+} from "./expo";
 import {
   isFcmConfigured,
   sendFcmDataMessages,
   type FcmDataMessage,
+  type FcmDeliveryReport,
 } from "./fcm";
+import type { ServiceClient } from "@/lib/supabase/service";
 import { messagePushPreview } from "./chat";
 import {
   AUDIBLE_CHANNEL_ID,
@@ -154,12 +161,40 @@ export function directMessageFcmData(input: {
   return data;
 }
 
+/**
+ * Injection points, so the delivery rules (one round trip for the three reads,
+ * both transports in flight together, the FCM-only fallback) are testable
+ * without a network or a database.
+ */
+export interface DirectMessagePushDeps {
+  db?: ServiceClient;
+  /** Whether the direct-FCM transport is configured. */
+  fcmConfigured?: boolean;
+  /** Provider sender; must account for every message it was given. */
+  sendExpo?: (
+    messages: ExpoPushMessage[],
+    options: { deadline: number },
+  ) => Promise<ExpoPushDelivery>;
+  /** Direct-FCM sender, injectable so tests never touch Google. */
+  sendFcm?: (messages: FcmDataMessage[]) => Promise<FcmDeliveryReport>;
+  /** Wall clock for quiet hours, injectable so tests are deterministic. */
+  now?: () => Date;
+}
+
 /** The device half of a DM. Best-effort; never throws into the send route. */
-export async function sendDirectMessagePush(params: DirectMessagePushParams): Promise<void> {
+export async function sendDirectMessagePush(
+  params: DirectMessagePushParams,
+  deps: DirectMessagePushDeps = {},
+): Promise<void> {
   try {
-    const db = createServiceClient();
-    const fcmConfigured = isFcmConfigured();
-    const [tokenResult, preferenceResult] = await Promise.all([
+    const db = deps.db ?? createServiceClient();
+    const fcmConfigured = deps.fcmConfigured ?? isFcmConfigured();
+    const sendExpoPush = deps.sendExpo ?? sendExpoPushBatches;
+    // All three reads are independent, so they share one round trip. They used
+    // to be two: tokens/preferences in parallel, then `fcm_tokens` only after
+    // both answered — which put a second full Supabase RTT (340 ms–1 s) in
+    // front of every DM notification.
+    const [tokenResult, preferenceResult, fcmResult] = await Promise.all([
       db
         .from("push_tokens")
         .select("token, platform")
@@ -169,17 +204,14 @@ export async function sendDirectMessagePush(params: DirectMessagePushParams): Pr
         .select("*")
         .eq("user_id", params.recipientId)
         .maybeSingle(),
+      fcmConfigured
+        ? db.from("fcm_tokens").select("token").eq("user_id", params.recipientId)
+        : Promise.resolve({ data: [] as { token: string }[] | null, error: null }),
     ]);
-    let fcmRows: { data: { token: string }[] | null; error: unknown } = {
-      data: [],
-      error: null,
+    const fcmRows = fcmResult as unknown as {
+      data: { token: string }[] | null;
+      error: unknown;
     };
-    if (fcmConfigured) {
-      fcmRows = (await db
-        .from("fcm_tokens")
-        .select("token")
-        .eq("user_id", params.recipientId)) as unknown as typeof fcmRows;
-    }
 
     const expoTokens = ((tokenResult.data ?? []) as { token: string; platform?: string }[])
       .filter((row) => Boolean(row.token))
@@ -191,7 +223,7 @@ export async function sendDirectMessagePush(params: DirectMessagePushParams): Pr
 
     const plan = directMessagePushPlan(
       (preferenceResult.data as DirectMessagePreferences | null) ?? undefined,
-      new Date(),
+      deps.now?.() ?? new Date(),
     );
     if (!plan.send) return;
 
@@ -207,7 +239,7 @@ export async function sendDirectMessagePush(params: DirectMessagePushParams): Pr
 
     const sendExpo = async (tokens: { token: string }[]) => {
       if (tokens.length === 0) return null;
-      const delivery = await sendExpoPushBatches(
+      const delivery = await sendExpoPush(
         directMessagePushMessages(
           tokens.map((row) => row.token),
           { ...params, audible: plan.audible },
@@ -220,9 +252,12 @@ export async function sendDirectMessagePush(params: DirectMessagePushParams): Pr
       return delivery;
     };
 
-    await sendExpo(expoNow);
-
-    if (direct) {
+    // iOS rides Expo and Android rides direct FCM; a member signed in on both
+    // must not wait for one provider before the other is even asked. The
+    // held-back Android Expo tokens still follow an FCM result: they are the
+    // fallback for a provider-wide FCM failure, not a second notification.
+    const fcmTask = async (): Promise<void> => {
+      if (!direct) return;
       const fcmMessages: FcmDataMessage[] = fcmTokens.map((token) => ({
         token,
         collapseKey: `dm-${params.conversationId}`,
@@ -233,13 +268,15 @@ export async function sendDirectMessagePush(params: DirectMessagePushParams): Pr
         }),
         ttlSeconds: 3600,
       }));
-      const report = await sendFcmDataMessages(fcmMessages, {
-        fetch: (input, init) =>
-          globalThis.fetch(input, {
-            ...init,
-            ...(timeoutSignal(8_000) ? { signal: timeoutSignal(8_000) } : {}),
-          }),
-      });
+      const report = deps.sendFcm
+        ? await deps.sendFcm(fcmMessages)
+        : await sendFcmDataMessages(fcmMessages, {
+            fetch: (input, init) =>
+              globalThis.fetch(input, {
+                ...init,
+                ...(timeoutSignal(8_000) ? { signal: timeoutSignal(8_000) } : {}),
+              }),
+          });
       const delivered = report.outcomes.filter((outcome) => outcome.ok).length;
       const dead = report.outcomes
         .filter((outcome) => !outcome.ok && outcome.deadToken)
@@ -254,7 +291,12 @@ export async function sendDirectMessagePush(params: DirectMessagePushParams): Pr
       if (dead.length > 0) {
         await db.from("fcm_tokens").delete().in("token", dead);
       }
-    }
+    };
+
+    const [expoResult] = await Promise.allSettled([sendExpo(expoNow), fcmTask()]);
+    // Preserve the old failure surface: an Expo error used to reach the
+    // outer catch and log `push.dm_failed`.
+    if (expoResult.status === "rejected") throw expoResult.reason;
   } catch (error) {
     logEvent("error", {
       event: "push.dm_failed",
