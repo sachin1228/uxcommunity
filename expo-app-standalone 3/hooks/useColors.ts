@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 import colors, { DEFAULT_COLOR_SCHEME, type ColorScheme } from '@/constants/colors';
 
@@ -25,12 +26,19 @@ export function useColors(override?: ColorScheme) {
   const palette = scheme === 'dark' ? colors.dark : colors.light;
   const isDark = scheme === 'dark';
 
-  return {
-    ...palette,
-    scheme,
-    isDark,
-    /** Kept for callers that still branch on the raw device scheme. */
-    deviceScheme,
-    radius: colors.radius,
-  };
+  // A fresh object here made every `useColors()` consumer look changed on every
+  // render — including memoized chat bubbles and `renderItem` callbacks that
+  // list `colors` in their dependency arrays. The palette itself is static per
+  // scheme, so only a real scheme change should produce a new object.
+  return useMemo(
+    () => ({
+      ...palette,
+      scheme,
+      isDark,
+      /** Kept for callers that still branch on the raw device scheme. */
+      deviceScheme,
+      radius: colors.radius,
+    }),
+    [deviceScheme, isDark, palette, scheme],
+  );
 }

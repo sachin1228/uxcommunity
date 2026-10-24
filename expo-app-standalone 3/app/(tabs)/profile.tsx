@@ -19,7 +19,12 @@ import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
-import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
+import {
+  ContentDetail,
+  ContentPlaybackProvider,
+  useContentActions,
+} from '@/components/community/contentView';
+import { ContentCardRow } from '@/components/community/ContentCardRow';
 import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -28,13 +33,25 @@ import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent
 import { chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
-import { feedItemKey, feedItemKind, type FeedItem } from '@/lib/homeFeed';
+import {
+  FEED_LIST_PERFORMANCE,
+  feedItemKey,
+  feedItemKind,
+  prefetchFeedImages,
+  type FeedItem,
+} from '@/lib/homeFeed';
 import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 import { hapticSelection } from '@/lib/haptics';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
-import { fetchScreenData, peekScreenData, readScreenData, writeScreenData } from '@/lib/screenDataCacheStore';
+import {
+  fetchScreenData,
+  peekScreenData,
+  readScreenData,
+  writeScreenData,
+  writeScreenDataDebounced,
+} from '@/lib/screenDataCacheStore';
 import { mergeUniquePage, SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
 import {
   ownProfileCacheSnapshot,
@@ -144,7 +161,7 @@ function ProfileTabSession({
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
+  const { viewableStore, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   /** The activity row whose editor is open (owner-only; null when closed). */
   const [editing, setEditing] = useState<FeedItem | null>(null);
   const itemsRef = useRef(items);
@@ -191,7 +208,7 @@ function ProfileTabSession({
       setItems(nextItems);
       setHasMore(nextHasMore);
       if (persist && userId && readyScopeRef.current === `${cacheSessionKey}:${targetScope}`) {
-        void writeScreenData(
+        writeScreenDataDebounced(
           userId,
           profileFeedCacheKey(targetScope),
           sessionEpoch,
@@ -325,6 +342,7 @@ function ProfileTabSession({
         networkSucceeded = true;
         readyScopeRef.current = cacheIdentity;
         commitFeed(targetScope, result.data.items, result.data.hasMore);
+        prefetchFeedImages(result.data.items);
         resetActions();
       } catch (e) {
         if (!isCurrent()) return;
@@ -563,21 +581,22 @@ function ProfileTabSession({
 
   const renderItem = useCallback(
     ({ item, index }: { item: FeedItem; index: number }) => (
-      <ContentCard
+      <ContentCardRow
         item={item}
+        itemKey={feedItemKey(item)}
         kind={feedItemKind(item)}
         currentUserId={userId ?? ''}
         actions={actions}
+        viewableStore={viewableStore}
         communityName={item.community_name}
         communityImage={item.community_image}
         onComments={openItem}
         onEdit={editItem}
         onDelete={deleteItem}
-        videoActive={!selected && visibleKeys.has(feedItemKey(item))}
         videoRank={index}
       />
     ),
-    [actions, deleteItem, editItem, openItem, selected, userId, visibleKeys],
+    [actions, deleteItem, editItem, openItem, userId, viewableStore],
   );
 
   const body = profile?.profile;
@@ -682,69 +701,75 @@ function ProfileTabSession({
           </Pressable>
         </View>
       ) : (
-        <FlatList
-          data={items}
-          keyExtractor={feedItemKey}
-          renderItem={renderItem}
-          ListHeaderComponent={hero}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          contentContainerStyle={[
-            styles.list,
-            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
-          ]}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.4}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                void loadProfile();
-                void loadFeed(scopeRef.current, 'refresh');
-              }}
-              tintColor={colors.foregroundMuted}
-            />
-          }
-          ListFooterComponent={
-            loadingMore ? (
-              <View style={styles.footer}>
-                <ActivityIndicator size="small" color={colors.foregroundMuted} />
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            feedLoading ? (
-              <View style={styles.centerSmall}>
-                <ActivityIndicator color={colors.accent} />
-              </View>
-            ) : feedError ? (
-              <View style={styles.centerSmall}>
-                <Feather name="wifi-off" size={26} color={colors.foregroundMuted} />
-                <Text style={[styles.stateTitle, { color: colors.foreground }]}>
-                  Couldn&apos;t load your posts
-                </Text>
-                <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{feedError}</Text>
-                <Pressable onPress={() => void loadFeed(scopeRef.current, 'initial')} accessibilityRole="button">
-                  <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.centerSmall}>
-                <Feather
-                  name={scope === 'saved' ? 'bookmark' : 'inbox'}
-                  size={30}
-                  color={colors.foregroundSubtle}
-                />
-                <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>
-                  {EMPTY_STATE[scope].title}
-                </Text>
-                <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                  {EMPTY_STATE[scope].body}
-                </Text>
-              </View>
-            )
-          }
-        />
+        <ContentPlaybackProvider enabled={!selected}>
+          <FlatList
+            data={items}
+            keyExtractor={feedItemKey}
+            renderItem={renderItem}
+            initialNumToRender={FEED_LIST_PERFORMANCE.initialNumToRender}
+            maxToRenderPerBatch={FEED_LIST_PERFORMANCE.maxToRenderPerBatch}
+            windowSize={FEED_LIST_PERFORMANCE.windowSize}
+            updateCellsBatchingPeriod={FEED_LIST_PERFORMANCE.updateCellsBatchingPeriod}
+            ListHeaderComponent={hero}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            contentContainerStyle={[
+              styles.list,
+              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
+            ]}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  void loadProfile();
+                  void loadFeed(scopeRef.current, 'refresh');
+                }}
+                tintColor={colors.foregroundMuted}
+              />
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footer}>
+                  <ActivityIndicator size="small" color={colors.foregroundMuted} />
+                </View>
+              ) : null
+            }
+            ListEmptyComponent={
+              feedLoading ? (
+                <View style={styles.centerSmall}>
+                  <ActivityIndicator color={colors.accent} />
+                </View>
+              ) : feedError ? (
+                <View style={styles.centerSmall}>
+                  <Feather name="wifi-off" size={26} color={colors.foregroundMuted} />
+                  <Text style={[styles.stateTitle, { color: colors.foreground }]}>
+                    Couldn&apos;t load your posts
+                  </Text>
+                  <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{feedError}</Text>
+                  <Pressable onPress={() => void loadFeed(scopeRef.current, 'initial')} accessibilityRole="button">
+                    <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.centerSmall}>
+                  <Feather
+                    name={scope === 'saved' ? 'bookmark' : 'inbox'}
+                    size={30}
+                    color={colors.foregroundSubtle}
+                  />
+                  <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>
+                    {EMPTY_STATE[scope].title}
+                  </Text>
+                  <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
+                    {EMPTY_STATE[scope].body}
+                  </Text>
+                </View>
+              )
+            }
+          />
+        </ContentPlaybackProvider>
       )}
 
       <ContentDetail

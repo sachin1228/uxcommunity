@@ -13,6 +13,7 @@ import {
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
+import { CHAT_LIST_PERFORMANCE } from '@/lib/homeFeed';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useChatContentEvents } from '@/hooks/useChatContentEvents';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
@@ -343,6 +344,15 @@ export default function CommunityChat() {
     softDeleteMessage,
   } = useChatMessages(id);
 
+  // Handler-stable mirrors of the timeline. Reaction and reply handlers read
+  // these instead of closing over `messages`/`rows`, so a new page or a
+  // reaction no longer changes the callbacks and re-renders every mounted
+  // bubble through `renderItem`.
+  const messagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   // The chat timeline's permanent "created a …" cards (threads / showcase /
   // resources / events) — history window + realtime + local mirror.
   const {
@@ -649,8 +659,16 @@ export default function CommunityChat() {
   // same merge the web MessageList builds), so a card sits among the messages
   // of its moment. A card also breaks the "same author" run — the message
   // after one starts a fresh bubble group, exactly like the web list.
+  // The list's cell renderer only skips a re-render when the row object keeps
+  // its identity. Rebuilding every row on each message or page would therefore
+  // re-render every mounted bubble; reuse the previous object when the message
+  // and its group flag are unchanged.
+  const rowCacheRef = useRef(new Map<string, ChatRow>());
+
   const rows = useMemo<ChatRow[]>(() => {
     const out: ChatRow[] = [];
+    const previousRows = rowCacheRef.current;
+    const nextRows = new Map<string, ChatRow>();
     let currentDate: string | null = null;
     let prevAuthorId: string | null = null;
     let groupIndex = 0;
@@ -673,7 +691,14 @@ export default function CommunityChat() {
 
       if (item.kind === 'content') {
         prevAuthorId = null;
-        out.push({ kind: 'content', key: `content-${item.event.id}`, event: item.event });
+        const key = `content-${item.event.id}`;
+        const cached = previousRows.get(key);
+        const row: ChatRow =
+          cached && cached.kind === 'content' && cached.event === item.event
+            ? cached
+            : { kind: 'content', key, event: item.event };
+        nextRows.set(key, row);
+        out.push(row);
         continue;
       }
 
@@ -683,12 +708,14 @@ export default function CommunityChat() {
         unreadPlaced = true;
       }
 
-      out.push({
-        kind: 'message',
-        key: msg.id,
-        msg,
-        isSameAuthor: prevAuthorId === msg.user_id,
-      });
+      const isSameAuthor = prevAuthorId === msg.user_id;
+      const cached = previousRows.get(msg.id);
+      const row: ChatRow =
+        cached && cached.kind === 'message' && cached.msg === msg && cached.isSameAuthor === isSameAuthor
+          ? cached
+          : { kind: 'message', key: msg.id, msg, isSameAuthor };
+      nextRows.set(msg.id, row);
+      out.push(row);
       prevAuthorId = msg.user_id;
     }
 
@@ -699,12 +726,18 @@ export default function CommunityChat() {
     if (!hasMore && out.length > 0) {
       out.unshift({ kind: 'notice', key: 'notice' });
     }
+    rowCacheRef.current = nextRows;
     // The list is inverted; newest must sit at the bottom. Offset 0 is the
     // visual bottom, so an appended row lands at the composer's edge the
     // moment it is laid out — no scrollToEnd measurement racing the row's
     // layout (DM thread parity).
     return out.reverse();
   }, [messages, contentEvents, hasMore, firstUnreadId]);
+
+  const rowsRef = useRef<ChatRow[]>([]);
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
 
   // ── Initial position: the unread divider when one exists, newest otherwise
   // (the web's useScrollAndUnread anchor). One-shot: later messages never
@@ -849,7 +882,7 @@ export default function CommunityChat() {
   const handleReaction = useCallback(
     async (messageId: string, emoji: string) => {
       const currentUser = user?.id ?? '';
-      const message = messages.find((m) => m.id === messageId);
+      const message = messagesRef.current.find((m) => m.id === messageId);
       if (!message || !currentUser) return;
 
       const previousReactions = message.reactions ?? [];
@@ -875,7 +908,7 @@ export default function CommunityChat() {
         updateReactions(messageId, previousReactions);
       }
     },
-    [id, updateReactions, messages, user?.id],
+    [id, updateReactions, user?.id],
   );
 
   const handleDelete = useCallback(
@@ -954,7 +987,7 @@ export default function CommunityChat() {
   /** Jumps the list to the message a reply quotes (web parity). */
   const handleReplyPress = useCallback(
     (messageId: string) => {
-      const index = rows.findIndex((row) => row.kind === 'message' && row.msg.id === messageId);
+      const index = rowsRef.current.findIndex((row) => row.kind === 'message' && row.msg.id === messageId);
       if (index < 0) return;
       try {
         listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
@@ -967,13 +1000,13 @@ export default function CommunityChat() {
       setFlashMessageId(messageId);
       flashTimerRef.current = setTimeout(() => setFlashMessageId(null), 1500);
     },
-    [rows],
+    [],
   );
 
   /** Jumps the list to the "created a …" card a reply quotes (web parity). */
   const handleContentChipPress = useCallback(
     (contentId: string) => {
-      const index = rows.findIndex(
+      const index = rowsRef.current.findIndex(
         (row) => row.kind === 'content' && row.event.id === contentId,
       );
       if (index < 0) return;
@@ -983,7 +1016,7 @@ export default function CommunityChat() {
         listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
       }
     },
-    [rows],
+    [],
   );
 
   /**
@@ -1051,12 +1084,17 @@ export default function CommunityChat() {
     [messages],
   );
 
+  const lightboxImagesRef = useRef<LightboxImage[]>([]);
+  useEffect(() => {
+    lightboxImagesRef.current = lightboxImages;
+  }, [lightboxImages]);
+
   const handleImagePress = useCallback(
     (url: string) => {
-      const index = lightboxImages.findIndex((img) => img.url === url);
+      const index = lightboxImagesRef.current.findIndex((img) => img.url === url);
       setImageIndex(index < 0 ? 0 : index);
     },
-    [lightboxImages],
+    [],
   );
 
   const renderItem = useCallback(
@@ -1235,6 +1273,10 @@ export default function CommunityChat() {
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          initialNumToRender={CHAT_LIST_PERFORMANCE.initialNumToRender}
+          maxToRenderPerBatch={CHAT_LIST_PERFORMANCE.maxToRenderPerBatch}
+          windowSize={CHAT_LIST_PERFORMANCE.windowSize}
+          updateCellsBatchingPeriod={CHAT_LIST_PERFORMANCE.updateCellsBatchingPeriod}
           // A cached window is already the right thing to look at: show it at
           // once and let the bootstrap anchor it when the network settles (the
           // inverted list starts at offset 0 = the newest row).

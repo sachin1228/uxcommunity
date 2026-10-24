@@ -41,6 +41,7 @@ import { DmReportModal } from '@/components/dm/DmReportModal';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { CHAT_LIST_PERFORMANCE } from '@/lib/homeFeed';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
@@ -1052,8 +1053,15 @@ export default function DmThreadScreen() {
   );
 
   // ── Rows: day dividers interleaved with the timeline ─────────────────────
+  // The list's cell renderer only skips a re-render when the row object keeps
+  // its identity, so rebuilding all rows on every message would re-render
+  // every mounted bubble. Reuse the previous object when the message and its
+  // group flag are unchanged.
+  const rowCacheRef = useRef(new Map<string, ThreadRow>());
   const rows = useMemo<ThreadRow[]>(() => {
     const out: ThreadRow[] = [];
+    const previousRows = rowCacheRef.current;
+    const nextRows = new Map<string, ThreadRow>();
     let currentDay: string | null = null;
     let previousUser: string | null = null;
 
@@ -1071,15 +1079,18 @@ export default function DmThreadScreen() {
           count: initialUnread.count,
         });
       }
-      out.push({
-        kind: 'message',
-        key: message.id,
-        msg: message,
-        isSameAuthor: previousUser === message.user_id,
-      });
+      const isSameAuthor = previousUser === message.user_id;
+      const cached = previousRows.get(message.id);
+      const row: ThreadRow =
+        cached && cached.kind === 'message' && cached.msg === message && cached.isSameAuthor === isSameAuthor
+          ? cached
+          : { kind: 'message', key: message.id, msg: message, isSameAuthor };
+      nextRows.set(message.id, row);
+      out.push(row);
       previousUser = message.user_id;
     }
 
+    rowCacheRef.current = nextRows;
     // The list is inverted; newest must sit at the bottom.
     return out.reverse();
   }, [messages, initialUnread]);
@@ -1137,12 +1148,17 @@ export default function DmThreadScreen() {
     [messages],
   );
 
+  const lightboxImagesRef = useRef<LightboxImage[]>([]);
+  useEffect(() => {
+    lightboxImagesRef.current = lightboxImages;
+  }, [lightboxImages]);
+
   const handleImagePress = useCallback(
     (url: string) => {
-      const index = lightboxImages.findIndex((image) => image.url === url);
+      const index = lightboxImagesRef.current.findIndex((image) => image.url === url);
       setImageIndex(index < 0 ? 0 : index);
     },
-    [lightboxImages],
+    [],
   );
 
   // ── Request answers + safety actions ──────────────────────────────────────
@@ -1238,6 +1254,69 @@ export default function DmThreadScreen() {
 
   const rejectedByMe =
     conversation?.request_state === 'rejected' && conversation.requested_by !== userId;
+
+  const renderItem = useCallback(({ item }: { item: ThreadRow }) => {
+    if (item.kind === 'date') {
+      return (
+        <View style={styles.dateDivider}>
+          <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
+            {item.label}
+          </Text>
+        </View>
+      );
+    }
+    if (item.kind === 'unread') {
+      return (
+        <View style={styles.unreadDivider}>
+          <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+          <Text
+            style={[
+              styles.unreadPill,
+              {
+                color: colors.mutedForeground,
+                backgroundColor: colors.surfaceRaised,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            {item.count} unread message{item.count === 1 ? '' : 's'}
+          </Text>
+          <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+        </View>
+      );
+    }
+    return (
+      <MessageBubble
+        message={item.msg}
+        isOwn={item.msg.user_id === userId}
+        isSameAuthor={item.isSameAuthor}
+        currentUserId={userId ?? ''}
+        onLongPress={setSelectedMessage}
+        onReactionPress={handleReaction}
+        onAuthorPress={openPeerProfile}
+        onImagePress={handleImagePress}
+        onCancel={handleCancel}
+        onRetry={handleRetry}
+        onReplyPress={handleReplyPress}
+        onSwipeReply={handleReply}
+        highlighted={flashMessageId === item.msg.id}
+        actionsOpen={selectedMessage?.id === item.msg.id}
+        variant="dm"
+      />
+    );
+  }, [
+    colors,
+    flashMessageId,
+    handleCancel,
+    handleImagePress,
+    handleReaction,
+    handleReply,
+    handleReplyPress,
+    handleRetry,
+    openPeerProfile,
+    selectedMessage?.id,
+    userId,
+  ]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -1356,56 +1435,11 @@ export default function DmThreadScreen() {
                     }
                   }, 120);
                 }}
-                renderItem={({ item }) => {
-                  if (item.kind === 'date') {
-                    return (
-                      <View style={styles.dateDivider}>
-                        <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>
-                          {item.label}
-                        </Text>
-                      </View>
-                    );
-                  }
-                  if (item.kind === 'unread') {
-                    return (
-                      <View style={styles.unreadDivider}>
-                        <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
-                        <Text
-                          style={[
-                            styles.unreadPill,
-                            {
-                              color: colors.mutedForeground,
-                              backgroundColor: colors.surfaceRaised,
-                              borderColor: colors.border,
-                            },
-                          ]}
-                        >
-                          {item.count} unread message{item.count === 1 ? '' : 's'}
-                        </Text>
-                        <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
-                      </View>
-                    );
-                  }
-                  return (
-                    <MessageBubble
-                      message={item.msg}
-                      isOwn={item.msg.user_id === userId}
-                      isSameAuthor={item.isSameAuthor}
-                      currentUserId={userId ?? ''}
-                      onLongPress={setSelectedMessage}
-                      onReactionPress={(messageId, emoji) => void handleReaction(messageId, emoji)}
-                      onAuthorPress={openPeerProfile}
-                      onImagePress={handleImagePress}
-                      onCancel={handleCancel}
-                      onRetry={handleRetry}
-                      onReplyPress={handleReplyPress}
-                      onSwipeReply={handleReply}
-                      highlighted={flashMessageId === item.msg.id}
-                      actionsOpen={selectedMessage?.id === item.msg.id}
-                      variant="dm"
-                    />
-                  );
-                }}
+                renderItem={renderItem}
+                initialNumToRender={CHAT_LIST_PERFORMANCE.initialNumToRender}
+                maxToRenderPerBatch={CHAT_LIST_PERFORMANCE.maxToRenderPerBatch}
+                windowSize={CHAT_LIST_PERFORMANCE.windowSize}
+                updateCellsBatchingPeriod={CHAT_LIST_PERFORMANCE.updateCellsBatchingPeriod}
                 ListFooterComponent={
                   loadingMore ? (
                     <View style={styles.moreSpinner}>

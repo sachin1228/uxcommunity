@@ -37,4 +37,9 @@ export function feedItemKind(item: FeedItem): ContentKind {
  * profile tabs pixel-identical.
  */
 export const feedCardWrapperClassName =
-  "relative z-0 overflow-hidden rounded-xl border border-border bg-background-subtle [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
+  // `content-visibility: auto` lets the browser skip layout/paint for cards
+  // below the fold while keeping them in the DOM for find-in-page, focus and
+  // scroll anchoring. The intrinsic size is the feed's average card height;
+  // `auto` remembers each card's real height after its first paint, so the
+  // scrollbar never jumps once a card has been seen.
+  "relative z-0 overflow-hidden rounded-xl border border-border bg-background-subtle [content-visibility:auto] [contain-intrinsic-size:auto_420px] [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";

@@ -592,7 +592,7 @@ export function ThreadCard({
                 {/* Native aspect ratio, capped at 550px tall — never cropped. The
                     w-fit wrapper keeps the border hugging the scaled image. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={images[0].url} alt={images[0].name} draggable={false} className="mx-auto block max-h-[550px] max-w-full w-auto transition-opacity hover:opacity-95" />
+                <img src={images[0].url} alt={images[0].name} draggable={false} loading="lazy" decoding="async" className="mx-auto block max-h-[550px] max-w-full w-auto transition-opacity hover:opacity-95" />
               </div>
             );
           } else if (images.length > 1) {

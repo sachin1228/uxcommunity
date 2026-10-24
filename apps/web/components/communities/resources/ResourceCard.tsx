@@ -424,6 +424,8 @@ export function ResourceCard({
                       alt=""
                       width={14}
                       height={14}
+                      loading="lazy"
+                      decoding="async"
                       className="h-3.5 w-3.5 rounded-sm"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                     />
@@ -438,6 +440,8 @@ export function ResourceCard({
                     <img
                       src={linkPreview.image}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="block h-full w-full object-cover"
                       onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
                     />

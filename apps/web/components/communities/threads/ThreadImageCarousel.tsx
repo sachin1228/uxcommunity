@@ -118,6 +118,8 @@ export function ThreadImageCarousel({
           alt=""
           draggable={false}
           aria-hidden
+          loading="lazy"
+          decoding="async"
           className="pointer-events-none block w-full max-h-[480px] object-contain opacity-0"
         />
       ) : (
@@ -157,6 +159,8 @@ export function ThreadImageCarousel({
               src={img.url}
               alt={img.name}
               draggable={false}
+              loading="lazy"
+              decoding="async"
               className="mx-auto h-full w-auto max-w-full object-contain"
             />
           );

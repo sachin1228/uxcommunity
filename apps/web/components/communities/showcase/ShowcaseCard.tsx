@@ -178,6 +178,8 @@ export function ShowcaseCard({
             src={item.url}
             alt={`Preview of ${post.title}`}
             draggable={false}
+            loading="lazy"
+            decoding="async"
             className="mx-auto block max-h-[480px] max-w-full w-auto transition-opacity hover:opacity-95"
           />
         </div>

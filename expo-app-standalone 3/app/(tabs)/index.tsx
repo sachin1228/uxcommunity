@@ -19,13 +19,25 @@ import { AppHeader } from '@/components/AppHeader';
 import { useColors } from '@/hooks/useColors';
 import { useViewableKeys } from '@/hooks/useViewableKeys';
 import { useAuth } from '@/context/AuthContext';
-import { ContentDetail, ContentCard, useContentActions } from '@/components/community/contentView';
+import {
+  ContentDetail,
+  ContentPlaybackProvider,
+  useContentActions,
+} from '@/components/community/contentView';
+import { ContentCardRow } from '@/components/community/ContentCardRow';
 import { CommunityContentEditor } from '@/components/community/CommunityContentEditor';
 import { CommunityContent, deleteCommunityContent } from '@/lib/communityContent';
 import { chatContentKindForTab } from '@/lib/chatContentEvents';
 import { notifyContentEvent } from '@/lib/contentEventMirror';
 import { applyPollEventToFeed, feedPollCommunityIds, type ThreadPollEvent } from '@/lib/feedPollRealtime';
-import { feedItemKey, feedItemKind, getHomeFeed, type FeedItem } from '@/lib/homeFeed';
+import {
+  FEED_LIST_PERFORMANCE,
+  feedItemKey,
+  feedItemKind,
+  getHomeFeed,
+  prefetchFeedImages,
+  type FeedItem,
+} from '@/lib/homeFeed';
 import {
   DEFAULT_HOME_FEED_SCOPE,
   HOME_FEED_TAB_SCOPES,
@@ -37,7 +49,7 @@ import {
   fetchScreenData,
   peekScreenData,
   readScreenData,
-  writeScreenData,
+  writeScreenDataDebounced,
 } from '@/lib/screenDataCacheStore';
 import { mergeUniquePage, SCREEN_CACHE_TTL_MS } from '@/lib/screenDataCache';
 
@@ -215,7 +227,7 @@ function HomeTabSession({
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FeedItem | null>(null);
-  const { visibleKeys, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
+  const { viewableStore, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   /** The feed row whose editor is open (owner-only; null when closed). */
   const [editing, setEditing] = useState<FeedItem | null>(null);
 
@@ -235,7 +247,7 @@ function HomeTabSession({
       setItems(nextItems);
       setHasMore(nextHasMore);
       if (persist && userId && cacheReadyScopeRef.current === `${cacheSessionKey}:${targetScope}`) {
-        void writeScreenData(
+        writeScreenDataDebounced(
           userId,
           homeFeedCacheKey(targetScope),
           sessionEpoch,
@@ -338,6 +350,7 @@ function HomeTabSession({
         networkSucceeded = true;
         cacheReadyScopeRef.current = cacheIdentity;
         commitFeed(targetScope, result.data.items, result.data.hasMore);
+        prefetchFeedImages(result.data.items);
         resetActions();
       } catch (e) {
         if (!isCurrent()) return;
@@ -524,21 +537,22 @@ function HomeTabSession({
 
   const renderItem = useCallback(
     ({ item, index }: { item: FeedItem; index: number }) => (
-      <ContentCard
+      <ContentCardRow
         item={item}
+        itemKey={feedItemKey(item)}
         kind={feedItemKind(item)}
         currentUserId={userId ?? ''}
         actions={actions}
+        viewableStore={viewableStore}
         communityName={item.community_name}
         communityImage={item.community_image}
         onComments={openItem}
         onEdit={editItem}
         onDelete={deleteItem}
-        videoActive={!selected && visibleKeys.has(feedItemKey(item))}
         videoRank={index}
       />
     ),
-    [actions, deleteItem, editItem, openItem, selected, userId, visibleKeys],
+    [actions, deleteItem, editItem, openItem, userId, viewableStore],
   );
 
   const focusSeenRef = useRef(false);
@@ -572,59 +586,65 @@ function HomeTabSession({
             </Pressable>
           </View>
         ) : (
-          <FlatList
-            data={items}
-            keyExtractor={feedItemKey}
-            renderItem={renderItem}
-            contentContainerStyle={[
-              styles.list,
-              { paddingTop: FEED_TOP_INSET, paddingBottom: insets.bottom + 96 },
-            ]}
-            scrollIndicatorInsets={{ top: FEED_TOP_INSET }}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.4}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => void load(scopeRef.current, 'refresh')}
-                tintColor={colors.foregroundMuted}
-                progressViewOffset={FEED_TOP_INSET}
-              />
-            }
-            ListFooterComponent={
-              loadingMore ? (
-                <View style={styles.footer}>
-                  <ActivityIndicator size="small" color={colors.foregroundMuted} />
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              error ? (
-                <View style={styles.center}>
-                  <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
-                  <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t refresh your feed</Text>
-                  <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
-                  <Pressable onPress={() => void load(scopeRef.current, 'refresh')} accessibilityRole="button">
-                    <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View style={styles.center}>
-                  <Feather
-                    name={scope === 'communities' ? 'users' : 'layers'}
-                    size={32}
-                    color={colors.foregroundSubtle}
-                  />
-                  <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
-                  <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
-                    {EMPTY_STATE_DESCRIPTION[scope]}
-                  </Text>
-                </View>
-              )
-            }
-          />
+          <ContentPlaybackProvider enabled={!selected}>
+            <FlatList
+              data={items}
+              keyExtractor={feedItemKey}
+              renderItem={renderItem}
+              initialNumToRender={FEED_LIST_PERFORMANCE.initialNumToRender}
+              maxToRenderPerBatch={FEED_LIST_PERFORMANCE.maxToRenderPerBatch}
+              windowSize={FEED_LIST_PERFORMANCE.windowSize}
+              updateCellsBatchingPeriod={FEED_LIST_PERFORMANCE.updateCellsBatchingPeriod}
+              contentContainerStyle={[
+                styles.list,
+                { paddingTop: FEED_TOP_INSET, paddingBottom: insets.bottom + 96 },
+              ]}
+              scrollIndicatorInsets={{ top: FEED_TOP_INSET }}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.4}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => void load(scopeRef.current, 'refresh')}
+                  tintColor={colors.foregroundMuted}
+                  progressViewOffset={FEED_TOP_INSET}
+                />
+              }
+              ListFooterComponent={
+                loadingMore ? (
+                  <View style={styles.footer}>
+                    <ActivityIndicator size="small" color={colors.foregroundMuted} />
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                error ? (
+                  <View style={styles.center}>
+                    <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
+                    <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t refresh your feed</Text>
+                    <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
+                    <Pressable onPress={() => void load(scopeRef.current, 'refresh')} accessibilityRole="button">
+                      <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.center}>
+                    <Feather
+                      name={scope === 'communities' ? 'users' : 'layers'}
+                      size={32}
+                      color={colors.foregroundSubtle}
+                    />
+                    <Text style={[styles.stateTitle, { color: colors.foregroundMuted }]}>No posts yet</Text>
+                    <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>
+                      {EMPTY_STATE_DESCRIPTION[scope]}
+                    </Text>
+                  </View>
+                )
+              }
+            />
+          </ContentPlaybackProvider>
         )}
 
         {/* ── Floating source switcher — the cards scroll underneath it ── */}

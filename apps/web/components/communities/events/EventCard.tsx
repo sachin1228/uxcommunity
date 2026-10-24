@@ -575,6 +575,8 @@ export function EventCard({
               <img
                 src={event.cover_image_url}
                 alt={event.title}
+                loading="lazy"
+                decoding="async"
                 className="block h-auto w-full"
               />
             ) : (
