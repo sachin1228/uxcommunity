@@ -18,7 +18,11 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { BrandLogo } from '@/components/BrandLogo';
-import { OptionPickerSheet, type PickerOption } from '@/components/settings/OptionPickerSheet';
+import {
+  OptionPickerSheet,
+  OptionPickerValue,
+  type PickerOption,
+} from '@/components/settings/OptionPickerSheet';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticError, hapticSuccess } from '@/lib/haptics';
@@ -530,21 +534,10 @@ export default function SignupScreen() {
                               },
                             ]}
                           >
-                            <Text
-                              style={[
-                                styles.selectValue,
-                                {
-                                  color: option ? colors.foreground : colors.mutedForeground,
-                                },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {option?.name ?? PICKER_COPY[kind].placeholder}
-                            </Text>
-                            <Feather
-                              name="chevron-down"
-                              size={16}
-                              color={colors.mutedForeground}
+                            <OptionPickerValue
+                              option={option ?? null}
+                              placeholder={PICKER_COPY[kind].placeholder}
+                              textStyle={styles.selectValue}
                             />
                           </Pressable>
                         </Field>

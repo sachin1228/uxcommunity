@@ -9,6 +9,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type StyleProp,
+  type TextStyle,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -32,6 +34,70 @@ interface Props {
   selectedId: string | null;
   onPick: (option: PickerOption) => void;
   onClose: () => void;
+}
+
+/**
+ * The picture half of an option, used by both the sheet rows and the closed
+ * field: the master-data image, or — matching the web SearchableSelect — the
+ * value's initial when the row has no picture.
+ */
+function OptionMark({ option, size }: { option: PickerOption; size: number }) {
+  const colors = useColors();
+  const uri = resolveProfilePictureUri(option.image_url);
+  const box = { width: size, height: size, borderRadius: size / 2 };
+
+  if (uri) return <Image source={{ uri }} style={box} />;
+
+  return (
+    <View style={[styles.optionMarkFallback, box, { backgroundColor: colors.surfaceRaised }]}>
+      <Text
+        style={[
+          styles.optionMarkInitial,
+          { color: colors.mutedForeground, fontSize: Math.round(size * 0.46) },
+        ]}
+      >
+        {option.name[0]?.toUpperCase() ?? '?'}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * The closed picker field's contents — the selected option's picture, its
+ * name and the caret. The field itself stays with each form (their heights,
+ * radii and surfaces differ), so all four master-data dropdowns in the app
+ * show the same mark and truncation without a parallel Pressable to keep in
+ * sync.
+ */
+export function OptionPickerValue({
+  option,
+  placeholder,
+  textStyle,
+  chevronSize = 16,
+}: {
+  option: PickerOption | null;
+  placeholder: string;
+  textStyle?: StyleProp<TextStyle>;
+  chevronSize?: number;
+}) {
+  const colors = useColors();
+
+  return (
+    <>
+      {option ? <OptionMark option={option} size={20} /> : null}
+      <Text
+        style={[
+          styles.fieldText,
+          { color: option ? colors.foreground : colors.mutedForeground },
+          textStyle,
+        ]}
+        numberOfLines={1}
+      >
+        {option?.name ?? placeholder}
+      </Text>
+      <Feather name="chevron-down" size={chevronSize} color={colors.mutedForeground} />
+    </>
+  );
 }
 
 /**
@@ -118,7 +184,6 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
           keyboardDismissMode="on-drag"
           renderItem={({ item }) => {
             const selected = item.id === selectedId;
-            const uri = resolveProfilePictureUri(item.image_url);
             return (
               <Pressable
                 onPress={() => {
@@ -131,15 +196,7 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
                   { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
                 ]}
               >
-                {uri ? (
-                  <Image source={{ uri }} style={styles.rowImage} />
-                ) : (
-                  <View style={[styles.rowImage, styles.rowImageFallback, { backgroundColor: colors.surfaceRaised }]}>
-                    <Text style={[styles.rowInitial, { color: colors.mutedForeground }]}>
-                      {item.name[0]?.toUpperCase() ?? '?'}
-                    </Text>
-                  </View>
-                )}
+                <OptionMark option={item} size={26} />
                 <Text
                   style={[
                     styles.rowLabel,
@@ -237,10 +294,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  rowImage: { width: 26, height: 26, borderRadius: 13 },
-  rowImageFallback: { alignItems: 'center', justifyContent: 'center' },
-  rowInitial: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
+  optionMarkFallback: { alignItems: 'center', justifyContent: 'center' },
+  optionMarkInitial: { fontFamily: 'Geist_600SemiBold' },
   rowLabel: { flex: 1, fontSize: 15 },
+  fieldText: { flex: 1 },
   empty: { padding: 24, textAlign: 'center', fontSize: 13, fontFamily: 'Geist_400Regular' },
   divider: { height: StyleSheet.hairlineWidth },
   cancelRow: { paddingVertical: 15, alignItems: 'center' },

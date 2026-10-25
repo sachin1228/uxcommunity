@@ -9,7 +9,11 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { EventDatePickerSheet, formatDateStamp } from '@/components/community/EventDateTimePicker';
-import { OptionPickerSheet, type PickerOption } from '@/components/settings/OptionPickerSheet';
+import {
+  OptionPickerSheet,
+  OptionPickerValue,
+  type PickerOption,
+} from '@/components/settings/OptionPickerSheet';
 import { useColors } from '@/hooks/useColors';
 import { hapticSelection } from '@/lib/haptics';
 import {
@@ -125,10 +129,10 @@ export function JobFormFields({
     image_url: level.imageUrl,
   }));
 
-  const cityLabel = cityOptions.find((option) => option.id === values.cityId)?.name ?? '';
-  const sectorLabel = sectorOptions.find((option) => option.id === values.sectorId)?.name ?? '';
-  const titleLabel = titleOptions.find((option) => option.id === values.jobTitle)?.name ?? '';
-  const levelLabel = levelOptions.find((option) => option.id === values.experienceLevel)?.name ?? '';
+  const cityOption = cityOptions.find((option) => option.id === values.cityId) ?? null;
+  const sectorOption = sectorOptions.find((option) => option.id === values.sectorId) ?? null;
+  const titleOption = titleOptions.find((option) => option.id === values.jobTitle) ?? null;
+  const levelOption = levelOptions.find((option) => option.id === values.experienceLevel) ?? null;
 
   const pickerConfig: Record<
     PickerKey,
@@ -292,28 +296,28 @@ export function JobFormFields({
       <View style={[styles.grid, criteriaLocked ? styles.lockedFields : null]}>
         <SelectField
           label="City"
-          value={cityLabel}
+          option={cityOption}
           placeholder="City"
           disabled={criteriaLocked}
           onPress={() => setPicker('city')}
         />
         <SelectField
           label="Industry sector"
-          value={sectorLabel}
+          option={sectorOption}
           placeholder="Industry sector"
           disabled={criteriaLocked}
           onPress={() => setPicker('sector')}
         />
         <SelectField
           label="Job title"
-          value={titleLabel}
+          option={titleOption}
           placeholder="Job title"
           disabled={criteriaLocked}
           onPress={() => setPicker('jobTitle')}
         />
         <SelectField
           label="Experience level"
-          value={levelLabel}
+          option={levelOption}
           placeholder="Experience level"
           disabled={criteriaLocked}
           onPress={() => setPicker('experienceLevel')}
@@ -447,13 +451,13 @@ function Field({
 
 function SelectField({
   label,
-  value,
+  option,
   placeholder,
   disabled,
   onPress,
 }: {
   label: string;
-  value: string;
+  option: PickerOption | null;
   placeholder: string;
   disabled: boolean;
   onPress: () => void;
@@ -478,16 +482,12 @@ function SelectField({
         },
       ]}
     >
-      <Text
-        style={[
-          styles.selectText,
-          { color: value ? colors.foreground : colors.foregroundSubtle },
-        ]}
-        numberOfLines={1}
-      >
-        {value || placeholder}
-      </Text>
-      <Feather name="chevron-down" size={14} color={colors.foregroundMuted} />
+      <OptionPickerValue
+        option={option}
+        placeholder={placeholder}
+        textStyle={styles.selectText}
+        chevronSize={14}
+      />
     </Pressable>
   );
 }
