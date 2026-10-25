@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
+import { ProfileHeaderButton, ProfilePageHeader } from '@/components/profile/ProfilePageHeader';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { AddCompanyModal } from '@/components/companies/AddCompanyModal';
 import {
@@ -643,25 +644,23 @@ function ProfileTabSession({
         <DotField />
       </View>
 
-      <View style={styles.heroTop}>
-        <ProfileHero
-          name={profile?.user?.name ?? user?.name ?? ''}
-          // The session already carries the member's picture, so the hero shows
-          // the real DP from the first frame instead of a flash of initials
-          // while GET /api/profile is in flight.
-          avatarUrl={body?.avatar_url ?? user?.avatar_url ?? null}
-          city={body?.cities?.name ?? null}
-          roleLabel={profile?.roleLabel ?? null}
-          bio={body?.bio ?? ''}
-          company={profile?.company ?? null}
-          linkedinUrl={body?.linkedin_url ?? ''}
-          portfolioUrl={body?.portfolio_url ?? ''}
-          onPressAvatar={() => void handleChangePicture()}
-          onAddLinkedIn={() => setLinkModal('linkedin')}
-          onAddPortfolio={() => setLinkModal('portfolio')}
-          onAddCompany={() => setCompanyModalOpen(true)}
-        />
-      </View>
+      <ProfileHero
+        name={profile?.user?.name ?? user?.name ?? ''}
+        // The session already carries the member's picture, so the hero shows
+        // the real DP from the first frame instead of a flash of initials
+        // while GET /api/profile is in flight.
+        avatarUrl={body?.avatar_url ?? user?.avatar_url ?? null}
+        city={body?.cities?.name ?? null}
+        roleLabel={profile?.roleLabel ?? null}
+        bio={body?.bio ?? ''}
+        company={profile?.company ?? null}
+        linkedinUrl={body?.linkedin_url ?? ''}
+        portfolioUrl={body?.portfolio_url ?? ''}
+        onPressAvatar={() => void handleChangePicture()}
+        onAddLinkedIn={() => setLinkModal('linkedin')}
+        onAddPortfolio={() => setLinkModal('portfolio')}
+        onAddCompany={() => setCompanyModalOpen(true)}
+      />
 
       {/* ── Activity tabs — the app's underline vocabulary, web's tab set ── */}
       <View style={[styles.tabsShell, { borderBottomColor: colors.border }]}>
@@ -697,32 +696,16 @@ function ProfileTabSession({
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
-      {/* Keep scrolled content out of the Android status-bar area. */}
-      <View
-        pointerEvents="none"
-        style={[
-          styles.statusBarBackdrop,
-          { height: insets.top, backgroundColor: colors.background },
-        ]}
+      <ProfilePageHeader
+        title="Profile"
+        trailing={
+          <ProfileHeaderButton
+            label="Settings"
+            onPress={openSettings}
+            icon={<Feather name="settings" size={22} color={colors.foreground} />}
+          />
+        }
       />
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Settings"
-        hitSlop={6}
-        onPress={openSettings}
-        style={({ pressed }) => [
-          styles.settingsButton,
-          {
-            top: insets.top + 16,
-            backgroundColor: colors.surfaceRaised,
-            borderColor: colors.border,
-            opacity: pressed ? 0.8 : 1,
-          },
-        ]}
-      >
-        <Feather name="settings" size={22} color={colors.foreground} />
-      </Pressable>
 
       {profileError && !profile ? (
         <View style={styles.center}>
@@ -750,7 +733,7 @@ function ProfileTabSession({
             viewabilityConfig={viewabilityConfig}
             contentContainerStyle={[
               styles.list,
-              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
+              { paddingBottom: insets.bottom + 96 },
             ]}
             onEndReached={loadMore}
             onEndReachedThreshold={1.5}
@@ -866,34 +849,12 @@ function ProfileTabSession({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  statusBarBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 4,
-  },
-  settingsButton: {
-    position: 'absolute',
-    right: 11,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 5,
-  },
   heroWrap: { marginBottom: 4 },
-  // Extra breathing room above the display picture now that the header is
-  // gone. The dotted backdrop is absolutely positioned, so it stays anchored
-  // to the top of the hero while the picture moves down.
-  heroTop: { paddingTop: 32 },
   heroDots: {
     position: 'absolute',
-    // The list's own top gutter would leave a bare strip under the screen
+    // The list's own top gutter would leave a bare strip under the page
     // header, so the band starts at the list's top edge instead — the web
-    // texture begins at the page's top the same way.
+    // texture begins right under the header the same way.
     top: -LIST_PADDING,
     left: -LIST_PADDING,
     right: -LIST_PADDING,

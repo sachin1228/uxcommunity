@@ -940,11 +940,15 @@ export default function CommunityChat() {
     setSelectedMessage(msg);
   }, []);
 
-  /** A sender's avatar or name — opens their read-only member profile. */
+  /** A sender's avatar or name — own rows land on the profile tab. */
   const handleAuthorPress = useCallback(
     (userId: string) => {
-      if (!userId || userId === user?.id) return;
+      if (!userId) return;
       hapticSelection();
+      if (userId === user?.id) {
+        router.push('/profile');
+        return;
+      }
       router.push({ pathname: '/member/[id]', params: { id: userId } });
     },
     [router, user?.id],

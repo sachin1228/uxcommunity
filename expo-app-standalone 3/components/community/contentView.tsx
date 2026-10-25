@@ -781,11 +781,16 @@ export const ContentCard = React.memo(function ContentCard({
   const showcase = kind === 'showcase' ? item as CommunityShowcase : null;
   const author = contentAuthor(item);
   // The web `PostAuthorMeta` links the avatar and name whenever the API
-  // hydrated the author — the card itself has no route of its own.
+  // hydrated the author — the card itself has no route of its own. Your own
+  // author opens the profile tab; other members open their read-only page.
   const authorProfileId = author ? item.user_id : null;
   const openAuthorProfile = useCallback(() => {
-    if (!authorProfileId || authorProfileId === currentUserId) return;
+    if (!authorProfileId) return;
     hapticSelection();
+    if (authorProfileId === currentUserId) {
+      router.push('/profile');
+      return;
+    }
     router.push({ pathname: '/member/[id]', params: { id: authorProfileId } });
   }, [authorProfileId, currentUserId, router]);
   const images = (thread?.attachments ?? [])
@@ -875,7 +880,7 @@ export const ContentCard = React.memo(function ContentCard({
         <View style={styles.authorRow}>
           <Pressable
             onPress={openAuthorProfile}
-            disabled={!authorProfileId || authorProfileId === currentUserId}
+            disabled={!authorProfileId}
             hitSlop={6}
             accessibilityRole="link"
             accessibilityLabel={`Open ${author?.name ?? 'the author'}'s profile`}
@@ -886,7 +891,7 @@ export const ContentCard = React.memo(function ContentCard({
             <View style={styles.authorLine}>
               <Pressable
                 onPress={openAuthorProfile}
-                disabled={!authorProfileId || authorProfileId === currentUserId}
+                disabled={!authorProfileId}
                 hitSlop={6}
                 style={styles.authorNamePress}
                 accessibilityRole="link"
@@ -2262,13 +2267,17 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
   accessibilityLabel: string;
 }) {
   const colors = useColors();
-  // Inactive actions sit on the web's foreground-subtle, and the heart is the
-  // only one that turns pink when it lights up.
+  // The engagement pair reads at the card body's own ink (the description
+  // colour); any other action keeps the web's foreground-subtle. The heart is
+  // the only one that turns pink when it lights up.
+  const isEngagement = icon === 'heart' || icon === 'message-circle';
   const tint = active
     ? activeColor === 'like'
       ? colors.like
       : colors.accent
-    : colors.foregroundSubtle;
+    : isEngagement
+      ? colors.foreground
+      : colors.foregroundSubtle;
   // The heart and the comment bubble lead the footer and read a step larger
   // than the secondary actions (save, RSVP), which keep the web's 16px.
   const iconSize = icon === 'heart' || icon === 'message-circle' ? 20 : 16;
@@ -2282,7 +2291,7 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       accessibilityState={{ selected: Boolean(active) }}
     >
       {icon === 'heart' ? (
-        <HeartIcon size={iconSize} active={Boolean(active)} color={colors.foregroundSubtle} />
+        <HeartIcon size={iconSize} active={Boolean(active)} color={colors.foreground} />
       ) : icon === 'message-circle' ? (
         <CommentGlyph size={iconSize} color={tint} />
       ) : (

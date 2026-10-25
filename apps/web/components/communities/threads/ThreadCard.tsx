@@ -625,12 +625,12 @@ export function ThreadCard({
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
                     ? "text-[var(--like)]"
-                    : "text-foreground-subtle group-hover/like:text-white"
+                    : "text-foreground group-hover/like:text-white"
                 }`}
               />
               <span
                 className={`font-body text-sm font-medium ${
-                  thread.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
+                  thread.user_liked ? "text-[var(--like)]" : "text-foreground group-hover/like:text-white"
                 }`}
               >
                 {thread.like_count}
@@ -638,7 +638,7 @@ export function ThreadCard({
             </button>
 
             {/* Comments */}
-            <span className="inline-flex items-center gap-1.5 font-body font-medium text-sm text-foreground-subtle transition-colors duration-150 hover:text-white">
+            <span className="inline-flex items-center gap-1.5 font-body font-medium text-sm text-foreground transition-colors duration-150 hover:text-white">
               <CommentIcon />
               {thread.comment_count}
             </span>

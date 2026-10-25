@@ -315,12 +315,12 @@ export default function JobDetailScreen() {
           </Text>
           <Pressable
             onPress={() => {
-              if (job.is_mine) return;
               hapticSelection();
-              router.push(`/member/${job.poster.id}`);
+              // Your own posting ("You") opens the profile tab; other posters
+              // open their read-only member page, same as everywhere else.
+              router.push(job.is_mine ? '/profile' : `/member/${job.poster.id}`);
             }}
-            disabled={job.is_mine}
-            accessibilityRole={job.is_mine ? undefined : 'button'}
+            accessibilityRole="button"
             style={styles.posterRow}
           >
             <PersonAvatar name={job.poster.name} url={job.poster.avatar_url} size={36} />
