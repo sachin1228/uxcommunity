@@ -343,6 +343,10 @@ export interface CatchUpControllerOptions<T extends CursorMessage> {
   retryBaseDelayMs?: number;
   /** Injectable delay (tests drive it synchronously). */
   sleep?: (delayMs: number) => Promise<void>;
+  /** Suppress the same successfully drained cursor across overlapping lifecycle triggers. */
+  repeatSuppressionMs?: number;
+  /** Injectable clock for repeat-suppression tests. */
+  now?: () => number;
 }
 
 export interface CatchUpController {
@@ -373,17 +377,28 @@ export function createCatchUpController<T extends CursorMessage>(
     continuationDelayMs = 750,
     retryBaseDelayMs = 1_000,
     sleep = (delayMs) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)),
+    repeatSuppressionMs = 600,
+    now = Date.now,
   } = options;
 
   let disposed = false;
   let running = false;
   /** A start requested while a drain ran; at most one, newest start point wins. */
   let queued: MessageCursor | null | undefined;
+  let lastDrainedCursorKey: string | null = null;
+  let lastDrainedAt = 0;
 
   const cancelled = () => disposed || Boolean(isCancelled?.());
+  const suppressesRecentDrain = (from: MessageCursor | null) =>
+    Boolean(
+      from &&
+        `${from.ts}\u0000${from.id}` === lastDrainedCursorKey &&
+        now() - lastDrainedAt < repeatSuppressionMs,
+    );
 
   async function drain(from: MessageCursor | null): Promise<void> {
     running = true;
+    let completed = false;
     try {
       let cursor: MessageCursor | null = from;
       let passes = 0;
@@ -404,6 +419,9 @@ export function createCatchUpController<T extends CursorMessage>(
         onPass?.(result);
 
         if (result.stoppedBy === "cancelled") return;
+        if (result.stoppedBy === "complete" || result.stoppedBy === "empty") {
+          completed = true;
+        }
 
         if (result.stoppedBy === "error") {
           if (!isRetryableCatchUpError(result.error) || retries >= maxRetries) return;
@@ -441,6 +459,10 @@ export function createCatchUpController<T extends CursorMessage>(
       // trigger retries from the newest cached cursor.
     } finally {
       running = false;
+      if (completed && from) {
+        lastDrainedCursorKey = `${from.ts}\u0000${from.id}`;
+        lastDrainedAt = now();
+      }
       flushQueued();
     }
   }
@@ -449,11 +471,13 @@ export function createCatchUpController<T extends CursorMessage>(
     if (disposed || running || queued === undefined) return;
     const next = queued;
     queued = undefined;
+    if (suppressesRecentDrain(next)) return;
     void drain(next);
   }
 
   function start(from: MessageCursor | null): Promise<void> {
     if (cancelled()) return Promise.resolve();
+    if (suppressesRecentDrain(from)) return Promise.resolve();
     if (running) {
       queued = from;
       return Promise.resolve();

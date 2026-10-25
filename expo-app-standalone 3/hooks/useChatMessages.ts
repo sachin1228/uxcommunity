@@ -1,13 +1,13 @@
 /**
  * Loads and keeps messages live for a single community chat.
- * - Initial load: the shared bootstrap page (GET /api/communities/:id/bootstrap,
- *   reused inside its freshness window — see lib/communityBootstrap.ts)
- * - Pagination: older messages via ?before=<ISO>
+ * - Initial load: an account-scoped disk window when available, otherwise the
+ *   shared bootstrap page (GET /api/communities/:id/bootstrap)
+ * - Pagination: older messages via (before, before_id)
  * - Realtime: Cloudflare Durable Object WebSocket (message, message-edit,
  *   message-delete, reaction-insert/update/delete)
  * - Catch-up: every open (and every reconnect / return to the foreground) the
  *   hook asks the API for everything after its newest real message
- *   (?after=<ISO>) and merges it without duplicates. The open is the important
+ *   (after, after_id) and drains missed pages without duplicates. The open is the important
  *   one: the communities list keeps this room's socket alive, so re-entering
  *   the chat fires no status event — and a re-entry inside the bootstrap
  *   cache's window would otherwise paint the fetch-time snapshot.
@@ -16,29 +16,37 @@
  *   just saw, not from the snapshot.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
   getMessages,
   markRead,
   Message,
+  MessageCursor,
   Reaction,
 } from '@/lib/communities';
 import { scheduleMarkRead } from '@/lib/readManager';
 import {
   fetchCommunityBootstrap,
+  getCachedCommunityMessageWindow,
   patchCachedBootstrapMessages,
+  rememberCommunityMessageWindow,
 } from '@/lib/communityBootstrap';
 import { pickOptimisticMatch, compareChatTimeline } from '@/lib/chat';
 import { chatCache } from '@/lib/chatCacheStore';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
   createCatchUpScheduler,
+  drainCatchUpPages,
   latestMessageCursor,
   mergeCaughtUpMessages,
+  mergeMessagePage,
+  oldestMessageCursor,
 } from '@/lib/realtimeCatchUp';
 import { useAuth } from '@/context/AuthContext';
+
+const PAGE_SIZE = 50;
 
 /**
  * True for an optimistic upload preview (a device-local URI rather than the
@@ -52,11 +60,15 @@ function isLocalUri(uri: string | null | undefined): boolean {
 
 export function useChatMessages(communityId: string) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(
+    () => getCachedCommunityMessageWindow(communityId, user?.id) ?? [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isLoadingMoreRef = useRef(false);
+  const paginationRequestIdRef = useRef(0);
 
   // Latest list for the catch-up cursor. Read when the fetch actually runs (not
   // when it is scheduled), so a burst of triggers uses the newest cursor and
@@ -67,9 +79,7 @@ export function useChatMessages(communityId: string) {
   }, [messages]);
   /** Guards a catch-up that is still in flight when the user switches chat. */
   const communityIdRef = useRef(communityId);
-  useEffect(() => {
-    communityIdRef.current = communityId;
-  }, [communityId]);
+  const userIdRef = useRef(user?.id);
 
   /**
    * The community whose rows the on-screen window belongs to. Seeded with the
@@ -79,13 +89,50 @@ export function useChatMessages(communityId: string) {
    * never merge into — or be cached as — another's.
    */
   const windowCommunityRef = useRef(communityId);
+  const windowUserIdRef = useRef(user?.id);
+  const cacheReadRef = useRef<{
+    communityId: string;
+    userId: string | undefined;
+    promise: Promise<Message[] | null>;
+  } | null>(null);
+
+  // Update guards before paint and drop the outgoing window on an in-place
+  // room or account switch, so previous rows cannot flash under a new title.
+  useLayoutEffect(() => {
+    const changed =
+      communityIdRef.current !== communityId || userIdRef.current !== user?.id;
+    communityIdRef.current = communityId;
+    userIdRef.current = user?.id;
+    if (!changed) return;
+    windowCommunityRef.current = communityId;
+    windowUserIdRef.current = user?.id;
+    messagesRef.current = [];
+    openCatchUpRef.current = false;
+    openCatchUpAtRef.current = 0;
+    paginationRequestIdRef.current += 1;
+    isLoadingMoreRef.current = false;
+    const cached = user?.id
+      ? getCachedCommunityMessageWindow(communityId, user.id)
+      : null;
+    if (cached) {
+      windowCommunityRef.current = communityId;
+      windowUserIdRef.current = user?.id;
+      setMessages(cached);
+      setHasMore(cached.length >= PAGE_SIZE);
+      setIsLoading(false);
+    } else {
+      setMessages([]);
+      setIsLoading(true);
+    }
+    setIsLoadingMore(false);
+    if (!cached) setHasMore(true);
+    setError(null);
+  }, [communityId, user?.id]);
 
   /**
-   * Cold start: paint the window the previous session ended on while the
-   * bootstrap request is in flight. The fetch below merges over it, and the
-   * open catch-up closes the gap — the same "local store first, sync after"
-   * order messaging apps use. The catch-up starts from the cached cursor in
-   * parallel with the bootstrap instead of waiting for it to settle.
+   * Cold start: paint the window the previous session ended on while local
+   * storage resolves. When present, the open catch-up closes the gap without
+   * re-downloading the latest page.
    */
   const [cacheHydrated, setCacheHydrated] = useState(false);
   const openCatchUpRef = useRef(false);
@@ -95,68 +142,128 @@ export function useChatMessages(communityId: string) {
     openCatchUpRef.current = false;
     openCatchUpAtRef.current = 0;
     setCacheHydrated(false);
-  }, [communityId]);
+  }, [communityId, user?.id]);
 
   const loadMore = useCallback(async () => {
-    // A cached window makes the list long enough to fire `onEndReached` before
-    // the bootstrap page (and its `hasMore`) has settled.
-    if (isLoading || isLoadingMore || !hasMore || messages.length === 0) return;
-    const oldest = messages[0]?.created_at;
-    if (!oldest) return;
+    // A cached window can fire `onEndReached` while its `hasMore` state is
+    // still being restored.
+    if (isLoading || isLoadingMoreRef.current || !hasMore || messages.length === 0) return;
+    const before = oldestMessageCursor(messages);
+    if (!before) return;
+    const targetCommunityId = communityId;
+    const targetUserId = user?.id;
+    const requestId = ++paginationRequestIdRef.current;
+    isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
     try {
-      const older = await getMessages(communityId, oldest);
-      // The `before` cursor is timestamp-only, so equal-timestamp rows are
-      // re-included by design (see the messages API) — dedupe against what is
-      // already on screen before prepending, or the FlatList sees duplicate keys.
+      const older = await getMessages(targetCommunityId, before);
+      if (
+        communityIdRef.current !== targetCommunityId ||
+        userIdRef.current !== targetUserId
+      ) return;
+      const known = new Set(messagesRef.current.map((message) => message.id));
+      let freshCount = 0;
+      for (const message of older) {
+        if (known.has(message.id)) continue;
+        known.add(message.id);
+        freshCount += 1;
+      }
       setMessages((prev) => {
-        const known = new Set(prev.map((m) => m.id));
-        const fresh = older.filter((m) => !known.has(m.id));
-        return fresh.length > 0 ? [...fresh, ...prev] : prev;
+        if (
+          communityIdRef.current !== targetCommunityId ||
+          userIdRef.current !== targetUserId
+        ) return prev;
+        return mergeMessagePage(prev, older);
       });
-      setHasMore(older.length === 50);
+      if (older.length < PAGE_SIZE || (older.length > 0 && freshCount === 0)) {
+        setHasMore(false);
+      }
     } catch {
       // silent — user can scroll again
     } finally {
-      setIsLoadingMore(false);
+      if (requestId === paginationRequestIdRef.current) {
+        isLoadingMoreRef.current = false;
+      }
+      if (
+        requestId === paginationRequestIdRef.current &&
+        communityIdRef.current === targetCommunityId &&
+        userIdRef.current === targetUserId
+      ) setIsLoadingMore(false);
     }
-  }, [communityId, messages, isLoading, isLoadingMore, hasMore]);
+  }, [communityId, messages, isLoading, hasMore, user?.id]);
 
   /**
    * Catch up on anything this client is missing: published while the socket
    * was down, or since the loaded snapshot (`load()` schedules one on every
    * open, because an already-live socket fires no status event).
    *
-   * Debounced and single-flight: the reconnect signal, the load, the foreground
-   * probe and the heartbeat recycle routinely fire within a second of each
-   * other, and one `?after=` page is enough to cover all of them.
+   * Debounced and single-flight: the reconnect signal, the open, and the
+   * foreground probe collapse into one serialized drain. The drain follows
+   * compound cursors until it reaches the live edge or spends its page budget.
    */
+  const catchUpRef = useRef<ReturnType<typeof createCatchUpScheduler> | null>(null);
   const catchUp = useMemo(() => {
     const targetCommunityId = communityId;
+    const targetUserId = user?.id;
     return createCatchUpScheduler(async () => {
       const cursor = latestMessageCursor(messagesRef.current);
-      // Nothing real to anchor the cursor to yet — the initial `load()` is
-      // already on its way with a full page.
-      if (!cursor) return;
-      const missed = await getMessages(targetCommunityId, undefined, cursor);
-      // The user switched away while the page was in flight: those rows belong
-      // to the community that was on screen, not this one.
-      if (communityIdRef.current !== targetCommunityId) return;
-      if (missed.length === 0) return;
-      setMessages((prev) => mergeCaughtUpMessages(prev, missed));
-      // Whatever arrived while the socket was down is on screen now.
-      scheduleMarkRead(targetCommunityId, {
-        skipIfUpdatedWithinMs: 10_000,
-        patch: markRead,
+      const knownServerIds = new Set(messagesRef.current.map((message) => message.id));
+      const result = await drainCatchUpPages<Message>({
+        from: cursor ?? null,
+        pageSize: PAGE_SIZE,
+        maxPages: 20,
+        fetchPage: (after: MessageCursor) => getMessages(targetCommunityId, undefined, after),
+        // An empty chat has no cursor. A single latest-window query is enough
+        // to recover its first message after suspension without warming history.
+        fetchLatestPage: () => getMessages(targetCommunityId),
+        isCancelled: () =>
+          communityIdRef.current !== targetCommunityId ||
+          userIdRef.current !== targetUserId,
+        onPage: (page) => {
+          if (
+            communityIdRef.current !== targetCommunityId ||
+            userIdRef.current !== targetUserId
+          ) return 0;
+          for (const message of messagesRef.current) knownServerIds.add(message.id);
+          let mergedCount = 0;
+          for (const message of page) {
+            if (knownServerIds.has(message.id)) continue;
+            knownServerIds.add(message.id);
+            mergedCount += 1;
+          }
+          setMessages((prev) => {
+            if (
+              communityIdRef.current !== targetCommunityId ||
+              userIdRef.current !== targetUserId
+            ) return prev;
+            return mergeCaughtUpMessages(prev, page);
+          });
+          scheduleMarkRead(targetCommunityId, {
+            skipIfUpdatedWithinMs: 10_000,
+            patch: markRead,
+          });
+          return mergedCount;
+        },
       });
+      if (__DEV__ && result.pages > 0) {
+        console.debug('[chat] catch-up', {
+          pages: result.pages,
+          received: result.received,
+          merged: result.merged,
+          duplicates: result.received - result.merged,
+          stoppedBy: result.stoppedBy,
+        });
+      }
+      // Continue a very large but finite backlog in another bounded pass.
+      if (result.stoppedBy === 'max-pages') catchUpRef.current?.schedule();
     });
-  }, [communityId]);
+  }, [communityId, user?.id]);
+  catchUpRef.current = catchUp;
   useEffect(() => () => catchUp.cancel(), [catchUp]);
 
   /**
-   * One open-time catch-up, whichever side gets its cursor first: the disk
-   * window can start it while the bootstrap is still in flight, and a room
-   * with no cache starts it once the bootstrap page lands.
+   * One open-time catch-up. A disk window starts it directly; a room without
+   * a cache starts it after the initial bootstrap page lands.
    */
   const requestOpenCatchUp = useCallback(() => {
     if (openCatchUpRef.current) return;
@@ -167,24 +274,34 @@ export function useChatMessages(communityId: string) {
 
   useEffect(() => {
     const userId = user?.id;
+    const memoryWindow = userId
+      ? getCachedCommunityMessageWindow(communityId, userId)
+      : null;
+    const promise = userId && !memoryWindow
+      ? chatCache.loadCommunityMessages(userId, communityId).catch(() => null)
+      : Promise.resolve(null);
+    cacheReadRef.current = { communityId, userId, promise };
+    if (memoryWindow) {
+      setCacheHydrated(true);
+      return undefined;
+    }
     if (!userId) {
       setCacheHydrated(true);
       return undefined;
     }
     let active = true;
-    void chatCache
-      .loadCommunityMessages(userId, communityId)
+    void promise
       .then((cached) => {
         if (!active || !cached || cached.length === 0) return;
         // Plain id-dedupe: unlike the catch-up merge this must never "confirm"
         // an in-flight optimistic bubble, or an old cached row with the same
         // text would remove the message the member just sent.
         setMessages((prev) => {
-          const known = new Set(prev.map((message) => message.id));
-          const fresh = cached.filter((message) => !known.has(message.id));
-          return fresh.length > 0
-            ? [...prev, ...fresh].sort(compareChatTimeline)
-            : prev;
+          if (
+            communityIdRef.current !== communityId ||
+            userIdRef.current !== userId
+          ) return prev;
+          return mergeMessagePage(prev, cached);
         });
         requestOpenCatchUp();
       })
@@ -197,32 +314,88 @@ export function useChatMessages(communityId: string) {
   }, [communityId, requestOpenCatchUp, user?.id]);
 
   const load = useCallback(async () => {
+    const targetCommunityId = communityId;
+    const targetUserId = user?.id;
+    const memoryWindow = targetUserId
+      ? getCachedCommunityMessageWindow(targetCommunityId, targetUserId)
+      : null;
     setIsLoading(true);
     setError(null);
     try {
-      // The shared bootstrap: one request at chat open, reused while fresh
-      // (see lib/communityBootstrap.ts). Pagination and catch-up below keep
-      // using the cheap cursor-based messages endpoint.
-      const bootstrap = await fetchCommunityBootstrap(communityId);
+      if (memoryWindow?.length) {
+        setMessages((prev) => {
+          if (
+            communityIdRef.current !== targetCommunityId ||
+            userIdRef.current !== targetUserId
+          ) return prev;
+          return mergeMessagePage(prev, memoryWindow);
+        });
+        setHasMore(memoryWindow.length >= PAGE_SIZE);
+        scheduleMarkRead(targetCommunityId, {
+          bypassCooldown: true,
+          skipIfUpdatedWithinMs: 10_000,
+          patch: markRead,
+        });
+        requestOpenCatchUp();
+        return;
+      }
+      const cacheRead = cacheReadRef.current;
+      const diskMessages =
+        cacheRead?.communityId === targetCommunityId && cacheRead.userId === targetUserId
+          ? await cacheRead.promise
+          : null;
+      if (
+        communityIdRef.current !== targetCommunityId ||
+        userIdRef.current !== targetUserId
+      ) return;
+
+      // A valid disk window is already a usable first page. The cursor drain
+      // asks only for rows missed while this community was away.
+      if (diskMessages?.length) {
+        if (targetUserId) {
+          rememberCommunityMessageWindow(targetCommunityId, diskMessages, targetUserId);
+        }
+        setHasMore(diskMessages.length >= PAGE_SIZE);
+        scheduleMarkRead(targetCommunityId, {
+          bypassCooldown: true,
+          skipIfUpdatedWithinMs: 10_000,
+          patch: markRead,
+        });
+        requestOpenCatchUp();
+        return;
+      }
+
+      // No usable message window exists, so bootstrap supplies the initial
+      // latest page. Pagination and catch-up use cursor pages only.
+      const bootstrap = await fetchCommunityBootstrap(targetCommunityId, targetUserId);
       // The user switched communities while the request was in flight — those
       // rows belong to the community that was on screen, not this one.
-      if (communityIdRef.current !== communityId) return;
+      if (
+        communityIdRef.current !== targetCommunityId ||
+        userIdRef.current !== targetUserId
+      ) return;
       // Merge, never replace: realtime rows that landed while the request was
       // in flight — and the window a previous visit folded into the cache
       // (the patch effect below) — are newer than the fetched snapshot and
       // must survive it.
-      const sameWindow = windowCommunityRef.current === communityId;
-      windowCommunityRef.current = communityId;
-      setMessages((prev) =>
-        mergeCaughtUpMessages(sameWindow ? prev : [], bootstrap.messages)
-      );
-      // The window may hold more than the fresh page (the cache was patched,
-      // or the user paginated back earlier), so `>=` keeps history reachable.
-      setHasMore(bootstrap.messages.length >= 50);
+      const sameWindow =
+        windowCommunityRef.current === targetCommunityId &&
+        windowUserIdRef.current === targetUserId;
+      windowCommunityRef.current = targetCommunityId;
+      windowUserIdRef.current = targetUserId;
+      setMessages((prev) => {
+        if (
+          communityIdRef.current !== targetCommunityId ||
+          userIdRef.current !== targetUserId
+        ) return prev;
+        return mergeCaughtUpMessages(sameWindow ? prev : [], bootstrap.messages);
+      });
+      // A full page means older history may exist.
+      setHasMore(bootstrap.messages.length >= PAGE_SIZE);
       // Opening the chat is a user action — its mark-read bypasses the
       // realtime cooldown so the badge always clears (see lib/readManager).
       // If the list tap just sent the same PATCH, this one falls away.
-      scheduleMarkRead(communityId, {
+      scheduleMarkRead(targetCommunityId, {
         bypassCooldown: true,
         skipIfUpdatedWithinMs: 10_000,
         patch: markRead,
@@ -234,11 +407,17 @@ export function useChatMessages(communityId: string) {
       // for what was published since the snapshot.
       requestOpenCatchUp();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load messages');
+      if (
+        communityIdRef.current === targetCommunityId &&
+        userIdRef.current === targetUserId
+      ) setError(e instanceof Error ? e.message : 'Failed to load messages');
     } finally {
-      setIsLoading(false);
+      if (
+        communityIdRef.current === targetCommunityId &&
+        userIdRef.current === targetUserId
+      ) setIsLoading(false);
     }
-  }, [communityId, requestOpenCatchUp]);
+  }, [communityId, requestOpenCatchUp, user?.id]);
 
   /** Optimistically append a sent message. */
   const appendMessage = useCallback((msg: Message) => {
@@ -305,17 +484,14 @@ export function useChatMessages(communityId: string) {
   useEffect(() => () => flushSave(), [communityId, user?.id, flushSave]);
 
   /**
-   * Keep the shared bootstrap cache's message window current with what is on
-   * screen — the mobile counterpart of the web chat's live msgCache. Leaving
-   * and re-entering inside the cache's 15-minute freshness window then paints
-   * the rows the user just saw (their own sends included) instead of the
-   * fetch-time snapshot; without this they vanished on re-entry until some
-   * later reconnect happened to catch up.
+   * Keep the bounded in-memory switch window and shared bootstrap current with
+   * what is on screen — the mobile counterpart of the web chat's live msgCache.
+   * Leaving and re-entering paints the rows the user just saw (their own sends
+   * included) instead of waiting for disk or the fetch-time snapshot.
    *
    * Optimistic rows are never persisted — a resurrected "sending" bubble could
-   * never resolve — and an empty window is never written, because the
-   * bootstrap module deliberately refuses to serve one from cache (it would
-   * only force the refetch this write exists to avoid).
+   * never resolve — and an empty window is never written because it has no
+   * confirmed cursor to resume from on the next open.
    *
    * The disk write is throttled: a busy room changes state on every message,
    * echo and reaction, and serializing the whole window each time is pure
@@ -324,12 +500,13 @@ export function useChatMessages(communityId: string) {
   useEffect(() => {
     if (!cacheHydrated) return;
     if (windowCommunityRef.current !== communityId) return;
+    if (windowUserIdRef.current !== user?.id) return;
     const rows = messages.filter((message) => !message.id.startsWith('temp-'));
     if (rows.length === 0) return;
-    patchCachedBootstrapMessages(communityId, rows);
+    const userId = user?.id;
+    if (userId) patchCachedBootstrapMessages(communityId, rows, userId);
     // Write-through to the persistent window: a process restart reads this
     // back on mount, so everything the member just saw survives the kill.
-    const userId = user?.id;
     if (!userId) return;
     pendingSaveRef.current = { userId, communityId, rows };
     if (saveTimerRef.current) return;
@@ -392,6 +569,11 @@ export function useChatMessages(communityId: string) {
         };
 
         setMessages((prev) => {
+          if (
+            communityIdRef.current !== communityId ||
+            userIdRef.current !== user?.id ||
+            row.community_id !== communityId
+          ) return prev;
           if (prev.some((m) => m.id === row.id)) return prev;
 
           const matchedTemp = pickOptimisticMatch(prev, {

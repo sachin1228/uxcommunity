@@ -13,11 +13,9 @@
  *     • in-flight requests are shared (a hook pair mounting together issues
  *       one fetch);
  *     • a settled response stays fresh for COMMUNITY_BOOTSTRAP_STALE_MS —
- *       re-entering the chat inside the window issues NO request at all. The
- *       messages hook's cursor catch-up (?after) is what keeps the window
- *       correct in between, exactly like web; realtime keeps it live, and
- *       patchCachedBootstrapMessages below keeps the CACHED window itself
- *       current while the chat is open.
+ *       re-entering the chat inside the window issues NO bootstrap request.
+ *       Cursor catch-up keeps the message window correct in between, while
+ *       realtime and the bounded hot window cache keep it current in-app.
  *
  *   Freshness matters to the server, not just the phone: every avoided
  *   refetch is a Worker invocation that is no longer paying for the four
@@ -30,6 +28,9 @@ import type { ChatContentEvent } from './chatContentEvents';
 
 /** Same staleness window the web client gives its bootstrap (lib/request-cache.ts). */
 export const COMMUNITY_BOOTSTRAP_STALE_MS = 15 * 60_000;
+export const MAX_COMMUNITY_BOOTSTRAP_ENTRIES = 40;
+export const COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT = 120;
+export const COMMUNITY_BOOTSTRAP_EVENT_LIMIT = 60;
 
 interface CommunityBootstrapResponse {
   messages?: { messages?: Message[] };
@@ -43,6 +44,49 @@ export interface CommunityBootstrap {
 
 const cache = new Map<string, { fetchedAt: number; data: CommunityBootstrap }>();
 const inflight = new Map<string, Promise<CommunityBootstrap>>();
+const eventCache = new Map<string, { fetchedAt: number; data: ChatContentEvent[] }>();
+const eventInflight = new Map<string, Promise<ChatContentEvent[]>>();
+const messageWindowCache = new Map<string, { fetchedAt: number; data: Message[] }>();
+
+function bootstrapKey(communityId: string, userId: string): string {
+  return `${encodeURIComponent(userId)}:${encodeURIComponent(communityId)}`;
+}
+
+function rememberBootstrap(
+  key: string,
+  value: { fetchedAt: number; data: CommunityBootstrap },
+): void {
+  cache.delete(key);
+  cache.set(key, {
+    fetchedAt: value.fetchedAt,
+    data: {
+      messages: value.data.messages.slice(-COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT),
+      contentEvents: value.data.contentEvents.slice(-COMMUNITY_BOOTSTRAP_EVENT_LIMIT),
+    },
+  });
+  while (cache.size > MAX_COMMUNITY_BOOTSTRAP_ENTRIES) {
+    cache.delete(cache.keys().next().value!);
+  }
+}
+
+function rememberEvents(key: string, value: { fetchedAt: number; data: ChatContentEvent[] }): void {
+  eventCache.delete(key);
+  eventCache.set(key, {
+    fetchedAt: value.fetchedAt,
+    data: value.data.slice(-COMMUNITY_BOOTSTRAP_EVENT_LIMIT),
+  });
+  while (eventCache.size > MAX_COMMUNITY_BOOTSTRAP_ENTRIES) {
+    eventCache.delete(eventCache.keys().next().value!);
+  }
+}
+
+function rememberMessageWindow(key: string, value: { fetchedAt: number; data: Message[] }): void {
+  messageWindowCache.delete(key);
+  messageWindowCache.set(key, value);
+  while (messageWindowCache.size > MAX_COMMUNITY_BOOTSTRAP_ENTRIES) {
+    messageWindowCache.delete(messageWindowCache.keys().next().value!);
+  }
+}
 
 /**
  * The bootstrapped sections, deduped across concurrent callers and reused
@@ -51,17 +95,15 @@ const inflight = new Map<string, Promise<CommunityBootstrap>>();
  * catch-up cursor, so serving it from cache after a socket gap would leave
  * the room looking blank.
  */
-export function fetchCommunityBootstrap(communityId: string): Promise<CommunityBootstrap> {
-  const cached = cache.get(communityId);
-  if (
-    cached &&
-    cached.data.messages.length > 0 &&
-    Date.now() - cached.fetchedAt < COMMUNITY_BOOTSTRAP_STALE_MS
-  ) {
-    return Promise.resolve(cached.data);
-  }
+export function fetchCommunityBootstrap(
+  communityId: string,
+  userId = 'anonymous',
+): Promise<CommunityBootstrap> {
+  const key = bootstrapKey(communityId, userId);
+  const cached = getCachedCommunityBootstrap(communityId, userId);
+  if (cached) return Promise.resolve(cached);
 
-  const pending = inflight.get(communityId);
+  const pending = inflight.get(key);
   if (pending) return pending;
 
   const request = apiFetch<CommunityBootstrapResponse>(
@@ -72,14 +114,118 @@ export function fetchCommunityBootstrap(communityId: string): Promise<CommunityB
         messages: data.messages?.messages ?? [],
         contentEvents: data['content-events']?.events ?? [],
       };
-      cache.set(communityId, { fetchedAt: Date.now(), data: normalized });
+      const fetchedAt = Date.now();
+      rememberBootstrap(key, { fetchedAt, data: normalized });
+      rememberEvents(key, { fetchedAt, data: normalized.contentEvents });
+      rememberMessageWindow(key, { fetchedAt, data: normalized.messages });
       return normalized;
     })
     .finally(() => {
-      inflight.delete(communityId);
+      inflight.delete(key);
     });
 
-  inflight.set(communityId, request);
+  inflight.set(key, request);
+  return request;
+}
+
+/** Read a warm message window without waiting on persistent storage or network. */
+export function getCachedCommunityBootstrap(
+  communityId: string,
+  userId = 'anonymous',
+): CommunityBootstrap | null {
+  const key = bootstrapKey(communityId, userId);
+  const cached = cache.get(key);
+  if (
+    !cached ||
+    cached.data.messages.length === 0 ||
+    Date.now() - cached.fetchedAt >= COMMUNITY_BOOTSTRAP_STALE_MS
+  ) return null;
+  // Touch the entry so the bounded cache evicts the least recently used room.
+  rememberBootstrap(key, cached);
+  return cached.data;
+}
+
+/** Read the latest in-process message window, including one hydrated from disk. */
+export function getCachedCommunityMessageWindow(
+  communityId: string,
+  userId = 'anonymous',
+): Message[] | null {
+  const key = bootstrapKey(communityId, userId);
+  const cached = messageWindowCache.get(key);
+  if (
+    !cached ||
+    cached.data.length === 0 ||
+    Date.now() - cached.fetchedAt >= COMMUNITY_BOOTSTRAP_STALE_MS
+  ) return null;
+  rememberMessageWindow(key, cached);
+  return cached.data;
+}
+
+/** Seed the switch cache after AsyncStorage supplies a valid community window. */
+export function rememberCommunityMessageWindow(
+  communityId: string,
+  messages: Message[],
+  userId = 'anonymous',
+): void {
+  const rows = messages.filter((message) => !message.id.startsWith('temp-'));
+  if (rows.length === 0) return;
+  rememberMessageWindow(bootstrapKey(communityId, userId), {
+    fetchedAt: Date.now(),
+    data: rows.slice(-COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT),
+  });
+}
+
+/** Read a fresh timeline-card snapshot for an instant in-app community switch. */
+export function getCachedCommunityContentEvents(
+  communityId: string,
+  userId = 'anonymous',
+): ChatContentEvent[] | null {
+  const key = bootstrapKey(communityId, userId);
+  const cached = eventCache.get(key) ?? (() => {
+    const bootstrap = cache.get(key);
+    return bootstrap
+      ? { fetchedAt: bootstrap.fetchedAt, data: bootstrap.data.contentEvents }
+      : undefined;
+  })();
+  if (!cached || Date.now() - cached.fetchedAt >= COMMUNITY_BOOTSTRAP_STALE_MS) {
+    return null;
+  }
+  rememberEvents(key, cached);
+  return cached.data;
+}
+
+/** Fetch just timeline cards when messages already have a usable local window. */
+export function fetchCommunityContentEvents(
+  communityId: string,
+  userId = 'anonymous',
+): Promise<ChatContentEvent[]> {
+  const key = bootstrapKey(communityId, userId);
+  const cached = eventCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < COMMUNITY_BOOTSTRAP_STALE_MS) {
+    rememberEvents(key, cached);
+    return Promise.resolve(cached.data);
+  }
+  const pending = eventInflight.get(key);
+  if (pending) return pending;
+
+  const request = apiFetch<Pick<CommunityBootstrapResponse, 'content-events'>>(
+    `/api/communities/${communityId}/bootstrap?section=content-events`,
+  )
+    .then(({ data }) => data['content-events']?.events ?? [])
+    .then((events) => {
+      const fetchedAt = Date.now();
+      rememberEvents(key, { fetchedAt, data: events });
+      const bootstrap = cache.get(key);
+      if (bootstrap) {
+        rememberBootstrap(key, {
+          fetchedAt: bootstrap.fetchedAt,
+          data: { ...bootstrap.data, contentEvents: events },
+        });
+      }
+      return events;
+    })
+    .finally(() => eventInflight.delete(key));
+  eventInflight.set(key, request);
   return request;
 }
 
@@ -110,12 +256,18 @@ export function fetchCommunityBootstrap(communityId: string): Promise<CommunityB
 export function patchCachedBootstrapMessages(
   communityId: string,
   messages: Message[],
+  userId = 'anonymous',
 ): void {
-  const cached = cache.get(communityId);
+  const key = bootstrapKey(communityId, userId);
+  const window = messages
+    .filter((message) => !message.id.startsWith('temp-'))
+    .slice(-COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT);
+  rememberCommunityMessageWindow(communityId, window, userId);
+  const cached = cache.get(key);
   if (!cached) return;
-  cache.set(communityId, {
+  rememberBootstrap(key, {
     fetchedAt: cached.fetchedAt,
-    data: { ...cached.data, messages },
+    data: { ...cached.data, messages: window },
   });
 }
 
@@ -137,17 +289,26 @@ export function patchCachedBootstrapContentEvents(
   change:
     | { kind: 'insert'; event: ChatContentEvent }
     | { kind: 'delete'; id: string },
+  userId = 'anonymous',
 ): void {
-  const cached = cache.get(communityId);
-  if (!cached) return;
+  const key = bootstrapKey(communityId, userId);
+  const cached = cache.get(key);
+  const cachedEvents = eventCache.get(key);
+  const currentEvents = cachedEvents?.data ?? cached?.data.contentEvents;
+  if (!currentEvents) return;
   const events = change.kind === 'delete'
-    ? cached.data.contentEvents.filter((event) => event.id !== change.id)
-    : cached.data.contentEvents.some((event) => event.id === change.event.id)
-      ? cached.data.contentEvents
-      : [...cached.data.contentEvents, change.event].sort(
+    ? currentEvents.filter((event) => event.id !== change.id)
+    : currentEvents.some((event) => event.id === change.event.id)
+      ? currentEvents
+      : [...currentEvents, change.event].sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
-  cache.set(communityId, {
+  rememberEvents(key, {
+    fetchedAt: cachedEvents?.fetchedAt ?? cached?.fetchedAt ?? Date.now(),
+    data: events,
+  });
+  if (!cached) return;
+  rememberBootstrap(key, {
     fetchedAt: cached.fetchedAt,
     data: { ...cached.data, contentEvents: events },
   });

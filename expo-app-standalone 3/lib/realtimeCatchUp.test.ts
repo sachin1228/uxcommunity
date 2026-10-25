@@ -19,10 +19,14 @@ import test from 'node:test';
 
 import {
   createCatchUpScheduler,
+  drainCatchUpPages,
   latestMessageCursor,
   mergeCaughtUpMessages,
+  mergeMessagePage,
+  oldestMessageCursor,
   type CaughtUpMessage,
 } from './realtimeCatchUp';
+import { compareChatTimeline } from './chat';
 
 // ── A minimal Message-shaped row ───────────────────────────────────────────
 
@@ -318,7 +322,140 @@ test('the catch-up cursor is the newest real message, never an optimistic one', 
     row('temp-4-ghi', '2026-09-27T10:09:00Z', { id: 'temp-4-ghi', status: 'sending' }),
   ];
 
-  assert.equal(latestMessageCursor(messages), '2026-09-27T10:01:00Z');
+  assert.deepEqual(latestMessageCursor(messages), {
+    ts: '2026-09-27T10:01:00Z',
+    id: 'm2',
+  });
+  assert.deepEqual(oldestMessageCursor(messages), {
+    ts: '2026-09-27T10:00:00Z',
+    id: 'm1',
+  });
+});
+
+test('compound cursors use message id to order equal timestamps', () => {
+  const timestamp = '2026-09-27T10:01:00Z';
+  const messages = [row('z-message', timestamp), row('a-message', timestamp)];
+  assert.deepEqual(latestMessageCursor(messages), { ts: timestamp, id: 'z-message' });
+  assert.deepEqual(oldestMessageCursor(messages), { ts: timestamp, id: 'a-message' });
+
+  const merged = mergeMessagePage([], messages);
+  assert.deepEqual(merged.map((message) => message.id), ['a-message', 'z-message']);
+  assert.deepEqual(merged.slice().sort(compareChatTimeline).map((message) => message.id), [
+    'a-message',
+    'z-message',
+  ]);
+});
+
+test('catch-up drains every missed page with the server compound cursor', async () => {
+  const rows = Array.from({ length: 122 }, (_, index) =>
+    row(`m${String(index).padStart(3, '0')}`, `2026-09-27T10:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}Z`),
+  );
+  const calls: Array<{ ts: string; id: string }> = [];
+  let window = [rows[0]];
+  const result = await drainCatchUpPages({
+    from: { ts: rows[0].created_at, id: rows[0].id },
+    pageSize: 50,
+    maxPages: 10,
+    fetchPage: async (after) => {
+      calls.push(after);
+      const index = rows.findIndex((message) => message.id === after.id);
+      return rows.slice(index + 1, index + 51);
+    },
+    onPage: (page) => {
+      const before = window.length;
+      window = mergeCaughtUpMessages(window, page);
+      return window.length - before;
+    },
+  });
+
+  assert.deepEqual(result, {
+    pages: 3,
+    received: 121,
+    merged: 121,
+    stoppedBy: 'complete',
+  });
+  assert.deepEqual(calls.map((cursor) => cursor.id), ['m000', 'm050', 'm100']);
+  assert.equal(window.length, rows.length);
+  assert.equal(new Set(window.map((message) => message.id)).size, rows.length);
+  assert.deepEqual(window.map((message) => message.id), rows.map((message) => message.id));
+});
+
+test('an empty catch-up ends cleanly and a failed page preserves its retry cursor', async () => {
+  const from = { ts: '2026-09-27T10:00:00Z', id: 'm1' };
+  const empty = await drainCatchUpPages({
+    from,
+    pageSize: 50,
+    maxPages: 10,
+    fetchPage: async () => [],
+  });
+  assert.equal(empty.pages, 1);
+  assert.equal(empty.stoppedBy, 'empty');
+
+  const failed = await drainCatchUpPages({
+    from,
+    pageSize: 50,
+    maxPages: 10,
+    maxRetries: 0,
+    fetchPage: async () => { throw new Error('offline'); },
+  });
+  assert.equal(failed.pages, 0);
+  assert.equal(failed.stoppedBy, 'error');
+  assert.deepEqual(failed.resumeFrom, from);
+});
+
+test('a room without a cursor recovers one latest window without paging history', async () => {
+  const latest = row('first-after-empty', '2026-09-27T10:01:00Z');
+  let latestCalls = 0;
+  let afterCalls = 0;
+  let window: Row[] = [];
+  const result = await drainCatchUpPages({
+    from: null,
+    pageSize: 50,
+    maxPages: 20,
+    fetchLatestPage: async () => {
+      latestCalls += 1;
+      return [latest];
+    },
+    fetchPage: async () => {
+      afterCalls += 1;
+      return [];
+    },
+    onPage: (page) => {
+      const before = window.length;
+      window = mergeMessagePage(window, page);
+      return window.length - before;
+    },
+  });
+
+  assert.equal(result.stoppedBy, 'complete');
+  assert.equal(result.pages, 1);
+  assert.equal(latestCalls, 1);
+  assert.equal(afterCalls, 0, 'the empty-room recovery does not page backward through history');
+  assert.deepEqual(window.map((message) => message.id), ['first-after-empty']);
+});
+
+test('a transient page failure retries from the same confirmed cursor', async () => {
+  const from = { ts: '2026-09-27T10:00:00Z', id: 'm1' };
+  let attempts = 0;
+  const calls: Array<{ ts: string; id: string }> = [];
+  const recovered = row('m2', '2026-09-27T10:01:00Z');
+  const result = await drainCatchUpPages({
+    from,
+    pageSize: 50,
+    maxPages: 10,
+    wait: async () => {},
+    fetchPage: async (cursor) => {
+      calls.push(cursor);
+      attempts += 1;
+      if (attempts === 1) throw Object.assign(new Error('temporary'), { status: 503 });
+      return [recovered];
+    },
+  });
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(calls, [from, from]);
+  assert.equal(result.stoppedBy, 'complete');
+  assert.equal(result.received, 1);
 });
 
 test('the cursor is undefined until the server has given us a message', () => {

@@ -640,6 +640,31 @@ test("concurrent triggers cannot start overlapping drains", async () => {
   assert.deepEqual([...new Set(applied)], sorted.slice(1).map((row) => row.id));
 });
 
+test("the bootstrap and first socket connection share one drained cursor read", async () => {
+  let now = 1_000;
+  let fetches = 0;
+  const cursor = cursorOf(msg("m1", at(1)));
+  const controller = createCatchUpController<Row>({
+    pageSize: PAGE_SIZE,
+    maxPagesPerPass: 5,
+    fetchPage: async () => {
+      fetches += 1;
+      return [];
+    },
+    repeatSuppressionMs: 600,
+    now: () => now,
+    sleep: () => Promise.resolve(),
+  });
+
+  await controller.start(cursor);
+  await controller.start(cursor);
+  assert.equal(fetches, 1, "the socket's post-connect trigger reuses the open catch-up");
+
+  now += 601;
+  await controller.start(cursor);
+  assert.equal(fetches, 2, "a later focus/reconnect probe still checks for new rows");
+});
+
 test("a transient failure is retried a bounded number of times from the last cursor", async () => {
   const rows = Array.from({ length: 6 }, (_, index) => msg(`m${index}`, at(index)));
   const sorted = rows.slice().sort(compareCommunityMessages);

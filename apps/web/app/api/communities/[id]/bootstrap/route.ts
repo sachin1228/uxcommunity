@@ -50,7 +50,7 @@ function unwrapReadResult<T>(result: ReadResult<T>): T {
   return result.data;
 }
 
-export async function GET(_request: NextRequest, context: Params) {
+export async function GET(request: NextRequest, context: Params) {
   const startedAt = performance.now();
   let session;
   try {
@@ -62,6 +62,32 @@ export async function GET(_request: NextRequest, context: Params) {
   const authDuration = performance.now() - startedAt;
   const { id: communityId } = await context.params;
   const userId = session.userId!;
+
+  // A client with a valid cached message window may have an expired card
+  // snapshot. Let it refresh only the timeline cards instead of downloading
+  // the bootstrap's latest message page again.
+  if (request.nextUrl.searchParams.get('section') === 'content-events') {
+    const readModel = await loadCommunityReadModel(communityId, userId);
+    if (!readModel.ok) {
+      return NextResponse.json(
+        { error: readModel.error },
+        { status: readModel.status },
+      );
+    }
+    try {
+      const events = await loadCommunityContentEvents(
+        communityId,
+        contentAreaLimits(readModel.data.community as Record<string, unknown>),
+      );
+      return NextResponse.json(
+        { 'content-events': { events } },
+        { headers: { 'Cache-Control': 'private, no-store' } },
+      );
+    } catch {
+      return NextResponse.json({ error: 'Section unavailable.' }, { status: 502 });
+    }
+  }
+
   const db = createServiceClient();
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],

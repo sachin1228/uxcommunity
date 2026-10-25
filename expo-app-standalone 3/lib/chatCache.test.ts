@@ -17,6 +17,7 @@ import test from 'node:test';
 
 import {
   COMMUNITY_EVENT_CACHE_LIMIT,
+  COMMUNITY_EVENTS_CACHE_TTL_MS,
   COMMUNITY_MESSAGE_CACHE_LIMIT,
   DM_MESSAGE_CACHE_LIMIT,
   communityEventsCacheKey,
@@ -105,8 +106,8 @@ function memoryStorage(): MemoryStorage {
   };
 }
 
-function cacheOn(storage: ChatCacheStorage) {
-  return createChatCache(storage, { now: () => NOW });
+function cacheOn(storage: ChatCacheStorage, now = () => NOW) {
+  return createChatCache(storage, { now });
 }
 
 test('a saved community window is read back in timeline order', async () => {
@@ -256,6 +257,21 @@ test('content events keep the newest bounded window', async () => {
   const loaded = await cache.loadCommunityEvents('user-a', 'community-a');
   assert.equal(loaded?.length, COMMUNITY_EVENT_CACHE_LIMIT);
   assert.equal(loaded?.[0].id, 'e005');
+});
+
+test('an empty event snapshot is reusable until its freshness window expires', async () => {
+  const storage = memoryStorage();
+  const cache = cacheOn(storage);
+
+  await cache.saveCommunityEvents('user-a', 'empty-room', []);
+  assert.deepEqual(await cache.loadCommunityEvents('user-a', 'empty-room'), []);
+
+  const expired = cacheOn(storage, () => NOW + COMMUNITY_EVENTS_CACHE_TTL_MS + 1);
+  assert.equal(
+    await expired.loadCommunityEvents('user-a', 'empty-room'),
+    null,
+    'an old empty snapshot triggers bootstrap refresh',
+  );
 });
 
 test('the oldest window is evicted past the per-member cap', async () => {
