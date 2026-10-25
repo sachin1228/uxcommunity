@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -16,7 +17,9 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SignupWelcome } from '@/components/auth/SignupWelcome';
 import {
   OptionPickerSheet,
   OptionPickerValue,
@@ -81,9 +84,10 @@ const EMPTY_SELECTION: SignupSelection = {
  */
 export default function SignupScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { refresh } = useAuth();
-  const styles = makeStyles(colors);
+  const styles = makeStyles();
 
   const [step, setStep] = useState<Step>(1);
   const [identity, setIdentity] = useState<SignupIdentityInput>(EMPTY_IDENTITY);
@@ -101,6 +105,16 @@ export default function SignupScreen() {
 
   const [picker, setPicker] = useState<PickerKind | null>(null);
   const [avatar, setAvatar] = useState<PreparedImage | null>(null);
+  const [welcomePhase, setWelcomePhase] = useState<'loading' | 'ready' | null>(null);
+  const [joinedCommunities, setJoinedCommunities] = useState(0);
+
+  // Once the account request starts there is no way back: the web welcome
+  // overlay has no back either, and leaving here would drop the result.
+  useEffect(() => {
+    if (!welcomePhase) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [welcomePhase]);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const patchIdentity = useCallback((patch: Partial<SignupIdentityInput>) => {
@@ -215,26 +229,35 @@ export default function SignupScreen() {
       Keyboard.dismiss();
       setLoading(true);
       setStepError(null);
+      // The overlay starts now and stays up until the request answers, like the
+      // web signup: a fake-progress setup screen, then the all-set screen.
+      setWelcomePhase('loading');
       try {
         const chosenAvatar = withAvatar ? avatar : null;
         const payload = buildSignupPayload(identity, selection, {
           hasAvatar: Boolean(chosenAvatar),
         });
-        await completeSignup(payload, chosenAvatar);
+        const result = await completeSignup(payload, chosenAvatar);
         hapticSuccess();
-        // The response set the session cookie; refresh() loads the member and
-        // the (auth) layout redirects into the app.
-        await refresh().catch(() => {});
-        router.replace('/(tabs)/communities');
+        setJoinedCommunities(result.joinedCommunities);
+        setWelcomePhase('ready');
       } catch (error) {
         hapticError();
+        setWelcomePhase(null);
         setStepError(signupErrorMessage(error, 'Failed to complete signup. Please try again.'));
       } finally {
         setLoading(false);
       }
     },
-    [avatar, identity, loading, refresh, router, selection],
+    [avatar, identity, loading, selection],
   );
+
+  // The welcome screen deliberately waits to refresh the session: the (auth)
+  // layout redirects as soon as a member exists, which would skip the screen.
+  const enterApp = useCallback(async () => {
+    await refresh().catch(() => {});
+    router.replace('/(tabs)/communities');
+  }, [refresh, router]);
 
   const goBack = useCallback(() => {
     if (loading) return;
@@ -255,6 +278,17 @@ export default function SignupScreen() {
     if (!picker) return;
     patchSelection({ [pickerSelectionKey(picker)]: option.id });
     setPicker(null);
+  }
+
+  if (welcomePhase) {
+    return (
+      <SignupWelcome
+        phase={welcomePhase}
+        firstName={identity.firstName.trim()}
+        joinedCommunities={joinedCommunities}
+        onGoToDashboard={() => void enterApp()}
+      />
+    );
   }
 
   return (
@@ -309,20 +343,6 @@ export default function SignupScreen() {
           <View
             style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
-            {step > 1 ? (
-              <Pressable
-                onPress={goBack}
-                disabled={loading}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Go back"
-                style={styles.backRow}
-              >
-                <Feather name="chevron-left" size={16} color={colors.mutedForeground} />
-                <Text style={[styles.backLabel, { color: colors.mutedForeground }]}>Back</Text>
-              </Pressable>
-            ) : null}
-
             {stepError ? (
               <View
                 style={[
@@ -649,6 +669,26 @@ export default function SignupScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {step > 1 ? (
+        <Pressable
+          onPress={goBack}
+          disabled={loading}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          accessibilityState={{ disabled: loading }}
+          style={({ pressed }) => [
+            styles.backButton,
+            {
+              top: insets.top + 8,
+              opacity: loading ? 0.4 : pressed ? 0.6 : 1,
+            },
+          ]}
+        >
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
+        </Pressable>
+      ) : null}
+
       <OptionPickerSheet
         visible={picker !== null}
         title={picker ? PICKER_COPY[picker].title : ''}
@@ -825,7 +865,7 @@ const fieldStyles = StyleSheet.create({
   eyeText: { fontSize: 13, fontFamily: 'Geist_500Medium' },
 });
 
-function makeStyles(colors: Colors) {
+function makeStyles() {
   return StyleSheet.create({
     root: { flex: 1 },
     flex: { flex: 1 },
@@ -858,14 +898,16 @@ function makeStyles(colors: Colors) {
       borderWidth: 1,
       padding: 22,
       gap: 16,
-      shadowColor: colors.foreground,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      elevation: 3,
     },
-    backRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: -4 },
-    backLabel: { fontSize: 13, fontFamily: 'Geist_500Medium' },
+    backButton: {
+      position: 'absolute',
+      left: 12,
+      zIndex: 10,
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     errorBanner: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
     errorText: { fontSize: 13, fontFamily: 'Geist_400Regular', lineHeight: 18 },
     input: {

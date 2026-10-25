@@ -274,12 +274,6 @@ function makeStyles(colors: Colors) {
       borderWidth: 1,
       padding: 24,
       gap: 20,
-      // subtle shadow
-      shadowColor: colors.foreground,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      elevation: 3,
     },
     errorBanner: {
       borderRadius: 8,
