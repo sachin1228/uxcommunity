@@ -554,7 +554,7 @@ export function VerificationForm() {
           ))}
 
           {samples.length < 3 ? (
-            <label className="flex h-24 w-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background text-center transition-colors hover:bg-surface-raised">
+            <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background text-center transition-colors hover:bg-surface-raised">
               <span className="font-body text-[11px] font-medium text-foreground">
                 {uploading ? "Uploading…" : "Add images"}
               </span>
