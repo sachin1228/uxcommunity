@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import type { ContentEventKind } from "./cache";
 import type { ContentEventMeta } from "./content-notifications";
 import { loadCommentCounts, loadRsvpCounts } from "./content-notifications";
+import { chatTimelineVisibleSince } from "./message-retention";
 
 export interface ContentEventRow {
   id: string;
@@ -76,19 +77,38 @@ function metaFor(kind: ContentEventKind, row: Record<string, unknown>): ContentE
 /**
  * Loads the first page of the community's threads / showcase posts / resources
  * / events with author display info merged in — the data the chat timeline's
- * permanent "John created a …" notification cards are rendered from. The
- * timeline merges these alongside chat messages, so the same fresh-visit
- * window (50 per list) that messages already use applies per kind.
+ * "John created a …" notification cards are rendered from. The timeline merges
+ * these alongside chat messages, so the same fresh-visit window (50 per list)
+ * that messages already use applies per kind.
+ *
+ * A card is a NOTIFICATION, not the content: the thread/post/resource/event
+ * keeps its own page and is never deleted, while the card lives in the chat
+ * and obeys the chat's rules (see chatTimelineVisibleSince) — it never predates
+ * the member's own history start (a new member does not open the room on
+ * months of older "created a …" cards) and it ages out with the 15-day
+ * retention window, exactly as the message rows beside it do.
  *
  * Only kinds a member can actually reach are included — callers pass the
  * community's enabled tabs / showcase flag (see areas.ts).
  */
 export async function loadCommunityContentEvents(
   communityId: string,
+  userId: string,
   limits: { threads: boolean; showcase: boolean; events: boolean; resources: boolean },
   perKind = 50,
 ): Promise<ContentEventRow[]> {
   const db = createServiceClient();
+
+  // The viewer's own history start (and the retention cutoff) bound every
+  // kind below. A member row is required — the bootstrap already refused
+  // non-members — so a missing one just falls back to the bare window.
+  const { data: membership } = await db
+    .from("community_members")
+    .select("joined_at, history_cleared_at")
+    .eq("community_id", communityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const visibleSince = chatTimelineVisibleSince(membership ?? {});
 
   // Repo-wide untyped supabase-js baseline (see next.config.js): queries are
   // cast, not generated. Promise.all keeps the four lists to one round trip.
@@ -98,6 +118,7 @@ export async function loadCommunityContentEvents(
           .from("community_threads")
           .select("id, community_id, user_id, title, attachments, created_at")
           .eq("community_id", communityId)
+          .gte("created_at", visibleSince)
           .order("created_at", { ascending: false })
           .limit(perKind)
       : Promise.resolve(null),
@@ -106,6 +127,7 @@ export async function loadCommunityContentEvents(
           .from("community_showcase_posts")
           .select("id, community_id, user_id, title, image_url, attachments, created_at")
           .eq("community_id", communityId)
+          .gte("created_at", visibleSince)
           .order("created_at", { ascending: false })
           .limit(perKind)
       : Promise.resolve(null),
@@ -114,6 +136,7 @@ export async function loadCommunityContentEvents(
           .from("community_resources")
           .select("id, community_id, user_id, title, description, resource_type, url, created_at")
           .eq("community_id", communityId)
+          .gte("created_at", visibleSince)
           .order("created_at", { ascending: false })
           .limit(perKind)
       : Promise.resolve(null),
@@ -122,6 +145,7 @@ export async function loadCommunityContentEvents(
           .from("community_events")
           .select("id, community_id, user_id, title, description, event_date, end_date, is_online, cover_image_url, created_at")
           .eq("community_id", communityId)
+          .gte("created_at", visibleSince)
           .order("created_at", { ascending: false })
           .limit(perKind)
       : Promise.resolve(null),

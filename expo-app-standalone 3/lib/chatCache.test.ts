@@ -219,7 +219,7 @@ test('rows past the server retention window are never resurrected', async () => 
   );
 });
 
-test('content events are cached separately and are not retention-swept', async () => {
+test('content events are cached separately and expire with the message window', async () => {
   const storage = memoryStorage();
   const cache = cacheOn(storage);
 
@@ -231,8 +231,8 @@ test('content events are cached separately and are not retention-swept', async (
   const loaded = await cache.loadCommunityEvents('user-a', 'community-a');
   assert.deepEqual(
     loaded?.map((row) => row.id),
-    ['old-card', 'new-card'],
-    'cards are permanent timeline items',
+    ['new-card'],
+    'a card older than the 15-day window is not repainted from disk',
   );
   assert.equal(
     await cache.loadCommunityMessages('user-a', 'community-a'),

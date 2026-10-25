@@ -11,8 +11,11 @@
  * `?after=` catch-up reconciles it.
  *
  * Windows are capped and the server's 15-day retention is applied here too, so
- * the cache can never resurrect rows the sweep has deleted. Keys are scoped to
- * the signed-in member, so one account's rooms are never served to another.
+ * the cache can never resurrect rows the sweep has deleted — messages, and the
+ * chat's "created a …" cards, which age out of the timeline with them (the
+ * threads/posts/resources/events behind those cards are never deleted). Keys
+ * are scoped to the signed-in member, so one account's rooms are never served
+ * to another.
  */
 
 import { CHAT_MESSAGE_RETENTION_DAYS } from './chat';
@@ -492,10 +495,12 @@ export function createChatCache(
         communityEventsCacheKey(userId, communityId),
         COMMUNITY_EVENT_CACHE_LIMIT,
         isContentEventRow,
-        false,
-        // Cards are permanent timeline items, not part of the 15-day message
-        // sweep — the window size bounds them. Empty snapshots are reusable
-        // only for the same short freshness window as the bootstrap.
+        // Cards are chat-timeline rows, so they expire with the message window:
+        // the server stops returning them past it, and a snapshot written just
+        // before the boundary must not repaint them afterwards.
+        true,
+        // Empty snapshots are reusable only for the same short freshness
+        // window as the bootstrap.
         { allowEmpty: true, maxAgeMs: COMMUNITY_EVENTS_CACHE_TTL_MS },
       );
     },
@@ -507,7 +512,7 @@ export function createChatCache(
         communityEventsCacheKey(userId, communityId),
         events,
         COMMUNITY_EVENT_CACHE_LIMIT,
-        false,
+        true,
         true,
       );
     },

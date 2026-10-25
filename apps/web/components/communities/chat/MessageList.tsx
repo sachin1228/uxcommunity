@@ -266,27 +266,29 @@ export const MessageList = memo(function MessageList({
       {/* Empty state — only shown once threads and content events have loaded
           too, so we don't flash "Be the first to say something" in communities
           whose only activity is a thread or a showcase post while those fetches
-          are still in flight. */}
+          are still in flight.
+
+          No disappearing-messages notice here: a fresh room opens on the
+          welcome copy alone, exactly like the mobile app. The notice belongs to
+          the history, so it arrives with the first message rather than sitting
+          at the start of an otherwise empty chat. */}
       {mergedGroups.length === 0 && threadsReady && contentEventsReady && (
-        <>
-          <DisappearingNotice />
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
-            <CommunityDp
-              imageUrl={displayCommunity?.image_url ?? null}
-              name={displayCommunity?.name ?? ""}
-              size={48}
-              className="bg-surface-raised"
-            />
-            <p className="font-body text-sm text-foreground-muted text-center">
-              Welcome to{" "}
-              <span className="font-medium text-foreground">
-                {displayCommunity?.name ?? ""}
-              </span>
-              !<br />
-              <span className="text-xs">Be the first to say something.</span>
-            </p>
-          </div>
-        </>
+        <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
+          <CommunityDp
+            imageUrl={displayCommunity?.image_url ?? null}
+            name={displayCommunity?.name ?? ""}
+            size={48}
+            className="bg-surface-raised"
+          />
+          <p className="font-body text-sm text-foreground-muted text-center">
+            Welcome to{" "}
+            <span className="font-medium text-foreground">
+              {displayCommunity?.name ?? ""}
+            </span>
+            !<br />
+            <span className="text-xs">Be the first to say something.</span>
+          </p>
+        </div>
       )}
 
       {/* Date-grouped timeline (messages + thread notifications merged) */}

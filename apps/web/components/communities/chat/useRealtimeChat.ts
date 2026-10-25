@@ -27,7 +27,7 @@ interface UseRealtimeChatOptions {
   catchUpMessages: (from?: MessageCursor | null) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
-  /** Permanent "<name> created a …" cards (threads/showcase/resources/events). */
+  /** "<name> created a …" cards (threads/showcase/resources/events). */
   setContentEvents: React.Dispatch<React.SetStateAction<CachedContentEvent[]>>;
   membersRef: MutableRefObject<Member[]>;
   pendingProfileFetchRef: MutableRefObject<Map<string, Promise<void>>>;
@@ -354,7 +354,9 @@ export function useRealtimeChat({
     // The scheduled sweep hard-deletes messages older than the 15-day window
     // and tells the room with their cutoff (see message-retention-sweep.ts).
     // Drop everything before it from state and cache — otherwise an open tab
-    // keeps showing messages that no longer exist for anyone.
+    // keeps showing messages that no longer exist for anyone. The "created a
+    // …" cards obey the same window (their threads/posts/resources/events are
+    // never deleted), so they leave the open timeline with their messages.
     unsubscribes.push(
       realtimeClient.on(chatRoom, "messages-expired", (data) => {
         const { cutoff } = data as { cutoff?: string | null };
@@ -366,6 +368,10 @@ export function useRealtimeChat({
           if (next.length === prev.length) return prev;
           msgCache.set(communityId, next);
           return next;
+        });
+        setContentEvents((prev) => {
+          const next = prev.filter((event) => new Date(event.created_at).getTime() >= cutoffMs);
+          return next.length === prev.length ? prev : next;
         });
       }),
     );
