@@ -12,7 +12,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showApplyLink, setShowApplyLink] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
@@ -31,12 +30,10 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error ?? "Login failed. Please try again.");
-        setShowApplyLink(!!data.showApplyLink);
         // Dismiss the full-screen state so the inline error is visible.
         setLoading(false);
         return;
       }
-      setShowApplyLink(false);
 
       // Drop the previous session's caches, then leave with a FULL document
       // navigation (not router.push). Next's client Router Cache is keyed by
@@ -74,14 +71,6 @@ export default function LoginPage() {
             {error && (
               <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
                 <p className="font-body text-sm text-red-500">{error}</p>
-                {showApplyLink && (
-                  <Link
-                    href="/signup"
-                    className="mt-1 inline-block font-body text-xs text-accent underline hover:text-accent-hover"
-                  >
-                    Create an account →
-                  </Link>
-                )}
               </div>
             )}
 

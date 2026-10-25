@@ -370,7 +370,7 @@ test("Resend is critical: a rejected key silently kills password resets", async 
   assert.equal(rejected.status, "down");
   assert.equal(rejected.severity, "critical");
   assert.equal(rejected.alerts, true);
-  assert.match(rejected.hint ?? "", /Password resets and invitations fail silently/);
+  assert.match(rejected.hint ?? "", /Password resets and welcome emails fail silently/);
 
   const ok = await checkResend({ apiKey: "key", fetchImpl: stubFetch(200).fetchImpl });
   assert.equal(ok.status, "ok");

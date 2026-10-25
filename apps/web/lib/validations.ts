@@ -1,15 +1,5 @@
 import { z } from "zod";
 
-export const applicationSchema = z.object({
-  name: z.string().min(2, "Full name must be at least 2 characters").max(100),
-  email: z.string().email("Please enter a valid email address"),
-  linkedin_url: z
-    .string()
-    .url("Please enter a valid URL")
-    .refine((v) => v.includes("linkedin.com"), "Must be a LinkedIn URL"),
-  portfolio_url: z.string().url("Please enter a valid portfolio URL"),
-});
-
 export const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
@@ -25,24 +15,6 @@ const nameWithSurname = z
     message: "Please enter both your name and surname.",
   });
 
-export const signupStep1Schema = z
-  .object({
-    name: nameWithSurname,
-    email: z.string().email("Please enter a valid email address"),
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[0-9]/, "Must contain at least one number"),
-    confirm_password: z.string(),
-    // L-2: token validated here so the route uses parsed.data.token, not a raw cast
-    token: z.string().min(1, "Invitation token is required"),
-  })
-  .refine((d) => d.password === d.confirm_password, {
-    message: "Passwords do not match",
-    path: ["confirm_password"],
-  });
-
-// Schema for the direct signup flow (no invitation token required)
 export const directSignupStep1Schema = z
   .object({
     name: nameWithSurname,
@@ -71,7 +43,6 @@ export const signupStep2Schema = z.object({
 export const completeSignupSchema = z.object({
   identity: directSignupStep1Schema,
   profile: signupStep2Schema,
-  token: z.string().min(1).optional(),
   avatar_source: z.literal("upload").optional(),
   // Picture pre-uploaded via /api/signup/picture (validated + on R2).
   avatar_url: z.string().url().optional(),

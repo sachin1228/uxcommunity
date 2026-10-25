@@ -5,9 +5,7 @@ import { EMAIL_LOGO_PATH } from "./layout";
 import type { RenderedEmail } from "./document";
 import {
   renderCompanyVerificationEmail,
-  renderInvitationEmail,
   renderPasswordResetEmail,
-  renderRejectionEmail,
   renderResumeSignupEmail,
   renderWelcomeEmail,
 } from "./templates";
@@ -30,7 +28,7 @@ import {
 
 const APP_URL = "https://app.uxcommunity.in";
 
-/** The six emails, rendered with representative data. */
+/** Every email, rendered with representative data. */
 const RENDERED: Array<[name: string, email: RenderedEmail]> = [
   [
     "password reset",
@@ -38,15 +36,6 @@ const RENDERED: Array<[name: string, email: RenderedEmail]> = [
       name: "Ada",
       appUrl: APP_URL,
       link: `${APP_URL}/reset-password?token=t1`,
-    }),
-  ],
-  [
-    "invitation",
-    renderInvitationEmail({
-      name: "Ada",
-      appUrl: APP_URL,
-      link: `${APP_URL}/signup?token=t2`,
-      expiryDays: 7,
     }),
   ],
   ["welcome", renderWelcomeEmail({ name: "Ada", appUrl: APP_URL })],
@@ -59,7 +48,6 @@ const RENDERED: Array<[name: string, email: RenderedEmail]> = [
       expiryDays: 7,
     }),
   ],
-  ["rejection", renderRejectionEmail({ name: "Ada", appUrl: APP_URL })],
   [
     "company verification",
     renderCompanyVerificationEmail({
@@ -195,7 +183,7 @@ test("every email is a complete document with a hidden preheader", () => {
 });
 
 /** Emails whose ask is a single primary action — the code email has none. */
-const PRIMARY_ACTION_EMAILS = ["password reset", "invitation", "welcome", "resumed signup"];
+const PRIMARY_ACTION_EMAILS = ["password reset", "welcome", "resumed signup"];
 
 test("a primary call to action is the product's accent, inverted in dark", () => {
   for (const name of PRIMARY_ACTION_EMAILS) {
@@ -211,16 +199,6 @@ test("a primary call to action is the product's accent, inverted in dark", () =>
       `${name} email does not invert its primary action in dark`
     );
   }
-});
-
-test("the rejection email offers a quieter action than a primary one", () => {
-  const rejection = RENDERED.find(([name]) => name === "rejection")?.[1];
-  assert.ok(rejection, "no rendered rejection email");
-  assert.ok(rejection.html.includes('class="uxc-secondary"'), "the rejection email has no quiet action");
-  assert.ok(
-    !rejection.html.includes('class="uxc-accent"'),
-    "the rejection email should not lead with the primary action"
-  );
 });
 
 test("the shell asks for both schemes and every dark rule beats the inline style", () => {
@@ -279,10 +257,8 @@ test("the verification email shows the code, the company and the domain", () => 
 test("each email links to the page its call to action belongs to", () => {
   const expectedLinks: Array<[name: string, href: string]> = [
     ["password reset", `${APP_URL}/reset-password?token=t1`],
-    ["invitation", `${APP_URL}/signup?token=t2`],
     ["welcome", `${APP_URL}/dashboard`],
     ["resumed signup", `${APP_URL}/signup?resume=t3`],
-    ["rejection", `${APP_URL}/`],
   ];
 
   for (const [name, href] of expectedLinks) {

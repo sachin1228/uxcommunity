@@ -13,11 +13,9 @@ import { SignupWelcome } from "./components/SignupWelcome";
 
 interface MasterItem { id: string; name: string; image_url?: string | null }
 
-interface TokenState {
+interface LinkState {
   status: "loading" | "valid" | "invalid";
   error?: string;
-  applicationId?: string;
-  applicantEmail?: string;
 }
 
 type Step = 1 | 2 | 3 | "done";
@@ -28,7 +26,7 @@ type WelcomeState =
   | { phase: "error"; message: string }
   | null;
 
-/** Splits an existing full name (e.g. from an approved application) into first/last parts. */
+/** Splits a saved full name into first/last parts. */
 function splitFullName(fullName: string): { first_name: string; last_name: string } {
   const trimmed = fullName.trim();
   const space = trimmed.indexOf(" ");
@@ -46,14 +44,13 @@ function joinNameParts(firstName: string, lastName: string): string {
 
 function SignupInner() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-  // Resume link emailed from Admin → Incomplete Signups (no invitation token).
+  // Resume link emailed from Admin → Incomplete Signups.
   const resumeToken = searchParams.get("resume") ?? "";
 
-  // With neither an invitation nor a resume link we open direct signup at once.
-  const directMode = !token && !resumeToken;
+  // Without a resume link we open signup immediately.
+  const directMode = !resumeToken;
 
-  const [tokenState, setTokenState] = useState<TokenState>(() =>
+  const [linkState, setLinkState] = useState<LinkState>(() =>
     directMode
       ? { status: "valid" }          // nothing to validate → open signup immediately
       : { status: "loading" }
@@ -93,48 +90,31 @@ function SignupInner() {
   // welcome animation, then hands off to the dashboard with a button.
   const [welcome, setWelcome] = useState<WelcomeState>(null);
 
-  // ── Validate token (skipped in direct-signup mode) ───────────────────────
+  // ── Validate the resume link (skipped in direct-signup mode) ─────────────
   useEffect(() => {
     if (directMode) return;
 
     // Resume link: prefill the identity and keep the member on step 1, because
     // passwords are never stored — they must pick one to continue.
-    if (resumeToken) {
-      fetch(`/api/signup/resume?token=${encodeURIComponent(resumeToken)}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.valid) {
-            const { first_name, last_name } = splitFullName(d.name ?? "");
-            setStep1((p) => ({ ...p, email: d.email ?? "", first_name, last_name }));
-            setResumeNotice(
-              "Welcome back — your details are saved. Choose a password to finish setting up your account."
-            );
-            setTokenState({ status: "valid" });
-            setStep(1);
-          } else {
-            setTokenState({ status: "invalid", error: d.error ?? "This link is invalid." });
-          }
-        })
-        .catch(() =>
-          setTokenState({ status: "invalid", error: "Failed to validate this link. Please try again." })
-        );
-      return;
-    }
-
-    fetch(`/api/signup/validate?token=${encodeURIComponent(token)}`)
+    fetch(`/api/signup/resume?token=${encodeURIComponent(resumeToken)}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.valid) {
-          setTokenState({ status: "valid", applicationId: d.applicationId, applicantEmail: d.applicantEmail });
-          const { first_name, last_name } = splitFullName(d.applicantName ?? "");
-          setStep1((p) => ({ ...p, email: d.applicantEmail ?? "", first_name, last_name }));
+          const { first_name, last_name } = splitFullName(d.name ?? "");
+          setStep1((p) => ({ ...p, email: d.email ?? "", first_name, last_name }));
+          setResumeNotice(
+            "Welcome back — your details are saved. Choose a password to finish setting up your account."
+          );
+          setLinkState({ status: "valid" });
           setStep(1);
         } else {
-          setTokenState({ status: "invalid", error: d.error ?? "Invalid invitation link." });
+          setLinkState({ status: "invalid", error: d.error ?? "This link is invalid." });
         }
       })
-      .catch(() => setTokenState({ status: "invalid", error: "Failed to validate invitation. Please try again." }));
-  }, [token, resumeToken, directMode]);
+      .catch(() =>
+        setLinkState({ status: "invalid", error: "Failed to validate this link. Please try again." })
+      );
+  }, [resumeToken, directMode]);
 
   // ── Load dropdowns for step 2 ─────────────────────────────────────────────
   useEffect(() => {
@@ -165,9 +145,6 @@ function SignupInner() {
     setStep1Error(null);
     setStep1FieldErrors({});
     try {
-      // Invitation signups post to the token endpoint; direct and resumed
-      // signups both use the token-free endpoint.
-      const endpoint = token ? "/api/signup/complete" : "/api/signup/direct";
       const issues: Record<string, string[]> = {};
       if (!step1.first_name.trim()) issues.first_name = ["Name is required."];
       if (!step1.last_name.trim())  issues.last_name  = ["Surname is required."];
@@ -175,19 +152,13 @@ function SignupInner() {
         setStep1FieldErrors(issues);
         return;
       }
-      const identity = step1Identity();
-      const body = token ? { ...identity, token } : identity;
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/signup/direct", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(step1Identity()),
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.redirectToLogin) {
-          setStep1Error(data.error ?? "Your account is already set up. Please log in.");
-          return;
-        }
         if (data.issues) setStep1FieldErrors(data.issues);
         else setStep1Error(data.error ?? "Failed to create account.");
         return;
@@ -245,7 +216,6 @@ function SignupInner() {
       const payload = {
         identity: step1Identity(),
         profile: step2,
-        ...(token ? { token } : {}),
         ...(uploadedBlob ? { avatar_source: "upload" as const } : {}),
       };
 
@@ -320,24 +290,24 @@ function SignupInner() {
       />
       <div className="w-full max-w-md">
 
-        {tokenState.status === "valid" && step !== "done" && (
+        {linkState.status === "valid" && step !== "done" && (
           <SignupStepper current={step} />
         )}
 
-        {tokenState.status === "loading" && (
+        {linkState.status === "loading" && (
           <div className="flex justify-center py-16">
             <Spinner className="h-6 w-6" />
           </div>
         )}
 
-        {tokenState.status === "invalid" && (
+        {linkState.status === "invalid" && (
           <div className="rounded-xl bg-surface p-8 text-center shadow-card">
             <p className="font-display text-lg font-semibold text-foreground mb-2">Invalid link</p>
-            <p className="font-body text-sm text-foreground-muted">{tokenState.error}</p>
+            <p className="font-body text-sm text-foreground-muted">{linkState.error}</p>
           </div>
         )}
 
-        {tokenState.status === "valid" && step === 1 && (
+        {linkState.status === "valid" && step === 1 && (
           <SignupStep1
             state={step1}
             onChange={(patch) => setStep1((p) => ({ ...p, ...patch }))}
@@ -349,7 +319,7 @@ function SignupInner() {
           />
         )}
 
-        {tokenState.status === "valid" && step === 2 && (
+        {linkState.status === "valid" && step === 2 && (
           <SignupStep2
             state={step2}
             onChange={(patch) => setStep2((p) => ({ ...p, ...patch }))}
@@ -364,7 +334,7 @@ function SignupInner() {
           />
         )}
 
-        {tokenState.status === "valid" && step === 3 && (
+        {linkState.status === "valid" && step === 3 && (
           <SignupStep3
             uploadPreviewUrl={uploadPreviewUrl}
             loading={step3Loading}

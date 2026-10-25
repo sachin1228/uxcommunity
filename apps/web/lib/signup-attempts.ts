@@ -14,7 +14,7 @@ import { createServiceClient } from "@/lib/supabase/service";
  * example if the `signup_attempts` migration hasn't been applied yet).
  */
 
-export type SignupFlow = "direct" | "invitation";
+export type SignupFlow = "direct";
 
 /**
  * Upserts the email's attempt row, refreshing `started_at`/`name` for repeat
@@ -25,7 +25,6 @@ export async function recordSignupAttempt(input: {
   email: string;
   name?: string | null;
   flow: SignupFlow;
-  applicationId?: string | null;
 }): Promise<void> {
   const email = input.email.trim().toLowerCase();
   if (!email) return;
@@ -37,7 +36,6 @@ export async function recordSignupAttempt(input: {
         email,
         name: input.name?.trim() || null,
         flow: input.flow,
-        application_id: input.applicationId ?? null,
         status: "started",
         updated_at: new Date().toISOString(),
       },
