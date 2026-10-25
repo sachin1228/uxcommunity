@@ -19,9 +19,6 @@ function safeSignupError(error: { code?: string; message?: string }) {
   if (error.code === "23505") {
     return { status: 409, message: "An account with this email already exists." };
   }
-  if (error.message === "invitation_unavailable") {
-    return { status: 409, message: "This invitation link is no longer available." };
-  }
   if (error.code === "23503" || error.code === "22023") {
     return { status: 422, message: "One or more signup selections are no longer available." };
   }
@@ -70,7 +67,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { identity, profile, token } = parsed.data;
+  const { identity, profile } = parsed.data;
   const avatarSource = parsed.data.avatar_source ?? null;
   const preUploadedUrl = parsed.data.avatar_url ?? null;
 
@@ -136,8 +133,6 @@ export async function POST(request: NextRequest) {
     p_job_title: profile.job_title,
     p_avatar_url: profilePictureUrl as string,
     p_avatar_source: (profilePictureUrl ? "upload" : null) as string,
-    // `undefined` takes the parameter's DEFAULT NULL — the same stored value.
-    p_invitation_token: token ?? undefined,
   });
 
   if (error || !data?.[0]?.user_id) {
@@ -172,9 +167,8 @@ export async function POST(request: NextRequest) {
     console.error("[signup/avatar] auto-join error:", autoJoinError);
   }
 
-  // The account now exists, so send the welcome email for BOTH invitation and
-  // direct signups. Non-fatal: a mail-provider failure must never fail the
-  // signup the member just completed.
+  // The account now exists, so send the welcome email. Non-fatal: a
+  // mail-provider failure must never fail the signup the member just completed.
   try {
     await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
   } catch (emailError) {

@@ -3,9 +3,7 @@ import { appLink } from "./layout";
 import { renderEmail, type EmailBlock, type RenderedEmail } from "./document";
 import {
   renderCompanyVerificationEmail,
-  renderInvitationEmail,
   renderPasswordResetEmail,
-  renderRejectionEmail,
   renderResumeSignupEmail,
   renderWelcomeEmail,
 } from "./templates";
@@ -36,8 +34,8 @@ const getAppUrl = () => {
   return url;
 };
 
-/** The window an invitation link and a resumed signup link stay valid for. */
-const invitationExpiryDays = () => Number(process.env.INVITATION_EXPIRY_DAYS ?? 7);
+/** The window a resumed signup link stays valid for. */
+const signupExpiryDays = () => Number(process.env.SIGNUP_EXPIRY_DAYS ?? 7);
 
 async function send(to: string, email: RenderedEmail): Promise<void> {
   // Both bodies go out on every send: `html` is what a mail client shows, and
@@ -69,24 +67,6 @@ export async function sendPasswordResetEmail(
   );
 }
 
-export async function sendInvitationEmail(
-  to: string,
-  name: string,
-  token: string
-): Promise<void> {
-  const appUrl = getAppUrl();
-
-  await send(
-    to,
-    renderInvitationEmail({
-      name,
-      appUrl,
-      link: appLink(appUrl, `/signup?token=${token}`),
-      expiryDays: invitationExpiryDays(),
-    })
-  );
-}
-
 export async function sendWelcomeEmail(to: string, name: string): Promise<void> {
   await send(to, renderWelcomeEmail({ name, appUrl: getAppUrl() }));
 }
@@ -104,13 +84,9 @@ export async function sendResumeSignupEmail(
       name,
       appUrl,
       link: appLink(appUrl, `/signup?resume=${token}`),
-      expiryDays: invitationExpiryDays(),
+      expiryDays: signupExpiryDays(),
     })
   );
-}
-
-export async function sendRejectionEmail(to: string, name: string): Promise<void> {
-  await send(to, renderRejectionEmail({ name, appUrl: getAppUrl() }));
 }
 
 /**

@@ -8,14 +8,13 @@ import { ModalPortal } from "@/components/ui/Modal";
 import { ModalError } from "@/components/ui/ModalError";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { UserInfoCard } from "@/components/admin/users/UserInfoCard";
-import type { AdminUser, UserApplication } from "@/components/admin/users/userTypes";
+import type { AdminUser } from "@/components/admin/users/userTypes";
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
   const [user, setUser] = useState<AdminUser | null>(null);
-  const [application, setApplication] = useState<UserApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -32,7 +31,6 @@ export default function UserDetailPage() {
         if (!res.ok) { setError("User not found."); return; }
         const data = await res.json();
         setUser(data.user);
-        setApplication(data.application ?? null);
         setMemberOfAll(data.memberOfAllCommunities ?? false);
       } catch {
         setError("Failed to load user.");
@@ -224,7 +222,7 @@ export default function UserDetailPage() {
       </div>
 
       {/* Details card */}
-      <UserInfoCard user={user} application={application} />
+      <UserInfoCard user={user} />
 
       {/* Delete confirm modal */}
       {confirmDelete && (
@@ -237,7 +235,7 @@ export default function UserDetailPage() {
             <p className="font-body text-sm text-foreground-muted mb-6">
               This permanently removes{" "}
               <span className="text-foreground font-medium">{user.name}</span>{" "}
-              ({user.email}), their profile, applications and memberships. Any
+              ({user.email}), their profile and memberships. Any
               community they own is handed to its longest-standing member, or
               deleted if nobody is left. This cannot be undone.
             </p>

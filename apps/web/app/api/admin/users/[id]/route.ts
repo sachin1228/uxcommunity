@@ -20,9 +20,10 @@ export async function GET(
   const { data: user, error } = await db
     .from("users")
     .select(`
-      id, name, email, is_blocked, created_at, application_id,
+      id, name, email, is_blocked, created_at,
       designer_profiles (
         experience_level, job_title, avatar_url, avatar_source,
+        linkedin_url, portfolio_url,
         cities ( name ),
         design_sectors ( name )
       )
@@ -54,17 +55,6 @@ export async function GET(
     return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
 
-  // Fetch application URLs if linked
-  let application: { linkedin_url: string | null; portfolio_url: string | null } | null = null;
-  if (user.application_id) {
-    const { data: app } = await db
-      .from("applications")
-      .select("linkedin_url, portfolio_url")
-      .eq("id", user.application_id)
-      .maybeSingle();
-    application = app ?? null;
-  }
-
   // Community membership stats for the "member of all communities" toggle
   const [{ count: totalCommunities }, { count: userCommunities }] = await Promise.all([
     db.from("communities").select("id", { count: "exact", head: true }),
@@ -86,7 +76,6 @@ export async function GET(
             : user.designer_profiles,
         }
       : user,
-    application,
     memberOfAllCommunities,
   });
 }
@@ -138,13 +127,6 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
-  // Fetch application_id + email + avatar before deleting — needed to clean
-  // up the application record (email free to reapply) and the R2 avatar.
-  const { data: user } = await db
-    .from("users")
-    .select("application_id, email")
-    .eq("id", id)
-    .maybeSingle();
   // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
   const { data: profile } = (await db
     .from("designer_profiles")
@@ -191,33 +173,12 @@ export async function DELETE(
   // 1. Delete designer profile
   await db.from("designer_profiles").delete().eq("user_id", id);
 
-  // 2. Delete user (must come before application due to FK ON DELETE RESTRICT)
+  // 2. Delete user
   const { error } = await db.from("users").delete().eq("id", id);
 
   if (error) {
     console.error("[admin/users] DELETE error:", error);
     return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
-  }
-
-  // 3. Hard-delete the application so the email is completely free to reapply.
-  // Delete by application_id first (precise); then fall back to email to catch
-  // any orphaned rows where application_id was null or not linked correctly.
-  if (user?.application_id) {
-    await db.from("applications").delete().eq("id", user.application_id);
-  } else if (user?.email) {
-    await db
-      .from("applications")
-      .delete()
-      .eq("applicant_email", user.email.toLowerCase());
-  }
-
-  // Guarantee: even if application_id was set and deleted above, also sweep by
-  // email to remove any duplicate / orphaned application rows for this address.
-  if (user?.application_id && user?.email) {
-    await db
-      .from("applications")
-      .delete()
-      .eq("applicant_email", user.email.toLowerCase());
   }
 
   // Delete the uploaded avatar from R2 unless another row still references it.

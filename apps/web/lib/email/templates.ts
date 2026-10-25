@@ -37,38 +37,6 @@ export function renderPasswordResetEmail({
   });
 }
 
-export interface InvitationEmail {
-  name: string;
-  link: string;
-  appUrl: string;
-  expiryDays: number;
-}
-
-export function renderInvitationEmail({
-  name,
-  link,
-  appUrl,
-  expiryDays,
-}: InvitationEmail): RenderedEmail {
-  return renderEmail({
-    appUrl,
-    subject: `You're invited to join ${APP_NAME} 🎉`,
-    preheader: `Your application was approved — create your ${APP_NAME} account.`,
-    heading: `Welcome, ${name}!`,
-    blocks: [
-      {
-        kind: "paragraph",
-        text: `Your application has been approved. You're invited to create your ${APP_NAME} account and join a curated community of designers — share your work, connect with other creatives, get feedback, and discover new career opportunities.`,
-      },
-      { kind: "action", label: "Create your account", href: link },
-      {
-        kind: "finePrint",
-        text: `This invitation link expires in ${expiryDays} days and can only be used once. If you didn't apply to ${APP_NAME}, you can ignore this email.`,
-      },
-    ],
-  });
-}
-
 export interface WelcomeEmail {
   name: string;
   appUrl: string;
@@ -122,32 +90,6 @@ export function renderResumeSignupEmail({
         kind: "finePrint",
         text: `This link expires in ${expiryDays} days. If you did not start signing up, you can ignore this email.`,
       },
-    ],
-  });
-}
-
-export interface RejectionEmail {
-  name: string;
-  appUrl: string;
-}
-
-export function renderRejectionEmail({ name, appUrl }: RejectionEmail): RenderedEmail {
-  return renderEmail({
-    appUrl,
-    subject: `An update on your ${APP_NAME} application`,
-    preheader: "An update on your application.",
-    heading: `Hi ${name},`,
-    blocks: [
-      {
-        kind: "paragraph",
-        text: `Thank you for applying to ${APP_NAME}. After reviewing your portfolio, we weren't able to approve your application at this time.`,
-      },
-      {
-        kind: "paragraph",
-        text: `We know this is disappointing, but we genuinely encourage you to keep building. ${APP_NAME} is a curated community for designers who share their work, connect with creatives, and grow their careers — and the bar keeps rising. Take some time to strengthen your case studies and portfolio; we'd love to see you reapply when you're ready.`,
-      },
-      { kind: "action", label: "Apply again", href: appLink(appUrl), variant: "secondary" },
-      { kind: "finePrint", text: "If you have any questions, just reply to this email." },
     ],
   });
 }

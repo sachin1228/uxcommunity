@@ -11,7 +11,6 @@ Realtime runs out-of-process on the Cloudflare Worker in `apps/realtime`.
 |---|---|---|
 | `/` | Public | Landing / home page |
 | `/login` | Public | Email + password login |
-| `/apply` | Public | Inactive: redirects to `/signup` (the old apply form is preserved but not shown) |
 | `/signup` | Public | Multi-step onboarding: profile → avatar/picture → complete |
 | `/join/[token]` | Invited users | Community invite landing |
 | `/forgot-password` | Public | Request a password reset email |
@@ -26,7 +25,6 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 
 | Section | What it manages |
 |---|---|
-| Dashboard (`/admin`) | Applications review — all / pending / approved / rejected tabs, detail modal, approve & reject |
 | Users | View all members, block/unblock, open a profile, delete accounts |
 | Communities | Create/edit communities, community admins & permissions |
 | Master data | Cities, sectors, experience levels, job titles, Lottie animations |
@@ -36,13 +34,12 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 
 ### API routes (`app/api/`)
 
-129 route handlers:
+166 route handlers:
 
 | Prefix | Purpose |
 |---|---|
 | `/api/auth/*` | login, logout, me, reset-request, reset-confirm |
-| `/api/applications` | Application submission endpoint (rate-limited: 5/hr per IP) |
-| `/api/signup/*` | Multi-step onboarding: validate, direct, profile, avatar, picture, complete, resume |
+| `/api/signup/*` | Multi-step onboarding: direct, profile, avatar, picture, resume |
 | `/api/profile/*` | Update profile, avatar |
 | `/api/communities/*` | Communities, membership, invites, chat messages + reactions + upload, read receipts, threads, events, resources, showcase, comments, rules, content reactions |
 | `/api/home/*` | Home feed pages |
@@ -85,7 +82,6 @@ Community rooms (`chat:*`, `presence:*`, `threads:*`, `events:*`, `resources:*`,
 | `POST /api/auth/login` (per IP) | 10 requests / 15 min |
 | `POST /api/auth/login` (per email) | 20 requests / 15 min |
 | `GET /api/auth/me` (per IP) | 60 requests / min |
-| `POST /api/applications` (per IP) | 5 requests / hour |
 | `POST /api/auth/reset-request` (per IP) | 5 requests / hour |
 | `POST /api/auth/reset-confirm` (per IP) | 10 requests / hour |
 | `POST /api/signup/*` (per IP) | 20–60 requests / hour, per step |
@@ -106,7 +102,7 @@ All uploads go to **Cloudflare R2** (S3-compatible) through `lib/r2.ts` — not 
 
 ## Email
 
-Transactional emails are sent via **Resend** from `lib/email/index.ts`: password reset, invitation, welcome, resume-signup, and rejection templates.
+Transactional emails are sent via **Resend** from `lib/email/index.ts`: password reset, welcome, and resume-signup templates.
 
 ## Tests
 

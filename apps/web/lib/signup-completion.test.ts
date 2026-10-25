@@ -27,18 +27,9 @@ test("final signup requires identity and profile", () => {
   }
 });
 
-test("direct completion accepts a complete payload without an invitation", () => {
+test("completion accepts a complete payload", () => {
   assert.equal(completeSignupSchema.safeParse(completePayload).success, true);
 });
-
-test("invitation completion accepts a complete payload with a token", () => {
-  assert.equal(
-    completeSignupSchema.safeParse({ ...completePayload, token: "secure-invitation-token"    })
-    .success,
-    true
-  );
-});
-
 
 test("completion rejects mismatched passwords", () => {
   assert.equal(

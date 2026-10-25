@@ -2,7 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
-import type { AdminUser, UserApplication } from "./userTypes";
+import type { AdminUser } from "./userTypes";
 import { EXPERIENCE_LABELS, AVATAR_SOURCE_LABELS } from "./userTypes";
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -16,10 +16,9 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 interface Props {
   user: AdminUser;
-  application: UserApplication | null;
 }
 
-export function UserInfoCard({ user, application }: Props) {
+export function UserInfoCard({ user }: Props) {
   const profile = user.designer_profiles;
   const avatarUrl = profile?.avatar_url;
 
@@ -69,14 +68,14 @@ export function UserInfoCard({ user, application }: Props) {
       <InfoRow
         label="LinkedIn"
         value={
-          application?.linkedin_url ? (
+          profile?.linkedin_url ? (
             <a
-              href={application.linkedin_url}
+              href={profile.linkedin_url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-accent hover:underline"
             >
-              {application.linkedin_url}
+              {profile.linkedin_url}
               <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
             </a>
           ) : (
@@ -87,14 +86,14 @@ export function UserInfoCard({ user, application }: Props) {
       <InfoRow
         label="Portfolio"
         value={
-          application?.portfolio_url ? (
+          profile?.portfolio_url ? (
             <a
-              href={application.portfolio_url}
+              href={profile.portfolio_url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-accent hover:underline"
             >
-              {application.portfolio_url}
+              {profile.portfolio_url}
               <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
             </a>
           ) : (

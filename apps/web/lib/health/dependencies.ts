@@ -38,8 +38,8 @@
  *     the rate limiter uses. It fails open by design (see lib/auth/rate-limit.ts),
  *     so this is the only way to learn the limiter has been off.
  *   - Resend: `GET /domains`, an authenticated read that proves RESEND_API_KEY
- *     without sending mail. A dead key here breaks password resets and invites
- *     silently — nothing in the app surfaces it.
+ *     without sending mail. A dead key here breaks password resets and welcome
+ *     emails silently — nothing in the app surfaces it.
  *   - GIPHY: a one-result trending lookup with GIPHY_API_KEY.
  *
  * SEVERITY AND ALERTING
@@ -245,7 +245,7 @@ const SPECS: Record<DependencyId, CheckSpec> = {
   // Fails open by design, so it degrades rate limiting rather than the app —
   // but it is also invisible, which is why it is checked at all.
   upstash: { id: "upstash", label: "Upstash Redis (rate limiting)", severity: "supporting", alerts: false },
-  // Silent when dead: password resets and invitations just stop arriving.
+  // Silent when dead: password resets and welcome emails just stop arriving.
   resend: { id: "resend", label: "Resend (transactional email)", severity: "critical", alerts: true },
   giphy: { id: "giphy", label: "GIPHY (GIF search)", severity: "supporting", alerts: false },
 };
@@ -702,8 +702,9 @@ export async function checkUpstash(
 /**
  * Authenticated read on Resend that proves RESEND_API_KEY without sending mail.
  *
- * Nothing in the app surfaces a dead email key: an invitation or password reset
- * that never arrives looks exactly like a user who did not check their inbox.
+ * Nothing in the app surfaces a dead email key: a password reset or welcome
+ * email that never arrives looks exactly like a user who did not check their
+ * inbox.
  */
 export async function checkResend(
   options: { apiKey?: string; fetchImpl?: FetchLike } = {},
@@ -731,7 +732,7 @@ export async function checkResend(
           status: "down" as const,
           detail: `Resend rejected the API key (HTTP ${response.status}).`,
           hint:
-            `Password resets and invitations fail silently while this is broken. ${REPO_SECRET_HINT}`,
+            `Password resets and welcome emails fail silently while this is broken. ${REPO_SECRET_HINT}`,
         };
       }
       if (!response.ok) {
@@ -747,7 +748,7 @@ export async function checkResend(
         status: "down" as const,
         detail:
           error instanceof Error ? `Resend did not answer: ${error.message}` : "Resend did not answer.",
-        hint: "Email features (password reset, invitations) fail while this lasts.",
+        hint: "Email features (password reset, welcome emails) fail while this lasts.",
       };
     }
   });

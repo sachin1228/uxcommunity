@@ -8,8 +8,6 @@ interface SignupAttempt {
   id: string;
   email: string;
   name: string | null;
-  flow: "direct" | "invitation";
-  application_id: string | null;
   started_at: string;
   resume_email_sent_at: string | null;
 }
@@ -18,11 +16,6 @@ type RowStatus =
   | { state: "sending" }
   | { state: "sent" }
   | { state: "error"; message: string };
-
-const FLOW_LABELS: Record<string, string> = {
-  direct: "Direct",
-  invitation: "Invited",
-};
 
 export default function IncompleteSignupsPage() {
   const [attempts, setAttempts] = useState<SignupAttempt[]>([]);
@@ -140,11 +133,11 @@ export default function IncompleteSignupsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["Name", "Email", "Entry", "Started", "Actions"].map((h, i) => (
+                {["Name", "Email", "Started", "Actions"].map((h, i) => (
                   <th
                     key={h}
                     className={`px-4 py-2.5 font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider ${
-                      i === 4 ? "text-right" : "text-left"
+                      i === 3 ? "text-right" : "text-left"
                     }`}
                   >
                     {h}
@@ -175,17 +168,6 @@ export default function IncompleteSignupsPage() {
                         })}
                       </p>
                     )}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium ${
-                        attempt.flow === "invitation"
-                          ? "bg-purple-500/10 text-purple-400"
-                          : "bg-blue-500/10 text-blue-400"
-                      }`}
-                    >
-                      {FLOW_LABELS[attempt.flow] ?? attempt.flow}
-                    </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <p className="font-mono text-[10px] text-foreground-muted whitespace-nowrap">
