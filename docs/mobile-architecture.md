@@ -42,6 +42,7 @@ Provider order matters: the push hook reads the signed-in member from
 | `app/index.tsx` | Entry point — redirects based on auth state |
 | `app/(tabs)/` | Main app: `index` (Home), `communities`, `explore`, `jobs` |
 | `app/(auth)/login.tsx` | Login |
+| `app/(auth)/signup.tsx` | Signup — three steps: account, profile, picture |
 | `app/community/[id].tsx` | Single community chat (slide-in) |
 | `app/settings/notifications.tsx` | Notification settings + push diagnostics |
 | `app/+not-found.tsx` | 404 fallback |
@@ -55,6 +56,24 @@ watch `AuthContext`:
    `/(tabs)/communities` if signed in, else `/(auth)/login`.
 2. `app/(auth)/_layout.tsx` redirects to `(tabs)` the moment a user appears,
    so a logged-in member never sees the login screen.
+
+### Signup
+
+`app/(auth)/signup.tsx` mirrors the web wizard in `apps/web/app/signup/` and
+talks to the same endpoints, so the two clients cannot drift:
+
+| Step | Endpoint |
+|---|---|
+| 1 — account (name, surname, email, password) | `POST /api/signup/direct` (validation only) |
+| 2 — profile (city, sector, job title, experience level) | `GET /api/data/cities`, `sectors`, `job-titles`, `experience-levels` |
+| 3 — picture (optional) | `POST /api/signup/avatar` (JSON, or multipart with `payload` + `file`) |
+
+`lib/signupFlow.ts` holds the pure rules and payload builder (mirroring
+`directSignupStep1Schema` / `signupStep2Schema`); `lib/signup.ts` is the
+transport. The final request also sets the session cookie and auto-joins the
+profile communities server-side, exactly like the web flow, after which
+`AuthContext.refresh()` loads the member and the auth layout redirects into
+the app.
 
 `AuthContext` hydrates the session on mount by calling `GET /api/auth/me`.
 Deep links and push taps to `/community/[id]` render directly; the API returns
