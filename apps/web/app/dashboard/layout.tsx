@@ -5,6 +5,7 @@ import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { UndoToast } from "@/components/ui/UndoToast";
+import { AppBodyScrollLock } from "@/components/AppBodyScrollLock";
 import { VerificationBanner } from "@/components/verification/VerificationBanner";
 import { Topbar } from "./Topbar";
 
@@ -70,6 +71,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+      <AppBodyScrollLock />
       <VerificationBanner status={verificationStatus} />
 
       {/* End to end: the bar spans the window and sits above the sidebar, so
@@ -83,7 +85,7 @@ export default async function DashboardLayout({
           </div>
         </SidebarRouteGate>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-background">
           {children}
         </main>
       </div>

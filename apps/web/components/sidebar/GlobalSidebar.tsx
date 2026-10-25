@@ -98,7 +98,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
       {/* No brand row here: the logo, the unread badge and the profile menu all
           moved to the topbar (see apps/web/app/dashboard/Topbar.tsx), which is
           visible from every page. */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {/* WORKSPACE nav */}
       <div className="px-[8px] pb-[9px] pt-[13px]">
         <p className="mb-[9px] px-[14px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
