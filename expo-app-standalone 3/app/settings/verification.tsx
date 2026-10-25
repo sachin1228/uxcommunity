@@ -494,23 +494,39 @@ export default function VerificationScreen() {
                 ]}
               />
               {showSecondPortfolio ? (
-                <TextInput
-                  value={portfolio2}
-                  onChangeText={setPortfolio2}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  placeholder="Optional second link"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[
-                    styles.input,
-                    {
-                      color: colors.foreground,
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                    },
-                  ]}
-                />
+                <View style={styles.secondLinkRow}>
+                  <TextInput
+                    value={portfolio2}
+                    onChangeText={setPortfolio2}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    placeholder="Optional second link"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[
+                      styles.input,
+                      styles.secondLinkInput,
+                      {
+                        color: colors.foreground,
+                        borderColor: colors.border,
+                        backgroundColor: colors.background,
+                      },
+                    ]}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      setPortfolio2('');
+                      setShowSecondPortfolio(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove second portfolio link"
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.removeLink, { color: colors.mutedForeground }]}>
+                      Remove
+                    </Text>
+                  </Pressable>
+                </View>
               ) : (
                 <Pressable
                   onPress={() => setShowSecondPortfolio(true)}
@@ -658,4 +674,7 @@ const styles = StyleSheet.create({
   link: { fontSize: 13, fontFamily: 'Geist_500Medium' },
   addLink: { alignSelf: 'flex-start', paddingVertical: 2 },
   addLinkText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  secondLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  secondLinkInput: { flex: 1 },
+  removeLink: { fontSize: 12, fontFamily: 'Geist_500Medium' },
 });

@@ -493,14 +493,26 @@ export function VerificationForm() {
             aria-label="Portfolio link 1"
           />
           {showSecondPortfolio ? (
-            <input
-              value={portfolio2}
-              onChange={(event) => setPortfolio2(event.target.value)}
-              placeholder="Optional second link"
-              type="url"
-              className="field w-full"
-              aria-label="Portfolio link 2"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                value={portfolio2}
+                onChange={(event) => setPortfolio2(event.target.value)}
+                placeholder="Optional second link"
+                type="url"
+                className="field w-auto min-w-0 flex-1"
+                aria-label="Portfolio link 2"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setPortfolio2("");
+                  setShowSecondPortfolio(false);
+                }}
+                className="shrink-0 font-body text-xs text-foreground-subtle transition-colors hover:text-foreground"
+              >
+                Remove
+              </button>
+            </div>
           ) : (
             <button
               type="button"
