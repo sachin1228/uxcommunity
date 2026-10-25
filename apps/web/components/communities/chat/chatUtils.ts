@@ -166,7 +166,7 @@ export interface OptimisticLike {
   id: string;
   user_id: string;
   content: string | null;
-  status?: "sending" | "sent" | "failed";
+  status?: "queued" | "sending" | "sent" | "failed";
 }
 
 /**

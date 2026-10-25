@@ -18,6 +18,7 @@ import {
 } from "@/lib/request-cache";
 import { communityMessagePageSearch } from "@/lib/communities/message-cursor";
 import {
+  compareCommunityMessages,
   createCatchUpController,
   mergeCommunityMessages,
   newestRealCursor,
@@ -25,6 +26,17 @@ import {
   type CatchUpController,
   type MessageCursor,
 } from "@/lib/communities/messages";
+import { chatKey } from "@uxcommunity/offline-chat";
+import {
+  OFFLINE_RESUME_EVENT,
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from "@/lib/offline/engine";
+import {
+  fromLocalCachedMessage,
+  toLocalCachedMessage,
+} from "@/lib/offline/rows";
 import { logEvent } from "@/lib/observability/log";
 import { newestChatMediaUrls } from "./mediaLayout";
 import { warmChatMedia } from "./prefetchMedia";
@@ -61,6 +73,44 @@ const MAX_CATCH_UP_RETRIES = 2;
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/**
+ * Replace the rows the local store also knows about with its copy, keep any
+ * optimistic bubble it has not confirmed, and preserve older paginated rows it
+ * does not cache. This is how an outbox confirmation, a revalidation edit or a
+ * delete reaches the screen without a refetch.
+ */
+function reconcileWithLocalWindow(
+  current: Message[],
+  local: Message[],
+): Message[] {
+  if (local.length === 0) return current;
+  const localById = new Map(local.map((row) => [row.id, row]));
+  const localNonces = new Set(
+    local.map((row) => row.client_nonce).filter((nonce): nonce is string => !!nonce),
+  );
+  const seen = new Set<string>();
+  const next: Message[] = [];
+
+  for (const row of current) {
+    // A temp bubble whose authoritative row is now local has been confirmed;
+    // realtime/HTTP already removed it, or this is that removal.
+    if (
+      row.id.startsWith("temp-") &&
+      row.client_nonce &&
+      localNonces.has(row.client_nonce) &&
+      !localById.has(row.id)
+    ) {
+      continue;
+    }
+    next.push(localById.get(row.id) ?? row);
+    seen.add(row.id);
+  }
+  for (const row of local) {
+    if (!seen.has(row.id)) next.push(row);
+  }
+  return next.sort(compareCommunityMessages);
+}
 
 export interface Community {
   id: string;
@@ -543,6 +593,96 @@ export function useChatData({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, retryToken]);
+
+  // ── Offline layer: local-first paint, live reconciliation, durable writes ──
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const ref = offlineRef("community", communityId);
+    const key = chatKey(ref);
+    let active = true;
+    let unsubscribeEvents: (() => void) | null = null;
+
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribeEvents?.();
+      unsubscribeEvents = null;
+      if (!active || !engine) return;
+
+      unsubscribeEvents = engine.subscribe((event) => {
+        if (event.type !== "messages" || event.conversationKey !== key) return;
+        const local = event.messages.map(fromLocalCachedMessage);
+        setMessages((prev) => {
+          if (communityIdRef.current !== communityId) return prev;
+          const next = reconcileWithLocalWindow(prev, local);
+          msgCache.set(communityId, persistableMessages(next));
+          return next;
+        });
+      });
+
+      // Paint the persisted window immediately — before the bootstrap/page
+      // request — so a cold start (including a fully offline one) shows the
+      // conversation instead of a spinner. If a live window is already on
+      // screen, leave it alone: the disk copy may predate a realtime event.
+      if (msgCache.get(communityId)?.length) return;
+      void engine
+        .hydrate(ref)
+        .then((rows) => {
+          if (!active || rows.length === 0 || communityIdRef.current !== communityId) return;
+          const local = rows.map(fromLocalCachedMessage);
+          setMessages((prev) =>
+            prev.length ? reconcileWithLocalWindow(prev, local) : local,
+          );
+          msgCache.set(communityId, persistableMessages(local));
+          msgFetchedAt.set(communityId, Date.now());
+          setHasMoreAbove(local.length >= PAGE_SIZE);
+          setLoading(false);
+        })
+        .catch(() => undefined);
+    };
+
+    const unsubscribeChange = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      unsubscribeChange();
+      unsubscribeEvents?.();
+    };
+  }, [communityId, currentUserId]);
+
+  /**
+   * Write-through: every loaded/realtime/edited row goes to IndexedDB after a
+   * short debounce. The write is a bounded window (the controller drops
+   * optimistic rows, which the outbox owns), so a busy room does not serialize
+   * its whole history on each event.
+   */
+  useEffect(() => {
+    if (!currentUserId || messages.length === 0) return undefined;
+    if (communityIdRef.current !== communityId) return undefined;
+    const timer = setTimeout(() => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      const ref = offlineRef("community", communityId);
+      const rows = messages.map((row) =>
+        toLocalCachedMessage(currentUserId, ref, row),
+      );
+      void engine.persistWindow(ref, rows).catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [messages, communityId, currentUserId]);
+
+  // Connectivity returned: re-read the visible window so edits/deletes and
+  // reactions applied while this device was offline become visible, then send
+  // anything queued. The existing realtime reconnect path still owns the
+  // missed-message catch-up (no second cursor loop).
+  useEffect(() => {
+    const onResume = () => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      const ref = offlineRef("community", communityId);
+      void engine.revalidateWindow(ref).catch(() => undefined);
+      void engine.drainOutbox().catch(() => undefined);
+    };
+    window.addEventListener(OFFLINE_RESUME_EVENT, onResume);
+    return () => window.removeEventListener(OFFLINE_RESUME_EVENT, onResume);
+  }, [communityId]);
 
   return {
     community,

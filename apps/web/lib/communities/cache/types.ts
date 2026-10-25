@@ -50,7 +50,14 @@ export interface CachedMessage {
   created_at: string;
   user_id: string;
   users: { name: string; avatar_url: string | null; designation?: string | null } | null;
-  status?: "sending" | "sent" | "failed";
+  /**
+   * Delivery state. `queued` is the durable outbox: the message is safely on
+   * this device and will be sent when connectivity returns. It is distinct from
+   * `sending` (a request is in flight) and never means server-accepted.
+   */
+  status?: "queued" | "sending" | "sent" | "failed";
+  /** Client idempotency key; sent on every retry of the same logical send. */
+  client_nonce?: string | null;
   reactions?: MessageReaction[];
   reply_to?: ReplyPreview | null;
   /** Set when the reply anchors to a content item instead of a message. */

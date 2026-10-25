@@ -10,11 +10,19 @@
  *   5. Editing an owned message PATCHes it and stamps `edited_at` locally.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Message, editMessage, uploadChatImage, sendMessage } from '@/lib/communities';
 import { PendingImage } from '@/components/chat/ChatInput';
 import type { MessageMention } from '@/lib/chat';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
+import { chatKey, newClientNonce, optimisticMessageId } from '../../packages/offline-chat/src';
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from '@/lib/offline/engine';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type RetryPayload = {
   text: string;
@@ -49,6 +57,65 @@ export function useSendMessage({
 
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Confirmations for queued text sends arrive later (possibly after a
+  // restart), so the bubble listens for them instead of awaiting a request.
+  useEffect(() => {
+    const key = chatKey(offlineRef('community', communityId));
+    let unsubscribe: (() => void) | null = null;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribe?.();
+      unsubscribe = null;
+      if (!engine) return;
+      unsubscribe = engine.subscribe((event) => {
+        if (event.type === 'connectivity') return;
+        if (event.conversationKey !== key) return;
+        if (event.type === 'message-sent') {
+          const tempId = optimisticMessageId(event.clientNonce);
+          const incoming = event.message.payload as unknown as Message;
+          setMessages((prev) => {
+            const optimistic = prev.find((message) => message.id === tempId);
+            const existing = prev.find((message) => message.id === incoming.id);
+            const merged: Message = {
+              ...(existing ?? optimistic ?? {}),
+              ...incoming,
+              users: incoming.users ?? existing?.users ?? optimistic?.users ?? null,
+              reply_to: incoming.reply_to ?? existing?.reply_to ?? optimistic?.reply_to ?? null,
+              reply_to_content:
+                incoming.reply_to_content ?? existing?.reply_to_content ?? optimistic?.reply_to_content ?? null,
+              image_url: incoming.image_url ?? existing?.image_url ?? optimistic?.image_url ?? null,
+              mentions: incoming.mentions ?? existing?.mentions ?? optimistic?.mentions ?? null,
+              status: 'sent',
+              client_nonce: event.clientNonce,
+            };
+            const next = prev.filter(
+              (message) => message.id !== tempId && message.id !== incoming.id,
+            );
+            next.push(merged);
+            next.sort((a, b) => {
+              const at = Date.parse(a.created_at);
+              const bt = Date.parse(b.created_at);
+              return at !== bt ? at - bt : a.id.localeCompare(b.id);
+            });
+            return next;
+          });
+        } else if (event.type === 'message-failed') {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === optimisticMessageId(event.clientNonce)
+                ? { ...message, status: 'failed' }
+                : message,
+            ),
+          );
+        }
+      });
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      stop();
+      unsubscribe?.();
+    };
+  }, [communityId, setMessages]);
 
   // ── private helpers ────────────────────────────────────────────────────────
 
@@ -222,6 +289,79 @@ export function useSendMessage({
     ) => {
       if (!text.trim() && !pendingImage) return;
       stopTyping();
+
+      // ── Durable text path ───────────────────────────────────────────────
+      // Text-only sends are written with their outbox record before any
+      // network call. Online and offline share the path, so a lost response or
+      // a killed app retries the SAME nonce and the server dedupes it.
+      const engine = getOfflineChat();
+      if (engine && !pendingImage) {
+        const nonce = newClientNonce();
+        const tempId = optimisticMessageId(nonce);
+        const replyToContent = replyTo?.content_kind
+          ? { id: replyTo.id, kind: replyTo.content_kind }
+          : null;
+        const optimistic: Message = {
+          id: tempId,
+          content: text || null,
+          created_at: new Date().toISOString(),
+          user_id: currentUser.id,
+          reply_to_id: replyToContent ? null : replyTo?.id ?? null,
+          users: {
+            name: currentUser.name,
+            avatar_url: currentUser.avatar_url,
+            designation: null,
+          },
+          reactions: [],
+          reply_to:
+            replyTo && !replyToContent
+              ? {
+                  id: replyTo.id,
+                  content: replyTo.content,
+                  user_name: replyTo.user_name,
+                  user_id: replyTo.user_id,
+                }
+              : null,
+          reply_to_content: replyToContent
+            ? {
+                id: replyToContent.id,
+                kind: replyToContent.kind,
+                title: replyTo?.content ?? '',
+              }
+            : null,
+          image_url: null,
+          deleted_at: null,
+          mentions,
+          status: 'queued',
+          client_nonce: nonce,
+        };
+
+        setMessages((prev) => {
+          if (prev.some((message) => message.id === tempId)) return prev;
+          return [...prev, optimistic];
+        });
+        scrollToLatest(false);
+
+        void engine
+          .enqueueText({
+            ref: offlineRef('community', communityId),
+            content: text,
+            replyToId: replyToContent ? null : replyTo?.id ?? null,
+            replyToContent,
+            mentionUserIds: mentions.map((mention) => mention.user_id),
+            optimisticPayload: optimistic as unknown as Record<string, unknown>,
+            clientNonce: nonce,
+          })
+          .catch(() => {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === tempId ? { ...message, status: 'failed' } : message,
+              ),
+            );
+          });
+        return;
+      }
+
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       runSend(tempId, text, pendingImage ?? null, replyTo, mentions);
     },
@@ -230,12 +370,29 @@ export function useSendMessage({
 
   /** Abort the in-flight upload/send for this bubble. */
   const handleCancel = useCallback((tempId: string) => {
+    // A queued outbox row has no request to abort; removing it here would
+    // leave the message to send after the member dismissed it.
+    if (
+      !retryData.current.has(tempId) &&
+      UUID_RE.test(tempId.replace(/^temp-/, ''))
+    ) {
+      return;
+    }
     abortRefs.current.get(tempId)?.abort();
   }, []);
 
   /** Re-run the full send flow for a failed bubble. */
   const handleRetry = useCallback(
     (tempId: string) => {
+      const outboxNonce = tempId.startsWith('temp-')
+        ? tempId.slice('temp-'.length)
+        : '';
+      const engine = getOfflineChat();
+      if (engine && UUID_RE.test(outboxNonce)) {
+        void engine.retry(outboxNonce).catch(() => undefined);
+        return;
+      }
+
       const payload = retryData.current.get(tempId);
       if (!payload) return;
 

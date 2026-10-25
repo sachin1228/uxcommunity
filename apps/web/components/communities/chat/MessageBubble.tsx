@@ -226,8 +226,13 @@ function BubbleTime({
         <span className={`font-body text-[10px] ${editedClass}`}>edited</span>
       )}
       <span className={`text-[10px] ${timeClass}`}>{fmtTime(createdAt)}</span>
-      {isMe && status === "sending" && (
-        <Clock strokeWidth={2.5} size={10} className={`${timeClass} animate-pulse`} />
+      {isMe && (status === "sending" || status === "queued") && (
+        <Clock
+          strokeWidth={2.5}
+          size={10}
+          className={`${timeClass} ${status === "sending" ? "animate-pulse" : "opacity-70"}`}
+          aria-label={status === "queued" ? "Waiting to send" : "Sending"}
+        />
       )}
       {isMe && (status === "sent" || !status) && (
         <CheckCheck strokeWidth={2.5} size={11} className={timeClass} />
@@ -500,8 +505,16 @@ function MessageHeader({
         <span className={`font-body text-[10px] ${metaClass}`}>edited</span>
       )}
       {/* Community chat shows the day/time only — no delivery ticks or sending
-          spinner beside it; a failed send keeps its "!" as the last signal
-          before the retry button. */}
+          spinner beside it. A queued (not yet transmitted) row gets a small
+          clock, and a failed send keeps its "!" before the retry button. */}
+      {isMe && status === "queued" && (
+        <Clock
+          strokeWidth={2.5}
+          size={10}
+          className={`${metaClass} opacity-70`}
+          aria-label="Waiting to send"
+        />
+      )}
       {isMe && status === "failed" && (
         <span className={`text-[10px] ${onPage ? "text-red-400" : "text-red-200"}`}>!</span>
       )}

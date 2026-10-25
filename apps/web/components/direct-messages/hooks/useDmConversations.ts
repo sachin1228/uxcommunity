@@ -6,6 +6,12 @@ import { applyLocalReaction, applyReadFloor, dmCache } from "@/lib/direct-messag
 import { getReadFloor } from "@/lib/direct-messages/read-manager";
 import { dmUrls } from "@/lib/direct-messages/client";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
+import { chatKey } from "@uxcommunity/offline-chat";
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from "@/lib/offline/engine";
 
 /**
  * One list read, reconciled with what this client already knows — the read
@@ -58,6 +64,58 @@ export function useDmConversations({ userId }: { userId: string }) {
     },
     [],
   );
+
+  // ── Offline: paint the last persisted list, then keep it current ─────────
+  useEffect(() => {
+    let active = true;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      if (!active || !engine || dmCache.getConversations()) return;
+      void engine
+        .listConversations()
+        .then((rows) => {
+          if (!active || dmCache.getConversations()) return;
+          const cached = rows
+            .filter((row) => row.ref.kind === "dm")
+            .map((row) => row.payload as unknown as DmConversationSummary)
+            .filter((row) => typeof row?.id === "string" && !!row.peer);
+          if (cached.length === 0) return;
+          dmCache.setConversations(cached);
+          setConversationsState(cached);
+        })
+        .catch(() => undefined);
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      stop();
+    };
+  }, [userId]);
+
+  // Bounded list write; the controller scopes it to the signed-in member.
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) return undefined;
+    const timer = setTimeout(() => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      void engine
+        .saveConversations(
+          conversations.map((conversation) => {
+            const ref = offlineRef("dm", conversation.id);
+            return {
+              userId,
+              conversationKey: chatKey(ref),
+              ref,
+              lastMessageAt: conversation.last_message_at,
+              unreadCount: conversation.unread_count,
+              payload: conversation as unknown as Record<string, unknown>,
+              updatedAt: Date.now(),
+            };
+          }),
+        )
+        .catch(() => undefined);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [conversations, userId]);
 
   const refresh = useCallback(
     async (force = false) => {

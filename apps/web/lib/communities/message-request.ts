@@ -20,7 +20,12 @@
  *   * mentions arrive as opaque member ids picked from the client roster; names
  *     are resolved server-side, and the sender is never their own mention.
  *     Mentions only make sense beside text, so they are dropped when the message
- *     has none.
+ *     has none;
+ *   * `client_nonce` is the sender's idempotency key for one logical send. It is
+ *     captured only when it is a UUID — the shape the unique
+ *     (user_id, client_nonce) index stores. A non-UUID value (an older client
+ *     sent its `temp-…` bubble id) is dropped rather than rejected: idempotency
+ *     is an enhancement, never a precondition for sending.
  *
  * REASONS, NOT STATUS CODES
  *   A body that cannot be read at all (`malformed`) is a different client
@@ -37,6 +42,8 @@ const CONTENT_ANCHOR_KINDS = ["thread", "showcase", "resource", "event"];
 /** Longest message the composer accepts, and the column's practical ceiling. */
 const MESSAGE_MAX_CHARS = 2000;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface MessageRequestBody {
   content: string;
   replyToId: string | null;
@@ -45,6 +52,11 @@ export interface MessageRequestBody {
   imageUrl: string | null;
   /** Deduped member ids to resolve names for, capped. */
   mentionUserIds: string[];
+  /**
+   * Sender-scoped idempotency key, or null when the client did not send a
+   * valid UUID. See the module doc: never a reason to reject the request.
+   */
+  clientNonce: string | null;
 }
 
 export type MessageRequestBodyResult =
@@ -64,6 +76,7 @@ export async function readMessageRequestBody(
   let replyToContent: { id: string; kind: string } | null = null;
   let imageUrl: string | null = null;
   let mentionUserIds: string[] = [];
+  let clientNonce: string | null = null;
 
   try {
     const body = (await req.json()) as {
@@ -72,6 +85,7 @@ export async function readMessageRequestBody(
       reply_to_content?: { id?: unknown; kind?: unknown };
       image_url?: unknown;
       mentions?: unknown;
+      client_nonce?: unknown;
     };
     content     = ((body.content as string | undefined) ?? "").trim();
     replyToId   = (body.reply_to_id as string | null | undefined) ?? null;
@@ -88,6 +102,12 @@ export async function readMessageRequestBody(
       replyToContent = { id: body.reply_to_content.id, kind: body.reply_to_content.kind };
     }
     imageUrl    = (body.image_url as string | null | undefined) ?? null;
+    // Normalized to lower case so two casings of one UUID are the same key
+    // (the uuid column would normalize it anyway; doing it here keeps the
+    // replay lookup identical to the insert).
+    if (typeof body.client_nonce === "string" && UUID_RE.test(body.client_nonce)) {
+      clientNonce = body.client_nonce.toLowerCase();
+    }
     // Mentions are sent as opaque member ids picked from the client roster;
     // names are resolved server-side, so storage never trusts the client.
     if (Array.isArray(body.mentions)) {
@@ -109,6 +129,13 @@ export async function readMessageRequestBody(
 
   return {
     ok: true,
-    value: { content, replyToId, replyToContent, imageUrl, mentionUserIds },
+    value: {
+      content,
+      replyToId,
+      replyToContent,
+      imageUrl,
+      mentionUserIds,
+      clientNonce,
+    },
   };
 }

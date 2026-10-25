@@ -535,6 +535,12 @@ function TimeRow({
           <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
         </View>
       )}
+      {isOwn && status === 'queued' && (
+        // Durable outbox: saved on this device, no request in flight yet.
+        <View style={styles.statusSlot} accessibilityLabel="Waiting to send">
+          <Text style={[styles.timeText, { color: timeColor, opacity: 0.6 }]}>◷</Text>
+        </View>
+      )}
       {isOwn && (status === 'sent' || !status) && (
         <CheckCheckIcon size={12} color={timeColor} opacity={0.7} />
       )}
@@ -630,7 +636,16 @@ function BubbleHeader({
             </Text>
           )}
           {/* Community chat shows the time only — no delivery ticks or
-              sending spinner; a failed send keeps its "!". */}
+              sending spinner; a queued row gets a small clock and a failed
+              send keeps its "!". */}
+          {isOwn && status === 'queued' && (
+            <Text
+              style={[styles.headerTime, { color: timeColor, opacity: 0.6 }]}
+              accessibilityLabel="Waiting to send"
+            >
+              ◷
+            </Text>
+          )}
           {isOwn && status === 'failed' && (
             <Text style={[styles.headerTime, { color: colors.destructive }]}>!</Text>
           )}

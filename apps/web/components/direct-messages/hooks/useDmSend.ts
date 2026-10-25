@@ -6,6 +6,18 @@ import { compressImage, compressedFile, preloadImage } from "@/lib/image-client"
 import { dmUrls } from "@/lib/direct-messages/client";
 import { dmCache } from "@/lib/direct-messages/client-cache";
 import { compareDmMessages } from "@/lib/direct-messages/messages";
+import {
+  chatKey,
+  newClientNonce,
+  optimisticMessageId,
+} from "@uxcommunity/offline-chat";
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from "@/lib/offline/engine";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import type { DmMessage, DmPreviewMessage, DmRequestState } from "@/lib/direct-messages/types";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { MAX_MESSAGE_CHARS, scrollChatToBottom } from "@/components/communities/chat/chatUtils";
@@ -146,6 +158,89 @@ export function useDmSend({
     replyToRef.current = replyTo;
   }, [replyTo]);
 
+  // ── Durable outbox confirmations ──────────────────────────────────────────
+  useEffect(() => {
+    if (!conversationId) return undefined;
+    const key = chatKey(offlineRef("dm", conversationId));
+    let unsubscribe: (() => void) | null = null;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribe?.();
+      unsubscribe = null;
+      if (!engine) return;
+      unsubscribe = engine.subscribe((event) => {
+        if (event.type === "connectivity") return;
+        if (event.conversationKey !== key) return;
+
+        if (event.type === "message-sent") {
+          const tempId = optimisticMessageId(event.clientNonce);
+          const message = event.message.payload as unknown as DmMessage;
+          setMessages((prev) => {
+            const optimisticRow = prev.find((m) => m.id === tempId);
+            const existing = prev.find((m) => m.id === message.id);
+            const merged: DmMessage = {
+              ...(existing ?? optimisticRow ?? {}),
+              ...message,
+              users: message.users ?? existing?.users ?? optimisticRow?.users ?? null,
+              reply_to: message.reply_to ?? existing?.reply_to ?? optimisticRow?.reply_to ?? null,
+              image_url: message.image_url ?? existing?.image_url ?? optimisticRow?.image_url ?? null,
+              status: "sent" as const,
+              client_nonce: event.clientNonce,
+            };
+            const next = prev.filter((m) => m.id !== tempId && m.id !== message.id);
+            next.push(merged);
+            next.sort(compareDmMessages);
+            dmCache.setMessages(
+              conversationId,
+              next.filter((m) => !m.id.startsWith("temp-")),
+            );
+            return next;
+          });
+          onPreviewConfirmed(conversationId, tempId, {
+            id: message.id,
+            content: message.content || null,
+            image_url: message.image_url ?? null,
+            created_at: message.created_at,
+            user_id: message.user_id,
+            deleted_at: null,
+            edited_at: null,
+          });
+          const state = event.meta?.request_state;
+          const requestedBy = event.meta?.requested_by;
+          if (state === "pending" || state === "rejected" || state === "accepted") {
+            onConversationState(
+              conversationId,
+              state,
+              typeof requestedBy === "string" ? requestedBy : null,
+            );
+          }
+          setHideUnreadDivider(true);
+        } else if (event.type === "message-failed") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === optimisticMessageId(event.clientNonce)
+                ? { ...m, status: "failed" as const }
+                : m,
+            ),
+          );
+          onPreviewFailed(conversationId, optimisticMessageId(event.clientNonce));
+          setError(event.error);
+        }
+      });
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      stop();
+      unsubscribe?.();
+    };
+  }, [
+    conversationId,
+    onConversationState,
+    onPreviewConfirmed,
+    onPreviewFailed,
+    setHideUnreadDivider,
+    setMessages,
+  ]);
+
   const prevPreviewRef = useRef<string | null>(null);
   useEffect(() => {
     if (prevPreviewRef.current && prevPreviewRef.current !== pendingImagePreview) {
@@ -198,6 +293,9 @@ export function useDmSend({
     abortControllersRef.current.get(tempId)?.abort();
     abortControllersRef.current.delete(tempId);
     const retryData = failedRetryDataRef.current.get(tempId);
+    // A durable outbox row has no in-flight request; removing its bubble here
+    // would leave the queued message to send after the member dismissed it.
+    if (!retryData && UUID_RE.test(tempId.replace(/^temp-/, ""))) return;
     if (retryData?.uploadedUrl) {
       // The upload finished but the send never did — release the asset.
       // The server skips the delete if a racing send already stored the URL,
@@ -414,6 +512,75 @@ export function useDmSend({
     if (!conversationIdRef.current) return;
 
     setError(null);
+
+    // ── Durable text path ──────────────────────────────────────────────────
+    // Text-only DMs queue exactly like community messages: optimistic row and
+    // outbox record committed together, one nonce reused by every retry, and
+    // the server's request-state transition carried back in the response meta.
+    const offlineEngine = getOfflineChat();
+    if (offlineEngine && !imageFile) {
+      dispatchingRef.current = true;
+      try {
+        const targetConversationId = conversationIdRef.current;
+        const currentReplyTo = replyToRef.current;
+        const nonce = newClientNonce();
+        const tempId = optimisticMessageId(nonce);
+        const optimistic: DmMessage = {
+          id: tempId,
+          content,
+          created_at: new Date().toISOString(),
+          user_id: currentUserId,
+          users: { name: currentUserName, avatar_url: currentUserAvatar },
+          status: "queued",
+          reactions: [],
+          reply_to: currentReplyTo ?? null,
+          image_url: null,
+          client_nonce: nonce,
+        };
+
+        setMessages((prev) => [...prev, optimistic]);
+        onPreview(targetConversationId, tempId, {
+          id: tempId,
+          content: content || null,
+          image_url: null,
+          created_at: optimistic.created_at,
+          user_id: currentUserId,
+          deleted_at: null,
+          edited_at: null,
+        });
+        setPendingImagePreview(null);
+        setPendingImageFile(null);
+        setInput("");
+        onClearReply();
+        if (inputRef.current) inputRef.current.style.height = "24px";
+        inputRef.current?.focus();
+        requestAnimationFrame(() => scrollChatToBottom(scrollContainerRef.current));
+
+        void offlineEngine
+          .enqueueText({
+            ref: offlineRef("dm", targetConversationId),
+            content,
+            replyToId: currentReplyTo?.id ?? null,
+            replyToContent: null,
+            mentionUserIds: [],
+            optimisticPayload: optimistic as unknown as Record<string, unknown>,
+            clientNonce: nonce,
+          })
+          .catch(() => {
+            setMessages((prev) =>
+              prev.map((row) =>
+                row.id === tempId ? { ...row, status: "failed" as const } : row,
+              ),
+            );
+            onPreviewFailed(targetConversationId, tempId);
+            setError("Could not save this message on this device. Please try again.");
+          });
+      } finally {
+        dispatchingRef.current = false;
+      }
+      return;
+    }
+
     const currentReplyTo = replyToRef.current;
     const tempId = nextTempId();
 
@@ -436,6 +603,20 @@ export function useDmSend({
 
   const handleRetrySend = useCallback(
     async (failedTempId: string) => {
+      const outboxNonce = failedTempId.startsWith("temp-")
+        ? failedTempId.slice("temp-".length)
+        : "";
+      const offlineEngine = getOfflineChat();
+      if (offlineEngine && UUID_RE.test(outboxNonce)) {
+        setError(null);
+        try {
+          await offlineEngine.retry(outboxNonce);
+        } catch {
+          setError("Could not retry this message. Please try again.");
+        }
+        return;
+      }
+
       const retryData = failedRetryDataRef.current.get(failedTempId);
       if (!retryData) return;
       setMessages((prev) => prev.filter((m) => m.id !== failedTempId));

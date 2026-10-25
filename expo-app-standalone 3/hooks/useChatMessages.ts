@@ -46,6 +46,18 @@ import {
   oldestMessageCursor,
 } from '@/lib/realtimeCatchUp';
 import { useAuth } from '@/context/AuthContext';
+import { chatKey } from '../../packages/offline-chat/src';
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+  onOfflineResume,
+} from '@/lib/offline/engine';
+import {
+  fromLocalChatMessage,
+  reconcileMessages,
+  toLocalChatMessage,
+} from '@/lib/offline/rows';
 
 const PAGE_SIZE = 50;
 
@@ -136,6 +148,87 @@ export function useChatMessages(communityId: string) {
    * re-downloading the latest page.
    */
   const [cacheHydrated, setCacheHydrated] = useState(false);
+
+  // ── Offline store: paint local history, reconcile live, re-send queued ──
+  // The SQLite window is the durable history; chatCache remains a warm
+  // first-paint layer for the previous AsyncStorage generation. Both read the
+  // same account-scoped rows, so whichever resolves first paints the same
+  // conversation.
+  useEffect(() => {
+    const ref = offlineRef('community', communityId);
+    const key = chatKey(ref);
+    let active = true;
+    let unsubscribeEvents: (() => void) | null = null;
+
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribeEvents?.();
+      unsubscribeEvents = null;
+      if (!active || !engine) return;
+
+      unsubscribeEvents = engine.subscribe((event) => {
+        if (event.type === 'connectivity') return;
+        if (event.conversationKey !== key) return;
+        if (event.type === 'messages') {
+          const local = event.messages.map(fromLocalChatMessage);
+          setMessages((prev) => {
+            if (communityIdRef.current !== communityId) return prev;
+            return reconcileMessages(prev, local, (rows) =>
+              rows.sort(compareChatTimeline),
+            );
+          });
+          setCacheHydrated(true);
+        } else if (event.type === 'message-failed') {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === `temp-${event.clientNonce}`
+                ? { ...message, status: 'failed' }
+                : message,
+            ),
+          );
+        }
+      });
+
+      if (getCachedCommunityMessageWindow(communityId, user?.id)?.length) return;
+      void engine
+        .hydrate(ref)
+        .then((rows) => {
+          if (!active || rows.length === 0 || communityIdRef.current !== communityId) return;
+          const local = rows.map(fromLocalChatMessage);
+          setMessages((prev) =>
+            prev.length
+              ? reconcileMessages(prev, local, (rows) => rows.sort(compareChatTimeline))
+              : local,
+          );
+          windowCommunityRef.current = communityId;
+          windowUserIdRef.current = user?.id;
+          setHasMore(local.length >= PAGE_SIZE);
+          setIsLoading(false);
+          setCacheHydrated(true);
+        })
+        .catch(() => undefined);
+    };
+
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      stop();
+      unsubscribeEvents?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId, user?.id]);
+
+  // Foreground: the socket may have missed edits/de-clarations and reactions;
+  // re-read the visible window (one request) and drain the queue. Message
+  // catch-up remains the existing `catchUp.schedule()` path.
+  useEffect(() => {
+    return onOfflineResume(() => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      const ref = offlineRef('community', communityId);
+      void engine.revalidateWindow(ref).catch(() => undefined);
+      void engine.drainOutbox().catch(() => undefined);
+    });
+  }, [communityId]);
   const openCatchUpRef = useRef(false);
   /** When the open catch-up was requested — suppresses the connect echo. */
   const openCatchUpAtRef = useRef(0);
@@ -538,6 +631,21 @@ export function useChatMessages(communityId: string) {
           pending.communityId,
           pending.rows,
         );
+        // Durable copy for the offline reader and cross-restart sync state.
+        // The controller keeps only confirmed rows here; queued rows are owned
+        // by the outbox record written in the same transaction.
+        const engine = getOfflineChat();
+        if (engine) {
+          const ref = offlineRef('community', pending.communityId);
+          void engine
+            .persistWindow(
+              ref,
+              pending.rows.map((row) =>
+                toLocalChatMessage(pending.userId, ref, row),
+              ),
+            )
+            .catch(() => undefined);
+        }
       }
     }, 500);
   }, [cacheHydrated, communityId, messages, user?.id]);
@@ -816,6 +924,15 @@ export function useChatMessages(communityId: string) {
     unsubscribes.push(
       realtimeClient.onRoomStatus(room, (connected) => {
         if (!connected) return;
+        // A live socket is proof the API is reachable: retry the queue. The
+        // window revalidation catches edits/deletes/reactions lost while the
+        // socket was down (an ?after= cursor cannot see those).
+        const engine = getOfflineChat();
+        if (engine) {
+          const offlineRefForRoom = offlineRef('community', communityId);
+          void engine.revalidateWindow(offlineRefForRoom).catch(() => undefined);
+          void engine.drainOutbox().catch(() => undefined);
+        }
         // Mounting a chat opens its socket; that first "connected" is not a
         // gap — the open catch-up is already covering it.
         if (Date.now() - openCatchUpAtRef.current < 5_000) return;

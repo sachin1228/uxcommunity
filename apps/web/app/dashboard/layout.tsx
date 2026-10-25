@@ -5,6 +5,7 @@ import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { UndoToast } from "@/components/ui/UndoToast";
+import { OfflineChatProvider } from "@/components/offline/OfflineChatProvider";
 import { Topbar } from "./Topbar";
 
 
@@ -67,6 +68,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+      {/* Activates the account-scoped IndexedDB store, the durable outbox and
+          the shell service worker. Renders nothing. */}
+      <OfflineChatProvider userId={userId} />
       {/* End to end: the bar spans the window and sits above the sidebar, so
           the brand reads as the app's header rather than the sidebar's. */}
       <Topbar userId={userId} user={sidebarUser} />

@@ -8,7 +8,7 @@
  * the server rejects it.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { PendingImage } from '@/components/chat/ChatInput';
 import type { ReplyDraft } from '@/lib/chatContentEvents';
@@ -21,6 +21,14 @@ import {
   sendDmMessage,
   uploadDmImage,
 } from '@/lib/dmApi';
+import { chatKey, newClientNonce, optimisticMessageId } from '../../packages/offline-chat/src';
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from '@/lib/offline/engine';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Options {
   conversationId: string | null;
@@ -70,6 +78,69 @@ export function useDmSend({
   const [editError, setEditError] = useState<string | null>(null);
 
   const clearSendError = useCallback(() => setSendError(null), []);
+
+  // Durable send confirmations arrive through the controller (possibly after
+  // the app was killed and reopened).
+  useEffect(() => {
+    if (!conversationId) return undefined;
+    const key = chatKey(offlineRef('dm', conversationId));
+    let unsubscribe: (() => void) | null = null;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribe?.();
+      unsubscribe = null;
+      if (!engine) return;
+      unsubscribe = engine.subscribe((event) => {
+        if (event.type === 'connectivity') return;
+        if (event.conversationKey !== key) return;
+        if (event.type === 'message-sent') {
+          const tempId = optimisticMessageId(event.clientNonce);
+          const incoming = event.message.payload as unknown as DmMessage;
+          setMessages((current) => {
+            const optimistic = current.find((message) => message.id === tempId);
+            const existing = current.find((message) => message.id === incoming.id);
+            const merged: DmMessage = {
+              ...(existing ?? optimistic ?? {}),
+              ...incoming,
+              users: incoming.users ?? existing?.users ?? optimistic?.users ?? null,
+              reply_to: incoming.reply_to ?? existing?.reply_to ?? optimistic?.reply_to ?? null,
+              image_url: incoming.image_url ?? existing?.image_url ?? optimistic?.image_url ?? null,
+              status: 'sent',
+              client_nonce: event.clientNonce,
+            };
+            const next = current.filter(
+              (message) => message.id !== tempId && message.id !== incoming.id,
+            );
+            next.push(merged);
+            return sortMessages(next);
+          });
+          const state = event.meta?.request_state;
+          if (state === 'pending' || state === 'accepted' || state === 'rejected') {
+            onConversationState(
+              state,
+              typeof event.meta?.requested_by === 'string'
+                ? event.meta.requested_by
+                : null,
+            );
+          }
+          setSendError(null);
+        } else if (event.type === 'message-failed') {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === optimisticMessageId(event.clientNonce)
+                ? { ...message, status: 'failed' }
+                : message,
+            ),
+          );
+          setSendError(event.error);
+        }
+      });
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      stop();
+      unsubscribe?.();
+    };
+  }, [conversationId, onConversationState, setMessages]);
 
   const removeMessage = useCallback(
     (messageId: string) => {
@@ -168,6 +239,61 @@ export function useDmSend({
       stopTyping();
       setSendError(null);
 
+      // ── Durable text path ────────────────────────────────────────────────
+      const engine = getOfflineChat();
+      if (engine && !pendingImage) {
+        const nonce = newClientNonce();
+        const tempId = optimisticMessageId(nonce);
+        const optimistic: DmMessage = {
+          id: tempId,
+          content: trimmed || null,
+          created_at: new Date().toISOString(),
+          user_id: currentUser.id,
+          reply_to_id: replyTo?.id ?? null,
+          image_url: null,
+          deleted_at: null,
+          edited_at: null,
+          users: {
+            name: currentUser.name,
+            avatar_url: currentUser.avatar_url,
+            designation: null,
+          },
+          reactions: [],
+          reply_to: replyTo
+            ? {
+                id: replyTo.id,
+                content: replyTo.content,
+                user_name: replyTo.user_name,
+                user_id: replyTo.user_id,
+              }
+            : null,
+          status: 'queued',
+          client_nonce: nonce,
+        };
+        setMessages((current) => [...current, optimistic]);
+        scrollToLatest(false);
+        setSendError(null);
+        void engine
+          .enqueueText({
+            ref: offlineRef('dm', conversationId),
+            content: trimmed,
+            replyToId: replyTo?.id ?? null,
+            replyToContent: null,
+            mentionUserIds: [],
+            optimisticPayload: optimistic as unknown as Record<string, unknown>,
+            clientNonce: nonce,
+          })
+          .catch(() => {
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === tempId ? { ...message, status: 'failed' } : message,
+              ),
+            );
+            setSendError('Could not save this message on this device. Please try again.');
+          });
+        return;
+      }
+
       const tempId = nextTempId();
       const now = new Date().toISOString();
       const optimistic: DmMessage = {
@@ -214,6 +340,14 @@ export function useDmSend({
   );
 
   const handleCancel = useCallback((tempId: string) => {
+    // A queued outbox row has no request to abort; removing its bubble here
+    // would leave the queued message to send after the member dismissed it.
+    if (
+      !retryDataRef.current.has(tempId) &&
+      UUID_RE.test(tempId.replace(/^temp-/, ''))
+    ) {
+      return;
+    }
     const payload = retryDataRef.current.get(tempId);
     if (payload?.uploadedUrl && conversationId) {
       const url = payload.uploadedUrl;
@@ -227,6 +361,15 @@ export function useDmSend({
 
   const handleRetry = useCallback(
     (tempId: string) => {
+      const outboxNonce = tempId.startsWith('temp-')
+        ? tempId.slice('temp-'.length)
+        : '';
+      const engine = getOfflineChat();
+      if (engine && UUID_RE.test(outboxNonce)) {
+        void engine.retry(outboxNonce).catch(() => undefined);
+        return;
+      }
+
       const payload = retryDataRef.current.get(tempId);
       if (!payload) return;
       removeMessage(tempId);

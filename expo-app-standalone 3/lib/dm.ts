@@ -79,8 +79,13 @@ export interface DmMessage {
   users: { name: string; avatar_url: string | null; designation: string | null } | null;
   reactions: DmReaction[];
   reply_to: DmReplyPreview | null;
-  /** Client-only — optimistic bubbles carry their send state like the chat's. */
-  status?: 'sending' | 'sent' | 'failed';
+  /**
+   * Client-only — optimistic bubbles carry their send state like the chat's.
+   * `queued` is the durable outbox (no request in flight, not accepted yet).
+   */
+  status?: 'queued' | 'sending' | 'sent' | 'failed';
+  /** Idempotency key for one logical send; reused by every retry. */
+  client_nonce?: string | null;
 }
 
 /** Matches the server's DM_MESSAGE_PAGE_SIZE. */

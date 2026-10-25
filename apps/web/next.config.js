@@ -47,7 +47,7 @@ const nextConfig = {
     "*": ["../../k6/**"],
   },
   reactStrictMode: true,
-  transpilePackages: ["@uxcommunity/shared", "@uxcommunity/design-system"],
+  transpilePackages: ["@uxcommunity/shared", "@uxcommunity/design-system", "@uxcommunity/offline-chat"],
   allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "*.sisko.replit.dev", "127.0.0.1"],
   // Emoji assets are vendored static files (see apps/web/public/emoji and
   // scripts/update-emoji.mjs) that only change when someone deliberately

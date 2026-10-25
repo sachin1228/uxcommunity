@@ -125,7 +125,11 @@
     "test:mobile-polls": "tsx --test \"expo-app-standalone 3/lib/communityPoll.test.ts\" \"expo-app-standalone 3/lib/feedPollRealtime.test.ts\"",
     "test:mobile-home-feed": "tsx --test \"expo-app-standalone 3/lib/homeFeedScope.test.ts\"",
     "test:mobile-content-actions": "tsx --test \"expo-app-standalone 3/lib/contentReports.test.ts\" \"expo-app-standalone 3/lib/communityPreviewData.test.ts\" \"expo-app-standalone 3/lib/communityPermissions.test.ts\"",
-    "test:mobile-push": "tsx --test \"expo-app-standalone 3/lib/pushRegistrationCoordinator.test.ts\" \"expo-app-standalone 3/lib/pushRegistrationState.test.ts\" \"expo-app-standalone 3/lib/pushRegistrationGate.test.ts\" \"expo-app-standalone 3/lib/pushRotationFollowUp.test.ts\" \"expo-app-standalone 3/lib/pushRoutes.test.ts\" \"expo-app-standalone 3/lib/withTimeout.test.ts\""
+    "test:mobile-push": "tsx --test \"expo-app-standalone 3/lib/pushRegistrationCoordinator.test.ts\" \"expo-app-standalone 3/lib/pushRegistrationState.test.ts\" \"expo-app-standalone 3/lib/pushRegistrationGate.test.ts\" \"expo-app-standalone 3/lib/pushRotationFollowUp.test.ts\" \"expo-app-standalone 3/lib/pushRoutes.test.ts\" \"expo-app-standalone 3/lib/withTimeout.test.ts\"",
+    "test:offline-chat": "tsx --test packages/offline-chat/src/*.test.ts",
+    "test:offline-web": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/offline/*.test.ts apps/web/lib/communities/message-request.test.ts",
+    "test:offline-mobile": "tsx --test \"expo-app-standalone 3/lib/offline/*.test.ts\"",
+    "test:community-idempotency": "bash supabase/tests/run-local.sh supabase/tests/community_message_idempotency.test.sql"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -135,6 +139,7 @@
     "lottie-react": "^2.4.1"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.6",
     "playwright": "^1.63.0",
     "tsx": "^4.20.6"
   }

@@ -25,8 +25,14 @@ import { resetReadManager } from "@/lib/communities/read-manager";
 import { clearDedupeCache } from "@/lib/dedupe-fetch";
 import { resetCurrentUserSummary } from "@/lib/current-user";
 import { clearRequestCache } from "@/lib/request-cache";
+import { deactivateOfflineChat } from "@/lib/offline/engine";
 
 export function resetClientSessionCaches(): void {
+  // Stop the offline sync worker and abort any in-flight send BEFORE the
+  // in-memory caches disappear. The account-scoped IndexedDB stays on disk
+  // (an unsent queue belongs to that member); it can never be read or written
+  // while another account is active.
+  deactivateOfflineChat();
   // Community, sidebar and explore stores + the chat message/metadata caches.
   clearAllUserCaches();
   // Fetched `/api/*` payloads, their in-flight promises and subscribers.

@@ -6,6 +6,7 @@ import { dmCache } from "@/lib/direct-messages/client-cache";
 import { dmUrls } from "@/lib/direct-messages/client";
 import { dmCursorQuery } from "@/lib/direct-messages/cursor";
 import {
+  compareDmMessages,
   cursorAfter,
   mergeDmMessages,
   newestRealMessage,
@@ -13,6 +14,49 @@ import {
 } from "@/lib/direct-messages/messages";
 import { DM_MESSAGE_PAGE_SIZE } from "@/lib/direct-messages/constants";
 import type { DmMessage } from "@/lib/direct-messages/types";
+import { chatKey } from "@uxcommunity/offline-chat";
+import {
+  OFFLINE_RESUME_EVENT,
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from "@/lib/offline/engine";
+import { fromLocalDmMessage, toLocalDmMessage } from "@/lib/offline/rows";
+
+/**
+ * Merge the local store's copy over what is on screen: confirmed rows replace
+ * their optimistic bubbles by nonce, edits/deletes replace by id, and rows the
+ * store does not hold (older paginated history) stay put.
+ */
+function reconcileWithLocalWindow(
+  current: DmMessage[],
+  local: DmMessage[],
+): DmMessage[] {
+  if (local.length === 0) return current;
+  const localById = new Map(local.map((row) => [row.id, row]));
+  const localNonces = new Set(
+    local.map((row) => row.client_nonce).filter((nonce): nonce is string => !!nonce),
+  );
+  const seen = new Set<string>();
+  const next: DmMessage[] = [];
+
+  for (const row of current) {
+    if (
+      row.id.startsWith("temp-") &&
+      row.client_nonce &&
+      localNonces.has(row.client_nonce) &&
+      !localById.has(row.id)
+    ) {
+      continue;
+    }
+    next.push(localById.get(row.id) ?? row);
+    seen.add(row.id);
+  }
+  for (const row of local) {
+    if (!seen.has(row.id)) next.push(row);
+  }
+  return next.sort(compareDmMessages);
+}
 
 /** A catch-up may legitimately span many pages; this bounds one drain pass. */
 const MAX_CATCH_UP_PAGES = 20;
@@ -214,6 +258,84 @@ export function useDmThreadData({
     },
     [fetchPage],
   );
+
+  // ── Offline layer: local-first paint, live reconciliation, durable writes ──
+  useEffect(() => {
+    if (typeof window === "undefined" || !conversationId) return undefined;
+    const ref = offlineRef("dm", conversationId);
+    const key = chatKey(ref);
+    let active = true;
+    let unsubscribeEvents: (() => void) | null = null;
+
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribeEvents?.();
+      unsubscribeEvents = null;
+      if (!active || !engine) return;
+
+      unsubscribeEvents = engine.subscribe((event) => {
+        if (event.type !== "messages" || event.conversationKey !== key) return;
+        const local = event.messages.map(fromLocalDmMessage);
+        setMessages((current) => {
+          if (activeIdRef.current !== conversationId) return current;
+          const next = reconcileWithLocalWindow(current, local);
+          dmCache.setMessages(
+            conversationId,
+            next.filter((row) => !row.id.startsWith("temp-")),
+          );
+          return next;
+        });
+      });
+
+      if (dmCache.getMessages(conversationId)?.length) return;
+      void engine
+        .hydrate(ref)
+        .then((rows) => {
+          if (!active || rows.length === 0 || activeIdRef.current !== conversationId) return;
+          const local = rows.map(fromLocalDmMessage);
+          setMessages((current) =>
+            current.length ? reconcileWithLocalWindow(current, local) : local,
+          );
+          setHasMoreAbove(local.length >= DM_MESSAGE_PAGE_SIZE);
+          setLoading(false);
+          setInitialReady(true);
+        })
+        .catch(() => undefined);
+    };
+
+    const unsubscribeChange = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      unsubscribeChange();
+      unsubscribeEvents?.();
+    };
+  }, [conversationId, userId, setMessages]);
+
+  useEffect(() => {
+    if (!conversationId || messages.length === 0) return undefined;
+    const timer = setTimeout(() => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      const ref = offlineRef("dm", conversationId);
+      const rows = messages.map((row) => toLocalDmMessage(userId, ref, row));
+      void engine.persistWindow(ref, rows).catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [messages, conversationId, userId]);
+
+  // Reconnect: re-read the visible window for edits/deletes/reactions missed
+  // while offline, then drain the outbox. Missed-message catch-up stays with
+  // the existing realtime/focus path.
+  useEffect(() => {
+    const onResume = () => {
+      const engine = getOfflineChat();
+      if (!engine || !conversationId) return;
+      const ref = offlineRef("dm", conversationId);
+      void engine.revalidateWindow(ref).catch(() => undefined);
+      void engine.drainOutbox().catch(() => undefined);
+    };
+    window.addEventListener(OFFLINE_RESUME_EVENT, onResume);
+    return () => window.removeEventListener(OFFLINE_RESUME_EVENT, onResume);
+  }, [conversationId]);
 
   return {
     messages,

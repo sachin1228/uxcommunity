@@ -183,7 +183,7 @@ export async function POST(
     }
     return NextResponse.json({ error: "Message too long." }, { status: 422 });
   }
-  const { content, replyToContent, imageUrl: image_url, mentionUserIds } = parsed.value;
+  const { content, replyToContent, imageUrl: image_url, mentionUserIds, clientNonce } = parsed.value;
   // Mutable: an anchor that turns out not to exist in this community is
   // silently dropped below rather than failing the send.
   let reply_to_id = parsed.value.replyToId;
@@ -263,7 +263,16 @@ export async function POST(
   const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
       .from("community_messages")
-      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, reply_to_content_id, image_url, mentions })
+      .insert({
+        community_id: communityId,
+        user_id: userId,
+        content: content || null,
+        reply_to_id,
+        reply_to_content_id,
+        image_url,
+        mentions,
+        client_nonce: clientNonce,
+      })
       .select("id, content, created_at, user_id, reply_to_id, reply_to_content_id, image_url, mentions")
       .single(),
   )) as unknown as {
@@ -282,6 +291,58 @@ export async function POST(
   };
 
   if (insertErr || !inserted) {
+    // 23505 on this insert can only be the (user_id, client_nonce) unique
+    // index: the original send committed but its response never reached the
+    // client, which is retrying the same logical send. Answer with the row the
+    // FIRST attempt wrote and do not publish again — clients dedupe by id, and
+    // a second fan-out would only cost a duplicate push/realtime frame.
+    const conflict = insertErr as { code?: string } | null;
+    if (clientNonce && conflict?.code === "23505") {
+      const { data: existing } = (await db
+        .from("community_messages")
+        .select("id, content, created_at, user_id, reply_to_id, reply_to_content_id, image_url, mentions, community_id")
+        .eq("user_id", userId)
+        .eq("client_nonce", clientNonce)
+        .maybeSingle()) as unknown as {
+        data: {
+          id: string;
+          content: string | null;
+          created_at: string;
+          user_id: string;
+          reply_to_id: string | null;
+          reply_to_content_id: string | null;
+          image_url: string | null;
+          mentions: Array<{ user_id: string; name: string }> | null;
+          community_id: string;
+        } | null;
+      };
+
+      if (existing && existing.community_id === communityId) {
+        const timing = timer.finish({ query_count: 1 });
+        return NextResponse.json(
+          {
+            duplicate: true,
+            message: {
+              ...existing,
+              users: null,
+              reactions: [],
+              reply_to: null,
+              reply_content_kind: null,
+              reply_content_title: null,
+              image_url: existing.image_url ?? null,
+              mentions: existing.mentions ?? [],
+            },
+          },
+          { status: 200, headers: { "Server-Timing": timing } },
+        );
+      }
+      if (existing) {
+        return NextResponse.json(
+          { error: "This send id was already used in another community." },
+          { status: 409 },
+        );
+      }
+    }
     console.error("[POST message] insert error:", insertErr);
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }

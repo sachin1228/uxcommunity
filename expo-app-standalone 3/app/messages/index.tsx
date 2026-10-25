@@ -33,6 +33,12 @@ import {
   seedDmConversationsFromDisk,
 } from '@/lib/dmConversationsCache';
 import { chatCache } from '@/lib/chatCacheStore';
+import { chatKey } from '../../../packages/offline-chat/src';
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from '@/lib/offline/engine';
 import {
   dmConversationPreview,
   dmTimestampLabel,
@@ -133,6 +139,35 @@ export default function MessagesScreen() {
     };
   }, [userId]);
 
+  // SQLite copy: the durable conversation list the offline reader paints.
+  useEffect(() => {
+    if (!userId) return undefined;
+    let active = true;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      if (!active || !engine) return;
+      void engine
+        .listConversations()
+        .then((rows) => {
+          if (!active) return;
+          const cached = rows
+            .filter((row) => row.ref.kind === 'dm')
+            .map((row) => row.payload as unknown as DmConversation)
+            .filter((row) => typeof row?.id === 'string' && !!row.peer);
+          if (cached.length === 0) return;
+          loadedForUserRef.current = userId;
+          if (!peekDmConversations()) seedDmConversationsFromDisk(cached);
+          setConversations((prev) => (prev.length > 0 ? prev : cached));
+          setLoading(false);
+        })
+        .catch(() => undefined);
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      stop();
+    };
+  }, [userId]);
+
   // Keep the disk snapshot current (throttled — the live page changes on
   // every message preview and read).
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,6 +183,25 @@ export default function MessagesScreen() {
       pendingSaveRef.current = null;
       if (pending && loadedForUserRef.current === userId) {
         void chatCache.saveDmConversationList(userId, pending);
+        const engine = getOfflineChat();
+        if (engine) {
+          void engine
+            .saveConversations(
+              pending.map((conversation) => {
+                const ref = offlineRef('dm', conversation.id);
+                return {
+                  userId,
+                  conversationKey: chatKey(ref),
+                  ref,
+                  lastMessageAt: conversation.last_message_at,
+                  unreadCount: conversation.unread_count,
+                  payload: conversation as unknown as Record<string, unknown>,
+                  updatedAt: Date.now(),
+                };
+              }),
+            )
+            .catch(() => undefined);
+        }
       }
     }, 800);
   }, [conversations, userId]);

@@ -11,6 +11,18 @@ import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communit
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { compressImage, compressedFile, preloadImage } from "@/lib/image-client";
 import { MAX_MESSAGE_CHARS, scrollChatToBottom } from "./chatUtils";
+import {
+  chatKey,
+  newClientNonce,
+  optimisticMessageId,
+} from "@uxcommunity/offline-chat";
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from "@/lib/offline/engine";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Message = CachedMessage;
 
@@ -111,6 +123,73 @@ export function useSendMessage({
     replyToRef.current = replyTo;
   }, [replyTo]);
 
+  // ── Durable outbox confirmations ──────────────────────────────────────────
+  // A queued text send does not have an in-flight promise to await: the
+  // controller delivers its authoritative row later (possibly after a restart).
+  // These events are the only place that bubble learns it landed or was
+  // rejected.
+  useEffect(() => {
+    const key = chatKey(offlineRef("community", communityId));
+    let unsubscribe: (() => void) | null = null;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribe?.();
+      unsubscribe = null;
+      if (!engine) return;
+      unsubscribe = engine.subscribe((event) => {
+        if (event.type === "connectivity") return;
+        if (event.conversationKey !== key) return;
+        if (event.type === "message-sent") {
+          const tempId = optimisticMessageId(event.clientNonce);
+          const message = event.message.payload as unknown as Message;
+          setMessages((prev) => {
+            const optimistic = prev.find((m) => m.id === tempId);
+            const existing = prev.find((m) => m.id === message.id);
+            const merged: Message = {
+              ...(existing ?? optimistic ?? {}),
+              ...message,
+              users: message.users ?? existing?.users ?? optimistic?.users ?? null,
+              reply_to: message.reply_to ?? existing?.reply_to ?? optimistic?.reply_to ?? null,
+              reply_to_content:
+                message.reply_to_content ?? existing?.reply_to_content ?? optimistic?.reply_to_content ?? null,
+              image_url: message.image_url ?? existing?.image_url ?? optimistic?.image_url ?? null,
+              mentions:
+                message.mentions ?? existing?.mentions ?? optimistic?.mentions ?? undefined,
+              status: "sent" as const,
+              client_nonce: event.clientNonce,
+            };
+            const next = prev.filter((m) => m.id !== tempId && m.id !== message.id);
+            next.push(merged);
+            next.sort((a, b) => {
+              const at = new Date(a.created_at).getTime();
+              const bt = new Date(b.created_at).getTime();
+              return at !== bt ? at - bt : a.id.localeCompare(b.id);
+            });
+            msgCache.set(communityId, next);
+            return next;
+          });
+          setHideUnreadDivider(true);
+        } else if (event.type === "message-failed") {
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === optimisticMessageId(event.clientNonce)
+                ? { ...m, status: "failed" as const }
+                : m,
+            );
+            msgCache.set(communityId, next);
+            return next;
+          });
+          setError(event.error);
+        }
+      });
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      stop();
+      unsubscribe?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId, setMessages]);
+
   const prevPreviewRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -186,6 +265,10 @@ export function useSendMessage({
     // as "failed" so the user can retry — don't remove the message here.
     // For text-only sends: no retry data stored, so remove immediately.
     const retryData = failedRetryDataRef.current.get(tempId);
+    // A durable outbox row has no in-flight request to abort. Removing the
+    // bubble here would leave the queue record to send a message the member
+    // just dismissed, so the cancel path must not touch it.
+    if (!retryData && UUID_RE.test(tempId.replace(/^temp-/, ""))) return;
     if (!retryData?.file) {
       setMessages((prev) => {
         const next = prev.filter((m) => m.id !== tempId);
@@ -541,6 +624,110 @@ export function useSendMessage({
 
     setError(null);
 
+    // ── Durable text path ───────────────────────────────────────────────────
+    // A text-only send is written to the outbox with its optimistic bubble in
+    // one transaction, then drained. This is the SAME path online and offline:
+    // a lost response, a browser restart or a flaky connection all converge on
+    // the same idempotency key, so the server can never create a duplicate.
+    const offlineEngine = getOfflineChat();
+    if (offlineEngine && !imageFile) {
+      dispatchingRef.current = true;
+      try {
+        const currentReplyTo = replyToRef.current;
+        const mentions = resolveMentionsFor(content);
+        const replyToContent = currentReplyTo?.content_kind
+          ? { id: currentReplyTo.id, kind: currentReplyTo.content_kind }
+          : null;
+        const nonce = newClientNonce();
+        const tempId = optimisticMessageId(nonce);
+
+        const optimistic: Message = {
+          id: tempId,
+          content,
+          created_at: new Date().toISOString(),
+          user_id: currentUserId,
+          users: { name: currentUserName, avatar_url: currentUserAvatar },
+          status: "queued",
+          reactions: [],
+          reply_to:
+            currentReplyTo && !replyToContent
+              ? {
+                  id: currentReplyTo.id,
+                  content: currentReplyTo.content,
+                  user_name: currentReplyTo.user_name,
+                  user_id: currentReplyTo.user_id,
+                }
+              : null,
+          reply_to_content: replyToContent
+            ? {
+                id: replyToContent.id,
+                kind: replyToContent.kind,
+                title: currentReplyTo?.content ?? "",
+              }
+            : null,
+          image_url: null,
+          mentions,
+          client_nonce: nonce,
+        };
+
+        setMessages((prev) => {
+          const next = [...prev, optimistic];
+          msgCache.set(communityId, next);
+          return next;
+        });
+        patchSidebarLastMessage(communityId, {
+          id: tempId,
+          content,
+          created_at: optimistic.created_at,
+          user: { name: currentUserName },
+          is_own: true,
+          has_image: false,
+          is_reply: !!currentReplyTo,
+          reply_to_user:
+            currentReplyTo && !currentReplyTo.content_kind
+              ? currentReplyTo.user_name.split(" ")[0]
+              : null,
+          reply_to_content_kind: currentReplyTo?.content_kind ?? null,
+          is_deleted: false,
+          reactions: [],
+        });
+
+        // Clear the composer synchronously — the write is async, but the
+        // member must be able to type the next message immediately.
+        setPendingImagePreview(null);
+        setPendingImageFile(null);
+        setInput("");
+        onClearReply();
+        if (inputRef.current) inputRef.current.style.height = "24px";
+        inputRef.current?.focus();
+        requestAnimationFrame(() => scrollChatToBottom(scrollContainerRef.current));
+
+        void offlineEngine
+          .enqueueText({
+            ref: offlineRef("community", communityId),
+            content,
+            replyToId: replyToContent ? null : currentReplyTo?.id ?? null,
+            replyToContent,
+            mentionUserIds: mentions.map((mention) => mention.user_id),
+            optimisticPayload: optimistic as unknown as Record<string, unknown>,
+            clientNonce: nonce,
+          })
+          .catch(() => {
+            setMessages((prev) => {
+              const next = prev.map((row) =>
+                row.id === tempId ? { ...row, status: "failed" as const } : row,
+              );
+              msgCache.set(communityId, next);
+              return next;
+            });
+            setError("Could not save this message on this device. Please try again.");
+          });
+      } finally {
+        dispatchingRef.current = false;
+      }
+      return;
+    }
+
     const currentReplyTo = replyToRef.current;
     const tempId = nextTempId();
 
@@ -593,6 +780,23 @@ export function useSendMessage({
    * optimistic one, and re-runs the upload + message flow.
    */
   const handleRetrySend = useCallback(async (failedTempId: string) => {
+    // A durable outbox failure is retried through the controller, which reuses
+    // the SAME nonce — the server recognises the original attempt and returns
+    // it instead of inserting a second message.
+    const outboxNonce = failedTempId.startsWith("temp-")
+      ? failedTempId.slice("temp-".length)
+      : "";
+    const offlineEngine = getOfflineChat();
+    if (offlineEngine && UUID_RE.test(outboxNonce)) {
+      setError(null);
+      try {
+        await offlineEngine.retry(outboxNonce);
+      } catch {
+        setError("Could not retry this message. Please try again.");
+      }
+      return;
+    }
+
     // The retry payload is consumed synchronously below, so a double-click on
     // Retry can never queue two sends for the same bubble — and a retry for a
     // bubble that scrolled out of the previous chat window is dropped instead

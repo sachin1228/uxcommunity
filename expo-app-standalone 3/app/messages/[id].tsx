@@ -49,6 +49,19 @@ import { setActiveDmConversationForNotifications } from '@/lib/chatNotificationS
 import { useDmSend } from '@/hooks/useDmSend';
 import { useDmTyping } from '@/hooks/useDmTyping';
 import { chatCache } from '@/lib/chatCacheStore';
+import { chatKey } from '../../../packages/offline-chat/src';
+import {
+  getOfflineChat,
+  notifyOfflineOnline,
+  offlineRef,
+  onOfflineChatChange,
+  onOfflineResume,
+} from '@/lib/offline/engine';
+import {
+  fromLocalDmMessage,
+  reconcileMessages,
+  toLocalDmMessage,
+} from '@/lib/offline/rows';
 import {
   answerDmRequest,
   blockUser,
@@ -259,9 +272,94 @@ export default function DmThreadScreen() {
           pending.conversationId,
           pending.messages,
         );
+        const engine = getOfflineChat();
+        if (engine) {
+          const ref = offlineRef('dm', pending.conversationId);
+          void engine
+            .persistWindow(
+              ref,
+              pending.messages.map((message) =>
+                toLocalDmMessage(pending.userId, ref, message),
+              ),
+            )
+            .catch(() => undefined);
+        }
       }
     }, 500);
   }, [conversationId, messages, userId]);
+
+  // ── Offline store: durable history + live reconciliation ────────────────
+  useEffect(() => {
+    if (!userId || !conversationId || isPendingConversation) return undefined;
+    const ref = offlineRef('dm', conversationId);
+    const key = chatKey(ref);
+    let active = true;
+    let unsubscribeEvents: (() => void) | null = null;
+
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      unsubscribeEvents?.();
+      unsubscribeEvents = null;
+      if (!active || !engine) return;
+
+      unsubscribeEvents = engine.subscribe((event) => {
+        if (event.type === 'connectivity') return;
+        if (event.conversationKey !== key) return;
+        if (event.type === 'messages') {
+          const local = event.messages.map(fromLocalDmMessage);
+          setMessages((current) => reconcileMessages(current, local, sortMessages));
+
+        } else if (event.type === 'message-failed') {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === `temp-${event.clientNonce}`
+                ? { ...message, status: 'failed' }
+                : message,
+            ),
+          );
+        }
+      });
+
+      if (dataConversationRef.current === conversationId && messagesRef.current.length > 0) {
+        return;
+      }
+      void engine
+        .hydrate(ref)
+        .then((rows) => {
+          if (!active || rows.length === 0 || dataConversationRef.current !== conversationId) {
+            return;
+          }
+          const local = rows.map(fromLocalDmMessage);
+          setMessages((current) =>
+            current.length ? reconcileMessages(current, local, sortMessages) : local,
+          );
+          setHasMore(local.length >= 50);
+          setLoading(false);
+        })
+        .catch(() => undefined);
+    };
+
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      stop();
+      unsubscribeEvents?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, userId, isPendingConversation]);
+
+  // Foreground / reconnect: pick up edits, deletes and reactions missed while
+  // offline, and drain anything queued. Message catch-up stays with the
+  // existing realtime + AppState path.
+  useEffect(() => {
+    if (!conversationId || isPendingConversation) return undefined;
+    return onOfflineResume(() => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      const ref = offlineRef('dm', conversationId);
+      void engine.revalidateWindow(ref).catch(() => undefined);
+      void engine.drainOutbox().catch(() => undefined);
+    });
+  }, [conversationId, isPendingConversation]);
 
   useEffect(() => {
     return () => {
@@ -903,6 +1001,16 @@ export default function DmThreadScreen() {
     );
 
     const unsubscribeStatus = realtimeClient.onRoomStatus(room, (connected) => {
+      if (connected) {
+        // Reachable again: retry the outbox and revalidate the visible window.
+        notifyOfflineOnline();
+        const engine = getOfflineChat();
+        if (engine && conversationId) {
+          void engine
+            .revalidateWindow(offlineRef('dm', conversationId))
+            .catch(() => undefined);
+        }
+      }
       // Mounting the thread opens its socket right after the page request;
       // that first connect is not a gap the page did not already cover.
       if (connected && Date.now() - lastLoadedAtRef.current > 5_000) scheduleCatchUp();

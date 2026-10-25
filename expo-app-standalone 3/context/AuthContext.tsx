@@ -40,6 +40,7 @@ import {
 } from '@/lib/authSnapshot';
 import { resolveSessionRestore, type SessionProbe } from '@/lib/authRestore';
 import { chatCache } from '@/lib/chatCacheStore';
+import { activateOfflineChat } from '@/lib/offline/engine';
 import {
   clearCommunitiesSnapshot,
   peekCommunitiesSnapshot,
@@ -132,6 +133,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     realtimeUserIdRef.current = next?.id ?? null;
     activateScreenDataSession(next?.id ?? null, sessionClock.current());
     chatCache.activateUser(next?.id ?? null);
+    // One SQLite offline store + outbox per member. Suspending (null) keeps
+    // the previous account's unsent queue on disk, scoped to its own database,
+    // but stops every worker so nothing can be transmitted as the new member.
+    void activateOfflineChat(next?.id ?? null);
     setCommunitiesActiveUser(next?.id ?? null);
     setDmConversationsActiveUser(next?.id ?? null);
     setUser(next);

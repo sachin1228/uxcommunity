@@ -511,6 +511,7 @@ export type Database = {
       };
       community_messages: {
         Row: {
+          client_nonce: string | null;
           community_id: string;
           content: string | null;
           created_at: string;
@@ -526,6 +527,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          client_nonce?: string | null;
           community_id: string;
           content?: string | null;
           created_at?: string;
@@ -541,6 +543,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          client_nonce?: string | null;
           community_id?: string;
           content?: string | null;
           created_at?: string;

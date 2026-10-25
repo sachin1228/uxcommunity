@@ -125,8 +125,14 @@ export interface Message {
   reply_to: ReplyPreview | null;
   /** Set when this message replies to a "created a …" card instead. */
   reply_to_content?: ContentReplyPreview | null;
-  /** Client-only — not stored on the server. */
-  status?: 'sending' | 'sent' | 'failed';
+  /**
+   * Client-only — not stored on the server. `queued` means the durable outbox
+   * has it and will transmit when connectivity returns; it is not `sending`
+   * (no request is in flight) and never means accepted.
+   */
+  status?: 'queued' | 'sending' | 'sent' | 'failed';
+  /** Idempotency key for one logical send; reused by every retry. */
+  client_nonce?: string | null;
 }
 
 /** Message cursor used by the server's canonical (created_at, id) ordering. */
@@ -305,6 +311,8 @@ export async function sendMessage(
     image_url?: string;
     /** Members picked from the composer's @-autocomplete. */
     mentions?: MessageMention[];
+    /** Sender-scoped idempotency key (UUID) for a safe retry. */
+    client_nonce?: string;
   },
   signal?: AbortSignal
 ): Promise<Message> {

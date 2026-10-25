@@ -28,6 +28,12 @@ import { useSidebarTyping } from "./useSidebarTyping";
 import { mergeStaleServerList } from "./sidebar-merge";
 import { expiredPinIds } from "./sidebar-order";
 import { subscribeToNowTick } from "@/lib/use-now-tick";
+import { chatKey } from "@uxcommunity/offline-chat";
+import {
+  getOfflineChat,
+  offlineRef,
+  onOfflineChatChange,
+} from "@/lib/offline/engine";
 
 /**
  * How often the sidebar checks whether a pin has run out. The deadline is the
@@ -144,6 +150,61 @@ export function useSidebarCommunities(userId: string) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // ── Offline conversation list ────────────────────────────────────────────
+  // Paint the persisted sidebar before the network read lands, then keep the
+  // durable copy current. A cache miss is not an error: the fetch below owns
+  // the first paint in that case.
+  useEffect(() => {
+    let active = true;
+    const attach = (engine: ReturnType<typeof getOfflineChat>) => {
+      if (!active || !engine || sidebarStore.data) return;
+      void engine
+        .listConversations()
+        .then((rows) => {
+          if (!active || sidebarStore.data) return;
+          const cached = rows
+            .filter((row) => row.ref.kind === "community")
+            .map((row) => row.payload as unknown as CachedSidebarCommunity)
+            .filter((row) => typeof row?.id === "string" && typeof row?.name === "string");
+          if (cached.length === 0) return;
+          setSidebarCommunities(cached);
+          setSettled(true);
+        })
+        .catch(() => undefined);
+    };
+    const stop = onOfflineChatChange(attach);
+    return () => {
+      active = false;
+      stop();
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (communities.length === 0) return undefined;
+    const timer = setTimeout(() => {
+      const engine = getOfflineChat();
+      if (!engine) return;
+      void engine
+        .saveConversations(
+          communities.map((community) => {
+            const ref = offlineRef("community", community.id);
+            return {
+              userId,
+              conversationKey: chatKey(ref),
+              ref,
+              lastMessageAt: community.last_message?.created_at ?? null,
+              unreadCount:
+                (community.mention_count ?? 0) + (community.unread_content_count ?? 0),
+              payload: community as unknown as Record<string, unknown>,
+              updatedAt: Date.now(),
+            };
+          }),
+        )
+        .catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [communities, userId]);
 
   // Realtime subscriptions are suspended while the tab is hidden (see
   // useSidebarRealtime) and the sockets don't replay missed events, so a
