@@ -43,6 +43,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { CHAT_LIST_PERFORMANCE } from '@/lib/homeFeed';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
+import { useChatScrollIndicator } from '@/hooks/useChatScrollIndicator';
 import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { setDmActiveConversation, signalDmListChanged } from '@/hooks/useDmUnread';
 import { setActiveDmConversationForNotifications } from '@/lib/chatNotificationState';
@@ -211,6 +212,12 @@ export default function DmThreadScreen() {
    * route) so the thread never waits on the navigation state to settle.
    */
   const [conversationId, setConversationId] = useState(routeConversationId);
+  /**
+   * The scrollbar waits for the last render batch. Eight rows are measured on
+   * the first frame, so a bar drawn then would start almost full length and
+   * rescale on every batch while the window mounts (lib/chatScrollIndicator).
+   */
+  const chatScrollIndicator = useChatScrollIndicator();
   const peerName = params.name ?? 'Member';
   const peerId = params.peerId ?? null;
   /** A profile pushed this screen before the conversation had a server id. */
@@ -1511,6 +1518,8 @@ export default function DmThreadScreen() {
                 inverted
                 data={rows}
                 keyExtractor={(row) => row.key}
+                showsVerticalScrollIndicator={chatScrollIndicator.showsVerticalScrollIndicator}
+                onContentSizeChange={chatScrollIndicator.onContentSizeChange}
                 // A cached window paints at once; the anchor runs when the page
                 // request settles and may move it to the unread divider.
                 style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}

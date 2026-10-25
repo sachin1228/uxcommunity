@@ -77,6 +77,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
+import { useChatScrollIndicator } from '@/hooks/useChatScrollIndicator';
 import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
@@ -147,6 +148,12 @@ export default function CommunityChat() {
    * the open stutter (see hooks/useScreenTransitionSettled).
    */
   const listSettled = useScreenTransitionSettled();
+  /**
+   * The scrollbar waits for the last render batch. Eight rows are measured on
+   * the first frame, so a bar drawn then would start almost full length and
+   * rescale on every batch while the window mounts (lib/chatScrollIndicator).
+   */
+  const chatScrollIndicator = useChatScrollIndicator();
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -1273,6 +1280,8 @@ export default function CommunityChat() {
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          showsVerticalScrollIndicator={chatScrollIndicator.showsVerticalScrollIndicator}
+          onContentSizeChange={chatScrollIndicator.onContentSizeChange}
           initialNumToRender={CHAT_LIST_PERFORMANCE.initialNumToRender}
           maxToRenderPerBatch={CHAT_LIST_PERFORMANCE.maxToRenderPerBatch}
           windowSize={CHAT_LIST_PERFORMANCE.windowSize}
