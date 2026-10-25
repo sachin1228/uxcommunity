@@ -139,7 +139,7 @@ Download the APK from the link EAS provides when the build finishes.
 ```
 expo-app-standalone 3/
 ├── app/                      Expo Router screens
-│   ├── (auth)/               Login screen
+│   ├── (auth)/               Login + three-step signup
 │   ├── (tabs)/               Main tabs: home, communities, explore, jobs
 │   ├── community/[id].tsx    Community chat screen
 │   ├── settings/             Notification settings + push diagnostics

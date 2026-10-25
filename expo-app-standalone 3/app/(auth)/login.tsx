@@ -209,6 +209,21 @@ export default function LoginScreen() {
               )}
             </Pressable>
           </View>
+
+          {/* Create account — the same three-step signup the web app runs. */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+              New to uxcommunity?
+            </Text>
+            <Pressable
+              onPress={() => router.push('/(auth)/signup')}
+              disabled={isLoading}
+              hitSlop={6}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.footerLink, { color: colors.primary }]}>Create an account</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -322,6 +337,21 @@ function makeStyles(colors: Colors) {
     },
     buttonText: {
       fontSize: 15,
+      fontFamily: 'Geist_600SemiBold',
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 20,
+    },
+    footerText: {
+      fontSize: 13,
+      fontFamily: 'Geist_400Regular',
+    },
+    footerLink: {
+      fontSize: 13,
       fontFamily: 'Geist_600SemiBold',
     },
   });
