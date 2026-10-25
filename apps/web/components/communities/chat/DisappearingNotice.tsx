@@ -9,11 +9,13 @@ import { CHAT_MESSAGE_RETENTION_DAYS } from "@/lib/communities/message-retention
  * timestamp — a policy note, not a message.
  *
  * Rendered by MessageList only once the true start of the history is loaded
- * (hasMoreAbove === false) and above the empty state of a fresh room, so it
- * can never float mid-stream while older pages are still unloaded. The window
- * it names comes from the same constant the server-side sweep deletes by
- * (lib/communities/message-retention.ts), so the promise cannot drift from the
- * enforcement.
+ * (hasMoreAbove === false) and above the first date pill, so it can never
+ * float mid-stream while older pages are still unloaded. A room with no
+ * messages does not show it at all — a fresh chat opens on the welcome copy
+ * alone, the way the mobile app renders it, and the notice joins the timeline
+ * with the first message. The window it names comes from the same constant the
+ * server-side sweep deletes by (lib/communities/message-retention.ts), so the
+ * promise cannot drift from the enforcement.
  */
 export function DisappearingNotice() {
   return (
