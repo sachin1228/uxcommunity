@@ -205,7 +205,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string; msgId: string }> }
 ) {
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try { session = await requireSession("user", { allowUnverified: true }); } catch (e) { return e as Response; }
   const callerId = session.userId!;
   const { id: communityId, msgId } = await params;
 

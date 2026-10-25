@@ -7,6 +7,8 @@ import {
   renderCompanyVerificationEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
+  renderVerificationCodeEmail,
+  renderVerificationReapplyEmail,
   renderWelcomeEmail,
 } from "./templates";
 
@@ -39,6 +41,24 @@ const RENDERED: Array<[name: string, email: RenderedEmail]> = [
     }),
   ],
   ["welcome", renderWelcomeEmail({ name: "Ada", appUrl: APP_URL })],
+  [
+    "verification code",
+    renderVerificationCodeEmail({
+      name: "Ada",
+      appUrl: APP_URL,
+      code: "482913",
+      expiresMinutes: 10,
+    }),
+  ],
+  [
+    "verification reapply",
+    renderVerificationReapplyEmail({
+      name: "Ada",
+      appUrl: APP_URL,
+      link: `${APP_URL}/dashboard/verification`,
+      reapplyAt: "26 November 2026",
+    }),
+  ],
   [
     "resumed signup",
     renderResumeSignupEmail({
@@ -183,7 +203,12 @@ test("every email is a complete document with a hidden preheader", () => {
 });
 
 /** Emails whose ask is a single primary action — the code email has none. */
-const PRIMARY_ACTION_EMAILS = ["password reset", "welcome", "resumed signup"];
+const PRIMARY_ACTION_EMAILS = [
+  "password reset",
+  "welcome",
+  "resumed signup",
+  "verification reapply",
+];
 
 test("a primary call to action is the product's accent, inverted in dark", () => {
   for (const name of PRIMARY_ACTION_EMAILS) {
@@ -258,6 +283,7 @@ test("each email links to the page its call to action belongs to", () => {
   const expectedLinks: Array<[name: string, href: string]> = [
     ["password reset", `${APP_URL}/reset-password?token=t1`],
     ["welcome", `${APP_URL}/dashboard`],
+    ["verification reapply", `${APP_URL}/dashboard/verification`],
     ["resumed signup", `${APP_URL}/signup?resume=t3`],
   ];
 

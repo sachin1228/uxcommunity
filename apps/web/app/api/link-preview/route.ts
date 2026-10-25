@@ -80,7 +80,7 @@ function trimCache() {
 
 export async function GET(req: NextRequest) {
   // Must be an authenticated user — we don't want an open proxy.
-  try { await requireSession("user"); } catch (e) { return e as Response; }
+  try { await requireSession("user", { allowUnverified: true }); } catch (e) { return e as Response; }
 
   const rawUrl = req.nextUrl.searchParams.get("url");
   if (!rawUrl) {

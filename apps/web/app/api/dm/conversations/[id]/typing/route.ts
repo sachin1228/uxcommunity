@@ -20,7 +20,8 @@ export async function POST(
 ) {
   let session;
   try {
-    session = await requireSession("user");
+    // A presence ping is not a message; read-only accounts may still type.
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

@@ -5,6 +5,7 @@ import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { UndoToast } from "@/components/ui/UndoToast";
+import { VerificationBanner } from "@/components/verification/VerificationBanner";
 import { Topbar } from "./Topbar";
 
 
@@ -22,7 +23,7 @@ export default async function DashboardLayout({
   const [{ data: user }, { data: profile }] = await Promise.all([
     db
       .from("users")
-      .select("name, email")
+      .select("name, email, verification_status")
       .eq("id", session.userId!)
       .maybeSingle(),
     db
@@ -64,9 +65,13 @@ export default async function DashboardLayout({
   }
 
   const sidebarUser = { name, email, avatarUrl };
+  const verificationStatus =
+    (user as { verification_status?: string } | null)?.verification_status ?? null;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+      <VerificationBanner status={verificationStatus} />
+
       {/* End to end: the bar spans the window and sits above the sidebar, so
           the brand reads as the app's header rather than the sidebar's. */}
       <Topbar userId={userId} user={sidebarUser} />

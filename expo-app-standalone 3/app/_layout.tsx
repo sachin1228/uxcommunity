@@ -16,6 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
+import { VerificationBannerGate } from '@/components/verification/VerificationBannerGate';
 import { useColors } from '@/hooks/useColors';
 import { queryClient } from '@/lib/queryClient';
 
@@ -88,6 +89,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <SessionGate>
+                  <VerificationBannerGate>
                   <PushNotificationsBridge />
                   <Stack
                   screenOptions={{
@@ -155,8 +157,13 @@ export default function RootLayout() {
                     name="settings/job-profile"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
+                  <Stack.Screen
+                    name="settings/verification"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
                   <Stack.Screen name="+not-found" />
                 </Stack>
+                  </VerificationBannerGate>
                 </SessionGate>
               </AuthProvider>
             </KeyboardProvider>

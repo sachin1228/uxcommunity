@@ -46,7 +46,7 @@ function fileNameForUrl(url: string): string {
 export async function GET(req: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

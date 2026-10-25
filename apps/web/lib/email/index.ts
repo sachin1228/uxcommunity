@@ -5,6 +5,8 @@ import {
   renderCompanyVerificationEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
+  renderVerificationCodeEmail,
+  renderVerificationReapplyEmail,
   renderWelcomeEmail,
 } from "./templates";
 
@@ -69,6 +71,35 @@ export async function sendPasswordResetEmail(
 
 export async function sendWelcomeEmail(to: string, name: string): Promise<void> {
   await send(to, renderWelcomeEmail({ name, appUrl: getAppUrl() }));
+}
+
+export async function sendVerificationCodeEmail(
+  to: string,
+  name: string,
+  code: string,
+  expiresMinutes: number
+): Promise<void> {
+  await send(
+    to,
+    renderVerificationCodeEmail({ name, appUrl: getAppUrl(), code, expiresMinutes })
+  );
+}
+
+export async function sendVerificationReapplyEmail(
+  to: string,
+  name: string,
+  reapplyAt: string
+): Promise<void> {
+  const appUrl = getAppUrl();
+  await send(
+    to,
+    renderVerificationReapplyEmail({
+      name,
+      appUrl,
+      link: appLink(appUrl, "/dashboard/verification"),
+      reapplyAt,
+    })
+  );
 }
 
 export async function sendResumeSignupEmail(

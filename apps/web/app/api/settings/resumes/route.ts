@@ -84,7 +84,7 @@ function refreshed(resumes: SavedResume[] | null) {
 export async function GET() {
   let session: Awaited<ReturnType<typeof requireSession>>;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

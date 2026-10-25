@@ -25,6 +25,7 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth';
 import {
   clearSession,
@@ -32,6 +33,7 @@ import {
   peekSessionGeneration,
   peekSessionToken,
   subscribeUnauthorized,
+  subscribeVerificationRequired,
 } from '@/lib/api';
 import {
   AUTH_USER_STORAGE_KEY,
@@ -346,6 +348,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [applyUser, clearAndSignOut, makeClearSteps, sessionClock]);
+
+  // A read-only refusal means the server knows a verification state the local
+  // snapshot may not: refresh it so the banner and the verification screen
+  // settle on the truth (pending, rejected, or newly approved).
+  useEffect(
+    () =>
+      subscribeVerificationRequired(() => {
+        void refresh();
+      }),
+    [refresh],
+  );
+
+  // An admin decision can land while the app is backgrounded. Revalidate on
+  // foreground so the read-only banner disappears without a relaunch.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && userRef.current) void refresh();
+    });
+    return () => subscription.remove();
+  }, [refresh]);
 
   // Any API call rejected with 401 means the cookie no longer represents a
   // session (expired, revoked, cleared elsewhere). End the local session so

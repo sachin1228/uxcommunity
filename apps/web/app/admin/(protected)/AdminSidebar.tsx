@@ -47,6 +47,20 @@ export function AdminSidebar() {
 
   return (
     <nav className="flex flex-col gap-1">
+      {/* Verifications */}
+      <Link
+        href="/admin/verifications"
+        onClick={() => setPendingHref("/admin/verifications")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/verifications")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <BadgeCheck strokeWidth={2.5} size={16} className={active("/admin/verifications") ? "text-accent" : ""} />
+        Verifications
+      </Link>
+
       {/* Incomplete Signups */}
       <Link
         href="/admin/signup-attempts"

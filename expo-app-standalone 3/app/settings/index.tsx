@@ -21,7 +21,8 @@ const ROWS: {
     | '/settings/notifications'
     | '/settings/email'
     | '/settings/connected-accounts'
-    | '/settings/job-profile';
+    | '/settings/job-profile'
+    | '/settings/verification';
   label: string;
   description: string;
   icon: React.ComponentProps<typeof Feather>['name'];
@@ -37,6 +38,12 @@ const ROWS: {
     label: 'Job profile',
     description: 'Your portfolio link and saved resumes.',
     icon: 'briefcase',
+  },
+  {
+    href: '/settings/verification',
+    label: 'Verification',
+    description: 'Verify your profile to unlock all features.',
+    icon: 'shield',
   },
   {
     href: '/settings/account',

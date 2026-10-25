@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   ArrowRight,
+  BadgeCheck,
   Bell,
   Briefcase,
   CalendarDays,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/use-notifications";
 
 function iconFor(type: NotificationType) {
+  if (type.startsWith("verification_")) return BadgeCheck;
   if (type === "report_reviewed") return Flag;
   if (type === "content_restored") return Undo2;
   if (type === "job_match") return Briefcase;

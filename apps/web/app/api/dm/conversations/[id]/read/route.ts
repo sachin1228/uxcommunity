@@ -23,7 +23,8 @@ export async function PATCH(
 ) {
   let session;
   try {
-    session = await requireSession("user");
+    // Reading is allowed while read-only; the marker is part of reading.
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

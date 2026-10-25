@@ -38,7 +38,7 @@ async function enrich(
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
-  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
+  let session; try { session = await requireSession("user", { allowUnverified: true }); } catch (error) { return error as Response; }
   const { id, postId } = await params; const db = createServiceClient();
   if (!(await access(db, id, postId, session.userId!))) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   const { data, error } = await db.from("showcase_comments").select("id, post_id, user_id, parent_id, body, created_at, updated_at").eq("post_id", postId).order("created_at");

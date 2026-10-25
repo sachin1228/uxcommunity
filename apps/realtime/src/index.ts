@@ -7,6 +7,7 @@ import { isRetryableStatus, retryWithBackoff } from "./retry";
 import { logEvent } from "./log";
 import { runRetentionSweep } from "./retention";
 import { runEventLifecycleNotifications } from "./event-notifications";
+import { runVerificationReapplyEmails } from "./verification-emails";
 export { UserDO } from "./user";
 export { Room } from "./room";
 export { AlertMonitor } from "./alert-monitor";
@@ -101,8 +102,9 @@ export default {
    *   * (every 6 h) — the community chat retention sweep (see src/retention.ts).
    *     Stateless: a POST to the web app, which owns the deletion itself.
    *   * (every minute) — event lifecycle notifications (see
-   *     src/event-notifications.ts). Same stateless POST shape; the web app
-   *     owns the stage clock, the delivery ledger and the push.
+   *     src/event-notifications.ts) and reapply-eligible verification emails
+   *     (see src/verification-emails.ts). Same stateless POST shape; the web
+   *     app owns the clocks, the ledgers and the push.
    */
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (controller.cron === RETENTION_SWEEP_CRON) {
@@ -111,6 +113,9 @@ export default {
     }
     if (controller.cron === EVENT_LIFECYCLE_CRON) {
       await runEventLifecycleNotifications(env);
+      // The reapply email is due once a member's one-month window opens; the
+      // per-user sent timestamp makes a minute tick cheap and idempotent.
+      await runVerificationReapplyEmails(env);
       return;
     }
     if (controller.cron !== ALERT_MONITOR_CRON) {

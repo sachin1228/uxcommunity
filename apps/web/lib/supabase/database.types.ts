@@ -20,6 +20,59 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      account_verification_requests: {
+        Row: {
+          created_at: string;
+          email_verified_at: string;
+          id: string;
+          linkedin_url: string;
+          portfolio_links: string[];
+          rejection_reason: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
+          work_sample_urls: string[];
+        };
+        Insert: {
+          created_at?: string;
+          email_verified_at: string;
+          id?: string;
+          linkedin_url: string;
+          portfolio_links: string[];
+          rejection_reason?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+          work_sample_urls?: string[];
+        };
+        Update: {
+          created_at?: string;
+          email_verified_at?: string;
+          id?: string;
+          linkedin_url?: string;
+          portfolio_links?: string[];
+          rejection_reason?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+          work_sample_urls?: string[];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "account_verification_requests_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       application_tags: {
         Row: {
           application_id: string;
@@ -2835,36 +2888,89 @@ export type Database = {
           },
         ];
       };
+      verification_email_codes: {
+        Row: {
+          attempts: number;
+          code_hash: string;
+          created_at: string;
+          expires_at: string;
+          last_sent_at: string;
+          user_id: string;
+        };
+        Insert: {
+          attempts?: number;
+          code_hash: string;
+          created_at?: string;
+          expires_at: string;
+          last_sent_at?: string;
+          user_id: string;
+        };
+        Update: {
+          attempts?: number;
+          code_hash?: string;
+          created_at?: string;
+          expires_at?: string;
+          last_sent_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "verification_email_codes_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       users: {
         Row: {
           application_id: string | null;
           created_at: string;
           email: string;
+          email_verified_at: string | null;
           id: string;
           is_blocked: boolean;
           name: string;
           password_hash: string;
           updated_at: string;
+          verification_notified_at: string | null;
+          verification_reapply_at: string | null;
+          verification_rejection_reason: string | null;
+          verification_reviewed_at: string | null;
+          verification_status: string;
         };
         Insert: {
           application_id?: string | null;
           created_at?: string;
           email: string;
+          email_verified_at?: string | null;
           id?: string;
           is_blocked?: boolean;
           name: string;
           password_hash: string;
           updated_at?: string;
+          verification_notified_at?: string | null;
+          verification_reapply_at?: string | null;
+          verification_rejection_reason?: string | null;
+          verification_reviewed_at?: string | null;
+          verification_status?: string;
         };
         Update: {
           application_id?: string | null;
           created_at?: string;
           email?: string;
+          email_verified_at?: string | null;
           id?: string;
           is_blocked?: boolean;
           name?: string;
           password_hash?: string;
           updated_at?: string;
+          verification_notified_at?: string | null;
+          verification_reapply_at?: string | null;
+          verification_rejection_reason?: string | null;
+          verification_reviewed_at?: string | null;
+          verification_status?: string;
         };
         Relationships: [
           {
@@ -2977,6 +3083,22 @@ export type Database = {
         }[];
       };
       dearmor: { Args: { "": string }; Returns: string };
+      review_account_verification: {
+        Args: {
+          p_action: string;
+          p_reason: string | null;
+          p_request_id: string;
+          p_reviewed_by: string;
+        };
+        Returns: {
+          rejection_reason: string | null;
+          reapply_at: string | null;
+          user_email: string;
+          user_id: string;
+          user_name: string | null;
+          verification_status: string;
+        }[];
+      };
       gen_random_uuid: { Args: Record<PropertyKey, never>; Returns: string };
       gen_salt: { Args: { "": string }; Returns: string };
       get_all_communities: {

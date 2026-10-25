@@ -14,6 +14,9 @@ type LoginUserRow = {
   email: string;
   password_hash: string;
   is_blocked: boolean;
+  verification_status: string;
+  verification_reapply_at: string | null;
+  verification_rejection_reason: string | null;
   designer_profiles: { id: string; avatar_url: string | null } | null;
 };
 
@@ -94,7 +97,9 @@ export async function POST(request: NextRequest) {
   // client can paint the signed-in member without a second /me round trip.
   const { data: rawUser } = await db
     .from("users")
-    .select("id, name, email, password_hash, is_blocked, designer_profiles!user_id(id, avatar_url)")
+    .select(
+      "id, name, email, password_hash, is_blocked, verification_status, verification_reapply_at, verification_rejection_reason, designer_profiles!user_id(id, avatar_url)",
+    )
     .eq("email", normalizedEmail)
     .maybeSingle();
   const row = rawUser as unknown as LoginUserRow | null;
@@ -167,6 +172,9 @@ export async function POST(request: NextRequest) {
       role: "user",
       profileComplete: !!profile,
       avatar_url: profile?.avatar_url ?? null,
+      verificationStatus: row.verification_status,
+      verificationReapplyAt: row.verification_reapply_at,
+      verificationRejectionReason: row.verification_rejection_reason,
     },
   });
   setSessionCookie(response, token, request.nextUrl.hostname);

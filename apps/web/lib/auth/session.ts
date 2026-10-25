@@ -7,8 +7,17 @@ export const SESSION_COOKIE = "uxcommunity_session";
 export const LEGACY_SESSION_COOKIE = "draft_session";
 const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const USER_LIVENESS_TTL_MS = 15_000;
-const activeUserChecks = new Map<string, number>();
-const activeUserChecksInFlight = new Map<string, Promise<void>>();
+
+interface ActiveUserState {
+  is_blocked: boolean;
+  verification_status: string | null;
+}
+
+const activeUserChecks = new Map<string, ActiveUserState & { checkedAt: number }>();
+const activeUserChecksInFlight = new Map<string, Promise<ActiveUserState>>();
+
+/** Machine-readable code so clients can open the verification flow. */
+export const VERIFICATION_REQUIRED = "verification_required";
 
 export interface SessionPayload {
   userId?: string;
@@ -122,17 +131,17 @@ export function clearSessionCookie(res: NextResponse, host?: string) {
 }
 
 /**
- * Checks the DB to confirm the user still exists and isn't blocked.
- * Used in API routes to guard against deleted/blocked users who still hold
- * a valid JWT (sessions are stateless, so we must verify liveness explicitly).
+ * Reads the liveness + verification row, cached for 15s per isolate.
  *
- * Exported for routes that must run the check but not in front of every other
- * read: start it early, await it before the write (`requireSession` with
- * `verifyActive: false` keeps it out of the auth path).
+ * A blocked/deleted user is a 401 on every call, including reads that opted
+ * out of the check. Verification is returned rather than enforced here so a
+ * route can opt an action out (post likes) without weakening liveness.
  */
-export async function assertUserActive(userId: string): Promise<void> {
-  const checkedAt = activeUserChecks.get(userId);
-  if (checkedAt && Date.now() - checkedAt < USER_LIVENESS_TTL_MS) return;
+async function getActiveUserState(userId: string): Promise<ActiveUserState> {
+  const cached = activeUserChecks.get(userId);
+  if (cached && Date.now() - cached.checkedAt < USER_LIVENESS_TTL_MS) {
+    return cached;
+  }
 
   const pending = activeUserChecksInFlight.get(userId);
   if (pending) return pending;
@@ -143,26 +152,68 @@ export async function assertUserActive(userId: string): Promise<void> {
     const db = createServiceClient();
     const { data, error } = await db
       .from("users")
-      .select("id, is_blocked")
+      .select("id, is_blocked, verification_status")
       .eq("id", userId)
       .maybeSingle();
 
-    const activeUser = data as { id: string; is_blocked: boolean } | null;
-    if (error || !activeUser || activeUser.is_blocked) {
+    const row = data as {
+      id: string;
+      is_blocked: boolean;
+      verification_status: string | null;
+    } | null;
+    if (error || !row || row.is_blocked) {
       activeUserChecks.delete(userId);
       throw new Response(
         JSON.stringify({ error: "Account has been deactivated or deleted." }),
         { status: 401, headers: { "Content-Type": "application/json" } },
       );
     }
-    activeUserChecks.set(userId, Date.now());
+
+    const state: ActiveUserState = {
+      is_blocked: false,
+      verification_status: row.verification_status,
+    };
+    activeUserChecks.set(userId, { ...state, checkedAt: Date.now() });
+    return state;
   })().finally(() => activeUserChecksInFlight.delete(userId));
 
   activeUserChecksInFlight.set(userId, check);
   return check;
 }
 
-/** Clear a cached liveness result immediately after blocking or deleting a user. */
+function verificationRequiredResponse(status: string | null): Response {
+  return new Response(
+    JSON.stringify({
+      error: "Your account is read-only until verification is approved.",
+      code: VERIFICATION_REQUIRED,
+      verification_status: status ?? "unverified",
+    }),
+    { status: 403, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+/**
+ * Checks that the user still exists and may perform writes.
+ *
+ * Verification is enforced here because this is the one DB check every
+ * mutating API route runs (directly or through `requireSession`). Reads skip
+ * it with `verifyActive: false`; the few writes an unverified account may
+ * still make (likes, read markers) opt out explicitly with `allowUnverified`.
+ */
+export async function assertUserActive(
+  userId: string,
+  options?: { allowUnverified?: boolean },
+): Promise<void> {
+  const state = await getActiveUserState(userId);
+  if (
+    state.verification_status !== "approved" &&
+    !options?.allowUnverified
+  ) {
+    throw verificationRequiredResponse(state.verification_status);
+  }
+}
+
+/** Clear a cached liveness/verification result after a review or account action. */
 export function invalidateUserLiveness(userId: string): void {
   activeUserChecks.delete(userId);
   activeUserChecksInFlight.delete(userId);
@@ -171,7 +222,7 @@ export function invalidateUserLiveness(userId: string): void {
 /** Throws a Response if session is missing, role doesn't match, or user is blocked/deleted. */
 export async function requireSession(
   role?: "user" | "admin",
-  options?: { verifyActive?: boolean },
+  options?: { verifyActive?: boolean; allowUnverified?: boolean },
 ): Promise<SessionPayload> {
   const session = await getSession();
   if (!session) {
@@ -201,7 +252,9 @@ export async function requireSession(
     session.userId &&
     options?.verifyActive !== false
   ) {
-    await assertUserActive(session.userId);
+    await assertUserActive(session.userId, {
+      allowUnverified: options?.allowUnverified,
+    });
   }
 
   return session;

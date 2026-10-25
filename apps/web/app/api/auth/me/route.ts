@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
   const db = createServiceClient();
   const { data: user } = await db
     .from("users")
-    .select("id, name, email")
+    .select(
+      "id, name, email, verification_status, verification_reapply_at, verification_rejection_reason, email_verified_at",
+    )
     .eq("id", session.userId!)
     .maybeSingle();
 
@@ -54,6 +56,12 @@ export async function GET(request: NextRequest) {
       role: "user",
       profileComplete: !!profile,
       avatar_url: (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null,
+      verificationStatus: (user as { verification_status?: string }).verification_status ?? "unverified",
+      verificationReapplyAt:
+        (user as { verification_reapply_at?: string | null }).verification_reapply_at ?? null,
+      verificationRejectionReason:
+        (user as { verification_rejection_reason?: string | null }).verification_rejection_reason ?? null,
+      emailVerifiedAt: (user as { email_verified_at?: string | null }).email_verified_at ?? null,
     },
   });
 }

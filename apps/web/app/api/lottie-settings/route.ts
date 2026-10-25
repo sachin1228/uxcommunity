@@ -11,7 +11,7 @@ import { requireSession } from "@/lib/auth/session";
  * would be blocked by CORS and silently fall back to the spinner.
  */
 export async function GET() {
-  try { await requireSession("user"); } catch (e) { return e as Response; }
+  try { await requireSession("user", { allowUnverified: true }); } catch (e) { return e as Response; }
 
   const db = createServiceClient();
   const { data, error } = await db

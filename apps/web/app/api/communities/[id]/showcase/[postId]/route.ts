@@ -63,12 +63,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
-  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
+  let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  // Liking a post is allowed while read-only; saving it is not, so the action
+  // decides whether the verification gate applies.
+  let session; try { session = await requireSession("user", { allowUnverified: body.action === "like" }); } catch (error) { return error as Response; }
   const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
   const { data: post } = await getPost(db, id, postId);
   if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   if (!(await canInteract(db, id, (post as { is_public: boolean }).is_public, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   if ((body.action !== "like" && body.action !== "save") || typeof body.active !== "boolean") {
     return NextResponse.json({ error: "An action and boolean active state are required." }, { status: 422 });
   }
