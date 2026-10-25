@@ -11,7 +11,6 @@ import {
   TextInput,
   type StyleProp,
   type TextStyle,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -106,18 +105,16 @@ export function OptionPickerValue({
  * value. Mirrors the web SearchableSelect's behavior: the picked value
  * replaces the field's value; the sheet itself holds no selection state.
  *
- * The sheet is sized to its content between a floor and a ceiling rather than
- * collapsing to whatever the list happens to contain: searching "pune" leaves
- * a single row, and a sheet that shrank to that row used to end up behind the
- * keyboard, leaving nothing visible at all. It is also lifted above the
+ * The sheet hugs its content up to 78% of the screen and is lifted above the
  * keyboard — a `Modal` is its own window on Android, so the activity's
  * resize-to-keyboard mode does not reach it and the keyboard controller is
- * used there, exactly like the other modals in the app.
+ * used there, exactly like the other modals in the app. The close button sits
+ * in the header, the same place as the app's other sheets: a Cancel row at the
+ * bottom of a content-sized sheet was left stranded under a one-result list.
  */
 export function OptionPickerSheet({ visible, title, options, selectedId, onPick, onClose }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const [query, setQuery] = useState('');
 
   // A filter left behind from the previous field must not apply to the next
@@ -134,11 +131,6 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
 
   const showSearch = options.length > 8;
 
-  // Enough room to read and scroll the list, without growing past most of the
-  // screen when the list is long.
-  const sheetMinHeight = Math.min(Math.round(windowHeight * 0.42), 360);
-  const sheetMaxHeight = Math.round(windowHeight * 0.78);
-
   const panel = (
     <Pressable style={styles.backdrop} onPress={onClose}>
       <Pressable
@@ -148,14 +140,26 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
             backgroundColor: colors.card,
             borderColor: colors.border,
             paddingBottom: Math.max(insets.bottom, 12),
-            minHeight: sheetMinHeight,
-            maxHeight: sheetMaxHeight,
           },
         ]}
         onPress={(e) => e.stopPropagation()}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+          <Text
+            style={[styles.title, { color: colors.foreground }]}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          <Pressable
+            onPress={onClose}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Close picker"
+            style={styles.closeButton}
+          >
+            <Feather name="x" size={18} color={colors.mutedForeground} />
+          </Pressable>
         </View>
 
         {showSearch ? (
@@ -178,7 +182,7 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
           keyExtractor={(option) => option.id}
           style={styles.list}
           // Bounded by the sheet's maxHeight; without shrinking, a long list
-          // only clips at the divider instead of scrolling.
+          // only clips at the rounded edge instead of scrolling.
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -214,18 +218,6 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
             <Text style={[styles.empty, { color: colors.mutedForeground }]}>No matches</Text>
           }
         />
-
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <Pressable
-          onPress={onClose}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.cancelRow,
-            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
-          ]}
-        >
-          <Text style={[styles.cancelLabel, { color: colors.mutedForeground }]}>Cancel</Text>
-        </Pressable>
       </Pressable>
     </Pressable>
   );
@@ -253,8 +245,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   sheet: {
-    // Keeps the sheet on screen when the keyboard leaves less room than the
-    // minimum height it would otherwise insist on.
+    // Content-sized, capped at most of the screen; the list shrinks and
+    // scrolls inside that cap when it is long.
+    maxHeight: '78%',
     flexShrink: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -268,11 +261,15 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  title: { fontSize: 15, fontFamily: 'Geist_600SemiBold' },
+  title: { flex: 1, fontSize: 15, fontFamily: 'Geist_600SemiBold' },
+  closeButton: { padding: 2 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,9 +280,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Geist_400Regular', paddingVertical: 8 },
-  // Grows into the sheet's minimum height and shrinks when the list would run
-  // past its maximum, so the divider and Cancel row stay pinned to the bottom.
-  list: { flexGrow: 1, flexShrink: 1, marginTop: 6 },
+  // Shrinks when the list would run past the sheet's cap, so it scrolls
+  // instead of clipping at the rounded edge.
+  list: { flexShrink: 1, marginTop: 6 },
   listContent: { paddingBottom: 2 },
   row: {
     flexDirection: 'row',
@@ -299,7 +296,4 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 15 },
   fieldText: { flex: 1 },
   empty: { padding: 24, textAlign: 'center', fontSize: 13, fontFamily: 'Geist_400Regular' },
-  divider: { height: StyleSheet.hairlineWidth },
-  cancelRow: { paddingVertical: 15, alignItems: 'center' },
-  cancelLabel: { fontSize: 14, fontFamily: 'Geist_500Medium' },
 });
