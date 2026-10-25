@@ -89,14 +89,11 @@ export function useRealtimeChat({
 
     const unsubscribes: Array<() => void> = [];
 
-    // Catch-up on (re)subscription. The sidebar keeps chat sockets for its top
-    // communities alive, so switching into an already-connected community fires
-    // NO status event — without this, messages sent while the user was in
-    // another community would not load until the next focus/visibility change.
-    // The cursor is the newest real row under the (created_at, id) order — the
-    // same total order the server pages on, so the drain resumes exactly where
-    // this client stopped.
-    debouncedCatchUp(newestRealCursor(msgCache.get(communityId) ?? []));
+    // useChatData owns the open/switch catch-up after it has selected the
+    // community's cached window. Running one here as well races that fetch and
+    // can issue a second forced `?after=` read when the first finishes before
+    // this debounce. This effect only catches later reconnects and visibility
+    // returns, where useChatData has no new lifecycle event to observe.
 
     // ── New messages ───────────────────────────────────────────────────────
     unsubscribes.push(

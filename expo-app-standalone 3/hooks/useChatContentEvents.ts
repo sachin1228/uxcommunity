@@ -3,14 +3,12 @@
  * everything that keeps it live. Mirror of the web's useContentTimeline +
  * the content-event half of useRealtimeChat:
  *
- * - History: the shared /bootstrap read (lib/communityBootstrap.ts), the same
- *   request the messages hook uses — so opening the chat costs exactly one
- *   Worker invocation for both sections, and re-entering inside the web's
- *   15-minute freshness window costs none. There is deliberately NO refetch
- *   on reconnects or foregrounds: web never refetches the window either —
- *   realtime keeps it live, and a card missed while the socket was down
- *   arrives with the next bootstrap (the messages hook's cursor catch-up is
- *   what covers that same gap for messages).
+ * - History: account-scoped disk snapshots paint first. A cold chat without a
+ *   message window shares one /bootstrap request with useChatMessages; when
+ *   messages are cached but cards expired, a content-only bootstrap section
+ *   avoids downloading the latest message page again. Card snapshots expire
+ *   after 15 minutes because their missed updates have no message cursor.
+ *   Reconnects and foregrounds do not refetch the card window.
  * - Realtime: the chat room's content-insert / content-delete / content-comment
  *   / content-reaction-* topics, so a card is as permanent and as current as a
  *   message — not a session-only bubble.
@@ -18,11 +16,13 @@
  *   frame via lib/contentEventMirror.ts, ahead of the realtime echo.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
-import { getMemberBrief, markRead } from '@/lib/communities';
+import { getMemberBrief, markRead, type Message } from '@/lib/communities';
 import {
   fetchCommunityBootstrap,
+  fetchCommunityContentEvents,
+  getCachedCommunityContentEvents,
   patchCachedBootstrapContentEvents,
 } from '@/lib/communityBootstrap';
 import { scheduleMarkRead } from '@/lib/readManager';
@@ -54,9 +54,15 @@ interface ContentInsertRow {
 
 export function useChatContentEvents(communityId: string) {
   const { user } = useAuth();
-  const [events, setEvents] = useState<ChatContentEvent[]>([]);
+  const [events, setEvents] = useState<ChatContentEvent[]>(
+    () => user?.id
+      ? getCachedCommunityContentEvents(communityId, user.id) ?? []
+      : [],
+  );
   /** True once the history fetch has settled — gates the empty-state copy. */
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => user?.id
+    ? getCachedCommunityContentEvents(communityId, user.id) !== null
+    : false);
   /**
    * True once the disk read has settled. Persistence waits for it: a failed
    * fetch must not write an empty list over the cards still being read back.
@@ -64,32 +70,81 @@ export function useChatContentEvents(communityId: string) {
   const [cacheHydrated, setCacheHydrated] = useState(false);
 
   const communityIdRef = useRef(communityId);
-  useEffect(() => {
-    communityIdRef.current = communityId;
-  }, [communityId]);
+  const userIdRef = useRef(user?.id);
   /** True once the bootstrap answered; the disk snapshot must not overwrite it. */
-  const networkSettledRef = useRef(false);
-  useEffect(() => {
-    networkSettledRef.current = false;
-    setCacheHydrated(false);
-  }, [communityId]);
+  const networkSettledRef = useRef(
+    user?.id ? getCachedCommunityContentEvents(communityId, user.id) !== null : false,
+  );
+  const cacheReadRef = useRef<{
+    communityId: string;
+    userId: string | undefined;
+    events: Promise<ChatContentEvent[] | null>;
+    messages: Promise<Message[] | null>;
+  } | null>(null);
+  useLayoutEffect(() => {
+    const changed =
+      communityIdRef.current !== communityId || userIdRef.current !== user?.id;
+    communityIdRef.current = communityId;
+    userIdRef.current = user?.id;
+    if (changed) {
+      const cached = user?.id
+        ? getCachedCommunityContentEvents(communityId, user.id)
+        : null;
+      networkSettledRef.current = cached !== null;
+      setEvents(cached ?? []);
+      setReady(cached !== null);
+      setCacheHydrated(cached !== null);
+    }
+  }, [communityId, user?.id]);
 
   // Cold start: paint the cards cached with the message window while the
   // bootstrap request is in flight (see lib/chatCache.ts).
   useEffect(() => {
     const userId = user?.id;
-    if (!userId) return undefined;
+    const memoryEvents = userId
+      ? getCachedCommunityContentEvents(communityId, userId)
+      : null;
+    if (memoryEvents !== null) {
+      networkSettledRef.current = true;
+      cacheReadRef.current = {
+        communityId,
+        userId,
+        events: Promise.resolve(memoryEvents),
+        messages: Promise.resolve(null),
+      };
+      setEvents(memoryEvents);
+      setReady(true);
+      setCacheHydrated(true);
+      return undefined;
+    }
+    networkSettledRef.current = false;
+    const eventsPromise = userId
+      ? chatCache.loadCommunityEvents(userId, communityId).catch(() => null)
+      : Promise.resolve(null);
+    const messagesPromise = userId
+      ? chatCache.loadCommunityMessages(userId, communityId).catch(() => null)
+      : Promise.resolve(null);
+    cacheReadRef.current = { communityId, userId, events: eventsPromise, messages: messagesPromise };
+    if (!userId) {
+      setCacheHydrated(true);
+      return undefined;
+    }
     let active = true;
-    void chatCache
-      .loadCommunityEvents(userId, communityId)
+    void eventsPromise
       .then((cached) => {
-        if (!active || !cached || cached.length === 0) return;
+        if (!active || cached === null) return;
         if (networkSettledRef.current) return;
-        setEvents((prev) => {
-          const known = new Set(prev.map((event) => event.id));
-          const fresh = cached.filter((event) => !known.has(event.id));
-          return fresh.length > 0 ? [...prev, ...fresh].sort(byCreatedAt) : prev;
-        });
+        if (cached.length > 0) {
+          setEvents((prev) => {
+            if (
+              communityIdRef.current !== communityId ||
+              userIdRef.current !== userId
+            ) return prev;
+            const known = new Set(prev.map((event) => event.id));
+            const fresh = cached.filter((event) => !known.has(event.id));
+            return fresh.length > 0 ? [...prev, ...fresh].sort(byCreatedAt) : prev;
+          });
+        }
         setReady(true);
       })
       .finally(() => {
@@ -110,12 +165,61 @@ export function useChatContentEvents(communityId: string) {
 
   const load = useCallback(async () => {
     try {
+      const userId = user?.id;
+      const memoryEvents = userId
+        ? getCachedCommunityContentEvents(communityId, userId)
+        : null;
+      if (
+        communityIdRef.current !== communityId ||
+        userIdRef.current !== userId
+      ) return;
+      if (memoryEvents !== null) {
+        networkSettledRef.current = true;
+        setEvents(memoryEvents);
+        setReady(true);
+        return;
+      }
+      const cacheRead = cacheReadRef.current;
+      let diskEvents: ChatContentEvent[] | null = null;
+      let diskMessages: Message[] | null = null;
+      if (cacheRead?.communityId === communityId && cacheRead.userId === userId) {
+        [diskEvents, diskMessages] = await Promise.all([cacheRead.events, cacheRead.messages]);
+      }
+      if (
+        communityIdRef.current !== communityId ||
+        userIdRef.current !== userId
+      ) return;
+      // A recent account-scoped snapshot is enough to paint this timeline.
+      // The messages hook drains its cursor independently; content cards are
+      // refreshed from bootstrap after the bounded disk-snapshot TTL expires.
+      if (diskEvents !== null) {
+        setReady(true);
+        return;
+      }
+
+      if (diskMessages?.length) {
+        const contentEvents = await fetchCommunityContentEvents(communityId, userId);
+        if (
+          communityIdRef.current !== communityId ||
+          userIdRef.current !== userId
+        ) return;
+        networkSettledRef.current = true;
+        for (const row of contentEvents) {
+          if (row.users) authors.current.set(row.user_id, row.users);
+        }
+        setEvents(contentEvents);
+        return;
+      }
+
       // The shared bootstrap (see lib/communityBootstrap.ts) — the same
       // request the messages hook reads, so the two sections come from one
       // Worker invocation.
-      const bootstrap = await fetchCommunityBootstrap(communityId);
+      const bootstrap = await fetchCommunityBootstrap(communityId, userId);
       // The user switched communities while the page was in flight.
-      if (communityIdRef.current !== communityId) return;
+      if (
+        communityIdRef.current !== communityId ||
+        userIdRef.current !== userId
+      ) return;
       // Only a successful answer is authoritative; a failed fetch must leave
       // a still-pending disk read free to paint the cached cards.
       networkSettledRef.current = true;
@@ -126,9 +230,12 @@ export function useChatContentEvents(communityId: string) {
     } catch {
       // Keep whatever is on screen; realtime and the next open reconcile.
     } finally {
-      if (communityIdRef.current === communityId) setReady(true);
+      if (
+        communityIdRef.current === communityId &&
+        userIdRef.current === user?.id
+      ) setReady(true);
     }
-  }, [communityId]);
+  }, [communityId, user?.id]);
 
   useEffect(() => {
     load();
@@ -221,7 +328,7 @@ export function useChatContentEvents(communityId: string) {
         // The shared bootstrap is reused for 15 minutes: fold the live card
         // into it so leaving and re-entering the chat inside that window does
         // not paint the fetch-time snapshot and lose this card.
-        patchCachedBootstrapContentEvents(communityId, { kind: 'insert', event });
+        patchCachedBootstrapContentEvents(communityId, { kind: 'insert', event }, user?.id);
         if (row.user_id !== user.id) {
           // The member has the card in front of them — clear the server-side
           // content unread instead of letting it resurface after they leave.
@@ -242,7 +349,7 @@ export function useChatContentEvents(communityId: string) {
         if (!row.id) return;
         // Drop it from the shared bootstrap as well — otherwise re-entering
         // the chat inside its 15-minute window resurrects the deleted card.
-        patchCachedBootstrapContentEvents(communityId, { kind: 'delete', id: row.id });
+        patchCachedBootstrapContentEvents(communityId, { kind: 'delete', id: row.id }, user?.id);
         setEvents((prev) => prev.filter((event) => event.id !== row.id));
       }),
     );

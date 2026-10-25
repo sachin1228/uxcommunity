@@ -495,5 +495,7 @@ export function compareChatTimeline(
   const aTemp = a.id.startsWith('temp-');
   const bTemp = b.id.startsWith('temp-');
   if (aTemp !== bTemp) return aTemp ? 1 : -1;
-  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  const byTime = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  if (byTime !== 0) return byTime;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }

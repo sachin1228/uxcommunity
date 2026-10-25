@@ -18,7 +18,7 @@
  * unified card always — the state the web converges to.
  */
 
-import { compareChatTimeline, type Reaction } from './chat';
+import { type Reaction } from './chat';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -307,12 +307,10 @@ export type ChatTimelineItem<M, E> =
 /**
  * Interleaves chat messages and content cards into one ascending timeline.
  *
- * Sort is by created_at with messages first on a tie (they are pushed first
- * and Array.prototype.sort is stable) — the exact ordering the web
- * MessageList merge produces, so a card can never hop past a message that
- * shares its timestamp. Optimistic (`temp-`) rows pin last regardless of
- * their client stamp (see compareChatTimeline) — a just-sent bubble must
- * never drop into the pile above it.
+ * Sort is by created_at, with messages first on a tie and IDs ordered within
+ * each source. Optimistic (`temp-`) rows pin last regardless of their client
+ * stamp, matching the chat timeline's optimistic-row behavior — a just-sent
+ * bubble must never drop into the pile above it.
  */
 export function mergeChatTimeline<
   M extends { id: string; created_at: string },
@@ -330,12 +328,21 @@ export function mergeChatTimeline<
       event,
     })),
   ];
-  return items.sort((a, b) =>
-    compareChatTimeline(
-      a.kind === 'message' ? a.message : a.event,
-      b.kind === 'message' ? b.message : b.event,
-    ),
-  );
+  return items.sort((a, b) => {
+    const aItem = a.kind === 'message' ? a.message : a.event;
+    const bItem = b.kind === 'message' ? b.message : b.event;
+    const aTemp = aItem.id.startsWith('temp-');
+    const bTemp = bItem.id.startsWith('temp-');
+
+    // Optimistic bubbles stay at the end even when the device clock is behind
+    // server timestamps. For persisted rows, keep canonical ID ordering within
+    // each source and put messages before content cards on equal timestamps.
+    if (aTemp !== bTemp) return aTemp ? 1 : -1;
+    const byTime = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    if (byTime !== 0) return byTime;
+    if (a.kind !== b.kind) return a.kind === 'message' ? -1 : 1;
+    return aItem.id < bItem.id ? -1 : aItem.id > bItem.id ? 1 : 0;
+  });
 }
 
 // ─── Bounded author cache ─────────────────────────────────────────────────

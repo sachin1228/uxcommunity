@@ -22,6 +22,8 @@ import type { DmConversation, DmMessage } from './dm';
 
 export const COMMUNITY_MESSAGE_CACHE_LIMIT = 120;
 export const COMMUNITY_EVENT_CACHE_LIMIT = 60;
+/** Keep card snapshots fresh across cold starts; message cursors sync separately. */
+export const COMMUNITY_EVENTS_CACHE_TTL_MS = 15 * 60_000;
 export const DM_MESSAGE_CACHE_LIMIT = 100;
 /** The lists are snapshots for the first paint, not an offline database. */
 export const COMMUNITY_LIST_CACHE_LIMIT = 200;
@@ -343,15 +345,22 @@ export function createChatCache(
     limit: number,
     isRow: (value: unknown) => value is T,
     retention: boolean,
-  ): Promise<T[] | null> {    try {
+    options: { allowEmpty?: boolean; maxAgeMs?: number } = {},
+  ): Promise<T[] | null> {
+    try {
       const raw = await storage.getItem(key);
       if (!raw) return null;
       const parsed: unknown = JSON.parse(raw);
       if (
         !isRecord(parsed) ||
         parsed.version !== CACHE_VERSION ||
+        typeof parsed.savedAt !== 'number' ||
+        !Number.isFinite(parsed.savedAt) ||
         !Array.isArray(parsed.rows)
       ) {
+        return null;
+      }
+      if (options.maxAgeMs !== undefined && now() - parsed.savedAt > options.maxAgeMs) {
         return null;
       }
       const rows = prepareWindow(
@@ -360,7 +369,7 @@ export function createChatCache(
         now(),
         retention,
       );
-      return rows.length > 0 ? rows : null;
+      return rows.length > 0 || options.allowEmpty ? rows : null;
     } catch {
       // A corrupt or unreadable entry must never break a chat — the network
       // path below it still paints the room.
@@ -374,10 +383,11 @@ export function createChatCache(
     rows: readonly T[],
     limit: number,
     retention: boolean,
+    allowEmpty = false,
   ): Promise<void> {
     if (!isUserActive(userId)) return Promise.resolve();
     const prepared = prepareWindow(rows, limit, now(), retention);
-    if (prepared.length === 0) {
+    if (prepared.length === 0 && !allowEmpty) {
       return Promise.all([
         writeIfActive(userId, key, () => storage.removeItem(key)),
         dropWindow(userId, key),
@@ -482,9 +492,11 @@ export function createChatCache(
         communityEventsCacheKey(userId, communityId),
         COMMUNITY_EVENT_CACHE_LIMIT,
         isContentEventRow,
-        // Cards are permanent timeline items, not part of the 15-day message
-        // sweep — only the window size bounds them.
         false,
+        // Cards are permanent timeline items, not part of the 15-day message
+        // sweep — the window size bounds them. Empty snapshots are reusable
+        // only for the same short freshness window as the bootstrap.
+        { allowEmpty: true, maxAgeMs: COMMUNITY_EVENTS_CACHE_TTL_MS },
       );
     },
 
@@ -496,6 +508,7 @@ export function createChatCache(
         events,
         COMMUNITY_EVENT_CACHE_LIMIT,
         false,
+        true,
       );
     },
 

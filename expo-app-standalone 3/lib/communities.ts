@@ -129,6 +129,12 @@ export interface Message {
   status?: 'sending' | 'sent' | 'failed';
 }
 
+/** Message cursor used by the server's canonical (created_at, id) ordering. */
+export interface MessageCursor {
+  ts: string;
+  id: string;
+}
+
 // ---------------------------------------------------------------------------
 // API helpers
 // ---------------------------------------------------------------------------
@@ -266,12 +272,18 @@ export async function getCommunities(
  */
 export async function getMessages(
   communityId: string,
-  before?: string,
-  after?: string
+  before?: string | MessageCursor,
+  after?: string | MessageCursor,
 ): Promise<Message[]> {
   const params = new URLSearchParams();
-  if (before) params.set('before', before);
-  if (after) params.set('after', after);
+  if (before) {
+    params.set('before', typeof before === 'string' ? before : before.ts);
+    if (typeof before !== 'string') params.set('before_id', before.id);
+  }
+  if (after) {
+    params.set('after', typeof after === 'string' ? after : after.ts);
+    if (typeof after !== 'string') params.set('after_id', after.id);
+  }
   const qs = params.toString();
   const { data } = await apiFetch<{ messages: Message[] }>(
     `/api/communities/${communityId}/messages${qs ? `?${qs}` : ''}`

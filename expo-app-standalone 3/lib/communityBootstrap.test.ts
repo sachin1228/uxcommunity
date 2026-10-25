@@ -21,9 +21,16 @@ import test, { before, beforeEach } from 'node:test';
 
 import {
   COMMUNITY_BOOTSTRAP_STALE_MS,
+  COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT,
+  MAX_COMMUNITY_BOOTSTRAP_ENTRIES,
   fetchCommunityBootstrap,
+  fetchCommunityContentEvents,
+  getCachedCommunityBootstrap,
+  getCachedCommunityContentEvents,
+  getCachedCommunityMessageWindow,
   patchCachedBootstrapContentEvents,
   patchCachedBootstrapMessages,
+  rememberCommunityMessageWindow,
 } from './communityBootstrap';
 import type { ChatContentEvent } from './chatContentEvents';
 import type { Message } from './communities';
@@ -75,6 +82,7 @@ function contentEvent(id: string, created_at = '2026-10-17T10:02:00Z'): ChatCont
 
 const storage = new Map<string, string>();
 let fetchCalls = 0;
+let fetchUrls: string[] = [];
 let nextPayload: unknown = bootstrapPayload([]);
 
 before(() => {
@@ -85,8 +93,9 @@ before(() => {
       removeItem: (key: string) => void storage.delete(key),
     },
   };
-  (globalThis as Record<string, unknown>).fetch = async () => {
+  (globalThis as Record<string, unknown>).fetch = async (input: RequestInfo | URL) => {
     fetchCalls += 1;
+    fetchUrls.push(String(input));
     return new Response(JSON.stringify(nextPayload), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -96,6 +105,7 @@ before(() => {
 
 beforeEach(() => {
   fetchCalls = 0;
+  fetchUrls = [];
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -111,6 +121,109 @@ test('a settled bootstrap is reused inside the freshness window', async () => {
   const second = await fetchCommunityBootstrap('cached-community');
   assert.deepEqual(second.messages.map((message) => message.id), ['m1', 'm2']);
   assert.equal(fetchCalls, 1, 'the second open costs no request');
+});
+
+test('bootstrap entries are scoped to the authenticated account', async () => {
+  nextPayload = bootstrapPayload(['snapshot']);
+  await fetchCommunityBootstrap('account-scoped-room', 'user-a');
+  await fetchCommunityBootstrap('account-scoped-room', 'user-b');
+  assert.equal(fetchCalls, 2, 'each account makes its own authenticated request');
+
+  patchCachedBootstrapMessages('account-scoped-room', [row('private-to-a')], 'user-a');
+  assert.deepEqual(
+    getCachedCommunityMessageWindow('account-scoped-room', 'user-a')?.map((item) => item.id),
+    ['private-to-a'],
+  );
+  assert.equal(getCachedCommunityMessageWindow('account-scoped-room', 'user-b')?.[0]?.id, 'snapshot');
+  assert.deepEqual(
+    getCachedCommunityBootstrap('account-scoped-room', 'user-a')?.messages.map((item) => item.id),
+    ['private-to-a'],
+    'the hot switch path can read the updated account window synchronously',
+  );
+  assert.equal(
+    getCachedCommunityBootstrap('account-scoped-room', 'user-b')?.messages[0]?.id,
+    'snapshot',
+  );
+  assert.deepEqual(
+    (await fetchCommunityBootstrap('account-scoped-room', 'user-a')).messages.map((item) => item.id),
+    ['private-to-a'],
+  );
+  assert.deepEqual(
+    (await fetchCommunityBootstrap('account-scoped-room', 'user-b')).messages.map((item) => item.id),
+    ['snapshot'],
+  );
+  assert.equal(fetchCalls, 2, 'both account snapshots remain independently cached');
+});
+
+test('a disk-hydrated message window is ready for the next in-app switch', () => {
+  const rows = [row('disk-window')];
+  rememberCommunityMessageWindow('disk-hydrated-room', rows, 'disk-user');
+  assert.deepEqual(
+    getCachedCommunityMessageWindow('disk-hydrated-room', 'disk-user')?.map((item) => item.id),
+    ['disk-window'],
+  );
+  assert.equal(
+    getCachedCommunityMessageWindow('disk-hydrated-room', 'other-user'),
+    null,
+    'the hot window remains isolated by account',
+  );
+});
+
+test('the hot message window keeps only the newest bounded rows', () => {
+  const rows = Array.from({ length: COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT + 1 }, (_, index) =>
+    row(`bounded-${index}`),
+  );
+  rememberCommunityMessageWindow('bounded-hot-room', rows, 'bounded-hot-user');
+  const cached = getCachedCommunityMessageWindow('bounded-hot-room', 'bounded-hot-user');
+  assert.equal(cached?.length, COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT);
+  assert.equal(cached?.[0]?.id, 'bounded-1');
+  assert.equal(cached?.at(-1)?.id, `bounded-${COMMUNITY_BOOTSTRAP_MESSAGE_LIMIT}`);
+});
+
+test('a stale card window fetches only content events and reuses its account cache', async () => {
+  nextPayload = bootstrapPayload(['message-page-not-requested']);
+  const first = await fetchCommunityContentEvents('events-only-room', 'events-user');
+  const second = await fetchCommunityContentEvents('events-only-room', 'events-user');
+
+  assert.deepEqual(first.map((event) => event.id), ['evt-1']);
+  assert.deepEqual(second.map((event) => event.id), ['evt-1']);
+  assert.deepEqual(
+    getCachedCommunityContentEvents('events-only-room', 'events-user')?.map((event) => event.id),
+    ['evt-1'],
+  );
+  patchCachedBootstrapContentEvents('events-only-room', {
+    kind: 'insert',
+    event: contentEvent('evt-2'),
+  }, 'events-user');
+  assert.deepEqual(
+    getCachedCommunityContentEvents('events-only-room', 'events-user')?.map((event) => event.id),
+    ['evt-1', 'evt-2'],
+    'live cards patch the independent hot event cache too',
+  );
+  assert.deepEqual(fetchUrls, [
+    '/api/communities/events-only-room/bootstrap?section=content-events',
+  ]);
+  assert.equal(fetchCalls, 1);
+});
+
+test('bootstrap cache evicts the least recently used community', async () => {
+  nextPayload = bootstrapPayload(['m1']);
+  const communities = Array.from(
+    { length: MAX_COMMUNITY_BOOTSTRAP_ENTRIES },
+    (_, index) => `bounded-room-${index}`,
+  );
+  for (const communityId of communities) await fetchCommunityBootstrap(communityId, 'bounded-user');
+  assert.equal(fetchCalls, MAX_COMMUNITY_BOOTSTRAP_ENTRIES);
+
+  // Touch the oldest item so the next write evicts the next least-recent one.
+  await fetchCommunityBootstrap(communities[0], 'bounded-user');
+  await fetchCommunityBootstrap('bounded-room-new', 'bounded-user');
+  await fetchCommunityBootstrap(communities[1], 'bounded-user');
+  assert.equal(
+    fetchCalls,
+    MAX_COMMUNITY_BOOTSTRAP_ENTRIES + 2,
+    'the touched room survives while the least-recent room must be fetched again',
+  );
 });
 
 // ══════════════════════════════════════════════════════════════════════════
