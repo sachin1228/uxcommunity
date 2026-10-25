@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, useRef, useEffect } from "react";
+import { useId, useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import TruncateMarkup from "react-truncate-markup";
 import type { MessageMention } from "@/lib/communities/cache";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
@@ -98,6 +98,39 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
 /** Number of lines shown before a long message collapses behind "Read more". */
 const COLLAPSED_LINES = 10;
 
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/** `leading-6` on the message body; ten of these are the collapsed box. */
+const LINE_HEIGHT_PX = 24;
+
+/**
+ * The collapsed box's CSS clamp. It is what the first paint shows: the same
+ * ten-line box the truncated markup will occupy, so the bubble cannot start at
+ * the full message's height and collapse after mount.
+ *
+ * A max-height on a plain block is used instead of `-webkit-line-clamp`
+ * because `scrollHeight` on a clamped element is not a reliable "full content"
+ * measurement across browsers — and that measurement is what decides whether
+ * this message gets a "Read more" at all.
+ */
+const COLLAPSED_CLAMP_STYLE: React.CSSProperties = {
+  maxHeight: COLLAPSED_LINES * LINE_HEIGHT_PX,
+  overflow: "hidden",
+};
+
+interface CollapsedBodyState {
+  /** The clamped text hides content and needs the JS truncator. */
+  truncated: boolean;
+  /** The clamped box's height, held while the truncator searches candidates. */
+  holdHeight: number | null;
+}
+
+const INITIAL_COLLAPSED_BODY: CollapsedBodyState = {
+  truncated: false,
+  holdHeight: null,
+};
+
 export function MessageContent({
   content,
   mentions,
@@ -117,14 +150,87 @@ export function MessageContent({
   const textId = useId();
   const textRef = useRef<HTMLDivElement>(null);
   const [fontRevision, setFontRevision] = useState(0);
+  /** Bumped when the column gets narrower/wider; wrapping changes with it. */
+  const [layoutRevision, setLayoutRevision] = useState(0);
 
-  // Width changes are handled by TruncateMarkup's ResizeObserver. Font swaps
-  // can change wrapping without changing that width, so remeasure those too.
+  // Font swaps can change wrapping without changing the column width.
   useEffect(() => {
     const remeasure = () => setFontRevision((revision) => revision + 1);
     document.fonts.addEventListener("loadingdone", remeasure);
     return () => document.fonts.removeEventListener("loadingdone", remeasure);
   }, []);
+
+  // ── Stable collapsed body ────────────────────────────────────────────────
+  // react-truncate-markup renders the WHOLE message first and then slices it
+  // until the ellipsis fits, so the bubble used to paint at the full message's
+  // height and visibly shrink (one re-render per candidate slice) once the chat
+  // committed. The first paint is now the CSS-clamped ten-line box; the
+  // truncator only mounts when that box actually overflows, and its search runs
+  // inside a wrapper held at the measured ten-line height. Short messages — the
+  // common case — never run the truncator at all.
+  const measureKey = `${content}\u0000${fontRevision}\u0000${layoutRevision}`;
+  const measuredKeyRef = useRef<string | null>(null);
+  const [collapsedBody, setCollapsedBody] = useState<CollapsedBodyState>(
+    INITIAL_COLLAPSED_BODY,
+  );
+  const resetKeyRef = useRef(measureKey);
+
+  // A new content/width/font key invalidates the previous measurement. This
+  // runs before the measuring effect below, so the re-render it schedules
+  // mounts the clamped (untruncated) copy the measurement needs; a layout
+  // effect flushes before paint, so the stale copy is never shown.
+  useIsomorphicLayoutEffect(() => {
+    if (resetKeyRef.current === measureKey) return;
+    resetKeyRef.current = measureKey;
+    measuredKeyRef.current = null;
+    if (collapsedBody.truncated || collapsedBody.holdHeight !== null) {
+      setCollapsedBody(INITIAL_COLLAPSED_BODY);
+    }
+  }, [measureKey, collapsedBody.truncated, collapsedBody.holdHeight]);
+
+  useIsomorphicLayoutEffect(() => {
+    if (!collapsed) return;
+    // The truncator's unclamped tree is what is mounted while a truncation is
+    // active; measuring it would always report "overflows". The reset above
+    // replaces it with the clamped copy and re-runs this effect.
+    if (collapsedBody.truncated) return;
+    if (measuredKeyRef.current === measureKey) return;
+    const element = textRef.current;
+    if (!element) return;
+    measuredKeyRef.current = measureKey;
+    const overflows = element.scrollHeight > element.clientHeight + 1;
+    const next: CollapsedBodyState = {
+      truncated: overflows,
+      holdHeight: overflows ? element.clientHeight : null,
+    };
+    // Most messages fit; re-using the state object bails out of a re-render
+    // that would otherwise run for every short message on a page.
+    setCollapsedBody((previous) =>
+      previous.truncated === next.truncated &&
+      previous.holdHeight === next.holdHeight
+        ? previous
+        : next,
+    );
+  }, [collapsed, measureKey, collapsedBody.truncated]);
+
+  // A chat column can resize (window, sidebar, scrollbar) without the text
+  // changing; the ten-line boundary moves with it, so re-measure. The clamp
+  // itself never changes the column width, so this cannot feed back.
+  useEffect(() => {
+    if (!collapsed) return undefined;
+    const element = textRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return undefined;
+
+    let lastWidth = element.getBoundingClientRect().width;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? element.getBoundingClientRect().width;
+      if (Math.abs(width - lastWidth) < 1) return;
+      lastWidth = width;
+      setLayoutRevision((revision) => revision + 1);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [collapsed, collapsedBody.truncated]);
 
   // Mentions are matched against the raw text first (longest name wins), so
   // exactly the stored mentions become chips and everything else — including
@@ -201,12 +307,18 @@ export function MessageContent({
     }
   }
 
-  const text = (
+  /**
+   * The text node. `clamped` is true only for the stable first paint and while
+   * the tree is measuring; the truncator must see the unclamped element or its
+   * own height check always reports "fits".
+   */
+  const renderText = (clamped: boolean) => (
     <div
       id={textId}
       data-collapsed={collapsed || undefined}
       ref={textRef}
       tabIndex={-1}
+      style={clamped ? COLLAPSED_CLAMP_STYLE : undefined}
       className={`chat-message-text font-body text-sm font-normal leading-6 whitespace-pre-wrap break-words select-text cursor-text outline-none ${
         isMe ? "text-accent-foreground" : "text-foreground"
       }`}
@@ -215,42 +327,65 @@ export function MessageContent({
     </div>
   );
 
+  const truncateMarkup = (
+    <TruncateMarkup
+      key={fontRevision}
+      lines={COLLAPSED_LINES}
+      ellipsis={
+        <span className="whitespace-nowrap">
+          {"\u2060… "}
+          <button
+            type="button"
+            aria-expanded={false}
+            aria-controls={textId}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCollapsed(false);
+              requestAnimationFrame(() => textRef.current?.focus({ preventScroll: true }));
+            }}
+            className={`inline align-baseline font-body text-sm font-medium transition-colors rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+              animate ? "chat-read-more-in" : ""
+            } ${
+              isMe
+                ? "text-accent-foreground/70 hover:text-accent-foreground"
+                : "text-foreground-muted hover:text-foreground"
+            }`}
+            style={animate ? ({ "--i": Math.min(animateWordCount, 24) } as React.CSSProperties) : undefined}
+          >
+            Read more
+          </button>
+        </span>
+      }
+    >
+      {renderText(false)}
+    </TruncateMarkup>
+  );
+
   return (
     <>
       {/* Once expanded a message stays fully open — there is no collapse back. */}
       {collapsed ? (
-        <TruncateMarkup
-          key={fontRevision}
-          lines={COLLAPSED_LINES}
-          ellipsis={
-            <span className="whitespace-nowrap">
-              {"\u2060… "}
-              <button
-                type="button"
-                aria-expanded={false}
-                aria-controls={textId}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCollapsed(false);
-                  requestAnimationFrame(() => textRef.current?.focus({ preventScroll: true }));
-                }}
-                className={`inline align-baseline font-body text-sm font-medium transition-colors rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                  animate ? "chat-read-more-in" : ""
-                } ${
-                  isMe
-                    ? "text-accent-foreground/70 hover:text-accent-foreground"
-                    : "text-foreground-muted hover:text-foreground"
-                }`}
-                style={animate ? ({ "--i": Math.min(animateWordCount, 24) } as React.CSSProperties) : undefined}
-              >
-                Read more
-              </button>
-            </span>
-          }
-        >
-          {text}
-        </TruncateMarkup>
-      ) : text}
+        collapsedBody.truncated ? (
+          // The final truncation is built to fit the same COLLAPSED_LINES
+          // box, so its height is held for the bubble's whole collapsed life:
+          // a later parent render re-runs the library's search from the full
+          // text, and without the hold that search would flash the bubble
+          // taller for a frame.
+          <div
+            style={
+              collapsedBody.holdHeight !== null
+                ? { height: collapsedBody.holdHeight, overflow: "hidden" }
+                : undefined
+            }
+          >
+            {truncateMarkup}
+          </div>
+        ) : (
+          renderText(true)
+        )
+      ) : (
+        renderText(false)
+      )}
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
     </>
   );

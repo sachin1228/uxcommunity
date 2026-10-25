@@ -26,9 +26,21 @@ import {
   type MessageCursor,
 } from "@/lib/communities/messages";
 import { logEvent } from "@/lib/observability/log";
+import { newestChatMediaUrls } from "./mediaLayout";
+import { warmChatMedia } from "./prefetchMedia";
 
 /** Must match PAGE_SIZE in the messages API route. */
 const PAGE_SIZE = 50;
+
+/**
+ * How long a page waits for its newest images to be measured before it is
+ * committed. The measurements are what let the image bubbles mount at their
+ * final size; past the bound, the page paints with 4:3 placeholders and each
+ * image corrects itself once (see MessageBubble's BubbleImage), rather than
+ * holding the room on a spinner for slow media.
+ */
+const INITIAL_MEDIA_WARM_MS = 650;
+const OLDER_MEDIA_WARM_MS = 900;
 
 /**
  * Ceiling on pages drained in one catch-up PASS — the same bound the DM chat
@@ -267,6 +279,14 @@ export function useChatData({
       await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
       const page = await fetchMessagePage(null, force).catch(() => null);
       if (page === null || communityIdRef.current !== targetId) return;
+      // Measure the newest page's images before it paints. The bubble's frame
+      // is already reservable from a cached ratio; this is what makes the first
+      // paint of a fresh room final instead of widening/narrowing under the
+      // reader as each image decodes.
+      if (page.length) {
+        await warmChatMedia(newestChatMediaUrls(page), INITIAL_MEDIA_WARM_MS);
+      }
+      if (communityIdRef.current !== targetId) return;
       applyFetchedPage(page);
       msgFetchedAt.set(targetId, Date.now());
       evictIfNeeded();
@@ -376,6 +396,12 @@ export function useChatData({
         const incoming: Message[] = d.messages ?? [];
         if (incoming.length < PAGE_SIZE) setHasMoreAbove(false);
         if (incoming.length === 0) return;
+        // The prepended page's newest rows sit directly above the current
+        // viewport; measure their images (and only those — warming all 50 rows
+        // would download history the reader may never reach) so the append
+        // does not resize the list under the reader.
+        await warmChatMedia(newestChatMediaUrls(incoming), OLDER_MEDIA_WARM_MS);
+        if (communityIdRef.current !== targetId) return;
         applyFetchedPage(incoming);
       } catch {
         // Network error — leave state as-is
