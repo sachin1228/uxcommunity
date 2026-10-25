@@ -610,12 +610,13 @@ function BubbleHeader({
           hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
           accessibilityRole="button"
           accessibilityLabel={`View ${senderName}'s profile`}
+          style={styles.headerNamePress}
         >
           {nameNode}
         </Pressable>
       )}
       {withTime && (
-        <Fragment>
+        <View style={styles.headerMeta}>
           <Text style={[styles.headerTime, { color: timeColor, opacity: timeOpacity }]}>
             {fmtTime(message.created_at)}
           </Text>
@@ -634,7 +635,7 @@ function BubbleHeader({
           {isOwn && status === 'failed' && (
             <Text style={[styles.headerTime, { color: colors.destructive }]}>!</Text>
           )}
-        </Fragment>
+        </View>
       )}
     </View>
   );
@@ -1176,8 +1177,22 @@ const styles = StyleSheet.create({
   bubbleMedia: { padding: 4 },
 
   /** Name + time row that opens a run of messages (community layout). */
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  headerName: { fontSize: 12, lineHeight: 16, fontFamily: 'Geist_600SemiBold' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerName: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Geist_600SemiBold',
+    flexShrink: 1,
+  },
+  headerNamePress: { flexShrink: 1, minWidth: 0 },
+  /** Time and its delivery flags sit at the far-right corner of the row. */
+  headerMeta: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
   headerTime: { fontSize: 10, lineHeight: 14, fontFamily: 'Geist_500Medium' },
   /** Media bubbles wrap the image with a thin frame — give the row its own inset. */
   headerOnMedia: { marginBottom: 4, paddingLeft: 4, paddingRight: 4 },
