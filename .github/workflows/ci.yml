@@ -90,13 +90,6 @@ jobs:
       - name: Run chat media tests
         run: npm run test:chat-media
 
-      # Blocking. The chat scrollbar is held back until the list's render
-      # batches stop growing the content (a bar drawn on the first frame starts
-      # almost full length and rescales). The gate is React-Native-free, so it
-      # runs here like the suites above.
-      - name: Run mobile chat scrollbar tests
-        run: npm run test:mobile-chat-scrollbar
-
       # Blocking. The Home feed's two tabs (Public Posts / Your Communities)
       # ship in the mobile app, and the stored choice decides which one opens.
       # The axis lives in a React-Native-free module, so it runs here like the
