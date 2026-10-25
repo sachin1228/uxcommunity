@@ -85,6 +85,7 @@ export function VerificationForm() {
   const [linkedin, setLinkedin] = useState("");
   const [portfolio1, setPortfolio1] = useState("");
   const [portfolio2, setPortfolio2] = useState("");
+  const [showSecondPortfolio, setShowSecondPortfolio] = useState(false);
   const [samples, setSamples] = useState<string[]>([]);
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
 
@@ -121,6 +122,7 @@ export function VerificationForm() {
           setLinkedin(next.latest.linkedinUrl ?? "");
           setPortfolio1(next.latest.portfolioLinks[0] ?? "");
           setPortfolio2(next.latest.portfolioLinks[1] ?? "");
+          setShowSecondPortfolio(Boolean(next.latest.portfolioLinks[1]));
           setSamples(next.latest.workSampleUrls ?? []);
         }
       } catch (loadFailure) {
@@ -490,14 +492,24 @@ export function VerificationForm() {
             className="field w-full"
             aria-label="Portfolio link 1"
           />
-          <input
-            value={portfolio2}
-            onChange={(event) => setPortfolio2(event.target.value)}
-            placeholder="Optional second link"
-            type="url"
-            className="field w-full"
-            aria-label="Portfolio link 2"
-          />
+          {showSecondPortfolio ? (
+            <input
+              value={portfolio2}
+              onChange={(event) => setPortfolio2(event.target.value)}
+              placeholder="Optional second link"
+              type="url"
+              className="field w-full"
+              aria-label="Portfolio link 2"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSecondPortfolio(true)}
+              className="self-start font-body text-xs font-medium text-accent transition-colors hover:text-accent-hover"
+            >
+              + Add another link
+            </button>
+          )}
         </div>
       </section>
 

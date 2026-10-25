@@ -82,6 +82,7 @@ export default function VerificationScreen() {
   const [linkedin, setLinkedin] = useState('');
   const [portfolio1, setPortfolio1] = useState('');
   const [portfolio2, setPortfolio2] = useState('');
+  const [showSecondPortfolio, setShowSecondPortfolio] = useState(false);
   const [samples, setSamples] = useState<string[]>([]);
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
 
@@ -105,6 +106,7 @@ export default function VerificationScreen() {
         setLinkedin(next.latest.linkedinUrl ?? '');
         setPortfolio1(next.latest.portfolioLinks[0] ?? '');
         setPortfolio2(next.latest.portfolioLinks[1] ?? '');
+        setShowSecondPortfolio(Boolean(next.latest.portfolioLinks[1]));
         setSamples(next.latest.workSampleUrls ?? []);
       }
     } catch (loadFailure) {
@@ -491,23 +493,35 @@ export default function VerificationScreen() {
                   },
                 ]}
               />
-              <TextInput
-                value={portfolio2}
-                onChangeText={setPortfolio2}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                placeholder="Optional second link"
-                placeholderTextColor={colors.mutedForeground}
-                style={[
-                  styles.input,
-                  {
-                    color: colors.foreground,
-                    borderColor: colors.border,
-                    backgroundColor: colors.background,
-                  },
-                ]}
-              />
+              {showSecondPortfolio ? (
+                <TextInput
+                  value={portfolio2}
+                  onChangeText={setPortfolio2}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  placeholder="Optional second link"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[
+                    styles.input,
+                    {
+                      color: colors.foreground,
+                      borderColor: colors.border,
+                      backgroundColor: colors.background,
+                    },
+                  ]}
+                />
+              ) : (
+                <Pressable
+                  onPress={() => setShowSecondPortfolio(true)}
+                  accessibilityRole="button"
+                  style={styles.addLink}
+                >
+                  <Text style={[styles.addLinkText, { color: colors.link }]}>
+                    + Add another link
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -642,4 +656,6 @@ const styles = StyleSheet.create({
   addSampleText: { fontSize: 10, fontFamily: 'Geist_500Medium' },
   alert: { borderWidth: 1, borderRadius: 10, padding: 12 },
   link: { fontSize: 13, fontFamily: 'Geist_500Medium' },
+  addLink: { alignSelf: 'flex-start', paddingVertical: 2 },
+  addLinkText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
 });
