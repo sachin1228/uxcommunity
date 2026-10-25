@@ -10,8 +10,10 @@
  *   after 15 minutes because their missed updates have no message cursor.
  *   Reconnects and foregrounds do not refetch the card window.
  * - Realtime: the chat room's content-insert / content-delete / content-comment
- *   / content-reaction-* topics, so a card is as permanent and as current as a
- *   message — not a session-only bubble.
+ *   / content-reaction-* topics, so a card stays current while it lives in the
+ *   chat — not a session-only bubble. It is a NOTIFICATION: the server only
+ *   returns cards from the member's own history start and inside the 15-day
+ *   window, while the thread/post/resource/event it names keeps its page.
  * - Local mirror: creates/deletes from the mounted tabs land in the same
  *   frame via lib/contentEventMirror.ts, ahead of the realtime echo.
  */
@@ -338,6 +340,26 @@ export function useChatContentEvents(communityId: string) {
           // The creator's own mirror insert (or a duplicate echo) already has it.
           if (prev.some((entry) => entry.id === event.id)) return prev;
           return [...prev, event].sort(byCreatedAt);
+        });
+      }),
+    );
+
+    // ── Retention sweep ────────────────────────────────────────────────────
+    // The scheduled sweep announces its cutoff to the room (the message hook
+    // prunes its own rows with the same event). A card is a chat-timeline row,
+    // so it leaves the open timeline with its message window — the thread,
+    // post, resource or event it names is untouched.
+    unsubscribes.push(
+      realtimeClient.on(room, 'messages-expired', (data) => {
+        const { cutoff } = data as { cutoff?: string | null };
+        if (!cutoff) return;
+        const cutoffMs = Date.parse(cutoff);
+        if (Number.isNaN(cutoffMs)) return;
+        setEvents((prev) => {
+          const next = prev.filter(
+            (event) => new Date(event.created_at).getTime() >= cutoffMs,
+          );
+          return next.length === prev.length ? prev : next;
         });
       }),
     );

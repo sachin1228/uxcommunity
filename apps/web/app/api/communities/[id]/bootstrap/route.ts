@@ -77,6 +77,7 @@ export async function GET(request: NextRequest, context: Params) {
     try {
       const events = await loadCommunityContentEvents(
         communityId,
+        userId,
         contentAreaLimits(readModel.data.community as Record<string, unknown>),
       );
       return NextResponse.json(
@@ -99,6 +100,7 @@ export async function GET(request: NextRequest, context: Params) {
         if (!readModel.ok) return { events: [] };
         const events = await loadCommunityContentEvents(
           communityId,
+          userId,
           contentAreaLimits(readModel.data.community as Record<string, unknown>),
         );
         return { events };

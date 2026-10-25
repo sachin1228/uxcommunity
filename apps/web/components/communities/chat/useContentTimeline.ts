@@ -38,11 +38,14 @@ function sameReactions(current: MessageReaction[], next: MessageReaction[]) {
 /**
  * The "John created a …" cards interleaved with chat messages.
  *
- * Permanent cards for threads AND the other three areas. Seeded from
- * /bootstrap (history) and kept current by the chat room's content-insert /
- * content-delete realtime topics — so a card is as permanent as a message, not
- * a session-only bubble. This hook also primes the community meta/message
- * caches, because the same bootstrap request carries both.
+ * Cards for threads AND the other three areas. Seeded from /bootstrap
+ * (history) and kept current by the chat room's content-insert / content-delete
+ * realtime topics — so a card lives as long as the chat window shows it, not a
+ * session-only bubble. They are notifications: the server hands back only the
+ * cards created after this member joined (and inside the 15-day window), while
+ * the thread/post/resource/event itself keeps its own page. This hook also
+ * primes the community meta/message caches, because the same bootstrap request
+ * carries both.
  */
 export function useContentTimeline({
   communityId,

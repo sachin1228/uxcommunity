@@ -52,6 +52,7 @@
     "test:user-color": "tsx --test apps/web/lib/communities/user-color.test.ts",
     "test:r2-lifecycle": "tsx --test apps/web/lib/r2-lifecycle.test.ts",
     "test:content-event-ids": "tsx --test apps/web/lib/communities/content-event-ids.test.ts",
+    "test:chat-retention": "tsx --test apps/web/lib/communities/message-retention.test.ts",
     "test:publish-retry": "tsx --test apps/web/lib/realtime/publish-retry.test.ts apps/web/lib/realtime/publish-url.test.ts",
     "test:observability": "tsx --test apps/web/lib/observability/log.test.ts",
     "test:read-manager": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/read-manager.test.ts",
