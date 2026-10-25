@@ -599,21 +599,22 @@ function BubbleHeader({
 
   return (
     <View style={[styles.headerRow, media ? styles.headerOnMedia : null]}>
-      {isOwn ? (
-        nameNode
-      ) : (
+      {/* Own names are links too — the row's sender always opens the profile
+          the tap resolves to (own rows land on the profile tab). */}
+      {onAuthorPress ? (
         <Pressable
           onPress={onAuthorPress}
           onLongPress={onLongPress}
           delayLongPress={350}
-          disabled={!onAuthorPress}
           hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
           accessibilityRole="button"
-          accessibilityLabel={`View ${senderName}'s profile`}
+          accessibilityLabel={isOwn ? 'View your profile' : `View ${senderName}'s profile`}
           style={styles.headerNamePress}
         >
           {nameNode}
         </Pressable>
+      ) : (
+        nameNode
       )}
       {withTime && (
         <View style={styles.headerMeta}>

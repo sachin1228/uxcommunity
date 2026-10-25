@@ -31,6 +31,7 @@ import {
 } from '@/components/community/contentView';
 import { ContentCardRow } from '@/components/community/ContentCardRow';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
+import { ProfileHeaderButton, ProfilePageHeader } from '@/components/profile/ProfilePageHeader';
 import { MemberProfileHero } from '@/components/profile/MemberProfileHero';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -479,23 +480,21 @@ function MemberProfileSession({
         <DotField />
       </View>
 
-      <View style={styles.heroTop}>
-        <MemberProfileHero
-          name={identityName}
-          avatarUrl={body?.avatar_url ?? null}
-          city={body?.cities?.name ?? null}
-          roleLabel={member?.roleLabel ?? null}
-          bio={body?.bio ?? ''}
-          company={member?.company ?? null}
-          linkedinUrl={body?.linkedin_url ?? ''}
-          portfolioUrl={body?.portfolio_url ?? ''}
-          blockedByMe={member?.blockedByMe ?? false}
-          onMessage={() => void openMessage()}
-          onUnblock={() => void handleUnblock()}
-          unblocking={unblocking}
-          actionsDisabled={!memberAuthoritative}
-        />
-      </View>
+      <MemberProfileHero
+        name={identityName}
+        avatarUrl={body?.avatar_url ?? null}
+        city={body?.cities?.name ?? null}
+        roleLabel={member?.roleLabel ?? null}
+        bio={body?.bio ?? ''}
+        company={member?.company ?? null}
+        linkedinUrl={body?.linkedin_url ?? ''}
+        portfolioUrl={body?.portfolio_url ?? ''}
+        blockedByMe={member?.blockedByMe ?? false}
+        onMessage={() => void openMessage()}
+        onUnblock={() => void handleUnblock()}
+        unblocking={unblocking}
+        actionsDisabled={!memberAuthoritative}
+      />
 
       {memberError && member ? (
         <Text style={[styles.messageError, { color: colors.destructive }]}>{memberError}</Text>
@@ -514,32 +513,15 @@ function MemberProfileSession({
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
-      {/* Keep scrolled content out of the Android status-bar area. */}
-      <View
-        pointerEvents="none"
-        style={[
-          styles.statusBarBackdrop,
-          { height: insets.top, backgroundColor: colors.background },
-        ]}
+      <ProfilePageHeader
+        leading={
+          <ProfileHeaderButton
+            label="Back"
+            onPress={() => router.back()}
+            icon={<Ionicons name="arrow-back" size={22} color={colors.foreground} />}
+          />
+        }
       />
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-        hitSlop={6}
-        onPress={() => router.back()}
-        style={({ pressed }) => [
-          styles.backButton,
-          {
-            top: insets.top + 16,
-            backgroundColor: colors.surfaceRaised,
-            borderColor: colors.border,
-            opacity: pressed ? 0.8 : 1,
-          },
-        ]}
-      >
-        <Ionicons name="arrow-back" size={22} color={colors.foreground} />
-      </Pressable>
 
       {memberLoading && !member ? (
         <View style={styles.center}>
@@ -583,7 +565,7 @@ function MemberProfileSession({
             viewabilityConfig={viewabilityConfig}
             contentContainerStyle={[
               styles.list,
-              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96 },
+              { paddingBottom: insets.bottom + 96 },
             ]}
             onEndReached={loadMore}
             onEndReachedThreshold={1.5}
@@ -657,29 +639,11 @@ function MemberProfileSession({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  statusBarBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 4,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 11,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 5,
-  },
   heroWrap: { marginBottom: 4 },
-  // Match the own-profile hero's breathing room now that the header is gone.
-  heroTop: { paddingTop: 32 },
   heroDots: {
     position: 'absolute',
+    // The band starts at the list's top edge so the texture opens right under
+    // the page header, with no bare gutter above it.
     top: -LIST_PADDING,
     left: -LIST_PADDING,
     right: -LIST_PADDING,
