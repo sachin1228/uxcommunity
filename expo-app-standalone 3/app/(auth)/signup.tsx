@@ -129,9 +129,12 @@ export default function SignupScreen() {
     }
   }, []);
 
+  // Prefetch as soon as the screen mounts: filling in step 1 takes long enough
+  // that the four step-2 pickers are normally ready the moment they appear,
+  // instead of the step opening on a loading row.
   useEffect(() => {
-    if (step === 2) void requestOptions();
-  }, [step, requestOptions]);
+    void requestOptions();
+  }, [requestOptions]);
 
   // ── Step 1 ───────────────────────────────────────────────────────────────
   const submitIdentity = useCallback(async () => {
