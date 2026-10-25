@@ -697,6 +697,7 @@ function ProfileTabSession({
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <ProfilePageHeader
+        title="Profile"
         trailing={
           <ProfileHeaderButton
             label="Settings"

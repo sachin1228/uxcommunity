@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
@@ -10,9 +10,11 @@ import { useColors } from '@/hooks/useColors';
  * right under it instead of behind the status bar.
  */
 export function ProfilePageHeader({
+  title,
   leading,
   trailing,
 }: {
+  title?: string;
   leading?: React.ReactNode;
   trailing?: React.ReactNode;
 }) {
@@ -30,7 +32,12 @@ export function ProfilePageHeader({
         },
       ]}
     >
-      <View style={styles.slot}>{leading}</View>
+      <View style={styles.slot}>
+        {leading}
+        {title ? (
+          <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+        ) : null}
+      </View>
       <View style={styles.slot}>{trailing}</View>
     </View>
   );
@@ -68,7 +75,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  slot: { flexDirection: 'row', alignItems: 'center' },
+  slot: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title: { fontSize: 17, fontFamily: 'Geist_600SemiBold' },
   button: {
     width: 34,
     height: 34,
