@@ -31,9 +31,23 @@ function SessionGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
   const inAuth = segments[0] === '(auth)';
+  /**
+   * True from the moment a signed-out redirect is issued until the auth group
+   * is actually on screen. `useSegments()` can briefly report a stale or empty
+   * value while the navigation settles; without this latch each of those
+   * renders would issue another `replace('/(auth)/login')`, and every one of
+   * them re-animates the sign-in screen — the "login screen comes again"
+   * flicker after signing out.
+   */
+  const redirecting = React.useRef(false);
 
   useEffect(() => {
-    if (isLoading || user || inAuth) return;
+    if (isLoading || user || inAuth) {
+      redirecting.current = false;
+      return;
+    }
+    if (redirecting.current) return;
+    redirecting.current = true;
     router.replace('/(auth)/login');
   }, [inAuth, isLoading, router, user]);
 

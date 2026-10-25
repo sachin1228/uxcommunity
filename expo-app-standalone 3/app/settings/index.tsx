@@ -75,16 +75,21 @@ export default function SettingsScreen() {
     if (signingOut) return;
     hapticSelection();
     setSigningOut(true);
-    // logout() is best-effort on the wire and always clears the local session
-    // (realtime first, then the push token, then the cookie) — whatever it
-    // returns, the login screen is the right place to land next.
+    // logout() clears the local identity immediately, then finishes the
+    // best-effort teardown (push token, server session, caches). SessionGate
+    // in the root layout is the ONE place that reacts to that cleared
+    // identity by moving to the login screen.
+    //
+    // Do not navigate here as well: the gate's redirect lands while this
+    // request is still in flight, so a second replace when logout() settles
+    // re-enters the same screen and makes the sign-in page flicker
+    // (settings fades out, login fades in, login fades in again).
     try {
       await logout();
     } catch {
       /* the local session is cleared regardless */
     } finally {
       setSigningOut(false);
-      router.replace('/(auth)/login');
     }
   }
 
