@@ -78,6 +78,7 @@ import {
   putDmConversation,
 } from '@/lib/dmConversationsCache';
 import {
+  DM_MESSAGE_PAGE_SIZE,
   dmComposerState,
   isUnstartedRequest,
   newestMessageAt,
@@ -182,6 +183,33 @@ function messageFromRealtime(payload: RealtimeDmPayload): DmMessage {
       : null,
     status: 'sent',
   };
+}
+
+/**
+ * Older history this thread already holds on this device, oldest first.
+ *
+ * Pagination prefers it to the network: rows the member has scrolled past are
+ * in SQLite, and reading them costs a few milliseconds instead of a round trip.
+ * An empty list means the stored window ends at `before` — not that the thread
+ * has no older messages — so the caller falls back to `getDmMessages`.
+ */
+async function readLocalOlder(
+  conversationId: string,
+  before: Pick<DmMessage, 'id' | 'created_at'>,
+): Promise<DmMessage[]> {
+  const engine = getOfflineChat();
+  if (!engine) return [];
+  try {
+    const rows = await engine.readOlder(
+      offlineRef('dm', conversationId),
+      { ts: before.created_at, id: before.id },
+      DM_MESSAGE_PAGE_SIZE,
+    );
+    return rows.map(fromLocalDmMessage);
+  } catch {
+    // A local read failure must never stop history from loading.
+    return [];
+  }
 }
 
 export default function DmThreadScreen() {
@@ -1039,6 +1067,23 @@ export default function DmThreadScreen() {
     setLoadingMore(true);
     const oldest = messages[0];
     try {
+      // Local-first: this thread's window is already in SQLite, so paging back
+      // inside it is a disk read instead of a round trip. Only when the stored
+      // window ends at this cursor does the request go out (and that response
+      // decides `hasMore`).
+      const localOlder = await readLocalOlder(targetId, oldest);
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
+      if (localOlder.length > 0) {
+        setMessages((current) => {
+          const seen = new Set(current.map((message) => message.id));
+          return [
+            ...localOlder.filter((message) => !seen.has(message.id)),
+            ...current,
+          ];
+        });
+        return;
+      }
       const page = await getDmMessages(targetId, {
         createdAt: oldest.created_at,
         id: oldest.id,

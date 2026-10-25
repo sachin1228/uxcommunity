@@ -20,10 +20,21 @@
 
 import type {
   ConversationRecord,
+  Cursor,
   LocalMessage,
   OutboxRecord,
   SyncCheckpoint,
 } from "./types";
+
+/**
+ * How many rows one conversation may keep on disk.
+ *
+ * Deeper than the rendered window (`windowSize`, 120) on purpose: the extra
+ * tail is what makes scrolling back instant after a restart — those rows are
+ * read from SQLite instead of being requested again. The adapters prune at this
+ * bound, so the controller can never store more than they keep.
+ */
+export const STORAGE_WINDOW_SIZE = 300;
 
 export interface CompleteOutboxInput<TPayload = Record<string, unknown>> {
   userId: string;
@@ -42,6 +53,19 @@ export interface OfflineChatStorage<TPayload = Record<string, unknown>> {
     userId: string,
     conversationKey: string,
     limit?: number,
+  ): Promise<LocalMessage<TPayload>[]>;
+  /**
+   * Up to `limit` rows STRICTLY older than `before`, ascending (oldest first).
+   *
+   * This is the pagination floor. A conversation whose window is already on
+   * disk can answer "load older" without the network; an empty result means the
+   * stored window does not reach that far back and the caller should fetch.
+   */
+  loadMessagesBefore(
+    userId: string,
+    conversationKey: string,
+    before: Cursor,
+    limit: number,
   ): Promise<LocalMessage<TPayload>[]>;
   /**
    * Replace the stored window for one conversation. The caller always passes a

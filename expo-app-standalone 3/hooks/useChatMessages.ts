@@ -62,6 +62,33 @@ import {
 const PAGE_SIZE = 50;
 
 /**
+ * Older history this device already holds, oldest first.
+ *
+ * Pagination prefers it to the network: a conversation the member has already
+ * scrolled (or opened) has those rows in SQLite, and reading them costs a few
+ * milliseconds instead of a round trip. An empty list is the signal that the
+ * stored window ended, not that the conversation has no older messages.
+ */
+async function readLocalOlder(
+  communityId: string,
+  before: MessageCursor,
+): Promise<Message[]> {
+  const engine = getOfflineChat();
+  if (!engine) return [];
+  try {
+    const rows = await engine.readOlder(
+      offlineRef('community', communityId),
+      { ts: before.ts, id: before.id },
+      PAGE_SIZE,
+    );
+    return rows.map(fromLocalChatMessage);
+  } catch {
+    // A local read failure must never stop history from loading.
+    return [];
+  }
+}
+
+/**
  * True for an optimistic upload preview (a device-local URI rather than the
  * uploaded CDN URL). Keeping it on screen while the echo lands avoids the
  * split-second blank frame an un-loaded network URL would show.
@@ -250,6 +277,24 @@ export function useChatMessages(communityId: string) {
     isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
     try {
+      // Local-first: the window this screen already persisted holds the history
+      // directly above the viewport, so serving it from SQLite turns a ~1 s
+      // network page into a read that lands with the scroll. Only when the
+      // stored window ends at this cursor does the request go out — and that
+      // response, as before, is what decides `hasMore`.
+      const localOlder = await readLocalOlder(targetCommunityId, before);
+      if (
+        communityIdRef.current !== targetCommunityId ||
+        userIdRef.current !== targetUserId
+      ) return;
+      if (localOlder.length > 0) {
+        setMessages((prev) => mergeMessagePage(prev, localOlder));
+        // Not awaited: these images were fetched when the rows were first read,
+        // so the disk/memory cache usually answers instantly and the page must
+        // not wait on media to appear.
+        void warmChatMedia(localOlder);
+        return;
+      }
       const older = await getMessages(targetCommunityId, before);
       if (
         communityIdRef.current !== targetCommunityId ||

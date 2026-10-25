@@ -188,6 +188,42 @@ test("checkpoints, conversations and outbox are account-scoped", async () => {
   await driver.close();
 });
 
+test("the stored window answers \"older than\" in cursor order", async () => {
+  const driver = nodeDriver();
+  const storage = createSqliteStorage(driver);
+  const userId = user("paging");
+  await storage.init(userId);
+
+  const at = (second: number) => `2026-01-01T00:00:${String(second).padStart(2, "0")}.000Z`;
+  const sent = (id: string, second: number) => ({
+    ...message(userId, id, `nonce-${id}`, at(second)),
+    status: "sent" as const,
+  });
+  await storage.saveMessages(userId, KEY, [
+    sent("m1", 10),
+    sent("m2", 20),
+    sent("m3", 20),
+    sent("m4", 30),
+    sent("m5", 40),
+  ]);
+
+  // Ascending, and strictly older: m3 shares m2's timestamp but sorts after it,
+  // so only m1 and m2 sit before the cursor.
+  const older = await storage.loadMessagesBefore(userId, KEY, { ts: at(20), id: "m3" }, 10);
+  assert.deepEqual(older.map((row) => row.id), ["m1", "m2"]);
+
+  // A short limit takes the rows closest to the cursor and keeps them ascending.
+  const limited = await storage.loadMessagesBefore(userId, KEY, { ts: at(40), id: "m5" }, 2);
+  assert.deepEqual(limited.map((row) => row.id), ["m3", "m4"]);
+
+  // Another account reads nothing from this window.
+  assert.deepEqual(await storage.loadMessagesBefore(user("stranger"), KEY, { ts: at(40), id: "m5" }, 10), []);
+
+  // Past the oldest stored row the answer is empty — the caller's fetch signal.
+  assert.deepEqual(await storage.loadMessagesBefore(userId, KEY, { ts: at(10), id: "m1" }, 10), []);
+  await driver.close();
+});
+
 test("a foreign queue record is refused", async () => {
   const driver = nodeDriver();
   const storage = createSqliteStorage(driver);

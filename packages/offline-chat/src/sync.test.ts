@@ -131,6 +131,82 @@ test("a successful drain stores exactly one sent row, clears the queue and advan
   assert.ok(h.events.some((event) => event.type === "message-sent"));
 });
 
+test("readOlder serves the stored window instead of the network", async () => {
+  const h = setup();
+  await h.controller.activate("user-1");
+
+  const at = (n: number) => new Date(n * 10_000).toISOString();
+  const page = (rows: Array<[string, number]>) => ({
+    messages: rows.map(([id, n]) => ({
+      id,
+      created_at: at(n),
+      user_id: "u2",
+      payload: { content: id },
+    })),
+  });
+
+  await h.controller.saveFetchedPage(REF, page([["m4", 4], ["m5", 5]]), { authoritative: true });
+  await h.controller.saveOlderPage(REF, page([["m1", 1], ["m2", 2], ["m3", 3]]));
+
+  const older = await h.controller.readOlder(REF, { ts: at(3), id: "m3" }, 10);
+  assert.deepEqual(older.map((row) => row.id), ["m1", "m2"]);
+  assert.equal(older.some((row) => row.id === "m3"), false, "the cursor row is never repeated");
+  assert.equal(h.transport.fetched.length, 0, "a stored page must not touch the transport");
+
+  // Past the oldest stored row the answer is empty — the caller's fetch signal.
+  assert.deepEqual(await h.controller.readOlder(REF, { ts: at(1), id: "m1" }, 10), []);
+});
+
+test("the store keeps more history than a screen hydrates, so scrollback is local", async () => {
+  const storage = createMemoryStorage<Payload>();
+  const events: SyncEvent<Payload>[] = [];
+  const controller = createOfflineChatController<Payload>({
+    storage,
+    transport: new FakeTransport(),
+    now: () => 1_000,
+    random: () => 0.5,
+    windowSize: 2,
+    storageWindowSize: 5,
+    autoDrain: false,
+  });
+  controller.subscribe((event) => events.push(event));
+  await controller.activate("user-1");
+
+  const at = (n: number) => new Date(n * 10_000).toISOString();
+  const ids: Array<[string, number]> = [
+    ["m1", 1],
+    ["m2", 2],
+    ["m3", 3],
+    ["m4", 4],
+    ["m5", 5],
+  ];
+  await controller.saveFetchedPage(
+    REF,
+    {
+      messages: ids.map(([id, n]) => ({
+        id,
+        created_at: at(n),
+        user_id: "u2",
+        payload: { content: id },
+      })),
+    },
+    { authoritative: true },
+  );
+
+  // A screen hydrates only the newest `windowSize` rows…
+  assert.deepEqual((await controller.hydrate(REF)).map((row) => row.id), ["m4", "m5"]);
+  // …and nothing ever emits a bigger window to the UI.
+  const messageEvents = events.filter(
+    (event): event is Extract<SyncEvent<Payload>, { type: "messages" }> =>
+      event.type === "messages",
+  );
+  assert.equal(messageEvents[messageEvents.length - 1]?.messages.length, 2);
+
+  // …but the store keeps the deeper tail, so paging back inside it is a local read.
+  const older = await controller.readOlder(REF, { ts: at(4), id: "m4" }, 10);
+  assert.deepEqual(older.map((row) => row.id), ["m1", "m2", "m3"]);
+});
+
 test("pending work survives a process restart and is sent exactly once", async () => {
   const storage = createMemoryStorage<Payload>();
   const first = setup({ storage });

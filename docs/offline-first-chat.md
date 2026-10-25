@@ -159,6 +159,30 @@ the checkpoint advance re-fetches the same page; the merge is idempotent, so the
 only cost is one duplicate request. `oldest*` only moves backwards, when older
 pages are persisted.
 
+### Local-first pagination
+
+`?before=` is still the only way to reach history this device has never held,
+but it is no longer the first thing a scroll does. `readOlder(ref, cursor, limit)`
+returns the rows already in the stored window, and both chat screens prepend that
+page before touching the network.
+
+The two windows are deliberately different sizes: a screen hydrates `windowSize`
+(120) rows, while the store keeps `STORAGE_WINDOW_SIZE` (300) per conversation.
+That 180-row tail is the scrollback cushion — after a restart, paging back into
+it costs a SQLite read instead of a request. Every writer (`commitPage`,
+`persistWindow`, `applyRealtime`, `patchRealtime`) stores the deeper bound and
+emits only the rendered one, so the extra rows can never grow the mounted list.
+
+- rows inside the window appear with the scroll — an IndexedDB/SQLite read of a
+  few milliseconds instead of a ~1 s round trip;
+- only when the stored window ends at the cursor do `getMessages` /
+  `getDmMessages` run, and their response — as before — decides `hasMore` and is
+  what `saveOlderPage` / `persistWindow` folds into the window;
+- the page's images warm in the background, because they were fetched when the
+  rows first loaded and must not hold the page back;
+- an empty local page means "the stored window ends here", never "the
+  conversation ends here" — the network answer is authoritative for that.
+
 ### Sync triggers
 
 | Trigger | Web | Mobile |
@@ -201,7 +225,7 @@ Nothing is deleted implicitly; `clearOfflineAccount(userId)` is the explicit wip
 - `packages/offline-chat/src/{types,ids,messages,outbox,backoff,storage,sync,memory-storage,index}.ts`
   — merge rules, outbox policy, storage contract, controller, and an in-memory
   adapter used by the tests.
-- Tests: `messages.test.ts`, `outbox.test.ts`, `sync.test.ts` (38 cases).
+- Tests: `messages.test.ts`, `outbox.test.ts`, `sync.test.ts` (40 cases).
 
 ### Web
 
@@ -319,9 +343,10 @@ errors (`useChatData.ts:472`, `useDmThreadData.ts:161`). They are present at
    (IndexedDB) and the app sandbox (SQLite), like the existing session cookie.
    A shared unlocked device can read the signed-in member's local history;
    device-level encryption is out of scope.
-5. A very old cached window is bounded to 200 rows per conversation; older
-   history is fetched again when scrolled to (online) or simply unavailable
-   offline if it was never synchronized.
+5. A very old cached window is bounded to 300 rows per conversation (120 of
+   which a screen hydrates at once); older history is fetched again when
+   scrolled to (online) or simply unavailable offline if it was never
+   synchronized.
 6. Community messages written by a client older than this change have no nonce
    and are therefore not deduped (they could not have been retried safely
    anyway).

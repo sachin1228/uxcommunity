@@ -26,11 +26,18 @@ import type {
   OutboxRecord,
   SyncCheckpoint,
 } from "../../../packages/offline-chat/src";
-import { claimRecord, compareMessages, isClaimable, sortOutbox } from "../../../packages/offline-chat/src";
+import {
+  claimRecord,
+  compareMessages,
+  isClaimable,
+  sortOutbox,
+  STORAGE_WINDOW_SIZE,
+} from "../../../packages/offline-chat/src";
 import type { SqlDriver, SqlValue } from "./sql-driver";
 
 const SCHEMA_VERSION = 1;
-const WINDOW_LIMIT = 200;
+/** Keep at least what the controller stores; see STORAGE_WINDOW_SIZE. */
+const WINDOW_LIMIT = STORAGE_WINDOW_SIZE;
 
 type Payload = Record<string, unknown>;
 
@@ -242,6 +249,24 @@ export function createSqliteStorage(driver: SqlDriver): OfflineChatStorage<Paylo
           ORDER BY created_at DESC, id DESC
           LIMIT ?`,
         [userId, conversationKey, limit],
+      );
+      return rows
+        .map(toLocalMessage)
+        .filter((row): row is LocalMessage<Payload> => row !== null)
+        .reverse();
+    },
+
+    async loadMessagesBefore(userId, conversationKey, before, limit) {
+      // Same total order as `compareMessages` (created_at, then id); ISO
+      // timestamps compare chronologically as text. The row at the cursor is
+      // excluded so a page can never repeat the oldest row on screen.
+      const rows = await driver.all<MessageRow>(
+        `SELECT * FROM messages
+          WHERE user_id = ? AND conversation_key = ?
+            AND (created_at < ? OR (created_at = ? AND id < ?))
+          ORDER BY created_at DESC, id DESC
+          LIMIT ?`,
+        [userId, conversationKey, before.ts, before.ts, before.id, limit],
       );
       return rows
         .map(toLocalMessage)

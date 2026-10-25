@@ -6,6 +6,7 @@
 
 import { isClaimable, claimRecord, sortOutbox } from "./outbox";
 import { compareMessages } from "./messages";
+import { STORAGE_WINDOW_SIZE } from "./storage";
 import type { OfflineChatStorage, CompleteOutboxInput } from "./storage";
 import type {
   ConversationRecord,
@@ -66,6 +67,17 @@ export function createMemoryStorage<
       return window(account(userId), userId, conversationKey, limit);
     },
 
+    async loadMessagesBefore(userId, conversationKey, before, limit) {
+      const rows = (account(userId).messages.get(conversationKey) ?? [])
+        .filter((row) => row.userId === userId)
+        .filter(
+          (row) =>
+            compareMessages(row, { created_at: before.ts, id: before.id }) < 0,
+        )
+        .sort(compareMessages);
+      return rows.slice(-limit);
+    },
+
     async saveMessages(userId, conversationKey, rows) {
       const store = account(userId);
       // Replace the confirmed window but keep local-only rows: a UI snapshot
@@ -87,7 +99,7 @@ export function createMemoryStorage<
               ) === index,
           )
           .sort(compareMessages)
-          .slice(-200),
+          .slice(-STORAGE_WINDOW_SIZE),
       );
     },
 
@@ -169,7 +181,7 @@ export function createMemoryStorage<
       );
       store.messages.set(
         key,
-        [...withoutLocal, input.message].sort(compareMessages).slice(-200),
+        [...withoutLocal, input.message].sort(compareMessages).slice(-STORAGE_WINDOW_SIZE),
       );
       store.outbox.delete(input.recordId);
     },

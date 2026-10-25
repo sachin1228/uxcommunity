@@ -31,11 +31,18 @@ import type {
   OutboxRecord,
   SyncCheckpoint,
 } from "@uxcommunity/offline-chat";
-import { claimRecord, compareMessages, isClaimable, sortOutbox } from "@uxcommunity/offline-chat";
+import {
+  claimRecord,
+  compareMessages,
+  isClaimable,
+  sortOutbox,
+  STORAGE_WINDOW_SIZE,
+} from "@uxcommunity/offline-chat";
 
 const DB_PREFIX = "uxcommunity-chat-v1-";
 const SCHEMA_VERSION = 1;
-const WINDOW_LIMIT = 200;
+/** Keep at least what the controller stores; see STORAGE_WINDOW_SIZE. */
+const WINDOW_LIMIT = STORAGE_WINDOW_SIZE;
 
 type Payload = Record<string, unknown>;
 
@@ -201,6 +208,19 @@ export function createIndexedDbStorage(): OfflineChatStorage<Payload> {
       await done;
       return rows
         .filter((row) => row.userId === userId)
+        .sort(compareMessages)
+        .slice(-limit);
+    },
+
+    async loadMessagesBefore(userId, conversationKey, before, limit) {
+      const database = await db();
+      const tx = startsTransaction(database, "messages", "readonly");
+      const done = transactionDone(tx);
+      const rows = await readConversationMessages(tx.objectStore("messages"), conversationKey);
+      await done;
+      return rows
+        .filter((row) => row.userId === userId)
+        .filter((row) => compareMessages(row, { created_at: before.ts, id: before.id }) < 0)
         .sort(compareMessages)
         .slice(-limit);
     },

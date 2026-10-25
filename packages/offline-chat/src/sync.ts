@@ -34,7 +34,7 @@ import {
   toLocalMessage,
 } from "./messages";
 import { createOutboxRecord, markManualRetry, scheduleRetry } from "./outbox";
-import type { OfflineChatStorage } from "./storage";
+import { STORAGE_WINDOW_SIZE, type OfflineChatStorage } from "./storage";
 import type {
   ChatRef,
   ConversationRecord,
@@ -57,6 +57,12 @@ export interface OfflineChatControllerOptions<TPayload = Record<string, unknown>
   random?: () => number;
   /** Newest rows kept per conversation. Bounded storage, never full history. */
   windowSize?: number;
+  /**
+   * Rows kept ON DISK per conversation — the scrollback cushion. Deeper than
+   * `windowSize` (what a screen hydrates) so paging back inside it is a local
+   * read; never larger than the adapters' prune bound.
+   */
+  storageWindowSize?: number;
   /** Page size the existing APIs return; used to detect a short last page. */
   pageSize?: number;
   /** Upper bound on pages one catch-up pass may request. */
@@ -97,6 +103,19 @@ export interface OfflineChatController<TPayload = Record<string, unknown>> {
   subscribe(listener: (event: SyncEvent<TPayload>) => void): () => void;
 
   hydrate(ref: ChatRef): Promise<LocalMessage<TPayload>[]>;
+  /**
+   * Older rows this device already holds, ascending (oldest first).
+   *
+   * Pagination asks this before the network: a conversation whose window was
+   * persisted can prepend history with no request at all. An empty list means
+   * the stored window ends at `before` — the caller then fetches and calls
+   * `saveOlderPage`, which both commits the page and keeps the window bounded.
+   */
+  readOlder(
+    ref: ChatRef,
+    before: Cursor,
+    limit?: number,
+  ): Promise<LocalMessage<TPayload>[]>;
   /**
    * Persist the window the UI currently holds (sent rows only; queued/failed
    * rows are owned by the outbox). Used after realtime edits/deletes/reactions
@@ -187,6 +206,7 @@ export function createOfflineChatController<TPayload = Record<string, unknown>>(
     now = Date.now,
     random = Math.random,
     windowSize = 120,
+    storageWindowSize = STORAGE_WINDOW_SIZE,
     pageSize = 50,
     maxCatchUpPages = 10,
     maxAttempts = OUTBOX_MAX_ATTEMPTS,
@@ -261,10 +281,10 @@ export function createOfflineChatController<TPayload = Record<string, unknown>>(
   ): Promise<LocalMessage<TPayload>[]> {
     const owner = activeUser();
     const key = chatKey(ref);
-    const local = await storage.loadMessages(owner, key, windowSize);
+    const local = await storage.loadMessages(owner, key, storageWindowSize);
     const merged = mergeServerPage(local, page.messages, {
       authoritative,
-      limit: windowSize,
+      limit: storageWindowSize,
       userId: owner,
       conversationKey: key,
     });
@@ -283,8 +303,11 @@ export function createOfflineChatController<TPayload = Record<string, unknown>>(
       newest: incomingNewest,
       oldest: incomingOldest,
     });
-    emit({ type: "messages", conversationKey: key, messages: merged });
-    return merged;
+    // The store keeps the deeper tail; screens only ever receive the window
+    // they render, so a catch-up cannot grow the mounted list.
+    const visible = merged.slice(-windowSize);
+    emit({ type: "messages", conversationKey: key, messages: visible });
+    return visible;
   }
 
   async function runDrain(): Promise<void> {
@@ -450,13 +473,18 @@ export function createOfflineChatController<TPayload = Record<string, unknown>>(
       return storage.loadMessages(owner, chatKey(ref), windowSize);
     },
 
+    async readOlder(ref, before, limit = pageSize) {
+      const owner = activeUser();
+      return storage.loadMessagesBefore(owner, chatKey(ref), before, limit);
+    },
+
     async persistWindow(ref, rows) {
       const owner = activeUser();
       const sent = rows.filter(
         (row) => row.userId === owner && row.status === "sent" && !row.id.startsWith("temp-"),
       );
       if (sent.length === 0) return;
-      await storage.saveMessages(owner, chatKey(ref), sent.slice(-windowSize));
+      await storage.saveMessages(owner, chatKey(ref), sent.slice(-storageWindowSize));
     },
 
     async saveFetchedPage(ref, page, pageOptions) {
@@ -580,13 +608,13 @@ export function createOfflineChatController<TPayload = Record<string, unknown>>(
     async applyRealtime(ref, incoming) {
       const owner = activeUser();
       const key = chatKey(ref);
-      const local = await storage.loadMessages(owner, key, windowSize);
+      const local = await storage.loadMessages(owner, key, storageWindowSize);
       const merged = applyRealtimeMessage(local, incoming, {
         userId: owner,
         conversationKey: key,
       });
       if (merged === local) return;
-      await storage.saveMessages(owner, key, merged.slice(-windowSize));
+      await storage.saveMessages(owner, key, merged.slice(-storageWindowSize));
       await advanceCheckpoint(owner, key, {
         newest: { ts: incoming.created_at, id: incoming.id },
       });
@@ -596,11 +624,11 @@ export function createOfflineChatController<TPayload = Record<string, unknown>>(
     async patchRealtime(ref, messageId, patch) {
       const owner = activeUser();
       const key = chatKey(ref);
-      const local = await storage.loadMessages(owner, key, windowSize);
+      const local = await storage.loadMessages(owner, key, storageWindowSize);
       const patched = patchLocalMessage(local, messageId, patch);
       if (patched === local) return;
-      await storage.saveMessages(owner, key, patched);
-      emit({ type: "messages", conversationKey: key, messages: patched });
+      await storage.saveMessages(owner, key, patched.slice(-storageWindowSize));
+      emit({ type: "messages", conversationKey: key, messages: patched.slice(-windowSize) });
     },
 
     async getCheckpoint(ref) {
