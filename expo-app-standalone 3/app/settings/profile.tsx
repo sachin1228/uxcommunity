@@ -13,7 +13,11 @@ import {
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityIcon } from '@/components/communities/CommunityIcon';
-import { OptionPickerSheet, type PickerOption } from '@/components/settings/OptionPickerSheet';
+import {
+  OptionPickerSheet,
+  OptionPickerValue,
+  type PickerOption,
+} from '@/components/settings/OptionPickerSheet';
 import { SaveStatus, type SaveState } from '@/components/settings/SaveStatus';
 import { ScreenHeader } from '@/components/settings/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
@@ -352,32 +356,32 @@ export default function ProfileSettingsScreen() {
             <FieldRow
               colors={colors}
               label="CITY"
-              value={selectedCity?.name ?? 'Select city'}
-              placeholder={!selectedCity}
+              option={selectedCity}
+              placeholder="Select city"
               lockedUntil={lockOf('city')}
               onPress={() => setPicker('city')}
             />
             <FieldRow
               colors={colors}
               label="INDUSTRY SECTOR"
-              value={selectedSector?.name ?? 'Select industry sector'}
-              placeholder={!selectedSector}
+              option={selectedSector}
+              placeholder="Select industry sector"
               lockedUntil={lockOf('sector')}
               onPress={() => setPicker('sector')}
             />
             <FieldRow
               colors={colors}
               label="JOB TITLE"
-              value={selectedTitle?.name ?? 'Select job title'}
-              placeholder={!selectedTitle}
+              option={selectedTitle}
+              placeholder="Select job title"
               lockedUntil={lockOf('job_title')}
               onPress={() => setPicker('title')}
             />
             <FieldRow
               colors={colors}
               label="EXPERIENCE LEVEL"
-              value={selectedLevel?.name ?? 'Select experience level'}
-              placeholder={!selectedLevel}
+              option={selectedLevel}
+              placeholder="Select experience level"
               lockedUntil={lockOf('experience_level')}
               onPress={() => setPicker('level')}
             />
@@ -461,15 +465,15 @@ export default function ProfileSettingsScreen() {
 function FieldRow({
   colors,
   label,
-  value,
+  option,
   placeholder,
   lockedUntil,
   onPress,
 }: {
   colors: ReturnType<typeof useColors>;
   label: string;
-  value: string;
-  placeholder: boolean;
+  option: ProfileOption | null;
+  placeholder: string;
   lockedUntil: string | null;
   onPress: () => void;
 }) {
@@ -490,13 +494,11 @@ function FieldRow({
           },
         ]}
       >
-        <Text
-          style={[styles.fieldValue, { color: placeholder ? colors.mutedForeground : colors.foreground }]}
-          numberOfLines={1}
-        >
-          {value}
-        </Text>
-        <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+        <OptionPickerValue
+          option={option}
+          placeholder={placeholder}
+          textStyle={styles.fieldValue}
+        />
       </Pressable>
       {lockedUntil ? <LockNote until={lockedUntil} colors={colors} /> : null}
     </View>

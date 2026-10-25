@@ -17,8 +17,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { BrandLogo } from '@/components/BrandLogo';
-import { OptionPickerSheet, type PickerOption } from '@/components/settings/OptionPickerSheet';
+import {
+  OptionPickerSheet,
+  OptionPickerValue,
+  type PickerOption,
+} from '@/components/settings/OptionPickerSheet';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticError, hapticSuccess } from '@/lib/haptics';
@@ -126,9 +129,12 @@ export default function SignupScreen() {
     }
   }, []);
 
+  // Prefetch as soon as the screen mounts: filling in step 1 takes long enough
+  // that the four step-2 pickers are normally ready the moment they appear,
+  // instead of the step opening on a loading row.
   useEffect(() => {
-    if (step === 2) void requestOptions();
-  }, [step, requestOptions]);
+    void requestOptions();
+  }, [requestOptions]);
 
   // ── Step 1 ───────────────────────────────────────────────────────────────
   const submitIdentity = useCallback(async () => {
@@ -266,9 +272,6 @@ export default function SignupScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={styles.logoMark}>
-              <BrandLogo size={44} />
-            </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Create your account</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
               Step {step} of 3 · {STEP_LABELS[step - 1]}
@@ -530,21 +533,10 @@ export default function SignupScreen() {
                               },
                             ]}
                           >
-                            <Text
-                              style={[
-                                styles.selectValue,
-                                {
-                                  color: option ? colors.foreground : colors.mutedForeground,
-                                },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {option?.name ?? PICKER_COPY[kind].placeholder}
-                            </Text>
-                            <Feather
-                              name="chevron-down"
-                              size={16}
-                              color={colors.mutedForeground}
+                            <OptionPickerValue
+                              option={option ?? null}
+                              placeholder={PICKER_COPY[kind].placeholder}
+                              textStyle={styles.selectValue}
                             />
                           </Pressable>
                         </Field>
@@ -844,7 +836,6 @@ function makeStyles(colors: Colors) {
       paddingVertical: 40,
     },
     header: { alignItems: 'center', marginBottom: 20 },
-    logoMark: { marginBottom: 16 },
     title: {
       fontSize: 24,
       fontFamily: 'Geist_700Bold',
