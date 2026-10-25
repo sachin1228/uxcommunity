@@ -34,6 +34,7 @@ import {
   rememberCommunityMessageWindow,
 } from '@/lib/communityBootstrap';
 import { pickOptimisticMatch, compareChatTimeline } from '@/lib/chat';
+import { warmChatMedia } from '@/lib/chatMediaPrefetch';
 import { chatCache } from '@/lib/chatCacheStore';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
@@ -157,6 +158,15 @@ export function useChatMessages(communityId: string) {
     setIsLoadingMore(true);
     try {
       const older = await getMessages(targetCommunityId, before);
+      if (
+        communityIdRef.current !== targetCommunityId ||
+        userIdRef.current !== targetUserId
+      ) return;
+      // Measure the prepended page's newest images before it mounts. Those rows
+      // sit directly above the viewport, so an image that only gets its shape
+      // in `onLoad` would resize the bubble under the reader and push the
+      // history they are reading down the list.
+      await warmChatMedia(older);
       if (
         communityIdRef.current !== targetCommunityId ||
         userIdRef.current !== targetUserId
@@ -370,6 +380,14 @@ export function useChatMessages(communityId: string) {
       const bootstrap = await fetchCommunityBootstrap(targetCommunityId, targetUserId);
       // The user switched communities while the request was in flight — those
       // rows belong to the community that was on screen, not this one.
+      if (
+        communityIdRef.current !== targetCommunityId ||
+        userIdRef.current !== targetUserId
+      ) return;
+      // Warm the newest page's images before the list paints: this is what lets
+      // an image-only bubble (a GIF or sticker) render its frame on the first
+      // pass instead of appearing only once its bytes arrive.
+      await warmChatMedia(bootstrap.messages);
       if (
         communityIdRef.current !== targetCommunityId ||
         userIdRef.current !== targetUserId

@@ -18,6 +18,11 @@ import { Message, Reaction } from '@/lib/communities';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { CHAT_CONTENT_KIND_THEME } from '@/lib/chatContentEvents';
+import { chatMediaFrame } from '@/lib/chatMedia';
+import {
+  cachedImageAspectRatio,
+  rememberImageAspectRatio,
+} from '@/lib/imageAspectRatio';
 import {
   COLLAPSED_LINES,
   fmtTime,
@@ -397,10 +402,6 @@ function RichContent({
 // Media inside a bubble
 // ---------------------------------------------------------------------------
 
-const MEDIA_MAX_WIDTH = 240;
-const MEDIA_MAX_HEIGHT = 300;
-const MEDIA_MIN_HEIGHT = 90;
-
 function BubbleImage({
   uri,
   isOwn,
@@ -420,22 +421,20 @@ function BubbleImage({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  // The frame's aspect, measured from the loaded image itself (expo-image's
-  // onLoad carries the source dimensions) — the old Image.getSize round trip
-  // is gone; until it lands, the 4:3 fallback holds the layout.
-  const [ratio, setRatio] = useState<number | null>(null);
-
-  const aspect = ratio ?? 4 / 3;
-  let width = MEDIA_MAX_WIDTH;
-  let height = MEDIA_MAX_WIDTH / aspect;
-  if (height > MEDIA_MAX_HEIGHT) {
-    height = MEDIA_MAX_HEIGHT;
-    width = MEDIA_MAX_HEIGHT * aspect;
-  }
-  if (height < MEDIA_MIN_HEIGHT) {
-    height = MEDIA_MIN_HEIGHT;
-    width = Math.min(MEDIA_MIN_HEIGHT * aspect, MEDIA_MAX_WIDTH);
-  }
+  // The frame is final from the first layout: pages are warmed before they are
+  // committed (lib/chatMediaPrefetch), and a ratio cached by a previous mount
+  // is read synchronously. Measuring only on `onLoad` was what shrank a
+  // portrait's bubble from the 4:3 guess to its real width once the image
+  // decoded, re-flowing the caption and every row below it.
+  const [measured, setMeasured] = useState(() => ({
+    uri,
+    ratio: cachedImageAspectRatio(uri),
+  }));
+  // The source changes in place when an optimistic local preview is replaced
+  // by its uploaded URL; read the cache for the new URI during render so one
+  // frame never shows the previous image's shape.
+  const ratio = measured.uri === uri ? measured.ratio : cachedImageAspectRatio(uri);
+  const { width, height } = chatMediaFrame(ratio);
 
   return (
     <Pressable
@@ -450,10 +449,21 @@ function BubbleImage({
         source={{ uri }}
         style={{ width: '100%', height: '100%', opacity: dimmed ? 0.5 : 1 }}
         contentFit="cover"
+        cachePolicy="memory-disk"
+        recyclingKey={uri}
         onLoad={({ source }) => {
           const w = source?.width ?? 0;
           const h = source?.height ?? 0;
-          if (w > 0 && h > 0) setRatio(w / h);
+          if (w <= 0 || h <= 0) return;
+          rememberImageAspectRatio(uri, w, h);
+          // Keep the cached ratio a bubble mounted with; only an unwarmed
+          // image is allowed this single correction. The next mount reads the
+          // measurement above and starts at the final size.
+          setMeasured((previous) =>
+            previous.uri === uri && previous.ratio !== null
+              ? previous
+              : { uri, ratio: w / h },
+          );
         }}
       />
       {standalone && showStatus && (

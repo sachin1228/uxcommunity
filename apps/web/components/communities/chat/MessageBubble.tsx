@@ -9,6 +9,11 @@ import { MessageBubbleTail } from "./MessageBubbleTail";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageContent } from "./MessageText";
+import {
+  cachedChatMediaSize,
+  chatMediaIntrinsicSize,
+  rememberChatMediaSize,
+} from "./mediaLayout";
 
 import type { CachedMessage, MessageDeletedByRole, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { ModalPortal } from "@/components/ui/Modal";
@@ -248,6 +253,23 @@ function BubbleImage({
   /** Opens the image in the full-screen viewer. */
   onClick?: () => void;
 }) {
+  // A chat image has no dimensions in its row, so an unmeasured `<img>` is laid
+  // out at the browser's 300 × 150 default and snaps to its real shape once the
+  // bytes arrive — narrowing a portrait, then reflowing the caption below it.
+  // The natural size is therefore read synchronously at mount (pages are warmed
+  // before they are committed) and written into the width/height attributes,
+  // which is what reserves the final box before the image decodes. A measured
+  // value is latched: a late probe must never resize a bubble already on screen.
+  const [measured, setMeasured] = useState(() => ({
+    url,
+    size: cachedChatMediaSize(url),
+  }));
+  // The source changes in place when an optimistic local preview is replaced
+  // by its uploaded URL, so read the cache for the new URL during render rather
+  // than painting one frame with the previous image's shape.
+  const size = measured.url === url ? measured.size : cachedChatMediaSize(url);
+  const intrinsic = chatMediaIntrinsicSize(size);
+
   return (
     <div
       className={`relative ${
@@ -267,15 +289,31 @@ function BubbleImage({
       <img
         src={url}
         alt="Image"
+        width={intrinsic.width}
+        height={intrinsic.height}
         onClick={(e) => {
           e.stopPropagation();
           onClick?.();
         }}
-        className={`block max-w-full object-cover rounded-[8px] ${
+        onLoad={(e) => {
+          const image = e.currentTarget;
+          const { naturalWidth, naturalHeight } = image;
+          if (naturalWidth <= 0 || naturalHeight <= 0) return;
+          rememberChatMediaSize(url, naturalWidth, naturalHeight);
+          // The first measurement of an unwarmed image is the only correction
+          // this bubble ever makes; afterwards the cached size wins.
+          if (!size) {
+            setMeasured({
+              url,
+              size: { width: naturalWidth, height: naturalHeight },
+            });
+          }
+        }}
+        className={`block h-auto max-h-[300px] w-auto max-w-full rounded-[8px] bg-surface-raised object-cover ${
           isMe ? "opacity-95" : ""
         } ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
-        style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
+        decoding="async"
         draggable={false}
       />
       {standalone && createdAt && !uploading && status !== "failed" && (

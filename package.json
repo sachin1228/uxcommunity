@@ -65,6 +65,7 @@
     "test:jobs": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/jobs/format.test.ts apps/web/lib/jobs/rich-text.test.ts",
     "test:going-list": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/events/going-list.test.ts",
     "test:chat-scroll": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/chatUtils.test.ts",
+    "test:chat-media": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/mediaLayout.test.ts && tsx --test \"expo-app-standalone 3/lib/chatMedia.test.ts\"",
     "test:mention-jumps": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/mention-jumps.test.ts",
     "test:notification-tabs": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/notifications-tabs.test.ts",
     "test:notification-realtime": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/notifications-realtime.test.ts",
