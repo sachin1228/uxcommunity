@@ -17,7 +17,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { BrandLogo } from '@/components/BrandLogo';
 import {
   OptionPickerSheet,
   OptionPickerValue,
@@ -270,9 +269,6 @@ export default function SignupScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={styles.logoMark}>
-              <BrandLogo size={44} />
-            </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Create your account</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
               Step {step} of 3 · {STEP_LABELS[step - 1]}
@@ -837,7 +833,6 @@ function makeStyles(colors: Colors) {
       paddingVertical: 40,
     },
     header: { alignItems: 'center', marginBottom: 20 },
-    logoMark: { marginBottom: 16 },
     title: {
       fontSize: 24,
       fontFamily: 'Geist_700Bold',
