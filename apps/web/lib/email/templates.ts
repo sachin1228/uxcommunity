@@ -160,6 +160,64 @@ export function renderVerificationReapplyEmail({
   });
 }
 
+export interface VerificationApprovedEmail {
+  name: string;
+  appUrl: string;
+  link: string;
+}
+
+export function renderVerificationApprovedEmail({
+  name,
+  appUrl,
+  link,
+}: VerificationApprovedEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `You're verified on ${APP_NAME}`,
+    preheader: "Your account now has full access.",
+    heading: `You're verified, ${name}.`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "Your profile was approved. You can now post, message, join communities, and apply to jobs.",
+      },
+      { kind: "action", label: "Open your dashboard", href: link },
+    ],
+  });
+}
+
+export interface VerificationRejectedEmail {
+  name: string;
+  appUrl: string;
+  link: string;
+  reason: string;
+  reapplyAt: string;
+}
+
+export function renderVerificationRejectedEmail({
+  name,
+  appUrl,
+  link,
+  reason,
+  reapplyAt,
+}: VerificationRejectedEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `An update on your ${APP_NAME} verification`,
+    preheader: "An update on your verification.",
+    heading: `Hi ${name},`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "We couldn't approve your verification this time.",
+      },
+      { kind: "paragraph", text: `Reason: ${reason}` },
+      { kind: "paragraph", text: `You can reapply from ${reapplyAt}.` },
+      { kind: "action", label: "View details", href: link, variant: "secondary" },
+    ],
+  });
+}
+
 export interface CompanyVerificationEmail {
   name: string;
   appUrl: string;

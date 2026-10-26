@@ -5,6 +5,10 @@ import {
 } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createNotification } from "@/lib/notifications";
+import {
+  sendVerificationApprovedEmail,
+  sendVerificationRejectedEmail,
+} from "@/lib/email";
 
 interface ReviewRow {
   user_id: string;
@@ -96,6 +100,23 @@ export async function PATCH(
   });
   if (!notification.ok) {
     console.error("[admin/verifications] notification error:", notification.error);
+  }
+
+  // Non-fatal: the review is decided; a mail failure only costs the email.
+  try {
+    const name = row.user_name?.trim() || "there";
+    if (approved) {
+      await sendVerificationApprovedEmail(row.user_email, name);
+    } else {
+      await sendVerificationRejectedEmail(
+        row.user_email,
+        name,
+        row.rejection_reason ?? reason,
+        row.reapply_at ? reapplyLabel(row.reapply_at) : "one month from now",
+      );
+    }
+  } catch (emailError) {
+    console.error("[admin/verifications] email error:", emailError);
   }
 
   return NextResponse.json({
