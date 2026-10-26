@@ -106,6 +106,12 @@ export function useSendMessage({
   // messages can be retried without losing the original payload.
   const failedRetryDataRef = useRef<Map<string, RetryData>>(new Map());
 
+  // One sidebar rollback per send. runSend already restores the sidebar on a
+  // failure; a user-initiated cancel removes the optimistic bubble from the
+  // list before runSend's reject lands, so the rollback has to be reachable
+  // from handleCancelSend too.
+  const sidebarRollbacksRef = useRef<Map<string, () => void>>(new Map());
+
   const replyToRef = useRef<ReplyPreview | null>(replyTo);
   useEffect(() => {
     replyToRef.current = replyTo;
@@ -193,6 +199,10 @@ export function useSendMessage({
         return next;
       });
       failedRetryDataRef.current.delete(tempId);
+      // Undo the instant sidebar bump this send made (the rollback is keyed by
+      // temp id and only restores while our preview is still the newest one).
+      sidebarRollbacksRef.current.get(tempId)?.();
+      sidebarRollbacksRef.current.delete(tempId);
     }
   }, [communityId, setMessages]);
 
@@ -271,6 +281,7 @@ export function useSendMessage({
       if (!current || current.last_message?.id !== tempId) return;
       restoreSidebarEntry(communityId, prevSidebarEntry);
     };
+    sidebarRollbacksRef.current.set(tempId, rollbackSidebar);
     // Always jump to the bottom: the message just sent is the newest row, so
     // it is what the user expects to see — even when they sent it while
     // scrolled up reading older history. Running in a rAF puts the jump after
@@ -494,6 +505,7 @@ export function useSendMessage({
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       abortControllersRef.current.delete(tempId);
+      sidebarRollbacksRef.current.delete(tempId);
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }

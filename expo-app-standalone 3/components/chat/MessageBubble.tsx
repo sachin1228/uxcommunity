@@ -498,6 +498,61 @@ function RetryIndicator({ onRetry, colors }: { onRetry: () => void; colors: Pale
   );
 }
 
+/**
+ * The in-flight marker for your own message: a clock that fades in and out,
+ * standing in the slot the double-check occupies once the send settles.
+ * Tapping it cancels the send (web parity).
+ */
+function SendingClock({
+  tint,
+  onPress,
+  size = 12,
+}: {
+  tint: string;
+  onPress?: () => void;
+  size?: number;
+}) {
+  const opacity = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.35,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  const icon = (
+    <Animated.View style={{ opacity }}>
+      <Ionicons name="time-outline" size={size} color={tint} />
+    </Animated.View>
+  );
+
+  if (!onPress) return icon;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel="Cancel sending"
+    >
+      {icon}
+    </Pressable>
+  );
+}
+
 function TimeRow({
   message,
   isOwn,
@@ -631,8 +686,9 @@ function BubbleHeader({
               edited
             </Text>
           )}
-          {/* Community chat shows the time only — no delivery ticks or
-              sending spinner; a failed send keeps its "!". */}
+          {/* Community chat keeps delivery ticks out of the row — the in-flight
+              clock sits beside the bubble instead (same slot for every send);
+              a failed send ends with "!". */}
           {isOwn && status === 'failed' && (
             <Text style={[styles.headerTime, { color: colors.destructive }]}>!</Text>
           )}
@@ -784,6 +840,12 @@ export const MessageBubble = memo(function MessageBubble({
   const imageOnly = !!imageUrl && !message.content && !replyTo && !replyToContent;
   const isFirstInGroup = !isSameAuthor;
   const showHeader = !isSameAuthor;
+  // Your own text message, still in flight: the bubble fades and a pulsing
+  // clock joins the name row (or sits beside the bubble when this send
+  // continues a run and there is no name row to put it in). Image and GIF
+  // sends keep their in-bubble upload spinner, and DMs keep the footer clock.
+  const sendingText =
+    leftRail && isOwn && message.status === 'sending' && !imageUrl;
 
   const bubbleMaxWidth = Math.min(screenWidth * 0.78, 420);
 
@@ -948,6 +1010,14 @@ export const MessageBubble = memo(function MessageBubble({
                 colors={colors}
               />
             </View>
+            {sendingText && (
+              <View style={styles.sendingClockAside}>
+                <SendingClock
+                  tint={colors.mutedForeground}
+                  onPress={() => onCancel?.(message.id)}
+                />
+              </View>
+            )}
           </View>
         ) : (
           <View
@@ -977,6 +1047,7 @@ export const MessageBubble = memo(function MessageBubble({
                   isFirstInGroup &&
                     (alignRight ? styles.bubbleFirstOwn : styles.bubbleFirstOther),
                   textExpanded && expandedBubbleWidth ? { width: expandedBubbleWidth } : null,
+                  sendingText ? styles.bubbleSending : null,
                 ]}
               >
                 {isFirstInGroup && (
@@ -1115,6 +1186,14 @@ export const MessageBubble = memo(function MessageBubble({
                 colors={colors}
               />
             </View>
+            {sendingText && (
+              <View style={styles.sendingClockAside}>
+                <SendingClock
+                  tint={colors.mutedForeground}
+                  onPress={() => onCancel?.(message.id)}
+                />
+              </View>
+            )}
           </View>
         )}
 
@@ -1173,6 +1252,10 @@ const styles = StyleSheet.create({
   },
   bubbleFirstOwn: { borderTopRightRadius: 0 },
   bubbleFirstOther: { borderTopLeftRadius: 0 },
+  /** Own text message still in flight — faded until the send settles. */
+  bubbleSending: { opacity: 0.55 },
+  /** The clock that stands in when a send has no name row to live in. */
+  sendingClockAside: { alignSelf: 'center', marginLeft: 4 },
   bubbleText: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
   // Media bubbles keep a thin frame around the image (WhatsApp-style).
   bubbleMedia: { padding: 4 },
