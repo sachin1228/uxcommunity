@@ -11,7 +11,8 @@ export async function POST(
 ) {
   let session;
   try {
-    session = await requireSession("user");
+    // Liking a post is one of the few writes a read-only account may make.
+    session = await requireSession("user", { allowUnverified: true });
   } catch (error) {
     return error as Response;
   }

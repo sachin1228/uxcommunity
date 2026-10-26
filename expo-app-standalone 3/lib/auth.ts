@@ -4,6 +4,8 @@
 
 import { apiFetch } from './api';
 import { loginWith } from './loginFlow';
+export type VerificationStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
+
 export interface User {
   id: string;
   name: string;
@@ -11,6 +13,13 @@ export interface User {
   role: 'user' | 'admin';
   profileComplete: boolean;
   avatar_url: string | null;
+  /** Read-only accounts are `unverified`, `pending` or `rejected`. */
+  verificationStatus?: VerificationStatus;
+  /** Server-computed: false during the admin-configured signup grace window. */
+  verificationBannerVisible?: boolean;
+  verificationReapplyAt?: string | null;
+  verificationRejectionReason?: string | null;
+  emailVerifiedAt?: string | null;
 }
 
 export interface LoginResult {

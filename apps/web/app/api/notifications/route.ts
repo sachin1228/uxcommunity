@@ -46,7 +46,8 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    // Reading the bell is allowed while read-only; clearing it is part of reading.
+    session = await requireSession("user", { allowUnverified: true });
   } catch (error) {
     return error as Response;
   }

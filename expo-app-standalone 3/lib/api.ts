@@ -60,6 +60,25 @@ const unauthorizedListeners = new Set<
   (usedToken: string | null, usedGeneration: number) => void
 >();
 
+const verificationRequiredListeners = new Set<() => void>();
+
+/**
+ * Fires when a write is refused because the account is read-only. The auth
+ * provider refreshes `/me` so the banner and verification screen reflect the
+ * latest status instead of an old snapshot.
+ */
+export function subscribeVerificationRequired(listener: () => void): () => void {
+  verificationRequiredListeners.add(listener);
+  return () => {
+    verificationRequiredListeners.delete(listener);
+  };
+}
+
+function notifyVerificationRequired(data: unknown): void {
+  if ((data as { code?: string } | null)?.code !== 'verification_required') return;
+  verificationRequiredListeners.forEach((listener) => listener());
+}
+
 /**
  * Fires when the API rejects the session (outside the login route, where a 401
  * means "wrong password", not "signed out"). The listener also receives the
@@ -138,6 +157,7 @@ export async function apiFormUpload<T = unknown>(
     if (response.status === 401 && path !== '/api/auth/login') {
       notifyUnauthorized(sessionToken, dispatchGeneration);
     }
+    if (response.status === 403) notifyVerificationRequired(data);
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & { status: number; data: unknown };
@@ -253,6 +273,7 @@ export async function apiFetch<T = unknown>(
     if (response.status === 401 && path !== '/api/auth/login') {
       notifyUnauthorized(sessionToken, dispatchGeneration);
     }
+    if (response.status === 403) notifyVerificationRequired(data);
     const message =
       (data as { error?: string })?.error ?? `HTTP ${response.status}`;
     const error = new Error(message) as Error & {

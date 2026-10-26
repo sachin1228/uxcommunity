@@ -68,6 +68,9 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "report_reviewed",
     "content_restored",
     "join_request_accepted",
+    "verification_approved",
+    "verification_rejected",
+    "verification_reapply_ready",
   ]),
 };
 

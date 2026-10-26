@@ -36,7 +36,10 @@ export type NotificationType =
   | 'join_request_accepted'
   | 'event_reminder'
   | 'event_live'
-  | 'event_ended';
+  | 'event_ended'
+  | 'verification_approved'
+  | 'verification_rejected'
+  | 'verification_reapply_ready';
 
 /** One row of GET /api/notifications, trimmed to what the list draws. */
 export interface NotificationItem {
@@ -96,6 +99,9 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     'report_reviewed',
     'content_restored',
     'join_request_accepted',
+    'verification_approved',
+    'verification_rejected',
+    'verification_reapply_ready',
   ]),
 };
 
@@ -295,6 +301,8 @@ export type NotificationRoute =
   | { kind: 'job'; jobId: string }
   /** The jobs board — an href that named no posting. */
   | { kind: 'jobs' }
+  /** The account-verification status/form. */
+  | { kind: 'verification' }
   | { kind: 'none' };
 
 /** The content kinds, as they appear in a URL (the app's tab keys). */
@@ -328,6 +336,8 @@ export function notificationHrefToRoute(href: string): NotificationRoute {
   if (section === 'jobs' && id) return { kind: 'job', jobId: id };
 
   if (section === 'jobs') return { kind: 'jobs' };
+
+  if (section === 'verification') return { kind: 'verification' };
 
   return { kind: 'none' };
 }

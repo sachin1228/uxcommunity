@@ -5,6 +5,10 @@ import {
   renderCompanyVerificationEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
+  renderVerificationApprovedEmail,
+  renderVerificationCodeEmail,
+  renderVerificationReapplyEmail,
+  renderVerificationRejectedEmail,
   renderWelcomeEmail,
 } from "./templates";
 
@@ -69,6 +73,69 @@ export async function sendPasswordResetEmail(
 
 export async function sendWelcomeEmail(to: string, name: string): Promise<void> {
   await send(to, renderWelcomeEmail({ name, appUrl: getAppUrl() }));
+}
+
+export async function sendVerificationCodeEmail(
+  to: string,
+  name: string,
+  code: string,
+  expiresMinutes: number
+): Promise<void> {
+  await send(
+    to,
+    renderVerificationCodeEmail({ name, appUrl: getAppUrl(), code, expiresMinutes })
+  );
+}
+
+export async function sendVerificationApprovedEmail(
+  to: string,
+  name: string
+): Promise<void> {
+  const appUrl = getAppUrl();
+  await send(
+    to,
+    renderVerificationApprovedEmail({
+      name,
+      appUrl,
+      link: appLink(appUrl, "/dashboard"),
+    })
+  );
+}
+
+export async function sendVerificationRejectedEmail(
+  to: string,
+  name: string,
+  reason: string,
+  reapplyAt: string
+): Promise<void> {
+  const appUrl = getAppUrl();
+  await send(
+    to,
+    renderVerificationRejectedEmail({
+      name,
+      appUrl,
+      link: appLink(appUrl, "/dashboard/verification"),
+      reason,
+      reapplyAt,
+    })
+  );
+}
+
+export async function sendVerificationReapplyEmail(
+  to: string,
+  name: string,
+  reapplyAt: string
+): Promise<void> {
+  const appUrl = getAppUrl();
+  await send(
+    to,
+    renderVerificationReapplyEmail({
+      name,
+      appUrl,
+      link: appLink(appUrl, "/dashboard/verification"),
+      reapplyAt,
+    })
+  );
 }
 
 export async function sendResumeSignupEmail(

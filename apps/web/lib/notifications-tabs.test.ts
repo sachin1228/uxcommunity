@@ -42,6 +42,9 @@ const ALL_TYPES: NotificationType[] = [
   "event_reminder",
   "event_live",
   "event_ended",
+  "verification_approved",
+  "verification_rejected",
+  "verification_reapply_ready",
 ];
 
 test("every generated notification type lands in a tab", () => {

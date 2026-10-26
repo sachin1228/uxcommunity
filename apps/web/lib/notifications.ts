@@ -42,7 +42,10 @@ export type NotificationType =
   | "join_request_accepted"
   | "event_reminder"
   | "event_live"
-  | "event_ended";
+  | "event_ended"
+  | "verification_approved"
+  | "verification_rejected"
+  | "verification_reapply_ready";
 
 export type NotificationEntityType =
   | "thread"
@@ -50,7 +53,8 @@ export type NotificationEntityType =
   | "resource"
   | "event"
   | "job"
-  | "community";
+  | "community"
+  | "verification";
 
 /** The content kinds a removal notice can be about, and how it names them. */
 const REMOVED_CONTENT_LABELS = {

@@ -94,6 +94,130 @@ export function renderResumeSignupEmail({
   });
 }
 
+export interface VerificationCodeEmail {
+  name: string;
+  appUrl: string;
+  code: string;
+  expiresMinutes: number;
+}
+
+/** The code that proves the member controls their account email. */
+export function renderVerificationCodeEmail({
+  name,
+  appUrl,
+  code,
+  expiresMinutes,
+}: VerificationCodeEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `Your ${APP_NAME} verification code`,
+    preheader: `Enter this code to verify your account email.`,
+    heading: `Hi ${name},`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: `Enter this code on your verification page to confirm your account email:`,
+      },
+      { kind: "code", value: code },
+      {
+        kind: "finePrint",
+        text: `This code expires in ${expiresMinutes} minutes. If you didn't request it, you can ignore this email.`,
+      },
+    ],
+  });
+}
+
+export interface VerificationReapplyEmail {
+  name: string;
+  appUrl: string;
+  link: string;
+  reapplyAt: string;
+}
+
+/** Sent once the one-month reapplication window opens after a rejection. */
+export function renderVerificationReapplyEmail({
+  name,
+  appUrl,
+  link,
+  reapplyAt,
+}: VerificationReapplyEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `You can reapply to ${APP_NAME}`,
+    preheader: "Your verification reapplication window is open.",
+    heading: `Hi ${name},`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: `Your verification reapplication window is open again as of ${reapplyAt}. You can update your LinkedIn, portfolio and work samples and submit for review.`,
+      },
+      { kind: "action", label: "Reapply now", href: link },
+      {
+        kind: "finePrint",
+        text: "If your situation has changed, you're welcome to apply again.",
+      },
+    ],
+  });
+}
+
+export interface VerificationApprovedEmail {
+  name: string;
+  appUrl: string;
+  link: string;
+}
+
+export function renderVerificationApprovedEmail({
+  name,
+  appUrl,
+  link,
+}: VerificationApprovedEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `You're verified on ${APP_NAME}`,
+    preheader: "Your account now has full access.",
+    heading: `You're verified, ${name}.`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "Your profile was approved. You can now post, message, join communities, and apply to jobs.",
+      },
+      { kind: "action", label: "Open your dashboard", href: link },
+    ],
+  });
+}
+
+export interface VerificationRejectedEmail {
+  name: string;
+  appUrl: string;
+  link: string;
+  reason: string;
+  reapplyAt: string;
+}
+
+export function renderVerificationRejectedEmail({
+  name,
+  appUrl,
+  link,
+  reason,
+  reapplyAt,
+}: VerificationRejectedEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `An update on your ${APP_NAME} verification`,
+    preheader: "An update on your verification.",
+    heading: `Hi ${name},`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "We couldn't approve your verification this time.",
+      },
+      { kind: "paragraph", text: `Reason: ${reason}` },
+      { kind: "paragraph", text: `You can reapply from ${reapplyAt}.` },
+      { kind: "action", label: "View details", href: link, variant: "secondary" },
+    ],
+  });
+}
+
 export interface CompanyVerificationEmail {
   name: string;
   appUrl: string;

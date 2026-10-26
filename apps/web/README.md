@@ -16,7 +16,8 @@ Realtime runs out-of-process on the Cloudflare Worker in `apps/realtime`.
 | `/forgot-password` | Public | Request a password reset email |
 | `/reset-password` | Public | Confirm a password reset |
 | `/too-many-requests` | Public | Rate-limit fallback (middleware rewrite) |
-| `/dashboard/*` | Authenticated users | Home feed, communities, threads, events, resources, showcase, notifications, profile, library, jobs, settings |
+| `/dashboard/*` | Authenticated users | Home feed, communities, threads, events, resources, showcase, notifications, profile, library, jobs, settings, verification |
+| `/dashboard/verification` | Authenticated users | Read-only account verification form and review status |
 | `/admin/*` | Admin only | Admin panel (see below) |
 
 ### Admin panel (`/admin`)
@@ -26,6 +27,7 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 | Section | What it manages |
 |---|---|
 | Users | View all members, block/unblock, open a profile, delete accounts |
+| Verifications | Review LinkedIn/portfolio/work samples and approve or reject read-only accounts |
 | Communities | Create/edit communities, community admins & permissions |
 | Master data | Cities, sectors, experience levels, job titles, Lottie animations |
 | Signup attempts | Incomplete sign-ups; send a resume link |
@@ -34,12 +36,13 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 
 ### API routes (`app/api/`)
 
-166 route handlers:
+174 route handlers:
 
 | Prefix | Purpose |
 |---|---|
 | `/api/auth/*` | login, logout, me, reset-request, reset-confirm |
 | `/api/signup/*` | Multi-step onboarding: direct, profile, avatar, picture, resume |
+| `/api/verification/*` | Status, email OTP, work-sample upload, review submission |
 | `/api/profile/*` | Update profile, avatar |
 | `/api/communities/*` | Communities, membership, invites, chat messages + reactions + upload, read receipts, threads, events, resources, showcase, comments, rules, content reactions |
 | `/api/home/*` | Home feed pages |

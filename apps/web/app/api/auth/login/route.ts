@@ -7,6 +7,10 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
 import { isSignupIncomplete } from "@/lib/auth/signup-status";
+import {
+  getVerificationGraceDays,
+  isVerificationBannerVisible,
+} from "@/lib/verification/settings";
 
 type LoginUserRow = {
   id: string;
@@ -14,6 +18,10 @@ type LoginUserRow = {
   email: string;
   password_hash: string;
   is_blocked: boolean;
+  verification_status: string;
+  verification_reapply_at: string | null;
+  verification_rejection_reason: string | null;
+  created_at: string;
   designer_profiles: { id: string; avatar_url: string | null } | null;
 };
 
@@ -94,7 +102,9 @@ export async function POST(request: NextRequest) {
   // client can paint the signed-in member without a second /me round trip.
   const { data: rawUser } = await db
     .from("users")
-    .select("id, name, email, password_hash, is_blocked, designer_profiles!user_id(id, avatar_url)")
+    .select(
+      "id, name, email, password_hash, is_blocked, created_at, verification_status, verification_reapply_at, verification_rejection_reason, designer_profiles!user_id(id, avatar_url)",
+    )
     .eq("email", normalizedEmail)
     .maybeSingle();
   const row = rawUser as unknown as LoginUserRow | null;
@@ -154,6 +164,13 @@ export async function POST(request: NextRequest) {
     role: "user",
   });
 
+  const graceDays = await getVerificationGraceDays();
+  const verificationBannerVisible = isVerificationBannerVisible({
+    status: row.verification_status,
+    createdAt: row.created_at,
+    graceDays,
+  });
+
   const response = NextResponse.json({
     success: true,
     name: row.name,
@@ -167,6 +184,10 @@ export async function POST(request: NextRequest) {
       role: "user",
       profileComplete: !!profile,
       avatar_url: profile?.avatar_url ?? null,
+      verificationStatus: row.verification_status,
+      verificationBannerVisible,
+      verificationReapplyAt: row.verification_reapply_at,
+      verificationRejectionReason: row.verification_rejection_reason,
     },
   });
   setSessionCookie(response, token, request.nextUrl.hostname);

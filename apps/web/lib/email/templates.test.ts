@@ -7,6 +7,10 @@ import {
   renderCompanyVerificationEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
+  renderVerificationApprovedEmail,
+  renderVerificationCodeEmail,
+  renderVerificationReapplyEmail,
+  renderVerificationRejectedEmail,
   renderWelcomeEmail,
 } from "./templates";
 
@@ -39,6 +43,42 @@ const RENDERED: Array<[name: string, email: RenderedEmail]> = [
     }),
   ],
   ["welcome", renderWelcomeEmail({ name: "Ada", appUrl: APP_URL })],
+  [
+    "verification code",
+    renderVerificationCodeEmail({
+      name: "Ada",
+      appUrl: APP_URL,
+      code: "482913",
+      expiresMinutes: 10,
+    }),
+  ],
+  [
+    "verification reapply",
+    renderVerificationReapplyEmail({
+      name: "Ada",
+      appUrl: APP_URL,
+      link: `${APP_URL}/dashboard/verification`,
+      reapplyAt: "26 November 2026",
+    }),
+  ],
+  [
+    "verification approved",
+    renderVerificationApprovedEmail({
+      name: "Ada",
+      appUrl: APP_URL,
+      link: `${APP_URL}/dashboard`,
+    }),
+  ],
+  [
+    "verification rejected",
+    renderVerificationRejectedEmail({
+      name: "Ada",
+      appUrl: APP_URL,
+      link: `${APP_URL}/dashboard/verification`,
+      reason: "Portfolio links were not accessible.",
+      reapplyAt: "26 November 2026",
+    }),
+  ],
   [
     "resumed signup",
     renderResumeSignupEmail({
@@ -183,7 +223,13 @@ test("every email is a complete document with a hidden preheader", () => {
 });
 
 /** Emails whose ask is a single primary action — the code email has none. */
-const PRIMARY_ACTION_EMAILS = ["password reset", "welcome", "resumed signup"];
+const PRIMARY_ACTION_EMAILS = [
+  "password reset",
+  "welcome",
+  "resumed signup",
+  "verification reapply",
+  "verification approved",
+];
 
 test("a primary call to action is the product's accent, inverted in dark", () => {
   for (const name of PRIMARY_ACTION_EMAILS) {
@@ -199,6 +245,16 @@ test("a primary call to action is the product's accent, inverted in dark", () =>
       `${name} email does not invert its primary action in dark`
     );
   }
+});
+
+test("the verification rejection email offers a quieter action", () => {
+  const rejected = RENDERED.find(([name]) => name === "verification rejected")?.[1];
+  assert.ok(rejected, "no rendered verification rejection email");
+  assert.ok(rejected.html.includes('class="uxc-secondary"'), "the rejection email has no quiet action");
+  assert.ok(
+    !rejected.html.includes('class="uxc-accent"'),
+    "the rejection email should not lead with the primary action",
+  );
 });
 
 test("the shell asks for both schemes and every dark rule beats the inline style", () => {
@@ -258,6 +314,9 @@ test("each email links to the page its call to action belongs to", () => {
   const expectedLinks: Array<[name: string, href: string]> = [
     ["password reset", `${APP_URL}/reset-password?token=t1`],
     ["welcome", `${APP_URL}/dashboard`],
+    ["verification reapply", `${APP_URL}/dashboard/verification`],
+    ["verification approved", `${APP_URL}/dashboard`],
+    ["verification rejected", `${APP_URL}/dashboard/verification`],
     ["resumed signup", `${APP_URL}/signup?resume=t3`],
   ];
 

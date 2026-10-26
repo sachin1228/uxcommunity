@@ -46,6 +46,9 @@ type FeatherName = React.ComponentProps<typeof Feather>['name'];
 
 /** Row icon per type — the web view's iconFor, in the same order. */
 function iconFor(type: NotificationType): FeatherName {
+  if (type === 'verification_approved') return 'check-circle';
+  if (type === 'verification_rejected') return 'x-circle';
+  if (type === 'verification_reapply_ready') return 'clock';
   if (type === 'report_reviewed') return 'flag';
   if (type === 'content_restored') return 'rotate-ccw';
   if (type === 'job_match') return 'briefcase';
@@ -166,6 +169,8 @@ export default function NotificationsScreen() {
         router.push(`/jobs/${route.jobId}`);
       } else if (route.kind === 'jobs') {
         router.push('/jobs');
+      } else if (route.kind === 'verification') {
+        router.push('/settings/verification');
       } else if (route.kind === 'feed') {
         router.push('/(tabs)');
       }

@@ -13,7 +13,8 @@ import { requireSession } from "@/lib/auth/session";
 export async function POST(req: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    // A read-only account still receives notifications about its review.
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

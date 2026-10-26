@@ -3,6 +3,10 @@ import { getSession, clearSessionCookie } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
+import {
+  getVerificationGraceDays,
+  isVerificationBannerVisible,
+} from "@/lib/verification/settings";
 
 export async function GET(request: NextRequest) {
   // L-7: Rate-limit /me to prevent aggressive polling from hammering the DB
@@ -30,7 +34,9 @@ export async function GET(request: NextRequest) {
   const db = createServiceClient();
   const { data: user } = await db
     .from("users")
-    .select("id, name, email")
+    .select(
+      "id, name, email, created_at, verification_status, verification_reapply_at, verification_rejection_reason, email_verified_at",
+    )
     .eq("id", session.userId!)
     .maybeSingle();
 
@@ -42,11 +48,22 @@ export async function GET(request: NextRequest) {
     return response;
   }
 
-  const { data: profile } = await db
-    .from("designer_profiles")
-    .select("id, avatar_url")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, graceDays] = await Promise.all([
+    db
+      .from("designer_profiles")
+      .select("id, avatar_url")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    getVerificationGraceDays(),
+  ]);
+
+  const verificationStatus =
+    (user as { verification_status?: string }).verification_status ?? "unverified";
+  const verificationBannerVisible = isVerificationBannerVisible({
+    status: verificationStatus,
+    createdAt: (user as { created_at?: string | null }).created_at ?? null,
+    graceDays,
+  });
 
   return NextResponse.json({
     user: {
@@ -54,6 +71,13 @@ export async function GET(request: NextRequest) {
       role: "user",
       profileComplete: !!profile,
       avatar_url: (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null,
+      verificationStatus,
+      verificationBannerVisible,
+      verificationReapplyAt:
+        (user as { verification_reapply_at?: string | null }).verification_reapply_at ?? null,
+      verificationRejectionReason:
+        (user as { verification_rejection_reason?: string | null }).verification_rejection_reason ?? null,
+      emailVerifiedAt: (user as { email_verified_at?: string | null }).email_verified_at ?? null,
     },
   });
 }

@@ -28,7 +28,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string; threadId: string }> },
 ) {
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try { session = await requireSession("user", { allowUnverified: true }); } catch (e) { return e as Response; }
 
   const { id: communityId, threadId } = await params;
   const db = createServiceClient();
