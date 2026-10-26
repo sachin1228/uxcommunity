@@ -499,9 +499,9 @@ function MessageHeader({
       {editedAt && (
         <span className={`font-body text-[10px] ${metaClass}`}>edited</span>
       )}
-      {/* Community chat shows the day/time only — no delivery ticks or sending
-          spinner beside it; a failed send keeps its "!" as the last signal
-          before the retry button. */}
+      {/* Community chat keeps delivery ticks out of this row — the in-flight
+          clock sits beside the bubble instead (same slot for every send); a
+          failed send ends with "!". */}
       {isMe && status === "failed" && (
         <span className={`text-[10px] ${onPage ? "text-red-400" : "text-red-200"}`}>!</span>
       )}
@@ -690,6 +690,27 @@ export const MessageBubble = memo(function MessageBubble({
   const leftRail = variant === "community";
   const alignRight = !leftRail && isMe;
 
+  // Your own text message, still in flight: the bubble fades and a pulsing
+  // clock sits just outside it. Image and GIF sends keep their in-bubble upload
+  // spinner, and direct messages keep the footer clock they always had.
+  const sendingText =
+    leftRail && isMe && msg.status === "sending" && !imageUrl;
+  // One position for every send, whether or not the message opens a run: the
+  // clock never rides inside the bubble (a header clock would disappear for
+  // the second and third message of a run).
+  const sendingClock =
+    sendingText ? (
+      <button
+        type="button"
+        onClick={() => onCancelSend(msg.id)}
+        aria-label="Cancel sending"
+        title="Sending — click to cancel"
+        className="flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-foreground-muted transition-colors hover:text-foreground"
+      >
+        <Clock strokeWidth={2.5} size={12} className="animate-pulse" />
+      </button>
+    ) : null;
+
   // Long-press (touch) opens the same menu as the hover "more" button —
   // touch users had no way to reach reply/copy/delete/reactions at all.
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -835,6 +856,7 @@ export const MessageBubble = memo(function MessageBubble({
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
+              {sendingClock}
               <MessageHoverActions
                 msg={msg}
                 isMe={isMe}
@@ -876,6 +898,12 @@ export const MessageBubble = memo(function MessageBubble({
                     // Media bubbles keep a thin frame around the image
                     // (WhatsApp-style); text-only bubbles use the roomier padding.
                     imageUrl ? "p-1" : "px-3 pt-2 pb-1.5"
+                  } ${
+                    // An in-flight own message reads as pending at a glance —
+                    // full colour returns under the pointer so it stays legible.
+                    sendingText
+                      ? "opacity-[0.55] transition-opacity group-hover:opacity-100"
+                      : ""
                   }`}
                 >
                   {isFirstInGroup && (
@@ -965,6 +993,7 @@ export const MessageBubble = memo(function MessageBubble({
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
+              {sendingClock}
               {/* Emoji reaction + more-actions buttons to the right of bubble */}
               <MessageHoverActions
                 msg={msg}
