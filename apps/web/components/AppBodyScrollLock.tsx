@@ -9,10 +9,25 @@ import { useEffect } from "react";
  */
 export function AppBodyScrollLock() {
   useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const html = document.documentElement;
+    const body = document.body;
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+
     return () => {
-      document.body.style.overflow = previous;
+      html.style.overflow = previous.htmlOverflow;
+      body.style.overflow = previous.bodyOverflow;
+      html.style.overscrollBehavior = previous.htmlOverscroll;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
     };
   }, []);
 

@@ -70,7 +70,7 @@ export default async function DashboardLayout({
     (user as { verification_status?: string } | null)?.verification_status ?? null;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-background-subtle text-foreground">
       <AppBodyScrollLock />
       <VerificationBanner status={verificationStatus} />
 
