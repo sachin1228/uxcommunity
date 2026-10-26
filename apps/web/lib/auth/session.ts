@@ -11,6 +11,7 @@ const USER_LIVENESS_TTL_MS = 15_000;
 interface ActiveUserState {
   is_blocked: boolean;
   verification_status: string | null;
+  created_at: string | null;
 }
 
 const activeUserChecks = new Map<string, ActiveUserState & { checkedAt: number }>();
@@ -152,7 +153,7 @@ async function getActiveUserState(userId: string): Promise<ActiveUserState> {
     const db = createServiceClient();
     const { data, error } = await db
       .from("users")
-      .select("id, is_blocked, verification_status")
+      .select("id, is_blocked, verification_status, created_at")
       .eq("id", userId)
       .maybeSingle();
 
@@ -160,6 +161,7 @@ async function getActiveUserState(userId: string): Promise<ActiveUserState> {
       id: string;
       is_blocked: boolean;
       verification_status: string | null;
+      created_at: string | null;
     } | null;
     if (error || !row || row.is_blocked) {
       activeUserChecks.delete(userId);
@@ -172,6 +174,7 @@ async function getActiveUserState(userId: string): Promise<ActiveUserState> {
     const state: ActiveUserState = {
       is_blocked: false,
       verification_status: row.verification_status,
+      created_at: row.created_at,
     };
     activeUserChecks.set(userId, { ...state, checkedAt: Date.now() });
     return state;
@@ -205,10 +208,22 @@ export async function assertUserActive(
   options?: { allowUnverified?: boolean },
 ): Promise<void> {
   const state = await getActiveUserState(userId);
-  if (
-    state.verification_status !== "approved" &&
-    !options?.allowUnverified
-  ) {
+  if (state.verification_status === "approved" || options?.allowUnverified) {
+    return;
+  }
+
+  // New signups get a short, admin-configured grace window before the gate
+  // applies. Lazy import keeps this module edge-compatible.
+  const { getVerificationGraceDays, isVerificationRestricted } = await import(
+    "@/lib/verification/settings"
+  );
+  const graceDays = await getVerificationGraceDays();
+  const restricted = isVerificationRestricted({
+    status: state.verification_status,
+    createdAt: state.created_at,
+    graceDays,
+  });
+  if (restricted) {
     throw verificationRequiredResponse(state.verification_status);
   }
 }

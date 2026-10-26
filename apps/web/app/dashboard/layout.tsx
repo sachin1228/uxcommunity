@@ -7,6 +7,10 @@ import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { UndoToast } from "@/components/ui/UndoToast";
 import { AppBodyScrollLock } from "@/components/AppBodyScrollLock";
 import { VerificationBanner } from "@/components/verification/VerificationBanner";
+import {
+  getVerificationGraceDays,
+  isVerificationBannerVisible,
+} from "@/lib/verification/settings";
 import { Topbar } from "./Topbar";
 
 
@@ -21,10 +25,10 @@ export default async function DashboardLayout({
   }
 
   const db = createServiceClient();
-  const [{ data: user }, { data: profile }] = await Promise.all([
+  const [{ data: user }, { data: profile }, graceDays] = await Promise.all([
     db
       .from("users")
-      .select("name, email, verification_status")
+      .select("name, email, verification_status, created_at")
       .eq("id", session.userId!)
       .maybeSingle(),
     db
@@ -34,6 +38,7 @@ export default async function DashboardLayout({
       )
       .eq("user_id", session.userId!)
       .maybeSingle(),
+    getVerificationGraceDays(),
   ]);
 
   const name = user?.name ?? session.email ?? "User";
@@ -68,11 +73,16 @@ export default async function DashboardLayout({
   const sidebarUser = { name, email, avatarUrl };
   const verificationStatus =
     (user as { verification_status?: string } | null)?.verification_status ?? null;
+  const showVerificationBanner = isVerificationBannerVisible({
+    status: verificationStatus,
+    createdAt: (user as { created_at?: string | null } | null)?.created_at ?? null,
+    graceDays,
+  });
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-background-subtle text-foreground">
       <AppBodyScrollLock />
-      <VerificationBanner status={verificationStatus} />
+      {showVerificationBanner ? <VerificationBanner status={verificationStatus} /> : null}
 
       {/* End to end: the bar spans the window and sits above the sidebar, so
           the brand reads as the app's header rather than the sidebar's. */}

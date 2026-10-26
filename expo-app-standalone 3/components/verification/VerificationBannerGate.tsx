@@ -22,10 +22,7 @@ export function VerificationBannerGate({ children }: { children: React.ReactNode
   const colors = useColors();
   const router = useRouter();
 
-  const show =
-    user?.role === 'user' &&
-    user.verificationStatus != null &&
-    user.verificationStatus !== 'approved';
+  const show = user?.role === 'user' && user.verificationBannerVisible === true;
 
   if (!show) return <>{children}</>;
 

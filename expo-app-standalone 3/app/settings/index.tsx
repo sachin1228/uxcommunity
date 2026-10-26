@@ -75,7 +75,13 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  // The verification option appears with the banner: after the signup grace
+  // window, or immediately for pending/rejected accounts. Approved accounts
+  // have nothing to do here.
+  const rows = ROWS.filter(
+    (row) => row.href !== '/settings/verification' || user?.verificationBannerVisible === true,
+  );
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -109,7 +115,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {ROWS.map((row, index) => (
+          {rows.map((row, index) => (
             <View key={row.href}>
               {index > 0 ? (
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />

@@ -15,6 +15,8 @@ export interface User {
   avatar_url: string | null;
   /** Read-only accounts are `unverified`, `pending` or `rejected`. */
   verificationStatus?: VerificationStatus;
+  /** Server-computed: false during the admin-configured signup grace window. */
+  verificationBannerVisible?: boolean;
   verificationReapplyAt?: string | null;
   verificationRejectionReason?: string | null;
   emailVerifiedAt?: string | null;

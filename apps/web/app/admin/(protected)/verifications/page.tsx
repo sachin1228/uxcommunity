@@ -69,6 +69,10 @@ export default function AdminVerificationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [graceDays, setGraceDays] = useState(0);
+  const [graceSaving, setGraceSaving] = useState(false);
+  const [graceSaved, setGraceSaved] = useState(false);
+  const [graceError, setGraceError] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -94,6 +98,43 @@ export default function AdminVerificationsPage() {
     void fetchRequests();
   }, [fetchRequests]);
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/verification-settings");
+        const body = await res.json();
+        if (active && res.ok) setGraceDays(body.graceDays ?? 0);
+      } catch {
+        // A failed read leaves the current default; saving still works.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function updateGrace(days: number) {
+    setGraceSaving(true);
+    setGraceSaved(false);
+    setGraceError(null);
+    try {
+      const res = await fetch("/api/admin/verification-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Failed to save the setting.");
+      setGraceDays(days);
+      setGraceSaved(true);
+    } catch (saveError) {
+      setGraceError(saveError instanceof Error ? saveError.message : "Failed to save the setting.");
+    } finally {
+      setGraceSaving(false);
+    }
+  }
+
   async function review(id: string, action: "approve" | "reject") {
     setActionLoading(`${id}:${action}`);
     setError(null);
@@ -116,14 +157,43 @@ export default function AdminVerificationsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-end justify-between">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-semibold text-foreground">Verifications</h1>
           <p className="mt-0.5 font-body text-xs text-foreground-muted">
             {total} {total === 1 ? "request" : "requests"} in this view
           </p>
         </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="grace-days" className="font-body text-xs text-foreground-muted">
+            Banner after
+          </label>
+          <select
+            id="grace-days"
+            value={graceDays}
+            onChange={(event) => void updateGrace(Number(event.target.value))}
+            disabled={graceSaving}
+            className="field h-8 w-32 px-2 font-body text-xs text-foreground disabled:opacity-60"
+          >
+            <option value={0}>Immediately</option>
+            {Array.from({ length: 30 }, (_, index) => index + 1).map((days) => (
+              <option key={days} value={days}>
+                {days} {days === 1 ? "day" : "days"}
+              </option>
+            ))}
+          </select>
+          <span className="w-12 font-body text-[11px] text-foreground-subtle">
+            {graceSaving ? "Saving…" : graceSaved ? "Saved" : ""}
+          </span>
+        </div>
       </div>
+
+      {graceError ? (
+        <div className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+          <p className="font-body text-xs text-red-500">{graceError}</p>
+        </div>
+      ) : null}
 
       <div className="mb-3 flex gap-1">
         {TABS.map((tab) => (

@@ -2888,6 +2888,24 @@ export type Database = {
           },
         ];
       };
+      verification_settings: {
+        Row: {
+          grace_days: number;
+          id: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          grace_days?: number;
+          id?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          grace_days?: number;
+          id?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       verification_email_codes: {
         Row: {
           attempts: number;
