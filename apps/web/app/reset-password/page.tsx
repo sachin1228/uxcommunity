@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { APP_NAME } from "@uxcommunity/shared";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -74,15 +74,12 @@ function ResetPasswordInner() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+      <BrandLogo
+        className="fixed left-6 top-6 z-20"
+        iconClassName="h-8 w-8"
+        wordmarkClassName="hidden"
+      />
       <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="mb-8 text-center">
-          <span className="font-display text-xl font-semibold text-foreground">
-            {APP_NAME}
-            <span className="text-accent mx-1">/</span>
-          </span>
-        </div>
-
         {pageState === "loading" && (
           <div className="flex justify-center py-16">
             <Spinner className="h-6 w-6" />
