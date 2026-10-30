@@ -9,6 +9,7 @@ import { createContentEventIdCache } from "@/lib/communities/content-event-ids";
 import { readMessageRequestBody } from "@/lib/communities/message-request";
 import { announceNewChatMessage } from "@/lib/communities/message-publish";
 import { warmChatPushTargets } from "@/lib/push/chat";
+import { blockedAmong } from "@/lib/blocks/server";
 
 /**
  * Ids of the community's recent content items (threads / showcase posts /
@@ -46,7 +47,7 @@ export async function GET(
 ) {
   let session;
   try {
-    session = await requireSession("user", { verifyActive: false });
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }
@@ -93,7 +94,7 @@ export async function POST(
     // alongside the membership/profile reads and is awaited before the insert,
     // so a cold isolate no longer pays a DB round trip before its first query.
     session = await timer.measure("auth", () =>
-      requireSession("user", { verifyActive: false }),
+      requireSession("user", { allowUnverified: true }),
     );
   } catch (e) {
     return e as Response;
@@ -197,14 +198,16 @@ export async function POST(
   const pushWarmup = warmChatPushTargets({ communityId, senderId: userId }, { db });
 
   // Validate reply_to_id belongs to this community (if provided)
+  let replyAuthorId: string | null = null;
   if (reply_to_id) {
     const { data: parent } = await db
       .from("community_messages")
-      .select("id")
+      .select("id, user_id")
       .eq("id", reply_to_id)
       .eq("community_id", communityId)
       .maybeSingle();
     if (!parent) reply_to_id = null; // silently ignore invalid reply
+    else replyAuthorId = parent.user_id;
   }
 
   // Validate the content-reply anchor: the item must exist in this community.
@@ -252,6 +255,23 @@ export async function POST(
       mentions = validIds
         .filter((id) => nameById.has(id))
         .map((id) => ({ user_id: id, name: nameById.get(id) as string }));
+    }
+  }
+
+  // A block suppresses interaction with that member. A reply anchored to their
+  // message is dropped (the message still sends), and they are removed from
+  // the mention list so the blocked member is neither highlighted nor notified.
+  const blockCandidates = [
+    replyAuthorId,
+    ...mentions.map((mention) => mention.user_id),
+  ].filter((id): id is string => Boolean(id));
+  if (blockCandidates.length > 0) {
+    const blocked = await blockedAmong(db, userId, blockCandidates);
+    if (replyAuthorId && blocked.has(replyAuthorId)) {
+      reply_to_id = null;
+    }
+    if (mentions.length > 0) {
+      mentions = mentions.filter((mention) => !blocked.has(mention.user_id));
     }
   }
 

@@ -1,0 +1,93 @@
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { createServiceClient } from "@/lib/supabase/service";
+import { clearSessionCookie, getSession } from "@/lib/auth/session";
+import { rateLimit } from "@/lib/auth/rate-limit";
+import { deleteAccountCascade } from "@/lib/account/delete";
+import { parseDeleteAccountRequest } from "@/lib/account/delete-request";
+import { sendAccountDeletedEmail } from "@/lib/email";
+
+/**
+ * Member-initiated account deletion.
+ *
+ * Requires the current password and the literal confirmation "DELETE" so a
+ * stolen session alone cannot erase an account. Liveness is not checked:
+ * a blocked or verification-restricted member must still be able to exercise
+ * erasure. A JWT for an already-deleted account reaches the row lookup and
+ * gets a 404.
+ */
+export async function POST(request: NextRequest) {
+  // No liveness check on purpose: a blocked member must still be able to
+  // exercise erasure. The password + DELETE confirmation below are the gate.
+  const session = await getSession();
+  const userId = session?.userId;
+  if (!session || session.role !== "user" || !userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limit = await rateLimit(`account-delete:${userId}`, 5, 3600);
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many deletion attempts. Try again later." },
+      { status: 429 },
+    );
+  }
+
+  const parsed = parseDeleteAccountRequest(await request.json().catch(() => null));
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  }
+
+  const db = createServiceClient();
+  const { data: row, error } = await db
+    .from("users")
+    .select("id, password_hash, email, name")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[account/delete] lookup error:", error);
+    return NextResponse.json({ error: "Could not verify your account." }, { status: 500 });
+  }
+  if (!row) {
+    return NextResponse.json({ error: "Account not found." }, { status: 404 });
+  }
+
+  const passwordMatch = await bcrypt.compare(parsed.password, row.password_hash);
+  if (!passwordMatch) {
+    return NextResponse.json({ error: "Password is incorrect." }, { status: 403 });
+  }
+
+  try {
+    const summary = await deleteAccountCascade(db, userId);
+
+    // Confirmation is sent after the rows are gone, to the address captured
+    // before deletion. A mail failure must not resurrect the account or turn a
+    // completed deletion into an error the member could retry.
+    try {
+      await sendAccountDeletedEmail(row.email, row.name);
+    } catch (emailError) {
+      console.error("[account/delete] confirmation email error:", emailError);
+    }
+
+    const response = NextResponse.json({
+      success: true,
+      communities: {
+        transferred: summary.transferred,
+        deleted: summary.deleted,
+        r2_cleanup: summary.r2Cleanup,
+      },
+    });
+    clearSessionCookie(response, request.nextUrl.hostname);
+    return response;
+  } catch (deleteError) {
+    console.error("[account/delete] deletion error:", deleteError);
+    return NextResponse.json(
+      {
+        error:
+          "Your account could not be deleted. Please try again, or email hello@uxcommunity.in.",
+      },
+      { status: 500 },
+    );
+  }
+}

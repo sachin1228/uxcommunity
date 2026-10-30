@@ -27,6 +27,7 @@ interface Props {
   blockedByMe: boolean;
   onMessage: () => void;
   onUnblock: () => void;
+  onReport: () => void;
   unblocking?: boolean;
   /** Disable member actions until the server confirms profile access. */
   actionsDisabled?: boolean;
@@ -56,6 +57,7 @@ export function MemberProfileHero({
   blockedByMe,
   onMessage,
   onUnblock,
+  onReport,
   unblocking,
   actionsDisabled = false,
 }: Props) {
@@ -160,6 +162,21 @@ export function MemberProfileHero({
             >
               <DmIcon size={14} color="#FFFFFF" />
               <Text style={styles.messageChipText}>Message</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Report ${name}`}
+              onPress={onReport}
+              style={({ pressed }) => [
+                styles.secondaryChip,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: pressed ? colors.surfaceRaised : 'transparent',
+                },
+              ]}
+            >
+              <Feather name="flag" size={14} color={colors.foreground} />
             </Pressable>
 
             {linkedin ? (

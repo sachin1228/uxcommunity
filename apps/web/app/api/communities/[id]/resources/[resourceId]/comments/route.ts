@@ -10,6 +10,7 @@ import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
+import { isBlockedWithAny } from "@/lib/blocks/server";
 
 type EnrichedRow = Record<string, unknown> & {
   users: CommentAuthor | null;
@@ -135,6 +136,13 @@ export async function POST(
     if (!parent) return NextResponse.json({ error: "Parent comment not found." }, { status: 404 });
     if (parent.parent_id) return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 422 });
     parentAuthorId = parent.user_id;
+  }
+
+  if (await isBlockedWithAny(db, userId, [resource.user_id, parentAuthorId])) {
+    return NextResponse.json(
+      { error: "You can't interact with this member." },
+      { status: 403 },
+    );
   }
 
   const { data: inserted, error } = await db

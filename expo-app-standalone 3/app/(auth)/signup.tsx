@@ -5,6 +5,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -64,6 +65,8 @@ const EMPTY_IDENTITY: SignupIdentityInput = {
   email: '',
   password: '',
   confirmPassword: '',
+  ageConfirmed: false,
+  termsAccepted: false,
 };
 
 const EMPTY_SELECTION: SignupSelection = {
@@ -487,6 +490,96 @@ export default function SignupScreen() {
                   />
                 </Field>
 
+                <View style={styles.consentBlock}>
+                  <View style={styles.consentRow}>
+                    <Pressable
+                      onPress={() => {
+                        patchIdentity({ ageConfirmed: !identity.ageConfirmed });
+                        if (fieldErrors.consent) {
+                          setFieldErrors((previous) => ({ ...previous, consent: undefined }));
+                        }
+                      }}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: identity.ageConfirmed }}
+                      hitSlop={8}
+                      style={[
+                        styles.checkbox,
+                        {
+                          borderColor: identity.ageConfirmed
+                            ? colors.foreground
+                            : colors.isDark ? "#52525B" : "#A3A3A3",
+                          backgroundColor: identity.ageConfirmed ? colors.foreground : "transparent",
+                        },
+                      ]}
+                    >
+                      {identity.ageConfirmed ? (
+                        <Feather name="check" size={12} color={colors.background} />
+                      ) : null}
+                    </Pressable>
+                    <Text style={[styles.consentText, { color: colors.foreground }]}>
+                      I confirm that I am 18 years or older.
+                    </Text>
+                  </View>
+
+                  <View style={styles.consentRow}>
+                    <Pressable
+                      onPress={() => {
+                        patchIdentity({ termsAccepted: !identity.termsAccepted });
+                        if (fieldErrors.consent) {
+                          setFieldErrors((previous) => ({ ...previous, consent: undefined }));
+                        }
+                      }}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: identity.termsAccepted }}
+                      hitSlop={8}
+                      style={[
+                        styles.checkbox,
+                        {
+                          borderColor: identity.termsAccepted
+                            ? colors.foreground
+                            : colors.isDark ? "#52525B" : "#A3A3A3",
+                          backgroundColor: identity.termsAccepted ? colors.foreground : "transparent",
+                        },
+                      ]}
+                    >
+                      {identity.termsAccepted ? (
+                        <Feather name="check" size={12} color={colors.background} />
+                      ) : null}
+                    </Pressable>
+                    <Text style={[styles.consentText, { color: colors.foreground }]}>
+                      I agree to the{' '}
+                      <Text
+                        style={styles.consentLink}
+                        onPress={() => void Linking.openURL('https://uxcommunity.in/terms')}
+                      >
+                        Terms of Service
+                      </Text>
+                      {', '}
+                      <Text
+                        style={styles.consentLink}
+                        onPress={() =>
+                          void Linking.openURL('https://uxcommunity.in/community-guidelines')
+                        }
+                      >
+                        Community Guidelines
+                      </Text>{' '}
+                      and{' '}
+                      <Text
+                        style={styles.consentLink}
+                        onPress={() => void Linking.openURL('https://uxcommunity.in/privacy')}
+                      >
+                        Privacy Policy
+                      </Text>
+                      .
+                    </Text>
+                  </View>
+                </View>
+                {fieldErrors.consent ? (
+                  <Text style={[styles.consentError, { color: colors.destructive }]}>
+                    {fieldErrors.consent}
+                  </Text>
+                ) : null}
+
                 <PrimaryButton
                   label="Continue"
                   loading={loading}
@@ -899,6 +992,27 @@ function makeStyles() {
       padding: 22,
       gap: 16,
     },
+    consentBlock: {
+      gap: 14,
+    },
+    consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    checkbox: {
+      width: 18,
+      height: 18,
+      borderRadius: 5,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 1,
+    },
+    consentText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 18,
+      fontFamily: 'Geist_400Regular',
+    },
+    consentLink: { textDecorationLine: 'underline' },
+    consentError: { fontSize: 12, fontFamily: 'Geist_400Regular', lineHeight: 17 },
     backButton: {
       position: 'absolute',
       left: 12,

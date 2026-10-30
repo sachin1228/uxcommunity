@@ -8,6 +8,8 @@ const completePayload = {
     email: "ada@example.org",
     password: "analytical1",
     confirm_password: "analytical1",
+    age_confirmed: true,
+    terms_accepted: true,
   },
   profile: {
     city_id: "22222222-2222-4222-8222-222222222222",

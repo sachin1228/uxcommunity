@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
+import { assertPublicUrl, safeFetch } from "@/lib/link-preview/safe-url";
 import {
   normalizePreviewUrl,
   type LinkPreviewData,
@@ -87,26 +88,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing url param" }, { status: 400 });
   }
 
-  // Validate: only http/https, no private/loopback hosts
+  // Validate: public http(s) only, no private/loopback/metadata destinations.
   let parsed: URL;
   try {
-    parsed = new URL(rawUrl);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new Error("bad protocol");
-    }
-    const h = parsed.hostname;
-    if (
-      h === "localhost" ||
-      /^127\./.test(h) ||
-      /^10\./.test(h) ||
-      /^192\.168\./.test(h) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
-      h === "::1"
-    ) {
-      return NextResponse.json({ error: "Forbidden host" }, { status: 403 });
-    }
+    parsed = assertPublicUrl(new URL(rawUrl));
   } catch {
-    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid or forbidden URL" }, { status: 400 });
   }
 
   // Cache by normalized URL so equivalent spellings (case, trailing slash,
@@ -130,7 +117,7 @@ export async function GET(req: NextRequest) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const response = await fetch(rawUrl, {
+    const { response } = await safeFetch(parsed, {
       signal: controller.signal,
       headers: {
         "User-Agent":

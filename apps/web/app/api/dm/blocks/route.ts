@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient, type ServiceClient } from "@/lib/supabase/service";
 import { loadDmPeer } from "@/lib/direct-messages/server";
+import { blockMember, listBlockedMembers, unblockMember } from "@/lib/blocks/server";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -19,15 +20,28 @@ function parseQueryUserId(req: NextRequest): string | null {
 }
 
 /**
- * POST /api/dm/blocks  { user_id }   — block a member
- * DELETE /api/dm/blocks?user_id=…    — unblock
+ * GET    /api/dm/blocks                 — the member's blocked accounts
+ * POST   /api/dm/blocks  { user_id }    — block a member
+ * DELETE /api/dm/blocks?user_id=…       — unblock
  *
- * Blocking is a soft, self-service act: the blocker stops seeing the
- * conversation (the list RPC drops it, and no new message can be inserted
- * into the pair from either side — the database trigger is the gate). The
- * blocked member keeps their own history; their sends fail server-side.
- * Both calls are idempotent.
+ * A block is global, not DM-only: it stops direct messages, comments and
+ * replies between the pair, and suppresses notifications either would send
+ * the other. Profiles already hide the blocked member. Both writes are
+ * idempotent.
  */
+export async function GET() {
+  let session;
+  try {
+    session = await requireSession("user");
+  } catch (e) {
+    return e as Response;
+  }
+
+  const db = createServiceClient();
+  const blocked = await listBlockedMembers(db, session.userId!);
+  return NextResponse.json({ blocked });
+}
+
 export async function POST(req: NextRequest) {
   let session;
   try {
@@ -58,12 +72,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
-  const { error } = await db.from("dm_blocks").upsert(
-    { blocker_id: userId, blocked_id: targetId },
-    { onConflict: "blocker_id,blocked_id", ignoreDuplicates: true },
-  );
-  if (error) {
-    console.error("[POST dm block] insert error:", error);
+  const ok = await blockMember(db, userId, targetId);
+  if (!ok) {
+    console.error("[POST block] insert failed");
     return NextResponse.json({ error: "Failed to block this member." }, { status: 500 });
   }
   return NextResponse.json({ blocked: true });
@@ -92,13 +103,9 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const { error } = await db
-    .from("dm_blocks")
-    .delete()
-    .eq("blocker_id", userId)
-    .eq("blocked_id", targetId);
-  if (error) {
-    console.error("[DELETE dm block] delete error:", error);
+  const ok = await unblockMember(db, userId, targetId);
+  if (!ok) {
+    console.error("[DELETE block] delete failed");
     return NextResponse.json({ error: "Failed to unblock this member." }, { status: 500 });
   }
   return NextResponse.json({ blocked: false });

@@ -10,6 +10,7 @@ import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
+import { isBlockedWithAny } from "@/lib/blocks/server";
 
 type EnrichedRow = Record<string, unknown> & {
   users: CommentAuthor | null;
@@ -134,6 +135,15 @@ export async function POST(
     // Only allow one level of nesting
     if (parent.parent_id) return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 422 });
     parentAuthorId = parent.user_id;
+  }
+
+  // A block closes this surface in both directions: the author of the thread
+  // (or of the comment being replied to) and the commenter must not interact.
+  if (await isBlockedWithAny(db, userId, [thread.user_id, parentAuthorId])) {
+    return NextResponse.json(
+      { error: "You can't interact with this member." },
+      { status: 403 },
+    );
   }
 
   const { data: inserted, error } = await db

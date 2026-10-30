@@ -62,6 +62,37 @@ export function renderWelcomeEmail({ name, appUrl }: WelcomeEmail): RenderedEmai
   });
 }
 
+export interface AccountDeletedEmail {
+  name: string;
+  appUrl: string;
+}
+
+export function renderAccountDeletedEmail({
+  name,
+  appUrl,
+}: AccountDeletedEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `Your ${APP_NAME} account has been deleted`,
+    preheader: "Your account and its content have been removed.",
+    heading: `Your account has been deleted, ${name}.`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: `This confirms that your ${APP_NAME} account has been deleted and the content tied to it has been removed, as described in our Privacy Policy. Community chat and direct messages that belonged to your account were removed as well.`,
+      },
+      {
+        kind: "paragraph",
+        text: "Some records, such as moderation and abuse reports, may be kept for legal and safety reasons. If you did not ask us to delete this account, contact hello@uxcommunity.in immediately.",
+      },
+      {
+        kind: "paragraph",
+        text: "You are welcome back any time — a new account can be created with the same email address.",
+      },
+    ],
+  });
+}
+
 export interface ResumeSignupEmail {
   name: string;
   link: string;

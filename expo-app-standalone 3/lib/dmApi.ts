@@ -273,6 +273,19 @@ export async function unblockUser(userId: string): Promise<void> {
   });
 }
 
+export interface BlockedMember {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  blocked_at: string;
+}
+
+/** Everyone the member has blocked, newest first. */
+export async function getBlockedUsers(): Promise<BlockedMember[]> {
+  const { data } = await apiFetch<{ blocked?: BlockedMember[] }>('/api/dm/blocks');
+  return data.blocked ?? [];
+}
+
 /** Report the member on the other side of a conversation (admin queue). */
 export async function reportDmConversation(
   conversationId: string,

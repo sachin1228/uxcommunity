@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
   let session;
   try {
     session = await timer.measure("auth", () =>
-      requireSession("user", { verifyActive: false }),
+      requireSession("user", { allowUnverified: true }),
     );
   } catch (error) {
     timer.finish({ status: (error as Response).status ?? 401 });

@@ -18,6 +18,7 @@ const ROWS: {
   href:
     | '/settings/profile'
     | '/settings/account'
+    | '/settings/blocked-accounts'
     | '/settings/notifications'
     | '/settings/email'
     | '/settings/connected-accounts'
@@ -50,6 +51,12 @@ const ROWS: {
     label: 'Account',
     description: 'Your email, password and sign-in details.',
     icon: 'key',
+  },
+  {
+    href: '/settings/blocked-accounts',
+    label: 'Blocked accounts',
+    description: 'People who cannot message or mention you.',
+    icon: 'slash',
   },
   {
     href: '/settings/notifications',

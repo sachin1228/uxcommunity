@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { appLink } from "./layout";
 import { renderEmail, type EmailBlock, type RenderedEmail } from "./document";
 import {
+  renderAccountDeletedEmail,
   renderCompanyVerificationEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
@@ -73,6 +74,10 @@ export async function sendPasswordResetEmail(
 
 export async function sendWelcomeEmail(to: string, name: string): Promise<void> {
   await send(to, renderWelcomeEmail({ name, appUrl: getAppUrl() }));
+}
+
+export async function sendAccountDeletedEmail(to: string, name: string): Promise<void> {
+  await send(to, renderAccountDeletedEmail({ name, appUrl: getAppUrl() }));
 }
 
 export async function sendVerificationCodeEmail(

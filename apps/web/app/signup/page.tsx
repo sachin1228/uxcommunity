@@ -63,6 +63,7 @@ function SignupInner() {
   // Step 1
   const [step1, setStep1] = useState({
     first_name: "", last_name: "", email: "", password: "", confirm_password: "",
+    age_confirmed: false, terms_accepted: false,
   });
   const [step1Loading,     setStep1Loading]     = useState(false);
   const [step1Error,       setStep1Error]       = useState<string | null>(null);
@@ -136,6 +137,8 @@ function SignupInner() {
       email: step1.email,
       password: step1.password,
       confirm_password: step1.confirm_password,
+      age_confirmed: step1.age_confirmed,
+      terms_accepted: step1.terms_accepted,
     };
   }
 
@@ -148,6 +151,8 @@ function SignupInner() {
       const issues: Record<string, string[]> = {};
       if (!step1.first_name.trim()) issues.first_name = ["Name is required."];
       if (!step1.last_name.trim())  issues.last_name  = ["Surname is required."];
+      if (!step1.age_confirmed)     issues.age_confirmed = ["You must confirm that you are 18 or older."];
+      if (!step1.terms_accepted)    issues.terms_accepted = ["Please accept the Terms, Community Guidelines and Privacy Policy."];
       if (Object.keys(issues).length) {
         setStep1FieldErrors(issues);
         return;

@@ -11,7 +11,7 @@ import { loadDmUnreadTotal } from "@/lib/direct-messages/server";
 export async function GET() {
   let session;
   try {
-    session = await requireSession("user", { verifyActive: false });
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

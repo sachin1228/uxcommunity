@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   let session;
   try {
-    session = await requireSession("user", { verifyActive: false });
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

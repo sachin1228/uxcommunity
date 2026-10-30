@@ -9,6 +9,8 @@ interface Step1State {
   email: string;
   password: string;
   confirm_password: string;
+  age_confirmed: boolean;
+  terms_accepted: boolean;
 }
 
 interface SignupStep1Props {
@@ -145,6 +147,61 @@ export function SignupStep1({
             </button>
           </div>
           <FieldError errors={fieldErrors} field="confirm_password" />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={state.age_confirmed}
+              onChange={(e) => onChange({ age_confirmed: e.target.checked })}
+              className="ux-check mt-0.5"
+            />
+            <span className="font-body text-xs leading-[1.5] text-foreground">
+              I confirm that I am 18 years or older.
+            </span>
+          </label>
+          <FieldError errors={fieldErrors} field="age_confirmed" />
+
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={state.terms_accepted}
+              onChange={(e) => onChange({ terms_accepted: e.target.checked })}
+              className="ux-check mt-0.5"
+            />
+            <span className="font-body text-xs leading-[1.5] text-foreground">
+              I agree to the{" "}
+              <a
+                href="https://uxcommunity.in/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                Terms of Service
+              </a>
+              ,{" "}
+              <a
+                href="https://uxcommunity.in/community-guidelines"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                Community Guidelines
+              </a>{" "}
+              and{" "}
+              <a
+                href="https://uxcommunity.in/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                Privacy Policy
+              </a>
+              .
+            </span>
+          </label>
+          <FieldError errors={fieldErrors} field="terms_accepted" />
         </div>
 
         <PendingButton type="submit" pending={loading} pendingLabel="Creating account…" spinnerSize={16}

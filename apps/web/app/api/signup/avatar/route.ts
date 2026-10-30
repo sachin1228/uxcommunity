@@ -150,6 +150,22 @@ export async function POST(request: NextRequest) {
 
   const userId = data[0].user_id as string;
 
+  // Record eligibility and consent on the account itself. The request was
+  // rejected above unless both flags were true; the timestamps are the durable
+  // proof of what was accepted and when.
+  const acceptedAt = new Date().toISOString();
+  const { error: consentError } = await db
+    .from("users")
+    .update({
+      age_confirmed_at: acceptedAt,
+      terms_accepted_at: acceptedAt,
+    })
+    .eq("id", userId);
+  if (consentError) {
+    // Never fail a created account on this write; surface it for follow-up.
+    console.error("[signup/avatar] consent record error:", consentError);
+  }
+
   // The account exists now — clear the email from the incomplete-signups view.
   // Best-effort: the account is already created, so a tracking failure is silent.
   await markSignupCompleted(identity.email, userId);

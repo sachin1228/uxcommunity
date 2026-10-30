@@ -28,7 +28,7 @@ export default async function DashboardLayout({
   const [{ data: user }, { data: profile }, graceDays] = await Promise.all([
     db
       .from("users")
-      .select("name, email, verification_status, created_at")
+      .select("name, email, is_blocked, verification_status, created_at")
       .eq("id", session.userId!)
       .maybeSingle(),
     db
@@ -40,6 +40,12 @@ export default async function DashboardLayout({
       .maybeSingle(),
     getVerificationGraceDays(),
   ]);
+
+  // A deleted or blocked account must not render the dashboard shell. Clearing
+  // the stale cookie needs a route handler, so hand off before using identity.
+  if (!user || user.is_blocked) {
+    redirect("/api/auth/session-ended");
+  }
 
   const name = user?.name ?? session.email ?? "User";
   const email = user?.email ?? session.email ?? "";

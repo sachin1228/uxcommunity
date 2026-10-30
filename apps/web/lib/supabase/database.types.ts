@@ -2943,6 +2943,7 @@ export type Database = {
       };
       users: {
         Row: {
+          age_confirmed_at: string | null;
           application_id: string | null;
           created_at: string;
           email: string;
@@ -2951,6 +2952,7 @@ export type Database = {
           is_blocked: boolean;
           name: string;
           password_hash: string;
+          terms_accepted_at: string | null;
           updated_at: string;
           verification_notified_at: string | null;
           verification_reapply_at: string | null;
@@ -2959,6 +2961,7 @@ export type Database = {
           verification_status: string;
         };
         Insert: {
+          age_confirmed_at?: string | null;
           application_id?: string | null;
           created_at?: string;
           email: string;
@@ -2967,6 +2970,7 @@ export type Database = {
           is_blocked?: boolean;
           name: string;
           password_hash: string;
+          terms_accepted_at?: string | null;
           updated_at?: string;
           verification_notified_at?: string | null;
           verification_reapply_at?: string | null;
@@ -2975,6 +2979,7 @@ export type Database = {
           verification_status?: string;
         };
         Update: {
+          age_confirmed_at?: string | null;
           application_id?: string | null;
           created_at?: string;
           email?: string;
@@ -2983,6 +2988,7 @@ export type Database = {
           is_blocked?: boolean;
           name?: string;
           password_hash?: string;
+          terms_accepted_at?: string | null;
           updated_at?: string;
           verification_notified_at?: string | null;
           verification_reapply_at?: string | null;

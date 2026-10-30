@@ -5,6 +5,7 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { notificationRealtimeEvent } from "@/lib/notifications-realtime";
 import { sendActivityPush } from "@/lib/push/activity";
+import { isBlockedWith } from "@/lib/blocks/server";
 import { logEvent } from "@/lib/observability/log";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -54,6 +55,8 @@ export type NotificationEntityType =
   | "event"
   | "job"
   | "community"
+  | "message"
+  | "profile"
   | "verification";
 
 /** The content kinds a removal notice can be about, and how it names them. */
@@ -264,6 +267,11 @@ export function deferNotification(input: DeferredNotificationInput) {
   after(async () => {
     try {
       const db = createServiceClient();
+      // A block is a boundary in both directions: nothing a blocked member
+      // does should reach the other's notification list.
+      if (input.actorId && (await isBlockedWith(db, input.userId, input.actorId))) {
+        return;
+      }
       const actorName = input.actorId
         ? await getActorName(db, input.actorId)
         : "Someone";

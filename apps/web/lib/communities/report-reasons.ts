@@ -30,19 +30,58 @@ export const REPORT_REASON_VALUES: ReadonlySet<string> = new Set(
 /** The optional explanation the reporter can add — 1000 characters. */
 export const REPORT_DETAILS_MAX_LENGTH = 1000;
 
-/** The four kinds of content a member can report. */
+/** The four kinds of POST that use the content_reports removal queue. */
 export const REPORT_CONTENT_TYPES = ["thread", "showcase", "resource", "event"] as const;
 
 export type ReportableContentType = (typeof REPORT_CONTENT_TYPES)[number];
 
 export const REPORT_CONTENT_TYPE_VALUES: ReadonlySet<string> = new Set(REPORT_CONTENT_TYPES);
 
+/** Comments, chat messages and profiles use the interaction report queue. */
+export const INTERACTION_REPORT_TYPES = [
+  "thread_comment",
+  "showcase_comment",
+  "resource_comment",
+  "event_comment",
+  "community_message",
+  "profile",
+] as const;
+
+export type InteractionReportType = (typeof INTERACTION_REPORT_TYPES)[number];
+
+export const INTERACTION_REPORT_TYPE_VALUES: ReadonlySet<string> = new Set(
+  INTERACTION_REPORT_TYPES,
+);
+
+/** Every reportable kind, for the shared report modal's copy. */
+export type ReportType = ReportableContentType | InteractionReportType;
+
+export function isInteractionReportType(value: string): value is InteractionReportType {
+  return INTERACTION_REPORT_TYPE_VALUES.has(value);
+}
+
+export const CONTENT_REPORT_ENDPOINT = "/api/content-reports";
+export const INTERACTION_REPORT_ENDPOINT = "/api/interaction-reports";
+
+/** Posts go to the removal queue; comments/messages/profiles to the other. */
+export function reportEndpointFor(contentType: ReportType): string {
+  return isInteractionReportType(contentType)
+    ? INTERACTION_REPORT_ENDPOINT
+    : CONTENT_REPORT_ENDPOINT;
+}
+
 /** How each reported kind is named in copy ("your thread", "this event"). */
-export const REPORT_CONTENT_LABELS: Record<ReportableContentType, string> = {
+export const REPORT_CONTENT_LABELS: Record<ReportType, string> = {
   thread: "thread",
   showcase: "showcase post",
   resource: "resource",
   event: "event",
+  thread_comment: "comment",
+  showcase_comment: "comment",
+  resource_comment: "comment",
+  event_comment: "comment",
+  community_message: "message",
+  profile: "profile",
 };
 
 /** The label for a stored reason, falling back to the raw id for old rows. */

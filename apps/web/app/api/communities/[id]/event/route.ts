@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   let session;
-  try { session = await requireSession("user", { verifyActive: false }); } catch (e) { return e as Response; }
+  try { session = await requireSession("user", { allowUnverified: true }); } catch (e) { return e as Response; }
 
   const { id } = await params;
   const userId = (session as { userId: string }).userId;

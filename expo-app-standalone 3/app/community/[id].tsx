@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ContentNotificationCard } from '@/components/chat/ContentNotificationCard';
 import { ContentActionsSheet } from '@/components/chat/ContentActionsSheet';
+import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, ChatComposerHandle, PendingImage } from '@/components/chat/ChatInput';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
@@ -369,6 +370,7 @@ export default function CommunityChat() {
    */
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [reportMessage, setReportMessage] = useState<Message | null>(null);
   /** The "created a …" card a long-press opened the actions sheet for. */
   const [selectedContent, setSelectedContent] = useState<ChatContentEvent | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
@@ -1645,6 +1647,18 @@ export default function CommunityChat() {
           setEditingMessage(msg);
         }}
         onDelete={handleDelete}
+        onReport={(msg) => {
+          setSelectedMessage(null);
+          setReportMessage(msg);
+        }}
+      />
+
+      <ContentReportModal
+        visible={reportMessage !== null}
+        contentType="community_message"
+        contentId={reportMessage?.id ?? ''}
+        onClose={() => setReportMessage(null)}
+        onReported={() => setReportMessage(null)}
       />
 
       {/* Long-press action sheet for a "created a …" card — reactions + reply

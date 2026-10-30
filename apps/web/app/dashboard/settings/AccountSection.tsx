@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
+import { Modal } from "@/components/ui/Modal";
 
 interface AccountSectionProps {
   email: string;
@@ -20,9 +22,54 @@ interface AccountSectionProps {
  * mail — and reports the server's own message inline.
  */
 export function AccountSection({ email, memberSince }: AccountSectionProps) {
+  const router = useRouter();
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function closeDeleteDialog() {
+    if (deleting) return;
+    setDeleteOpen(false);
+    setDeletePassword("");
+    setDeleteConfirmation("");
+    setDeleteError(null);
+  }
+
+  async function deleteAccount() {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: deletePassword,
+          confirmation: deleteConfirmation,
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: string }
+        | null;
+
+      if (!res.ok || !body?.success) {
+        setDeleteError(body?.error ?? "Your account could not be deleted. Please try again.");
+        return;
+      }
+
+      router.replace("/login?account=deleted");
+    } catch {
+      setDeleteError("Your account could not be deleted. Check your connection and try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function sendResetLink() {
     if (sending) return;
@@ -101,7 +148,92 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
             </p>
           )}
         </div>
+
+        <div className="border-t border-border pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-body text-xs font-medium text-foreground">Delete account</p>
+              <p className="mt-0.5 font-body text-xs text-foreground-muted">
+                Permanently remove your account and content.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              className="modal-btn modal-btn-danger-soft shrink-0"
+            >
+              Delete account
+            </button>
+          </div>
+        </div>
       </div>
+
+      <Modal open={deleteOpen} onClose={closeDeleteDialog} title="Delete account">
+        <div className="flex flex-col gap-4">
+          <p className="font-body text-sm leading-relaxed text-foreground-muted">
+            This permanently deletes your profile, posts, comments, community
+            messages, direct messages (for both participants), applications and
+            uploaded files. It cannot be undone.
+          </p>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="font-body text-xs font-medium text-foreground">
+              Your password
+            </span>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              className="field w-full"
+              autoComplete="current-password"
+              disabled={deleting}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="font-body text-xs font-medium text-foreground">
+              Type <span className="font-mono">DELETE</span> to confirm
+            </span>
+            <input
+              type="text"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              className="field w-full"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={deleting}
+            />
+          </label>
+
+          {deleteError && (
+            <p className="font-body text-xs text-red-400" role="alert">
+              {deleteError}
+            </p>
+          )}
+
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeDeleteDialog}
+              disabled={deleting}
+              className="modal-btn modal-btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void deleteAccount()}
+              disabled={
+                deleting || deletePassword.length === 0 || deleteConfirmation !== "DELETE"
+              }
+              className="modal-btn modal-btn-danger"
+            >
+              {deleting && <Spinner size={13} />}
+              {deleting ? "Deleting…" : "Delete account"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }
