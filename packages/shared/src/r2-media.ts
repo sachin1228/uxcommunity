@@ -142,6 +142,7 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "job_titles.image_url": "job_title",
   "job_titles.lottie_url": "job_title",
   "community_messages.image_url": "message",
+  "dm_messages.image_url": "direct_message",
   "event_comments.image_url": "event_comment",
   "community_events.cover_image_url": "event",
   "community_showcase_posts.image_url": "showcase",
