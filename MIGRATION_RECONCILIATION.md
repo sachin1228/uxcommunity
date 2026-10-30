@@ -10,7 +10,9 @@
 
 ## 1. Executive summary
 
-Production is a **brownfield, manually applied database**, not a replay of the repository migration chain. The current `supabase_migrations.schema_migrations` records only five versions. The repository now has **216 migration files / 204 unique versions**. Only **two versions match** the production ledger; three remote versions have no local file; 214 local files are unrecorded (202 unique local versions).
+Production is a **brownfield, manually applied database**, not a replay of the repository migration chain. The current `supabase_migrations.schema_migrations` records only five versions. The repository now has **216 migration files / 204 unique versions**. Only **two versions match** the production ledger by version string; 214 local files are unrecorded (202 unique local versions).
+
+The three remote-only versions were retrieved with `supabase migration fetch --linked` into a **temporary directory** (no production write). They are **not unknown migrations**: each is an earlier/rebadged copy of a local migration. Their content differs only by comments/extra semicolons, or is the same executable SQL under a different header. No production ledger repair was attempted.
 
 The launch-critical fresh-chain defect is fixed in this branch:
 
@@ -28,12 +30,20 @@ The launch-critical fresh-chain defect is fixed in this branch:
 | Version | Local file? | Notes |
 |---|---|---|
 | `001` | `001_password_resets.sql` | Matches. |
-| `20261005140518` | **No local file** | Remote-only; SQL content/unknown. Obtain before baselining. |
-| `20261008145053` | **No local file** | Remote-only; SQL content/unknown. |
-| `20261012205406` | **No local file** | Remote-only; SQL content/unknown. |
+| `20261005140518` | No exact local filename | Fetched: `report_review_and_undo`, equivalent to local `20261005140000_report_review_and_undo.sql`; diff is comments + one extra semicolon. Effects present (`content_removals`, `report_groups`, undo). |
+| `20261008145053` | No exact local filename | Fetched: `drop_general_community`, equivalent to local `20261008130000_drop_general_community.sql`; diff is one extra semicolon. |
+| `20261012205406` | No exact local filename | Fetched: `community_message_compound_cursor`, equivalent to local `20261013100000_community_message_compound_cursor.sql`; executable SQL matches; fetched header says applied from the local timestamp. Effects present (compound function/index). |
 | `20261023120000` | `20261023120000_fcm_tokens.sql` | Matches. |
 
-**Counts:** 216 local files; 204 unique local versions; 2 matched; **214 local files / 202 unique versions unrecorded**; **3 remote-only** versions.
+**Counts:** 216 local files; 204 unique local versions; 2 matched by version; **214 local files / 202 unique versions unrecorded**; **3 remote-only versions, all mapped to local equivalents**. The remote-only versions do not need to be invented or applied; they are historical aliases of local migrations.
+
+## 2.1 Remote-only mapping (fetched read-only, temp only)
+
+| Remote version | Fetched name | Local equivalent | Executable difference | Production effect verified |
+|---|---|---|---|---|
+| `20261005140518` | `report_review_and_undo` | `20261005140000_report_review_and_undo.sql` | comments; extra `;` | `content_removals` and `report_groups` exist live. |
+| `20261008145053` | `drop_general_community` | `20261008130000_drop_general_community.sql` | extra `;` | general community was retired; schema objects exist. |
+| `20261012205406` | `community_message_compound_cursor` | `20261013100000_community_message_compound_cursor.sql` | header/comments; same SQL body | live `get_community_message_page` has `p_before_id`/`p_after_id` and the compound index. |
 
 ## 3. Duplicate timestamps
 
@@ -64,7 +74,9 @@ New migrations in this branch use unique `20261031…` timestamps. Do not rename
 | `apply_to_job_with_resume` | Absent | New 20261031140000 | Apply before deploying the transactional apply route. |
 | `verification_settings.grace_days` | `2` | Policy A ignores it for writes | Product decision: leave legacy value or set to 0 with approval; no code change required. |
 
-**Verified schema checks performed live (read-only):** table inventory, RLS flags, 20 policies, default ACL, sensitive-table ACLs, audit/appeal/auth-session tables, reporter `SET NULL` FKs, moderation audit trigger, source `get_resource_list_aggregates` definition, live `get_resource_list_page` body, and `supabase_realtime` publication (empty). The full row-level schema diff for all 216 migrations was not possible without a staging clone; this is the main remaining reconciliation step.
+**Verified schema checks performed live (read-only):** 91 public tables/views, RLS flags, 20 policies, default ACL, sensitive-table ACLs, audit/appeal/auth-session tables, reporter `SET NULL` FKs, moderation audit trigger, source `get_resource_list_aggregates` definition (still 6 columns in production), live `get_resource_list_page` body, and `supabase_realtime` publication (empty).
+
+**Object inventory comparison:** the live object list is consistent with the repository's `create table/view` statements plus `schema.sql`, the retired objects, and the one manual repair artifact `moderation_audit_log_legacy_20261030`. A name-only comparison flags some retired/supabase-only objects; it is not a substitute for a column-level staging diff. The full column/constraint/trigger diff for all 216 migrations was **not completed**; a real Supabase staging clone is required. Production schema access was available, but a full schema diff without a controlled staging environment is incomplete.
 
 ## 5. Fresh-database strategy
 
@@ -91,18 +103,33 @@ Apply in this order, one file at a time, transactionally where indicated:
 
 **Do not re-run** `20261030220000_complete_moderation_system.sql` or `20261030230000_preserve_moderation_evidence.sql` against production: production is already in the repaired state (new audit table + renamed legacy table). They are safe only on a pre-repair database with the legacy table renamed first; see the verified sequence in `PRODUCTION_APPROVAL_CHECKLIST.md`.
 
+**Also do not re-run** `20260814030000_community_list_aggregate_rpcs.sql` after `20261031110000_fix_resource_list_aggregates.sql`: its restored fresh-install form creates the 6-column function and would overwrite the 7-column production definition. It is in the chain for fresh databases only. `20260911160000_resource_allow_replies.sql` is additive (`add column if not exists`) but not needed on production.
+
+
+### Known failure / do-not-rerun list
+
+- `20260814030000_community_list_aggregate_rpcs.sql` — do not rerun after `20261031110000`; it creates the old 6-column function.
+- `20261030220000_complete_moderation_system.sql` — do not rerun against a legacy `moderation_audit_log`; production is already repaired. Against the new table it is not guaranteed idempotent because of FK/constraint history.
+- `20261030230000_preserve_moderation_evidence.sql` — do not rerun; it is part of the repair sequence and assumes the new table exists.
+- The three remote-only ledger aliases (`20261005140518`, `20261008145053`, `20261012205406`) — do not re-apply; they are historical aliases of local migrations.
+- Destructive/historical migrations (drop-table/delete-data drops such as `20261008140000`, `20261008130000`, `20261021140000`) — do not apply as a batch; they belong to fresh-install history only and may delete data if replayed.
+- Any migration that creates a function must explicitly revoke PUBLIC/anon/authenticated and grant service_role. PostgreSQL default privileges cannot remove a new function’s built-in PUBLIC EXECUTE.
+- Duplicate timestamp groups are unsafe for `db push`; use the controlled SQL-editor/ledger path until a staging baseline is approved.
+
 **Deployment order:** migrations first, then web Worker, then realtime Worker. The app expects the new RPCs/columns/audit actions immediately after the web deploy; deploying web before the migrations would break signup, job apply, content reports and audit writes.
+
+**Dependency/order notes:** `20260814030000` → `20260911160000` → `20261031110000` (resource RPC); `20261030210000` → `20261030220000`/`20261030230000` (sessions → moderation → evidence); `20261031120000` depends on the audit table/action check; `20261031150000` depends on `20261030220000`/`20261030230000`; `20261031140000` depends on job tables; permission migrations should run before deploying code that expects the new columns/RPCs. The eight newly added migrations are the only ones required for this remediation; the other local files are historical/brownfield and must not be applied as a batch.
 
 **Migration history baseline:** after a schema diff against a staging clone, choose one of:
 - keep the current controlled SQL-editor process and record applied versions in the repository ledger (preferred while backup/history remains brownfield); or
-- after approval, use `supabase migration repair --status applied <version>` for the verified set and obtain the SQL of the three remote-only versions. Never insert 202 versions speculatively; never run `db push` against production in this state.
+- after approval, use `supabase migration repair --status applied <version>` for the verified set. The three remote-only versions are already fetched/mapped and do not need to be invented. Never insert 202 versions speculatively; never run `db push` against production in this state.
 
 **Rollback:** keep a pre-change dump and the old 6-column function definition. The moderation repair is rename-based and preserves the legacy table; do not drop it. RPC/column migrations are additive or function-only; a forward fix is safer than a destructive downgrade. If a migration fails partway, stop, restore from the approved dump, and re-run from the last verified file.
 
 ## 7. Upgrade behavior and verification plan
 
 - **Local fresh chain:** 216 migrations applied; integrity/permission/evidence tests pass (see `STAGING_TEST_RESULTS.md`).
-- **Staging upgrade clone:** **NOT RUN** — no staging project was available/confirmed. This is the next required step before production.
+- **Staging upgrade clone:** **NOT RUN** — no staging project was available/confirmed. This is the next required step before production. The three remote-only aliases are mapped above; the remaining 202 unrecorded unique versions still need a column-level diff.
 - **Production upgrade:** **NOT RUN** — approval required.
 - Post-apply verification SQL: confirm the 7-column function result, `users.terms_version`, `content_reports.target_snapshot`, `apply_to_job_with_resume`, `moderation_appeals.user_deleted_at`, zero client grants, service-role access, and one audit insert with a new action.
 - Data preservation: all new migrations are additive or function-only; `moderation_appeals` FK changes preserve rows; `moderation_audit_log` is append-only; `content_reports` rows are untouched except for the new column default.

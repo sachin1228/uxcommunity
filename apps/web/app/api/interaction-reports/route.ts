@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
       `interaction-report:${targetType}:${userId}`,
       10,
       3600,
+      { failClosed: true },
     );
     if (!targetLimit.success) {
       return NextResponse.json(

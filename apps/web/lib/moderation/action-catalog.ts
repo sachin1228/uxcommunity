@@ -86,4 +86,6 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   delete_community: "Deleted the community",
   toggle_job: "Changed job status",
   delete_job: "Deleted the job",
+  delete_event: "Deleted the event",
+  review_verification: "Reviewed a verification request",
 };

@@ -40,7 +40,7 @@ export async function POST(
 
   const db = createServiceClient();
   const [limitResult, access] = await Promise.all([
-    rateLimit(`dm:request:${userId}:60s`, 30, 60),
+    rateLimit(`dm:request:${userId}:60s`, 30, 60, { failClosed: true }),
     loadDmConversationForUser(db, conversationId, userId),
   ]);
   if (!limitResult.success) {

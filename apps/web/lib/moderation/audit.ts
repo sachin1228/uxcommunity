@@ -37,6 +37,8 @@ export const MODERATION_AUDIT_ACTIONS = [
   "delete_community",
   "toggle_job",
   "delete_job",
+  "delete_event",
+  "review_verification",
 ] as const;
 
 export type ModerationAuditAction = (typeof MODERATION_AUDIT_ACTIONS)[number];

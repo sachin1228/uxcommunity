@@ -28,7 +28,7 @@ Production-readiness remediation branch:
 - transactional resume attachment, reject public verification URLs, strip resume keys
 - event schedule validation, attendee cancellation notices, report visibility/caps
 
-Tests: web tsc, 1,070 web unit tests, isolated production build, website build,
+Tests: web tsc, 1,080 web unit tests, isolated production build, website build,
 mobile tsc + realtime/cache/signup tests, local 216-migration DB suites.
 No production deploy/migration/R2/secret change was performed.
 Backup/DR is deferred to a separate task.
@@ -47,6 +47,10 @@ Backup/DR is deferred to a separate task.
 - Run during a low-write window; use one SQL editor/psql session per file; stop on the first error.
 - **Do not run `supabase db push` or `db reset`.**
 - **Do not re-run** `20261030220000_complete_moderation_system.sql` or `20261030230000_preserve_moderation_evidence.sql`; production is already in the repaired state (new `moderation_audit_log` + `moderation_audit_log_legacy_20261030`, both 0 rows).
+
+**Do not re-run** `20260814030000_community_list_aggregate_rpcs.sql` after `20261031110000_fix_resource_list_aggregates.sql`; its restored fresh-install form would overwrite the 7-column production function. It is for fresh databases only.
+
+The three remote-only ledger versions (`20261005140518`, `20261008145053`, `20261012205406`) were fetched read-only into a temp directory and mapped to local equivalents in `MIGRATION_RECONCILIATION.md`; do not insert ledger records or re-apply them.
 
 | # | File | Purpose | Reversible? |
 |---|---|---|---|
@@ -78,11 +82,45 @@ select column_name from information_schema.columns
  where table_schema='public' and table_name='moderation_appeals' and column_name='user_deleted_at';
 select proname from pg_proc where proname in ('complete_signup_with_consent','apply_to_job_with_resume');
 
--- 3. no client grants on public tables
-select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
- where n.nspname='public' and c.relkind in ('r','p')
-   and (has_table_privilege('anon',c.oid,'SELECT') or has_table_privilege('authenticated',c.oid,'SELECT'));
+-- 3. scoped sensitive-table denylist (do NOT assert a blanket zero)
+with sensitive(name) as (
+  values ('content_reports'), ('content_removals'), ('fcm_tokens'),
+         ('account_verification_requests'), ('verification_email_codes'),
+         ('verification_settings'), ('member_resumes')
+)
+select count(*) from pg_class c
+ join pg_namespace n on n.oid = c.relnamespace
+ join sensitive s on s.name = c.relname
+where n.nspname = 'public' and c.relkind in ('r','p')
+  and (has_table_privilege('anon', c.oid, 'SELECT')
+       or has_table_privilege('authenticated', c.oid, 'SELECT'));
 -- expect 0
+
+with sensitive(name) as (
+  values ('content_reports'), ('content_removals'), ('fcm_tokens'),
+         ('account_verification_requests'), ('verification_email_codes'),
+         ('verification_settings'), ('member_resumes')
+)
+select count(*) from pg_class c
+ join pg_namespace n on n.oid = c.relnamespace
+ join sensitive s on s.name = c.relname
+where n.nspname = 'public' and c.relkind in ('r','p')
+  and has_table_privilege('service_role', c.oid, 'SELECT');
+-- expect 7
+
+-- 3b. default-ACL probes (transaction + cleanup; staging test covers this)
+-- create table public.__acl_probe(id int);
+-- anon/authenticated SELECT = false; service_role SELECT = true
+-- create function public.__acl_fn_probe() returns int language sql as 'select 1';
+-- service_role EXECUTE = true; anon EXECUTE is STILL true by PostgreSQL built-in
+-- PUBLIC EXECUTE. Default privileges cannot remove that built-in. Every
+-- sensitive function migration must explicitly revoke PUBLIC/anon/auth and
+-- grant service_role; the regression test checks a representative RPC.
+
+-- 3c. intentional public-read allowlist
+-- Current allowlist is EMPTY (the app is service-role-only). A future public
+-- table must be granted explicitly; the default ACL will not grant it. The
+-- test creates an explicit anon read policy + grant fixture to prove that path.
 
 -- 4. service role still works
 select has_table_privilege('service_role','public.community_messages','SELECT'); -- true
@@ -91,7 +129,7 @@ select has_table_privilege('service_role','public.community_messages','SELECT');
 select pg_get_constraintdef(oid) from pg_constraint
  where conrelid='public.moderation_audit_log'::regclass
    and conname='moderation_audit_log_action_check';
--- expect 'delete_user', 'review_dm_report', 'toggle_community' among the values
+-- expect 'delete_user', 'review_dm_report', 'toggle_community', 'delete_event', 'review_verification' among the values
 
 -- 6. appeals retention
 select is_nullable from information_schema.columns
@@ -217,11 +255,12 @@ The file `apps/web/.open-next/cloudflare/next-env.mjs` (gitignored, untracked, m
 
 ## 6. Verification policy and existing accounts
 
-- Policy A is enforced by the deployed code; no production setting change is required.
+- **Policy A is implemented in the remediation branch and locally verified. Production enforcement begins only after the relevant code is deployed.** It is not active in production today.
 - `verification_settings.grace_days` remains 2 and is now **inert** for writes/banner. Optional clarity change (approval): `update public.verification_settings set grace_days = 0 where id is true;` — data change, no schema change.
-- Existing accounts: production has **2 users; 1 has NULL `terms_accepted_at`/`age_confirmed_at`**. Do not back-fill or fabricate timestamps. Decide:
-  - **(a)** if the two accounts are test-only: delete them under the approved data plan before launch; or
-  - **(b)** keep them: add a re-consent gate/flow and have each accept the current policy; no bulk update.
+- Existing accounts: production has **2 users; 1 has NULL `terms_accepted_at`/`age_confirmed_at`**. Do not back-fill or fabricate timestamps. Recommended safe approach:
+  - Add a post-authentication `consent_required` gate that redirects only affected accounts to a consent page; record `terms_version`, `terms_accepted_at` and `age_confirmed_at` only when the member actively accepts. Keep logout, export and account deletion available while consent is pending; block new writes.
+  - If the two accounts are test-only, delete them under the approved data plan instead.
+  - No bulk update without a signed product/data decision.
 - Production content is test-seeded (2 users, 42 communities, 68 messages, 1 event, 1 DM, 1 saved resume, 0 jobs/reports). Confirm which communities are official and remove test content under a written data plan.
 
 **Approval required:** yes (product/data decision).
@@ -232,10 +271,14 @@ The file `apps/web/.open-next/cloudflare/next-env.mjs` (gitignored, untracked, m
 
 1. **Turnstile / CAPTCHA is not implemented.** Policy A blocks most writes, but open signup still permits account creation, likes, reports and account/verification actions. If required before launch, add Cloudflare Turnstile site/secret, server-side `siteverify` (fail closed), web/mobile widgets, and staging tests. Do not enable enforcement until keys/rollout are approved.
 2. **DM-origin suspend/ban has no signed appeal token.** The member is told to email `hello@uxcommunity.in`; the signed appeal system is report-scoped. Decide whether to auto-create a profile report for DM bans or accept the support-email path.
-3. **Admin audit coverage is not exhaustive.** Admin event deletion and verification decisions are not written to `moderation_audit_log`; direct user suspend/lift UI is not added. Add before launch if the policy requires “every moderator decision.”
+3. **Admin audit route-level verification is incomplete.** Admin event deletion and verification decisions are wired to `moderation_audit_log`, but only a static/action-contract test exists; no staging route E2E. Direct user suspend/lift UI and some non-moderation admin edits remain outside the audited set. Add before launch if the policy requires “every moderator decision.”
 4. **CSP is report-only; cookie domain remains `.uxcommunity.in`.** CSRF checking is live in code; a strict CSP/host-only cookie/realtime-token redesign is future hardening.
 5. **Event comments/likes/chat after end, event lifecycle FCM/preferences/quiet hours, mobile event push routing, notification dedupe, mobile private-verification disk cache, mobile appeals screen, mobile legal links** remain deferred (documented in the remediation report).
 6. **Backup/DR** remains out of scope and unaddressed. Do not apply production migrations until the separate backup task is complete or an approved one-off recoverable dump exists.
+7. **Android production signing is not configured.** `android/app/build.gradle` uses `signingConfigs.debug` for release; `app.json` Android package is `in.uxcommunity.app`, versionCode 1/versionName 1.0.0, scheme `uxcommunity`; iOS bundle identifier is still `com.sachinpatil1228.myapp`. A production upload keystore, release signing config/EAS credentials, FCM `google-services.json` validation, API/realtime env verification, deep-link host review and Play Console review are required. Do not generate or replace keys here.
+8. **Verification owner keys:** the owner GET returns raw `work_sample_keys` because the resubmit form needs them; admin responses strip keys. Keys alone do not authorize reads (private bucket/signed URL). Legacy rows still return public URLs. Accepted for this branch; reassess if the policy forbids owner key exposure.
+9. **CSP/cookies:** CSP remains report-only; the session cookie must stay `.uxcommunity.in` for the current realtime cookie handshake. Enforcing CSP or narrowing the cookie requires nonce/script work and a realtime token redesign, tested in staging.
+10. **Turnstile:** not implemented; open signup remains a bot-risk decision. Implement siteverify (hostname/action, single-use, expired/invalid/missing tests) and web/mobile widgets if required; do not enable until approved.
 
 ---
 

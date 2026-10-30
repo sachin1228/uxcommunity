@@ -129,8 +129,8 @@ export async function POST(request: NextRequest) {
   // are limited. The per-member window is the effective one for a member
   // retrying a code; the IP window blunts a scripted run.
   const [perUser, perIp] = await Promise.all([
-    rateLimit(`company-verification:${userId}`, 5, 3600),
-    rateLimit(`company-verification-ip:${ip}`, 10, 3600),
+    rateLimit(`company-verification:${userId}`, 5, 3600, { failClosed: true }),
+    rateLimit(`company-verification-ip:${ip}`, 10, 3600, { failClosed: true }),
   ]);
   if (!perUser.success || !perIp.success) {
     return NextResponse.json(

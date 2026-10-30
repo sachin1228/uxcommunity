@@ -19,6 +19,13 @@ alter default privileges for role postgres in schema public
 alter default privileges for role postgres in schema public
   revoke all on sequences from public, anon, authenticated;
 
+-- Scope note: PostgreSQL gives every new function EXECUTE to PUBLIC as a
+-- built-in default. ALTER DEFAULT PRIVILEGES cannot remove that built-in
+-- PUBLIC grant; it can only remove the project-level anon/authenticated
+-- defaults and add the service_role grant. Every function migration must
+-- still explicitly REVOKE EXECUTE FROM PUBLIC, anon, authenticated and GRANT
+-- it to service_role. The permission test checks representative sensitive
+-- RPCs, not a false guarantee about every future function.
 alter default privileges for role postgres in schema public
   revoke all on functions from public, anon, authenticated;
 
@@ -31,6 +38,12 @@ alter default privileges for role postgres in schema public
 alter default privileges for role postgres in schema public
   grant usage, select on sequences to service_role;
 
+-- New RPCs are created by migrations and called by the service-role client.
+-- Revoking PUBLIC's default EXECUTE without this grant would make every new
+-- function inaccessible to the app until a migration explicitly granted it.
+alter default privileges for role postgres in schema public
+  grant execute on functions to service_role;
+
 do $default_privileges$
 begin
   begin
@@ -40,6 +53,10 @@ begin
              revoke all on sequences from public, anon, authenticated';
     execute 'alter default privileges for role supabase_admin in schema public
              revoke all on functions from public, anon, authenticated';
+    execute 'alter default privileges for role supabase_admin in schema public
+             grant select, insert, update, delete on tables to service_role';
+    execute 'alter default privileges for role supabase_admin in schema public
+             grant execute on functions to service_role';
   exception
     when insufficient_privilege then
       raise notice 'supabase_admin default privileges need a platform-privileged change';

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth/session";
+import { requireSession, type SessionPayload } from "@/lib/auth/session";
+import { recordAdminAudit } from "@/lib/moderation/admin-audit";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   deferNotification,
@@ -36,13 +37,13 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  let session;
+  let session: SessionPayload;
   try {
     session = await requireSession("admin");
   } catch (error) {
     return error as Response;
   }
-  const adminId = session.userId!;
+  const adminId = session.userId ?? null;
 
   const { id } = await params;
   if (!UUID_PATTERN.test(id)) {
@@ -77,6 +78,27 @@ export async function DELETE(
   }
 
   if (removal.removed) {
+    try {
+      await recordAdminAudit(db, session, {
+        action: "delete_event",
+        targetType: "event",
+        targetId: id,
+        subjectUserId: event.user_id,
+        previousState: {
+          title: event.title,
+          community_id: communityId,
+        },
+        newState: { deleted: true },
+        reason: "admin_delete",
+      });
+    } catch (auditError) {
+      console.error("[admin/events] audit failed:", auditError);
+      return NextResponse.json(
+        { error: "Event was deleted, but the moderation audit record could not be written." },
+        { status: 500 },
+      );
+    }
+
     const href = communityId ? communityHref(communityId) : "/dashboard/notifications";
 
     // The host hears why the event is gone; the notice names the role, never

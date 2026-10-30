@@ -307,7 +307,7 @@ Production is already repaired; this is for any environment still holding the le
 Production’s history is not usable for tooling. Choose one controlled approach after a schema diff:
 
 - **Preferred:** keep the existing manual SQL-editor process, but maintain a signed “applied migrations” ledger in the repo and run a schema diff against staging before each release. Never run `db push` blindly.
-- **Alternative:** after verifying every object against a staging clone, use `supabase migration repair --status applied <version>` for the versions actually applied (a write to `supabase_migrations`), and record the three unknown remote versions after obtaining their SQL. This requires approval and a backup; do not insert 194 rows speculatively.
+- **Alternative:** after verifying every object against a staging clone, use `supabase migration repair --status applied <version>` for the versions actually applied (a write to `supabase_migrations`), and record the three remote-only versions after they were fetched and mapped to local equivalents in `MIGRATION_RECONCILIATION.md`. This requires approval and a backup; do not insert 194 rows speculatively.
 - Resolve duplicate timestamp groups before adding new migrations; use unique, increasing timestamps.
 
 ### 5.6 Rollback/recovery

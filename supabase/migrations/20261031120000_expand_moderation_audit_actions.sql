@@ -32,7 +32,9 @@ alter table public.moderation_audit_log
       'toggle_community',
       'delete_community',
       'toggle_job',
-      'delete_job'
+      'delete_job',
+      'delete_event',
+      'review_verification'
     )
   );
 

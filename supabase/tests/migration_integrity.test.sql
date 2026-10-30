@@ -20,6 +20,8 @@ select is(
   (select pg_get_constraintdef(oid) like '%delete_user%'
           and pg_get_constraintdef(oid) like '%review_dm_report%'
           and pg_get_constraintdef(oid) like '%toggle_community%'
+          and pg_get_constraintdef(oid) like '%delete_event%'
+          and pg_get_constraintdef(oid) like '%review_verification%'
    from pg_constraint
    where conrelid = 'public.moderation_audit_log'::regclass
      and conname = 'moderation_audit_log_action_check'),

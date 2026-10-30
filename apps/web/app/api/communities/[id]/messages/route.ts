@@ -119,8 +119,8 @@ export async function POST(
   const [rateResult, membershipResult, senderProfileResult] = await Promise.all([
     timer.measure("rate_limits", () =>
       Promise.all([
-        rateLimit(`chat:send:${userId}:10s`, 5, 10),
-        rateLimit(`chat:send:${userId}:60s`, 20, 60),
+        rateLimit(`chat:send:${userId}:10s`, 5, 10, { failClosed: true }),
+        rateLimit(`chat:send:${userId}:60s`, 20, 60, { failClosed: true }),
       ]),
     ),
     timer.measure("membership_query", async () =>
