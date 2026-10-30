@@ -16,6 +16,7 @@ import { communityHref, deferNotification, managerRemovalNotice } from "@/lib/no
 import { loadEventForViewer } from "@/lib/communities/event-access";
 import { removeCommunityContent, type RemoveContentResult } from "@/lib/communities/content-removal";
 import { requireZoneAwareIso, validOffsetMinutes, validTimeZone } from "@/lib/communities/event-time";
+import { validateEventSchedule } from "@/lib/communities/event-schedule";
 import type { Database } from "@/lib/supabase/database.types";
 
 export async function GET(
@@ -69,13 +70,14 @@ export async function PATCH(
     title: string;
     cover_image_url: string | null;
     event_date: string;
+    end_date: string | null;
     is_public: boolean;
   }>(
     db,
     communityId,
     eventId,
     userId,
-    "id, user_id, title, cover_image_url, event_date, is_public",
+    "id, user_id, title, cover_image_url, event_date, end_date, is_public",
   );
   if (!access.ok) {
     return NextResponse.json(
@@ -154,6 +156,21 @@ export async function PATCH(
   if (typeof body.is_public === "boolean") patch.is_public = body.is_public;
 
   if (!Object.keys(patch).length) return NextResponse.json({ error: "Nothing to update." }, { status: 422 });
+
+  const nextStart = patch.event_date ?? existing.event_date;
+  const nextEnd =
+    "end_date" in body ? patch.end_date ?? null : existing.end_date ?? null;
+  const scheduleError = validateEventSchedule({
+    start: nextStart,
+    end: nextEnd,
+    requireFutureStart: Boolean(patch.event_date),
+  });
+  if (scheduleError === "end_before_start") {
+    return NextResponse.json({ error: "The end time must be after the start time." }, { status: 422 });
+  }
+  if (scheduleError === "start_in_past") {
+    return NextResponse.json({ error: "The event start cannot be in the past." }, { status: 422 });
+  }
 
   const { data, error } = await db
     .from("community_events")
@@ -270,6 +287,16 @@ export async function DELETE(
     moderator = check.status;
   }
 
+  // Everyone who RSVPed needs to know the host cancelled. Query before the
+  // event row (and the FK cascade) disappears.
+  const { data: attendeeRows } = isOwn
+    ? await db
+        .from("event_rsvps")
+        .select("user_id")
+        .eq("event_id", eventId)
+        .neq("user_id", userId)
+    : { data: null };
+
   // Unlink the event's group chat (which outlives the event — see
   // 20260925140000_event_delete_keeps_group_chat), delete the row, reclaim its
   // cover from R2 and announce the change in every room that rendered it.
@@ -283,6 +310,25 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete event." }, { status: 500 });
   }
   const chatCommunityId = removal.chatCommunityId;
+
+  if (isOwn && removal.removed) {
+    const href = isPublicContentScope(communityId)
+      ? "/dashboard"
+      : communityHref(communityId);
+    for (const attendee of attendeeRows ?? []) {
+      deferNotification({
+        userId: attendee.user_id,
+        actorId: userId,
+        communityId: isPublicContentScope(communityId) ? null : communityId,
+        type: "event_deleted",
+        entityType: "event",
+        entityId: eventId,
+        title: () => "Event cancelled",
+        body: typeof existing.title === "string" ? existing.title : null,
+        href,
+      });
+    }
+  }
 
   // Audit trail for moderated deletions of other members' events, plus a
   // removal notice to the host. The title rides in the notice body so the

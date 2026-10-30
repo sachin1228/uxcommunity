@@ -12,7 +12,7 @@
 -- supabase_realtime publication entry.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(9);
 
 -- No table in `public` is readable by the client roles. Checked at the
 -- privilege level as well as the policy level, because either one alone
@@ -69,6 +69,29 @@ select ok(
   has_table_privilege('service_role', 'public.community_messages', 'SELECT'),
   'service_role retains read access to community_messages'
 );
+
+-- A table created after the default-ACL hardening must not inherit client
+-- grants. This is the regression guard for future migrations.
+create table public.__default_priv_probe (id integer);
+
+select is(
+  (select count(*)::integer
+   from pg_class as c
+   join pg_namespace as n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = '__default_priv_probe'
+     and (has_table_privilege('anon', c.oid, 'SELECT')
+          or has_table_privilege('authenticated', c.oid, 'SELECT'))),
+  0,
+  'a new public table does not inherit anon/authenticated grants'
+);
+
+select ok(
+  has_table_privilege('service_role', 'public.__default_priv_probe', 'SELECT'),
+  'service_role can still read a new public table'
+);
+
+drop table public.__default_priv_probe;
 
 -- And the three tables named in the incident are unreachable in practice,
 -- not merely policy-free.

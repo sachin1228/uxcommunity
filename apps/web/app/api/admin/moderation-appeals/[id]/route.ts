@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { setUserBlocked } from "@/lib/auth/session-registry";
 import { createNotification } from "@/lib/notifications";
+import { sendModerationAppealDecisionEmail } from "@/lib/email";
 import { recordModerationAction, type ModerationAuditAction } from "@/lib/moderation/audit";
 
 const NOTE_MAX_LENGTH = 500;
@@ -11,7 +12,7 @@ const NOTE_MAX_LENGTH = 500;
 interface AppealRecord {
   id: string;
   report_id: string;
-  user_id: string;
+  user_id: string | null;
   target_type: string;
   target_id: string;
   message: string;
@@ -150,28 +151,51 @@ export async function PATCH(
     reason: note || null,
   });
 
-  await createNotification(db, {
-    userId: appeal.user_id,
-    actorId: null,
-    communityId: report.community_id,
-    type: "appeal_reviewed",
-    // Keyed by the report, so the outcome is never folded into another unread
-    // notification on the same target.
-    entityType: "moderation",
-    entityId: report.id,
-    title: action === "grant" ? "Your appeal was granted" : "Your appeal was denied",
-    body:
-      action === "grant"
-        ? restored === "content_deleted"
-          ? "We reviewed your appeal and changed our decision. Removed content cannot be restored automatically; any account or community restriction has been lifted."
-          : restored
-            ? "We reviewed your appeal and restored your access or listing."
-            : "We reviewed your appeal and changed our decision."
-        : note
-          ? `Our original decision stands: ${note}`
-          : "We reviewed your appeal and our original decision stands.",
-    href: "/dashboard/appeals",
-  });
+  if (appeal.user_id) {
+    await createNotification(db, {
+      userId: appeal.user_id,
+      actorId: null,
+      communityId: report.community_id,
+      type: "appeal_reviewed",
+      // Keyed by the report, so the outcome is never folded into another unread
+      // notification on the same target.
+      entityType: "moderation",
+      entityId: report.id,
+      title: action === "grant" ? "Your appeal was granted" : "Your appeal was denied",
+      body:
+        action === "grant"
+          ? restored === "content_deleted"
+            ? "We reviewed your appeal and changed our decision. Removed content cannot be restored automatically; any account or community restriction has been lifted."
+            : restored
+              ? "We reviewed your appeal and restored your access or listing."
+              : "We reviewed your appeal and changed our decision."
+          : note
+            ? `Our original decision stands: ${note}`
+            : "We reviewed your appeal and our original decision stands.",
+      href: "/dashboard/appeals",
+    });
+
+    // A suspended/banned member cannot read the in-app notice. The decision
+    // email is the durable delivery path; failure never rolls back the review.
+    try {
+      const { data: subject } = await db
+        .from("users")
+        .select("email, name")
+        .eq("id", appeal.user_id)
+        .maybeSingle();
+      const email = subject?.email?.trim();
+      if (email) {
+        await sendModerationAppealDecisionEmail(
+          email,
+          subject?.name?.trim() || "there",
+          action === "grant",
+          note || null,
+        );
+      }
+    } catch (emailError) {
+      console.error("[admin/moderation-appeals] decision email failed:", emailError);
+    }
+  }
 
   return NextResponse.json({ success: true, status: appealStatus, restored });
 }

@@ -28,6 +28,15 @@ export const MODERATION_AUDIT_ACTIONS = [
   "lift_suspension",
   "grant_appeal",
   "deny_appeal",
+  "delete_user",
+  "review_dm_report",
+  "reopen_dm_report",
+  "restore_content",
+  "reopen_report",
+  "toggle_community",
+  "delete_community",
+  "toggle_job",
+  "delete_job",
 ] as const;
 
 export type ModerationAuditAction = (typeof MODERATION_AUDIT_ACTIONS)[number];

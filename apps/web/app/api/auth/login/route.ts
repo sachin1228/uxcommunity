@@ -11,6 +11,7 @@ import {
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
+import { secureEqual } from "@/lib/auth/secure-compare";
 import { isSignupIncomplete } from "@/lib/auth/signup-status";
 import {
   getVerificationGraceDays,
@@ -55,8 +56,8 @@ export async function POST(request: NextRequest) {
   // per account) run concurrently — both were previously awaited sequentially,
   // adding one extra external Redis round trip to every login attempt.
   const [rlIp, rlEmail] = await Promise.all([
-    rateLimit(`login:ip:${ip}`, 10, 900),
-    rateLimit(`login:email:${normalizedEmail}`, 20, 900),
+    rateLimit(`login:ip:${ip}`, 10, 900, { failClosed: true }),
+    rateLimit(`login:email:${normalizedEmail}`, 20, 900, { failClosed: true }),
   ]);
   if (!rlIp.success) {
     return NextResponse.json(
@@ -83,8 +84,8 @@ export async function POST(request: NextRequest) {
 
   if (
     adminEmail && adminPassword &&
-    email.toLowerCase() === adminEmail.toLowerCase() &&
-    password === adminPassword
+    secureEqual(email.toLowerCase(), adminEmail.toLowerCase()) &&
+    secureEqual(password, adminPassword)
   ) {
     const adm = await getAdminEpoch();
     if (!adm) {

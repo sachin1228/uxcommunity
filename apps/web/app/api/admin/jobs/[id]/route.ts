@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { requireSession } from "@/lib/auth/session";
+import { requireSession, type SessionPayload } from "@/lib/auth/session";
+import { recordAdminAudit } from "@/lib/moderation/admin-audit";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   collectJobResumeKeys,
@@ -28,8 +29,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let session: SessionPayload;
   try {
-    await requireSession("admin");
+    session = await requireSession("admin");
   } catch (error) {
     return error as Response;
   }
@@ -40,6 +42,13 @@ export async function DELETE(
   }
 
   const db = createServiceClient();
+  const { data: before } = (await (db as unknown as SupabaseClient)
+    .from("job_posts")
+    .select("id, title, status, poster_id")
+    .eq("id", id)
+    .maybeSingle()) as {
+    data: { id: string; title: string | null; status: string | null; poster_id: string | null } | null;
+  };
   const resumeKeys = await collectJobResumeKeys(db, id);
 
   const { data, error } = (await (db as unknown as SupabaseClient)
@@ -58,6 +67,24 @@ export async function DELETE(
   }
   if (!data) {
     return NextResponse.json({ error: "Job not found." }, { status: 404 });
+  }
+
+  try {
+    await recordAdminAudit(db, session, {
+      action: "delete_job",
+      targetType: "job",
+      targetId: id,
+      subjectUserId: before?.poster_id ?? null,
+      previousState: { title: before?.title ?? null, status: before?.status ?? null },
+      newState: { deleted: true },
+      reason: "admin_delete",
+    });
+  } catch (auditError) {
+    console.error("[admin/jobs] delete audit failed:", auditError);
+    return NextResponse.json(
+      { error: "Job was deleted, but the moderation audit record could not be written." },
+      { status: 500 },
+    );
   }
 
   await deletePrivateResumeKeysIfUnreferenced(db, resumeKeys).catch((cleanupError) =>

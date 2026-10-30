@@ -5,6 +5,7 @@ import {
   renderAccountDeletedEmail,
   renderCompanyVerificationEmail,
   renderModerationAppealEmail,
+  renderModerationAppealDecisionEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
   renderVerificationApprovedEmail,
@@ -201,6 +202,23 @@ export async function sendModerationAppealEmail(
       decision,
       appUrl: getAppUrl(),
       expiresDays,
+    }),
+  );
+}
+
+export async function sendModerationAppealDecisionEmail(
+  to: string,
+  name: string,
+  granted: boolean,
+  note: string | null,
+): Promise<void> {
+  await send(
+    to,
+    renderModerationAppealDecisionEmail({
+      name,
+      appUrl: getAppUrl(),
+      granted,
+      note,
     }),
   );
 }

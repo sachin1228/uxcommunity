@@ -22,6 +22,7 @@ const STATUS_FOR_FAILURE: Record<ApplyFailureCode, number> = {
   invalid_portfolio_url: 422,
   invalid_linkedin_url: 422,
   invalid_resume_url: 422,
+  invalid_resume_key: 422,
   not_eligible: 403,
   already_applied: 409,
   not_installed: 503,
@@ -36,6 +37,7 @@ const MESSAGE_FOR_FAILURE: Partial<Record<ApplyFailureCode, string>> = {
   not_eligible:
     "This job is only open to members whose city, sector, job title and experience level match the posting.",
   already_applied: "You have already applied to this job.",
+  invalid_resume_key: "That resume could not be attached. Please upload it again.",
   not_installed: "Jobs are not available right now.",
 };
 
@@ -176,6 +178,7 @@ export async function POST(
     portfolioUrl: parsed.data.portfolio_url,
     linkedinUrl: parsed.data.linkedin_url,
     resumeUrl,
+    resumeKey,
   });
 
   if (!result.ok) {
@@ -196,20 +199,6 @@ export async function POST(
       },
       { status: STATUS_FOR_FAILURE[result.code] }
     );
-  }
-
-  // The private key rides beside the application row. The RPC validates the
-  // public resume URL, so a key-backed upload reaches the database here; a
-  // failure leaves the application landed and logs, rather than losing the
-  // whole send after the row exists.
-  if (resumeKey && result.applicationId) {
-    const { error: keyError } = await (db as unknown as SupabaseClient)
-      .from("job_applications")
-      .update({ resume_key: resumeKey })
-      .eq("id", result.applicationId)
-      .eq("applicant_id", session.userId!);
-
-    if (keyError) console.error("[jobs/apply] resume key update error:", keyError);
   }
 
   // First-upload adoption: when a member with no saved resumes attaches a

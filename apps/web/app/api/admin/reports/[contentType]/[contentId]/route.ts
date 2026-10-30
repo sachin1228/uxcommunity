@@ -9,6 +9,7 @@ import {
   restoreRemovedContent,
 } from "@/lib/communities/content-removal";
 import { logCommunityActivity } from "@/lib/communities/manager-role";
+import { recordAdminAudit } from "@/lib/moderation/admin-audit";
 import {
   REPORT_CONTENT_TYPE_VALUES,
   reportReasonLabel,
@@ -72,6 +73,7 @@ interface ReportRow {
   reason: string;
   details: string | null;
   status: string;
+  target_snapshot: unknown;
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
@@ -383,6 +385,7 @@ export async function GET(
       reason: report.reason,
       reason_label: reportReasonLabel(report.reason),
       details: report.details,
+      snapshot: report.target_snapshot ?? null,
       status: report.status,
       created_at: report.created_at,
       resolved_at: report.resolved_at,
@@ -465,10 +468,20 @@ export async function POST(
       console.error("[admin/reports/detail] dismiss", dismissError);
       return NextResponse.json({ error: "Failed to dismiss the reports." }, { status: 500 });
     }
+    const dismissedReportIds = (dismissed ?? []).map((row: { id: string }) => row.id);
+    await recordAdminAudit(db, session, {
+      action: "dismiss_report",
+      targetType: kind,
+      targetId: id,
+      subjectUserId: reports[0]?.content_author_id ?? null,
+      previousState: { status: "pending" },
+      newState: { status: "dismissed", report_ids: dismissedReportIds },
+      reason: "admin_dismiss",
+    });
     return NextResponse.json({
       ok: true,
       action: "dismiss",
-      dismissedReportIds: (dismissed ?? []).map((row: { id: string }) => row.id),
+      dismissedReportIds,
     });
   }
 
@@ -489,10 +502,20 @@ export async function POST(
       console.error("[admin/reports/detail] reopen", reopenError);
       return NextResponse.json({ error: "Failed to reopen the reports." }, { status: 500 });
     }
+    const reopenedReportIds = (reopened ?? []).map((row: { id: string }) => row.id);
+    await recordAdminAudit(db, session, {
+      action: "reopen_report",
+      targetType: kind,
+      targetId: id,
+      subjectUserId: reports[0]?.content_author_id ?? null,
+      previousState: { status: "dismissed" },
+      newState: { status: "pending", report_ids: reopenedReportIds },
+      reason: "admin_reopen",
+    });
     return NextResponse.json({
       ok: true,
       action: "reopen",
-      reopenedReportIds: (reopened ?? []).map((row: { id: string }) => row.id),
+      reopenedReportIds,
     });
   }
 
@@ -543,11 +566,21 @@ export async function POST(
       }
     }
 
+    const reopenedReportIds = (reopened ?? []).map((row: { id: string }) => row.id);
+    await recordAdminAudit(db, session, {
+      action: "restore_content",
+      targetType: kind,
+      targetId: id,
+      subjectUserId: removal.content_author_id ?? null,
+      previousState: { removed: true, removal_id: removal.id },
+      newState: { restored: restored.restored, report_ids: reopenedReportIds },
+      reason: "admin_restore",
+    });
     return NextResponse.json({
       ok: true,
       action: "restore",
       restored: restored.restored,
-      reopenedReportIds: (reopened ?? []).map((row: { id: string }) => row.id),
+      reopenedReportIds,
     });
   }
 
@@ -649,6 +682,20 @@ export async function POST(
       },
     });
   }
+
+  await recordAdminAudit(db, session, {
+    action: "remove_content",
+    targetType: kind,
+    targetId: id,
+    subjectUserId: removalResult.content?.userId ?? reports[0]?.content_author_id ?? null,
+    previousState: { status: "pending" },
+    newState: {
+      status: "removed",
+      removed: removalResult.removed,
+      report_ids: resolvedRows.map((row) => row.id),
+    },
+    reason: reasonSource?.reason ?? null,
+  });
 
   return NextResponse.json({
     ok: true,

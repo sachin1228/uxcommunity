@@ -27,9 +27,8 @@ export interface InteractionTarget {
   entityType: NotificationEntityType;
   entityId: string;
   /**
-   * Structured evidence for a whole community or job listing. Stored on the
-   * report, so the queue still reads after the target is edited or deleted.
-   * Interactions keep an empty object.
+   * Structured evidence captured at report time. Stored on the report, so the
+   * queue still reads after the target is edited or deleted.
    */
   snapshot: Record<string, unknown>;
 }
@@ -57,7 +56,7 @@ export async function loadInteractionTarget(
     case "thread_comment": {
       const { data: comment } = await db
         .from("thread_comments")
-        .select("user_id, body, thread_id")
+        .select("user_id, body, thread_id, created_at")
         .eq("id", targetId)
         .maybeSingle();
       if (!comment) return null;
@@ -75,14 +74,20 @@ export async function loadInteractionTarget(
         communityId: thread?.community_id ?? null,
         entityType: "thread",
         entityId: comment.thread_id,
-        snapshot: {},
+        snapshot: {
+          kind: "thread_comment",
+          body: comment.body,
+          created_at: comment.created_at,
+          thread_id: comment.thread_id,
+          community_id: thread?.community_id ?? null,
+        },
       };
     }
 
     case "showcase_comment": {
       const { data: comment } = await db
         .from("showcase_comments")
-        .select("user_id, body, post_id")
+        .select("user_id, body, post_id, created_at")
         .eq("id", targetId)
         .maybeSingle();
       if (!comment) return null;
@@ -100,14 +105,20 @@ export async function loadInteractionTarget(
         communityId: post?.community_id ?? null,
         entityType: "showcase",
         entityId: comment.post_id,
-        snapshot: {},
+        snapshot: {
+          kind: "showcase_comment",
+          body: comment.body,
+          created_at: comment.created_at,
+          post_id: comment.post_id,
+          community_id: post?.community_id ?? null,
+        },
       };
     }
 
     case "resource_comment": {
       const { data: comment } = await db
         .from("resource_comments")
-        .select("user_id, body, resource_id")
+        .select("user_id, body, resource_id, created_at")
         .eq("id", targetId)
         .maybeSingle();
       if (!comment) return null;
@@ -125,14 +136,20 @@ export async function loadInteractionTarget(
         communityId: resource?.community_id ?? null,
         entityType: "resource",
         entityId: comment.resource_id,
-        snapshot: {},
+        snapshot: {
+          kind: "resource_comment",
+          body: comment.body,
+          created_at: comment.created_at,
+          resource_id: comment.resource_id,
+          community_id: resource?.community_id ?? null,
+        },
       };
     }
 
     case "event_comment": {
       const { data: comment } = await db
         .from("event_comments")
-        .select("user_id, body, event_id")
+        .select("user_id, body, event_id, created_at")
         .eq("id", targetId)
         .maybeSingle();
       if (!comment) return null;
@@ -150,14 +167,20 @@ export async function loadInteractionTarget(
         communityId: event?.community_id ?? null,
         entityType: "event",
         entityId: comment.event_id,
-        snapshot: {},
+        snapshot: {
+          kind: "event_comment",
+          body: comment.body,
+          created_at: comment.created_at,
+          event_id: comment.event_id,
+          community_id: event?.community_id ?? null,
+        },
       };
     }
 
     case "community_message": {
       const { data: message } = await db
         .from("community_messages")
-        .select("id, user_id, content, community_id")
+        .select("id, user_id, content, community_id, created_at, image_url")
         .eq("id", targetId)
         .maybeSingle();
       if (!message) return null;
@@ -175,7 +198,13 @@ export async function loadInteractionTarget(
         communityId: message.community_id,
         entityType: "message",
         entityId: message.id,
-        snapshot: {},
+        snapshot: {
+          kind: "community_message",
+          content: message.content,
+          image_url: message.image_url,
+          created_at: message.created_at,
+          community_id: message.community_id,
+        },
       };
     }
 
@@ -195,7 +224,10 @@ export async function loadInteractionTarget(
         communityId: null,
         entityType: "profile",
         entityId: user.id,
-        snapshot: {},
+        snapshot: {
+          kind: "profile",
+          name: user.name,
+        },
       };
     }
 

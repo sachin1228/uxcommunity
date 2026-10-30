@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { parseR2Key } from "@/lib/r2";
 import { isOwnVerificationKey } from "@/lib/r2-private";
 import {
   normalizeLinkedInUrl,
   normalizePortfolioLinks,
   normalizeWorkSampleKeys,
-  normalizeWorkSampleUrls,
   VERIFICATION_SAMPLES_MAX,
 } from "@/lib/verification/rules";
 
@@ -28,7 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const rl = await rateLimit(`verification:submit:${userId}`, 5, 3600);
+  const rl = await rateLimit(`verification:submit:${userId}`, 5, 3600, { failClosed: true });
   if (!rl.success) {
     return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
   }
@@ -59,11 +57,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: sampleKeys.error }, { status: 422 });
   }
 
-  const samples = normalizeWorkSampleUrls(body.work_sample_urls);
-  if (samples.error) {
-    return NextResponse.json({ error: samples.error }, { status: 422 });
+  // New submissions must use the private upload flow. Legacy public URLs are
+  // still readable on old requests, but acceptance here would recreate the
+  // public-PII path the private bucket was introduced to close.
+  if (Array.isArray(body.work_sample_urls) && body.work_sample_urls.length > 0) {
+    return NextResponse.json(
+      { error: "Work samples must be uploaded through the verification form." },
+      { status: 422 },
+    );
   }
-  if (sampleKeys.keys.length + samples.urls.length > VERIFICATION_SAMPLES_MAX) {
+  if (sampleKeys.keys.length > VERIFICATION_SAMPLES_MAX) {
     return NextResponse.json(
       { error: `Upload at most ${VERIFICATION_SAMPLES_MAX} work samples.` },
       { status: 422 },
@@ -71,15 +74,6 @@ export async function POST(request: NextRequest) {
   }
   for (const key of sampleKeys.keys) {
     if (!isOwnVerificationKey(key, userId)) {
-      return NextResponse.json(
-        { error: "Work samples must be uploaded through the verification form." },
-        { status: 422 },
-      );
-    }
-  }
-  for (const url of samples.urls) {
-    const key = parseR2Key(url);
-    if (!key || !key.startsWith(`verification/${userId}/`)) {
       return NextResponse.json(
         { error: "Work samples must be uploaded through the verification form." },
         { status: 422 },
@@ -136,7 +130,7 @@ export async function POST(request: NextRequest) {
       linkedin_url: linkedinUrl,
       portfolio_links: portfolio.links,
       work_sample_keys: sampleKeys.keys,
-      work_sample_urls: samples.urls,
+      work_sample_urls: [],
       email_verified_at: row.email_verified_at,
       status: "pending",
     })

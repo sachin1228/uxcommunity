@@ -232,6 +232,17 @@ type PerformanceRpcMap = {
     };
     returns: Array<{ application_id: string; created_at: string }>;
   };
+  apply_to_job_with_resume: {
+    args: {
+      p_job_id: string;
+      p_applicant_id: string;
+      p_name: string;
+      p_portfolio_url: string;
+      p_linkedin_url: string;
+      p_resume_key: string;
+    };
+    returns: Array<{ application_id: string; created_at: string }>;
+  };
   get_job_feed: {
     // p_before_created_at / p_before_id are the compound (created_at, id)
     // cursor added by 20261015120000_job_feed_cursor. They are OPTIONAL here

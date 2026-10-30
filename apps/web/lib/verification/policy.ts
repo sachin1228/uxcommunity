@@ -28,18 +28,20 @@ export function verificationEligibleAt(
   return created + clampGraceDays(graceDays) * 24 * 60 * 60 * 1000;
 }
 
-/** Should the persistent read-only banner render? */
+/**
+ * Should the persistent read-only banner render?
+ *
+ * Policy A: every non-approved account is read-only from signup. The old
+ * grace window is not used for visibility or enforcement; it remains a
+ * legacy/admin value only so existing settings and migrations stay valid.
+ */
 export function isVerificationBannerVisible(input: {
   status: string | null | undefined;
   createdAt: string | null | undefined;
   graceDays: number;
   now?: number;
 }): boolean {
-  if (input.status === "approved") return false;
-  if (input.status === "unverified") {
-    return (input.now ?? Date.now()) >= verificationEligibleAt(input.createdAt, input.graceDays);
-  }
-  return true;
+  return Boolean(input.status) && input.status !== "approved";
 }
 
 /** Should writes be refused for this member right now? */
@@ -49,9 +51,5 @@ export function isVerificationRestricted(input: {
   graceDays: number;
   now?: number;
 }): boolean {
-  if (input.status === "approved") return false;
-  if (input.status === "unverified") {
-    return (input.now ?? Date.now()) >= verificationEligibleAt(input.createdAt, input.graceDays);
-  }
-  return true;
+  return input.status !== "approved";
 }

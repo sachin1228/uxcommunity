@@ -83,9 +83,9 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { logout, user } = useAuth();
-  // The verification option appears with the banner: after the signup grace
-  // window, or immediately for pending/rejected accounts. Approved accounts
-  // have nothing to do here.
+  // The verification option appears with the banner. Policy A makes every
+  // non-approved account read-only from signup; approved accounts have nothing
+  // to do here.
   const rows = ROWS.filter(
     (row) => row.href !== '/settings/verification' || user?.verificationBannerVisible === true,
   );

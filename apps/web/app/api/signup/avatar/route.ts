@@ -12,6 +12,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { markSignupCompleted } from "@/lib/signup-attempts";
+import { CURRENT_TERMS_VERSION } from "@/lib/legal";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -28,7 +29,7 @@ function safeSignupError(error: { code?: string; message?: string }) {
 
 export async function POST(request: NextRequest) {
   const ip = getRequestClientIp(request);
-  const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600);
+  const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600, { failClosed: true });
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
   // though NULL is the right value for a member with no uploaded avatar, and
   // the function's own guards handle both. Cast at this boundary instead of
   // weakening the generated types.
-  const { data, error } = await db.rpc("complete_signup", {
+  const { data, error } = await db.rpc("complete_signup_with_consent", {
     p_name: identity.name,
     p_email: identity.email.toLowerCase(),
     p_password_hash: passwordHash,
@@ -134,6 +135,9 @@ export async function POST(request: NextRequest) {
     p_job_title: profile.job_title,
     p_avatar_url: profilePictureUrl as string,
     p_avatar_source: (profilePictureUrl ? "upload" : null) as string,
+    p_age_confirmed: identity.age_confirmed,
+    p_terms_accepted: identity.terms_accepted,
+    p_terms_version: CURRENT_TERMS_VERSION,
   });
 
   if (error || !data?.[0]?.user_id) {
@@ -150,22 +154,6 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = data[0].user_id as string;
-
-  // Record eligibility and consent on the account itself. The request was
-  // rejected above unless both flags were true; the timestamps are the durable
-  // proof of what was accepted and when.
-  const acceptedAt = new Date().toISOString();
-  const { error: consentError } = await db
-    .from("users")
-    .update({
-      age_confirmed_at: acceptedAt,
-      terms_accepted_at: acceptedAt,
-    })
-    .eq("id", userId);
-  if (consentError) {
-    // Never fail a created account on this write; surface it for follow-up.
-    console.error("[signup/avatar] consent record error:", consentError);
-  }
 
   // The account exists now — clear the email from the incomplete-signups view.
   // Best-effort: the account is already created, so a tracking failure is silent.

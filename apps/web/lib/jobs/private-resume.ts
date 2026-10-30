@@ -40,16 +40,29 @@ export async function signedResumeUrl(item: ResumeBearer): Promise<string | null
   }
 }
 
+function withoutResumeKey<T extends { resume_key?: string | null }>(
+  value: T,
+): Omit<T, "resume_key"> {
+  const { resume_key: _resumeKey, ...rest } = value;
+  return rest;
+}
+
 export function withWebJobResumePath<T extends JobPost>(job: T): T {
   if (!job.my_application) return job;
   return {
     ...job,
-    my_application: { ...job.my_application, resume_url: webResumeUrl(job.my_application) },
-  };
+    my_application: {
+      ...withoutResumeKey(job.my_application),
+      resume_url: webResumeUrl(job.my_application),
+    },
+  } as T;
 }
 
 export function withWebApplicantResumePath<T extends JobApplicant>(applicant: T): T {
-  return { ...applicant, resume_url: webResumeUrl(applicant) };
+  return {
+    ...withoutResumeKey(applicant),
+    resume_url: webResumeUrl(applicant),
+  } as T;
 }
 
 export async function withMobileJobResumeUrl<T extends JobPost>(job: T): Promise<T> {
@@ -57,12 +70,15 @@ export async function withMobileJobResumeUrl<T extends JobPost>(job: T): Promise
   return {
     ...job,
     my_application: {
-      ...job.my_application,
+      ...withoutResumeKey(job.my_application),
       resume_url: await signedResumeUrl(job.my_application),
     },
-  };
+  } as T;
 }
 
 export async function withMobileApplicantResumeUrl<T extends JobApplicant>(applicant: T): Promise<T> {
-  return { ...applicant, resume_url: await signedResumeUrl(applicant) };
+  return {
+    ...withoutResumeKey(applicant),
+    resume_url: await signedResumeUrl(applicant),
+  } as T;
 }

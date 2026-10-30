@@ -43,12 +43,14 @@ export async function POST(
     is_public: boolean;
     community_id: string | null;
     max_attendees: number | null;
+    event_date: string;
+    end_date: string | null;
   }>(
     db,
     communityId,
     eventId,
     userId,
-    "id, user_id, title, cover_image_url, is_public, community_id, max_attendees",
+    "id, user_id, title, cover_image_url, is_public, community_id, max_attendees, event_date, end_date",
   );
   if (!access.ok) {
     return NextResponse.json(
@@ -57,6 +59,10 @@ export async function POST(
     );
   }
   const event = access.event;
+  const eventEnd = event.end_date ?? event.event_date;
+  if (eventEnd && Date.parse(eventEnd) <= Date.now()) {
+    return NextResponse.json({ error: "This event has ended." }, { status: 409 });
+  }
 
   // Check if already RSVPed
   const { data: existing } = await db

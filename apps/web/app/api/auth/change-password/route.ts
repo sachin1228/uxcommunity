@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const limit = await rateLimit(`change-password:${userId}`, 5, 3600);
+  const limit = await rateLimit(`change-password:${userId}`, 5, 3600, { failClosed: true });
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },

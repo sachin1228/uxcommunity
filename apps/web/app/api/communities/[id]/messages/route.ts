@@ -94,7 +94,7 @@ export async function POST(
     // alongside the membership/profile reads and is awaited before the insert,
     // so a cold isolate no longer pays a DB round trip before its first query.
     session = await timer.measure("auth", () =>
-      requireSession("user", { allowUnverified: true }),
+      requireSession("user"),
     );
   } catch (e) {
     return e as Response;

@@ -138,7 +138,7 @@ export async function POST(
     // and is awaited before the insert, which removes a cold-isolate DB round
     // trip from the send path without weakening the guard.
     session = await timer.measure("auth", () =>
-      requireSession("user", { allowUnverified: true }),
+      requireSession("user"),
     );
   } catch (e) {
     return e as Response;

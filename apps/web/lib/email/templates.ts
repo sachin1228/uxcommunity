@@ -340,3 +340,48 @@ export function renderModerationAppealEmail({
     ],
   });
 }
+
+export interface ModerationAppealDecisionEmail {
+  name: string;
+  appUrl: string;
+  granted: boolean;
+  note: string | null;
+}
+
+/**
+ * Sent when an appeal is decided. A suspended/banned member cannot sign in to
+ * read the in-app notification, so the outcome must also reach their inbox.
+ */
+export function renderModerationAppealDecisionEmail({
+  name,
+  appUrl,
+  granted,
+  note,
+}: ModerationAppealDecisionEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: granted
+      ? `Your ${APP_NAME} appeal was granted`
+      : `Your ${APP_NAME} appeal was reviewed`,
+    preheader: granted
+      ? "The decision has been changed."
+      : "The original decision stands.",
+    heading: granted ? "Your appeal was granted" : "Your appeal was reviewed",
+    blocks: [
+      {
+        kind: "paragraph",
+        text: granted
+          ? `Hi ${name}, we reviewed your appeal and changed our decision. Any account or community restriction has been lifted; a deleted comment or message cannot be restored.`
+          : `Hi ${name}, we reviewed your appeal. The original decision stands.`,
+      },
+      ...(note
+        ? [{ kind: "paragraph" as const, text: `Reviewer note: ${note}` }]
+        : []),
+      {
+        kind: "paragraph",
+        text: "You can sign in to review your account and the decision record.",
+      },
+      { kind: "action", label: `Open ${APP_NAME}`, href: appUrl },
+    ],
+  });
+}

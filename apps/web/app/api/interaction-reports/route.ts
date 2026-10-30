@@ -10,6 +10,7 @@ import {
   isReportReasonValidFor,
 } from "@/lib/communities/report-reasons";
 import { loadInteractionTarget } from "@/lib/moderation/interaction-reports";
+import { canReportTarget } from "@/lib/moderation/target-visibility";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,13 +31,13 @@ const UUID_PATTERN =
 export async function POST(request: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (error) {
     return error as Response;
   }
   const userId = session.userId!;
 
-  const limit = await rateLimit(`interaction-report:${userId}`, 30, 3600);
+  const limit = await rateLimit(`interaction-report:${userId}`, 30, 3600, { failClosed: true });
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many reports. Please try again later." },
@@ -100,6 +101,23 @@ export async function POST(request: NextRequest) {
   }
   if (target.authorId === userId) {
     return NextResponse.json({ error: "You cannot report your own content." }, { status: 422 });
+  }
+  if (!(await canReportTarget(db, userId, target.communityId))) {
+    return NextResponse.json({ error: "This content is no longer available." }, { status: 404 });
+  }
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count: targetReports } = await (db as unknown as SupabaseClient)
+    .from("interaction_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("target_type", targetType)
+    .eq("target_id", contentId)
+    .gte("created_at", since);
+  if ((targetReports ?? 0) >= 25) {
+    return NextResponse.json(
+      { error: "This content has already been reported by many members. Our team is reviewing it." },
+      { status: 429 },
+    );
   }
 
   const { error } = await (db as unknown as SupabaseClient)

@@ -70,6 +70,18 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          {
+            // Report-only first: the app still needs Next's inline bootstrap
+            // scripts/styles. This gives us violation data without breaking
+            // the product while a nonce-based enforcing policy is prepared.
+            key: "Content-Security-Policy-Report-Only",
+            value:
+              "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+              "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; " +
+              "media-src 'self' blob: https:; font-src 'self' data:; " +
+              "connect-src 'self' https://rt.uxcommunity.in https://*.supabase.co https://api.giphy.com",
+          },
         ],
       },
       {

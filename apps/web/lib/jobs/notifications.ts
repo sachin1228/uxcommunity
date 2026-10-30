@@ -37,7 +37,7 @@ export function deferJobMatchNotifications(jobId: string, posterId: string) {
       if (job.city_id) query = query.eq("city_id", job.city_id);
       if (job.sector_id) query = query.eq("sector_id", job.sector_id);
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(500);
       if (error) {
         logEvent("error", {
           event: "jobs.match_notify_recipients_failed",
@@ -48,20 +48,25 @@ export function deferJobMatchNotifications(jobId: string, posterId: string) {
       }
 
       const recipients = (data ?? []).map((row) => row.user_id as string);
-      await Promise.allSettled(
-        recipients.map((userId) =>
-          createNotification(db, {
-            userId,
-            actorId: posterId,
-            type: "job_match",
-            entityType: "job",
-            entityId: job.id,
-            title: "A new role matches your profile",
-            body: jobMatchBody(job),
-            href: `/dashboard/jobs/${job.id}`,
-          })
-        )
-      );
+      // Bounded and batched: a wide match must not open hundreds of writes at
+      // once. 500 is the delivery cap for one posting; revisit if a real role
+      // legitimately matches more members.
+      for (let start = 0; start < recipients.length; start += 25) {
+        await Promise.allSettled(
+          recipients.slice(start, start + 25).map((userId) =>
+            createNotification(db, {
+              userId,
+              actorId: posterId,
+              type: "job_match",
+              entityType: "job",
+              entityId: job.id,
+              title: "A new role matches your profile",
+              body: jobMatchBody(job),
+              href: `/dashboard/jobs/${job.id}`,
+            })
+          )
+        );
+      }
     } catch (error) {
       logEvent("error", { event: "jobs.match_notify_failed", job_id: jobId, error });
     }

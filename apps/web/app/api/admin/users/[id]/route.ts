@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
-import { requireSession } from "@/lib/auth/session";
+import { requireSession, type SessionPayload } from "@/lib/auth/session";
+import { recordAdminAudit } from "@/lib/moderation/admin-audit";
 import { setUserBlocked } from "@/lib/auth/session-registry";
 import { revokeRealtimeSessions } from "@/lib/realtime/revoke";
 import { logEvent } from "@/lib/observability/log";
@@ -86,8 +88,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let session: SessionPayload;
   try {
-    await requireSession("admin");
+    session = await requireSession("admin");
   } catch (e) {
     return e as Response;
   }
@@ -101,6 +104,13 @@ export async function PATCH(
   }
 
   const db = createServiceClient();
+  const { data: before } = (await (db as unknown as SupabaseClient)
+    .from("users")
+    .select("id, is_blocked, suspended_until")
+    .eq("id", id)
+    .maybeSingle()) as {
+    data: { id: string; is_blocked: boolean; suspended_until: string | null } | null;
+  };
 
   try {
     // One transaction flips the flag, bumps session_version and revokes every
@@ -124,6 +134,19 @@ export async function PATCH(
     }
   }
 
+  await recordAdminAudit(db, session, {
+    action: is_blocked ? "ban_user" : "unban_user",
+    targetType: "user",
+    targetId: id,
+    subjectUserId: id,
+    previousState: {
+      is_blocked: before?.is_blocked ?? null,
+      suspended_until: before?.suspended_until ?? null,
+    },
+    newState: { is_blocked, suspended_until: is_blocked ? before?.suspended_until ?? null : null },
+    reason: is_blocked ? "admin_block" : "admin_unblock",
+  });
+
   const { data, error } = await db
     .from("users")
     .select("id, name, email, is_blocked")
@@ -142,14 +165,22 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let session: SessionPayload;
   try {
-    await requireSession("admin");
+    session = await requireSession("admin");
   } catch (e) {
     return e as Response;
   }
 
   const { id } = await params;
   const db = createServiceClient();
+  const { data: before } = (await (db as unknown as SupabaseClient)
+    .from("users")
+    .select("id, is_blocked, suspended_until")
+    .eq("id", id)
+    .maybeSingle()) as {
+    data: { id: string; is_blocked: boolean; suspended_until: string | null } | null;
+  };
 
   try {
     const summary = await deleteAccountCascade(db, id);
@@ -162,6 +193,27 @@ export async function DELETE(
         userId: id,
         error,
       });
+    }
+
+    try {
+      await recordAdminAudit(db, session, {
+        action: "delete_user",
+        targetType: "user",
+        targetId: id,
+        subjectUserId: id,
+        previousState: {
+          is_blocked: before?.is_blocked ?? null,
+          suspended_until: before?.suspended_until ?? null,
+        },
+        newState: { deleted: true },
+        reason: "admin_delete",
+      });
+    } catch (auditError) {
+      console.error("[admin/users] delete audit failed:", auditError);
+      return NextResponse.json(
+        { error: "Account was deleted, but the moderation audit record could not be written." },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({

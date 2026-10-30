@@ -6,10 +6,11 @@
  * own memory, so attempts were spread across instances and the limit never
  * triggered reliably).
  *
- * Fail-open policy: if Redis is unreachable the request is allowed through and
- * the error is logged. This keeps the app available during Redis outages at the
- * cost of rate-limiting not being enforced. If you prefer fail-closed, replace
- * the catch branch with { success: false, remaining: 0, resetAt: ... }.
+ * Fail-open by default for read-heavy/non-security endpoints. Authentication,
+ * signup, password-reset, account-deletion and report endpoints pass
+ * `{ failClosed: true }`, so a Redis outage cannot silently disable their
+ * abuse controls. In development the limiter still fails open so a missing
+ * local Upstash configuration does not block the app.
  *
  * Required env vars:
  *   UPSTASH_REDIS_REST_URL
@@ -57,9 +58,17 @@ export interface RateLimitResult {
 export async function rateLimit(
   key: string,
   limit: number,
-  windowS: number
+  windowS: number,
+  options?: { failClosed?: boolean },
 ): Promise<RateLimitResult> {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    if (options?.failClosed && process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        remaining: 0,
+        resetAt: Date.now() + windowS * 1000,
+      };
+    }
     return {
       success: true,
       remaining: limit,
@@ -76,8 +85,15 @@ export async function rateLimit(
       resetAt: result.reset, // Upstash returns reset as Unix ms
     };
   } catch (err) {
-    // Fail open — allow the request through if Redis is unavailable.
-    console.error("[rate-limit] Redis unreachable, failing open:", err);
+    console.error("[rate-limit] Redis unreachable:", err);
+    if (options?.failClosed) {
+      return {
+        success: false,
+        remaining: 0,
+        resetAt: Date.now() + windowS * 1000,
+      };
+    }
+    // Non-security endpoints stay available during a Redis outage.
     return {
       success: true,
       remaining: 0,

@@ -73,6 +73,7 @@ export const APPLY_FAILURE_CODES = [
   "invalid_portfolio_url",
   "invalid_linkedin_url",
   "invalid_resume_url",
+  "invalid_resume_key",
   "not_eligible",
   "already_applied",
 ] as const;
@@ -453,17 +454,28 @@ export interface ApplyParams {
   portfolioUrl: string;
   linkedinUrl: string;
   resumeUrl: string | null;
+  /** Private bucket key for a new/saved private resume. */
+  resumeKey?: string | null;
 }
 
 export async function applyToJob(db: SupabaseClient, params: ApplyParams): Promise<ApplyResult> {
-  const { data, error } = await callPerformanceRpc(db, "apply_to_job", {
-    p_job_id: params.jobId,
-    p_applicant_id: params.applicantId,
-    p_name: params.name,
-    p_portfolio_url: params.portfolioUrl,
-    p_linkedin_url: params.linkedinUrl,
-    p_resume_url: params.resumeUrl,
-  });
+  const { data, error } = params.resumeKey
+    ? await callPerformanceRpc(db, "apply_to_job_with_resume", {
+        p_job_id: params.jobId,
+        p_applicant_id: params.applicantId,
+        p_name: params.name,
+        p_portfolio_url: params.portfolioUrl,
+        p_linkedin_url: params.linkedinUrl,
+        p_resume_key: params.resumeKey,
+      })
+    : await callPerformanceRpc(db, "apply_to_job", {
+        p_job_id: params.jobId,
+        p_applicant_id: params.applicantId,
+        p_name: params.name,
+        p_portfolio_url: params.portfolioUrl,
+        p_linkedin_url: params.linkedinUrl,
+        p_resume_url: params.resumeUrl,
+      });
 
   if (error) {
     const code = readRaised(error);

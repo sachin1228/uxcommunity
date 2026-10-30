@@ -32,7 +32,7 @@ function parseQueryUserId(req: NextRequest): string | null {
 export async function GET() {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }
@@ -45,7 +45,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }
