@@ -22,7 +22,7 @@
 --   2. Confirm interaction_reports is empty or understood. This script does not
 --      touch it.
 --   3. Confirm no application deployment still reads the legacy audit columns
---      (`moderator_email`, `target_user_id`, `target_content_type`). The current
+--      (moderator_email, target_user_id, target_content_type). The current
 --      application uses the new audit schema.
 --   4. Run this inside a transaction (the script does that itself). If any
 --      guard raises, nothing is changed.
