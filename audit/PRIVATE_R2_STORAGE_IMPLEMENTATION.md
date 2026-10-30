@@ -131,11 +131,11 @@ The script is **not** run automatically and was not run for this branch.
 
 1. **Plan (default, read-only):** scans `member_resumes.url`, `job_applications.resume_url`, `account_verification_requests.work_sample_urls` and `dm_messages.image_url`; keeps only keys under the public base with `resumes/`, `verification/` or `dm/`. De-duplicates shared source objects and prints the plan.
 2. **Copy + verify (`--apply`):** public GET → private PUT (`private, no-store`), private GET back, compare SHA-256 and byte length, then update the key column(s). Verification arrays are updated by matching source URLs, preserving order. DM rows are rewritten to the stable proxy path, and report snapshots are rewritten from the old public URL to that path. The public URL columns for résumés are left intact.
-3. **Purge (`--purge-public --confirm-purge`):** re-verifies the private copy exists, detaches the legacy URL only when the row already points at the verified key, refuses while any row or report snapshot still references the source URL, then deletes the public object and writes the URL list to `tmp/private-r2-purge-urls.txt`.
+3. **Purge (`--purge-public --confirm-purge`):** re-verifies the private copy exists, detaches the legacy URL only when the row already points at the verified key, refuses while any row or report snapshot still references the source URL, then deletes the public object and writes the URL list to a purge-list file under `tmp/`.
 
-State is written to `tmp/private-r2-migration-state.json`; both files are local artifacts.
+State is written to a migration-state file under `tmp/`; both artifacts are local only.
 
-**CDN:** public objects were uploaded with `immutable` one-year caching. Deleting the origin does not evict an edge copy. Hand `tmp/private-r2-purge-urls.txt` to Cloudflare → Caching → Purge by URL (or invalidate the media host) before treating the public copy as gone. If `R2_PUBLIC_URL` is a `pub-*.r2.dev` URL, edge caching is bypassed and origin deletion is immediate.
+**CDN:** public objects were uploaded with `immutable` one-year caching. Deleting the origin does not evict an edge copy. Hand the generated purge list to Cloudflare → Caching → Purge by URL (or invalidate the media host) before treating the public copy as gone. If `R2_PUBLIC_URL` is a `pub-*.r2.dev` URL, edge caching is bypassed and origin deletion is immediate.
 
 Recommended production order:
 

@@ -101,7 +101,7 @@ Every object was uploaded with `Cache-Control: public, max-age=31536000, immutab
 - The admin R2 audit lists the **public** bucket and can delete public orphans. It had no visibility into private keys.
 - The showcase video ticket signs a PUT with a server-generated key and content type; it is not a sensitive-document path, but it is the only existing presign usage.
 - `apps/web/app/api/image-download/route.ts` allow-lists `*.r2.dev`, `*.supabase.co` and the configured public host. It is an authenticated image save helper, not an authorization boundary.
-- The marketing site has no R2 code, no uploads and no keys. Its audit docs already flag “private bucket + signed URLs for resumes/verification docs” and “global media privacy review” as open items (`uxcommunity-website/audit/11_PRE_LAUNCH_TASKS.md`, items 22–23). No website code change is required for this work.
+- The marketing site has no R2 code, no uploads and no keys. Its audit docs already flag “private bucket + signed URLs for resumes/verification docs” and “global media privacy review” as open items (items 22–23 in its pre-launch task list). No website code change is required for this work.
 
 ## 9. Residual exposures after this branch
 

@@ -14,12 +14,12 @@
  *     For every planned object: copy public → private, download the private
  *     copy back, compare SHA-256 and size, THEN update the row's key column.
  *     The public URL stays in place, so a failed copy never breaks a link.
- *     Writes tmp/private-r2-migration-state.json for the purge phase.
+ *     Writes a local state file under tmp/ for the purge phase.
  *
  *   node scripts/migrate-private-r2.mjs --purge-public --confirm-purge
  *     Delete the public copy only when (a) the private copy exists, (b) the
  *     database no longer references the public URL, and (c) no DM report
- *     snapshot still carries it. Emits tmp/private-r2-purge-urls.txt — the list
+ *     snapshot still carries it. Emits a local purge-list file under tmp/ — the list
  *     to hand to a Cloudflare cache purge, because an immutable CDN copy can
  *     outlive the origin object.
  *
