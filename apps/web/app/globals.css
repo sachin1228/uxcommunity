@@ -27,6 +27,12 @@
   --color-border:            #EAEAEA;
   --color-border-subtle:     #F5F5F5;
 
+  /* Checkbox — ink square with a white check (light theme) */
+  --check-fill:   #0A0A0A;
+  --check-border: #0A0A0A;
+  --check-mark:   #FFFFFF;
+  --check-idle:   #A3A3A3;
+
   /* Field inputs — Geist-style ring fields (light theme) */
   --color-field:            #FAFAFA;
   --color-field-ring:       rgba(0, 0, 0, 0.16);
@@ -198,6 +204,12 @@
     --color-border-subtle:     #1D1D21;  /* section dividers */
     --color-border-strong:     #2D2D34;  /* active components */
     --color-input-border:      #303036;  /* input fields */
+
+    /* Checkbox — elevated dark square with a white check */
+    --check-fill:   #1B1B1F;
+    --check-border: #3F3F46;
+    --check-mark:   #FFFFFF;
+    --check-idle:   #52525B;
 
     /* Field inputs — Geist-style ring fields (dark theme) */
     --color-field:            #151517;
@@ -388,6 +400,11 @@ body {
   --color-border:            #202024;
   --color-border-subtle:     #1D1D21;
 
+  --check-fill:   #1B1B1F;
+  --check-border: #3F3F46;
+  --check-mark:   #FFFFFF;
+  --check-idle:   #52525B;
+
   /* The dark scheme's heavy blacks — the sheets this scope floats sit on
      are dark, so the light scheme's whisper-soft set would vanish. */
   --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
@@ -480,6 +497,53 @@ select:focus-visible {
    selects. A borderless field with a neutral ring that strengthens on
    hover and gains a soft halo on focus — colors adapt to light/dark. */
 @layer components {
+  /* Square checkbox used by consent rows: a hairline box when empty, ink with
+     a white check when selected. Native appearance is removed so every browser
+     draws the same control. */
+  .ux-check {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 5px;
+    border: 1px solid var(--check-idle);
+    background-color: transparent;
+    display: inline-grid;
+    place-content: center;
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+
+  .ux-check::after {
+    content: "";
+    width: 9px;
+    height: 5px;
+    border-left: 2px solid var(--check-mark);
+    border-bottom: 2px solid var(--check-mark);
+    transform: rotate(-45deg) translateY(-1px);
+    opacity: 0;
+  }
+
+  .ux-check:checked {
+    background-color: var(--check-fill);
+    border-color: var(--check-border);
+  }
+
+  .ux-check:checked::after {
+    opacity: 1;
+  }
+
+  .ux-check:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  .ux-check:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .field {
     width: 100%;
     border: 0;

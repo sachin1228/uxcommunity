@@ -490,7 +490,7 @@ export default function SignupScreen() {
                   />
                 </Field>
 
-                <View style={[styles.consentBlock, { borderColor: colors.border }]}>
+                <View style={styles.consentBlock}>
                   <View style={styles.consentRow}>
                     <Pressable
                       onPress={() => {
@@ -505,8 +505,12 @@ export default function SignupScreen() {
                       style={[
                         styles.checkbox,
                         {
-                          borderColor: identity.ageConfirmed ? colors.primary : colors.border,
-                          backgroundColor: identity.ageConfirmed ? colors.primary : 'transparent',
+                          borderColor: identity.ageConfirmed
+                            ? colors.isDark ? "#3F3F46" : "#0A0A0A"
+                            : colors.isDark ? "#52525B" : "#A3A3A3",
+                          backgroundColor: identity.ageConfirmed
+                            ? colors.isDark ? "#1B1B1F" : "#0A0A0A"
+                            : "transparent",
                         },
                       ]}
                     >
@@ -531,8 +535,12 @@ export default function SignupScreen() {
                       style={[
                         styles.checkbox,
                         {
-                          borderColor: identity.termsAccepted ? colors.primary : colors.border,
-                          backgroundColor: identity.termsAccepted ? colors.primary : 'transparent',
+                          borderColor: identity.termsAccepted
+                            ? colors.isDark ? "#3F3F46" : "#0A0A0A"
+                            : colors.isDark ? "#52525B" : "#A3A3A3",
+                          backgroundColor: identity.termsAccepted
+                            ? colors.isDark ? "#1B1B1F" : "#0A0A0A"
+                            : "transparent",
                         },
                       ]}
                     >
@@ -985,10 +993,7 @@ function makeStyles() {
       gap: 16,
     },
     consentBlock: {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderRadius: 12,
-      padding: 14,
-      gap: 12,
+      gap: 14,
     },
     consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     checkbox: {

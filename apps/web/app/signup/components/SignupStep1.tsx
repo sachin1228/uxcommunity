@@ -149,13 +149,13 @@ export function SignupStep1({
           <FieldError errors={fieldErrors} field="confirm_password" />
         </div>
 
-        <div className="flex flex-col gap-2.5 rounded-md border border-border bg-surface-raised px-3.5 py-3">
-          <label className="flex items-start gap-2.5">
+        <div className="flex flex-col gap-3">
+          <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
               checked={state.age_confirmed}
               onChange={(e) => onChange({ age_confirmed: e.target.checked })}
-              className="mt-0.5 h-4 w-4 shrink-0"
+              className="ux-check mt-0.5"
             />
             <span className="font-body text-xs leading-[1.5] text-foreground">
               I confirm that I am 18 years or older.
@@ -163,12 +163,12 @@ export function SignupStep1({
           </label>
           <FieldError errors={fieldErrors} field="age_confirmed" />
 
-          <label className="flex items-start gap-2.5">
+          <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
               checked={state.terms_accepted}
               onChange={(e) => onChange({ terms_accepted: e.target.checked })}
-              className="mt-0.5 h-4 w-4 shrink-0"
+              className="ux-check mt-0.5"
             />
             <span className="font-body text-xs leading-[1.5] text-foreground">
               I agree to the{" "}
