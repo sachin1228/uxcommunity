@@ -58,7 +58,7 @@ jobs:
             UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN \
             RESEND_API_KEY EMAIL_FROM GIPHY_API_KEY \
             R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
-            R2_BUCKET_NAME R2_PUBLIC_URL \
+            R2_BUCKET_NAME R2_PUBLIC_URL R2_PRIVATE_BUCKET_NAME \
             ADMIN_EMAIL ADMIN_PASSWORD FCM_SERVICE_ACCOUNT; do
             if [ -z "${!name}" ]; then
               echo "::error::Missing GitHub secret: $name"
@@ -84,6 +84,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          R2_PRIVATE_BUCKET_NAME: ${{ secrets.R2_PRIVATE_BUCKET_NAME }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
@@ -246,6 +247,7 @@ jobs:
           R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
           R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
+          R2_PRIVATE_BUCKET_NAME=${{ secrets.R2_PRIVATE_BUCKET_NAME }}
           ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           INVITATION_EXPIRY_DAYS=${{ secrets.INVITATION_EXPIRY_DAYS || '7' }}
