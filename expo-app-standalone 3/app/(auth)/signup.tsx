@@ -513,7 +513,7 @@ export default function SignupScreen() {
                       ]}
                     >
                       {identity.ageConfirmed ? (
-                        <Text style={[styles.checkboxMark, { color: colors.background }]}>✓</Text>
+                        <Feather name="check" size={12} color={colors.background} />
                       ) : null}
                     </Pressable>
                     <Text style={[styles.consentText, { color: colors.foreground }]}>
@@ -543,7 +543,7 @@ export default function SignupScreen() {
                       ]}
                     >
                       {identity.termsAccepted ? (
-                        <Text style={[styles.checkboxMark, { color: colors.background }]}>✓</Text>
+                        <Feather name="check" size={12} color={colors.background} />
                       ) : null}
                     </Pressable>
                     <Text style={[styles.consentText, { color: colors.foreground }]}>
@@ -999,16 +999,11 @@ function makeStyles() {
     checkbox: {
       width: 18,
       height: 18,
-      borderRadius: 4,
+      borderRadius: 5,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 1,
-    },
-    checkboxMark: {
-      fontSize: 12,
-      lineHeight: 14,
-      fontFamily: 'Geist_600SemiBold',
     },
     consentText: {
       flex: 1,
