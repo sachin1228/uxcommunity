@@ -46,12 +46,12 @@ export async function isBlockedWithAny(
 ): Promise<boolean> {
   const ids = [...new Set(otherIds.filter((id): id is string => Boolean(id) && id !== userId))];
   if (ids.length === 0) return false;
-  const { data } = await blocksTable(db)
-    .select("blocker_id")
-    .in("blocker_id", [userId, ...ids])
-    .in("blocked_id", [userId, ...ids])
-    .limit(1);
-  return (data ?? []).length > 0;
+  // Delegate to the peer mapping: the raw query can also return a block
+  // between two candidates that does not involve this member (A blocked B
+  // while the member comments on A's thread and replies to B). Only rows that
+  // actually name the member count.
+  const blocked = await blockedAmong(db, userId, ids);
+  return blocked.size > 0;
 }
 
 /** The subset of candidates that have a block with the member, either way. */

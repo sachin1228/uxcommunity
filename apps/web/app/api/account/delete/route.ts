@@ -15,14 +15,15 @@ import { sendAccountDeletedEmail } from "@/lib/email";
  * Member-initiated account deletion.
  *
  * Requires the current password and the literal confirmation "DELETE" so a
- * stolen session alone cannot erase an account. A verification-restricted
- * account may still delete itself (allowUnverified) — leaving must never be
- * gated on a review.
+ * stolen session alone cannot erase an account. Liveness is not checked:
+ * a blocked or verification-restricted member must still be able to exercise
+ * erasure. A JWT for an already-deleted account reaches the row lookup and
+ * gets a 404.
  */
 export async function POST(request: NextRequest) {
   let session;
   try {
-    session = await requireSession("user", { allowUnverified: true });
+    session = await requireSession("user", { verifyActive: false });
   } catch (e) {
     return e as Response;
   }
