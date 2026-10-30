@@ -17,7 +17,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export async function GET(req: NextRequest) {
   let session;
-  try { session = await requireSession("user", { verifyActive: false }); } catch (e) { return e as Response; }
+  try { session = await requireSession("user", { allowUnverified: true }); } catch (e) { return e as Response; }
 
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();

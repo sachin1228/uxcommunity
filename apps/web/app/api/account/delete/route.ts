@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  clearSessionCookie,
-  invalidateUserLiveness,
-  requireSession,
-} from "@/lib/auth/session";
+import { clearSessionCookie, getSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deleteAccountCascade } from "@/lib/account/delete";
 import { parseDeleteAccountRequest } from "@/lib/account/delete-request";
@@ -21,15 +17,11 @@ import { sendAccountDeletedEmail } from "@/lib/email";
  * gets a 404.
  */
 export async function POST(request: NextRequest) {
-  let session;
-  try {
-    session = await requireSession("user", { verifyActive: false });
-  } catch (e) {
-    return e as Response;
-  }
-
-  const userId = session.userId;
-  if (!userId) {
+  // No liveness check on purpose: a blocked member must still be able to
+  // exercise erasure. The password + DELETE confirmation below are the gate.
+  const session = await getSession();
+  const userId = session?.userId;
+  if (!session || session.role !== "user" || !userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -68,7 +60,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const summary = await deleteAccountCascade(db, userId);
-    invalidateUserLiveness(userId);
 
     // Confirmation is sent after the rows are gone, to the address captured
     // before deletion. A mail failure must not resurrect the account or turn a

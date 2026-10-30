@@ -14,7 +14,7 @@ import { searchCompanies } from "@/lib/companies/service";
 export async function GET(request: NextRequest) {
   let session: Awaited<ReturnType<typeof requireSession>>;
   try {
-    session = await requireSession("user", { verifyActive: false });
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }

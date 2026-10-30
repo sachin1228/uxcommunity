@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  invalidateUserLiveness,
-  requireSession,
-} from "@/lib/auth/session";
+import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -78,7 +75,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
   }
 
-  invalidateUserLiveness(row.user_id);
 
   const approved = row.verification_status === "approved";
   const title = approved ? "Your account is verified" : "Verification not approved";

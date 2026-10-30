@@ -54,7 +54,7 @@ export async function GET(request: NextRequest, context: Params) {
   const startedAt = performance.now();
   let session;
   try {
-    session = await requireSession("user", { verifyActive: false });
+    session = await requireSession("user", { allowUnverified: true });
   } catch (error) {
     return error as Response;
   }
