@@ -21,7 +21,7 @@ import {
   REPORT_REASONS,
   isAlreadyReported,
   type ReportReason,
-  type ReportableContentType,
+  type ReportType,
 } from '@/lib/contentReports';
 import { reportContent } from '@/lib/contentReportsApi';
 
@@ -52,7 +52,7 @@ const REASON_ICONS: Record<ReportReason, FeatherName> = {
 
 interface Props {
   visible: boolean;
-  contentType: ReportableContentType;
+  contentType: ReportType;
   contentId: string;
   onClose: () => void;
   /** The report was accepted (or was already on file). */

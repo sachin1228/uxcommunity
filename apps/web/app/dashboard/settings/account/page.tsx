@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { loadAccount } from "@/lib/settings/load";
 import { AccountSection } from "../AccountSection";
+import { BlockedAccountsSection } from "../BlockedAccountsSection";
 import { SettingsBackLink } from "../SettingsBackLink";
 
 export const metadata = { title: "Account — Settings" };
@@ -18,6 +19,9 @@ export default async function AccountSettingsPage() {
       <SettingsBackLink />
       <div className="mt-4">
         <AccountSection email={email} memberSince={memberSince} />
+      </div>
+      <div className="mt-4">
+        <BlockedAccountsSection />
       </div>
     </>
   );

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Copy, Smile, Trash2, MoreHorizontal, Pencil, Reply } from "lucide-react";
+import { Copy, Flag, Smile, Trash2, MoreHorizontal, Pencil, Reply } from "lucide-react";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { ReportModal } from "../ReportModal";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 import type { CachedMessage, MessageDeletedByRole } from "@/lib/communities/cache";
 import { AnimatedEmoji } from "./AnimatedEmoji";
@@ -65,6 +66,7 @@ export function MessageHoverActions({
   waveIndex?: number;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const triggerBtnRef = useRef<HTMLButtonElement>(null);
   const myEmoji = msg.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji;
@@ -251,6 +253,21 @@ export function MessageHoverActions({
             </button>
           )}
 
+          {!isMe && !isDeleted && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setReportOpen(true);
+                onMenuOpenChange(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              role="menuitem"
+            >
+              <Flag strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+              <span>Report</span>
+            </button>
+          )}
+
           {(isMe || canModerate) && (
             <>
               <div className="h-px bg-white/[0.08]" role="separator" />
@@ -271,6 +288,13 @@ export function MessageHoverActions({
         </DropdownMenu>
       </div>
       )}
+
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        contentType="community_message"
+        contentId={msg.id}
+      />
     </div>
   );
 }

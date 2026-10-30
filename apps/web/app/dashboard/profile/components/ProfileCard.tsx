@@ -3,12 +3,13 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, Camera, Globe, Linkedin, MapPin, MoreVertical, Plus, ShieldOff } from "lucide-react";
+import { Ban, Camera, Flag, Globe, Linkedin, MapPin, MoreVertical, Plus, ShieldOff } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { PendingButton } from "@/components/ui/PendingButton";
+import { ReportModal } from "@/components/communities/ReportModal";
 import type { ProfileCompanyView } from "@/components/companies/types";
 import { dmUrls } from "@/lib/direct-messages/client";
 
@@ -138,6 +139,8 @@ export function ProfileCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockPending, setBlockPending] = useState<"block" | "unblock" | null>(null);
   const [blockError, setBlockError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
   const blockedByMe = blockControls?.blockedByMe ?? false;
   // While the viewer has this member blocked the profile reduces to the
   // identity the blocked line needs — picture, name, role, city — so the
@@ -278,7 +281,34 @@ export function ProfileCard({
                       <span>Block user</span>
                     </button>
                   )}
+
+                  {!blockedByMe && (
+                    <>
+                      <div className="my-1 h-px bg-border" role="separator" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setReportOpen(true);
+                        }}
+                        disabled={reported}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground transition-colors hover:bg-white/[0.08] disabled:opacity-50"
+                      >
+                        <Flag strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                        <span>{reported ? "Reported" : "Report user"}</span>
+                      </button>
+                    </>
+                  )}
                 </DropdownMenu>
+
+                <ReportModal
+                  open={reportOpen}
+                  onClose={() => setReportOpen(false)}
+                  contentType="profile"
+                  contentId={blockControls.memberId}
+                  onReported={() => setReported(true)}
+                />
               </div>
             ) : (
               <span aria-hidden="true" />

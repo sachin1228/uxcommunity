@@ -36,12 +36,44 @@ export const REPORT_CONTENT_TYPES = ['thread', 'showcase', 'resource', 'event'] 
 
 export type ReportableContentType = (typeof REPORT_CONTENT_TYPES)[number];
 
+/** Comments, chat messages and profiles use the interaction report queue. */
+export const INTERACTION_REPORT_TYPES = [
+  'thread_comment',
+  'showcase_comment',
+  'resource_comment',
+  'event_comment',
+  'community_message',
+  'profile',
+] as const;
+
+export type InteractionReportType = (typeof INTERACTION_REPORT_TYPES)[number];
+
+export type ReportType = ReportableContentType | InteractionReportType;
+
+export function isInteractionReportType(value: ReportType): value is InteractionReportType {
+  return (INTERACTION_REPORT_TYPES as readonly string[]).includes(value);
+}
+
 /** How each reported kind is named in copy. */
-export const REPORT_CONTENT_LABELS: Record<ReportableContentType, string> = {
+export const REPORT_CONTENT_LABELS: Record<ReportType, string> = {
   thread: 'thread',
   showcase: 'showcase post',
   resource: 'resource',
   event: 'event',
+  thread_comment: 'comment',
+  showcase_comment: 'comment',
+  resource_comment: 'comment',
+  event_comment: 'comment',
+  community_message: 'message',
+  profile: 'profile',
+};
+
+/** The comment surface's kind to the interaction report API's type. */
+export const REPORT_COMMENT_TYPE_BY_KIND: Record<ContentKind, InteractionReportType> = {
+  threads: 'thread_comment',
+  showcase: 'showcase_comment',
+  resources: 'resource_comment',
+  events: 'event_comment',
 };
 
 /** The card kind (a tab key) to the report API's singular content type. */

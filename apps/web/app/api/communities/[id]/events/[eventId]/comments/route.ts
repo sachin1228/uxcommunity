@@ -6,6 +6,7 @@ import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { loadEventForViewer } from "@/lib/communities/event-access";
 import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
+import { isBlockedWithAny } from "@/lib/blocks/server";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
@@ -107,6 +108,13 @@ export async function POST(
       .maybeSingle();
     if (!parent) return NextResponse.json({ error: "Parent comment not found." }, { status: 404 });
     parentAuthorId = parent.user_id;
+  }
+
+  if (await isBlockedWithAny(db, userId, [event.user_id, parentAuthorId])) {
+    return NextResponse.json(
+      { error: "You can't interact with this member." },
+      { status: 403 },
+    );
   }
 
   const { data: comment, error } = await db

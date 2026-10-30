@@ -37,6 +37,8 @@ interface Props {
   onCopy: (message: Message) => void;
   onEdit: (message: Message) => void;
   onDelete: (messageId: string) => void;
+  /** Community chat only — opens the interaction report wizard. */
+  onReport?: (message: Message) => void;
 }
 
 /**
@@ -56,6 +58,7 @@ export function MessageActionsSheet({
   onCopy,
   onEdit,
   onDelete,
+  onReport,
 }: Props) {
   const colors = useColors();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -194,6 +197,19 @@ export function MessageActionsSheet({
                   onPress={() => {
                     close();
                     onEdit(message);
+                  }}
+                />
+              )}
+
+              {/* ── Report (other members' messages, community chat) ── */}
+              {onReport && !isOwn && !isDeleted && (
+                <ActionRow
+                  icon={<Feather name="flag" size={16} color={colors.mutedForeground} />}
+                  label="Report"
+                  color={colors.mutedForeground}
+                  onPress={() => {
+                    close();
+                    onReport(message);
                   }}
                 />
               )}

@@ -16,6 +16,7 @@ import { CommentComposer, Avatar, renderEmojiText } from "./CommentComposer";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { ALLOWED_COMMENT_REACTIONS } from "@/lib/communities/comment-reactions";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
+import { ReportModal } from "./ReportModal";
 import { formatRelativeDate, formatFullDate } from "./threads/threadShared";
 import { sortCommentTree } from "@/lib/communities/comment-tree";
 import { profileHref } from "@/lib/profile/links";
@@ -30,6 +31,13 @@ import { profileHref } from "@/lib/profile/links";
 
 /** URL segment for the comments API, e.g. "threads" → …/threads/:targetId/comments */
 export type CommentKind = "threads" | "resources" | "showcase" | "events";
+
+const REPORT_TYPE_BY_KIND = {
+  threads: "thread_comment",
+  resources: "resource_comment",
+  showcase: "showcase_comment",
+  events: "event_comment",
+} as const;
 
 /** Minimal comment shape every content type's comment satisfies. */
 export interface CommunityComment {
@@ -175,10 +183,10 @@ function CommentRow<C extends CommunityComment>({
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Report is a signal to moderators, not a stored record — the option just
-  // acknowledges the tap ("Reported") for a moment, like the thread, resource
-  // and event menus do.
+  // Report is a stored moderation record: the menu opens the shared report
+  // wizard and flips to "Reported" once the API accepts it.
   const [reported, setReported] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const reactionPending = useRef(false);
@@ -351,8 +359,7 @@ function CommentRow<C extends CommunityComment>({
                     type="button"
                     onClick={() => {
                       setMenuOpen(false);
-                      setReported(true);
-                      setTimeout(() => setReported(false), 3000);
+                      setShowReportModal(true);
                     }}
                     disabled={reported}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
@@ -539,6 +546,14 @@ function CommentRow<C extends CommunityComment>({
         message="This will permanently remove this comment. This cannot be undone."
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
+      />
+
+      <ReportModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType={REPORT_TYPE_BY_KIND[kind]}
+        contentId={comment.id}
+        onReported={() => setReported(true)}
       />
     </>
   );

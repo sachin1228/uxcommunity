@@ -30,6 +30,7 @@ import {
   useContentActions,
 } from '@/components/community/contentView';
 import { ContentCardRow } from '@/components/community/ContentCardRow';
+import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHeaderButton, ProfilePageHeader } from '@/components/profile/ProfilePageHeader';
 import { MemberProfileHero } from '@/components/profile/MemberProfileHero';
@@ -161,6 +162,7 @@ function MemberProfileSession({
 
   const [messageError, setMessageError] = useState<string | null>(null);
   const [unblocking, setUnblocking] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   /** Guards a second push while the first tap's transition is starting. */
   const navigatingToMessagesRef = useRef(false);
 
@@ -492,8 +494,17 @@ function MemberProfileSession({
         blockedByMe={member?.blockedByMe ?? false}
         onMessage={() => void openMessage()}
         onUnblock={() => void handleUnblock()}
+        onReport={() => setReportOpen(true)}
         unblocking={unblocking}
         actionsDisabled={!memberAuthoritative}
+      />
+
+      <ContentReportModal
+        visible={reportOpen}
+        contentType="profile"
+        contentId={memberId ?? ''}
+        onClose={() => setReportOpen(false)}
+        onReported={() => setReportOpen(false)}
       />
 
       {memberError && member ? (

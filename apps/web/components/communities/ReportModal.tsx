@@ -32,8 +32,9 @@ import {
   REPORT_CONTENT_LABELS,
   REPORT_DETAILS_MAX_LENGTH,
   REPORT_REASONS,
-  type ReportableContentType,
+  isInteractionReportType,
   type ReportReason,
+  type ReportType,
 } from "@/lib/communities/report-reasons";
 
 const REASON_ICONS: Record<ReportReason, typeof Flag> = {
@@ -52,7 +53,7 @@ type Step = "reason" | "details" | "done";
 interface ReportModalProps {
   open: boolean;
   onClose: () => void;
-  contentType: ReportableContentType;
+  contentType: ReportType;
   contentId: string;
   /** Fired once the report is accepted (or was already on file), so the
    *  caller's menu can show the acknowledged "Reported" state. */
@@ -89,7 +90,10 @@ export function ReportModal({
     setError(null);
 
     try {
-      const response = await fetch("/api/content-reports", {
+      const endpoint = isInteractionReportType(contentType)
+        ? "/api/interaction-reports"
+        : "/api/content-reports";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

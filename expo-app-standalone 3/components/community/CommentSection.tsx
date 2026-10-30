@@ -38,6 +38,8 @@ import {
 } from '@/lib/comments';
 import { commentParticipantNames, splitCommentText } from '@/lib/commentText';
 import { PersonAvatar } from '@/components/PersonAvatar';
+import { ContentReportModal } from './ContentReportModal';
+import { REPORT_COMMENT_TYPE_BY_KIND } from '@/lib/contentReports';
 
 /**
  * The community comment section, ported from the web `CommentSection`.
@@ -628,9 +630,10 @@ function CommentRow({
   const colors = useColors();
   const [repliesOpen, setRepliesOpen] = useState(true);
   const [deleting, setDeleting] = useState(false);
-  // Report is a signal, not a stored record — the option acknowledges the tap
-  // ("Reported") for a moment, exactly like the web comment menu.
+  // Report is a stored moderation record: the menu opens the report wizard and
+  // flips to "Reported" once the API accepts it.
   const [reported, setReported] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const reactPending = useRef(false);
 
   const menuOpen = layer?.type === 'menu' && layer.commentId === comment.id;
@@ -682,8 +685,7 @@ function CommentRow({
   const handleReport = () => {
     hapticSelection();
     onLayerChange(null);
-    setReported(true);
-    setTimeout(() => setReported(false), 3000);
+    setReportOpen(true);
   };
 
   const toggleReaction = async (emoji: CommentReactionEmoji) => {
@@ -954,6 +956,14 @@ function CommentRow({
           </View>
         ) : null}
       </View>
+
+      <ContentReportModal
+        visible={reportOpen}
+        contentType={REPORT_COMMENT_TYPE_BY_KIND[kind]}
+        contentId={comment.id}
+        onClose={() => setReportOpen(false)}
+        onReported={() => setReported(true)}
+      />
     </View>
   );
 }

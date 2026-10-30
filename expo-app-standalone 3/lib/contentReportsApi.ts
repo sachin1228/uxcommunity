@@ -1,5 +1,9 @@
 import { apiFetch } from './api';
-import type { ReportReason, ReportableContentType } from './contentReports';
+import {
+  isInteractionReportType,
+  type ReportReason,
+  type ReportType,
+} from './contentReports';
 
 /**
  * File one report. Resolves when the report was accepted (or was already on
@@ -14,12 +18,15 @@ export async function reportContent({
   reason,
   details,
 }: {
-  contentType: ReportableContentType;
+  contentType: ReportType;
   contentId: string;
   reason: ReportReason;
   details: string;
 }): Promise<void> {
-  await apiFetch('/api/content-reports', {
+  const endpoint = isInteractionReportType(contentType)
+    ? '/api/interaction-reports'
+    : '/api/content-reports';
+  await apiFetch(endpoint, {
     method: 'POST',
     body: {
       content_type: contentType,

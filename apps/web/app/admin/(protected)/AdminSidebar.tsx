@@ -159,6 +159,20 @@ export function AdminSidebar() {
         Reports
       </Link>
 
+      {/* Interaction reports: comments, chat messages, profiles */}
+      <Link
+        href="/admin/interaction-reports"
+        onClick={() => setPendingHref("/admin/interaction-reports")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/interaction-reports")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <MessageSquareWarning strokeWidth={2.5} size={16} className={active("/admin/interaction-reports") ? "text-accent" : ""} />
+        Comments &amp; chat
+      </Link>
+
       {/* DM Reports */}
       <Link
         href="/admin/dm-reports"
