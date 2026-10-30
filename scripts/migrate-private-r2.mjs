@@ -509,20 +509,38 @@ async function main() {
   }
 
   const targetBySource = new Map(entries.map((entry) => [entry.sourceUrl, entry.targetKey]));
+  // Keep entries from earlier runs (a re-run skips rows that already have a
+  // key, and its purge phase still needs their source URLs).
   const done = [];
+  if (existsSync(STATE_PATH)) {
+    try {
+      const previous = JSON.parse(readFileSync(STATE_PATH, "utf8"));
+      if (Array.isArray(previous.entries)) done.push(...previous.entries);
+    } catch {
+      console.warn(`Could not read ${STATE_PATH}; starting a new state file.`);
+    }
+  }
+  const flushState = () => {
+    mkdirSync(path.dirname(STATE_PATH), { recursive: true });
+    writeFileSync(
+      STATE_PATH,
+      JSON.stringify({ generatedAt: new Date().toISOString(), entries: done }, null, 2),
+    );
+  };
+
   for (const entry of entries) {
     try {
       const result = await applyEntry(clients, entry, targetBySource);
-      done.push(entry);
+      if (!done.some((saved) => saved.sourceKey === entry.sourceKey)) done.push(entry);
+      flushState();
       console.log(`migrated ${entry.sourceKey} (${Math.round(result.bytes / 1024)} KB)`);
     } catch (error) {
       console.error(`FAILED ${entry.sourceKey}: ${error.message} — public copy kept`);
     }
   }
 
-  mkdirSync(path.dirname(STATE_PATH), { recursive: true });
-  writeFileSync(STATE_PATH, JSON.stringify({ generatedAt: new Date().toISOString(), entries: done }, null, 2));
-  console.log(`\nMigrated ${done.length}/${entries.length}. State: ${STATE_PATH}`);
+  flushState();
+  console.log(`\nMigrated ${entries.length} planned object(s); ${done.length} total in state. State: ${STATE_PATH}`);
   console.log("Public copies are untouched. Run --purge-public --confirm-purge after verification.");
 }
 
