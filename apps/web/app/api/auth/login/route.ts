@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loginSchema } from "@/lib/validations";
-import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { createSession, getAdminEpoch, setSessionCookie } from "@/lib/auth/session";
+import {
+  AccountUnavailableError,
+  createAuthSession,
+  revokeAuthSession,
+} from "@/lib/auth/session-registry";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
@@ -81,10 +86,36 @@ export async function POST(request: NextRequest) {
     email.toLowerCase() === adminEmail.toLowerCase() &&
     password === adminPassword
   ) {
-    const token = await createSession({ email: adminEmail, role: "admin" });
-    const response = NextResponse.json({ success: true, redirect: "/admin" });
-    setSessionCookie(response, token, request.nextUrl.hostname);
-    return response;
+    const adm = await getAdminEpoch();
+    if (!adm) {
+      console.error("[login] admin epoch unavailable");
+      return NextResponse.json(
+        { error: "Admin sign-in is temporarily unavailable." },
+        { status: 500 },
+      );
+    }
+
+    try {
+      const { sessionId } = await createAuthSession({
+        role: "admin",
+        userAgent: request.headers.get("user-agent"),
+      });
+      const token = await createSession({
+        email: adminEmail,
+        role: "admin",
+        sid: sessionId,
+        adm,
+      });
+      const response = NextResponse.json({ success: true, redirect: "/admin" });
+      setSessionCookie(response, token, request.nextUrl.hostname);
+      return response;
+    } catch (err) {
+      console.error("[login] admin session creation failed:", err);
+      return NextResponse.json(
+        { error: "Admin sign-in is temporarily unavailable." },
+        { status: 500 },
+      );
+    }
   }
 
   const db = createServiceClient();
@@ -148,20 +179,68 @@ export async function POST(request: NextRequest) {
   // ~350ms of pure-JS bcrypt CPU. On a successful login, downgrade the stored
   // hash to the current cost so the NEXT login is ~4x cheaper. New signups and
   // resets already hash at the current cost.
+  let verifiedHash = row.password_hash;
   if (needsPasswordRehash(row.password_hash)) {
     try {
       const upgradedHash = await hashPassword(password);
-      await db.from("users").update({ password_hash: upgradedHash }).eq("id", row.id);
+      // Optimistic: only rehash the exact hash this login verified. A reset
+      // that landed in between must not be overwritten with the old password.
+      const { data: rehashed, error: rehashError } = await db
+        .from("users")
+        .update({ password_hash: upgradedHash })
+        .eq("id", row.id)
+        .eq("password_hash", row.password_hash)
+        .select("id");
+      if (!rehashError && rehashed && rehashed.length === 1) {
+        verifiedHash = upgradedHash;
+      }
     } catch (err) {
       // Non-fatal: the login itself succeeded; the hash is just upgraded next time.
       console.error("[login] password rehash failed:", err);
     }
   }
 
+  let issued: { sessionId: string; sessionVersion: number };
+  try {
+    issued = await createAuthSession({
+      userId: row.id,
+      role: "user",
+      userAgent: request.headers.get("user-agent"),
+    });
+  } catch (err) {
+    if (err instanceof AccountUnavailableError) {
+      return NextResponse.json(
+        { error: "Your account is unavailable. Please contact support." },
+        { status: 403 },
+      );
+    }
+    console.error("[login] session creation failed:", err);
+    return NextResponse.json({ error: "Sign-in failed. Please try again." }, { status: 500 });
+  }
+
+  // Password reset/change may have committed between the bcrypt compare and
+  // the session insert. If the stored hash is no longer the one this login
+  // verified, revoke the just-created row and refuse the token. This also
+  // catches a reset that lands after the insert but before this read.
+  const { data: current } = await db
+    .from("users")
+    .select("password_hash")
+    .eq("id", row.id)
+    .maybeSingle();
+  if (!current || current.password_hash !== verifiedHash) {
+    await revokeAuthSession(issued.sessionId, "password_changed_during_login");
+    return NextResponse.json(
+      { error: "Your password changed. Please sign in again." },
+      { status: 401 },
+    );
+  }
+
   const token = await createSession({
     userId: row.id,
     email: row.email,
     role: "user",
+    sid: issued.sessionId,
+    sv: issued.sessionVersion,
   });
 
   const graceDays = await getVerificationGraceDays();

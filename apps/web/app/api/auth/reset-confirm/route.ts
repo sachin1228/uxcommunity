@@ -3,6 +3,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword } from "@/lib/auth/password";
+import { completePasswordReset } from "@/lib/auth/session-registry";
+import { revokeRealtimeSessions } from "@/lib/realtime/revoke";
+import { logEvent } from "@/lib/observability/log";
 import { z } from "zod";
 
 const schema = z
@@ -78,43 +81,50 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── Atomic token claim (C-3: fix TOCTOU race) ───────────────────────
-  // Mark the token as used BEFORE updating the password. The IS NULL guard
-  // ensures only one concurrent request can win; if another request already
-  // claimed it, we return 410 without touching the password.
-  const { data: claimed } = await db
-    .from("password_resets")
-    .update({ used_at: new Date().toISOString() })
-    .eq("id", reset.id)
-    .is("used_at", null)
-    .select("id");
+  // One transaction claims the token, updates the hash, bumps
+  // users.session_version and revokes every registry row. A concurrent reset
+  // either loses the claim or produces a token generation that no issued JWT
+  // can match.
+  const passwordHash = await hashPassword(password);
 
-  if (!claimed || claimed.length === 0) {
+  let result;
+  try {
+    result = await completePasswordReset(token, passwordHash);
+  } catch (error) {
+    console.error("[reset-confirm] atomic reset failed:", error);
+    return NextResponse.json(
+      { error: "Failed to update password. Please try again." },
+      { status: 500 }
+    );
+  }
+
+  if (result.status === "used") {
     return NextResponse.json(
       { error: "This reset link has already been used. Please request a new one." },
       { status: 410 }
     );
   }
-
-  const passwordHash = await hashPassword(password);
-
-  const { error: updateError } = await db
-    .from("users")
-    .update({ password_hash: passwordHash })
-    .eq("id", reset.user_id);
-
-  if (updateError) {
-    // Roll back the used_at claim so the user can retry
-    await db
-      .from("password_resets")
-      .update({ used_at: null })
-      .eq("id", reset.id);
-
-    console.error("[reset-confirm] update error:", updateError);
+  if (result.status === "expired") {
     return NextResponse.json(
-      { error: "Failed to update password. Please try again." },
-      { status: 500 }
+      { error: "This reset link has expired. Please request a new one." },
+      { status: 410 }
     );
+  }
+  if (result.status !== "ok" || !result.userId) {
+    return NextResponse.json(
+      { error: "Invalid or expired reset link." },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await revokeRealtimeSessions({ userId: result.userId, all: true });
+  } catch (error) {
+    logEvent("warn", {
+      event: "auth.password_reset.realtime_failed",
+      userId: result.userId,
+      error,
+    });
   }
 
   return NextResponse.json({ success: true });

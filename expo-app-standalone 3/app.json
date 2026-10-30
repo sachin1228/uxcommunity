@@ -56,7 +56,8 @@
           "isAccessMediaLocationEnabled": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-secure-store"
     ],
     "notification": {
       "color": "#1D1F26"

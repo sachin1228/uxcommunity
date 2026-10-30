@@ -10,13 +10,14 @@
  *   EXPO_PUBLIC_API_URL=https://app.example.com
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { shouldApplySessionCookie } from './sessionLifecycle';
+import {
+  clearStoredSessionToken,
+  readStoredSessionToken,
+  writeStoredSessionToken,
+} from './sessionStorage';
 
 const SESSION_COOKIE_NAME = 'uxcommunity_session';
-const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
-// Read once for users upgrading from the pre-rebrand mobile app.
-const LEGACY_SESSION_STORAGE_KEY = '@auth/draft_session';
 
 export const API_BASE_URL =
   (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
@@ -40,12 +41,12 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
     // was already in flight must not be allowed to apply its cookie or sign
     // this new session out through a late 401.
     sessionGeneration += 1;
-    await AsyncStorage.setItem(SESSION_STORAGE_KEY, match[1]);
+    await writeStoredSessionToken(match[1]);
   }
 }
 
 // Every request needs the cookie, and every screen issues several. Reading it
-// from AsyncStorage each time put a native round trip in front of every fetch;
+// from SecureStore each time put a native round trip in front of every fetch;
 // the value only changes when a response rotates it or the session is cleared.
 let sessionToken: string | null | undefined;
 let sessionTokenRead: Promise<string | null> | null = null;
@@ -174,10 +175,7 @@ export async function clearSession(): Promise<void> {
   sessionToken = null;
   sessionTokenRead = null;
   sessionGeneration += 1;
-  await AsyncStorage.multiRemove([
-    SESSION_STORAGE_KEY,
-    LEGACY_SESSION_STORAGE_KEY,
-  ]);
+  await clearStoredSessionToken();
 }
 
 /** Retrieve the stored session token (or null). */
@@ -187,26 +185,13 @@ export async function getStoredSession(): Promise<string | null> {
 
   const startedGeneration = sessionGeneration;
   const request = (async () => {
-    const current = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+    const current = await readStoredSessionToken();
     // A sign-out/login replaced the session while the native read was in
     // flight. Return the value to the request that needed it, but never cache
     // or migrate it into the new session.
     if (sessionGeneration !== startedGeneration) return current;
-    if (current) {
-      sessionToken = current;
-      return current;
-    }
-
-    const legacy = await AsyncStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
-    if (sessionGeneration !== startedGeneration) return legacy;
-    if (legacy) {
-      await AsyncStorage.setItem(SESSION_STORAGE_KEY, legacy);
-      sessionToken = legacy;
-      return legacy;
-    }
-
-    sessionToken = null;
-    return null;
+    sessionToken = current;
+    return current;
   })();
 
   const tracked = request.finally(() => {

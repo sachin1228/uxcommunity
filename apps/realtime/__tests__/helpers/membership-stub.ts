@@ -40,9 +40,27 @@ export interface MembershipStub {
 
 /** Start a local HTTP server that authorizes every membership check. */
 export async function startMembershipStub(): Promise<MembershipStub> {
-  const server: Server = createServer((_req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true }));
+  const server: Server = createServer((req, res) => {
+    // Realtime now validates the registry-backed session on every handshake.
+    // The test harness has no Supabase, so it echoes the signed claims back;
+    // production always checks the real row (see the web route).
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      if (req.url?.includes("/internal/session/validate")) {
+        let claims: { userId?: unknown; sv?: unknown } = {};
+        try { claims = JSON.parse(body || "{}"); } catch { /* invalid body */ }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          ok: true,
+          userId: claims.userId,
+          sessionVersion: claims.sv,
+        }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
   });
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
   const port = (server.address() as { port: number }).port;

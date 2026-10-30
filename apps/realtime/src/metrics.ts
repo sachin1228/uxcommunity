@@ -83,6 +83,10 @@ export class RealtimeMetrics {
   membershipChecksFailed = 0;
   membershipCacheHits = 0;
   membershipCacheEvictions = 0;
+  /** Revocation pushes that closed at least one socket in this DO. */
+  sessionRevocations = 0;
+  /** Sockets closed because their session was revoked. */
+  socketsClosedByRevocation = 0;
 
   toJSON(): Record<string, number> {
     return {
@@ -109,6 +113,8 @@ export class RealtimeMetrics {
       membershipChecksFailed: this.membershipChecksFailed,
       membershipCacheHits: this.membershipCacheHits,
       membershipCacheEvictions: this.membershipCacheEvictions,
+      sessionRevocations: this.sessionRevocations,
+      socketsClosedByRevocation: this.socketsClosedByRevocation,
     };
   }
 }

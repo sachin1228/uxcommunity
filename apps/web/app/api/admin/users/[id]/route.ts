@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { setUserBlocked } from "@/lib/auth/session-registry";
+import { revokeRealtimeSessions } from "@/lib/realtime/revoke";
+import { logEvent } from "@/lib/observability/log";
 import { deleteAccountCascade } from "@/lib/account/delete";
 
 export async function GET(
@@ -98,15 +101,37 @@ export async function PATCH(
   }
 
   const db = createServiceClient();
+
+  try {
+    // One transaction flips the flag, bumps session_version and revokes every
+    // registry row. Unblocking bumps the version again, so the member must sign
+    // in fresh rather than resuming a pre-suspension session.
+    await setUserBlocked(id, is_blocked, is_blocked ? "admin_block" : "admin_unblock");
+  } catch (error) {
+    console.error("[admin/users] PATCH error:", error);
+    return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
+  }
+
+  if (is_blocked) {
+    try {
+      await revokeRealtimeSessions({ userId: id, all: true });
+    } catch (error) {
+      logEvent("warn", {
+        event: "admin.user_blocked.realtime_failed",
+        userId: id,
+        error,
+      });
+    }
+  }
+
   const { data, error } = await db
     .from("users")
-    .update({ is_blocked })
-    .eq("id", id)
     .select("id, name, email, is_blocked")
-    .single();
+    .eq("id", id)
+    .maybeSingle();
 
   if (error) {
-    console.error("[admin/users] PATCH error:", error);
+    console.error("[admin/users] PATCH readback error:", error);
     return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
   }
 
@@ -128,6 +153,17 @@ export async function DELETE(
 
   try {
     const summary = await deleteAccountCascade(db, id);
+
+    try {
+      await revokeRealtimeSessions({ userId: id, all: true });
+    } catch (error) {
+      logEvent("warn", {
+        event: "admin.user_deleted.realtime_failed",
+        userId: id,
+        error,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       communities: {

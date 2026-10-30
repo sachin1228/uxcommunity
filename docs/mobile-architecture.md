@@ -83,9 +83,24 @@ Deep links and push taps to `/community/[id]` render directly; the API returns
 
 `lib/api.ts` wraps `fetch`. The web backend issues an HttpOnly JWT cookie
 (`uxcommunity_session`); React Native can read the `Set-Cookie` response
-header, so the client captures that value into AsyncStorage and replays it as
-a `Cookie:` header on every request. The same stored token authenticates the
-realtime WebSocket (see below).
+header, so the client captures that value and replays it as a `Cookie:` header
+on every request and on the realtime WebSocket handshake (see below).
+
+Token storage is `expo-secure-store` (Keychain on iOS, Keystore-backed on
+Android), behind `lib/sessionStorage.ts`. On first launch after upgrading, the
+module reads the old `@auth/uxcommunity_session` / `@auth/draft_session` values
+from AsyncStorage, writes them to SecureStore, and only then removes the
+plaintext copy. The web build (where SecureStore is unavailable) keeps the
+AsyncStorage fallback; a native device where SecureStore cannot be used fails
+the write instead of silently storing a bearer token in plaintext. Logout, a 401
+and a revoked realtime session all clear both stores.
+
+The JWT is now a pointer into the server-side session registry, so deleting,
+suspending or revoking the account takes effect on the next `/api/auth/me`
+call: the route returns `{ user: null }` and `AuthContext` clears the cookie,
+snapshots, query cache, chat cache and sockets. A realtime close with code
+**4001** (`session revoked`) is terminal: it does not reconnect, and it raises
+the same sign-out path immediately.
 
 ## Realtime chat
 
@@ -175,8 +190,17 @@ hook (useChatMessages, useTypingPresence, …)
 - A room is torn down only when topic refs, `subscribe()` refs **and** presence
   handlers are all empty — otherwise one screen's cleanup kills a socket the
   community list still depends on.
-- Auth: the session JWT goes in the `token` query parameter, because React
-  Native's WebSocket API cannot send custom headers.
+- Auth: the session JWT is sent as the `uxcommunity_session` cookie through
+  React Native's non-standard WebSocket header option — not in the URL, where
+  proxies and logs would capture it. The Worker verifies the signature **and**
+  asks the web API whether the token's `sid`/`sv` are still live before
+  accepting the upgrade; a revoked user is rejected with 401. It validates
+  again after the DO accepts, closing the handshake/revocation race.
+- Revocation: the web app posts to the realtime Worker after committing the
+  database revocation. Existing sockets for that user are closed with **4001**
+  (one sid for logout, every sid for logout-all/reset/suspension/deletion,
+  every sid except the current one for a password change). The client treats
+  4001 as terminal and does not reconnect.
 
 ### Liveness — the mobile-specific part
 

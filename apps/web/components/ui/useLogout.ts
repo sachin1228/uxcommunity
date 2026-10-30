@@ -46,7 +46,13 @@ export function useLogout() {
   const handleLogout = useCallback(async () => {
     setLoggingOut(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) {
+        // The server could not revoke the registry row; navigating away would
+        // hide that the old token is still valid.
+        setLoggingOut(false);
+        return;
+      }
       const { resetClientSessionCaches } = await import("@/lib/session-cache");
       resetClientSessionCaches();
       await closeRealtime();

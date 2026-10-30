@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { createAuthSession } from "@/lib/auth/session-registry";
 import { sendWelcomeEmail } from "@/lib/email";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
@@ -191,17 +192,33 @@ export async function POST(request: NextRequest) {
     console.error("[signup/avatar] welcome email error:", emailError);
   }
 
-  const sessionToken = await createSession({
-    userId,
-    email: identity.email.toLowerCase(),
-    role: "user",
-  });
   const response = NextResponse.json({
     success: true,
     userId,
     avatar_url: profilePictureUrl,
     joined_communities: joinedCommunities,
   });
-  setSessionCookie(response, sessionToken, request.nextUrl.hostname);
+
+  // The account exists at this point. If the registry insert fails we still
+  // return success so a retry cannot collide with the just-created email; the
+  // member can sign in normally, which will issue a fresh session.
+  try {
+    const issued = await createAuthSession({
+      userId,
+      role: "user",
+      userAgent: request.headers.get("user-agent"),
+    });
+    const sessionToken = await createSession({
+      userId,
+      email: identity.email.toLowerCase(),
+      role: "user",
+      sid: issued.sessionId,
+      sv: issued.sessionVersion,
+    });
+    setSessionCookie(response, sessionToken, request.nextUrl.hostname);
+  } catch (sessionError) {
+    console.error("[signup/avatar] session creation failed:", sessionError);
+  }
+
   return response;
 }

@@ -105,6 +105,12 @@ export interface RealtimePlatform {
   createSocket(url: string, headers?: Record<string, string>): RealtimeSocket;
   /** Fires when the app returns to the foreground. Returns an unsubscribe. */
   onForeground(handler: () => void): () => void;
+  /**
+   * The server closed a socket because its registry session was revoked
+   * (close code 4001). The app must clear local credentials and cached member
+   * state, not merely reconnect.
+   */
+  onSessionRevoked?(): void;
 }
 
 /** Name of the session cookie the web backend issues and the realtime Worker reads. */
@@ -162,7 +168,7 @@ const DEFAULT_RECONNECT_JITTER = 0.2;
  * application-level authorization codes. A 401/403 handshake arrives as 1006
  * (the status is hidden), which the attempt cap above covers.
  */
-const TERMINAL_CLOSE_CODES = new Set([1008, 4401, 4403]);
+const TERMINAL_CLOSE_CODES = new Set([1008, 4001, 4401, 4403]);
 
 export function isTerminalCloseCode(code: number | null | undefined): boolean {
   return typeof code === "number" && TERMINAL_CLOSE_CODES.has(code);
@@ -678,6 +684,7 @@ export class RealtimeClient {
         // foreground/network/session reset is cheaper than a 15 s retry loop.
         conn.terminal = true;
         conn.reconnectAttempt = 0;
+        if (event?.code === 4001) this.platform.onSessionRevoked?.();
         return;
       }
       if (!conn.manuallyClosed) this.scheduleReconnect(conn);

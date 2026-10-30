@@ -32,6 +32,16 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [signingOutAll, setSigningOutAll] = useState(false);
+  const [signOutAllError, setSignOutAllError] = useState<string | null>(null);
+
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changing, setChanging] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
+  const [changeSuccess, setChangeSuccess] = useState<string | null>(null);
 
   function closeDeleteDialog() {
     if (deleting) return;
@@ -68,6 +78,72 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
       setDeleteError("Your account could not be deleted. Check your connection and try again.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function signOutEverywhere() {
+    if (signingOutAll) return;
+    setSigningOutAll(true);
+    setSignOutAllError(null);
+    try {
+      const res = await fetch("/api/auth/logout-all", { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setSignOutAllError(body?.error ?? "Could not sign out all devices. Please try again.");
+        return;
+      }
+      const { resetClientSessionCaches } = await import("@/lib/session-cache");
+      resetClientSessionCaches();
+      window.location.replace("/login");
+    } catch {
+      setSignOutAllError("Could not sign out all devices. Check your connection and try again.");
+    } finally {
+      setSigningOutAll(false);
+    }
+  }
+
+  function closeChangeDialog() {
+    if (changing) return;
+    setChangeOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setChangeError(null);
+  }
+
+  async function changePassword() {
+    if (changing) return;
+    setChanging(true);
+    setChangeError(null);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { success?: boolean; message?: string; error?: string }
+        | null;
+
+      if (!res.ok || !body?.success) {
+        setChangeError(body?.error ?? "Password could not be changed. Please try again.");
+        return;
+      }
+
+      setChangeSuccess(body.message ?? "Password changed. Other devices have been signed out.");
+      setChangeOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setChangeError(null);
+    } catch {
+      setChangeError("Password could not be changed. Check your connection and try again.");
+    } finally {
+      setChanging(false);
     }
   }
 
@@ -127,24 +203,63 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
                 Send a reset link to your email.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void sendResetLink()}
-              disabled={sending}
-              className="modal-btn modal-btn-secondary shrink-0"
-            >
-              {sending && <Spinner size={13} />}
-              {sending ? "Sending…" : "Send reset link"}
-            </button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setChangeOpen(true)}
+                className="modal-btn modal-btn-secondary"
+              >
+                Change password
+              </button>
+              <button
+                type="button"
+                onClick={() => void sendResetLink()}
+                disabled={sending}
+                className="modal-btn modal-btn-secondary"
+              >
+                {sending && <Spinner size={13} />}
+                {sending ? "Sending…" : "Send reset link"}
+              </button>
+            </div>
           </div>
           {message && (
             <p className="mt-2.5 font-body text-xs text-emerald-500" role="status">
               {message}
             </p>
           )}
+          {changeSuccess && (
+            <p className="mt-2.5 font-body text-xs text-emerald-500" role="status">
+              {changeSuccess}
+            </p>
+          )}
           {error && (
             <p className="mt-2.5 font-body text-xs text-red-400" role="alert">
               {error}
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-body text-xs font-medium text-foreground">Signed-in devices</p>
+              <p className="mt-0.5 font-body text-xs text-foreground-muted">
+                Sign out this browser and every other device.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void signOutEverywhere()}
+              disabled={signingOutAll}
+              className="modal-btn modal-btn-secondary shrink-0"
+            >
+              {signingOutAll && <Spinner size={13} />}
+              {signingOutAll ? "Signing out…" : "Sign out all devices"}
+            </button>
+          </div>
+          {signOutAllError && (
+            <p className="mt-2.5 font-body text-xs text-red-400" role="alert">
+              {signOutAllError}
             </p>
           )}
         </div>
@@ -167,6 +282,88 @@ export function AccountSection({ email, memberSince }: AccountSectionProps) {
           </div>
         </div>
       </div>
+
+      <Modal open={changeOpen} onClose={closeChangeDialog} title="Change password">
+        <div className="flex flex-col gap-4">
+          <p className="font-body text-sm leading-relaxed text-foreground-muted">
+            Your current browser stays signed in. Every other device is
+            signed out.
+          </p>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="font-body text-xs font-medium text-foreground">
+              Current password
+            </span>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="field w-full"
+              autoComplete="current-password"
+              disabled={changing}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="font-body text-xs font-medium text-foreground">
+              New password
+            </span>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="field w-full"
+              autoComplete="new-password"
+              disabled={changing}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="font-body text-xs font-medium text-foreground">
+              Confirm new password
+            </span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="field w-full"
+              autoComplete="new-password"
+              disabled={changing}
+            />
+          </label>
+
+          {changeError && (
+            <p className="font-body text-xs text-red-400" role="alert">
+              {changeError}
+            </p>
+          )}
+
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeChangeDialog}
+              disabled={changing}
+              className="modal-btn modal-btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void changePassword()}
+              disabled={
+                changing ||
+                currentPassword.length === 0 ||
+                newPassword.length === 0 ||
+                confirmPassword.length === 0
+              }
+              className="modal-btn modal-btn-primary"
+            >
+              {changing && <Spinner size={13} />}
+              {changing ? "Changing…" : "Change password"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={deleteOpen} onClose={closeDeleteDialog} title="Delete account">
         <div className="flex flex-col gap-4">
