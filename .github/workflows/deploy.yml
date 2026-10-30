@@ -119,7 +119,7 @@ jobs:
       #   exists: 401 ... Authentication error
       #
       # — the web deploy's R2 check using the same dead token the realtime
-      # deploy above had already failed with, on the same run whose sibling job
+      # deploy had already failed with, on the same run whose sibling job
       # could not even delete a preview worker. The message reads like OpenNext
       # or R2; the cause was the credential. This step asks the credential to
       # prove itself (`/user/tokens/verify` — a rejection there can only be the
@@ -128,84 +128,6 @@ jobs:
       # "Workers R2 Storage" also fails here, with the permission named.
       - name: Verify Cloudflare credentials
         run: node scripts/verify-cloudflare-credentials.mjs
-
-      # ── Realtime worker (the web app publishes to it) ─────────────────────
-      - name: Deploy realtime worker
-        working-directory: apps/realtime
-        run: npx wrangler deploy
-
-      # Set AFTER the deploy, and never from the dashboard: `wrangler deploy`
-      # replaces the Worker's vars with the ones in its config file, so a
-      # plaintext value added by hand in the Cloudflare UI disappears on the
-      # next merge. Secrets are exempt from that sweep — wrangler never deletes
-      # them on a deploy — but the values still belong here, because taking both
-      # Workers' copies from one GitHub secret is what keeps them provably in
-      # sync.
-      #
-      # WHY `secret put` AND NOT `versions secret put` (this is load-bearing):
-      # `wrangler versions secret put` stages the value into a NEW version of the
-      # Worker and deliberately does NOT deploy it — it exists for gradual
-      # rollouts, which this Worker does not use. So every run of this step used
-      # to write the four secrets into a version nobody served, leaving the live
-      # version on whatever it already had: rotating a GitHub secret silently
-      # changed nothing in production, and a Worker that is running without
-      # SESSION_SECRET refuses every handshake with a 401 that no log explains
-      # (see apps/realtime/src/session-config.ts). `wrangler secret put`
-      # publishes the version it creates, which is what this step means.
-      #
-      # The value is written with `printf '%s'` rather than `echo`, which appends
-      # a newline: a secret that arrives with a trailing \n still signs nothing
-      # the web app can verify.
-      #
-      # API_URL / API_SECRET are the membership check's configuration. The
-      # realtime Worker FAILS CLOSED without them (audit M-8): with API_URL
-      # missing or unreachable, or API_SECRET not matching the web app's, every
-      # community socket is refused rather than silently let in. They are
-      # therefore verified above and pushed here on every deploy, and API_SECRET
-      # is written into the web Worker's .dev.vars below from the same GitHub
-      # secret, so the two Workers cannot drift apart.
-      - name: Set realtime worker secrets
-        working-directory: apps/realtime
-        run: |
-          printf '%s' "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
-          printf '%s' "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
-          printf '%s' "${{ secrets.API_URL }}" | npx wrangler secret put API_URL
-          printf '%s' "${{ secrets.API_SECRET }}" | npx wrangler secret put API_SECRET
-
-      # The smoke check chooses the origin it probes, mints the session token and
-      # picks which secrets to sign with — a mistake there would fail a HEALTHY
-      # deploy, so its helpers are pinned down before it is allowed to gate one.
-      - name: Unit-test the realtime smoke harness
-        run: node --test scripts/smoke-realtime.test.mjs
-
-      # Prove the version just published actually works, BEFORE the web worker
-      # ships against it. A deploy that answers `/publish` with "ok" while
-      # refusing every WebSocket handshake (a secret that never reached the live
-      # version, a broken custom-domain route) used to look like a successful
-      # release; this turns it into a red build. Blocks on exit code 1.
-      #
-      # The target is the SAME origin the client bundle is built against — the
-      # value in apps/web/wrangler.toml [vars] — so a route that works for CI but
-      # not for browsers cannot pass.
-      #
-      # API_URL / API_SECRET are passed for the same reason: the smoke test now
-      # also proves the MEMBERSHIP endpoint with them, because the socket checks
-      # above are all user-scoped and user rooms skip the membership gate. A
-      # wrong pair here — an API_URL that is a stale deployment, an API_SECRET
-      # the web app does not recognize — refuses every COMMUNITY socket in the
-      # product while every other check stays green, which is exactly how this
-      # went unnoticed. Both come from the same GitHub secrets the step above
-      # pushed, so the failure names the secret that is wrong.
-      - name: Smoke-test the deployed realtime worker
-        env:
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
-          REALTIME_URL: ${{ secrets.REALTIME_URL }}
-          API_URL: ${{ secrets.API_URL }}
-          API_SECRET: ${{ secrets.API_SECRET }}
-        run: |
-          origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
-          node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"
 
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files
@@ -310,7 +232,7 @@ jobs:
         run: |
           # The project URL is not a secret: it is the [vars] value that reaches
           # the Worker, so the probe has to use THAT one (same read as the
-          # realtime smoke step above) rather than a copy that could drift.
+          # realtime smoke step below) rather than a copy that could drift.
           export NEXT_PUBLIC_SUPABASE_URL="$(awk -F'"' '/^NEXT_PUBLIC_SUPABASE_URL/{print $2}' apps/web/wrangler.toml)"
           node scripts/verify-service-credentials.mjs
 
@@ -387,7 +309,7 @@ jobs:
       # file does not mention, so secrets set by hand that are not in the
       # repository are left alone. It publishes the version it creates — the
       # same reasoning as the realtime Worker's "Set realtime worker secrets"
-      # step above (see the long comment there for why `secret put` and not
+      # step below (see the long comment there for why `secret put` and not
       # `versions secret put`). The required-secrets check at the top of the
       # job is what keeps this safe: no pushed name can be empty, or the run
       # has already stopped.
@@ -414,3 +336,96 @@ jobs:
         env:
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
         run: printf '%s' "$FCM_SERVICE_ACCOUNT" | npx wrangler secret put FCM_SERVICE_ACCOUNT
+
+      # ── Realtime worker (the web app publishes to it) ─────────────────────
+      #
+      # Deliberately deployed AFTER the web worker and its secrets. Every
+      # WebSocket handshake calls the web app's /api/internal/session/validate,
+      # so the web half must already exist in production. Deploying this Worker
+      # first against an older web app made the smoke probe below fail with a
+      # 404, which skipped the web deploy and left production split — the
+      # realtime Worker refused every socket while the web app still issued
+      # tokens without sid/sv (2026-10-30). Web first, realtime second, smoke
+      # last: every release is then internally consistent, and the probe is a
+      # real end-to-end gate instead of a check against the previous release.
+      - name: Deploy realtime worker
+        working-directory: apps/realtime
+        run: npx wrangler deploy
+
+      # Set AFTER the deploy, and never from the dashboard: `wrangler deploy`
+      # replaces the Worker's vars with the ones in its config file, so a
+      # plaintext value added by hand in the Cloudflare UI disappears on the
+      # next merge. Secrets are exempt from that sweep — wrangler never deletes
+      # them on a deploy — but the values still belong here, because taking both
+      # Workers' copies from one GitHub secret is what keeps them provably in
+      # sync.
+      #
+      # WHY `secret put` AND NOT `versions secret put` (this is load-bearing):
+      # `wrangler versions secret put` stages the value into a NEW version of the
+      # Worker and deliberately does NOT deploy it — it exists for gradual
+      # rollouts, which this Worker does not use. So every run of this step used
+      # to write the four secrets into a version nobody served, leaving the live
+      # version on whatever it already had: rotating a GitHub secret silently
+      # changed nothing in production, and a Worker that is running without
+      # SESSION_SECRET refuses every handshake with a 401 that no log explains
+      # (see apps/realtime/src/session-config.ts). `wrangler secret put`
+      # publishes the version it creates, which is what this step means.
+      #
+      # The value is written with `printf '%s'` rather than `echo`, which appends
+      # a newline: a secret that arrives with a trailing \n still signs nothing
+      # the web app can verify.
+      #
+      # API_URL / API_SECRET are the membership check's configuration. The
+      # realtime Worker FAILS CLOSED without them (audit M-8): with API_URL
+      # missing or unreachable, or API_SECRET not matching the web app's, every
+      # community socket is refused rather than silently let in. They are
+      # therefore verified above and pushed here on every deploy, and API_SECRET
+      # is written into the web Worker's .dev.vars above from the same GitHub
+      # secret, so the two Workers cannot drift apart.
+      - name: Set realtime worker secrets
+        working-directory: apps/realtime
+        run: |
+          printf '%s' "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
+          printf '%s' "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
+          printf '%s' "${{ secrets.API_URL }}" | npx wrangler secret put API_URL
+          printf '%s' "${{ secrets.API_SECRET }}" | npx wrangler secret put API_SECRET
+
+      # The smoke check chooses the origin it probes, mints the session token and
+      # picks which secrets to sign with — a mistake there would fail a HEALTHY
+      # deploy, so its helpers are pinned down before it is allowed to gate one.
+      - name: Unit-test the realtime smoke harness
+        run: node --test scripts/smoke-realtime.test.mjs
+
+      # Prove the version just published actually works against the web worker
+      # that is now live. A deploy that answers `/publish` with "ok" while
+      # refusing every WebSocket handshake (a secret that never reached the live
+      # version, a broken custom-domain route, a handshake dependency the web
+      # app does not serve) used to look like a successful release; this turns
+      # it into a red build. Blocks on exit code 1.
+      #
+      # This step runs LAST on purpose: it is the only check that exercises the
+      # realtime Worker and the web Worker together, so it can only be honest
+      # once both of this run's deploys are live.
+      #
+      # The target is the SAME origin the client bundle is built against — the
+      # value in apps/web/wrangler.toml [vars] — so a route that works for CI but
+      # not for browsers cannot pass.
+      #
+      # API_URL / API_SECRET are passed for the same reason: the smoke test now
+      # also proves the MEMBERSHIP endpoint with them, because the socket checks
+      # above are all user-scoped and user rooms skip the membership gate. A
+      # wrong pair here — an API_URL that is a stale deployment, an API_SECRET
+      # the web app does not recognize — refuses every COMMUNITY socket in the
+      # product while every other check stays green, which is exactly how this
+      # went unnoticed. Both come from the same GitHub secrets the step above
+      # pushed, so the failure names the secret that is wrong.
+      - name: Smoke-test the deployed realtime worker
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
+          REALTIME_URL: ${{ secrets.REALTIME_URL }}
+          API_URL: ${{ secrets.API_URL }}
+          API_SECRET: ${{ secrets.API_SECRET }}
+        run: |
+          origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
+          node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"
