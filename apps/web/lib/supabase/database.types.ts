@@ -145,6 +145,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      auth_sessions: {
+        Row: {
+          created_at: string;
+          expires_at: string;
+          id: string;
+          last_seen_at: string;
+          revoked_at: string | null;
+          revoked_reason: string | null;
+          role: string;
+          session_version: number;
+          user_agent: string | null;
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          expires_at: string;
+          id?: string;
+          last_seen_at?: string;
+          revoked_at?: string | null;
+          revoked_reason?: string | null;
+          role: string;
+          session_version?: number;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          last_seen_at?: string;
+          revoked_at?: string | null;
+          revoked_reason?: string | null;
+          role?: string;
+          session_version?: number;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "auth_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       cities: {
         Row: {
           created_at: string;
@@ -2961,6 +3008,7 @@ export type Database = {
           is_blocked: boolean;
           name: string;
           password_hash: string;
+          session_version: number;
           terms_accepted_at: string | null;
           updated_at: string;
           verification_notified_at: string | null;
@@ -2979,6 +3027,7 @@ export type Database = {
           is_blocked?: boolean;
           name: string;
           password_hash: string;
+          session_version?: number;
           terms_accepted_at?: string | null;
           updated_at?: string;
           verification_notified_at?: string | null;
@@ -2997,6 +3046,7 @@ export type Database = {
           is_blocked?: boolean;
           name?: string;
           password_hash?: string;
+          session_version?: number;
           terms_accepted_at?: string | null;
           updated_at?: string;
           verification_notified_at?: string | null;
@@ -3020,6 +3070,70 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      change_user_password: {
+        Args: {
+          p_user_id: string;
+          p_password_hash: string;
+          p_keep_session_id: string | null;
+          p_expected_hash?: string | null;
+        };
+        Returns: number;
+      };
+      complete_password_reset: {
+        Args: {
+          p_token: string;
+          p_password_hash: string;
+        };
+        Returns: {
+          status: string;
+          user_id: string | null;
+        }[];
+      };
+      create_auth_session: {
+        Args: {
+          p_user_id: string | null;
+          p_role: string;
+          p_expires_at: string;
+          p_user_agent?: string | null;
+        };
+        Returns: {
+          session_id: string;
+          session_version: number;
+        }[];
+      };
+      revoke_all_admin_sessions: {
+        Args: {
+          p_reason: string;
+        };
+        Returns: number;
+      };
+      revoke_all_user_sessions: {
+        Args: {
+          p_user_id: string;
+          p_reason: string;
+        };
+        Returns: number | null;
+      };
+      revoke_other_user_sessions: {
+        Args: {
+          p_user_id: string;
+          p_keep_session_id: string | null;
+          p_reason: string;
+        };
+        Returns: number;
+      };
+      set_user_blocked: {
+        Args: {
+          p_user_id: string;
+          p_blocked: boolean;
+          p_reason: string;
+        };
+        Returns: {
+          id: string;
+          is_blocked: boolean;
+          session_version: number;
+        }[];
+      };
       admin_create_company: {
         Args: {
           p_name: string;

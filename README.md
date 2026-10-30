@@ -7,7 +7,7 @@ A platform for UI/UX, product, and social media designers. Designers sign up dir
 | Area | What's built |
 |---|---|
 | **Application / onboarding** | Direct multi-step sign-up (profile → avatar) at `/signup`, with invite links for approved/invited users. Applications still land in the admin dashboard for approve/reject review with email notifications. |
-| **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
+| **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — the JWT is an httpOnly cookie pointing at a server-side `auth_sessions` row plus a per-account `session_version`, so logout, logout-all, password change/reset, suspension and deletion revoke immediately instead of at token expiry. Includes login, logout, logout-all, password change, and password-reset request/confirm. |
 | **Admin panel** | Review and approve/reject applications; manage users (block/unblock/delete); community admins & permissions; CRUD for master data: cities, sectors, experience levels, job titles, communities, Lottie animations; incomplete sign-up recovery; R2 storage health audit; System Health dashboard for every external service, with automatic email alerts when one goes down; k6 load-test runs. |
 | **Communities / chat** | Real-time community chat (Cloudflare Durable Objects — see `apps/realtime`). Members are auto-joined to communities on sign-up. Admins can delete messages. |
 | **Image & file uploads** | Avatars, community images, chat/thread/showcase/event media uploaded to Cloudflare R2 (S3-compatible). Clients compress before upload (Canvas on web, `expo-image-manipulator` on mobile) and the server validates the bytes (signature sniffing) and stores them as-is. Orphaned objects are reclaimed by a reference-aware cleanup plus an admin R2 audit. |
@@ -39,7 +39,7 @@ uxcommunity/
 │   │   │   ├── admin/          Admin panel (protected — admin role required)
 │   │   │   │   └── (protected)/  users, communities, master data, signup attempts, tools, load test
 │   │   │   ├── dashboard/      Member area (protected — user role required)
-│   │   │   └── api/            129 route handlers (auth, admin, communities, home, push, …)
+│   │   │   └── api/            187 route handlers (auth, admin, communities, home, push, …)
 │   │   ├── components/         UI: admin/, communities/, feeds/, sidebar/, home/, …
 │   │   ├── lib/                Domain + client code: auth/, communities/ (+ models/, tests),
 │   │   │                       realtime/, push/, supabase/, home/, feeds/, r2*/
@@ -83,6 +83,8 @@ uxcommunity/
 | `docs/mobile-design-system.md` | How the mobile app consumes the shared design tokens |
 | `docs/performance-audit.md` | Ranked API/realtime performance findings and recommendations |
 | `docs/user-deletion-audit.md` | What `DELETE /api/admin/users/[id]` removes, cascades, and leaves in R2 |
+| `audit/SESSION_REVOCATION_VERIFICATION.md` | Authentication audit: what could survive logout, reset, deletion or suspension |
+| `audit/SESSION_REVOCATION_IMPLEMENTATION.md` | Session registry, revocation propagation, realtime/R2/mobile changes, tests and limitations |
 | `INFRASTRUCTURE-AUDIT.md` | Full production infrastructure audit (deployment, flows, scale, cost) |
 | `docs/infrastructure-cost-audit.md` | Third-party services and cloud-cost audit: every billable service, current vendor prices, and a monthly cost model from 1K to 1M users (`node scripts/cost-model.mjs`) |
 

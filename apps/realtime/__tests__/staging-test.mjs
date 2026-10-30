@@ -38,7 +38,12 @@ function record(testName, result, evidence) {
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 async function createToken(userId) {
-  return new SignJWT({ userId })
+  return new SignJWT({
+      userId,
+      sid: `test-sid-${userId}`,
+      sv: 1,
+      role: "user",
+    })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("24h")

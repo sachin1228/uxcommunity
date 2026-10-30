@@ -14,7 +14,12 @@ const PUBLISH_SECRET = "2be34006e8e98f5dc3f9e8276b35283bc02e2571087c009f";
 const SECRET_KEY = new TextEncoder().encode(SESSION_SECRET);
 
 async function createToken(userId) {
-  return new SignJWT({ userId })
+  return new SignJWT({
+      userId,
+      sid: `test-sid-${userId}`,
+      sv: 1,
+      role: "user",
+    })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("24h")

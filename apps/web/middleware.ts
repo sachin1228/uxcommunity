@@ -61,17 +61,16 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // Redirect already-authenticated users away from / and /login
+  // / and /login are deliberately NOT redirected from here. `verifySession`
+  // only checks the signature; a revoked token still verifies, so redirecting
+  // an apparently-signed-in user to /dashboard would bounce them straight back
+  // to /login forever. The root page does the database-backed check instead.
   if (pathname === "/" || pathname === "/login") {
-    if (session) {
-      const url = request.nextUrl.clone();
-      url.pathname = session.role === "admin" ? "/admin" : "/dashboard";
-      return NextResponse.redirect(url);
-    }
     return NextResponse.next();
   }
 
-  // Protect /admin/* — must be admin role
+  // Protect /admin/* — signature/role prefilter only. The protected layout and
+  // every admin route handler perform the registry + admin-epoch check.
   if (pathname.startsWith("/admin")) {
     if (!session || session.role !== "admin") {
       const url = request.nextUrl.clone();

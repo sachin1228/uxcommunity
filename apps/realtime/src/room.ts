@@ -19,6 +19,14 @@ import { MembershipAuthorizer } from "./membership-auth";
 import { PresenceBroadcaster } from "./presence";
 import { communityIdFromRoomName } from "./room-routing";
 import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
+import { secretMatches } from "./session-validation";
+
+interface RevokeRequest {
+  userId: string;
+  sid?: string;
+  exceptSid?: string;
+  all?: boolean;
+}
 
 /**
  * Community Durable Object — ONE per community. Handles all logical realtime
@@ -156,6 +164,10 @@ export class Room extends DurableObject<Env> {
       return Response.json(this.stats());
     }
 
+    if (new URL(request.url).pathname === "/revoke") {
+      return this.revoke(request);
+    }
+
     // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
       return this.publish(request);
@@ -187,7 +199,9 @@ export class Room extends DurableObject<Env> {
 
   private async upgrade(request: Request): Promise<Response> {
     const userId = request.headers.get("x-realtime-uid");
-    if (!userId) {
+    const sid = request.headers.get("x-realtime-sid");
+    const sv = Number(request.headers.get("x-realtime-sv"));
+    if (!userId || !sid || !Number.isFinite(sv)) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -216,6 +230,8 @@ export class Room extends DurableObject<Env> {
     // Attach metadata to the WebSocket (survives hibernation)
     const attachment: WebSocketAttachment = {
       userId,
+      sid,
+      sv,
       topics: [],
       name: null,
       avatar: null,
@@ -303,7 +319,10 @@ export class Room extends DurableObject<Env> {
    * `close` is used for send failures: a socket that cannot be written to must
    * not stay in the fan-out index, otherwise every subsequent event retries it.
    */
-  private removeSocket(ws: WebSocket, reason: "close" | "error" | "send-failed"): void {
+  private removeSocket(
+    ws: WebSocket,
+    reason: "close" | "error" | "send-failed" | "session-revoked",
+  ): void {
     const userId = this.sockets.userId(ws);
     if (userId === undefined && !this.subscriptions.socketTopics(ws)) return;
 
@@ -311,9 +330,14 @@ export class Room extends DurableObject<Env> {
     const { lastSocketForUser } = this.sockets.untrack(ws);
     this.socketPublishLimit.release(ws);
 
-    // Last socket for this user in this room — its shared budget goes too.
-    if (userId !== undefined && lastSocketForUser) {
-      this.userPublishLimit.release(userId);
+    // Release the shared budget only when this was the user's last socket.
+    // Unregister on EVERY socket close, not just the last: the user's DO keeps
+    // a per-room reference count, and the old "unregister only on last" rule
+    // let a delayed unregister from a closing socket delete the registration a
+    // newer socket had just written.
+    if (userId !== undefined) {
+      if (lastSocketForUser) this.userPublishLimit.release(userId);
+      this.ctx.waitUntil(this.unregisterRoom(userId));
     }
 
     this.metrics.connectionsClosed += 1;
@@ -324,8 +348,88 @@ export class Room extends DurableObject<Env> {
       } catch {
         // Already closing/closed — nothing to do.
       }
+    } else if (reason === "session-revoked") {
+      try {
+        ws.close(4001, "session revoked");
+      } catch {
+        // Already closing/closed — nothing to do.
+      }
     }
     this.markPresenceDirty();
+  }
+
+  /**
+   * Close every socket for this user that matches a revocation selector.
+   *
+   * Called by the user's DO after the web app has already revoked the registry
+   * row. The selector is evaluated against the attachment written at handshake,
+   * so `logout` closes one device, `logout-all`/reset/block close every device,
+   * and a password change can spare the current `sid`.
+   */
+  private async revoke(request: Request): Promise<Response> {
+    if (!secretMatches(request.headers.get("x-realtime-publish-secret"), this.env.REALTIME_PUBLISH_SECRET)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    let body: RevokeRequest;
+    try {
+      body = (await request.json()) as RevokeRequest;
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+    if (!body?.userId) return new Response("Bad request", { status: 400 });
+
+    await this.ensureSubscribers();
+
+    const sockets = this.sockets.socketsByUser.get(body.userId);
+    let closed = 0;
+    if (sockets) {
+      for (const ws of [...sockets]) {
+        let sid: string | undefined;
+        try {
+          sid = (ws.deserializeAttachment() as WebSocketAttachment | undefined)?.sid;
+        } catch {
+          sid = undefined;
+        }
+
+        const matches = body.all
+          ? true
+          : body.sid
+            ? sid === body.sid
+            : body.exceptSid
+              ? sid !== body.exceptSid
+              : false;
+
+        if (!matches) continue;
+        this.removeSocket(ws, "session-revoked");
+        closed += 1;
+      }
+    }
+
+    if (closed > 0) {
+      this.metrics.sessionRevocations += 1;
+      this.metrics.socketsClosedByRevocation += closed;
+    }
+    return Response.json({ ok: true, closed });
+  }
+
+  /** Tell the user's DO this room no longer holds a socket for them. */
+  private async unregisterRoom(userId: string): Promise<void> {
+    if (this.roomName().startsWith("user:")) return;
+    try {
+      const stub = this.env.USER_DO.get(this.env.USER_DO.idFromName(`user:${userId}`));
+      await stub.fetch("https://user/unregister-room", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-realtime-publish-secret": this.env.REALTIME_PUBLISH_SECRET,
+        },
+        body: JSON.stringify({ room: this.roomName() }),
+      });
+    } catch {
+      // Stale registry entries only cost an extra no-op call during a future
+      // revocation; they never grant access.
+    }
   }
 
   // ── WebSocket message handlers ─────────────────────────────────────

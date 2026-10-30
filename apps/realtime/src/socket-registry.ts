@@ -54,6 +54,10 @@ import type { PresenceMeta } from "./subscriptions";
  */
 export interface WebSocketAttachment {
   userId: string;
+  /** Registry session id this socket authenticated with. */
+  sid: string;
+  /** User session version at handshake time. */
+  sv: number;
   topics: string[];
   name: string | null;
   avatar: string | null;
@@ -62,6 +66,8 @@ export interface WebSocketAttachment {
 /** A socket registered from its hibernation attachment. */
 export interface AdoptedSocket {
   userId: string;
+  sid: string;
+  sv: number;
   /** Topics the attachment says this socket had subscribed to. */
   topics: string[];
   /** Display metadata to cache for the owning user. */
@@ -151,6 +157,11 @@ export class SocketRegistry {
       return null;
     }
     if (!attachment?.userId) return null;
+    // Sockets accepted before the revocation rollout have no sid/sv. Do not
+    // index them: they receive no fan-out and are closed by the next `all`
+    // revocation. A deploy must never leave an unversioned socket active.
+    if (typeof attachment.sid !== "string" || !attachment.sid) return null;
+    if (typeof attachment.sv !== "number") return null;
 
     const userId = attachment.userId;
     this.track(ws, userId);
@@ -163,7 +174,13 @@ export class SocketRegistry {
       this.userMeta.set(userId, meta);
     }
 
-    return { userId, topics: attachment.topics ?? [], meta };
+    return {
+      userId,
+      sid: attachment.sid,
+      sv: attachment.sv,
+      topics: attachment.topics ?? [],
+      meta,
+    };
   }
 
   /** Sockets per user — the input the presence count folds over. */

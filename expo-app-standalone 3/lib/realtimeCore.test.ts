@@ -78,10 +78,10 @@ class FakeSocket implements RealtimeSocket {
     this.sent.push(data);
   }
 
-  close(): void {
+  close(code?: number): void {
     this.closed = true;
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.(code === undefined ? undefined : { code });
   }
 
   /** Parsed non-heartbeat frames, in the order they were sent. */
@@ -135,6 +135,12 @@ class FakePlatform implements RealtimePlatform {
     return () => {
       this.foregroundHandlers.delete(handler);
     };
+  };
+
+  /** Number of server-side revocation notifications. */
+  sessionRevocations = 0;
+  onSessionRevoked = (): void => {
+    this.sessionRevocations += 1;
   };
 
   /** Simulate the app returning to the foreground. */
@@ -966,8 +972,26 @@ test('reconnect delay jitters below the cap and parks at the cooldown', () => {
 
   assert.equal(isTerminalCloseCode(4403), true);
   assert.equal(isTerminalCloseCode(4401), true);
+  assert.equal(isTerminalCloseCode(4001), true, 'a revoked session closes with 4001');
   assert.equal(isTerminalCloseCode(1008), true);
   assert.equal(isTerminalCloseCode(1006), false, 'an unknown handshake failure is retryable');
+});
+
+test('a 4001 close reports session revocation and does not reconnect', async () => {
+  const { client, platform } = createClient({ ...FAST_TIMINGS, reconnectJitter: 0 });
+  const off = client.on("chat:revoked-mobile", "message", () => {});
+  client.init(ALICE);
+  await flush();
+
+  platform.current?.open();
+  platform.current?.close(4001);
+  await sleep(20);
+
+  assert.equal(platform.sessionRevocations, 1);
+  assert.equal(platform.sockets.length, 1, 'a revoked socket must not reconnect');
+
+  off();
+  client.destroy();
 });
 
 test('a terminal close code parks the room until a lifecycle probe', async () => {

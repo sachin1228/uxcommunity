@@ -42,6 +42,7 @@ export interface DeletedAccountSummary {
 export async function deleteAccountCascade(
   db: DbClient,
   userId: string,
+  options?: { expectedPasswordHash?: string },
 ): Promise<DeletedAccountSummary> {
   const { data: profile } = (await db
     .from("designer_profiles")
@@ -92,9 +93,19 @@ export async function deleteAccountCascade(
   // One delete for the account and everything that cascades from it. The
   // profile is not deleted by hand: its FK already cascades, and deleting it
   // first used to leave an account that could not sign in if this failed.
-  const { error } = await db.from("users").delete().eq("id", userId);
+  // The optional hash guard closes the same race as password change: if a
+  // reset commits between the route's bcrypt compare and this delete, the
+  // delete matches nothing and the account is not erased.
+  let deleteQuery = db.from("users").delete().eq("id", userId);
+  if (options?.expectedPasswordHash) {
+    deleteQuery = deleteQuery.eq("password_hash", options.expectedPasswordHash);
+  }
+  const { data: deletedRows, error } = await deleteQuery.select("id");
   if (error) {
     throw new Error(`users delete failed: ${error.message}`);
+  }
+  if (!deletedRows || deletedRows.length === 0) {
+    throw new Error("password_changed");
   }
 
   if (avatarUrl) {

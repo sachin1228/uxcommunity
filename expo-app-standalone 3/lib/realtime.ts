@@ -15,10 +15,13 @@
  * NOT as a `?token=` query parameter — React Native's WebSocket accepts request
  * headers via its third constructor argument. The server reads the same
  * `uxcommunity_session` cookie it reads for browsers, so nothing changed there.
+ * The handshake is rejected if the registry row behind the token's `sid` is
+ * revoked or the account is blocked/deleted; a live socket is closed with 4001
+ * after the web app pushes a revocation.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus } from 'react-native';
+import { readStoredSessionToken } from './sessionStorage';
 import {
   RealtimeClient,
   buildRealtimeSocketUrl,
@@ -36,7 +39,6 @@ export type {
 } from './realtimeCore';
 
 const REALTIME_URL = process.env.EXPO_PUBLIC_REALTIME_URL ?? '';
-const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
 
 /**
  * Build a WebSocket URL for a connection key.
@@ -54,12 +56,12 @@ async function buildSocketUrl(socketKey: string): Promise<string> {
 }
 
 /**
- * Handshake headers for a socket: the session cookie replayed from AsyncStorage,
+ * Handshake headers for a socket: the session cookie replayed from SecureStore,
  * read on every open attempt so a renewed session is picked up without an app
  * restart.
  */
 async function buildSocketHeaders(): Promise<Record<string, string> | undefined> {
-  const token = await AsyncStorage.getItem(SESSION_STORAGE_KEY).catch(() => null);
+  const token = await readStoredSessionToken().catch(() => null);
   return sessionCookieHeaders(token);
 }
 
@@ -87,6 +89,20 @@ function createReactNativeSocket(
  * Singleton RealtimeClient — manages multiple WebSockets, one per community,
  * plus one for the signed-in user's own rooms.
  */
+const sessionRevokedListeners = new Set<() => void>();
+
+/**
+ * Subscribe to server-side session revocation (socket close code 4001).
+ * AuthContext uses this to clear credentials and member-scoped caches without
+ * waiting for the next API request to return 401.
+ */
+export function subscribeRealtimeSessionRevoked(listener: () => void): () => void {
+  sessionRevokedListeners.add(listener);
+  return () => {
+    sessionRevokedListeners.delete(listener);
+  };
+}
+
 export const realtimeClient = new RealtimeClient({
   buildSocketUrl,
   buildSocketHeaders,
@@ -96,6 +112,9 @@ export const realtimeClient = new RealtimeClient({
       if (state === 'active') handler();
     });
     return () => subscription.remove();
+  },
+  onSessionRevoked: () => {
+    sessionRevokedListeners.forEach((listener) => listener());
   },
 });
 

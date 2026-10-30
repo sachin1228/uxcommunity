@@ -11,6 +11,21 @@ import { TopicSocketIndex } from "./subscriptions";
 import { EventIdDedupe } from "./event-dedupe";
 import type { PublishRequest } from "./types";
 import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
+import { secretMatches } from "./session-validation";
+
+interface RevokeRequest {
+  userId: string;
+  sid?: string;
+  exceptSid?: string;
+  all?: boolean;
+}
+
+/** A community room this user currently has at least one socket in. */
+interface RegisteredRoom {
+  ts: number;
+  /** Live sockets for this user in the room. Older rows may omit it (1). */
+  count?: number;
+}
 
 /**
  * User Durable Object — ONE per user (`user:${userId}`). Owns the single
@@ -41,12 +56,16 @@ import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
 
 interface ClientState {
   userId: string;
+  sid: string;
+  sv: number;
   subscriptions: Map<string, Set<string>>; // room → Set<topics>
 }
 
 /** Persisted on the WebSocket so subscriptions survive hibernation. */
 interface UserAttachment {
   userId: string;
+  sid: string;
+  sv: number;
   /** room → topics */
   subs?: Record<string, string[]>;
 }
@@ -99,6 +118,25 @@ export class UserDO extends DurableObject<Env> {
       });
     }
 
+    const path = new URL(request.url).pathname;
+    const internal = secretMatches(
+      request.headers.get("x-realtime-publish-secret"),
+      this.env.REALTIME_PUBLISH_SECRET,
+    );
+
+    if (path === "/register-room") {
+      if (!internal) return new Response("Forbidden", { status: 403 });
+      return this.registerRoom(request);
+    }
+    if (path === "/unregister-room") {
+      if (!internal) return new Response("Forbidden", { status: 403 });
+      return this.unregisterRoom(request);
+    }
+    if (path === "/revoke") {
+      if (!internal) return new Response("Forbidden", { status: 403 });
+      return this.revoke(request);
+    }
+
     // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
       return this.publish(request);
@@ -128,6 +166,9 @@ export class UserDO extends DurableObject<Env> {
       return null;
     }
     if (!attachment?.userId) return null;
+    // Pre-revocation sockets carry no sid/sv; leave them unindexed.
+    if (typeof attachment.sid !== "string" || !attachment.sid) return null;
+    if (typeof attachment.sv !== "number") return null;
 
     const subscriptions = new Map<string, Set<string>>();
     for (const [room, topics] of Object.entries(attachment.subs ?? {})) {
@@ -138,7 +179,12 @@ export class UserDO extends DurableObject<Env> {
       }
     }
 
-    const state: ClientState = { userId: attachment.userId, subscriptions };
+    const state: ClientState = {
+      userId: attachment.userId,
+      sid: attachment.sid,
+      sv: attachment.sv,
+      subscriptions,
+    };
     this.clients.set(ws, state);
     return state;
   }
@@ -148,7 +194,12 @@ export class UserDO extends DurableObject<Env> {
     for (const [room, topics] of state.subscriptions) {
       subs[room] = [...topics];
     }
-    const attachment: UserAttachment = { userId: state.userId, subs };
+    const attachment: UserAttachment = {
+      userId: state.userId,
+      sid: state.sid,
+      sv: state.sv,
+      subs,
+    };
     try {
       ws.serializeAttachment(attachment);
     } catch {
@@ -161,7 +212,9 @@ export class UserDO extends DurableObject<Env> {
 
   private async upgrade(request: Request): Promise<Response> {
     const userId = request.headers.get("x-realtime-uid");
-    if (!userId) {
+    const sid = request.headers.get("x-realtime-sid");
+    const sv = Number(request.headers.get("x-realtime-sv"));
+    if (!userId || !sid || !Number.isFinite(sv)) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -169,11 +222,13 @@ export class UserDO extends DurableObject<Env> {
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
-    const attachment: UserAttachment = { userId, subs: {} };
+    const attachment: UserAttachment = { userId, sid, sv, subs: {} };
     server.serializeAttachment(attachment);
 
     this.clients.set(server, {
       userId,
+      sid,
+      sv,
       subscriptions: new Map(),
     });
     this.metrics.connectionsOpened += 1;
@@ -221,6 +276,9 @@ export class UserDO extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket): Promise<void> {
     this.ensureReconstructed();
+    // A revocation closes the socket after removing it; the runtime then fires
+    // this callback. Do not count or clean the same socket twice.
+    if (!this.clients.has(ws)) return;
     this.clients.delete(ws);
     this.subscriptions.removeSocket(ws);
     this.socketPublishLimit.release(ws);
@@ -350,6 +408,139 @@ export class UserDO extends DurableObject<Env> {
     // The publisher's own sockets are the exclusion set, matching the previous
     // behaviour where a client never received its own event back.
     this.deliver(subscriptionKey(room, topic), eventMsg, state.userId);
+  }
+
+  // ── Revocation fan-out ───────────────────────────────────────────────
+
+  /** Remember a community room with a live socket for this user. */
+  private async registerRoom(request: Request): Promise<Response> {
+    let room: string | undefined;
+    try {
+      room = ((await request.json()) as { room?: string })?.room;
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+    if (!room || room.startsWith("user:")) {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    const key = `revoke-room:${room}`;
+    const existing = await this.ctx.storage.get<RegisteredRoom>(key);
+    await this.ctx.storage.put(key, {
+      ts: existing?.ts ?? Date.now(),
+      count: (existing?.count ?? 1) + 1,
+    });
+    return Response.json({ ok: true });
+  }
+
+  private async unregisterRoom(request: Request): Promise<Response> {
+    let room: string | undefined;
+    try {
+      room = ((await request.json()) as { room?: string })?.room;
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+    if (!room) return new Response("Bad request", { status: 400 });
+
+    const key = `revoke-room:${room}`;
+    const existing = await this.ctx.storage.get<RegisteredRoom>(key);
+    if (!existing) return Response.json({ ok: true });
+
+    const count = (existing.count ?? 1) - 1;
+    if (count <= 0) {
+      await this.ctx.storage.delete(key);
+    } else {
+      await this.ctx.storage.put(key, { ts: existing.ts, count });
+    }
+    return Response.json({ ok: true });
+  }
+
+  /**
+   * Close every socket for this user that matches the selector, then fan the
+   * same selector into every community room the user has a socket in.
+   *
+   * This is the immediate-close guarantee. The registry row was revoked before
+   * the web app called here, so a socket that survives a failed fan-out still
+   * cannot revalidate or reconnect; it is closed by the next successful
+   * notification or its device's next session check.
+   */
+  private async revoke(request: Request): Promise<Response> {
+    let body: RevokeRequest;
+    try {
+      body = (await request.json()) as RevokeRequest;
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    const headerUser = request.headers.get("x-realtime-uid");
+    if (!body?.userId || (headerUser && headerUser !== body.userId)) {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    this.ensureReconstructed();
+
+    let closed = 0;
+    for (const [ws, state] of [...this.clients]) {
+      if (state.userId !== body.userId) continue;
+      const matches = body.all
+        ? true
+        : body.sid
+          ? state.sid === body.sid
+          : body.exceptSid
+            ? state.sid !== body.exceptSid
+            : false;
+      if (!matches) continue;
+      this.revokeSocket(ws);
+      closed += 1;
+    }
+
+    const rooms = await this.ctx.storage.list<RegisteredRoom>({
+      prefix: "revoke-room:",
+    });
+    let roomsNotified = 0;
+    let roomsFailed = 0;
+    await Promise.all(
+      [...rooms.keys()].map(async (key) => {
+        const room = key.slice("revoke-room:".length);
+        try {
+          const stub = this.env.COMMUNITY_DO.get(this.env.COMMUNITY_DO.idFromName(room));
+          const response = await stub.fetch("https://room/revoke", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-realtime-publish-secret": this.env.REALTIME_PUBLISH_SECRET,
+            },
+            body: JSON.stringify(body),
+          });
+          if (response.ok) roomsNotified += 1;
+          else roomsFailed += 1;
+        } catch {
+          roomsFailed += 1;
+        }
+      }),
+    );
+
+    if (closed > 0) {
+      this.metrics.sessionRevocations += 1;
+      this.metrics.socketsClosedByRevocation += closed;
+    }
+
+    return Response.json(
+      { ok: roomsFailed === 0, closed, roomsNotified, roomsFailed },
+      { status: roomsFailed === 0 ? 200 : 502 },
+    );
+  }
+
+  private revokeSocket(ws: WebSocket): void {
+    this.clients.delete(ws);
+    this.subscriptions.removeSocket(ws);
+    this.socketPublishLimit.release(ws);
+    this.metrics.connectionsClosed += 1;
+    try {
+      ws.close(4001, "session revoked");
+    } catch {
+      // Already closing/closed.
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────

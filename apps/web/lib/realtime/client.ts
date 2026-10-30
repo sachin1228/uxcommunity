@@ -63,7 +63,7 @@ const HEARTBEAT_TIMEOUT_MS = 6_000;
  * application-level authorization codes. A 401/403 handshake is surfaced by the
  * browser as 1006 (the HTTP status is hidden), which the attempt cap covers.
  */
-const TERMINAL_CLOSE_CODES = new Set([1008, 4401, 4403]);
+const TERMINAL_CLOSE_CODES = new Set([1008, 4001, 4401, 4403]);
 
 export function isTerminalCloseCode(code: number | null | undefined): boolean {
   return typeof code === "number" && TERMINAL_CLOSE_CODES.has(code);
@@ -456,6 +456,12 @@ export class RealtimeClient {
         // hammering the same unauthorized room every 15 s.
         conn.terminal = true;
         conn.reconnectAttempt = 0;
+        if (event?.code === 4001 && typeof window !== "undefined") {
+          // The registry session was revoked. A full document navigation to
+          // the cookie-clearing route ends every other socket and guarantees
+          // the next page is rendered without the stale identity.
+          window.location.replace("/api/auth/session-ended");
+        }
         return;
       }
       if (!conn.manuallyClosed) this.scheduleReconnect(conn);

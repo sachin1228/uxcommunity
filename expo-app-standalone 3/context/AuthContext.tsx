@@ -57,7 +57,10 @@ import {
 import { queryClient } from '@/lib/queryClient';
 import { activateScreenDataSession, clearScreenDataForUser } from '@/lib/screenDataCacheStore';
 import { resetReadManager } from '@/lib/readManager';
-import { resetRealtimeSession } from '@/lib/realtime';
+import {
+  resetRealtimeSession,
+  subscribeRealtimeSessionRevoked,
+} from '@/lib/realtime';
 import { resetPushRegistrationState, unregisterStoredPushTokenAsync } from '@/lib/push';
 import {
   clearMemberScopedState,
@@ -358,6 +361,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void refresh();
       }),
     [refresh],
+  );
+
+  // A revoked registry session closes every socket with code 4001. Clear the
+  // credential and member-scoped caches immediately; waiting for the next API
+  // call would leave stale profile data on screen in the meantime.
+  useEffect(
+    () =>
+      subscribeRealtimeSessionRevoked(() => {
+        if (!userRef.current || logoutInFlightRef.current) return;
+        void clearAndSignOut();
+      }),
+    [clearAndSignOut],
   );
 
   // An admin decision can land while the app is backgrounded. Revalidate on

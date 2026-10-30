@@ -1,6 +1,14 @@
 import { jwtVerify } from "jose";
 import type { Env } from "./env";
-import { isUserScopedRoomAllowed, resolveRoomTarget } from "./room-routing";
+import {
+  isUserScopedRoomAllowed,
+  resolveRoomTarget,
+  USER_ROOM_PREFIXES,
+} from "./room-routing";
+import {
+  secretMatches,
+  validateSessionWithApi,
+} from "./session-validation";
 import { resolveSessionConfig } from "./session-config";
 import { runBoundedPool } from "./subscriptions";
 import { isRetryableStatus, retryWithBackoff } from "./retry";
@@ -58,10 +66,17 @@ function warnMissingSessionSecretOnce(): void {
   logEvent("error", { event: "realtime.session.config_missing" });
 }
 
-async function verifyJwt(token: string, secret: string): Promise<{ userId?: string } | null> {
+interface SessionClaims {
+  userId?: string;
+  sid?: string;
+  sv?: number;
+  role?: string;
+}
+
+async function verifyJwt(token: string, secret: string): Promise<SessionClaims | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey(secret));
-    return payload as unknown as { userId?: string };
+    return payload as unknown as SessionClaims;
   } catch {
     return null;
   }
@@ -139,6 +154,9 @@ export default {
     if (url.pathname === "/publish") {
       return handlePublish(request, env, ctx);
     }
+    if (url.pathname === "/revoke") {
+      return handleRevoke(request, env);
+    }
     if (url.pathname === "/stats") {
       return handleStats(request, env, url);
     }
@@ -171,7 +189,17 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
 
   const session = token && secret ? await verifyJwt(token, secret) : null;
   const userId = session?.userId;
-  if (!userId) {
+  const sid = session?.sid;
+  const sv = session?.sv;
+
+  // Admin tokens are not valid for user sockets, and a token without the
+  // registry claims predates revocation support.
+  if (
+    !userId ||
+    !sid ||
+    typeof sv !== "number" ||
+    session?.role !== "user"
+  ) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -183,18 +211,192 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
     return new Response("Forbidden", { status: 403 });
   }
 
+  // Signature alone is not enough: the registry row must still be live. This
+  // is the only database-backed check on the socket's lifetime.
+  const active = await validateSessionWithApi(env, { userId, sid, sv });
+  if (!active) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   // A user-scoped room name (`user:${userId}`) is already resolved; community
   // rooms keep their own name. Both go to the namespace that owns them.
+  const isUserRoom =
+    room.startsWith("user:") ||
+    USER_ROOM_PREFIXES.some((prefix) => room.startsWith(prefix));
   const { namespace, name } = resolveRoomTarget(env, room);
   const stub = namespace.get(namespace.idFromName(name));
 
-  const forwarded = new Request(request, {
-    headers: new Headers([
-      ...request.headers,
-      ["x-realtime-uid", userId],
-    ]),
-  });
-  return stub.fetch(forwarded);
+  const headers = new Headers(request.headers);
+  headers.set("x-realtime-uid", userId);
+  headers.set("x-realtime-sid", sid);
+  headers.set("x-realtime-sv", String(sv));
+  // The DO authorizes from these headers, never from a client cookie.
+  headers.delete("cookie");
+
+  const forwarded = new Request(request, { headers });
+  const response = await stub.fetch(forwarded);
+  if (response.status !== 101) return response;
+
+  // Register the community room AFTER the socket exists. Doing it before the
+  // membership check let a failed handshake (or a close racing the accept)
+  // leave a room key that did not correspond to a live socket, and the reverse
+  // ordering could delete a key for a socket that had just been accepted. Once
+  // the socket is tracked, registration is safe: an old socket closing cannot
+  // unregister a user who still has this new socket in the room.
+  if (!isUserRoom) {
+    const registered = await registerRoomForRevocation(env, userId, room);
+    if (!registered) {
+      logEvent("error", { event: "realtime.revoke.registration_failed", room });
+      try {
+        response.webSocket?.close(1011, "realtime unavailable");
+      } catch {
+        // Already closing.
+      }
+      // The user DO never learned about this room, so close the server end
+      // directly before refusing the socket.
+      try {
+        await stub.fetch("https://room/revoke", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-realtime-publish-secret": env.REALTIME_PUBLISH_SECRET,
+          },
+          body: JSON.stringify({ userId, sid }),
+          signal: AbortSignal.timeout(2_000),
+        });
+      } catch {
+        // The client end is already closed; a stale DO socket cannot
+        // revalidate and will close on its next transport failure.
+      }
+      return response;
+    }
+  }
+
+  // A revocation can commit after the pre-upgrade check but before the DO
+  // accepts the socket. Revalidate once the socket exists: if the session died
+  // in that window, close it and make the user's DO remove the server end too.
+  // A revocation that lands after this second read is covered by the web app's
+  // revocation push, because the room registration above already exists.
+  const stillActive = await validateSessionWithApi(env, { userId, sid, sv });
+  if (!stillActive) {
+    try {
+      response.webSocket?.close(4001, "session revoked");
+    } catch {
+      // Already closing; the DO cleanup below is still required.
+    }
+    await revokeUserSessions(env, userId, { sid });
+  }
+
+  return response;
+}
+
+/** Ask a user's DO to close matching sockets and fan the selector into rooms. */
+async function revokeUserSessions(
+  env: Env,
+  userId: string,
+  selector: { sid?: string; exceptSid?: string; all?: boolean },
+): Promise<void> {
+  try {
+    const stub = env.USER_DO.get(env.USER_DO.idFromName(`user:${userId}`));
+    await stub.fetch("https://user/revoke", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-realtime-publish-secret": env.REALTIME_PUBLISH_SECRET,
+        "x-realtime-uid": userId,
+      },
+      body: JSON.stringify({ userId, ...selector }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    logEvent("error", { event: "realtime.revoke.post_upgrade_failed", userId, error });
+  }
+}
+
+/** Tell a user's DO that a community room holds a live socket for them. */
+async function registerRoomForRevocation(
+  env: Env,
+  userId: string,
+  room: string,
+): Promise<boolean> {
+  try {
+    const stub = env.USER_DO.get(env.USER_DO.idFromName(`user:${userId}`));
+    const response = await stub.fetch("https://user/register-room", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-realtime-publish-secret": env.REALTIME_PUBLISH_SECRET,
+      },
+      body: JSON.stringify({ room }),
+      signal: AbortSignal.timeout(2_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Web → realtime revocation push.
+ *
+ * The web app has already committed the registry revocation; this endpoint is
+ * the fast path that closes existing sockets. It returns 502 if any community
+ * room could not be notified, which makes the web helper retry.
+ */
+async function handleRevoke(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization");
+  const provided = auth?.startsWith("Bearer ")
+    ? auth.slice("Bearer ".length)
+    : request.headers.get("x-realtime-publish-secret");
+
+  if (!secretMatches(provided, env.REALTIME_PUBLISH_SECRET)) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  let body: {
+    userId?: unknown;
+    sid?: unknown;
+    exceptSid?: unknown;
+    all?: unknown;
+  };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return new Response("Bad request", { status: 400 });
+  }
+
+  const userId = typeof body?.userId === "string" ? body.userId : null;
+  const sid = typeof body?.sid === "string" ? body.sid : undefined;
+  const exceptSid = typeof body?.exceptSid === "string" ? body.exceptSid : undefined;
+  const all = body?.all === true;
+
+  if (!userId || (!all && !sid && !exceptSid)) {
+    return new Response("Bad request", { status: 400 });
+  }
+
+  const stub = env.USER_DO.get(env.USER_DO.idFromName(`user:${userId}`));
+  try {
+    const response = await stub.fetch("https://user/revoke", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-realtime-publish-secret": env.REALTIME_PUBLISH_SECRET,
+        "x-realtime-uid": userId,
+      },
+      body: JSON.stringify({ userId, sid, exceptSid, all }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return new Response(await response.text(), {
+      status: response.status,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    logEvent("error", { event: "realtime.revoke.failed", userId, error });
+    return new Response(JSON.stringify({ ok: false }), {
+      status: 502,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
 
 async function handleStats(request: Request, env: Env, url: URL): Promise<Response> {

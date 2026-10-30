@@ -93,6 +93,7 @@ test("reconnect delay applies bounded jitter and the cooldown cap", () => {
   assert.equal(reconnectDelayMs(8, timing, () => 0), 60_000);
   assert.equal(isTerminalCloseCode(4403), true);
   assert.equal(isTerminalCloseCode(4401), true);
+  assert.equal(isTerminalCloseCode(4001), true);
   assert.equal(isTerminalCloseCode(1008), true);
   assert.equal(isTerminalCloseCode(1006), false);
 });

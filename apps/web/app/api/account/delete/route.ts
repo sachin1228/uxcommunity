@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { createServiceClient } from "@/lib/supabase/service";
-import { clearSessionCookie, getSession } from "@/lib/auth/session";
+import { clearSessionCookie, getSessionForErasure } from "@/lib/auth/session";
+import { revokeRealtimeSessions } from "@/lib/realtime/revoke";
+import { logEvent } from "@/lib/observability/log";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deleteAccountCascade } from "@/lib/account/delete";
 import { parseDeleteAccountRequest } from "@/lib/account/delete-request";
@@ -19,7 +21,7 @@ import { sendAccountDeletedEmail } from "@/lib/email";
 export async function POST(request: NextRequest) {
   // No liveness check on purpose: a blocked member must still be able to
   // exercise erasure. The password + DELETE confirmation below are the gate.
-  const session = await getSession();
+  const session = await getSessionForErasure();
   const userId = session?.userId;
   if (!session || session.role !== "user" || !userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,7 +61,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const summary = await deleteAccountCascade(db, userId);
+    const summary = await deleteAccountCascade(db, userId, {
+      expectedPasswordHash: row.password_hash,
+    });
 
     // Confirmation is sent after the rows are gone, to the address captured
     // before deletion. A mail failure must not resurrect the account or turn a
@@ -68,6 +72,19 @@ export async function POST(request: NextRequest) {
       await sendAccountDeletedEmail(row.email, row.name);
     } catch (emailError) {
       console.error("[account/delete] confirmation email error:", emailError);
+    }
+
+    // The users delete cascaded auth_sessions away, so every token is already
+    // invalid. Tell the realtime Worker to close any sockets that are still
+    // open for this member.
+    try {
+      await revokeRealtimeSessions({ userId, all: true });
+    } catch (error) {
+      logEvent("warn", {
+        event: "auth.account_deleted.realtime_failed",
+        userId,
+        error,
+      });
     }
 
     const response = NextResponse.json({
@@ -82,6 +99,15 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (deleteError) {
     console.error("[account/delete] deletion error:", deleteError);
+    if (
+      deleteError instanceof Error &&
+      deleteError.message.includes("password_changed")
+    ) {
+      return NextResponse.json(
+        { error: "Your password changed elsewhere. Please sign in again." },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       {
         error:

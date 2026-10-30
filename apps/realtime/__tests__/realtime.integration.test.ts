@@ -36,7 +36,12 @@ let baseUrl: string;
 async function createToken(userId: string): Promise<string> {
   const { SignJWT } = await import("jose");
   const secret = new TextEncoder().encode(REALTIME_SECRET);
-  return new SignJWT({ userId })
+  return new SignJWT({
+      userId,
+      sid: `test-sid-${userId}`,
+      sv: 1,
+      role: "user",
+    })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("1h")
@@ -602,7 +607,9 @@ describe("Membership authorization", () => {
         ws.on("open", () => resolveStatus(200));
         setTimeout(() => resolveStatus(0), 5000);
       });
-      expect(status).toBe(403);
+      // The handshake now refuses a dead API at session validation (401) before
+      // the DO's membership check (403); either way it must never open.
+      expect([401, 403]).toContain(status);
       try { ws.close(); } catch { /* ignore */ }
     } finally {
       await outageWorker.stop();
@@ -631,10 +638,25 @@ describe("Membership authorization", () => {
     const { writeFileSync, readFileSync } = await import("fs");
     const { resolve } = await import("path");
 
-    // Start a mock membership API that returns 403
-    const mockApi = createServer((_req, res) => {
-      res.writeHead(403, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: false }));
+    // Start a mock membership API that returns 403 for membership checks and
+    // authorizes the registry validation the handshake performs first.
+    const mockApi = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", () => {
+        if (req.url?.includes("/internal/session/validate")) {
+          const claims = JSON.parse(body || "{}");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            ok: true,
+            userId: claims.userId,
+            sessionVersion: claims.sv,
+          }));
+          return;
+        }
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false }));
+      });
     });
     await new Promise<void>((resolve) => mockApi.listen(0, resolve));
     const mockPort = (mockApi.address() as any).port;
@@ -730,14 +752,28 @@ describe("Membership authorization", () => {
 
     // Start a mock membership API that returns 200 with valid auth
     const mockApi = createServer((req, res) => {
-      const auth = req.headers.authorization;
-      if (!auth || !auth.startsWith("Bearer ")) {
-        res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
-        return;
-      }
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true }));
+      let body = "";
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", () => {
+        const auth = req.headers.authorization;
+        if (!auth || !auth.startsWith("Bearer ")) {
+          res.writeHead(401, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+          return;
+        }
+        if (req.url?.includes("/internal/session/validate")) {
+          const claims = JSON.parse(body || "{}");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            ok: true,
+            userId: claims.userId,
+            sessionVersion: claims.sv,
+          }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      });
     });
     await new Promise<void>((resolve) => mockApi.listen(0, resolve));
     const mockPort = (mockApi.address() as any).port;

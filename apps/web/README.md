@@ -36,11 +36,11 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 
 ### API routes (`app/api/`)
 
-174 route handlers:
+187 route handlers:
 
 | Prefix | Purpose |
 |---|---|
-| `/api/auth/*` | login, logout, me, reset-request, reset-confirm |
+| `/api/auth/*` | login, logout, logout-all, change-password, me, reset-request, reset-confirm, session-ended |
 | `/api/signup/*` | Multi-step onboarding: direct, profile, avatar, picture, resume |
 | `/api/verification/*` | Status, email OTP, work-sample upload, review submission |
 | `/api/profile/*` | Update profile, avatar |
@@ -54,9 +54,13 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 
 ## Auth
 
-Sessions use custom signed JWTs (`jose`) stored in an httpOnly cookie — **not** Supabase Auth. The session payload carries `userId`, `email`, and `role` (`"user"` | `"admin"`). `lib/auth/session.ts` owns signing/verification plus `requireSession(role?)` for route handlers.
+Sessions use custom signed JWTs (`jose`) stored in an httpOnly cookie — **not** Supabase Auth. The session payload carries `userId`, `email`, `role` (`"user"` | `"admin"`), a registry session id (`sid`) and, for users, the account generation (`sv`). `lib/auth/session.ts` owns signing/verification plus `getSession()` / `requireSession(role?)`.
 
-`middleware.ts` is the first gate on every page request: it verifies the JWT, enforces the global request rate limit, redirects signed-in users away from `/` and `/login`, and protects `/admin/*` and `/dashboard/*`. Per-user liveness (blocked/deleted accounts) is checked by `lib/auth/user-status-cache.ts`, which caches the lookup for 15 seconds.
+The JWT signature is only the first check. `getSession()` loads the `auth_sessions` row and its embedded `users` row, then `lib/auth/session-validity.ts` requires the row to be unrevoked and unexpired, the role/subject to match, and both the row and account `session_version` to equal `sv`. A revoked row, blocked account, deleted account or stale generation returns `null`; database errors fail closed. `requireSession()` uses the same decision, so route handlers, server pages and the private R2 proxies cannot drift apart.
+
+`middleware.ts` is a cheap prefilter: it verifies the signature, enforces the global request rate limit and protects `/admin/*` and `/dashboard/*`. It deliberately does not redirect `/` or `/login` from a signature-only check; those pages and the protected layouts perform the registry-backed check.
+
+`lib/auth/session-registry.ts` wraps the service-role SQL functions that issue, revoke and rotate sessions. See `audit/SESSION_REVOCATION_IMPLEMENTATION.md` for the full lifecycle, realtime propagation and limitations.
 
 ## Realtime
 
@@ -68,7 +72,13 @@ Sessions use custom signed JWTs (`jose`) stored in an httpOnly cookie — **not*
 | `pool.ts` | Community-scoped room pool with a 5-minute idle release |
 | `rooms.ts` | Room-name helpers (client-safe) |
 | `publish.ts` | Server-side `/publish` client (`publishRealtime`, `publishRealtimeBatch`) |
+| `revoke.ts` | Posts a sid/all/exceptSid revocation to the Worker after a database session revoke |
 | `server.ts` | `publishChatEvent` — publishes one event to a community's chat room |
+
+New sockets are accepted only after the Worker verifies the JWT and calls
+`/api/internal/session/validate` (API_SECRET-gated) to check the registry row
+and account version. Revocation closes matching live sockets with code 4001;
+the web client treats 4001 as terminal and redirects to login.
 
 Community rooms (`chat:*`, `presence:*`, `threads:*`, `events:*`, `resources:*`, `showcase:*`, `rules:*`) are served by one `Room` Durable Object per community; user rooms (`notifications:*`, `profile:*`) share the recipient's `UserDO`. The sidebar keeps at most `SIDEBAR_REALTIME_LIMIT` (15) community chat sockets open, most-recently-active first.
 
@@ -114,7 +124,7 @@ Unit suites live next to the code as `*.test.ts` (50 files, run with `tsx --test
 ```bash
 npm run test:comment-tree      # one suite, e.g. comment tree helpers
 cd apps/realtime && npm test   # realtime worker suites (vitest)
-bash supabase/tests/run-local.sh   # SQL suites for the community APIs
+bash supabase/tests/run-local.sh   # SQL suites for the community APIs, including session_revocation.test.sql
 ```
 
 `npm run test:*` in the root `package.json` lists every suite. CI (`.github/workflows/ci.yml`) runs a blocking `tsc --noEmit` and the whole web unit suite; ESLint is advisory while pre-existing findings are cleared.
