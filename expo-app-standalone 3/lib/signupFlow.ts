@@ -19,6 +19,8 @@ export interface SignupIdentityInput {
   email: string;
   password: string;
   confirmPassword: string;
+  ageConfirmed: boolean;
+  termsAccepted: boolean;
 }
 
 /** The identity object `/api/signup/direct` and `/api/signup/avatar` accept. */
@@ -27,6 +29,8 @@ export interface SignupIdentity {
   email: string;
   password: string;
   confirm_password: string;
+  age_confirmed: boolean;
+  terms_accepted: boolean;
 }
 
 /** The step-2 selection as the member sees it (values are master-data ids). */
@@ -50,7 +54,8 @@ export type SignupIdentityField =
   | 'lastName'
   | 'email'
   | 'password'
-  | 'confirmPassword';
+  | 'confirmPassword'
+  | 'consent';
 
 export type SignupIdentityErrors = Partial<Record<SignupIdentityField, string>>;
 
@@ -114,6 +119,10 @@ export function validateSignupIdentity(input: SignupIdentityInput): SignupIdenti
   if (!input.confirmPassword) errors.confirmPassword = 'Please confirm your password.';
   else if (input.confirmPassword !== input.password) errors.confirmPassword = 'Passwords do not match.';
 
+  if (!input.ageConfirmed || !input.termsAccepted) {
+    errors.consent = 'Confirm you are 18 or older and accept the Terms, Community Guidelines and Privacy Policy.';
+  }
+
   return errors;
 }
 
@@ -145,6 +154,8 @@ export function buildSignupIdentity(input: SignupIdentityInput): SignupIdentity 
     email: input.email.trim(),
     password: input.password,
     confirm_password: input.confirmPassword,
+    age_confirmed: input.ageConfirmed,
+    terms_accepted: input.termsAccepted,
   };
 }
 

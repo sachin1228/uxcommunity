@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import {
   REPORT_CONTENT_TYPE_VALUES,
   REPORT_DETAILS_MAX_LENGTH,
@@ -49,6 +50,14 @@ export async function POST(request: NextRequest) {
     session = await requireSession("user");
   } catch (error) {
     return error as Response;
+  }
+
+  const reportLimit = await rateLimit(`content-report:${session.userId}`, 30, 3600);
+  if (!reportLimit.success) {
+    return NextResponse.json(
+      { error: "Too many reports. Please try again later." },
+      { status: 429 },
+    );
   }
 
   let body: Record<string, unknown>;

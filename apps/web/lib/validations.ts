@@ -24,6 +24,14 @@ export const directSignupStep1Schema = z
       .min(8, "Password must be at least 8 characters")
       .regex(/[0-9]/, "Must contain at least one number"),
     confirm_password: z.string(),
+    // Eligibility and consent are recorded on the account at completion; the
+    // API refuses to create an account without both.
+    age_confirmed: z
+      .boolean()
+      .refine((v) => v === true, { message: "You must confirm that you are 18 or older." }),
+    terms_accepted: z.boolean().refine((v) => v === true, {
+      message: "You must accept the Terms of Service and Privacy Policy.",
+    }),
   })
   .refine((d) => d.password === d.confirm_password, {
     message: "Passwords do not match",

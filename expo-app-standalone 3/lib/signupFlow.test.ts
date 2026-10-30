@@ -19,6 +19,8 @@ const identity: SignupIdentityInput = {
   email: 'ada@example.com',
   password: 'design123',
   confirmPassword: 'design123',
+  ageConfirmed: true,
+  termsAccepted: true,
 };
 
 const selection: SignupSelection = {
@@ -78,12 +80,23 @@ test('empty passwords are reported before any comparison', () => {
   assert.equal(errors.confirmPassword, 'Please confirm your password.');
 });
 
+test('age and terms acceptance are required', () => {
+  const errors = validateSignupIdentity({
+    ...identity,
+    ageConfirmed: false,
+    termsAccepted: false,
+  });
+  assert.ok(errors.consent);
+});
+
 test('step 1 builds the body /api/signup/direct validates', () => {
   assert.deepEqual(buildSignupIdentity({ ...identity, email: ' ADA@example.com ' }), {
     name: 'Ada Lovelace',
     email: 'ADA@example.com',
     password: 'design123',
     confirm_password: 'design123',
+    age_confirmed: true,
+    terms_accepted: true,
   });
 });
 
@@ -128,6 +141,8 @@ test('the final payload omits avatar_source unless a picture was chosen', () => 
       email: 'ada@example.com',
       password: 'design123',
       confirm_password: 'design123',
+      age_confirmed: true,
+      terms_accepted: true,
     },
     profile: {
       city_id: 'city-uuid',

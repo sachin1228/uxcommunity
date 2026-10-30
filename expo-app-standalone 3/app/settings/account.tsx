@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/settings/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
@@ -41,6 +42,7 @@ function memberSinceLabel(createdAt: string | null | undefined): string | null {
 export default function AccountSettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [email, setEmail] = useState<string | null>(null);
   const [memberSince, setMemberSince] = useState<string | null>(null);
@@ -162,6 +164,34 @@ export default function AccountSettingsScreen() {
                 {error ? (
                   <Text style={[styles.feedback, { color: colors.destructive }]}>{error}</Text>
                 ) : null}
+              </View>
+
+              <View style={[styles.passwordBlock, { borderTopColor: colors.border }]}>
+                <View style={styles.passwordRow}>
+                  <View style={styles.passwordText}>
+                    <Text style={[styles.rowLabel, { color: colors.foreground }]}>
+                      Delete account
+                    </Text>
+                    <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                      Permanently remove your account and content.
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => router.push('/settings/delete-account' as Href)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.resetButton,
+                      {
+                        borderColor: colors.destructive,
+                        backgroundColor: pressed ? `${colors.destructive}14` : 'transparent',
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.resetLabel, { color: colors.destructive }]}>
+                      Delete
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             </>
           )}
