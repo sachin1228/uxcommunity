@@ -50,6 +50,17 @@ These columns are `on delete set null` so history is not silently rewritten:
 | `community_admin_activity.actor_id`, `target_user_id` | audit trail survives via the snapshotted `actor_name` |
 | `signup_attempts.user_id` | attempt record survives for support tracing |
 
+## Moderation reports are the exception
+
+`interaction_reports`, `content_reports` and `dm_reports` used to reference
+`reporter_id` with `on delete cascade`, so deleting a member erased every report
+they had filed. They now use `on delete set null` plus the
+`trg_anonymize_deleted_user_reports` trigger: the report, evidence snapshot and
+audit link survive, the reporter reads **Deleted user**, and no reporter email,
+profile or account id remains. Audit historical ids are plain UUIDs rather than
+foreign keys so account deletion cannot rewrite an append-only audit row. See
+[../audit/MODERATION_EVIDENCE_RETENTION.md](../audit/MODERATION_EVIDENCE_RETENTION.md).
+
 ## The orphan bug (fixed by this change)
 
 `communities.owner_id` was `references users(id) on delete set null`. Deleting a

@@ -140,6 +140,61 @@ test("appeals are one-per-report at the database level and rate limited in the A
   assert.match(route, /validateAppeal\(/);
 });
 
+test("reports and audit history survive reporter account deletion", () => {
+  const migration = readRepo(
+    "supabase/migrations/20261030230000_preserve_moderation_evidence.sql",
+  );
+
+  for (const table of ["interaction_reports", "content_reports", "dm_reports"]) {
+    assert.match(
+      migration,
+      new RegExp(`alter table public\\.${table}[\\s\\S]{0,80}alter column reporter_id drop not null`),
+      `${table}.reporter_id must become nullable`,
+    );
+    assert.match(
+      migration,
+      new RegExp(`constraint ${table}_reporter_id_fkey[\\s\\S]{0,120}on delete set null`),
+      `${table}'s reporter link must survive account deletion`,
+    );
+  }
+
+  assert.match(migration, /trg_anonymize_deleted_user_reports/);
+  assert.match(migration, /before delete on public\.users/);
+  assert.match(migration, /reporter_deleted_at/);
+  assert.match(migration, /'Deleted user'/);
+  assert.match(migration, /drop constraint if exists moderation_audit_log_report_id_fkey/);
+  assert.match(
+    migration,
+    /drop constraint if exists moderation_audit_log_moderator_id_fkey/,
+  );
+  assert.match(
+    migration,
+    /drop constraint if exists moderation_audit_log_subject_user_id_fkey/,
+  );
+
+  const engine = readWeb("lib/moderation/resolve-report.ts");
+  assert.match(engine, /reporter_id: string \| null/);
+  assert.match(
+    engine,
+    /if \(report\.reporter_id\) \{[\s\S]*type: "report_reviewed"/,
+    "resolution must not notify a deleted reporter account",
+  );
+  assert.match(
+    readWeb("lib/account/delete.ts"),
+    /trg_anonymize_deleted_user_reports/,
+    "the shared deletion service must document the database anonymization trigger",
+  );
+
+  const contentDetail = readWeb("app/api/admin/reports/[contentType]/[contentId]/route.ts");
+  assert.match(contentDetail, /reporter_id: string \| null/);
+  assert.match(contentDetail, /name: "Deleted user"/);
+  assert.match(
+    readWeb("app/api/admin/events/[id]/route.ts"),
+    /reporter_id: string \| null/,
+    "event takedowns must not notify a deleted reporter account",
+  );
+});
+
 test("temporary suspension is enforced by the session evaluator", () => {
   const validity = readWeb("lib/auth/session-validity.ts");
   assert.match(validity, /suspended_until/);

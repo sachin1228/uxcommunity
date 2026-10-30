@@ -33,7 +33,8 @@ Expand the report row. You get:
 
 - the report type and target name;
 - the reported content excerpt and its author/owner;
-- the reporter and when the report was filed;
+- the reporter (or **Deleted user** if they erased their account) and when the
+  report was filed;
 - the reporter's optional note;
 - for communities and job listings, a structured snapshot (description,
   company, owner/poster, lifecycle state);
@@ -80,6 +81,9 @@ job applications, community membership and content, and the report's evidence.
 - A deleted comment or message is **not** recoverable; the evidence snapshot
   is what remains.
 - Moderation never deletes a report row, an audit row, or evidence.
+- A reporter deleting their account does not delete their reports; the
+  reporter link is nulled and the queue shows **Deleted user**, while the
+  evidence and audit history remain.
 - Account actions revoke the member's live sessions immediately.
 
 ## 5. Close the report

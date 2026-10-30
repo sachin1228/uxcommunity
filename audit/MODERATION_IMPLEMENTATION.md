@@ -1,8 +1,9 @@
 # Moderation implementation audit
 
 Date: 2026-10-30
-Branch: `feat/complete-moderation-system`
-Scope: `apps/web`, `expo-app-standalone 3`, `supabase/migrations`, `docs`.
+Branches: `feat/complete-moderation-system` (base implementation) and
+`feat/preserve-moderation-evidence` (evidence retention after account deletion)
+Scope: `apps/web`, `expo-app-standalone 3`, `supabase/migrations`, `supabase/tests`, `docs`, `audit`.
 
 ## Executive summary
 
@@ -24,6 +25,12 @@ did not have:
 - explicit enforcement that a moderated job keeps every application and a
   hidden community keeps its members and content;
 - the three policy documents and this audit.
+
+The follow-up branch `feat/preserve-moderation-evidence` fixes the account-
+deletion hole those reports inherited: reporter deletion used to cascade every
+report they had filed. All three report queues now survive account deletion with
+the reporter detached, and the audit log can no longer be rewritten by a user
+deletion. See [MODERATION_EVIDENCE_RETENTION.md](MODERATION_EVIDENCE_RETENTION.md).
 
 No production database, deployment or migration was touched.
 
@@ -129,8 +136,13 @@ Safety properties, enforced in code and guarded by tests:
 ### 2.4 Audit log
 
 `moderation_audit_log` records moderator id (null for the shared admin login),
-admin session id, action, target type/id, report id, subject account, previous
-state, new state, reason and timestamp.
+a moderator display-name snapshot (`moderator_label`), admin session id, action,
+target type/id, report id, subject account, previous state, new state, reason
+and timestamp. The historical account/report ids are plain UUID columns, not
+foreign keys: their `on delete set null` actions were UPDATEs, which the
+append-only trigger rejects, so a foreign key would have made deleting a
+previously-moderated account fail. Keeping the ids as history preserves
+attribution without ever rewriting an audit row.
 
 Protection:
 
@@ -148,7 +160,9 @@ actions against its target.
 When a report is resolved:
 
 - the reporter gets a `report_reviewed` notice (never told who was actioned or
-  anything about other reports);
+  anything about other reports) while their account still exists; if they
+  deleted it while the report was open, the retained anonymous report is still
+  resolved and there is no account left to notify;
 - the affected member gets a `moderation_action` notice for removals, hides,
   deactivations, warnings, suspensions and bans, with the reason and an appeal
   link;
@@ -202,6 +216,19 @@ best-effort on business days and publish internal targets, not guarantees.
 - Rebuilt `interaction_report_queue` view with snapshot/resolver columns.
 - `notifications`: `moderation_action`, `appeal_reviewed`, `moderation` entity.
 
+`supabase/migrations/20261030230000_preserve_moderation_evidence.sql`
+
+- report queues `interaction_reports`, `content_reports`, `dm_reports`:
+  `reporter_id` nullable, `reporter_deleted_at`, reporter FK
+  `on delete set null`;
+- `anonymize_deleted_user_reports` + `trg_anonymize_deleted_user_reports` on
+  `users` deletes;
+- audit historical ids become non-FK UUIDs, plus `moderator_label`;
+- rebuilt `interaction_report_queue`, `dm_report_queue`, `report_groups` so a
+  deleted reporter reads **Deleted user**;
+- comments and migration instructions in
+  [MODERATION_EVIDENCE_RETENTION.md](MODERATION_EVIDENCE_RETENTION.md).
+
 ### Server
 
 - `lib/communities/report-reasons.ts` — target-aware reason vocabulary;
@@ -228,6 +255,11 @@ Routes:
 - `GET /api/admin/moderation-appeals`, `PATCH /api/admin/moderation-appeals/[id]`.
 - `GET/POST /api/moderation/appeals` (session).
 - `POST /api/moderation/appeals/token` (signed link).
+- `GET/POST /api/admin/reports/[contentType]/[contentId]` — content-report
+  detail now renders a deleted reporter as **Deleted user** and skips
+  notifications to an account that no longer exists.
+- `DELETE /api/admin/events/[id]` — event takedown skips thank-you notices to
+  deleted reporters while still closing their retained reports.
 
 ### Web UI
 
@@ -237,6 +269,10 @@ Routes:
 - `components/jobs/JobReportMenu.tsx`, `JobCard.tsx`, `JobDetail.tsx` —
   Report job.
 - `app/admin/(protected)/interaction-reports/page.tsx` — unified queue.
+- `app/admin/(protected)/reports/[contentType]/[contentId]/page.tsx` — post-report
+  detail shows a deleted reporter without a profile link.
+- `app/admin/(protected)/dm-reports/page.tsx` — DM queue shows a deleted
+  reporter without exposing an id.
 - `components/admin/moderation/ModerationActionDialog.tsx` — confirmation.
 - `app/admin/(protected)/audit-log/page.tsx`.
 - `app/admin/(protected)/moderation-appeals/page.tsx`.
@@ -270,7 +306,9 @@ values, so web and mobile behavior cannot drift.
 | RLS / admin authorization | report/audit/appeal tables are service-role only and RLS-enabled; every admin route calls `requireSession("admin")`; source-audit test enforces both |
 | Moderator access to unrelated private data | queue returns only the report, its snapshot and involved accounts; appeals return name/block/suspension state, not emails or profiles |
 | Evidence protected | `interaction_report_queue` and `interaction_reports` grants are service-role only; no member-facing endpoint exposes them |
-| Reporter identity private | admin-only queue; `actor_id` null on all platform notices; affected-member copy never references the reporter (guarded by test) |
+| Reporter identity private | admin-only queue; `actor_id` null on all platform notices; affected-member copy never references the reporter (guarded by test); a deleted reporter has no id and reads **Deleted user** |
+| Report evidence survives account deletion | `on delete set null` reporter FKs + `before delete` anonymization trigger; report/audit snapshots untouched; no reporter id or profile remains |
+| Audit cannot be rewritten by deletion | historical audit ids are not foreign keys; append-only trigger still rejects UPDATE/DELETE; `moderator_label` snapshots attribution |
 | Mobile/web parity | one endpoint and one server-side reason validator |
 
 Additional controls:
@@ -291,15 +329,19 @@ Additional controls:
 | --- | --- | --- |
 | Web TypeScript | `npx tsc --noEmit -p apps/web/tsconfig.json` | pass, 0 errors |
 | Mobile TypeScript | `npx tsc --noEmit -p "expo-app-standalone 3/tsconfig.json"` | pass, 0 errors |
-| Moderation unit/source tests | `npm run test:moderation` | **74 pass, 0 fail** |
+| Moderation unit/source tests | `npm run test:moderation` | **75 pass, 0 fail** |
+| Evidence-retention SQL tests | `bash supabase/tests/run-local.sh supabase/tests/moderation_evidence_retention.test.sql` | **62 assertions pass, 0 fail** |
+| Account-deletion race | `bash supabase/tests/run-local.sh supabase/tests/moderation_evidence_concurrency.test.sql` | **6 assertions pass, 0 fail** |
+| Content-report regression | `bash supabase/tests/run-local.sh supabase/tests/content_reports.test.sql` | 38 pass, 0 fail |
+| DM report regression | `bash supabase/tests/run-local.sh supabase/tests/dm_requests_blocks_reports.test.sql` | 37 pass, **1 pre-existing failure** (`dm_blocks_pair_unique` was renamed to `user_blocks_pair_unique` by `20261030140000`; the stale assertion is unrelated to this change; all DM-queue report assertions pass) |
 | Email templates | `npx tsx --test apps/web/lib/email/templates.test.ts` | 15 pass, 0 fail |
 | Notification tabs (web) | `npx tsx --test apps/web/lib/notifications-tabs.test.ts` | 10 pass |
 | Notification model (mobile) | `npx tsx --test "expo-app-standalone 3/lib/notifications.test.ts"` | 9 pass |
-| Production build | `npm run build` | exit 0; `/dashboard/appeals`, `/appeals/[token]`, `/admin/audit-log`, `/admin/moderation-appeals`, `/admin/interaction-reports` and every new API route compiled |
+| Production build | `npm run build` | exit 0 after the evidence-retention changes; `/dashboard/appeals`, `/appeals/[token]`, `/admin/audit-log`, `/admin/moderation-appeals`, `/admin/interaction-reports` and every new API route compiled |
 | Lint (changed/new files) | `eslint` on the changed paths | 0 errors, 0 warnings |
-| Lint (whole web app) | `npm run lint` | **fails on 46 pre-existing errors** unrelated to this branch (e.g. `react-hooks/set-state-in-effect` in `DropdownMenu.tsx`, `useDmTyping.ts`); no new error was introduced by the changed files |
+| Lint (whole web app) | `npm run lint` | **fails on 43 pre-existing errors + 24 warnings** unrelated to this branch (e.g. `react-hooks/set-state-in-effect` in `DropdownMenu.tsx`); no finding names a changed file |
 
-The 74 tests cover:
+The 75 tests cover:
 
 - per-target reason lists and rejection of a reason offered for another target;
 - the full persisted reason vocabulary;
@@ -314,13 +356,50 @@ The 74 tests cover:
   job applications untouched, community memberships untouched, append-only
   audit table, reporter identity absent from affected-member notices,
   one-appeal-per-report + rate limiting, suspension wired through the session
-  evaluator.
+  evaluator, and the evidence-retention trigger/nullable-reporter contract.
+
+### Database-layer evidence-retention checks (new)
+
+A local PostgreSQL 14 runtime **is** available through
+`supabase/tests/run-local.sh`, so the evidence-retention migration was exercised
+against a scratch database built from `schema.sql` plus all 208 migrations. The
+new SQL suites cover these items from the task's test list at the database
+layer:
+
+1. reporter files a community report, then deletes account → report retained,
+   reporter nulled, snapshot intact;
+2. reporter files a job report, then deletes account → same;
+3. reporter files a comment report, then deletes account → same;
+4. reporter files a chat report, then deletes account → same;
+5. reporter files a profile report, then deletes account → same;
+6. the reports remain visible in the queue views, with **Deleted user** as the
+   reporter label and no reporter id;
+7. evidence snapshots remain readable after reporter, target and community
+   deletion;
+8. reporter identity is not exposed by the queue views or reporter columns;
+9. deleted reporter's email/profile/session rows are gone (the users row is the
+   root; no reporter data is copied into the report);
+10. audit history survives reporter, target and moderator deletion; the
+    append-only trigger still rejects UPDATE/DELETE;
+11. a retained report can still be resolved after its reporter is gone, and a
+    new audit row can be written;
+12. target deletion (reported member and community) does not cascade-delete its
+    reports; only live links are nulled and snapshots remain;
+13. existing report shapes, duplicate indexes and RLS/grant posture remain valid
+    after the migration;
+14. a report insert racing account deletion either commits first and is
+    anonymized, or loses the race and fails its foreign key — it never leaves a
+    report pointing at a deleted account.
+
+These are database tests, not browser/API tests. They prove the constraints,
+trigger, views and deletion semantics; they do not prove that a web or mobile
+button reaches the right route.
 
 ### Not executed (and why)
 
-There is **no local Supabase/Postgres runtime in this workspace** (`docker` is
-not installed), and no production access was authorized. Therefore the
-following were **not** run end-to-end, and no claim is made that they passed:
+No browser, mobile emulator or staging environment was used, and no production
+access was authorized. Therefore the following were **not** run end-to-end, and
+no claim is made that they passed:
 
 1. Report a community from web.
 2. Report a community from mobile.
@@ -331,16 +410,18 @@ following were **not** run end-to-end, and no claim is made that they passed:
 7. Rate limiting against Redis.
 8. Admin queue filtering against a live database.
 9. Admin dismissal/removal/hide/deactivate/account actions.
-10. Evidence surviving target deletion in a live database.
+10. Evidence surviving target deletion through the browser (the database
+    layer is covered by the new SQL suite).
 11. Ordinary users blocked from moderation routes (covered only by the
     source-level authorization audit).
 12. Reporter identity privacy in live notification rows.
 13. Notifications delivered/rendered in both apps.
 14. Appeals submitted and reviewed, including a granted ban appeal.
 
-The migration was written but **not applied** to any database. Before launch it
-must be applied to a staging database, then the 14 scenarios above exercised
-there. See §7.
+The migrations were written but **not applied to staging or production**. Local
+PostgreSQL tests pass; before launch the migration must be applied to staging,
+then the browser/mobile scenarios above exercised there. See §7 and
+[MODERATION_EVIDENCE_RETENTION.md](MODERATION_EVIDENCE_RETENTION.md).
 
 ## 6. Remaining gaps and risks
 
@@ -376,37 +457,58 @@ there. See §7.
    existing removal/restore machinery but means “all reports” is split between
    Moderation queue (interactions/communities/jobs) and Reports (posts). The
    acceptance list (profile, comment, chat, community, job) is fully unified.
-10. **Evidence retention is indefinite.** No retention/erasure policy for
-    report snapshots exists yet; it should be decided with legal review.
-11. **A reporter deleting their account cascades their reports away.** This is
-    the pre-existing `interaction_reports.reporter_id ... on delete cascade`
-    behavior. It means the snapshot of the reported target is lost when the
-    reporter erases their account. Preserving those reports would require a
-    nullable reporter + `ON DELETE SET NULL` migration and a decision about
-    whether retaining them is appropriate; it is deliberately left out of this
-    branch to avoid changing account-erasure semantics.
+10. **Evidence retention needs an approved policy.** Reports are now retained
+    after reporter deletion, so the proposed 24-month retention period in
+    [MODERATION_EVIDENCE_RETENTION.md](MODERATION_EVIDENCE_RETENTION.md) must be
+    reviewed by counsel/privacy before launch. It is labelled a policy
+    proposal, not a legal requirement. There is no automated purge job yet.
+11. **Audit historical ids are pseudonymous.** `moderator_id`, `subject_user_id`
+    and `report_id` remain in the append-only audit row after an account or
+    report is gone, so a decision stays attributable. They are no longer
+    foreign keys and cannot resolve through the schema, but they can still be
+    correlated with backups/logs; access must stay admin-only and the retention
+    review must cover them.
+12. **Generated database types are stale.** Regenerate
+    `apps/web/lib/supabase/database.types.ts` after applying the migration; it
+    predates `interaction_reports` and still marks the older reporter columns as
+    non-null.
 
 ## 7. Recommended pre-launch checklist
 
-1. Apply the migration to staging (never production from this branch), then to
-   production during the deploy window.
-2. Verify `set_user_suspended`, the audit trigger and the job reopen guard in
-   staging with a real Postgres.
-3. Run the 14 scenarios in §5 against staging; record results in this file or a
-   follow-up audit.
-4. Create at least one test community report and one test job report from each
+1. Apply both migrations to staging (never production from this branch), in
+   order, then to production during the deploy window:
+   `20261030220000_complete_moderation_system.sql` followed by
+   `20261030230000_preserve_moderation_evidence.sql`.
+2. Run the new SQL suites against staging:
+   `bash supabase/tests/run-local.sh supabase/tests/moderation_evidence_retention.test.sql supabase/tests/moderation_evidence_concurrency.test.sql`.
+3. Verify `set_user_suspended`, both audit triggers, the anonymization trigger
+   and the job reopen guard in staging with a real Postgres.
+4. Run the browser/mobile scenarios in §5 against staging; record results in
+   this file or a follow-up audit.
+5. Create at least one test community report and one test job report from each
    client, confirm both appear in the queue with snapshots, and resolve one
    with each action type.
-5. Suspend a test account, confirm immediate sign-out, confirm the email appeal
+6. Create a test reporter, file all five report types, delete the reporter, and
+   confirm every report is still in its queue with **Deleted user** as the
+   reporter, the snapshots intact, and the audit rows unchanged.
+7. Suspend a test account, confirm immediate sign-out, confirm the email appeal
    link works, grant the appeal and confirm the account can sign in again.
-6. Confirm `RESEND_API_KEY`, `EMAIL_FROM` and `NEXT_PUBLIC_APP_URL` are set in
+8. Confirm `RESEND_API_KEY`, `EMAIL_FROM` and `NEXT_PUBLIC_APP_URL` are set in
    the target environment.
-7. Confirm no production moderation queue contains a report that was resolved
+9. Confirm no production moderation queue contains a report that was resolved
    without an audit row.
+10. Regenerate Supabase types and confirm no UI still assumes a non-null
+    reporter id.
+11. Get the retention proposal in
+    [MODERATION_EVIDENCE_RETENTION.md](MODERATION_EVIDENCE_RETENTION.md) reviewed
+    before describing any retention period in public copy.
 
 ## 8. Files changed
 
-See `git status` on `feat/complete-moderation-system`. The migration, the three
+On `feat/preserve-moderation-evidence`, the changes are the new retention
+migration, the two SQL test suites, the nullable-reporter handling in the
+resolution engine/admin views/audit feed, this audit, and
+`MODERATION_EVIDENCE_RETENTION.md`. On the base branch, the migration, the three
 policy documents, the audit document, the moderation library/route/UI files and
-the mobile reporting entry points are all new or modified in place; no existing
+the mobile reporting entry points are new or modified in place; no existing
 reporting behavior was removed.

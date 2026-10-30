@@ -35,6 +35,8 @@ export type ModerationAuditAction = (typeof MODERATION_AUDIT_ACTIONS)[number];
 export interface ModerationAuditRow {
   id: string;
   moderator_id: string | null;
+  /** Captured at action time, so deletion of the moderator account keeps attribution. */
+  moderator_label: string | null;
   moderator_sid: string | null;
   action: ModerationAuditAction;
   target_type: string;
@@ -49,6 +51,8 @@ export interface ModerationAuditRow {
 
 export interface ModerationAuditInput {
   moderatorId: string | null;
+  /** Optional display-name snapshot; resolved from the account when omitted. */
+  moderatorLabel?: string | null;
   moderatorSid: string;
   action: ModerationAuditAction;
   targetType: string;
@@ -72,8 +76,25 @@ export async function recordModerationAction(
   db: ServiceClient,
   input: ModerationAuditInput,
 ): Promise<void> {
+  // Snapshot the moderator's name now. `moderator_id` is a historical id that
+  // account deletion no longer rewrites, so without this a deleted moderator
+  // account would make an old decision look like it was taken by the platform
+  // admin. A lookup failure must not block the decision: the id and session id
+  // are still recorded.
+  let moderatorLabel = input.moderatorLabel ?? null;
+  if (!moderatorLabel && input.moderatorId) {
+    const { data, error } = await db
+      .from("users")
+      .select("name")
+      .eq("id", input.moderatorId)
+      .maybeSingle();
+    if (!error) moderatorLabel = data?.name?.trim() || null;
+  }
+  if (!moderatorLabel && !input.moderatorId) moderatorLabel = "Platform admin";
+
   const { error } = await auditTable(db).insert({
     moderator_id: input.moderatorId,
+    moderator_label: moderatorLabel,
     moderator_sid: input.moderatorSid,
     action: input.action,
     target_type: input.targetType,
@@ -165,7 +186,11 @@ export async function loadAuditFeed(
   return {
     rows: rows.map((row) => ({
       ...row,
-      moderator_name: row.moderator_id ? names.get(row.moderator_id) ?? null : "Platform admin",
+      moderator_name:
+        row.moderator_label ??
+        (row.moderator_id
+          ? names.get(row.moderator_id) ?? "Former moderator"
+          : "Platform admin"),
     })),
     total: count ?? 0,
   };

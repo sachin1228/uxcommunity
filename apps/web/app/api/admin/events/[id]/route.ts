@@ -109,11 +109,13 @@ export async function DELETE(
 
     const reporterIds = [
       ...new Set(
-        ((resolvedReports ?? []) as { id: string; reporter_id: string }[]).map(
-          (row) => row.reporter_id,
-        ),
+        ((resolvedReports ?? []) as { id: string; reporter_id: string | null }[])
+          .map((row) => row.reporter_id)
+          .filter((id): id is string => Boolean(id)),
       ),
     ];
+    // A reporter whose account was deleted has a retained report but no
+    // account left to notify.
     const thanks = reportReviewedNotice("event", true);
     for (const reporterId of reporterIds) {
       deferNotification({

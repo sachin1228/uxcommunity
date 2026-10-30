@@ -62,7 +62,8 @@ const ACTIONS = new Set(["remove", "dismiss", "reopen", "restore"]);
 
 interface ReportRow {
   id: string;
-  reporter_id: string;
+  /** Null after the reporter deletes their account; the report is retained. */
+  reporter_id: string | null;
   content_type: string;
   content_id: string;
   community_id: string | null;
@@ -314,7 +315,9 @@ export async function GET(
 
   const ids = new Set<string>();
   if (authorId) ids.add(authorId);
-  for (const report of reports) ids.add(report.reporter_id);
+  for (const report of reports) {
+    if (report.reporter_id) ids.add(report.reporter_id);
+  }
   if (removal?.removed_by) ids.add(removal.removed_by);
 
   const [{ people, avatars }, communityResult, stats] = await Promise.all([
@@ -330,7 +333,12 @@ export async function GET(
     pending: reports.filter((report) => report.status === "pending").length,
     removed: reports.filter((report) => report.status === "removed").length,
     dismissed: reports.filter((report) => report.status === "dismissed").length,
-    reporters: new Set(reports.map((report) => report.reporter_id)).size,
+    reporters:
+      new Set(
+        reports
+          .map((report) => report.reporter_id)
+          .filter((id): id is string => Boolean(id)),
+      ).size + (reports.some((report) => report.reporter_id === null) ? 1 : 0),
   };
 
   return NextResponse.json({
@@ -378,7 +386,9 @@ export async function GET(
       status: report.status,
       created_at: report.created_at,
       resolved_at: report.resolved_at,
-      reporter: personFor(report.reporter_id, people, avatars),
+      reporter: report.reporter_id
+        ? personFor(report.reporter_id, people, avatars)
+        : { id: null, name: "Deleted user", email: null, avatar_url: null },
     })),
     counts,
     removal: removal
@@ -575,7 +585,7 @@ export async function POST(
     return NextResponse.json({ error: "Failed to close the reports." }, { status: 500 });
   }
 
-  const resolvedRows = (resolved ?? []) as Array<{ id: string; reporter_id: string }>;
+  const resolvedRows = (resolved ?? []) as Array<{ id: string; reporter_id: string | null }>;
   const pendingReports = reports.filter((report) => report.status === "pending");
   const reasonSource = pendingReports[0] ?? reports[0];
   const contentTitle = reasonSource?.content_title ?? removalResult.content?.title ?? null;
@@ -597,9 +607,17 @@ export async function POST(
     });
   }
 
-  // Every reporter who flagged this post gets the thank-you.
+  // Every reporter who flagged this post gets the thank-you while their
+  // account still exists. A deleted reporter's retained report has no account
+  // left to notify.
   const thanks = reportReviewedNotice(kind, removalResult.removed);
-  const reporterIds = [...new Set(resolvedRows.map((row) => row.reporter_id))];
+  const reporterIds = [
+    ...new Set(
+      resolvedRows
+        .map((row) => row.reporter_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
   for (const reporterId of reporterIds) {
     deferNotification({
       userId: reporterId,

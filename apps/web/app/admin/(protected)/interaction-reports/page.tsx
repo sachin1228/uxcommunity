@@ -25,8 +25,10 @@ import { ModerationActionDialog } from "@/components/admin/moderation/Moderation
 
 interface InteractionReport {
   id: string;
-  reporter_id: string;
+  /** Null after the reporter's account was deleted; the report is retained. */
+  reporter_id: string | null;
   reporter_name: string | null;
+  reporter_deleted_at: string | null;
   target_type: InteractionReportType;
   target_id: string;
   target_author_id: string | null;
@@ -492,9 +494,11 @@ export default function ModerationQueuePage() {
                       {reportReasonLabel(report.reason)}
                     </td>
                     <td className="px-3 py-3 font-body text-xs text-foreground-muted">
-                      {report.reporter_name || "Member"}
+                      {report.reporter_id ? report.reporter_name || "Member" : "Deleted user"}
                       <span className="mt-0.5 block text-[10px] text-foreground-subtle">
-                        Identity hidden from the target
+                        {report.reporter_id
+                          ? "Identity hidden from the target"
+                          : "Reporter account deleted"}
                       </span>
                     </td>
                     <td className="px-3 py-3 font-body text-[11px] text-foreground-muted">

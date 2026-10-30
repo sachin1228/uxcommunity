@@ -7,6 +7,7 @@ import { AUDIT_ACTION_LABELS } from "@/lib/moderation/action-catalog";
 interface AuditEntry {
   id: string;
   moderator_id: string | null;
+  moderator_label: string | null;
   moderator_sid: string | null;
   moderator_name: string | null;
   action: string;
@@ -222,7 +223,7 @@ export default function AuditLogPage() {
                       {formatDate(entry.created_at)}
                     </td>
                     <td className="px-3 py-3 font-body text-xs text-foreground">
-                      {entry.moderator_name ?? "Platform admin"}
+                      {entry.moderator_label ?? entry.moderator_name ?? "Platform admin"}
                       <span className="mt-0.5 block font-mono text-[9px] text-foreground-subtle">
                         {entry.moderator_sid ? entry.moderator_sid.slice(0, 8) : "—"}
                       </span>

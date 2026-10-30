@@ -42,7 +42,8 @@ import {
 
 export interface ModerationReport {
   id: string;
-  reporter_id: string;
+  /** Null after the reporter's account is deleted; the report is retained. */
+  reporter_id: string | null;
   target_type: InteractionReportType;
   target_id: string;
   context_id: string | null;
@@ -343,24 +344,28 @@ export async function resolveModerationReport({
   }
 
   // ── The reporter: reviewed, never told who was actioned ──
-  await createNotification(db, {
-    userId: report.reporter_id,
-    actorId: null,
-    communityId: report.community_id,
-    type: "report_reviewed",
-    entityType,
-    entityId,
-    title: status === "dismissed" ? "Your report was reviewed" : "Thanks for your report",
-    body:
-      status === "dismissed"
-        ? `We reviewed the ${targetLabel} you reported and did not find a violation.`
-        : status === "removed"
-          ? `We reviewed the ${targetLabel} you reported and took action.`
-          : `We reviewed the ${targetLabel} you reported and acted on the account.`,
-    href: report.community_id
-      ? `/dashboard/communities/${report.community_id}`
-      : "/dashboard/notifications",
-  });
+  // The reporter may have deleted their account while the report was open.
+  // The row is retained anonymously, and there is no account left to notify.
+  if (report.reporter_id) {
+    await createNotification(db, {
+      userId: report.reporter_id,
+      actorId: null,
+      communityId: report.community_id,
+      type: "report_reviewed",
+      entityType,
+      entityId,
+      title: status === "dismissed" ? "Your report was reviewed" : "Thanks for your report",
+      body:
+        status === "dismissed"
+          ? `We reviewed the ${targetLabel} you reported and did not find a violation.`
+          : status === "removed"
+            ? `We reviewed the ${targetLabel} you reported and took action.`
+            : `We reviewed the ${targetLabel} you reported and acted on the account.`,
+      href: report.community_id
+        ? `/dashboard/communities/${report.community_id}`
+        : "/dashboard/notifications",
+    });
+  }
 
   // ── The subject: what happened and where to appeal ──
   if (subjectNotice && report.target_author_id) {

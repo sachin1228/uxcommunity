@@ -127,16 +127,30 @@ When a report is filed, the platform stores on the report:
 This snapshot is what a reviewer decides from, and it survives the target being
 edited or deleted. **Do not delete report rows or snapshots as part of a
 moderation action.** If the reported member's account is deleted, the author
-link is nulled by the schema and the report remains. If the **reporter** deletes
-their own account, the existing schema cascades their reports away; the
-structured snapshot does not survive that case (see the implementation audit's
-remaining gaps).
+link is nulled by the schema and the report remains.
+
+If the **reporter** deletes their own account, their reports are also retained.
+A database trigger detaches the reporter in the same transaction as the account
+deletion: `reporter_id` becomes null, `reporter_deleted_at` records when, and the
+queue displays **Deleted user**. The report id, timestamp, reason, details,
+target snapshot, status and audit links stay exactly as they were. No reporter
+email, profile, session or account id is copied into the report. The free-text
+`details` field is retained as evidence and may contain personal information a
+member typed; treat it as confidential and never use it to re-identify an
+anonymized reporter.
+
+Retention after account deletion, access to retained evidence and the proposed
+retention period are documented in
+[../audit/MODERATION_EVIDENCE_RETENTION.md](../audit/MODERATION_EVIDENCE_RETENTION.md).
+The period is a policy proposal requiring legal/privacy review, not a legal
+requirement.
 
 ## 6. Audit log
 
 Every moderation action writes an append-only audit row recording:
 
-- the moderator (admin session id; the platform admin login has no user row);
+- the moderator (historical account id where one exists, a display-name
+  snapshot, and the admin session id; the platform admin login has no user row);
 - the action taken;
 - the target type and id, and the report id;
 - the affected account, where applicable;
@@ -146,7 +160,10 @@ Every moderation action writes an append-only audit row recording:
 
 Audit rows cannot be edited or deleted, including by an administrator: the
 database has no update/delete privilege for the application and a trigger
-rejects both. Only administrators can read the log.
+rejects both. Only administrators can read the log. Historical moderator and
+subject ids are retained as plain UUIDs (not foreign keys), so deleting an
+account cannot rewrite an old decision; the display-name snapshot keeps the
+attribution readable.
 
 ## 7. Notifications
 
@@ -192,7 +209,12 @@ through a notification.
 - Applicant résumés are private objects; moderation never exposes or downloads
   them.
 - Reporter identity and report details are visible only to administrators.
-- Evidence is retained for the life of the report for audit and appeal use.
+  After a reporter deletes their account, only the report evidence remains and
+  the reporter reads **Deleted user**.
+- Evidence is retained for audit and appeal use under the retention policy in
+  [../audit/MODERATION_EVIDENCE_RETENTION.md](../audit/MODERATION_EVIDENCE_RETENTION.md).
+  The proposed 24-month post-resolution period is a policy decision for legal
+  and privacy review, not a legal requirement.
 - Deleted content is not recoverable, which is why removal is reserved for
   violations of these policies and never used as a first response to
   disagreement.
