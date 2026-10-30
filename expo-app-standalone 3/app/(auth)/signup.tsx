@@ -506,15 +506,15 @@ export default function SignupScreen() {
                         styles.checkbox,
                         {
                           borderColor: identity.ageConfirmed
-                            ? colors.isDark ? "#3F3F46" : "#0A0A0A"
+                            ? colors.foreground
                             : colors.isDark ? "#52525B" : "#A3A3A3",
-                          backgroundColor: identity.ageConfirmed
-                            ? colors.isDark ? "#1B1B1F" : "#0A0A0A"
-                            : "transparent",
+                          backgroundColor: identity.ageConfirmed ? colors.foreground : "transparent",
                         },
                       ]}
                     >
-                      {identity.ageConfirmed ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                      {identity.ageConfirmed ? (
+                        <Text style={[styles.checkboxMark, { color: colors.background }]}>✓</Text>
+                      ) : null}
                     </Pressable>
                     <Text style={[styles.consentText, { color: colors.foreground }]}>
                       I confirm that I am 18 years or older.
@@ -536,15 +536,15 @@ export default function SignupScreen() {
                         styles.checkbox,
                         {
                           borderColor: identity.termsAccepted
-                            ? colors.isDark ? "#3F3F46" : "#0A0A0A"
+                            ? colors.foreground
                             : colors.isDark ? "#52525B" : "#A3A3A3",
-                          backgroundColor: identity.termsAccepted
-                            ? colors.isDark ? "#1B1B1F" : "#0A0A0A"
-                            : "transparent",
+                          backgroundColor: identity.termsAccepted ? colors.foreground : "transparent",
                         },
                       ]}
                     >
-                      {identity.termsAccepted ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                      {identity.termsAccepted ? (
+                        <Text style={[styles.checkboxMark, { color: colors.background }]}>✓</Text>
+                      ) : null}
                     </Pressable>
                     <Text style={[styles.consentText, { color: colors.foreground }]}>
                       I agree to the{' '}
@@ -1008,7 +1008,6 @@ function makeStyles() {
     checkboxMark: {
       fontSize: 12,
       lineHeight: 14,
-      color: '#FFFFFF',
       fontFamily: 'Geist_600SemiBold',
     },
     consentText: {

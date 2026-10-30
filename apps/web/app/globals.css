@@ -27,10 +27,7 @@
   --color-border:            #EAEAEA;
   --color-border-subtle:     #F5F5F5;
 
-  /* Checkbox — ink square with a white check (light theme) */
-  --check-fill:   #0A0A0A;
-  --check-border: #0A0A0A;
-  --check-mark:   #FFFFFF;
+  /* Checkbox — idle border only; checked uses the theme foreground. */
   --check-idle:   #A3A3A3;
 
   /* Field inputs — Geist-style ring fields (light theme) */
@@ -205,11 +202,8 @@
     --color-border-strong:     #2D2D34;  /* active components */
     --color-input-border:      #303036;  /* input fields */
 
-    /* Checkbox — elevated dark square with a white check */
-    --check-fill:   #1B1B1F;
-    --check-border: #3F3F46;
-    --check-mark:   #FFFFFF;
-    --check-idle:   #52525B;
+  /* Checkbox — idle border only; checked uses the theme foreground. */
+  --check-idle:   #52525B;
 
     /* Field inputs — Geist-style ring fields (dark theme) */
     --color-field:            #151517;
@@ -400,9 +394,7 @@ body {
   --color-border:            #202024;
   --color-border-subtle:     #1D1D21;
 
-  --check-fill:   #1B1B1F;
-  --check-border: #3F3F46;
-  --check-mark:   #FFFFFF;
+  /* Checkbox — idle border only; checked uses the theme foreground. */
   --check-idle:   #52525B;
 
   /* The dark scheme's heavy blacks — the sheets this scope floats sit on
@@ -519,15 +511,15 @@ select:focus-visible {
     content: "";
     width: 9px;
     height: 5px;
-    border-left: 2px solid var(--check-mark);
-    border-bottom: 2px solid var(--check-mark);
+    border-left: 2px solid var(--color-background);
+    border-bottom: 2px solid var(--color-background);
     transform: rotate(-45deg) translateY(-1px);
     opacity: 0;
   }
 
   .ux-check:checked {
-    background-color: var(--check-fill);
-    border-color: var(--check-border);
+    background-color: var(--color-foreground);
+    border-color: var(--color-foreground);
   }
 
   .ux-check:checked::after {
