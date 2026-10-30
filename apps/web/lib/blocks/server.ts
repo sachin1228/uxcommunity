@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ServiceClient } from "@/lib/supabase/service";
+import { blockedPeerIds } from "@/lib/blocks/peer-blocks";
 
 /**
  * Member-to-member blocks.
@@ -66,12 +67,10 @@ export async function blockedAmong(
     .in("blocker_id", [userId, ...ids])
     .in("blocked_id", [userId, ...ids]);
 
-  const blocked = new Set<string>();
-  for (const row of (data ?? []) as Array<{ blocker_id: string; blocked_id: string }>) {
-    if (row.blocker_id === userId) blocked.add(row.blocked_id);
-    else if (row.blocked_id === userId) blocked.add(row.blocker_id);
-  }
-  return blocked;
+  return blockedPeerIds(
+    (data ?? []) as Array<{ blocker_id: string; blocked_id: string }>,
+    userId,
+  );
 }
 
 export interface BlockedMember {

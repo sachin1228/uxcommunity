@@ -1,6 +1,6 @@
 import { apiFetch } from './api';
 import {
-  isInteractionReportType,
+  reportEndpointFor,
   type ReportReason,
   type ReportType,
 } from './contentReports';
@@ -23,9 +23,7 @@ export async function reportContent({
   reason: ReportReason;
   details: string;
 }): Promise<void> {
-  const endpoint = isInteractionReportType(contentType)
-    ? '/api/interaction-reports'
-    : '/api/content-reports';
+  const endpoint = reportEndpointFor(contentType);
   await apiFetch(endpoint, {
     method: 'POST',
     body: {

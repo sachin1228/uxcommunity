@@ -32,7 +32,7 @@ import {
   REPORT_CONTENT_LABELS,
   REPORT_DETAILS_MAX_LENGTH,
   REPORT_REASONS,
-  isInteractionReportType,
+  reportEndpointFor,
   type ReportReason,
   type ReportType,
 } from "@/lib/communities/report-reasons";
@@ -90,10 +90,7 @@ export function ReportModal({
     setError(null);
 
     try {
-      const endpoint = isInteractionReportType(contentType)
-        ? "/api/interaction-reports"
-        : "/api/content-reports";
-      const response = await fetch(endpoint, {
+      const response = await fetch(reportEndpointFor(contentType), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

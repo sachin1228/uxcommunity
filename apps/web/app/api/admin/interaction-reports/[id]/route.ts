@@ -4,6 +4,11 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createNotification } from "@/lib/notifications";
 import { removeInteractionContent } from "@/lib/moderation/interaction-reports";
+import {
+  interactionEntityType,
+  interactionTargetLabel,
+  isRemovableInteraction,
+} from "@/lib/moderation/interaction-targets";
 import type { InteractionReportType } from "@/lib/communities/report-reasons";
 
 interface ReportRow {
@@ -68,7 +73,7 @@ export async function PATCH(
   }
 
   if (action === "remove") {
-    if (report.target_type === "profile") {
+    if (!isRemovableInteraction(report.target_type)) {
       return NextResponse.json(
         { error: "Profile reports are resolved from the member page." },
         { status: 422 },
@@ -97,12 +102,7 @@ export async function PATCH(
 
   // Thank the reporter. The row survives if they close their account (FK set
   // null), so a missing reporter is a no-op rather than an error.
-  const targetLabel =
-    report.target_type === "profile"
-      ? "profile"
-      : report.target_type === "community_message"
-        ? "message"
-        : "comment";
+  const targetLabel = interactionTargetLabel(report.target_type);
   const href = report.community_id
     ? `/dashboard/communities/${report.community_id}`
     : "/dashboard/notifications";
@@ -112,12 +112,7 @@ export async function PATCH(
     actorId: null,
     communityId: report.community_id,
     type: "report_reviewed",
-    entityType:
-      report.target_type === "profile"
-        ? "profile"
-        : report.target_type === "community_message"
-          ? "message"
-          : "community",
+    entityType: interactionEntityType(report.target_type),
     entityId: report.context_id ?? report.target_id,
     title: status === "removed" ? "Thanks for your report" : "Your report was reviewed",
     body:

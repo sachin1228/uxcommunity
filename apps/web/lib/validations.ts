@@ -25,13 +25,19 @@ export const directSignupStep1Schema = z
       .regex(/[0-9]/, "Must contain at least one number"),
     confirm_password: z.string(),
     // Eligibility and consent are recorded on the account at completion; the
-    // API refuses to create an account without both.
+    // API refuses to create an account without both. Defaulting to false makes
+    // an older client that omits the flags fail with the same human message
+    // instead of Zod's generic "Required".
     age_confirmed: z
       .boolean()
+      .default(false)
       .refine((v) => v === true, { message: "You must confirm that you are 18 or older." }),
-    terms_accepted: z.boolean().refine((v) => v === true, {
-      message: "You must accept the Terms of Service and Privacy Policy.",
-    }),
+    terms_accepted: z
+      .boolean()
+      .default(false)
+      .refine((v) => v === true, {
+        message: "You must accept the Terms of Service and Privacy Policy.",
+      }),
   })
   .refine((d) => d.password === d.confirm_password, {
     message: "Passwords do not match",

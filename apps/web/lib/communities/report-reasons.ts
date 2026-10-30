@@ -60,6 +60,16 @@ export function isInteractionReportType(value: string): value is InteractionRepo
   return INTERACTION_REPORT_TYPE_VALUES.has(value);
 }
 
+export const CONTENT_REPORT_ENDPOINT = "/api/content-reports";
+export const INTERACTION_REPORT_ENDPOINT = "/api/interaction-reports";
+
+/** Posts go to the removal queue; comments/messages/profiles to the other. */
+export function reportEndpointFor(contentType: ReportType): string {
+  return isInteractionReportType(contentType)
+    ? INTERACTION_REPORT_ENDPOINT
+    : CONTENT_REPORT_ENDPOINT;
+}
+
 /** How each reported kind is named in copy ("your thread", "this event"). */
 export const REPORT_CONTENT_LABELS: Record<ReportType, string> = {
   thread: "thread",

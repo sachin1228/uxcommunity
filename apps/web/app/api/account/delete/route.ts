@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deleteAccountCascade } from "@/lib/account/delete";
+import { parseDeleteAccountRequest } from "@/lib/account/delete-request";
 import { sendAccountDeletedEmail } from "@/lib/email";
 
 /**
@@ -39,18 +40,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as
-    | { password?: string; confirmation?: string }
-    | null;
-
-  if (!body || typeof body.password !== "string" || body.password.length === 0) {
-    return NextResponse.json({ error: "Enter your password to continue." }, { status: 422 });
-  }
-  if (body.confirmation !== "DELETE") {
-    return NextResponse.json(
-      { error: 'Type DELETE to confirm you want to delete your account.' },
-      { status: 422 },
-    );
+  const parsed = parseDeleteAccountRequest(await request.json().catch(() => null));
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
   const db = createServiceClient();
@@ -68,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Account not found." }, { status: 404 });
   }
 
-  const passwordMatch = await bcrypt.compare(body.password, row.password_hash);
+  const passwordMatch = await bcrypt.compare(parsed.password, row.password_hash);
   if (!passwordMatch) {
     return NextResponse.json({ error: "Password is incorrect." }, { status: 403 });
   }
