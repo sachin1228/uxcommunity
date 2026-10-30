@@ -45,7 +45,7 @@ alter table public.interaction_reports
   );
 
 -- The union of every reason list. Which subset applies to which target is
--- enforced in the application (`lib/moderation/report-reasons.ts`), so a
+-- enforced in the application (`apps/web/lib/communities/report-reasons.ts`), so a
 -- client can never post a reason outside the set it was offered.
 alter table public.interaction_reports
   drop constraint if exists interaction_reports_reason_check;
