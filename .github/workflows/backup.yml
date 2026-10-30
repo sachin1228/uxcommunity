@@ -1,0 +1,199 @@
+name: Backup
+
+# WHY THIS WORKFLOW EXISTS
+#   Supabase's daily backups depend on the project's plan, R2 has no object
+#   versioning and no undelete, and nothing in this repository produced an
+#   independent copy of either. This workflow is that copy: an encrypted
+#   logical dump of PostgreSQL plus a mirror of the media buckets, taken daily
+#   from outside the Cloudflare account so a lost Worker, a revoked token or an
+#   accidental delete does not take the backups with it.
+#
+#   It runs on GitHub's infrastructure on purpose. The application's own cron
+#   runs inside the same Cloudflare account it is supposed to protect, so a
+#   Cloudflare-level failure would stop the backups exactly when they matter.
+#   The media mirror still needs R2 credentials; the database dump does not
+#   need Cloudflare at all.
+#
+# WHAT RUNS WHEN
+#   Daily 02:30 UTC  — database dump + media mirror + verification.
+#   Sunday 03:00 UTC — restore drill: builds a throwaway PostgreSQL 17, applies
+#                      the schema, seeds data, backs it up, restores it into a
+#                      second database and compares row counts. Needs no
+#                      production credentials, so it proves the tooling is
+#                      healthy even when a secret has expired.
+#
+# BEFORE THE FIRST RUN, set these repository secrets (Settings → Secrets and
+# variables → Actions). Without them the run fails at "Verify required secrets":
+#   SUPABASE_DB_URL            session-mode pooler URL, port 5432, includes the
+#                              database password. NOT the service-role key.
+#   BACKUP_R2_BUCKET           a bucket dedicated to backups
+#   BACKUP_R2_ACCOUNT_ID       (falls back to R2_ACCOUNT_ID)
+#   BACKUP_R2_ACCESS_KEY_ID    token scoped to the backup bucket only
+#                              (falls back to R2_ACCESS_KEY_ID)
+#   BACKUP_R2_SECRET_ACCESS_KEY
+#   BACKUP_AGE_RECIPIENT       age public key (`age1...`)
+# See audit/BACKUP_IMPLEMENTATION.md for how to generate the age keypair.
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Database and media backup
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_R2_BUCKET: ${{ secrets.BACKUP_R2_BUCKET }}
+      BACKUP_R2_ACCOUNT_ID: ${{ secrets.BACKUP_R2_ACCOUNT_ID || secrets.R2_ACCOUNT_ID }}
+      BACKUP_R2_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID || secrets.R2_ACCESS_KEY_ID }}
+      BACKUP_R2_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY || secrets.R2_SECRET_ACCESS_KEY }}
+      BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_PRIVATE_BUCKET_NAME: ${{ secrets.R2_PRIVATE_BUCKET_NAME }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      BACKUP_STAGE: database backup
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The server runs PostgreSQL 17, and pg_dump refuses to dump a newer
+      # server than itself. Ubuntu's default client is older, so install the
+      # matching major from the PGDG repository.
+      - name: Install PostgreSQL 17 client and age
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl gnupg age
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor --yes -o /usr/share/keyrings/pgdg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          pg_dump --version
+          age --version
+
+      # Fail with a sentence that names the missing secret, instead of a
+      # confusing pg_dump or S3 error three steps later.
+      - name: Verify required secrets
+        run: |
+          missing=0
+          for name in SUPABASE_DB_URL BACKUP_R2_BUCKET BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY BACKUP_AGE_RECIPIENT; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret $name (see the header of .github/workflows/backup.yml)"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Back up the database
+        run: node scripts/backup/backup-postgres.mjs | tee database-backup.json
+
+      # Proves the object is retrievable at the size the manifest claims, and
+      # that the newest backup is recent enough to meet the RPO.
+      - name: Verify the database backup
+        run: node scripts/backup/verify-backup.mjs --latest --max-age-hours 36 --download | tee database-verify.json
+
+      - name: Back up media
+        run: node scripts/backup/backup-r2.mjs --concurrency 8 | tee media-backup.json
+
+      - name: Run summary
+        if: always()
+        run: |
+          {
+            echo "## Backup run"
+            echo
+            if [ -s database-backup.json ]; then
+              echo "| item | value |"
+              echo "|---|---|"
+              echo "| object | \`$(jq -r '.objectKey' database-backup.json)\` |"
+              echo "| encrypted bytes | $(jq -r '.bytesEncrypted' database-backup.json) |"
+              echo "| duration (ms) | $(jq -r '.durationMs' database-backup.json) |"
+              echo "| created at | $(jq -r '.createdAt' database-backup.json) |"
+            fi
+            echo
+            jq -r 'select(.buckets) | .buckets[] | "- \(.sourceBucket): \(.sourceObjects) objects, copied \(.copiedObjects), failed \(.failed), missing \(.missingAfterCopy)"' media-backup.json 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Alert admins
+        if: failure()
+        run: node scripts/backup/notify-failure.mjs
+
+  restore-drill:
+    name: Weekly restore drill
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      BACKUP_STAGE: restore drill
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The drill needs the server binaries (initdb, pg_ctl), not just the
+      # client, because it builds its own throwaway cluster.
+      - name: Install PostgreSQL 17 and age
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl gnupg age
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor --yes -o /usr/share/keyrings/pgdg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+          pg_dump --version
+          /usr/lib/postgresql/17/bin/initdb --version
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Unit-test the backup logic
+        run: node --test scripts/backup/lib/*.test.mjs
+
+      - name: Run the restore drill
+        env:
+          PG_BIN: /usr/lib/postgresql/17/bin
+        run: node scripts/backup/restore-drill.mjs | tee drill.json
+
+      - name: Drill summary
+        if: always()
+        run: |
+          {
+            echo "## Restore drill"
+            echo
+            jq -r '"| item | value |\n|---|---|\n| backup taken | \(.dataTimestamp) |\n| backup (ms) | \(.timings.backupMs) |\n| restore (ms) | \(.timings.restoreMs) |\n| tables restored | \(.health.publicTables) |"' drill.json 2>/dev/null || echo "drill did not produce a report"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Alert admins
+        if: failure()
+        run: node scripts/backup/notify-failure.mjs

@@ -166,3 +166,17 @@ __pycache__/
 *-adminsdk-*.json
 *service-account*.json
 
+
+# =========================
+# Backup artifacts (never commit dumps or keys)
+# =========================
+# `scripts/backup/*` writes encrypted dumps here for local/inspection runs.
+backup-out/
+incident-snapshot/
+pre-migration-*/
+# An age private key must never enter the repository. `age-keygen -o` defaults
+# to a file matching these names.
+*.dump.age
+backup-key.txt
+drill-key.txt
+identity.txt
