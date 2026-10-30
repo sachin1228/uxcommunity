@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
-import { isAllowedDmImageUrl } from "./assets";
+import { isAllowedDmImageUrl, resolveDmImage } from "./assets";
 
 const CONV = "dec0de00-0000-4000-8000-000000000001";
 const OTHER_CONV = "dec0de00-0000-4000-8000-000000000002";
@@ -60,6 +60,32 @@ test("path traversal is resolved by URL rules before the prefix check", () => {
     isAllowedDmImageUrl(`https://cdn.example.test/dm/${CONV}/../../other/x.webp`, CONV),
     false,
   );
+});
+
+test("accepts this conversation's private upload path and resolves its key", () => {
+  const path = `/api/private/dm/${CONV}/0d1f8d1e-1111-4111-8111-111111111111.webp`;
+  assert.equal(isAllowedDmImageUrl(path, CONV), true);
+  assert.deepEqual(resolveDmImage(path, CONV), {
+    url: path,
+    key: `dm/${CONV}/0d1f8d1e-1111-4111-8111-111111111111.webp`,
+  });
+});
+
+test("rejects another conversation's private upload path", () => {
+  assert.equal(
+    isAllowedDmImageUrl(`/api/private/dm/${OTHER_CONV}/abc.webp`, CONV),
+    false,
+  );
+  assert.equal(
+    isAllowedDmImageUrl(`/api/private/dm/${CONV}/../abc.webp`, CONV),
+    false,
+  );
+  assert.equal(resolveDmImage(`/api/private/dm/${OTHER_CONV}/abc.webp`, CONV), null);
+});
+
+test("legacy public uploads stay URL-backed until migration", () => {
+  const url = `https://cdn.example.test/dm/${CONV}/1730000000-ab.webp`;
+  assert.deepEqual(resolveDmImage(url, CONV), { url, key: null });
 });
 
 // ─── GIPHY ────────────────────────────────────────────────────────────────

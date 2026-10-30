@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { formatJobFeedRows } from "@/lib/jobs/format";
 import { deleteJobPost, getJobDetail, type DeleteJobFailureCode } from "@/lib/jobs/service";
+import { withMobileJobResumeUrl } from "@/lib/jobs/private-resume";
 
 /**
  * Read one posting, or delete one the member owns.
@@ -38,7 +39,8 @@ export async function GET(
     );
   }
 
-  return NextResponse.json({ job: formatJobFeedRows([job])[0] });
+  const payload = formatJobFeedRows([job])[0];
+  return NextResponse.json({ job: await withMobileJobResumeUrl(payload) });
 }
 
 const STATUS_FOR_FAILURE: Record<DeleteJobFailureCode, number> = {

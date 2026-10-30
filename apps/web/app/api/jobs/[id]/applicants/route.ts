@@ -7,6 +7,7 @@ import {
   getJobDetail,
   loadJobApplicantDetails,
 } from "@/lib/jobs/service";
+import { withMobileApplicantResumeUrl } from "@/lib/jobs/private-resume";
 
 /**
  * The poster's applicant list for one posting — the mobile applicants board's
@@ -76,6 +77,6 @@ export async function GET(
 
   return NextResponse.json({
     job: formatJobFeedRows([job])[0],
-    applicants,
+    applicants: await Promise.all(applicants.map(withMobileApplicantResumeUrl)),
   });
 }

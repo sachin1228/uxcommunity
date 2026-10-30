@@ -23,6 +23,12 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fmtDate, fmtTime } from '@/lib/chat';
 import { saveImageToGallery } from '@/lib/deviceMedia';
+import {
+  mediaCachePolicy,
+  mediaSource,
+  privateMediaHeaders,
+  resolveMediaUri,
+} from '@/lib/privateMedia';
 import { PersonAvatar } from '@/components/PersonAvatar';
 
 /** One image from the chat timeline, as shown inside the viewer. */
@@ -161,7 +167,10 @@ export function ImageViewer({ images, index, onClose, onNavigate }: Props) {
   const handleDownload = useCallback(async () => {
     if (!image || saving) return;
     setSaving(true);
-    const result = await saveImageToGallery(image.url);
+    const result = await saveImageToGallery(
+      resolveMediaUri(image.url),
+      privateMediaHeaders(image.url),
+    );
     setSaving(false);
 
     if (result.ok) return;
@@ -234,10 +243,11 @@ export function ImageViewer({ images, index, onClose, onNavigate }: Props) {
           <GestureDetector gesture={composed}>
             <Animated.View style={[styles.imageWrapper, animatedStyle]}>
               <Image
-                source={{ uri: image.url }}
+                source={mediaSource(image.url)}
                 style={styles.image}
                 contentFit="contain"
                 transition={150}
+                cachePolicy={mediaCachePolicy(image.url)}
               />
             </Animated.View>
           </GestureDetector>
@@ -286,9 +296,10 @@ export function ImageViewer({ images, index, onClose, onNavigate }: Props) {
                     ]}
                   >
                     <Image
-                      source={{ uri: img.url }}
+                      source={mediaSource(img.url)}
                       style={styles.thumbImage}
                       contentFit="cover"
+                      cachePolicy={mediaCachePolicy(img.url)}
                       pointerEvents="none"
                     />
                   </Pressable>

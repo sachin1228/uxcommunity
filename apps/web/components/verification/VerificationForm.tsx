@@ -13,9 +13,21 @@ interface LatestApplication {
   linkedinUrl: string;
   portfolioLinks: string[];
   workSampleUrls: string[];
+  workSampleKeys?: string[];
   rejectionReason: string | null;
   reviewedAt: string | null;
   createdAt: string;
+}
+
+/** One thumbnail: a private key when this form uploaded it, else a legacy URL. */
+interface Sample {
+  key: string;
+  url: string;
+}
+
+function samplesFromLatest(latest: LatestApplication): Sample[] {
+  const keys = latest.workSampleKeys ?? [];
+  return latest.workSampleUrls.map((url, index) => ({ key: keys[index] ?? "", url }));
 }
 
 interface VerificationData {
@@ -86,7 +98,7 @@ export function VerificationForm() {
   const [portfolio1, setPortfolio1] = useState("");
   const [portfolio2, setPortfolio2] = useState("");
   const [showSecondPortfolio, setShowSecondPortfolio] = useState(false);
-  const [samples, setSamples] = useState<string[]>([]);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
 
   const [code, setCode] = useState("");
@@ -123,7 +135,7 @@ export function VerificationForm() {
           setPortfolio1(next.latest.portfolioLinks[0] ?? "");
           setPortfolio2(next.latest.portfolioLinks[1] ?? "");
           setShowSecondPortfolio(Boolean(next.latest.portfolioLinks[1]));
-          setSamples(next.latest.workSampleUrls ?? []);
+          setSamples(samplesFromLatest(next.latest));
         }
       } catch (loadFailure) {
         if (active) {
@@ -215,16 +227,24 @@ export function VerificationForm() {
           setError(body.error ?? "Upload failed.");
           continue;
         }
-        setSamples((current) => (current.includes(body.url) ? current : [...current, body.url]));
+        const next: Sample = { key: String(body.key ?? ""), url: String(body.url ?? "") };
+        setSamples((current) =>
+          current.some((sample) => sample.key === next.key && sample.url === next.url)
+            ? current
+            : [...current, next],
+        );
       }
     } finally {
       setUploading(false);
     }
   }
 
-  async function removeSample(url: string) {
-    setSamples((current) => current.filter((value) => value !== url));
-    await fetch(`/api/verification/upload?url=${encodeURIComponent(url)}`, {
+  async function removeSample(sample: Sample) {
+    setSamples((current) => current.filter((value) => value !== sample));
+    const query = sample.key
+      ? `key=${encodeURIComponent(sample.key)}`
+      : `url=${encodeURIComponent(sample.url)}`;
+    await fetch(`/api/verification/upload?${query}`, {
       method: "DELETE",
     }).catch(() => {});
   }
@@ -261,7 +281,8 @@ export function VerificationForm() {
         body: JSON.stringify({
           linkedin_url: linkedin.trim(),
           portfolio_links: portfolioLinks,
-          work_sample_urls: samples,
+          work_sample_keys: samples.map((sample) => sample.key).filter(Boolean),
+          work_sample_urls: samples.filter((sample) => !sample.key).map((sample) => sample.url),
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -283,7 +304,8 @@ export function VerificationForm() {
           status: "pending",
           linkedinUrl: linkedin.trim(),
           portfolioLinks,
-          workSampleUrls: samples,
+          workSampleUrls: samples.map((sample) => sample.url),
+          workSampleKeys: samples.map((sample) => sample.key).filter(Boolean),
           rejectionReason: null,
           reviewedAt: null,
           createdAt: body.submittedAt ?? new Date().toISOString(),
@@ -536,15 +558,15 @@ export function VerificationForm() {
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {samples.map((url) => (
+          {samples.map((sample) => (
             <div
-              key={url}
+              key={sample.key || sample.url}
               className="group relative h-24 w-32 overflow-hidden rounded-lg border border-border bg-background"
             >
-              <img src={url} alt="Work sample" className="h-full w-full object-cover" />
+              <img src={sample.url} alt="Work sample" className="h-full w-full object-cover" />
               <button
                 type="button"
-                onClick={() => void removeSample(url)}
+                onClick={() => void removeSample(sample)}
                 aria-label="Remove work sample"
                 className="absolute right-1 top-1 rounded-md bg-background/90 px-1.5 py-0.5 font-body text-[10px] text-foreground shadow-sm"
               >

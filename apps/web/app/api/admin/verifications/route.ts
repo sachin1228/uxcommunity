@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  verificationSampleDisplayUrls,
+  type VerificationSampleRow,
+} from "@/lib/verification/samples";
 
 const PAGE_SIZE = 25;
 
@@ -18,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const db = createServiceClient();
   let query = (db.from("account_verification_requests") as any).select(
-    `id, user_id, linkedin_url, portfolio_links, work_sample_urls, email_verified_at,
+    `id, user_id, linkedin_url, portfolio_links, work_sample_urls, work_sample_keys, email_verified_at,
      status, rejection_reason, reviewed_by, reviewed_at, created_at,
      users!inner(name, email)`,
     { count: "exact" },
@@ -37,8 +41,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to load verification requests." }, { status: 500 });
   }
 
+  const requests = await Promise.all(
+    ((data ?? []) as Array<VerificationSampleRow & Record<string, unknown>>).map(async (row) => ({
+      ...row,
+      // Signed thumbnails only; the object keys stay server-side for admins.
+      work_sample_urls: await verificationSampleDisplayUrls(row),
+      work_sample_keys: undefined,
+    })),
+  );
+
   return NextResponse.json({
-    requests: data ?? [],
+    requests,
     total: count ?? 0,
     page,
     pageSize: PAGE_SIZE,

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { JobsBrowser } from "@/components/jobs/JobsBrowser";
 import { formatJobFeedRows } from "@/lib/jobs/format";
 import { JOB_FEED_PAGE_SIZE, loadJobMasterData, loadJobViewer, getJobFeed } from "@/lib/jobs/service";
+import { withWebJobResumePath } from "@/lib/jobs/private-resume";
 
 export const metadata = { title: "Jobs — uxcommunity" };
 
@@ -37,7 +38,7 @@ export default async function JobsPage({
     <JobsBrowser
       viewer={viewer}
       master={master}
-      initialJobs={formatJobFeedRows(firstPage)}
+      initialJobs={formatJobFeedRows(firstPage).map(withWebJobResumePath)}
       initialHasMore={hasMore}
       initialJobId={typeof query.job === "string" ? query.job : null}
     />

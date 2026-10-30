@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteFromR2, getR2PublicBase, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
 import { collectAllMediaReferences } from "@/lib/r2-cleanup";
+import {
+  dmKeyFromImageUrl,
+  isPrivateStorageConfigured,
+  listPrivateObjectKeys,
+  type PrivateListedObject,
+} from "@/lib/r2-private";
 
 const DEFAULT_GRACE_DAYS = 7;
 
@@ -30,6 +37,54 @@ async function listAllObjects(): Promise<R2ObjectInfo[]> {
   } while (continuationToken);
 
   return objects;
+}
+
+async function listAllPrivateObjects(): Promise<PrivateListedObject[]> {
+  const objects: PrivateListedObject[] = [];
+  if (!isPrivateStorageConfigured()) return objects;
+  let continuationToken: string | undefined;
+  do {
+    const result = await listPrivateObjectKeys(continuationToken);
+    objects.push(...result.objects);
+    continuationToken =
+      result.isTruncated && result.nextContinuationToken ? result.nextContinuationToken : undefined;
+  } while (continuationToken);
+  return objects;
+}
+
+/** Every key a private-file column still points at. */
+async function collectPrivateKeyReferences(db: ReturnType<typeof createServiceClient>): Promise<Set<string>> {
+  const keys = new Set<string>();
+  const untyped = db as unknown as SupabaseClient;
+  const [resumes, applications, verifications, messages, reports] = await Promise.all([
+    untyped.from("member_resumes").select("storage_key").not("storage_key", "is", null),
+    untyped.from("job_applications").select("resume_key").not("resume_key", "is", null),
+    untyped.from("account_verification_requests").select("work_sample_keys"),
+    untyped.from("dm_messages").select("image_key").not("image_key", "is", null),
+    untyped.from("dm_reports").select("message_snapshot"),
+  ]);
+  for (const row of (resumes.data ?? []) as Array<{ storage_key: string | null }>) {
+    if (row.storage_key) keys.add(row.storage_key);
+  }
+  for (const row of (applications.data ?? []) as Array<{ resume_key: string | null }>) {
+    if (row.resume_key) keys.add(row.resume_key);
+  }
+  for (const row of (verifications.data ?? []) as Array<{ work_sample_keys: string[] | null }>) {
+    for (const key of row.work_sample_keys ?? []) keys.add(key);
+  }
+  for (const row of (messages.data ?? []) as Array<{ image_key: string | null }>) {
+    if (row.image_key) keys.add(row.image_key);
+  }
+  // Report evidence keeps a DM image alive after its conversation is gone.
+  for (const row of (reports.data ?? []) as Array<{
+    message_snapshot: Array<{ image_url?: string | null }> | null;
+  }>) {
+    for (const message of row.message_snapshot ?? []) {
+      const key = dmKeyFromImageUrl(message?.image_url ?? null);
+      if (key) keys.add(key);
+    }
+  }
+  return keys;
 }
 
 function ageDays(lastModified: string | null): number | null {
@@ -63,6 +118,14 @@ export async function GET() {
 
   const keySet = new Set(r2Objects.map((entry) => entry.key));
   const trackedKeys = new Set(Array.from(seen.keys()));
+
+  const privateObjects = await listAllPrivateObjects();
+  const privateKeySet = new Set(privateObjects.map((entry) => entry.key));
+  const privateTrackedKeys = await collectPrivateKeyReferences(db);
+  const privateOrphanKeys = [...privateKeySet].filter((key) => !privateTrackedKeys.has(key));
+  const privateBrokenKeys = [...privateTrackedKeys].filter((key) => !privateKeySet.has(key));
+  const privateOrphanByKey = new Map(privateObjects.map((entry) => [entry.key, entry]));
+  const privateBytes = privateObjects.reduce((sum, entry) => sum + entry.size, 0);
 
   const orphanKeys = [...keySet].filter((key) => !trackedKeys.has(key));
   const brokenReferences = [...seen.values()].filter((entry) => !keySet.has(entry.key));
@@ -108,6 +171,30 @@ export async function GET() {
       (sum, key) => sum + (orphanByKey.get(key)?.size ?? 0),
       0,
     ),
+    private: {
+      configured: isPrivateStorageConfigured(),
+      totalObjects: privateObjects.length,
+      trackedObjects: privateTrackedKeys.size,
+      potentialOrphans: privateOrphanKeys.length,
+      brokenReferences: privateBrokenKeys.length,
+      totalStorageBytes: privateBytes,
+      orphanStorageBytes: privateOrphanKeys.reduce(
+        (sum, key) => sum + (privateOrphanByKey.get(key)?.size ?? 0),
+        0,
+      ),
+      // No preview URLs: the private bucket has no public domain.
+      orphans: privateOrphanKeys.slice(0, 200).map((key) => {
+        const object = privateOrphanByKey.get(key);
+        return {
+          key,
+          size: object?.size ?? 0,
+          lastModified: object?.lastModified ?? null,
+          ageDays: ageDays(object?.lastModified ?? null),
+          status: "orphan",
+        };
+      }),
+      brokenReferenceKeys: privateBrokenKeys.slice(0, 200),
+    },
     generatedAt: new Date().toISOString(),
   });
 }

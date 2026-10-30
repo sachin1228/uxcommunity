@@ -1,5 +1,9 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
+import {
+  collectJobResumeKeys,
+  deletePrivateResumeKeysIfUnreferenced,
+} from "@/lib/private-storage-cleanup";
 import { getProfileCompanyState } from "@/lib/companies/service";
 import { companyLogoUrl } from "@/lib/companies/logos";
 import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
@@ -595,6 +599,10 @@ export async function deleteJobPost(
   db: SupabaseClient,
   params: { actorId: string; jobId: string }
 ): Promise<DeleteJobResult> {
+  // The applications cascade with the posting. Their résumé keys must be
+  // collected first, because the rows that name them disappear in the RPC.
+  const resumeKeys = await collectJobResumeKeys(db, params.jobId);
+
   const { data, error } = await callPerformanceRpc(db, "delete_job_post", {
     p_actor_id: params.actorId,
     p_job_id: params.jobId,
@@ -614,6 +622,13 @@ export async function deleteJobPost(
     console.error("[jobs] delete returned no row");
     return { ok: false, code: "unexpected" };
   }
+
+  // Saved résumés shared with another application are kept; one-off uploads
+  // are reclaimed now instead of waiting for an audit that does not cover the
+  // private bucket. Non-fatal: the posting is already gone.
+  await deletePrivateResumeKeysIfUnreferenced(db, resumeKeys).catch((cleanupError) =>
+    console.error("[jobs] private resume cleanup failed:", cleanupError),
+  );
 
   return { ok: true, jobId: row.job_id };
 }

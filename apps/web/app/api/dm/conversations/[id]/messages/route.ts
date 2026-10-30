@@ -11,7 +11,7 @@ import {
   loadDmMessagePage,
   normalizeDmRequestState,
 } from "@/lib/direct-messages/server";
-import { isAllowedDmImageUrl } from "@/lib/direct-messages/assets";
+import { resolveDmImage } from "@/lib/direct-messages/assets";
 import { publishDmEvent } from "@/lib/direct-messages/publish";
 import { sendDirectMessagePush } from "@/lib/push/direct-message";
 import type { DmRequestState } from "@/lib/direct-messages/types";
@@ -67,7 +67,11 @@ function parseSendBody(body: unknown): { ok: true; value: ParsedSend } | { ok: f
     if (typeof record.image_url !== "string") return { ok: false, reason: "malformed" };
     const candidate = record.image_url.trim();
     if (candidate) {
-      if (candidate.length > MAX_IMAGE_URL_CHARS || !/^https?:\/\//i.test(candidate)) {
+      const privatePath = candidate.startsWith("/api/private/dm/");
+      if (
+        candidate.length > MAX_IMAGE_URL_CHARS ||
+        (!privatePath && !/^https?:\/\//i.test(candidate))
+      ) {
         return { ok: false, reason: "bad_image" };
       }
       imageUrl = candidate;
@@ -216,7 +220,8 @@ export async function POST(
   // The URL is client input, not "what the upload route just returned": only
   // this conversation's own uploads (or a GIPHY gif) may be attached. Pure
   // string validation — nothing is fetched server-side.
-  if (imageUrl && !isAllowedDmImageUrl(imageUrl, conversationId)) {
+  const resolvedImage = imageUrl ? resolveDmImage(imageUrl, conversationId) : null;
+  if (imageUrl && !resolvedImage) {
     return NextResponse.json({ error: "Invalid image URL." }, { status: 422 });
   }
 
@@ -285,7 +290,10 @@ export async function POST(
         user_id: userId,
         content: content || null,
         reply_to_id: replyToIdValid,
-        image_url: imageUrl,
+        // A private upload keeps its key and the authorization-gated path;
+        // a GIPHY/legacy image keeps its public URL and has no key.
+        image_url: resolvedImage?.url ?? null,
+        image_key: resolvedImage?.key ?? null,
         // The sender-scoped idempotency key (see dm_hardening migration):
         // a retried send collides here instead of inserting a duplicate.
         client_nonce: clientNonce,

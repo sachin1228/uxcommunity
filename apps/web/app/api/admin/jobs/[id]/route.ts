@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  collectJobResumeKeys,
+  deletePrivateResumeKeysIfUnreferenced,
+} from "@/lib/private-storage-cleanup";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -36,6 +40,7 @@ export async function DELETE(
   }
 
   const db = createServiceClient();
+  const resumeKeys = await collectJobResumeKeys(db, id);
 
   const { data, error } = (await (db as unknown as SupabaseClient)
     .from("job_posts")
@@ -54,6 +59,10 @@ export async function DELETE(
   if (!data) {
     return NextResponse.json({ error: "Job not found." }, { status: 404 });
   }
+
+  await deletePrivateResumeKeysIfUnreferenced(db, resumeKeys).catch((cleanupError) =>
+    console.error("[admin/jobs] private resume cleanup failed:", cleanupError),
+  );
 
   const sweep = await db
     .from("notifications")

@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { deleteFromR2, deleteR2AssetIfUnreferenced, uploadToR2 } from "@/lib/r2";
+import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
 import { ALL_MEDIA_LOOKUPS } from "@/lib/r2-cleanup";
+import {
+  deletePrivateObject,
+  isPrivateStorageConfigured,
+  privateSavedResumeKey,
+  savedResumePath,
+  uploadPrivateToR2,
+} from "@/lib/r2-private";
+import { deletePrivateResumeKeysIfUnreferenced } from "@/lib/private-storage-cleanup";
 import { detectResumeMime, RESUME_MAX_BYTES, resumeExtension } from "@/lib/jobs/resume-file";
 import { MAX_SAVED_RESUMES, type SavedResume } from "@/lib/settings/resumes";
 
@@ -32,14 +40,16 @@ import { MAX_SAVED_RESUMES, type SavedResume } from "@/lib/settings/resumes";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const SELECT_COLUMNS = "id, file_name, mime_type, size_bytes, url, is_default, created_at";
+const SELECT_COLUMNS =
+  "id, file_name, mime_type, size_bytes, url, storage_key, is_default, created_at";
 
 interface SavedResumeRow {
   id: string;
   file_name: string;
   mime_type: string;
   size_bytes: number;
-  url: string;
+  url: string | null;
+  storage_key: string | null;
   is_default: boolean;
   created_at: string;
 }
@@ -50,7 +60,9 @@ function toSavedResume(row: SavedResumeRow): SavedResume {
     fileName: row.file_name,
     mimeType: row.mime_type,
     sizeBytes: row.size_bytes,
-    url: row.url,
+    // Key-backed rows get the authorization-gated path; the member's own
+    // browser carries the session cookie, so the link keeps working.
+    url: row.storage_key ? savedResumePath(row.id) : row.url ?? "",
     isDefault: row.is_default,
     createdAt: row.created_at,
   };
@@ -159,11 +171,17 @@ export async function POST(request: NextRequest) {
   const rawName = file instanceof File ? file.name.trim() : "";
   const fileName = rawName || `resume.${resumeExtension(mime)}`;
 
-  const key = `resumes/${userId}/saved/${Date.now()}-${Math.random().toString(36).slice(2)}.${resumeExtension(mime)}`;
+  if (!isPrivateStorageConfigured()) {
+    return NextResponse.json(
+      { error: "storage_unavailable", message: "Resume uploads are not available right now." },
+      { status: 503 },
+    );
+  }
 
-  let url: string;
+  const key = privateSavedResumeKey(userId, resumeExtension(mime));
+
   try {
-    url = await uploadToR2(key, buffer, mime);
+    await uploadPrivateToR2(key, buffer, mime);
   } catch (error) {
     console.error("[settings/resumes] upload error:", error);
     return NextResponse.json(
@@ -177,7 +195,8 @@ export async function POST(request: NextRequest) {
     file_name: fileName,
     mime_type: mime,
     size_bytes: file.size,
-    url,
+    url: null,
+    storage_key: key,
     // The new row is the default whenever no saved row carries the flag —
     // not only on the very first upload: a default goes missing when the
     // default row is deleted, and every non-empty list must have exactly
@@ -189,7 +208,7 @@ export async function POST(request: NextRequest) {
     console.error("[settings/resumes] insert error:", insertError);
     // The row never landed, so the object has no owner — take it back out.
     try {
-      await deleteFromR2(key);
+      await deletePrivateObject(key);
     } catch (cleanupError) {
       console.error("[settings/resumes] upload cleanup error:", cleanupError);
     }
@@ -289,7 +308,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: row } = await db
     .from("member_resumes")
-    .select("id, url, is_default")
+    .select("id, url, storage_key, is_default")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -339,11 +358,16 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  // Reclaim the file now that the row is gone. Checked against every media
-  // column, so an object still referenced elsewhere (e.g. a job application
-  // that used the same URL) is kept. Non-fatal: the admin orphan audit
-  // retries anything that fails here.
-  if (row.url) {
+  // Reclaim the file now that the row is gone. A private key is kept while a
+  // job application or another saved row still references it; a legacy public
+  // URL uses the bucket-wide reference lookups. Non-fatal either way.
+  if (row.storage_key) {
+    try {
+      await deletePrivateResumeKeysIfUnreferenced(db, [row.storage_key]);
+    } catch (cleanupError) {
+      console.error("[settings/resumes] private R2 cleanup error:", cleanupError);
+    }
+  } else if (row.url) {
     try {
       await deleteR2AssetIfUnreferenced(db, row.url, ALL_MEDIA_LOOKUPS);
     } catch (cleanupError) {

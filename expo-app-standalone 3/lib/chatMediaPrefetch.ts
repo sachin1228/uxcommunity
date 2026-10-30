@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { recentChatMediaUrls } from './chatMedia';
 import { prefetchImageAspectRatios } from './imageAspectRatio';
+import { isPrivateMediaUri } from './privateMedia';
 
 /**
  * How long a page waits for its newest images to be measured before it is
@@ -22,7 +23,9 @@ export async function warmChatMedia(
   messages: ReadonlyArray<{ image_url?: string | null }>,
   timeoutMs: number = CHAT_MEDIA_WARM_TIMEOUT_MS,
 ): Promise<void> {
-  const urls = recentChatMediaUrls(messages);
+  // Private DM images need the session cookie; expo-image's bulk prefetch
+  // cannot carry it, so they load on mount through their own source headers.
+  const urls = recentChatMediaUrls(messages).filter((url) => !isPrivateMediaUri(url));
   if (urls.length === 0) return;
 
   void Image.prefetch(urls, 'memory-disk').catch(() => undefined);

@@ -3,10 +3,13 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { parseR2Key } from "@/lib/r2";
+import { isOwnVerificationKey } from "@/lib/r2-private";
 import {
   normalizeLinkedInUrl,
   normalizePortfolioLinks,
+  normalizeWorkSampleKeys,
   normalizeWorkSampleUrls,
+  VERIFICATION_SAMPLES_MAX,
 } from "@/lib/verification/rules";
 
 /**
@@ -51,9 +54,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: portfolio.error }, { status: 422 });
   }
 
+  const sampleKeys = normalizeWorkSampleKeys(body.work_sample_keys);
+  if (sampleKeys.error) {
+    return NextResponse.json({ error: sampleKeys.error }, { status: 422 });
+  }
+
   const samples = normalizeWorkSampleUrls(body.work_sample_urls);
   if (samples.error) {
     return NextResponse.json({ error: samples.error }, { status: 422 });
+  }
+  if (sampleKeys.keys.length + samples.urls.length > VERIFICATION_SAMPLES_MAX) {
+    return NextResponse.json(
+      { error: `Upload at most ${VERIFICATION_SAMPLES_MAX} work samples.` },
+      { status: 422 },
+    );
+  }
+  for (const key of sampleKeys.keys) {
+    if (!isOwnVerificationKey(key, userId)) {
+      return NextResponse.json(
+        { error: "Work samples must be uploaded through the verification form." },
+        { status: 422 },
+      );
+    }
   }
   for (const url of samples.urls) {
     const key = parseR2Key(url);
@@ -113,6 +135,7 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       linkedin_url: linkedinUrl,
       portfolio_links: portfolio.links,
+      work_sample_keys: sampleKeys.keys,
       work_sample_urls: samples.urls,
       email_verified_at: row.email_verified_at,
       status: "pending",

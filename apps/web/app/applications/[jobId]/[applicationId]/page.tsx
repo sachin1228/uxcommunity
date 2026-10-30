@@ -10,6 +10,7 @@ import {
   loadJobApplicantDetails,
   loadJobViewer,
 } from "@/lib/jobs/service";
+import { withWebApplicantResumePath } from "@/lib/jobs/private-resume";
 
 export const metadata = { title: "Application — uxcommunity" };
 
@@ -56,13 +57,15 @@ export default async function ApplicantDesignPage({
     redirect(`/dashboard/jobs/${jobId}/applicants`);
   }
 
-  const applicants = await loadJobApplicantDetails(
-    db,
-    result.applicants.map((applicant) => ({
-      ...applicant,
-      applied_label: timeAgoLabel(applicant.created_at),
-    }))
-  );
+  const applicants = (
+    await loadJobApplicantDetails(
+      db,
+      result.applicants.map((applicant) => ({
+        ...applicant,
+        applied_label: timeAgoLabel(applicant.created_at),
+      }))
+    )
+  ).map(withWebApplicantResumePath);
 
   // The application the URL names must still exist — a deleted one sends the
   // poster back to the list rather than a page that cannot say who it is.

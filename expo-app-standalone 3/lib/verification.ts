@@ -16,6 +16,7 @@ export interface VerificationApplication {
   linkedinUrl: string;
   portfolioLinks: string[];
   workSampleUrls: string[];
+  workSampleKeys: string[];
   rejectionReason: string | null;
   reviewedAt: string | null;
   createdAt: string;
@@ -65,7 +66,14 @@ export async function confirmVerificationCode(code: string): Promise<string> {
   return data.emailVerifiedAt;
 }
 
-export async function uploadVerificationSample(image: PreparedImage): Promise<string> {
+export interface VerificationSample {
+  key: string;
+  url: string;
+}
+
+export async function uploadVerificationSample(
+  image: PreparedImage,
+): Promise<VerificationSample> {
   const formData = new FormData();
   formData.append('file', {
     uri: image.uri,
@@ -73,31 +81,35 @@ export async function uploadVerificationSample(image: PreparedImage): Promise<st
     name: image.name,
   } as unknown as Blob);
 
-  const { data } = await apiFormUpload<{ url?: string; error?: string }>(
+  const { data } = await apiFormUpload<{ key?: string; url?: string; error?: string }>(
     '/api/verification/upload',
     formData,
   );
-  if (!data.url) throw new Error(data.error ?? 'Upload failed.');
-  return data.url;
+  if (!data.key || !data.url) throw new Error(data.error ?? 'Upload failed.');
+  return { key: data.key, url: data.url };
 }
 
-export async function deleteVerificationSample(url: string): Promise<void> {
-  await apiFetch(`/api/verification/upload?url=${encodeURIComponent(url)}`, {
-    method: 'DELETE',
-  });
+export async function deleteVerificationSample(sample: VerificationSample): Promise<void> {
+  const query = sample.key
+    ? `key=${encodeURIComponent(sample.key)}`
+    : `url=${encodeURIComponent(sample.url)}`;
+  await apiFetch(`/api/verification/upload?${query}`, { method: 'DELETE' });
 }
 
 export async function submitVerification(input: {
   linkedinUrl: string;
   portfolioLinks: string[];
-  workSampleUrls: string[];
+  workSamples: VerificationSample[];
 }): Promise<void> {
   await apiFetch('/api/verification/submit', {
     method: 'POST',
     body: {
       linkedin_url: input.linkedinUrl,
       portfolio_links: input.portfolioLinks,
-      work_sample_urls: input.workSampleUrls,
+      work_sample_keys: input.workSamples.map((sample) => sample.key).filter(Boolean),
+      work_sample_urls: input.workSamples
+        .filter((sample) => !sample.key)
+        .map((sample) => sample.url),
     },
   });
 }
