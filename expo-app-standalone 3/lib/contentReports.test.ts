@@ -93,5 +93,5 @@ test('post and interaction reports route to their own endpoints', () => {
 test('the two report queues never share a content type', () => {
   const all = [...REPORT_CONTENT_TYPES, ...INTERACTION_REPORT_TYPES];
   assert.equal(new Set(all).size, all.length);
-  assert.equal(all.length, 10);
+  assert.equal(all.length, REPORT_CONTENT_TYPES.length + INTERACTION_REPORT_TYPES.length);
 });

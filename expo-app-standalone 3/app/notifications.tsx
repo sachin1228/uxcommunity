@@ -50,6 +50,8 @@ function iconFor(type: NotificationType): FeatherName {
   if (type === 'verification_rejected') return 'x-circle';
   if (type === 'verification_reapply_ready') return 'clock';
   if (type === 'report_reviewed') return 'flag';
+  if (type === 'moderation_action') return 'shield';
+  if (type === 'appeal_reviewed') return 'check-circle';
   if (type === 'content_restored') return 'rotate-ccw';
   if (type === 'job_match') return 'briefcase';
   if (type === 'join_request_accepted') return 'user-plus';

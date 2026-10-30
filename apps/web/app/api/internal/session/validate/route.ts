@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await db
       .from("auth_sessions")
       .select(
-        "id, user_id, role, session_version, revoked_at, expires_at, users!auth_sessions_user_id_fkey(id, is_blocked, session_version)",
+        "id, user_id, role, session_version, revoked_at, expires_at, users!auth_sessions_user_id_fkey(id, is_blocked, suspended_until, session_version)",
       )
       .eq("id", sid)
       .maybeSingle();

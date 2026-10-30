@@ -36,6 +36,12 @@ export interface DeletedAccountSummary {
  * nobody is left). R2 is outside the database, so the avatar and the media of
  * communities that disappear are cleaned up explicitly afterwards.
  *
+ * Moderation reports are the deliberate exception to the cascade: the
+ * `trg_anonymize_deleted_user_reports` trigger detaches every report this
+ * account filed (and every post/DM report) in the same transaction, leaving
+ * the report, evidence snapshot and audit links intact with no reporter
+ * identity. Do not delete those rows here — they are retained evidence.
+ *
  * Shared by the member-facing `/api/account/delete` and the admin
  * `DELETE /api/admin/users/[id]` so both paths behave identically.
  */

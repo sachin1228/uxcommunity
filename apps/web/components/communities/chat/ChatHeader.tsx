@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Activity, Bell, BellOff, LogOut, MessageCircle, MoreHorizontal, Settings, Trash2, Users } from "lucide-react";
+import { Activity, Bell, BellOff, Flag, LogOut, MessageCircle, MoreHorizontal, Settings, Trash2, Users } from "lucide-react";
 import { CONTENT_KIND_ICONS } from "@/components/communities/content-kind-icons";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -15,6 +15,7 @@ import { communityNameBadges } from "@/lib/communities/community-badges";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 import { isCommunityMuted } from "@/lib/communities/mute";
 import { showUndoToast } from "@/lib/undo-toast";
+import { ReportModal } from "../ReportModal";
 
 interface Community {
   id: string;
@@ -172,6 +173,11 @@ export const ChatHeader = memo(function ChatHeader({
   const [muteBusy, setMuteBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  // A whole-community report opens from the ⋯ menu. Reporting is not offered
+  // to the owner: the server refuses self-reports, and the menu should not
+  // offer an action that can only fail.
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Timed mutes lapse on their own without the row being rewritten, so the
@@ -325,6 +331,16 @@ export const ChatHeader = memo(function ChatHeader({
         />
       )}
 
+      {community && (
+        <ReportModal
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          contentType="community"
+          contentId={community.id}
+          onReported={() => setReported(true)}
+        />
+      )}
+
       <div className="px-5 pt-4 border-b border-border shrink-0">
         {community ? (
           <>
@@ -463,6 +479,24 @@ export const ChatHeader = memo(function ChatHeader({
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                      {community.owner_id !== currentUserId && (
+                        <>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={reported}
+                            onClick={() => {
+                              setOpenMenu(null);
+                              setReportOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-body text-xs text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                          >
+                            <Flag strokeWidth={2.5} size={14} className="shrink-0 text-foreground-muted" />
+                            <span>{reported ? "Reported" : "Report community"}</span>
+                          </button>
+                          <div className="my-1 h-px bg-white/[0.06]" aria-hidden="true" />
+                        </>
+                      )}
                       <button
                         type="button"
                         role="menuitem"

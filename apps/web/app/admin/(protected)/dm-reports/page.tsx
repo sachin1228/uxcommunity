@@ -38,8 +38,10 @@ interface SnapshotMessage {
 
 interface DmReportRow {
   id: string;
-  reporter_id: string;
+  /** Null after the reporter's account was deleted; the report is retained. */
+  reporter_id: string | null;
   reporter_name: string | null;
+  reporter_deleted_at: string | null;
   reported_user_id: string | null;
   reported_user_name: string | null;
   conversation_id: string | null;
@@ -323,7 +325,9 @@ export default function AdminDmReportsPage() {
                         </td>
                         <td className="max-w-[12rem] px-4 py-3">
                           <p className="font-body text-xs text-foreground-muted">
-                            {report.reporter_name ?? "Unknown member"}
+                            {report.reporter_id
+                              ? report.reporter_name ?? "Unknown member"
+                              : "Deleted user"}
                           </p>
                         </td>
                         <td className="px-4 py-3">

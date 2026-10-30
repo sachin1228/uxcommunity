@@ -4,6 +4,7 @@ import { renderEmail, type EmailBlock, type RenderedEmail } from "./document";
 import {
   renderAccountDeletedEmail,
   renderCompanyVerificationEmail,
+  renderModerationAppealEmail,
   renderPasswordResetEmail,
   renderResumeSignupEmail,
   renderVerificationApprovedEmail,
@@ -182,6 +183,25 @@ export async function sendAdminAlertEmail(
       heading: alert.heading,
       blocks: alert.blocks,
     })
+  );
+}
+
+export async function sendModerationAppealEmail(
+  to: string,
+  name: string,
+  link: string,
+  decision: string,
+  expiresDays: number,
+): Promise<void> {
+  await send(
+    to,
+    renderModerationAppealEmail({
+      name,
+      link,
+      decision,
+      appUrl: getAppUrl(),
+      expiresDays,
+    }),
   );
 }
 

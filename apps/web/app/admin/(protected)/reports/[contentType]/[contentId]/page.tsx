@@ -37,6 +37,11 @@ interface DetailPerson {
   avatar_url: string | null;
 }
 
+/** A reporter's id is null after their account is deleted. */
+interface DetailReporter extends Omit<DetailPerson, "id"> {
+  id: string | null;
+}
+
 interface DetailReport {
   id: string;
   reason: string;
@@ -45,7 +50,7 @@ interface DetailReport {
   status: ReportStatus;
   created_at: string;
   resolved_at: string | null;
-  reporter: DetailPerson | null;
+  reporter: DetailReporter | null;
 }
 
 interface DetailContent {
@@ -614,7 +619,7 @@ export default function AdminReportDetailPage() {
                 <li key={report.id} className="border-b border-border-subtle px-4 py-3.5 last:border-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
-                      {report.reporter && (
+                      {report.reporter?.id && (
                         <AvatarImg
                           url={report.reporter.avatar_url}
                           name={report.reporter.name}
@@ -622,7 +627,7 @@ export default function AdminReportDetailPage() {
                           className="h-[22px] w-[22px] shrink-0 rounded-full object-cover"
                         />
                       )}
-                      {report.reporter ? (
+                      {report.reporter?.id ? (
                         <Link
                           href={`/admin/users/${report.reporter.id}`}
                           className="truncate font-body text-xs text-foreground-muted hover:text-accent hover:underline"
@@ -630,7 +635,9 @@ export default function AdminReportDetailPage() {
                           {report.reporter.name}
                         </Link>
                       ) : (
-                        <span className="font-body text-xs text-foreground-subtle">Unknown member</span>
+                        <span className="font-body text-xs text-foreground-subtle">
+                          {report.reporter?.name ?? "Unknown member"}
+                        </span>
                       )}
                     </div>
                     <StatusBadge status={report.status} />

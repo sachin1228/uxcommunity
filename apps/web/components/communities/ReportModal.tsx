@@ -15,11 +15,14 @@ import {
   ArrowLeft,
   Ban,
   Check,
+  Clock,
   Copyright,
+  CreditCard,
   EyeOff,
   Flag,
   Info,
   MessageSquareWarning,
+  Scale,
   ShieldAlert,
   ThumbsDown,
   UserX,
@@ -31,13 +34,12 @@ import { filterChip } from "./filter-chip";
 import {
   REPORT_CONTENT_LABELS,
   REPORT_DETAILS_MAX_LENGTH,
-  REPORT_REASONS,
   reportEndpointFor,
-  type ReportReason,
+  reportReasonsFor,
   type ReportType,
 } from "@/lib/communities/report-reasons";
 
-const REASON_ICONS: Record<ReportReason, typeof Flag> = {
+const REASON_ICONS: Record<string, typeof Flag> = {
   spam: Ban,
   harassment: UserX,
   hate: ShieldAlert,
@@ -46,6 +48,12 @@ const REASON_ICONS: Record<ReportReason, typeof Flag> = {
   intellectual_property: Copyright,
   off_topic: ThumbsDown,
   other: MessageSquareWarning,
+  impersonation: UserX,
+  illegal: Scale,
+  scam: Ban,
+  discriminatory: UserX,
+  payment_request: CreditCard,
+  expired: Clock,
 };
 
 type Step = "reason" | "details" | "done";
@@ -68,7 +76,7 @@ export function ReportModal({
   onReported,
 }: ReportModalProps) {
   const [step, setStep] = useState<Step>("reason");
-  const [reason, setReason] = useState<ReportReason | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -120,7 +128,8 @@ export function ReportModal({
   }
 
   const label = REPORT_CONTENT_LABELS[contentType];
-  const selected = REPORT_REASONS.find((item) => item.value === reason);
+  const reasons = reportReasonsFor(contentType);
+  const selected = reasons.find((item) => item.value === reason);
 
   return (
     <Modal open={open} onClose={handleClose} maxWidth="max-w-md">
@@ -159,8 +168,8 @@ export function ReportModal({
 
           {step === "reason" ? (
             <div role="group" aria-label="Reporting reason" className="flex flex-wrap gap-2">
-              {REPORT_REASONS.map((option) => {
-                const Icon = REASON_ICONS[option.value];
+              {reasons.map((option) => {
+                const Icon = REASON_ICONS[option.value] ?? Flag;
                 const active = reason === option.value;
                 return (
                   <button

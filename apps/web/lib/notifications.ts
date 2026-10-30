@@ -46,7 +46,12 @@ export type NotificationType =
   | "event_ended"
   | "verification_approved"
   | "verification_rejected"
-  | "verification_reapply_ready";
+  | "verification_reapply_ready"
+  // Moderation: what happened to the member's content/account, and the
+  // outcome of an appeal. Both are platform notices (actor_id stays null, so
+  // the reporter's identity is never exposed).
+  | "moderation_action"
+  | "appeal_reviewed";
 
 export type NotificationEntityType =
   | "thread"
@@ -57,7 +62,9 @@ export type NotificationEntityType =
   | "community"
   | "message"
   | "profile"
-  | "verification";
+  | "verification"
+  /** One moderation/appeal notice, keyed by the report id. */
+  | "moderation";
 
 /** The content kinds a removal notice can be about, and how it names them. */
 const REMOVED_CONTENT_LABELS = {

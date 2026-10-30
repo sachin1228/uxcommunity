@@ -1,9 +1,5 @@
 import { apiFetch } from './api';
-import {
-  reportEndpointFor,
-  type ReportReason,
-  type ReportType,
-} from './contentReports';
+import { reportEndpointFor, type ReportType } from './contentReports';
 
 /**
  * File one report. Resolves when the report was accepted (or was already on
@@ -20,7 +16,8 @@ export async function reportContent({
 }: {
   contentType: ReportType;
   contentId: string;
-  reason: ReportReason;
+  /** A value from `reportReasonsFor(contentType)`; the server re-validates it. */
+  reason: string;
   details: string;
 }): Promise<void> {
   const endpoint = reportEndpointFor(contentType);

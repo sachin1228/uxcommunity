@@ -6,8 +6,8 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import {
   INTERACTION_REPORT_TYPE_VALUES,
   REPORT_DETAILS_MAX_LENGTH,
-  REPORT_REASON_VALUES,
   type InteractionReportType,
+  isReportReasonValidFor,
 } from "@/lib/communities/report-reasons";
 import { loadInteractionTarget } from "@/lib/moderation/interaction-reports";
 
@@ -15,12 +15,17 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Report a comment, a community chat message or a profile.
+ * Report a comment, a community chat message, a profile, a whole community or
+ * a job listing.
  *
  * The target is loaded and snapshotted at report time, so the admin queue
  * still reads after the target is edited or deleted. Posts keep using
  * /api/content-reports; the two queues are separate on purpose (see the
  * interaction_reports migration).
+ *
+ * Every field the report needs is derived from the target row loaded here —
+ * the client only names the target and the reason, so it cannot forge the
+ * owner, excerpt or context of an arbitrary id.
  */
 export async function POST(request: NextRequest) {
   let session;
@@ -57,7 +62,9 @@ export async function POST(request: NextRequest) {
   if (!UUID_PATTERN.test(contentId)) {
     return NextResponse.json({ error: "Unknown content." }, { status: 422 });
   }
-  if (!REPORT_REASON_VALUES.has(reason)) {
+  // The reason list belongs to the target: a job listing only accepts the
+  // recruitment reasons it offered, and so on.
+  if (!isReportReasonValidFor(contentType as InteractionReportType, reason)) {
     return NextResponse.json({ error: "Choose a reason." }, { status: 422 });
   }
   if (details.length > REPORT_DETAILS_MAX_LENGTH) {
@@ -67,8 +74,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const db = createServiceClient();
   const targetType = contentType as InteractionReportType;
+
+  // Communities and job listings are higher-impact than a single comment, so
+  // they get a tighter per-target limit on top of the shared hourly one. This
+  // stops a member mass-reporting every community or posting on the board.
+  if (targetType === "community" || targetType === "job") {
+    const targetLimit = await rateLimit(
+      `interaction-report:${targetType}:${userId}`,
+      10,
+      3600,
+    );
+    if (!targetLimit.success) {
+      return NextResponse.json(
+        { error: "Too many reports. Please try again later." },
+        { status: 429 },
+      );
+    }
+  }
+
+  const db = createServiceClient();
   const target = await loadInteractionTarget(db, targetType, contentId);
   if (!target) {
     return NextResponse.json({ error: "This content is no longer available." }, { status: 404 });
@@ -89,6 +114,7 @@ export async function POST(request: NextRequest) {
       target_author_name: target.authorName,
       target_excerpt: target.excerpt,
       context_title: target.contextTitle,
+      target_snapshot: target.snapshot,
       reason,
       details: details || null,
     });

@@ -61,6 +61,11 @@ interface Props {
   /** Owner, or a manager granted "edit community settings". */
   canOpenSettings?: boolean;
   onOpenSettings?: () => void;
+  /** Everyone except the owner can report the whole community. */
+  canReport?: boolean;
+  onReport?: () => void;
+  /** The member already has an open report on file. */
+  reported?: boolean;
   onClose: () => void;
   /** The row's durations / off switch live in the mute sheet. */
   onOpenMuteOptions: () => void;
@@ -77,6 +82,9 @@ export function CommunityMenu({
   muteStateLabel,
   canOpenSettings = false,
   onOpenSettings,
+  canReport = false,
+  onReport,
+  reported = false,
   onClose,
   onOpenMuteOptions,
   onMute,
@@ -219,6 +227,16 @@ export function CommunityMenu({
                 }}
               />
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              {canReport && onReport && (
+                <>
+                  <MenuRow
+                    icon="flag"
+                    label={reported ? 'Reported' : 'Report community'}
+                    onPress={onReport}
+                  />
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                </>
+              )}
               <MenuRow
                 destructive
                 icon="trash-2"

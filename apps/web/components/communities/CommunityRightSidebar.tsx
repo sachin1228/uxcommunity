@@ -18,7 +18,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Calendar, MapPin } from "lucide-react";
+import { Calendar, Flag, MapPin } from "lucide-react";
 import {
   metaCache,
   inFlightMetaFetch,
@@ -34,6 +34,7 @@ import { AvatarImg } from "@/components/ui/AvatarImg";
 import { profileHref } from "@/lib/profile/links";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { EventRoomGoneSection, EventRoomSection } from "./events/EventRoomSection";
+import { ReportModal } from "./ReportModal";
 
 type Community = CachedMeta["community"] & {
   reference_name?: string | null;
@@ -255,6 +256,8 @@ interface Props {
 export function CommunityRightSidebar({ currentUserId }: Props) {
   const params = useParams<{ id?: string }>();
   const communityId = typeof params?.id === "string" ? params.id : null;
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
 
   const { community, members } = useCommunityMeta(communityId);
   const rules = useCommunityRules(communityId, currentUserId);
@@ -278,6 +281,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
   ].filter((tag): tag is string => Boolean(tag));
 
   return (
+    <>
     <aside
       aria-label="Community details"
       className="hidden xl:flex w-[19rem] shrink-0 flex-col overflow-y-auto p-3 pl-0"
@@ -402,6 +406,17 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
                   ))}
                 </div>
               )}
+              {community.owner_id !== currentUserId && (
+                <button
+                  type="button"
+                  disabled={reported}
+                  onClick={() => setReportOpen(true)}
+                  className="mt-4 inline-flex items-center gap-1.5 font-body text-xs text-foreground-subtle transition-colors hover:text-foreground disabled:opacity-60"
+                >
+                  <Flag strokeWidth={2.5} size={12} aria-hidden="true" />
+                  {reported ? "Reported" : "Report community"}
+                </button>
+              )}
             </>
           ) : (
             <div className="mt-3 flex flex-col gap-2" aria-hidden="true">
@@ -444,5 +459,14 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
         </section>
       </div>
     </aside>
+
+    <ReportModal
+      open={reportOpen}
+      onClose={() => setReportOpen(false)}
+      contentType="community"
+      contentId={communityId}
+      onReported={() => setReported(true)}
+    />
+    </>
   );
 }

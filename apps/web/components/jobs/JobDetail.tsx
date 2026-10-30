@@ -10,6 +10,7 @@ import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { ApplyModal } from "./ApplyModal";
 import { JobStateBadge, KindBadge, LockedNote, MetaChip } from "./JobBadges";
 import { JobOwnerActions } from "./JobOwnerActions";
+import { JobReportMenu } from "./JobReportMenu";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { experienceYearsLabel } from "@/lib/jobs/format";
 import type { JobMasterData } from "@/lib/jobs/service";
@@ -79,6 +80,7 @@ export function JobDetail({
                 <JobStateBadge job={job} />
                 <KindBadge kind={job.kind} />
                 {job.is_mine && master && <JobOwnerActions job={job} master={master} />}
+                {!job.is_mine && <JobReportMenu jobId={job.id} />}
               </div>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-body text-sm text-foreground-muted">

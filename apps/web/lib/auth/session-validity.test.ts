@@ -69,6 +69,60 @@ test("suspension rejects even a structurally valid token", () => {
   assert.equal(evaluateSession(row, userClaims(), options()).active, false);
 });
 
+test("a live temporary suspension rejects a structurally valid token", () => {
+  const row = userRow({
+    users: {
+      id: USER_ID,
+      is_blocked: false,
+      suspended_until: "2026-11-05T12:00:00.000Z",
+      session_version: 4,
+    },
+  });
+  assert.equal(evaluateSession(row, userClaims(), options()).active, false);
+});
+
+test("an expired suspension no longer blocks the account", () => {
+  const row = userRow({
+    users: {
+      id: USER_ID,
+      is_blocked: false,
+      suspended_until: "2026-10-29T12:00:00.000Z",
+      session_version: 4,
+    },
+  });
+  assert.equal(evaluateSession(row, userClaims(), options()).active, true);
+});
+
+test("a suspension still requires a matching session generation", () => {
+  // set_user_suspended bumps the version and revokes rows, so the deadline is
+  // a second gate, never a way to keep a pre-suspension token alive.
+  const row = userRow({
+    session_version: 5,
+    users: {
+      id: USER_ID,
+      is_blocked: false,
+      suspended_until: "2026-10-29T12:00:00.000Z",
+      session_version: 5,
+    },
+  });
+  assert.equal(evaluateSession(row, userClaims({ sv: 4 }), options()).active, false);
+});
+
+test("the erasure path also ignores a live suspension", () => {
+  const row = userRow({
+    users: {
+      id: USER_ID,
+      is_blocked: false,
+      suspended_until: "2026-11-05T12:00:00.000Z",
+      session_version: 4,
+    },
+  });
+  assert.equal(
+    evaluateSession(row, userClaims(), options({ allowBlocked: true })).active,
+    true,
+  );
+});
+
 test("blocked erasure path is allowed only when explicitly opted in", () => {
   const row = userRow({
     users: { id: USER_ID, is_blocked: true, session_version: 4 },

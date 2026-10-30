@@ -15,6 +15,19 @@ const ENTITY_BY_TYPE: Record<InteractionReportType, string> = {
   event_comment: "event",
   community_message: "message",
   profile: "profile",
+  community: "community",
+  job: "job",
+};
+
+const LABEL_BY_TYPE: Record<InteractionReportType, string> = {
+  thread_comment: "comment",
+  showcase_comment: "comment",
+  resource_comment: "comment",
+  event_comment: "comment",
+  community_message: "message",
+  profile: "profile",
+  community: "community",
+  job: "job listing",
 };
 
 test("every interaction kind maps to a notification entity", () => {
@@ -23,18 +36,16 @@ test("every interaction kind maps to a notification entity", () => {
   }
 });
 
-test("copy names the three target families", () => {
+test("copy names each target family", () => {
   for (const type of INTERACTION_REPORT_TYPES) {
-    const label = interactionTargetLabel(type);
-    assert.ok(["comment", "message", "profile"].includes(label), `${type} → ${label}`);
+    assert.equal(interactionTargetLabel(type), LABEL_BY_TYPE[type], type);
   }
-  assert.equal(interactionTargetLabel("thread_comment"), "comment");
-  assert.equal(interactionTargetLabel("community_message"), "message");
-  assert.equal(interactionTargetLabel("profile"), "profile");
 });
 
-test("profiles are the only non-removable interaction target", () => {
+test("only comments and chat messages are deleted from the queue", () => {
   for (const type of INTERACTION_REPORT_TYPES) {
-    assert.equal(isRemovableInteraction(type), type !== "profile", type);
+    const expected =
+      type !== "profile" && type !== "community" && type !== "job";
+    assert.equal(isRemovableInteraction(type), expected, type);
   }
 });

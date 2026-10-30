@@ -18,9 +18,8 @@ import { hapticSelection } from '@/lib/haptics';
 import {
   REPORT_CONTENT_LABELS,
   REPORT_DETAILS_MAX_LENGTH,
-  REPORT_REASONS,
   isAlreadyReported,
-  type ReportReason,
+  reportReasonsFor,
   type ReportType,
 } from '@/lib/contentReports';
 import { reportContent } from '@/lib/contentReportsApi';
@@ -39,7 +38,7 @@ type Step = 'reason' | 'details' | 'done';
 type FeatherName = React.ComponentProps<typeof Feather>['name'];
 
 /** The web modal's lucide glyphs, read on Feather's set. */
-const REASON_ICONS: Record<ReportReason, FeatherName> = {
+const REASON_ICONS: Record<string, FeatherName> = {
   spam: 'slash',
   harassment: 'user-x',
   hate: 'shield',
@@ -48,6 +47,12 @@ const REASON_ICONS: Record<ReportReason, FeatherName> = {
   intellectual_property: 'copy',
   off_topic: 'thumbs-down',
   other: 'message-square',
+  impersonation: 'user-x',
+  illegal: 'shield-off',
+  scam: 'slash',
+  discriminatory: 'user-x',
+  payment_request: 'credit-card',
+  expired: 'clock',
 };
 
 interface Props {
@@ -69,7 +74,7 @@ export function ContentReportModal({
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('reason');
-  const [reason, setReason] = useState<ReportReason | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -86,6 +91,7 @@ export function ContentReportModal({
   }, [visible]);
 
   const label = REPORT_CONTENT_LABELS[contentType];
+  const reasons = reportReasonsFor(contentType);
 
   const close = () => {
     if (submitting) return;
@@ -189,7 +195,7 @@ export function ContentReportModal({
                 >
                   {step === 'reason' ? (
                     <View style={styles.reasons}>
-                      {REPORT_REASONS.map((option) => {
+                      {reasons.map((option) => {
                         const active = reason === option.value;
                         return (
                           <Pressable
@@ -213,7 +219,7 @@ export function ContentReportModal({
                             ]}
                           >
                             <Feather
-                              name={REASON_ICONS[option.value]}
+                              name={REASON_ICONS[option.value] ?? 'flag'}
                               size={13}
                               color={active ? colors.accent : colors.foregroundMuted}
                             />
@@ -235,7 +241,7 @@ export function ContentReportModal({
                         <View style={[styles.selectedReason, { backgroundColor: colors.accentSoft }]}>
                           <Feather name="check" size={13} color={colors.accent} />
                           <Text style={[styles.selectedReasonText, { color: colors.accent }]}>
-                            {REPORT_REASONS.find((option) => option.value === reason)?.label}
+                            {reasons.find((option) => option.value === reason)?.label}
                           </Text>
                         </View>
                       ) : null}

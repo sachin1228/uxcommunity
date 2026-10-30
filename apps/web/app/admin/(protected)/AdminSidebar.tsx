@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { MapPin, Layers, Database, ChevronDown, Users, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2, HeartPulse, MessageSquareWarning, Briefcase, CalendarDays, Library } from "lucide-react";
+import { MapPin, Layers, Database, ChevronDown, Users, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, Gauge, UserX, Flag, Building2, HeartPulse, MessageSquareWarning, Briefcase, CalendarDays, Library, Scale, ScrollText } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -159,7 +159,7 @@ export function AdminSidebar() {
         Reports
       </Link>
 
-      {/* Interaction reports: comments, chat messages, profiles */}
+      {/* Unified queue: comments, chat, profiles, communities, jobs */}
       <Link
         href="/admin/interaction-reports"
         onClick={() => setPendingHref("/admin/interaction-reports")}
@@ -170,7 +170,35 @@ export function AdminSidebar() {
         }`}
       >
         <MessageSquareWarning strokeWidth={2.5} size={16} className={active("/admin/interaction-reports") ? "text-accent" : ""} />
-        Comments &amp; chat
+        Moderation queue
+      </Link>
+
+      {/* Appeals filed by moderated members */}
+      <Link
+        href="/admin/moderation-appeals"
+        onClick={() => setPendingHref("/admin/moderation-appeals")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/moderation-appeals")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <Scale strokeWidth={2.5} size={16} className={active("/admin/moderation-appeals") ? "text-accent" : ""} />
+        Appeals
+      </Link>
+
+      {/* Append-only moderation audit log */}
+      <Link
+        href="/admin/audit-log"
+        onClick={() => setPendingHref("/admin/audit-log")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/audit-log")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <ScrollText strokeWidth={2.5} size={16} className={active("/admin/audit-log") ? "text-accent" : ""} />
+        Audit log
       </Link>
 
       {/* DM Reports */}

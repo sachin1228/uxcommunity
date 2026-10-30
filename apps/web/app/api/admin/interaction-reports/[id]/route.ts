@@ -2,64 +2,58 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { createNotification } from "@/lib/notifications";
-import { removeInteractionContent } from "@/lib/moderation/interaction-reports";
-import {
-  interactionEntityType,
-  interactionTargetLabel,
-  isRemovableInteraction,
-} from "@/lib/moderation/interaction-targets";
 import type { InteractionReportType } from "@/lib/communities/report-reasons";
+import { INTERACTION_REPORT_TYPE_VALUES } from "@/lib/communities/report-reasons";
+import {
+  allowedModerationActions,
+  type ModerationActionId,
+} from "@/lib/moderation/action-catalog";
+import {
+  resolveModerationReport,
+  type ModerationReport,
+} from "@/lib/moderation/resolve-report";
 
-interface ReportRow {
-  id: string;
-  reporter_id: string;
-  target_type: InteractionReportType;
-  target_id: string;
-  context_id: string | null;
-  community_id: string | null;
-  target_author_id: string | null;
-  target_author_name: string | null;
-  target_excerpt: string | null;
-  context_title: string | null;
-  status: string;
-}
-
-const ACTIONS = new Set(["dismiss", "remove"]);
+const NOTE_MAX_LENGTH = 500;
 
 /**
- * Resolve one interaction report.
+ * Resolve one interaction report — a comment, chat message, profile,
+ * community or job listing.
  *
- *   remove  — deletes the reported comment / chat message, closes the report
- *             and tells the reporter. Profiles are never deleted here: the
- *             reviewer opens the member page and uses block/delete there.
- *   dismiss — closes the report without touching the target.
+ * The action engine (`lib/moderation/resolve-report.ts`) owns the semantics:
+ * comments/messages are deleted, communities hidden, job listings closed with
+ * their applications intact, profiles only warned/suspended/banned. Every
+ * action writes one append-only audit row and notifies the reporter and (where
+ * appropriate) the affected account without ever revealing who reported it.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let session;
   try {
-    await requireSession("admin");
+    session = await requireSession("admin");
   } catch (error) {
     return error as Response;
   }
 
   const { id } = await params;
-  const body = (await request.json().catch(() => null)) as { action?: string } | null;
+  const body = (await request.json().catch(() => null)) as
+    | { action?: string; note?: string; suspend_days?: number }
+    | null;
+
   const action = typeof body?.action === "string" ? body.action : "";
-  if (!ACTIONS.has(action)) {
-    return NextResponse.json({ error: "Unknown action." }, { status: 422 });
-  }
+  const note = typeof body?.note === "string" ? body.note.trim().slice(0, NOTE_MAX_LENGTH) : null;
+  const suspendDays =
+    typeof body?.suspend_days === "number" ? Math.trunc(body.suspend_days) : null;
 
   const db = createServiceClient();
   const { data: report, error: loadError } = (await (db as unknown as SupabaseClient)
     .from("interaction_reports")
     .select(
-      "id, reporter_id, target_type, target_id, context_id, community_id, target_author_id, target_author_name, target_excerpt, context_title, status",
+      "id, reporter_id, target_type, target_id, context_id, community_id, target_author_id, target_author_name, target_excerpt, context_title, reason, details, status, target_snapshot",
     )
     .eq("id", id)
-    .maybeSingle()) as { data: ReportRow | null; error: unknown };
+    .maybeSingle()) as { data: ModerationReport | null; error: unknown };
 
   if (loadError) {
     console.error("[admin/interaction-reports] load error:", loadError);
@@ -68,59 +62,31 @@ export async function PATCH(
   if (!report) {
     return NextResponse.json({ error: "Report not found." }, { status: 404 });
   }
+  if (!INTERACTION_REPORT_TYPE_VALUES.has(report.target_type)) {
+    return NextResponse.json({ error: "Unknown report target." }, { status: 422 });
+  }
   if (report.status !== "pending") {
     return NextResponse.json({ error: "This report has already been resolved." }, { status: 409 });
   }
 
-  if (action === "remove") {
-    if (!isRemovableInteraction(report.target_type)) {
-      return NextResponse.json(
-        { error: "Profile reports are resolved from the member page." },
-        { status: 422 },
-      );
-    }
-    const removal = await removeInteractionContent(db, report.target_type, report.target_id);
-    if (!removal.ok) {
-      return NextResponse.json({ error: "Failed to remove the content." }, { status: 500 });
-    }
+  const allowed = allowedModerationActions(report.target_type as InteractionReportType);
+  if (!allowed.includes(action as ModerationActionId)) {
+    return NextResponse.json({ error: "Unknown action." }, { status: 422 });
   }
 
-  const status = action === "remove" ? "removed" : "dismissed";
-  const { error: updateError } = await (db as unknown as SupabaseClient)
-    .from("interaction_reports")
-    .update({
-      status,
-      resolved_at: new Date().toISOString(),
-      resolved_by: null,
-    })
-    .eq("id", id);
-
-  if (updateError) {
-    console.error("[admin/interaction-reports] update error:", updateError);
-    return NextResponse.json({ error: "Failed to resolve the report." }, { status: 500 });
-  }
-
-  // Thank the reporter. The row survives if they close their account (FK set
-  // null), so a missing reporter is a no-op rather than an error.
-  const targetLabel = interactionTargetLabel(report.target_type);
-  const href = report.community_id
-    ? `/dashboard/communities/${report.community_id}`
-    : "/dashboard/notifications";
-
-  await createNotification(db, {
-    userId: report.reporter_id,
-    actorId: null,
-    communityId: report.community_id,
-    type: "report_reviewed",
-    entityType: interactionEntityType(report.target_type),
-    entityId: report.context_id ?? report.target_id,
-    title: status === "removed" ? "Thanks for your report" : "Your report was reviewed",
-    body:
-      status === "removed"
-        ? `We reviewed the ${targetLabel} you reported and removed it.`
-        : `We reviewed the ${targetLabel} you reported and did not find a violation.`,
-    href,
+  const result = await resolveModerationReport({
+    db,
+    report: report as ModerationReport,
+    action: action as ModerationActionId,
+    note: note || null,
+    suspendDays,
+    moderatorId: session.userId ?? null,
+    moderatorSid: session.sid,
   });
 
-  return NextResponse.json({ success: true, status });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  return NextResponse.json({ success: true, status: result.status });
 }
