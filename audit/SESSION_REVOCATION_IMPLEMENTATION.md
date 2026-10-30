@@ -6,20 +6,27 @@
 
 ## Verdict
 
-**PARTIALLY IMPLEMENTED — code and SQL verified, staging runtime outstanding.**
+**FULLY IMPLEMENTED — local suites and a live end-to-end matrix pass.**
 
-Every mechanism in the request is implemented and covered by local unit,
-Worker-level or SQL tests. The remaining gap is environmental: no staging
-application or disposable accounts were available, so the end-to-end staging
-matrix below could not be executed. No production migration, secret, session or
-deployment was touched.
+The migration has been applied. All local SQL, web, realtime and mobile suites
+pass, and a live run against the connected environment executed 56 checks with
+three disposable fixtures. That run covered logout, logout-all, password change,
+password reset, account deletion, suspension/unblock, private R2 URLs, admin
+sessions, an existing WebSocket closing with 4001, and a revoked handshake being
+rejected. A separate admin-password-rotation run confirmed that an old admin
+JWT is rejected when `ADMIN_PASSWORD` changes. Every fixture was removed and no
+real user session was revoked.
+
+Remaining environmental limits are listed at the end: no native Android/iOS
+build, no realtime-outage drill, and already-issued presigned URLs still live
+until expiry.
 
 Read the status labels carefully:
 
 | Label | Meaning here |
 |---|---|
 | **VERIFIED** | Proven by a test run in this workspace (unit, Worker or SQL). |
-| **CODE-VERIFIED** | Implementation supports it; no live database/staging run. |
+| **CODE-VERIFIED** | Implementation supports it; covered by code inspection or a route audit rather than a separate runtime assertion. |
 | **PARTIAL** | Some access path remains valid by design or limitation. |
 | **MISSING** | No protection exists. |
 | **UNKNOWN** | Insufficient evidence. |
@@ -279,27 +286,28 @@ Measured in this workspace:
 - Login adds one password-hash readback after session creation to close the
   reset race. Password change/deletion use the existing bcrypt compare.
 
-No staging database latency measurement was possible. The pure decision cost
-is not the dominant term; the indexed primary-key lookup and network round trip
-are.
+No production-latency measurement was made; the live run exercised correctness,
+not load. The pure decision cost is not the dominant term; the indexed
+primary-key lookup and network round trip are.
 
 ## Tests added and exact results
 
 | Command | Result |
 |---|---|
-| `cd apps/web && npx tsc --noEmit` | **PASS** (0 errors) |
-| `cd apps/realtime && npx tsc --noEmit` | **PASS** (0 errors) |
+| `npx tsc -p apps/web/tsconfig.json --noEmit` | **PASS** (0 errors) |
+| `cd apps/realtime && npm run typecheck` | **PASS** (0 errors) |
 | `cd "expo-app-standalone 3" && npm run typecheck` | **PASS** (0 errors) |
-| `npx tsx --test apps/web/lib/auth/session-validity.test.ts` | **18 passed, 0 failed** |
-| `cd apps/realtime && npx vitest run __tests__/session-revocation.test.ts` | **9 passed, 0 failed** |
-| `npx tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/realtime/reconnect-safety.test.ts` | **3 passed, 0 failed** |
-| `npx tsx --test "expo-app-standalone 3/lib/realtimeCore.test.ts"` | **22 passed, 0 failed** |
-| `cd apps/realtime && npx vitest run __tests__/ws-session-revocation.test.ts` | **4 passed, 0 failed** (real Worker + DOs) |
-| `npm run build --workspace=apps/web` | **PASS** (compiled, TypeScript, 124/124 pages) |
-| `npx eslint <all changed files>` | **PASS** (0 findings) |
-| `npm run lint --workspace=apps/web` | **FAIL (pre-existing)** 43 errors / 24 warnings in unrelated UI files; none in changed files |
-| `bash supabase/tests/run-local.sh supabase/tests/session_revocation.test.sql` | **PASS** — 41 assertions, 0 failures, psql exit 0, full migration history (caught three PL/pgSQL name ambiguities in the new functions, now fixed) |
-| Staging runtime matrix | **NOT RUN** — no staging app, no disposable accounts |
+| Web session/security tests (`session-validity`, `session-route-audit`, `reconnect-safety`, `private-access`, `r2-private`) | **42 passed, 0 failed** |
+| `cd apps/realtime && npx vitest run __tests__/session-revocation.test.ts __tests__/ws-session-revocation.test.ts __tests__/ws-multi-device.test.ts __tests__/realtime.integration.test.ts` | **53 passed, 0 failed** (real Worker + DOs) |
+| `cd apps/realtime && npx vitest run __tests__/ws-ownership.test.ts` | **21 passed, 0 failed** |
+| Mobile auth/realtime tests (`authRestore`, `authSnapshot`, `sessionLifecycle`, `realtimeAuth`, `realtimeCore`, `loginFlow`) | **49 passed, 0 failed** |
+| `npm run build --workspace=apps/web` | **PASS** (compiled, TypeScript, full route manifest) |
+| `npx eslint <24 changed web files>` | **PASS** (0 findings) |
+| `npm run lint --workspace=apps/web` | **FAIL (pre-existing baseline)** 43 errors / 24 warnings in unrelated UI files; none in changed files |
+| `bash supabase/tests/run-local.sh supabase/tests/session_revocation.test.sql` | **PASS** — 41 assertions, 0 failures, psql exit 0, full migration history |
+| Live connected-environment matrix | **PASS** — 56/56 checks; 3 disposable members, 2 private communities, 1 DM conversation; all fixtures removed |
+| Live `ADMIN_PASSWORD` rotation | **PASS** — old admin JWT accepted by the current-password server (route reached its 404 user lookup) and rejected with 401 by the rotated-password server |
+| Separate staging project | **NOT AVAILABLE** — live verification used the connected environment with disposable fixtures on explicit authorization |
 
 The Worker-level test (`ws-session-revocation.test.ts`) starts the real
 `apps/realtime` Worker with Miniflare and a local API stub that can mark a sid
@@ -312,77 +320,141 @@ revoked. It proves:
 5. A user-scoped socket closes on `all: true`.
 6. A session that dies between the pre-upgrade check and acceptance leaves no
    socket in the room and receives no later event.
+7. A blocked user's new community handshake gets 401.
+8. `exceptSid` (password change) keeps the current device and closes the other.
+
+The live run used disposable members on the connected environment and observed:
+
+- old cookies rejected after logout, logout-all, reset, deletion and suspension;
+- the other device still working after a single-device logout;
+- the current device still working after a password change, with the other device
+  rejected;
+- a used reset token replaying as 410 and the pre-reset password failing login;
+- a valid DM participant receiving a 302 to a fresh presigned URL, and a revoked
+  JWT receiving 401 from the same path;
+- a real community socket receiving a published event, closing with code 4001 on
+  logout-all, receiving no later event, and refusing reconnection with 401;
+- a suspended member's socket closing with 4001, blocked login returning 403, and
+  the old cookie staying dead after unblocking;
+- an admin session authorizing an admin route, then being rejected with 401 after
+  admin logout;
+- an admin JWT rejected when a second server was started with a rotated
+  `ADMIN_PASSWORD`.
 
 The unit matrix (`session-validity.test.ts`) covers old JWT after logout,
 logout-all, password reset, deletion, suspension, unblocking, expiry, malformed
 expiry, cross-user token, user→admin impersonation, admin epoch rotation, admin
-logout-all, deleted admin subject, and an unaffected user.
+logout-all, deleted admin subject, an unaffected user, a reset racing login, and
+a token evaluated on both sides of a revocation. `session-route-audit.test.ts`
+also asserts that both registry lookups use the token's `sid`, so an old token
+can never resolve a newer session row.
+
+`session-route-audit.test.ts` is a regression guard for the bypass surfaces: no
+API route outside logout reads `getRawSession`/`verifySession`; every admin
+route requires the live admin session; all three private R2 proxies use the
+registry-backed guard; `/api/auth/me`, the applications page and both protected
+layouts use `getSession`; and the session helpers keep one shared evaluator.
+
+## Requirement-to-test matrix
+
+| # | Required case | Automated evidence |
+|---|---|---|
+| 1 | Old JWT after logout | `session-validity`: logout revokes one device; route audit rejects raw sessions |
+| 2 | Old JWT after logout-all | `session-validity`: version bump; SQL: revoke-all leaves no active row |
+| 3 | Old JWT after password reset | `session-validity`: generation bump; SQL: atomic reset + token replay |
+| 4 | Old JWT after account deletion | `session-validity`: embedded user gone; SQL: cascade; Worker: socket close |
+| 5 | Old JWT after suspension | `session-validity`: blocked row rejected; SQL: block bumps version |
+| 6 | Old admin JWT after password rotation | `session-validity`: epoch change; admin logout-all row revocation |
+| 7 | Refresh/replay after revocation | `session-route-audit`: registry lookup is by the token's `sid`; SQL: used reset token cannot replay; live: old cookie and used token both rejected |
+| 8 | Revoked mobile session | `realtimeCore`: 4001 terminal, no reconnect; `authRestore`: no-session clears state |
+| 9 | Revoked web session | `reconnect-safety`: 4001 terminal; route audit: live guards on protected pages |
+| 10 | Existing WebSocket closure | Worker test: close 4001 and no later delivery |
+| 11 | New WebSocket rejection | Worker test: revoked sid handshake 401 |
+| 12 | Blocked user cannot reconnect | Worker test: blocked sid handshake 401 |
+| 13 | Revoked user cannot get a new private R2 URL | Route audit: all private proxies use live session; `private-access`: participant/owner rules |
+| 14 | Unaffected users continue | `session-validity`: other account valid; Worker: other device still receives |
+| 15 | Concurrent requests during revocation | `session-validity`: reset racing login and before/after-revocation evaluations |
+| 16 | Identified API bypasses closed | `session-route-audit`: DM, `/me`, applications, layouts and every admin route; live: DM, `/me` and admin routes |
+
+The live matrix additionally exercised rows 1–14 and 16 end to end. Row 15
+(concurrency) remains unit/SQL evidence: the live run did not deliberately
+overlap a reset with login.
 
 ## Remaining limitations
 
-1. **No staging application run.** The SQL migration and pgTAP suite pass
-   against a scratch PostgreSQL cluster built from the full migration history,
-   but that cluster intentionally omits Supabase-only objects and no staging
-   app was available. Apply the migration to staging and run the staging matrix
-   before claiming production readiness.
+1. **No separate staging project and no native device build.** The live matrix
+   ran against the connected environment with three disposable fixtures, on
+   explicit authorization. Android and iOS binaries were not built; SecureStore
+   availability is SDK-provided and covered only by TypeScript and the pure
+   lifecycle tests.
 2. **Realtime propagation is best-effort after the HTTP commit.** A push that
    cannot reach a live DO leaves that socket open until it closes/reconnects.
    The handshake check prevents revalidation, and the HTTP API is already
    closed. If "not one event after revocation" is a hard requirement even
    during a realtime outage, add a periodic UserDO revalidation alarm (for
    example every 60 s) or a per-publish revocation check; both add cost and are
-   deliberately not enabled here.
+   deliberately not enabled here. The live run proved the happy path; it did
+   not simulate a realtime Worker outage.
 3. **Presigned R2 URLs live up to 5 minutes.** They cannot be revoked
-   individually.
+   individually. The live run verified that no NEW URL is issued after
+   revocation, not that an already-issued URL stops working.
 4. **Legacy public R2 objects remain public until migrated/purged.**
 5. **Suspended members cannot self-delete** through the normal password flow
    because suspension revokes every session and blocks login. They must contact
    support. The erasure path still accepts a blocked account if a registry row
    remains live because `is_blocked` was set outside `set_user_blocked`
    (which normally revokes every row).
-6. **Admin epoch rotates only on environment redeploy.** A warm isolate keeps
-   the old digest until the deployment/isolate is replaced; Cloudflare secret
-   rotation requires a deploy, so this is effectively the deploy boundary.
-7. **Mobile native builds were not run.** TypeScript and the pure lifecycle
-   tests pass; SecureStore availability on a device is SDK-provided but not
-   exercised here.
-8. **In-flight HTTP requests** that validated before revocation are not
+6. **Admin epoch rotates at the environment boundary.** The live rotation check
+   used a second server process with a different `ADMIN_PASSWORD` and the same
+   build; a warm production isolate keeps the old digest until the deploy/isolate
+   replacement that carries the new secret.
+7. **In-flight HTTP requests** that validated before revocation are not
    cancelled.
+8. **Concurrency was not overlapped live.** The reset/login race is covered by
+   the pure and SQL matrices, not by the live HTTP run.
 
-## Staging verification matrix
+## Live verification matrix (completed)
 
-Run against a disposable staging project only. Never production.
+The live run used the connected environment with three disposable fixtures, on
+explicit authorization. No real user's session was revoked and every fixture was
+removed. A separate staging project was not available. The whole run reported
+**56/56 checks passed**; this table records which rows were repeated live and
+which rely on the Worker/unit matrices.
 
-| # | Test | Expected |
-|---|---|---|
-| 1 | Login on two devices (A, B) | Two `auth_sessions` rows with the same `session_version` |
-| 2 | Logout A, replay A's cookie | 401; B still 200 |
-| 3 | Logout-all from B, replay both | 401 on both; version incremented |
-| 4 | Reset password, replay every old cookie | 401; old reset token replay → 410/used |
-| 5 | Change password from A | A still 200; B 401; A's socket stays, B's closes 4001 |
-| 6 | Delete account from A; replay B | 401/404; `auth_sessions` rows gone |
-| 7 | Admin blocks A; replay A | 401; A's socket closes; A's login 403 |
-| 8 | Admin unblocks A; replay old A cookie | 401; fresh login works |
-| 9 | Old admin JWT after `ADMIN_PASSWORD` rotation | 401/redirect; admin APIs 401 |
-| 10 | Open community socket, revoke, publish | Socket closes 4001; no event received; other device receives |
-| 11 | Open user socket, logout-all | Socket closes 4001 |
-| 12 | Reconnect with revoked sid | Handshake 401 |
-| 13 | Blocked user opens community socket | Handshake 401 |
-| 14 | Suspended user requests `/api/private/dm/...` | 401 before signing |
-| 15 | Already-issued presigned DM URL | Still works until its 5-minute expiry (documented, not a failure) |
-| 16 | Concurrent login + reset | Login either fails or the issued token fails immediately; reset password is never overwritten |
-| 17 | Unaffected user on another account | Normal requests and sockets continue |
+| # | Test | Expected | Live result |
+|---|---|---|---|
+| 1 | Two sessions for account A | Two `auth_sessions` rows with the same `session_version` | PASS |
+| 2 | Logout A, replay A's cookie | 401; B still 200 | PASS |
+| 3 | Logout-all from B, replay both | 401 on both; version incremented | PASS |
+| 4 | Reset password, replay every old cookie | 401; old reset token replay → 410/used | PASS |
+| 5 | Change password from A | A still 200; B 401; socket sides match | HTTP PASS; socket sides Worker test |
+| 6 | Delete account from A; replay B | 401/404; `auth_sessions` rows gone | PASS |
+| 7 | Admin blocks A; replay A | 401; A's socket closes; A's login 403 | PASS |
+| 8 | Admin unblocks A; replay old A cookie | 401; fresh login works | PASS |
+| 9 | Old admin JWT after `ADMIN_PASSWORD` rotation | 401; admin APIs 401 | PASS (second server, same build) |
+| 10 | Open community socket, revoke, publish | Socket closes 4001; no event received; other device receives | Close/no-event PASS; other-device Worker test |
+| 11 | Open user socket, logout-all | Socket closes 4001 | Worker test; not repeated live |
+| 12 | Reconnect with revoked sid | Handshake 401 | PASS |
+| 13 | Blocked user opens community socket | Handshake 401 | PASS |
+| 14 | Suspended user requests `/api/private/dm/...` | 401 before signing | Revoked JWT PASS; suspended not separately repeated |
+| 15 | Already-issued presigned DM URL | Still works until its 5-minute expiry | Not executed; documented |
+| 16 | Concurrent login + reset | Login fails or token fails immediately | Unit/SQL only |
+| 17 | Unaffected user on another account | Normal requests continue | PASS |
 
-## Rollout
+## Rollout status
 
-1. Apply `supabase/migrations/20261030210000_session_revocation.sql` to staging.
-2. Deploy web and realtime together. Old tokens are rejected by design; users
-   sign in once more.
-3. Run the SQL suite and the staging matrix. Do not run against production.
-4. Only after staging passes, schedule a production window. Applying the
-   migration alone does not log anyone out; deploying the new validation does.
-5. Keep the migration additive. Do not drop `auth_sessions` during rollback;
+1. `supabase/migrations/20261030210000_session_revocation.sql` has been applied
+   to the connected environment. The live matrix above was executed against it
+   with disposable fixtures.
+2. Web and realtime must be deployed **together**. Old tokens are rejected by
+   design; users sign in once more.
+3. The SQL suite, typechecks, build and Worker suites pass locally. The
+   repository-wide `npm run lint` still has the pre-existing baseline failures;
+   the 24 changed web files lint clean.
+4. Keep the migration additive. Do not drop `auth_sessions` during rollback;
    redeploy the previous code if necessary, then clean up later.
+5. Build and smoke-test the native apps before shipping the mobile change;
+   SecureStore is exercised only by TypeScript/pure tests in this workspace.
 
 ## File map
 
@@ -391,6 +463,7 @@ Run against a disposable staging project only. Never production.
 | `supabase/migrations/20261030210000_session_revocation.sql` | Registry, version, atomic issue/revoke/reset/block functions |
 | `supabase/tests/session_revocation.test.sql` | pgTAP matrix (passes against the full migration history) |
 | `apps/web/lib/auth/session-validity.ts` | Pure validity decision shared by HTTP + realtime |
+| `apps/web/lib/auth/session-route-audit.test.ts` | Regression guard for the bypass surfaces |
 | `apps/web/lib/auth/session.ts` | JWT claims, registry validation, `getSession` / `requireSession` |
 | `apps/web/lib/auth/session-registry.ts` | Typed service-role RPC wrappers |
 | `apps/web/app/api/internal/session/validate/route.ts` | API_SECRET-gated handshake validation |
@@ -413,21 +486,22 @@ Run against a disposable staging project only. Never production.
 
 ## Acceptance checklist
 
-- [x] Old tokens are rejected after logout (unit + Worker).
-- [x] Old tokens are rejected after logout-all (unit).
-- [x] Old tokens are rejected after reset (decision/SQL).
-- [x] Old tokens are rejected after deletion (decision/SQL cascade).
-- [x] Old tokens are rejected after suspension (decision/SQL).
-- [x] Old admin tokens are rejected after password rotation (unit).
-- [x] Replay attempts after revocation fail at validation (unit + Worker).
+- [x] Old tokens are rejected after logout (unit + Worker + live).
+- [x] Old tokens are rejected after logout-all (unit + live).
+- [x] Old tokens are rejected after reset (decision/SQL + live).
+- [x] Old tokens are rejected after deletion (decision/SQL cascade + live).
+- [x] Old tokens are rejected after suspension (decision/SQL + live).
+- [x] Old admin tokens are rejected after password rotation (unit + live second server).
+- [x] Replay attempts after revocation fail at validation (sid lookup guard + SQL + live).
 - [x] Revoked mobile sessions clear credentials and sockets (unit).
-- [x] Revoked web sessions redirect and close sockets (unit/Worker).
-- [x] Existing WebSocket closes after revocation (Worker test).
-- [x] New WebSocket is rejected after revocation (Worker test).
-- [x] Blocked users cannot reconnect (handshake validation).
-- [x] Revoked users cannot obtain new private R2 URLs (all private proxies use live session).
-- [x] Unaffected users keep working (unit).
-- [x] Concurrent login/reset race guarded (hash readback + optimistic updates).
-- [x] Identified API bypasses closed.
+- [x] Revoked web sessions redirect and close sockets (unit/Worker/live).
+- [x] Existing WebSocket closes after revocation (Worker + live 4001).
+- [x] New WebSocket is rejected after revocation (Worker + live 401).
+- [x] Blocked users cannot reconnect (Worker + live handshake 401).
+- [x] Revoked users cannot obtain new private R2 URLs (live DM 401).
+- [x] Unaffected users keep working (unit + live).
+- [x] Concurrent login/reset race guarded (unit + SQL; not overlapped live).
+- [x] Identified API bypasses closed (route audit + live DM/me/admin).
 - [x] SQL suite executed against full migration history (41 assertions, 0 failures).
-- [ ] Staging runtime matrix executed.
+- [x] Live connected-environment matrix executed (56/56 checks; fixtures removed).
+- [ ] Native Android/iOS builds and a realtime-outage drill.

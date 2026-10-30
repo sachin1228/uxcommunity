@@ -36,6 +36,7 @@ let baseUrl: string;
 let stub: Server;
 let restoreDevVars: () => void;
 const revokedSids = new Set<string>();
+const blockedSids = new Set<string>();
 /** A sid whose FIRST validation passes and SECOND fails, like a revocation
  *  landing between the pre-upgrade check and the post-accept check. */
 let raceSid: string | null = null;
@@ -139,7 +140,10 @@ beforeAll(async () => {
             return;
           }
         }
-        if (claims.sid && revokedSids.has(claims.sid)) {
+        if (
+          (claims.sid && revokedSids.has(claims.sid)) ||
+          (claims.sid && blockedSids.has(claims.sid))
+        ) {
           res.writeHead(401, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: false }));
           return;
@@ -249,6 +253,48 @@ describe("session revocation closes live sockets", () => {
     expect(
       conn.messages.filter((msg) => msg.t === "event" && msg.data?.text === "after-race-revoke"),
     ).toHaveLength(0);
+  });
+
+  it("refuses a blocked user's new community socket", async () => {
+    const userId = "revoke-user-blocked";
+    const sid = "revoke-sid-blocked";
+    blockedSids.add(sid);
+
+    const ws = new WebSocket(
+      `${baseUrl}/ws?room=${encodeURIComponent("chat:revoke-community-blocked")}&token=${await createToken(userId, sid)}`,
+    );
+    const status = await new Promise<number>((resolveStatus) => {
+      ws.on("error", () => resolveStatus(0));
+      ws.on("unexpected-response", (_req, res) => resolveStatus(res.statusCode ?? 0));
+      ws.on("open", () => resolveStatus(200));
+      setTimeout(() => resolveStatus(0), 3000);
+    });
+    expect(status).toBe(401);
+    try { ws.close(); } catch { /* ignore */ }
+  });
+
+  it("keeps the current device when revoking every other sid", async () => {
+    const userId = "revoke-user-except";
+    const room = "chat:revoke-community-except";
+    const currentSid = "revoke-sid-current";
+    const otherSid = "revoke-sid-other";
+    const current = connect(room, await createToken(userId, currentSid));
+    const other = connect(room, await createToken(userId, otherSid));
+
+    await joinAndSubscribe(current.ws, current.messages, userId, room, "chat");
+    await joinAndSubscribe(other.ws, other.messages, userId, room, "chat");
+
+    const response = await revoke({ userId, exceptSid: currentSid });
+    expect(response.ok).toBe(true);
+    expect(await other.closed).toBe(4001);
+
+    await publish(room, "chat", { text: "password-change-current" });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(
+      current.messages.some((msg) => msg.t === "event" && msg.data?.text === "password-change-current"),
+    ).toBe(true);
+
+    current.ws.close();
   });
 
   it("closes a user-scoped socket on logout-all", async () => {

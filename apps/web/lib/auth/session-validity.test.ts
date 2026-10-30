@@ -192,3 +192,28 @@ test("an unaffected user keeps working while another session is revoked", () => 
     true,
   );
 });
+
+test("a reset that commits during login leaves no token on the old generation", () => {
+  // Login read generation 4, the reset moved the account to 5 and revoked rows.
+  const resetRow = userRow({
+    session_version: 5,
+    users: { id: USER_ID, is_blocked: false, session_version: 5 },
+  });
+  assert.equal(evaluateSession(resetRow, userClaims({ sv: 4 }), options()).active, false);
+
+  // A login that starts after the reset receives `sv: 5` and is valid.
+  const freshClaims = userClaims({ sv: 5 });
+  assert.equal(evaluateSession(resetRow, freshClaims, options()).active, true);
+});
+
+test("a token validated before a revocation is rejected on the next evaluation", () => {
+  assert.equal(evaluateSession(userRow(), userClaims(), options()).active, true);
+  assert.equal(
+    evaluateSession(
+      userRow({ revoked_at: "2026-10-30T12:00:01.000Z" }),
+      userClaims(),
+      options(),
+    ).active,
+    false,
+  );
+});
