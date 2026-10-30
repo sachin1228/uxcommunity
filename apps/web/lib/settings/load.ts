@@ -15,6 +15,7 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from "@/lib/push/chat";
 import { createServiceClient } from "@/lib/supabase/service";
 import { clockHHMM, type EmailPreferences, type PushPreferences } from "./preferences";
 import type { SavedResume } from "./resumes";
+import { savedResumePath } from "@/lib/r2-private";
 
 /**
  * Every column the two preference shapes read. `*` rather than a list: a
@@ -111,7 +112,7 @@ export async function loadJobProfile(userId: string): Promise<JobProfileData> {
     db.from("designer_profiles").select("portfolio_url").eq("user_id", userId).maybeSingle(),
     db
       .from("member_resumes")
-      .select("id, file_name, mime_type, size_bytes, url, is_default, created_at")
+      .select("id, file_name, mime_type, size_bytes, url, storage_key, is_default, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: true }),
   ]);
@@ -123,7 +124,7 @@ export async function loadJobProfile(userId: string): Promise<JobProfileData> {
       fileName: row.file_name,
       mimeType: row.mime_type,
       sizeBytes: row.size_bytes,
-      url: row.url,
+      url: row.storage_key ? savedResumePath(row.id) : row.url ?? "",
       isDefault: row.is_default,
       createdAt: row.created_at,
     })),

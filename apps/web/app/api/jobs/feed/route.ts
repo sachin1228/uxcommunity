@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { normalizeUtcCursor } from "@/lib/communities/read-models";
 import { formatJobFeedRows } from "@/lib/jobs/format";
 import { JOB_FEED_PAGE_SIZE, getJobFeed } from "@/lib/jobs/service";
+import { withMobileJobResumeUrl } from "@/lib/jobs/private-resume";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,8 +39,9 @@ export async function GET(req: NextRequest) {
   try {
     const jobs = await getJobFeed(db, userId, { limit: JOB_FEED_PAGE_SIZE + 1, before });
     const hasMore = jobs.length > JOB_FEED_PAGE_SIZE;
+    const page = formatJobFeedRows(hasMore ? jobs.slice(0, JOB_FEED_PAGE_SIZE) : jobs);
     return NextResponse.json({
-      jobs: formatJobFeedRows(hasMore ? jobs.slice(0, JOB_FEED_PAGE_SIZE) : jobs),
+      jobs: await Promise.all(page.map(withMobileJobResumeUrl)),
       has_more: hasMore,
     });
   } catch (error) {

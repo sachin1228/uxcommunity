@@ -40,7 +40,10 @@ async function ensureGalleryPermission(): Promise<boolean> {
 }
 
 /** Downloads `url` and saves it to the photo gallery. */
-export async function saveImageToGallery(url: string): Promise<SaveResult> {
+export async function saveImageToGallery(
+  url: string,
+  headers?: Record<string, string>,
+): Promise<SaveResult> {
   try {
     if (!(await ensureGalleryPermission())) return { ok: false, reason: 'permission' };
 
@@ -48,7 +51,7 @@ export async function saveImageToGallery(url: string): Promise<SaveResult> {
     if (!cacheDir) return { ok: false, reason: 'failed' };
 
     const target = `${cacheDir}${Date.now()}-${fileNameForUrl(url)}`;
-    const download = await FileSystem.downloadAsync(url, target);
+    const download = await FileSystem.downloadAsync(url, target, headers ? { headers } : undefined);
     if (download.status !== 200) return { ok: false, reason: 'download' };
 
     await MediaLibrary.saveToLibraryAsync(download.uri);

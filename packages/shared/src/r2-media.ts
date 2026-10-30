@@ -105,9 +105,10 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   { table: "job_titles", column: "image_url" },
   { table: "job_titles", column: "lottie_url" },
   { table: "community_messages", column: "image_url" },
-  // Direct-message images are uploaded to the same bucket. Must be tracked
-  // here, or the orphan audit classifies every live DM image as an orphan and
-  // deletes it after the grace period.
+  // Legacy DM images (sent before private storage) still live in the public
+  // bucket and must be tracked, or the orphan audit deletes them after the
+  // grace period. New DM rows store `/api/private/dm/…` in this column, which
+  // getR2KeyFromUrl ignores; their objects are audited from `image_key`.
   { table: "dm_messages", column: "image_url" },
   // Event comment images are uploaded to the same bucket and rendered in the
   // event discussion. They must be tracked here or the orphan audit treats
@@ -118,12 +119,13 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   SHOWCASE_ATTACHMENT_LOOKUP,
   SHOWCASE_POSTER_LOOKUP,
   THREAD_ATTACHMENT_LOOKUP,
-  // Resumes attached to job applications. Must be tracked here or the
-  // orphan audit treats every live resume as an orphan and deletes it.
+  // Legacy public résumés attached to job applications. New rows use
+  // `resume_key` in the private bucket; this column still holds the public URL
+  // for un-migrated rows, so the public orphan audit must keep tracking it.
   { table: "job_applications", column: "resume_url" },
-  // Resumes a member saved on Settings and reuses while applying. Same
-  // reason: untracked, the orphan audit would delete live saved files
-  // after the grace period.
+  // Legacy public saved résumés (Settings → Job profile). New rows use
+  // `storage_key` in the private bucket; un-migrated rows keep their public
+  // URL here and must stay tracked by the public orphan audit.
   { table: "member_resumes", column: "url" },
   { table: "lottie_settings", column: "lottie_url" },
 ];

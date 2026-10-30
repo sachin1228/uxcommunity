@@ -3,7 +3,17 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadDmConversationForUser } from "@/lib/direct-messages/server";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
-import { deleteR2AssetIfUnreferenced, parseR2Key, uploadToR2 } from "@/lib/r2";
+import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
+import { deletePrivateDmKeys } from "@/lib/private-storage-cleanup";
+import {
+  isPrivateStorageConfigured,
+  dmAssetPath,
+  dmKeyFromImageUrl,
+  isSafeFileSegment,
+  legacyPrivateKeyFromUrl,
+  privateDmKey,
+  uploadPrivateToR2,
+} from "@/lib/r2-private";
 import { createServerTimer } from "@/lib/server-timing";
 
 const MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB raw upload limit
@@ -17,10 +27,10 @@ const ALLOWED_TYPES = new Set([
 /**
  * POST /api/dm/conversations/[id]/upload
  *
- * Stores a DM image, namespaced `dm/${conversationId}/…` so a conversation's
- * assets can be swept as a unit. Mirrors the community chat upload (same
- * limits, MIME sniffing, R2 write) — the only difference is the participant
- * check and the key prefix.
+ * Stores a DM image in the PRIVATE bucket, namespaced `dm/<conversationId>/…`.
+ * The response's `url` is the stable, authorization-gated
+ * `/api/private/dm/<conversation>/<file>` path — never a public object URL —
+ * and `key` lets a caller release the upload without re-parsing the path.
  */
 export async function POST(
   request: NextRequest,
@@ -37,6 +47,9 @@ export async function POST(
     session = await timer.measure("auth", () => requireSession("user"));
   } catch (e) {
     return finish(e as Response);
+  }
+  if (!isPrivateStorageConfigured()) {
+    return finish(NextResponse.json({ error: "Message images are not available right now." }, { status: 503 }));
   }
   const userId = session.userId!;
   const { id: conversationId } = await params;
@@ -75,51 +88,42 @@ export async function POST(
     return finish(NextResponse.json({ error: "Failed to read image." }, { status: 422 }));
   }
 
-  // The client compresses the image to WebP before upload; sniffing the file
-  // signature is the only remaining server-side step before the R2 write.
   const storedMime = detectImageMime(source);
   if (!storedMime) {
     return finish(NextResponse.json({ error: "That file is not a valid JPEG, PNG or WebP image." }, { status: 422 }));
   }
   timer.record("output_bytes", source.byteLength);
 
-  const key = `dm/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
+  const key = privateDmKey(conversationId, extensionForMime(storedMime));
 
   try {
-    const url = await timer.measure("r2_upload", () =>
-      uploadToR2(key, source, storedMime),
-    );
-
-    if (typeof url !== "string" || !url.trim()) {
-      throw new Error("R2 upload completed without a public URL.");
-    }
-
-    const imageUrl = url.trim();
-    return finish(NextResponse.json(
-      { url: imageUrl },
-      {
-        status: 200,
-        headers: {
-          "Cache-Control": "no-store",
-          "X-Image-Url": imageUrl,
+    await timer.measure("r2_upload", () => uploadPrivateToR2(key, source, storedMime));
+    const url = dmAssetPath(conversationId, key.split("/").pop()!);
+    return finish(
+      NextResponse.json(
+        { key, url },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store",
+            "X-Image-Url": url,
+          },
         },
-      },
-    ));
+      ),
+    );
   } catch (err) {
-    console.error("[dm-image-upload] R2 error:", err);
+    console.error("[dm-image-upload] private R2 error:", err);
     return finish(NextResponse.json({ error: "Upload failed." }, { status: 500 }));
   }
 }
 
 /**
- * DELETE /api/dm/conversations/[id]/upload  { url }
+ * DELETE /api/dm/conversations/[id]/upload  { key? , url? }
  *
- * Remove an upload whose send was abandoned (cancelled before the message
- * row could exist). Only assets under THIS conversation's prefix qualify —
- * the URL is client input, so the same DM-asset rule as a send applies. The
- * delete is skipped while any dm_messages row still references the URL, so a
- * racing successful send can never lose its image; a repeat call for an
- * already-gone object is a harmless no-op.
+ * Remove an upload whose send was abandoned. Only assets under THIS
+ * conversation's private prefix qualify. A racing successful send keeps its
+ * image: the object is retained while any dm_messages row references the key
+ * (or a report snapshot keeps the path).
  */
 export async function DELETE(
   request: NextRequest,
@@ -140,24 +144,44 @@ export async function DELETE(
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  let key = "";
   let url = "";
   try {
-    const body = (await request.json()) as { url?: unknown };
+    const body = (await request.json()) as { key?: unknown; url?: unknown };
+    key = typeof body.key === "string" ? body.key.trim() : "";
     url = typeof body.url === "string" ? body.url.trim() : "";
   } catch {
     // Fall through to the 400 below.
   }
 
-  const key = url ? parseR2Key(url) : null;
-  if (!url || !key || !key.startsWith(`dm/${conversationId}/`)) {
+  // A legacy public URL still points at the old bucket. It is reclaimed with
+  // the bucket-wide reference check; private keys go through the private
+  // cleanup (which also respects report evidence).
+  if (!key && url) {
+    const legacyKey = legacyPrivateKeyFromUrl(url);
+    if (legacyKey && legacyKey.startsWith(`dm/${conversationId}/`)) {
+      const result = await deleteR2AssetIfUnreferenced(db, url, [
+        { table: "dm_messages", column: "image_url" },
+      ]);
+      return NextResponse.json({ ok: true, status: result.status });
+    }
+    key = dmKeyFromImageUrl(url) ?? "";
+  }
+
+  const file = key.startsWith(`dm/${conversationId}/`)
+    ? key.slice(`dm/${conversationId}/`.length)
+    : "";
+  if (!key || !file || !isSafeFileSegment(file) || file.includes("/")) {
     return NextResponse.json(
       { error: "Not an upload of this conversation." },
       { status: 422 },
     );
   }
 
-  const result = await deleteR2AssetIfUnreferenced(db, url, [
-    { table: "dm_messages", column: "image_url" },
-  ]);
-  return NextResponse.json({ ok: true, status: result.status });
+  if (!isPrivateStorageConfigured()) {
+    return NextResponse.json({ error: "Message images are not available right now." }, { status: 503 });
+  }
+
+  const result = await deletePrivateDmKeys(db, [key]);
+  return NextResponse.json({ ok: true, status: result.deleted.length ? "deleted" : "kept" });
 }

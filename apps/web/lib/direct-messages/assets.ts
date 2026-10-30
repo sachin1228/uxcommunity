@@ -1,40 +1,64 @@
 /**
- * Which image URLs a DM message may carry — server-side only.
+ * Which image a DM message may carry — server-side only.
  *
- * A send's `image_url` is a client-supplied string, so it is treated as
- * untrusted input, not as "the URL the upload route just returned":
+ * A send's image is client-supplied, so it is treated as untrusted input:
  *
- *   * Our own storage: the URL must parse to an R2 key on THIS bucket AND sit
- *     under `dm/<conversationId>/`. That ties the asset to the conversation
- *     being written to — a member cannot attach another conversation's asset
- *     (or a community-chat upload) by pasting its URL, and the check is pure
- *     string parsing: no URL is ever fetched server-side (no SSRF surface).
- *   * GIPHY: the picker sends `media.giphy.com`-family URLs by design, and
- *     they are the one legitimate external image source.
+ *   * a private upload is the stable `/api/private/dm/<conversation>/<file>`
+ *     path returned by the upload route. It resolves to a `dm/<conversation>/…`
+ *     object key and must belong to the conversation being written to;
+ *   * a legacy public bucket URL is still accepted for messages sent before
+ *     the private-storage migration;
+ *   * GIPHY is the one legitimate external image source.
  *
- * Anything else is rejected. The route answers 422 ("Invalid image URL.")
- * exactly as before, so the client contract is unchanged.
+ * Nothing is fetched server-side: this is pure string validation (no SSRF).
  */
 
-import { parseR2Key } from "@/lib/r2";
+import { dmKeyFromImageUrl, dmKeyToAssetPath } from "@/lib/r2-private";
 
 const GIPHY_HOST = /(^|\.)giphy\.com$/i;
 
-/** True when `raw` is an https URL this conversation may legitimately attach. */
-export function isAllowedDmImageUrl(raw: string, conversationId: string): boolean {
-  let url: URL;
+export interface ResolvedDmImage {
+  /** What the message row keeps as `image_url` (a private path or public URL). */
+  url: string;
+  /** The private object key, or null for a public/legacy image. */
+  key: string | null;
+}
+
+/** Resolve an attachable image, or null when it is not allowed here. */
+export function resolveDmImage(raw: string, conversationId: string): ResolvedDmImage | null {
+  let parsed: URL;
   try {
-    url = new URL(raw);
+    parsed = new URL(raw, "https://local.invalid");
   } catch {
-    return false;
+    return null;
   }
-  if (url.protocol !== "https:") return false;
 
-  if (GIPHY_HOST.test(url.hostname)) return true;
+  if (parsed.protocol === "https:" && GIPHY_HOST.test(parsed.hostname)) {
+    return { url: raw, key: null };
+  }
 
-  // `new URL` resolves `..` segments, so the pathname cannot smuggle a
-  // traversal past the prefix check below.
-  const key = parseR2Key(url.href);
-  if (!key) return false;
-  return key.startsWith(`dm/${conversationId}/`);
+  // The private upload path contains the conversation id. A path for another
+  // conversation can never be attached by pasting its URL.
+  if (raw.startsWith("/api/private/dm/")) {
+    const key = dmKeyFromImageUrl(raw);
+    if (!key || !key.startsWith(`dm/${conversationId}/`)) return null;
+    return { url: dmKeyToAssetPath(key) ?? raw, key };
+  }
+
+  if (parsed.protocol !== "https:") return null;
+
+  // Legacy public bucket uploads are still readable; they stay URL-backed
+  // until the migration script moves them into the private bucket.
+  const key = dmKeyFromImageUrl(raw);
+  if (!key || !key.startsWith(`dm/${conversationId}/`)) {
+    // GIPHY images also reach here when the host check above did not match
+    // because the URL was uppercase; reject anything else.
+    return null;
+  }
+  return { url: raw, key: null };
+}
+
+/** True when `raw` is an image this conversation may legitimately attach. */
+export function isAllowedDmImageUrl(raw: string, conversationId: string): boolean {
+  return resolveDmImage(raw, conversationId) !== null;
 }

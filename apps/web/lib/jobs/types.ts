@@ -87,6 +87,8 @@ export interface JobApplicationSummary {
   portfolio_url: string;
   linkedin_url: string;
   resume_url: string | null;
+  /** Private R2 key; takes precedence over resume_url. */
+  resume_key?: string | null;
   created_at: string;
   /** Added server-side by the detail page (`timeAgoLabel`). */
   applied_label?: string;
@@ -163,6 +165,8 @@ export interface JobApplicant {
   portfolio_url: string;
   linkedin_url: string;
   resume_url: string | null;
+  /** Private R2 key; takes precedence over resume_url. */
+  resume_key?: string | null;
   created_at: string;
   avatar_url: string | null;
   /** The poster's triage standing; `new` until they decide. */

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { deleteFromR2, uploadToR2 } from "@/lib/r2";
+import {
+  deletePrivateObject,
+  isPrivateStorageConfigured,
+  privateResumeKey,
+  uploadPrivateToR2,
+} from "@/lib/r2-private";
 import { jobApplicationSchema } from "@/lib/jobs/validation";
 import { detectResumeMime, RESUME_MAX_BYTES, resumeExtension, type ResumeMime } from "@/lib/jobs/resume-file";
 import { applyToJob, type ApplyFailureCode } from "@/lib/jobs/service";
@@ -110,9 +116,16 @@ export async function POST(
       );
     }
 
-    resumeKey = `resumes/${session.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${resumeExtension(mime)}`;
+    if (!isPrivateStorageConfigured()) {
+      return NextResponse.json(
+        { error: "Resume uploads are not available right now." },
+        { status: 503 },
+      );
+    }
+
+    resumeKey = privateResumeKey(session.userId!, resumeExtension(mime));
     try {
-      resumeUrl = await uploadToR2(resumeKey, buffer, mime);
+      await uploadPrivateToR2(resumeKey, buffer, mime);
     } catch (error) {
       console.error("[jobs/apply] resume upload error:", error);
       return NextResponse.json({ error: "Resume upload failed. Please try again." }, { status: 500 });
@@ -133,12 +146,14 @@ export async function POST(
 
     // Scoped to the applicant: someone else's resume id resolves to
     // nothing and fails the same way a deleted one does.
-    const { data: savedResume } = await db
+    const { data: savedResume } = (await (db as unknown as SupabaseClient)
       .from("member_resumes")
-      .select("url")
+      .select("url, storage_key")
       .eq("id", savedResumeId)
       .eq("user_id", session.userId!)
-      .maybeSingle();
+      .maybeSingle()) as unknown as {
+      data: { url: string | null; storage_key: string | null } | null;
+    };
 
     if (!savedResume) {
       return NextResponse.json(
@@ -147,7 +162,10 @@ export async function POST(
       );
     }
 
-    resumeUrl = savedResume.url;
+    resumeKey = savedResume.storage_key ?? null;
+    // A legacy public row still travels as its URL; the migration script
+    // moves it to the private bucket without breaking this path.
+    resumeUrl = resumeKey ? null : savedResume.url;
   }
 
   const { id } = await params;
@@ -161,9 +179,11 @@ export async function POST(
   });
 
   if (!result.ok) {
-    if (resumeKey) {
+    // Only a file this request uploaded is reclaimed; a saved resume is shared
+    // with its member_resumes row and must survive a failed application.
+    if (uploadedFile && resumeKey) {
       try {
-        await deleteFromR2(resumeKey);
+        await deletePrivateObject(resumeKey);
       } catch (cleanupError) {
         console.error("[jobs/apply] resume cleanup error:", cleanupError);
       }
@@ -178,13 +198,27 @@ export async function POST(
     );
   }
 
+  // The private key rides beside the application row. The RPC validates the
+  // public resume URL, so a key-backed upload reaches the database here; a
+  // failure leaves the application landed and logs, rather than losing the
+  // whole send after the row exists.
+  if (resumeKey && result.applicationId) {
+    const { error: keyError } = await (db as unknown as SupabaseClient)
+      .from("job_applications")
+      .update({ resume_key: resumeKey })
+      .eq("id", result.applicationId)
+      .eq("applicant_id", session.userId!);
+
+    if (keyError) console.error("[jobs/apply] resume key update error:", keyError);
+  }
+
   // First-upload adoption: when a member with no saved resumes attaches a
   // one-off file, that file becomes their first saved resume, so the next
   // Apply offers it and Settings → Job profile lists it. Members who already
   // have a saved list manage it themselves — their one-off uploads stay
   // one-off. Non-fatal by design: the application already landed, so a
   // failure here is only logged.
-  if (uploadedResume && resumeUrl) {
+  if (uploadedResume && resumeKey) {
     try {
       const { count, error: countError } = await db
         .from("member_resumes")
@@ -194,14 +228,17 @@ export async function POST(
       if (countError) throw countError;
 
       if ((count ?? 0) === 0) {
-        const { error: insertError } = await db.from("member_resumes").insert({
-          user_id: session.userId!,
-          file_name: uploadedResume.name || `resume.${resumeExtension(uploadedResume.mime)}`,
-          mime_type: uploadedResume.mime,
-          size_bytes: uploadedResume.size,
-          url: resumeUrl,
-          is_default: true,
-        });
+        const { error: insertError } = await (db as unknown as SupabaseClient)
+          .from("member_resumes")
+          .insert({
+            user_id: session.userId!,
+            file_name: uploadedResume.name || `resume.${resumeExtension(uploadedResume.mime)}`,
+            mime_type: uploadedResume.mime,
+            size_bytes: uploadedResume.size,
+            url: null,
+            storage_key: resumeKey,
+            is_default: true,
+          });
 
         if (insertError) throw insertError;
       }

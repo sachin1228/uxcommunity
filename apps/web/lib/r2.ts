@@ -119,7 +119,7 @@ export async function sendR2Command<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-function getClient(): S3Client {
+export function getR2Client(): S3Client {
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
@@ -250,7 +250,7 @@ export async function presignR2Put(
   contentType: string,
   expiresInSeconds = 600,
 ): Promise<string> {
-  const client = getClient();
+  const client = getR2Client();
   const command = new PutObjectCommand({
     Bucket: getBucket(),
     Key: key,
@@ -276,7 +276,7 @@ export async function uploadToR2(
   body: Buffer,
   contentType: string
 ): Promise<string> {
-  const client = getClient();
+  const client = getR2Client();
   await sendR2Command(() =>
     client.send(
       new PutObjectCommand({
@@ -299,7 +299,7 @@ export async function uploadToR2(
  * re-upload path that would fail exactly the same way.
  */
 export async function r2ObjectExists(key: string): Promise<boolean> {
-  const client = getClient();
+  const client = getR2Client();
   try {
     await sendR2Command(() => client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key })));
     return true;
@@ -316,7 +316,7 @@ export async function r2ObjectExists(key: string): Promise<boolean> {
  * via an in-bucket copy — zero quality loss, no double upload.
  */
 export async function copyR2Object(sourceKey: string, destinationKey: string): Promise<void> {
-  const client = getClient();
+  const client = getR2Client();
   await sendR2Command(() =>
     client.send(new CopyObjectCommand({
       Bucket: getBucket(),
@@ -331,7 +331,7 @@ export async function copyR2Object(sourceKey: string, destinationKey: string): P
 
 /** Download an R2 object by key and return it as a Buffer. */
 export async function downloadFromR2(key: string): Promise<Buffer> {
-  const client = getClient();
+  const client = getR2Client();
   const resp = await sendR2Command(() =>
     client.send(new GetObjectCommand({ Bucket: getBucket(), Key: key }))
   );
@@ -354,7 +354,7 @@ export async function listR2ObjectKeys(
   continuationToken?: string,
   startAfter?: string,
 ): Promise<{ keys: string[]; objects: R2ListedObject[]; nextContinuationToken?: string; isTruncated: boolean }> {
-  const client = getClient();
+  const client = getR2Client();
   const response = await sendR2Command(() =>
     client.send(new ListObjectsV2Command({
       Bucket: getBucket(),
@@ -383,7 +383,7 @@ export async function listR2ObjectKeys(
 
 /** Delete an R2 object by key (best-effort — does not throw on 404). */
 export async function deleteFromR2(key: string): Promise<void> {
-  const client = getClient();
+  const client = getR2Client();
   await sendR2Command(() =>
     client.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }))
   );
@@ -405,7 +405,7 @@ export async function deleteR2Objects(
   const failed: Array<{ key: string; error: string }> = [];
 
   if (!normalized.length) return { deleted, failed };
-  const client = getClient();
+  const client = getR2Client();
 
   for (let i = 0; i < normalized.length; i += 1000) {
     const chunk = normalized.slice(i, i + 1000);

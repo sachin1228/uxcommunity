@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  privateWorkSampleKeys,
+  verificationSampleDisplayUrls,
+} from "@/lib/verification/samples";
 
 /**
  * GET /api/verification
@@ -29,7 +33,7 @@ export async function GET() {
     db
       .from("account_verification_requests")
       .select(
-        "id, status, linkedin_url, portfolio_links, work_sample_urls, rejection_reason, reviewed_at, created_at",
+        "id, status, linkedin_url, portfolio_links, work_sample_urls, work_sample_keys, rejection_reason, reviewed_at, created_at",
       )
       .eq("user_id", session.userId!)
       .order("created_at", { ascending: false })
@@ -56,10 +60,18 @@ export async function GET() {
     linkedin_url: string;
     portfolio_links: string[] | null;
     work_sample_urls: string[] | null;
+    work_sample_keys: string[] | null;
     rejection_reason: string | null;
     reviewed_at: string | null;
     created_at: string;
   } | null;
+
+  const latestSamples = application
+    ? {
+        keys: privateWorkSampleKeys(application),
+        urls: await verificationSampleDisplayUrls(application),
+      }
+    : null;
 
   return NextResponse.json({
     status: row.verification_status,
@@ -75,7 +87,8 @@ export async function GET() {
           status: application.status,
           linkedinUrl: application.linkedin_url,
           portfolioLinks: application.portfolio_links ?? [],
-          workSampleUrls: application.work_sample_urls ?? [],
+          workSampleUrls: latestSamples?.urls ?? [],
+          workSampleKeys: latestSamples?.keys ?? [],
           rejectionReason: application.rejection_reason,
           reviewedAt: application.reviewed_at,
           createdAt: application.created_at,

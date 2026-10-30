@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { ApplicantsBoard } from "@/components/jobs/ApplicantsBoard";
 import { deadlineFields, editedLabel, timeAgoLabel } from "@/lib/jobs/format";
 import { getJobApplicants, getJobDetail, loadJobViewer } from "@/lib/jobs/service";
+import {
+  withWebApplicantResumePath,
+  withWebJobResumePath,
+} from "@/lib/jobs/private-resume";
 
 export const metadata = { title: "Applicants — uxcommunity" };
 
@@ -41,12 +45,12 @@ export default async function JobApplicantsPage({
     // the board empty rather than a broken page — the error is logged.
     return (
       <ApplicantsBoard
-        job={{
+        job={withWebJobResumePath({
           ...job,
           posted_label: timeAgoLabel(job.created_at),
           updated_label: editedLabel(job.created_at, job.updated_at),
           ...deadlineFields(job),
-        }}
+        })}
         applicants={[]}
       />
     );
@@ -54,16 +58,18 @@ export default async function JobApplicantsPage({
 
   return (
     <ApplicantsBoard
-      job={{
+      job={withWebJobResumePath({
         ...job,
         posted_label: timeAgoLabel(job.created_at),
         updated_label: editedLabel(job.created_at, job.updated_at),
         ...deadlineFields(job),
-      }}
-      applicants={result.applicants.map((applicant) => ({
-        ...applicant,
-        applied_label: timeAgoLabel(applicant.created_at),
-      }))}
+      })}
+      applicants={result.applicants.map((applicant) =>
+        withWebApplicantResumePath({
+          ...applicant,
+          applied_label: timeAgoLabel(applicant.created_at),
+        }),
+      )}
     />
   );
 }

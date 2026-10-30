@@ -25,8 +25,14 @@ import {
   submitVerification,
   uploadVerificationSample,
   type VerificationData,
+  type VerificationSample,
   type VerificationStatus,
 } from '@/lib/verification';
+
+function samplesFromLatest(latest: NonNullable<VerificationData['latest']>): VerificationSample[] {
+  const keys = latest.workSampleKeys ?? [];
+  return latest.workSampleUrls.map((url, index) => ({ key: keys[index] ?? '', url }));
+}
 
 function dateLabel(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -83,7 +89,7 @@ export default function VerificationScreen() {
   const [portfolio1, setPortfolio1] = useState('');
   const [portfolio2, setPortfolio2] = useState('');
   const [showSecondPortfolio, setShowSecondPortfolio] = useState(false);
-  const [samples, setSamples] = useState<string[]>([]);
+  const [samples, setSamples] = useState<VerificationSample[]>([]);
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
 
   const [code, setCode] = useState('');
@@ -107,7 +113,7 @@ export default function VerificationScreen() {
         setPortfolio1(next.latest.portfolioLinks[0] ?? '');
         setPortfolio2(next.latest.portfolioLinks[1] ?? '');
         setShowSecondPortfolio(Boolean(next.latest.portfolioLinks[1]));
-        setSamples(next.latest.workSampleUrls ?? []);
+        setSamples(samplesFromLatest(next.latest));
       }
     } catch (loadFailure) {
       setLoadError(errorText(loadFailure, 'Could not load your verification status.'));
@@ -204,8 +210,12 @@ export default function VerificationScreen() {
             height: asset.height,
           };
         }
-        const url = await uploadVerificationSample(prepared);
-        setSamples((current) => (current.includes(url) ? current : [...current, url]));
+        const sample = await uploadVerificationSample(prepared);
+        setSamples((current) =>
+          current.some((entry) => entry.key === sample.key && entry.url === sample.url)
+            ? current
+            : [...current, sample],
+        );
       }
     } catch (uploadError) {
       setError(errorText(uploadError, 'Upload failed.'));
@@ -214,9 +224,9 @@ export default function VerificationScreen() {
     }
   }, [samples.length, uploading]);
 
-  const removeSample = useCallback((url: string) => {
-    setSamples((current) => current.filter((value) => value !== url));
-    void deleteVerificationSample(url).catch(() => {});
+  const removeSample = useCallback((sample: VerificationSample) => {
+    setSamples((current) => current.filter((value) => value !== sample));
+    void deleteVerificationSample(sample).catch(() => {});
   }, []);
 
   const submit = useCallback(async () => {
@@ -246,7 +256,7 @@ export default function VerificationScreen() {
       await submitVerification({
         linkedinUrl: linkedin.trim(),
         portfolioLinks,
-        workSampleUrls: samples,
+        workSamples: samples,
       });
       setData((current) =>
         current
@@ -260,7 +270,8 @@ export default function VerificationScreen() {
                 status: 'pending',
                 linkedinUrl: linkedin.trim(),
                 portfolioLinks,
-                workSampleUrls: samples,
+                workSampleUrls: samples.map((sample) => sample.url),
+                workSampleKeys: samples.map((sample) => sample.key).filter(Boolean),
                 rejectionReason: null,
                 reviewedAt: null,
                 createdAt: new Date().toISOString(),
@@ -550,11 +561,14 @@ export default function VerificationScreen() {
               </Text>
 
               <View style={styles.samples}>
-                {samples.map((url) => (
-                  <View key={url} style={[styles.sample, { borderColor: colors.border }]}>
-                    <Image source={{ uri: url }} style={styles.sampleImage} />
+                {samples.map((sample) => (
+                  <View
+                    key={sample.key || sample.url}
+                    style={[styles.sample, { borderColor: colors.border }]}
+                  >
+                    <Image source={{ uri: sample.url }} style={styles.sampleImage} />
                     <Pressable
-                      onPress={() => removeSample(url)}
+                      onPress={() => removeSample(sample)}
                       accessibilityRole="button"
                       accessibilityLabel="Remove work sample"
                       style={[styles.remove, { backgroundColor: colors.background }]}

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   normalizeLinkedInUrl,
   normalizePortfolioLinks,
+  normalizeWorkSampleKeys,
   normalizeWorkSampleUrls,
 } from "./rules";
 
@@ -64,4 +65,33 @@ test("work samples are optional and capped at three", () => {
     /at most 3/,
   );
   assert.match(normalizeWorkSampleUrls(["nope"]).error ?? "", /valid image URL/);
+});
+
+test("work-sample keys are private object paths, not URLs", () => {
+  const ok = normalizeWorkSampleKeys([
+    "verification/u1/0d1f8d1e-1111-4111-8111-111111111111.webp",
+    "verification/u1/0d1f8d1e-2222-4222-8222-222222222222.webp",
+  ]);
+  assert.equal(ok.error, null);
+  assert.equal(ok.keys.length, 2);
+
+  assert.match(normalizeWorkSampleKeys(["https://media.example/x.webp"]).error ?? "", /valid upload/);
+  assert.match(normalizeWorkSampleKeys(["/verification/u1/x.webp"]).error ?? "", /valid upload/);
+  assert.match(normalizeWorkSampleKeys(["verification/u1/../x.webp"]).error ?? "", /valid upload/);
+  assert.match(
+    normalizeWorkSampleKeys([
+      "verification/u1/1.webp",
+      "verification/u1/2.webp",
+      "verification/u1/3.webp",
+      "verification/u1/4.webp",
+    ]).error ?? "",
+    /at most 3/,
+  );
+  assert.deepEqual(normalizeWorkSampleKeys(null), { keys: [], error: null });
+});
+
+test("legacy work-sample URLs still validate during migration", () => {
+  const legacy = normalizeWorkSampleUrls(["https://media.example/x.webp"]);
+  assert.equal(legacy.error, null);
+  assert.equal(legacy.urls.length, 1);
 });

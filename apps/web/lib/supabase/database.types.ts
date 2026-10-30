@@ -33,6 +33,7 @@ export type Database = {
           status: string;
           updated_at: string;
           user_id: string;
+          work_sample_keys: string[];
           work_sample_urls: string[];
         };
         Insert: {
@@ -47,6 +48,7 @@ export type Database = {
           status?: string;
           updated_at?: string;
           user_id: string;
+          work_sample_keys?: string[];
           work_sample_urls?: string[];
         };
         Update: {
@@ -61,6 +63,7 @@ export type Database = {
           status?: string;
           updated_at?: string;
           user_id?: string;
+          work_sample_keys?: string[];
           work_sample_urls?: string[];
         };
         Relationships: [
@@ -1292,6 +1295,7 @@ export type Database = {
           deleted_at: string | null;
           edited_at: string | null;
           id: string;
+          image_key: string | null;
           image_url: string | null;
           reply_to_id: string | null;
           user_id: string;
@@ -1304,6 +1308,7 @@ export type Database = {
           deleted_at?: string | null;
           edited_at?: string | null;
           id?: string;
+          image_key?: string | null;
           image_url?: string | null;
           reply_to_id?: string | null;
           user_id: string;
@@ -1316,6 +1321,7 @@ export type Database = {
           deleted_at?: string | null;
           edited_at?: string | null;
           id?: string;
+          image_key?: string | null;
           image_url?: string | null;
           reply_to_id?: string | null;
           user_id?: string;
@@ -1831,7 +1837,8 @@ export type Database = {
           is_default: boolean;
           mime_type: string;
           size_bytes: number;
-          url: string;
+          storage_key: string | null;
+          url: string | null;
           user_id: string;
         };
         Insert: {
@@ -1841,7 +1848,8 @@ export type Database = {
           is_default?: boolean;
           mime_type: string;
           size_bytes: number;
-          url: string;
+          storage_key?: string | null;
+          url?: string | null;
           user_id: string;
         };
         Update: {
@@ -1851,7 +1859,8 @@ export type Database = {
           is_default?: boolean;
           mime_type?: string;
           size_bytes?: number;
-          url?: string;
+          storage_key?: string | null;
+          url?: string | null;
           user_id?: string;
         };
         Relationships: [

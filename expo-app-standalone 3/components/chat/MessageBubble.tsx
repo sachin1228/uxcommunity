@@ -12,6 +12,7 @@ import {
   type TextLayoutEvent,
 } from 'react-native';import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { mediaCachePolicy, mediaSource } from '@/lib/privateMedia';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { Message, Reaction } from '@/lib/communities';
@@ -446,10 +447,10 @@ function BubbleImage({
       style={[standalone ? styles.mediaStandalone : styles.mediaInBubble, { width, height }]}
     >
       <Image
-        source={{ uri }}
+        source={mediaSource(uri)}
         style={{ width: '100%', height: '100%', opacity: dimmed ? 0.5 : 1 }}
         contentFit="cover"
-        cachePolicy="memory-disk"
+        cachePolicy={mediaCachePolicy(uri)}
         recyclingKey={uri}
         onLoad={({ source }) => {
           const w = source?.width ?? 0;

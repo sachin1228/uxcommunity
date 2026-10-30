@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import {
+  collectCompanyResumeKeys,
+  deletePrivateResumeKeysIfUnreferenced,
+} from "@/lib/private-storage-cleanup";
 
 /**
  * Admin company update/delete. Both go through the database functions in
@@ -70,6 +74,9 @@ export async function DELETE(
 
   const { id } = await params;
   const db = createServiceClient();
+  // Postings and their applications cascade with the company; collect the
+  // applicants' private résumé keys before those rows disappear.
+  const resumeKeys = await collectCompanyResumeKeys(db, id);
   const { data, error } = await db.rpc("admin_delete_company", { p_id: id });
 
   if (error) {
@@ -83,6 +90,10 @@ export async function DELETE(
   if (!data) {
     return NextResponse.json({ error: "Company not found." }, { status: 404 });
   }
+
+  await deletePrivateResumeKeysIfUnreferenced(db, resumeKeys).catch((cleanupError) =>
+    console.error("[admin/companies] private resume cleanup failed:", cleanupError),
+  );
 
   return NextResponse.json({ success: true });
 }

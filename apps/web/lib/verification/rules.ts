@@ -91,6 +91,49 @@ export function normalizePortfolioLinks(raw: unknown): {
   return { links, error: null };
 }
 
+/**
+ * Optional private work-sample object keys. Only the shape is checked here;
+ * the route additionally proves each key sits under the session member's
+ * `verification/<userId>/` prefix.
+ */
+export function normalizeWorkSampleKeys(raw: unknown): {
+  keys: string[];
+  error: string | null;
+} {
+  if (raw == null) return { keys: [], error: null };
+  if (!Array.isArray(raw)) {
+    return { keys: [], error: "Work samples must be a list of uploaded images." };
+  }
+
+  const keys: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== "string") {
+      return { keys: [], error: "One of the work samples is not a valid upload." };
+    }
+    const key = value.trim();
+    if (
+      !key ||
+      key.length > 512 ||
+      !key.startsWith("verification/") ||
+      key.startsWith("/") ||
+      key.includes("..") ||
+      /^[a-z][a-z0-9+.-]*:/i.test(key)
+    ) {
+      return { keys: [], error: "One of the work samples is not a valid upload." };
+    }
+    if (!keys.includes(key)) keys.push(key);
+  }
+
+  if (keys.length > VERIFICATION_SAMPLES_MAX) {
+    return {
+      keys: [],
+      error: `Upload at most ${VERIFICATION_SAMPLES_MAX} work samples.`,
+    };
+  }
+
+  return { keys, error: null };
+}
+
 /** Optional work-sample URLs; the route additionally checks they are our R2 keys. */
 export function normalizeWorkSampleUrls(raw: unknown): {
   urls: string[];

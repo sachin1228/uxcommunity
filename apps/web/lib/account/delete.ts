@@ -5,6 +5,10 @@ import {
   collectCommunityMediaUrls,
   type DbClient,
 } from "@/lib/r2-cleanup";
+import {
+  collectAccountPrivateFiles,
+  deleteAccountPrivateFiles,
+} from "@/lib/private-storage-cleanup";
 
 export interface DeletedAccountSummary {
   transferred: Array<{ id: string; name: string; new_owner_id: string }>;
@@ -15,6 +19,11 @@ export interface DeletedAccountSummary {
     skipped: number;
     failed: number;
   }>;
+  /** Private-bucket files (résumés, verification samples, DM images). */
+  privateR2: {
+    deleted: number;
+    kept: number;
+  };
 }
 
 /**
@@ -40,6 +49,10 @@ export async function deleteAccountCascade(
     .eq("user_id", userId)
     .maybeSingle()) as unknown as { data: { avatar_url: string | null } | null };
   const avatarUrl = profile?.avatar_url ?? null;
+
+  // Private files live outside the public-bucket orphan audit; collect their
+  // keys before the cascade removes the rows that point at them.
+  const privateFiles = await collectAccountPrivateFiles(db, userId);
 
   // Work out which owned communities the trigger will delete before the
   // cascade, because their media URLs become unrecoverable afterwards.
@@ -117,9 +130,12 @@ export async function deleteAccountCascade(
     }
   }
 
+  const privateR2 = await deleteAccountPrivateFiles(db, privateFiles);
+
   return {
     transferred,
     deleted: removed.map(({ id, name }) => ({ id, name })),
     r2Cleanup,
+    privateR2,
   };
 }

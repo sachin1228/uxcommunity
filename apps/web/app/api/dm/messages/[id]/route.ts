@@ -4,6 +4,7 @@ import { createServiceClient, type ServiceClient } from "@/lib/supabase/service"
 import { canEditMessage } from "@/lib/communities/message-edit";
 import { dmParticipants } from "@/lib/direct-messages/server";
 import { publishDmEvent } from "@/lib/direct-messages/publish";
+import { deletePrivateDmKeys } from "@/lib/private-storage-cleanup";
 
 interface MessageWithConversation {
   id: string;
@@ -12,6 +13,7 @@ interface MessageWithConversation {
   created_at: string;
   content: string | null;
   image_url: string | null;
+  image_key: string | null;
   deleted_at: string | null;
   dm_conversations: { user_a: string; user_b: string } | null;
 }
@@ -29,7 +31,7 @@ async function loadMessageForUser(
   const { data } = (await db
     .from("dm_messages")
     .select(
-      "id, conversation_id, user_id, created_at, content, image_url, deleted_at, dm_conversations(user_a, user_b)",
+      "id, conversation_id, user_id, created_at, content, image_url, image_key, deleted_at, dm_conversations(user_a, user_b)",
     )
     .eq("id", messageId)
     .maybeSingle()) as unknown as { data: MessageWithConversation | null };
@@ -151,6 +153,7 @@ export async function DELETE(
       deleted_at: deletedAt,
       content: null,
       image_url: null,
+      image_key: null,
       reply_to_id: null,
     })
     .eq("id", messageId)
@@ -161,11 +164,17 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete message." }, { status: 500 });
   }
 
-  await import("@/lib/r2").then(({ deleteR2AssetIfUnreferenced }) =>
-    deleteR2AssetIfUnreferenced(db, msg.image_url, [
-      { table: "dm_messages", column: "image_url" },
-    ])
-  );
+  if (msg.image_key) {
+    await deletePrivateDmKeys(db, [msg.image_key]).catch((error) =>
+      console.error("[DELETE dm message] private image cleanup failed:", error),
+    );
+  } else {
+    await import("@/lib/r2").then(({ deleteR2AssetIfUnreferenced }) =>
+      deleteR2AssetIfUnreferenced(db, msg.image_url, [
+        { table: "dm_messages", column: "image_url" },
+      ])
+    );
+  }
 
   after(async () => {
     try {
