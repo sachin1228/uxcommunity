@@ -117,7 +117,8 @@ For a saved resume reused on an application, the route copies `storage_key` into
 |---|---|
 | Saved résumé deleted | Delete the key if no `member_resumes` or `job_applications` row references it |
 | Job deleted (poster or admin) | Collect application keys first; after cascade, delete keys not referenced by a saved résumé or another application |
-| Account deleted | Collect saved résumés, applications, verification samples and sent DM images; after cascade, delete unreferenced keys. DM images kept when a report snapshot still carries the path |
+| Company deleted (admin) | Collect résumé keys for every posting on the company before the cascade; delete unshared keys after |
+| Account deleted | Collect saved résumés, applications (including applications on postings the member posted, which cascade with them), verification samples and sent DM images; after cascade, delete unreferenced keys. DM images kept when a report snapshot still carries the path |
 | DM message deleted | Soft-delete row, clear `image_key`/`image_url`, reclaim the key unless report evidence holds it |
 | Abandoned verification/DM upload | Covered by the private orphan audit (`/api/admin/r2-audit` → `private.orphans`); a private deletion UI is intentionally not added in this change |
 | Community chat retention | Unchanged (15-day sweep, public bucket) |

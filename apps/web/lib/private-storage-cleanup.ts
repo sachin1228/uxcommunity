@@ -103,6 +103,30 @@ export async function collectJobResumeKeys(db: Db, jobId: string): Promise<strin
   return uniqueKeys((data ?? []).map((row) => row.resume_key));
 }
 
+/** The private résumé keys attached to every posting a company owns. */
+export async function collectCompanyResumeKeys(db: Db, companyId: string): Promise<string[]> {
+  const untyped = db as unknown as SupabaseClient;
+  const { data: jobs, error } = await untyped
+    .from("job_posts")
+    .select("id")
+    .eq("company_id", companyId);
+  if (error) {
+    console.error("[private-storage] company job lookup failed", { companyId, error });
+    return [];
+  }
+  const jobIds = (jobs ?? []).map((row) => row.id);
+  if (!jobIds.length) return [];
+  const { data, error: applicationError } = await untyped
+    .from("job_applications")
+    .select("resume_key")
+    .in("job_id", jobIds);
+  if (applicationError) {
+    console.error("[private-storage] company resume lookup failed", { companyId, error: applicationError });
+    return [];
+  }
+  return uniqueKeys((data ?? []).map((row) => row.resume_key));
+}
+
 /** Delete verification samples once the owning request row is gone. */
 export async function deletePrivateVerificationKeys(
   db: Db,
@@ -187,28 +211,39 @@ export async function collectAccountPrivateFiles(
   db: Db,
   userId: string,
 ): Promise<AccountPrivateFiles> {
+  const untyped = db as unknown as SupabaseClient;
   const [saved, applications, verifications, messages] = await Promise.all([
-    (db as unknown as SupabaseClient)
-      .from("member_resumes")
-      .select("storage_key, url")
-      .eq("user_id", userId),
-    (db as unknown as SupabaseClient)
-      .from("job_applications")
-      .select("resume_key, resume_url")
-      .eq("applicant_id", userId),
-    (db as unknown as SupabaseClient)
+    untyped.from("member_resumes").select("storage_key, url").eq("user_id", userId),
+    untyped.from("job_applications").select("resume_key, resume_url").eq("applicant_id", userId),
+    untyped
       .from("account_verification_requests")
       .select("work_sample_keys, work_sample_urls")
       .eq("user_id", userId),
-    (db as unknown as SupabaseClient)
-      .from("dm_messages")
-      .select("image_key, image_url")
-      .eq("user_id", userId),
+    untyped.from("dm_messages").select("image_key, image_url").eq("user_id", userId),
   ]);
+
+  // Deleting a poster cascades their postings and every application on them.
+  // Those applicants' private résumés are not the deleted account's rows, but
+  // the delete is what orphans them, so they join the cleanup set.
+  const { data: postedJobs } = await untyped
+    .from("job_posts")
+    .select("id")
+    .eq("poster_id", userId);
+  const postedJobIds = (postedJobs ?? []).map((row) => row.id);
+  const { data: postedApplications } = postedJobIds.length
+    ? await untyped
+        .from("job_applications")
+        .select("resume_key, resume_url")
+        .in("job_id", postedJobIds)
+    : { data: [] as Array<{ resume_key: string | null; resume_url: string | null }> };
 
   const resumeKeys = uniqueKeys([
     ...(saved.data ?? []).flatMap((row) => [row.storage_key, ...legacyKeysFromUrls([row.url])]),
     ...(applications.data ?? []).flatMap((row) => [
+      row.resume_key,
+      ...legacyKeysFromUrls([row.resume_url]),
+    ]),
+    ...(postedApplications ?? []).flatMap((row) => [
       row.resume_key,
       ...legacyKeysFromUrls([row.resume_url]),
     ]),
