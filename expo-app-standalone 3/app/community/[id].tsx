@@ -408,6 +408,9 @@ export default function CommunityChat() {
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
   /** The header ⋯ menu — notifications, Delete chat, Exit community. */
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Whole-community report, opened from the ⋯ menu or the info panel. */
+  const [reportCommunityOpen, setReportCommunityOpen] = useState(false);
+  const [communityReported, setCommunityReported] = useState(false);
   /** Bottom of the chat header, in the screen root's own coordinates. */
   const [headerHeight, setHeaderHeight] = useState(0);
 
@@ -1661,6 +1664,18 @@ export default function CommunityChat() {
         onReported={() => setReportMessage(null)}
       />
 
+      {/* The whole community — reached from the ⋯ menu and the info panel. */}
+      <ContentReportModal
+        visible={reportCommunityOpen}
+        contentType="community"
+        contentId={id}
+        onClose={() => setReportCommunityOpen(false)}
+        onReported={() => {
+          setCommunityReported(true);
+          setReportCommunityOpen(false);
+        }}
+      />
+
       {/* Long-press action sheet for a "created a …" card — reactions + reply
           (the touch form of the web card's hover actions) */}
       <ContentActionsSheet
@@ -1694,6 +1709,8 @@ export default function CommunityChat() {
         isOwner={isOwnCommunity}
         canManageMembers={canManageMembers}
         canManageModerators={canManageModerators}
+        onReport={() => setReportCommunityOpen(true)}
+        reported={communityReported}
         onClose={() => setInfoOpen(false)}
       />
 
@@ -1722,6 +1739,12 @@ export default function CommunityChat() {
             params: { id, name: communityName },
           })
         }
+        canReport={!isOwnCommunity}
+        reported={communityReported}
+        onReport={() => {
+          setMenuOpen(false);
+          setReportCommunityOpen(true);
+        }}
         onClose={() => setMenuOpen(false)}
         onOpenMuteOptions={() => {
           setMenuOpen(false);

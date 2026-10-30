@@ -17,6 +17,8 @@ import {
   Flag,
   Heart,
   MessageCircle,
+  Scale,
+  ShieldAlert,
   Trash2,
   Undo2,
   UserPlus,
@@ -37,6 +39,8 @@ import {
 function iconFor(type: NotificationType) {
   if (type.startsWith("verification_")) return BadgeCheck;
   if (type === "report_reviewed") return Flag;
+  if (type === "moderation_action") return ShieldAlert;
+  if (type === "appeal_reviewed") return Scale;
   if (type === "content_restored") return Undo2;
   if (type === "job_match") return Briefcase;
   if (type === "join_request_accepted") return UserPlus;

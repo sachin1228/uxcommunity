@@ -59,6 +59,9 @@ interface Props {
   canManageMembers?: boolean;
   /** Owner or platform-appointed admin — sees Activity and appoints moderators. */
   canManageModerators?: boolean;
+  /** Everyone except the owner can report the whole community. */
+  onReport?: () => void;
+  reported?: boolean;
   onClose: () => void;
 }
 
@@ -110,6 +113,8 @@ export function CommunityInfoView({
   isOwner = false,
   canManageMembers = false,
   canManageModerators = false,
+  onReport,
+  reported = false,
   onClose,
 }: Props) {
   const colors = useColors();
@@ -313,6 +318,21 @@ export function CommunityInfoView({
                   ))}
                 </View>
               )}
+              {!isOwner && onReport && (
+                <Pressable
+                  onPress={() => {
+                    onClose();
+                    onReport();
+                  }}
+                  accessibilityRole="button"
+                  style={styles.reportRow}
+                >
+                  <Feather name="flag" size={13} color={colors.foregroundSubtle} />
+                  <Text style={[styles.reportText, { color: colors.foregroundSubtle }]}>
+                    {reported ? 'Reported' : 'Report community'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -492,6 +512,15 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
   tag: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4 },
   tagText: { fontSize: 12, fontFamily: 'Geist_400Regular' },
+  reportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: 16,
+    paddingVertical: 4,
+  },
+  reportText: { fontSize: 12.5, fontFamily: 'Geist_500Medium' },
 
   rulesSpinner: { alignSelf: 'flex-start', marginTop: 12 },
   rulesList: { marginTop: 12, gap: 12 },

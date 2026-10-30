@@ -39,7 +39,10 @@ export type NotificationType =
   | 'event_ended'
   | 'verification_approved'
   | 'verification_rejected'
-  | 'verification_reapply_ready';
+  | 'verification_reapply_ready'
+  // Moderation outcome and appeal decision, keyed by the report id.
+  | 'moderation_action'
+  | 'appeal_reviewed';
 
 /** One row of GET /api/notifications, trimmed to what the list draws. */
 export interface NotificationItem {
@@ -97,6 +100,8 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     'resource_deleted',
     'event_deleted',
     'report_reviewed',
+    'moderation_action',
+    'appeal_reviewed',
     'content_restored',
     'join_request_accepted',
     'verification_approved',

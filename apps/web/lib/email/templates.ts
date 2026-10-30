@@ -296,3 +296,47 @@ export function renderCompanyVerificationEmail({
     blocks,
   });
 }
+
+export interface ModerationAppealEmail {
+  name: string;
+  link: string;
+  appUrl: string;
+  /** One sentence naming the restriction and its reason. */
+  decision: string;
+  expiresDays: number;
+}
+
+/**
+ * Sent when an account is suspended or banned, because the member cannot sign
+ * in to read the in-app notice. The link is report-scoped and signed; it opens
+ * the appeal form without a session.
+ */
+export function renderModerationAppealEmail({
+  name,
+  link,
+  appUrl,
+  decision,
+  expiresDays,
+}: ModerationAppealEmail): RenderedEmail {
+  return renderEmail({
+    appUrl,
+    subject: `Your ${APP_NAME} account was restricted`,
+    preheader: "You can ask for this decision to be reviewed.",
+    heading: `We restricted your ${APP_NAME} account`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: `Hi ${name}, ${decision}`,
+      },
+      {
+        kind: "paragraph",
+        text: "If you believe this was a mistake, you can appeal once. Explain what happened and why the decision should be reviewed — a moderator will read it.",
+      },
+      { kind: "action", label: "Appeal this decision", href: link },
+      {
+        kind: "finePrint",
+        text: `This link expires in ${expiresDays} days. It only works for this decision, and the appeal can be submitted once.`,
+      },
+    ],
+  });
+}

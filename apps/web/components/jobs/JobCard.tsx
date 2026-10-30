@@ -4,6 +4,7 @@ import { CheckCircle2, Users } from "lucide-react";
 import { CompanyLogo } from "@/components/companies/CompanyBadge";
 import { JobStateBadge, KindBadge, LockedNote } from "./JobBadges";
 import { JobOwnerActions } from "./JobOwnerActions";
+import { JobReportMenu } from "./JobReportMenu";
 import type { JobMasterData } from "@/lib/jobs/service";
 import type { JobPost } from "@/lib/jobs/types";
 import { workModeLabel } from "@/lib/jobs/types";
@@ -85,6 +86,7 @@ export function JobCard({
             {showOwnerActions && job.is_mine && (
               <JobOwnerActions job={job} master={master} redirectOnDelete={false} />
             )}
+            {!job.is_mine && <JobReportMenu jobId={job.id} compact />}
           </div>
         </div>
 

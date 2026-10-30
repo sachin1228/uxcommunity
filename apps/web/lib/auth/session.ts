@@ -41,6 +41,7 @@ export interface SessionPayload {
 export interface ActiveUserState {
   id: string;
   is_blocked: boolean;
+  suspended_until?: string | null;
   verification_status: string | null;
   created_at: string | null;
   session_version: number;
@@ -151,6 +152,7 @@ export async function getAdminEpoch(): Promise<string | null> {
 interface RegistryUserRow {
   id: string;
   is_blocked: boolean;
+  suspended_until?: string | null;
   session_version: number;
   verification_status: string | null;
   created_at: string | null;
@@ -175,7 +177,7 @@ export async function validateSessionPayload(
     const { data, error } = await db
       .from("auth_sessions")
       .select(
-        "id, user_id, role, session_version, revoked_at, expires_at, users!auth_sessions_user_id_fkey(id, is_blocked, session_version, verification_status, created_at)",
+        "id, user_id, role, session_version, revoked_at, expires_at, users!auth_sessions_user_id_fkey(id, is_blocked, suspended_until, session_version, verification_status, created_at)",
       )
       .eq("id", session.sid)
       .maybeSingle();
@@ -208,6 +210,7 @@ export async function validateSessionPayload(
       user: {
         id: validity.user.id,
         is_blocked: validity.user.is_blocked,
+        suspended_until: validity.user.suspended_until ?? null,
         verification_status: details?.verification_status ?? null,
         created_at: details?.created_at ?? null,
         session_version: validity.user.session_version,
@@ -333,7 +336,7 @@ const getActiveUserState = cache(async (userId: string): Promise<ActiveUserState
   const db = createServiceClient();
   const { data, error } = await db
     .from("users")
-    .select("id, is_blocked, session_version, verification_status, created_at")
+    .select("id, is_blocked, suspended_until, session_version, verification_status, created_at")
     .eq("id", userId)
     .maybeSingle();
 
@@ -348,6 +351,7 @@ const getActiveUserState = cache(async (userId: string): Promise<ActiveUserState
   return {
     id: row.id,
     is_blocked: false,
+    suspended_until: row.suspended_until ?? null,
     verification_status: row.verification_status,
     created_at: row.created_at,
     session_version: row.session_version,

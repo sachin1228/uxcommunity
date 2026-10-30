@@ -84,6 +84,8 @@ const TYPE_ICONS: Record<string, string> = {
   resource_deleted: "🗑️",
   event_deleted: "🗑️",
   report_reviewed: "🚩",
+  moderation_action: "🛡️",
+  appeal_reviewed: "⚖️",
   content_restored: "↩️",
 };
 

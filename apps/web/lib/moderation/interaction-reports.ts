@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
 import type { ServiceClient } from "@/lib/supabase/service";
 import type { NotificationEntityType } from "@/lib/notifications";
@@ -25,6 +26,12 @@ export interface InteractionTarget {
   /** The notification entity a reporter thank-you is scoped to. */
   entityType: NotificationEntityType;
   entityId: string;
+  /**
+   * Structured evidence for a whole community or job listing. Stored on the
+   * report, so the queue still reads after the target is edited or deleted.
+   * Interactions keep an empty object.
+   */
+  snapshot: Record<string, unknown>;
 }
 
 const EXCERPT_MAX = 500;
@@ -68,6 +75,7 @@ export async function loadInteractionTarget(
         communityId: thread?.community_id ?? null,
         entityType: "thread",
         entityId: comment.thread_id,
+        snapshot: {},
       };
     }
 
@@ -92,6 +100,7 @@ export async function loadInteractionTarget(
         communityId: post?.community_id ?? null,
         entityType: "showcase",
         entityId: comment.post_id,
+        snapshot: {},
       };
     }
 
@@ -116,6 +125,7 @@ export async function loadInteractionTarget(
         communityId: resource?.community_id ?? null,
         entityType: "resource",
         entityId: comment.resource_id,
+        snapshot: {},
       };
     }
 
@@ -140,6 +150,7 @@ export async function loadInteractionTarget(
         communityId: event?.community_id ?? null,
         entityType: "event",
         entityId: comment.event_id,
+        snapshot: {},
       };
     }
 
@@ -164,6 +175,7 @@ export async function loadInteractionTarget(
         communityId: message.community_id,
         entityType: "message",
         entityId: message.id,
+        snapshot: {},
       };
     }
 
@@ -183,6 +195,80 @@ export async function loadInteractionTarget(
         communityId: null,
         entityType: "profile",
         entityId: user.id,
+        snapshot: {},
+      };
+    }
+
+    case "community": {
+      const { data: community } = await db
+        .from("communities")
+        .select("id, name, description, type, is_active, owner_id")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (!community) return null;
+      const ownerName = await authorName(db, community.owner_id);
+      return {
+        authorId: community.owner_id,
+        authorName: community.owner_id ? ownerName : "No owner",
+        excerpt: excerpt(community.description),
+        contextTitle: community.name,
+        contextId: community.id,
+        communityId: community.id,
+        entityType: "community",
+        entityId: community.id,
+        snapshot: {
+          name: community.name,
+          description: community.description,
+          type: community.type,
+          is_active: community.is_active,
+          owner_id: community.owner_id,
+          owner_name: community.owner_id ? ownerName : null,
+        },
+      };
+    }
+
+    case "job": {
+      const { data: job } = (await (db as unknown as SupabaseClient)
+        .from("job_posts")
+        .select("id, poster_id, title, description, company_id, status, closes_at, moderated_at")
+        .eq("id", targetId)
+        .maybeSingle()) as {
+        data: {
+          id: string;
+          poster_id: string;
+          title: string;
+          description: string;
+          company_id: string;
+          status: string;
+          closes_at: string | null;
+          moderated_at: string | null;
+        } | null;
+      };
+      if (!job) return null;
+      const [{ data: company }, posterName] = await Promise.all([
+        db.from("companies").select("name").eq("id", job.company_id).maybeSingle(),
+        authorName(db, job.poster_id),
+      ]);
+      return {
+        authorId: job.poster_id,
+        authorName: posterName,
+        excerpt: excerpt(job.description),
+        contextTitle: job.title,
+        contextId: job.id,
+        communityId: null,
+        entityType: "job",
+        entityId: job.id,
+        snapshot: {
+          title: job.title,
+          company_id: job.company_id,
+          company_name: company?.name ?? null,
+          description: job.description,
+          poster_id: job.poster_id,
+          poster_name: posterName,
+          status: job.status,
+          closes_at: job.closes_at,
+          moderated_at: job.moderated_at,
+        },
       };
     }
   }
@@ -200,6 +286,8 @@ export async function removeInteractionContent(
 ): Promise<InteractionRemovalResult> {
   switch (targetType) {
     case "profile":
+    case "community":
+    case "job":
       return { ok: false, reason: "not_removable" };
 
     case "thread_comment":

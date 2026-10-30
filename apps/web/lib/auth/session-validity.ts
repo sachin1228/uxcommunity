@@ -11,6 +11,8 @@
 export interface SessionUserRow {
   id: string;
   is_blocked: boolean;
+  /** ISO timestamp; a future value means a live temporary suspension. */
+  suspended_until?: string | null;
   session_version: number;
 }
 
@@ -41,6 +43,15 @@ export interface SessionValidityOptions {
 export type SessionValidity =
   | { active: true; user: SessionUserRow | null }
   | { active: false };
+
+export function isSuspendedAccount(
+  suspendedUntil: string | null | undefined,
+  now: number,
+): boolean {
+  if (!suspendedUntil) return false;
+  const until = Date.parse(suspendedUntil);
+  return Number.isFinite(until) && until > now;
+}
 
 export function embeddedSessionUser(
   row: SessionRegistryRow,
@@ -91,6 +102,9 @@ export function evaluateSession(
   const user = embeddedSessionUser(row);
   if (!user) return { active: false };
   if (!options.allowBlocked && user.is_blocked) return { active: false };
+  if (!options.allowBlocked && isSuspendedAccount(user.suspended_until, now)) {
+    return { active: false };
+  }
   if (user.session_version !== claims.sv) return { active: false };
 
   return { active: true, user };

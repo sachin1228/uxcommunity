@@ -18,6 +18,7 @@ import { PersonAvatar } from '@/components/PersonAvatar';
 import { ApplyModal } from '@/components/jobs/ApplyModal';
 import { ApplicationModal } from '@/components/jobs/ApplicationModal';
 import { JobOwnerActions } from '@/components/jobs/JobOwnerActions';
+import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { LockedNote, MetaChip, JobStateBadge, KindBadge, AMBER } from '@/components/jobs/JobBadges';
 import { RichText } from '@/components/jobs/RichText';
 import { useAuth } from '@/context/AuthContext';
@@ -59,6 +60,8 @@ export default function JobDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
   const [applicationOpen, setApplicationOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
   const focusedOnceRef = useRef(false);
 
   const load = useCallback(
@@ -172,7 +175,32 @@ export default function JobDetailScreen() {
                     onChanged={() => void load('refresh')}
                     onDeleted={goBack}
                   />
-                ) : null}
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      hapticSelection();
+                      setReportOpen(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={reported ? 'Reported' : 'Report job'}
+                    hitSlop={6}
+                    style={[styles.reportButton, { borderColor: colors.border }]}
+                  >
+                    <Feather
+                      name="flag"
+                      size={13}
+                      color={reported ? colors.accent : colors.foregroundMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.reportButtonText,
+                        { color: reported ? colors.accent : colors.foregroundMuted },
+                      ]}
+                    >
+                      {reported ? 'Reported' : 'Report'}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             </View>
           </View>
@@ -388,6 +416,17 @@ export default function JobDetailScreen() {
         </Section>
       </ScrollView>
 
+      <ContentReportModal
+        visible={reportOpen}
+        contentType="job"
+        contentId={job.id}
+        onClose={() => setReportOpen(false)}
+        onReported={() => {
+          setReported(true);
+          setReportOpen(false);
+        }}
+      />
+
       {/* Held open by `applyOpen` alone: the refresh after sending flips
           `can_apply` off, and the modal's own success screen must stay up until
           the member dismisses it. */}
@@ -468,6 +507,16 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Geist_600SemiBold', fontSize: 19, lineHeight: 25 },
   years: { fontFamily: 'Geist_400Regular', fontSize: 12.5 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  reportButtonText: { fontFamily: 'Geist_500Medium', fontSize: 11 },
   metaLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
   meta: { fontFamily: 'Geist_400Regular', fontSize: 13 },
   stamps: { fontFamily: 'Geist_400Regular', fontSize: 11.5 },
