@@ -165,6 +165,7 @@ See `STAGING_TEST_RESULTS.md` for the full matrix. Highlights:
 - Web isolated production build: **PASS** (no production env files; dummy public env only).
 - Website build: **PASS**.
 - Mobile TypeScript: **PASS**; mobile realtime **71/71**, cache **7/7**, signup **12/12**.
+- Realtime Worker TypeScript: **PASS**. Full Worker suite: **TIMEOUT at 600 s** (killed during 500×100 fan-out). Targeted critical subset: **38/39**, with the 1,000-client ownership test failing `Timeout waiting for hello`; rerun not performed. This is a staging/load verification gap, not claimed as a pass.
 - DB local harness (216 migrations): migration integrity **9/9**, scoped permission exposure **19 ok/0 failed**, private storage **11/11**, moderation evidence **82/82**, signup consent **3/3**, appeal retention **5/5**.
 - Rate-limit regression **3/3**; appeal retention **5/5**; audit/CSP/sample contract tests **7/7**.
 - Middleware local: HTTP→HTTPS **308**, cross-origin mutation **403**, same-origin reaches route, CSP header present.
@@ -181,6 +182,7 @@ See `STAGING_TEST_RESULTS.md` for the full matrix. Highlights:
 7. **CSP is report-only** and the cookie domain must remain `.uxcommunity.in` for the current realtime cookie handshake; CSRF is checked. Enforcing CSP or narrowing the cookie requires tested nonce/script and realtime-token work.
 8. **Android release signing is not configured.** Release uses the debug keystore; package `in.uxcommunity.app`, versionCode 1/versionName 1.0.0; iOS bundle id is still the placeholder `com.sachinpatil1228.myapp`; FCM/deep-link/env verification and a real device build remain outstanding.
 9. **Verification privacy has accepted limits:** the owner GET returns own `work_sample_keys` for resubmit; admin responses strip keys; legacy rows return public URLs; signed URLs expire after 15 minutes without auto-refresh; mobile verification images use disk caching.
+10. **Realtime scale is not verified:** the local 1,000-client ownership test failed with a hello timeout and the full Worker suite timed out; a real staging/load run is required before claiming realtime readiness.
 10. **Account re-consent is a recommendation, not implemented:** production has one account with NULL consent; no timestamp was fabricated. See the approval checklist for a consent-gated plan.
 8. **Event-ended comments/likes/chat, event lifecycle FCM/preferences, mobile event routing, notification dedupe, mobile private-verification disk cache, mobile legal links** remain deferred.
 9. **Migration history is still brownfield**; the fresh chain is fixed, but production version history was not repaired.

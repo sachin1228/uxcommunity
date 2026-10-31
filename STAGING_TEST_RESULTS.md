@@ -84,10 +84,14 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 
 | Check | Result |
 |---|---|
+| Worker TypeScript | **PASS** — `npx tsc --noEmit` in `apps/realtime`, exit 0. |
+| Full Worker test suite | **TIMEOUT / NOT COMPLETED** — `npm test` was killed after 600 s while running the 500×100 fan-out integration; no final pass/fail summary (npm exit 143). |
+| Critical non-performance subset | **FAIL — 38/39** — 4 files passed; `ws-ownership.test.ts` 1,000-client test failed with `Timeout waiting for hello`. Rerun was not performed (interrupted). |
+| Mobile realtime tests | **PASS — 71/71** — separate RN realtime lifecycle suite. |
 | Unauthenticated production WebSocket | Closes without opening (1006 handshake rejection); no data access. |
 | Session validation endpoint | Code/live schema verified; requires `API_SECRET`, fails closed; no authenticated socket test. |
 | Revocation on an open socket | **NOT TESTED** — no staging/test account/device. |
-| 100/500/1,000 concurrent connection load tests | **NOT RUN** — no staging infrastructure; production intentionally untouched. |
+| 100/500/1,000 concurrent connection load tests | **NOT RUN / FAILED locally** — the local 1,000-client test failed; no staging load environment; production intentionally untouched. This must be rerun with the realtime load environment before launch. |
 
 ## 7. Email and push
 
@@ -106,7 +110,7 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 - Staging E2E (signup, login, delete, reports, admin actions, appeals, private R2, signed URL expiry).
 - Real Android device auth/session/deletion/push/private media.
 - Real email/FCM delivery and notification preferences.
-- Realtime revocation on an open socket and load tests.
+- Realtime revocation on an open socket and load tests; the local 1,000-client ownership test failed with a hello timeout, and the full Worker suite timed out.
 - Production deployment, migration application, R2 deletion/purge, secret rotation.
 - Backup/DR restore (out of scope).
 

@@ -31,6 +31,7 @@ Legend for “Type”: **CODE** = implementation/test change; **CONFIG** = produ
 | RB-19 | **MEDIUM** | **Legal copy is not published.** Terms/Privacy/Guidelines/Delete-account changes are in the separate website branch `fix/production-readiness-legal-copy`; live pages still show the old copy. | Review/merge/publish the website branch; verify live copy after deployment. | APPROVAL | Before launch |
 | RB-20 | **HIGH (local)** | **Secret-bearing local artifacts remain:** `apps/web/.open-next/cloudflare/next-env.mjs` and `apps/web/.dev.vars.bak-20261030151132` are gitignored/untracked but contain plaintext production credentials; deployed client bundle scan is clean. | Delete local artifacts after approval; rotate listed secrets if the artifacts were copied/shared; never print values. Do not rotate automatically. | APPROVAL / CONFIG | Before launch |
 | RB-21 | **INFO** | **PR not created/pushed.** `gh` is logged out; branches are local: app `b2c2aff5`, website `7223681`. | Publish via GitHub Desktop/authenticated git; open the two PRs using the compare links/checklist body. | APPROVAL | Before review |
+| RB-23 | **HIGH (verification)** | **Realtime scale is not verified.** Full Worker suite timed out at 600 s during 500×100 fan-out; targeted critical subset was 38/39 with the 1,000-client ownership test failing `Timeout waiting for hello`. Worker TypeScript passed; mobile realtime (71/71) is a separate suite and does not cover the Worker scale path. | Rerun the realtime suite/load test in a verified staging/load environment; investigate the 1,000-client hello timeout before launch. Do not claim realtime scale pass. | TEST / INFRA | Before launch / after staging |
 | RB-22 | **INFO** | **Backup/DR remains a separate task** and is a prerequisite for production migrations/launch; no backup work was started. | Complete separately. | INFRA / APPROVAL | Before launch |
 
 ## Status of the original audit’s critical items
@@ -60,6 +61,7 @@ Legend for “Type”: **CODE** = implementation/test change; **CONFIG** = produ
 5. Secret rotation decision (RB-20).
 6. Production data/consent decision (RB-11/RB-18).
 7. Android signing/device test (RB-09).
-8. Deploy + post-deploy HTTP/Policy A verification (RB-03).
+8. Rerun the realtime Worker/load suite in staging; investigate the 1,000-client hello timeout (RB-23).
+9. Deploy + post-deploy HTTP/Policy A verification (RB-03).
 
 **No production operation was performed in this task.**
