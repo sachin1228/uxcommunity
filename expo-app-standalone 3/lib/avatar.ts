@@ -4,25 +4,28 @@
  * Members without an uploaded picture get the same treatment everywhere in the
  * app (chat, cards, member lists, sidebars, profile): the first letter of
  * their first name plus the first letter of their surname ("sachin patil" →
- * "SP") on a color derived deterministically from their display name —
- * Google's contact-avatar pattern. The hash is the same FNV-1a the web uses,
- * so the same member wears the same color on both clients.
+ * "SP") on a color derived deterministically from their display name. The
+ * hash is the same FNV-1a the web uses, so the same member wears the same
+ * color on both clients.
  */
 
-/** Google-style avatar palette. Every color keeps white text legible. */
+/**
+ * Avatar palette — Geist steps from packages/design-system, one entry per hue
+ * family. Every step keeps white initials legible.
+ */
 const AVATAR_BACKGROUNDS = [
-  '#1a73e8', // blue
-  '#d93025', // red
-  '#188038', // green
-  '#b06000', // amber
-  '#9334e6', // purple
-  '#00838f', // teal
-  '#c5221f', // deep red
-  '#3949ab', // indigo
-  '#ad1457', // pink
-  '#00695c', // deep teal
-  '#6a1b9a', // violet
-  '#455a64', // blue grey
+  '#0062d1', // blue 800
+  '#da2f35', // red 800
+  '#297a3a', // green 900
+  '#a35200', // amber 900
+  '#8e4ec6', // purple 700
+  '#067a6e', // teal 900
+  '#bd2864', // pink 900
+  '#0068d6', // blue 900
+  '#df2670', // pink 800
+  '#0d8c7d', // teal 800
+  '#763da9', // purple 800
+  '#525252', // neutral 600
 ] as const;
 
 /**

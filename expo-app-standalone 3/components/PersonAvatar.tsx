@@ -21,8 +21,8 @@ interface Props {
  * The single person-avatar renderer for the app — a port of the web's
  * `AvatarImg`: when there is no picture (or the stored one fails to load / is
  * a retired generated avatar) it renders the member's initials on the
- * deterministic Google-palette color, so every surface — header, chat, cards,
- * member lists, profile — shows the same fallback the web shows.
+ * deterministic design-system palette color, so every surface — header, chat,
+ * cards, member lists, profile — shows the same fallback the web shows.
  */
 export function PersonAvatar({ name, url, size, rounded = true, style }: Props) {
   const resolved = resolveProfilePictureUri(url);

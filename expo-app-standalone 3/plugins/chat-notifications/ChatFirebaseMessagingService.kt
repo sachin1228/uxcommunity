@@ -98,14 +98,14 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     private const val SHORTCUT_PREFS = "uxcommunity_notification_shortcuts"
 
     /**
-     * Byte-identical to the Google-palette list in apps/web/lib/avatar.ts.
+     * Byte-identical to the design-system list in apps/web/lib/avatar.ts.
      * Server payloads carry the resolved sender colour; this copy is the
      * fallback for payloads that predate it, so an initials avatar is never
      * drawn in the community's colour.
      */
     private val AVATAR_BACKGROUNDS = arrayOf(
-      "#1a73e8", "#d93025", "#188038", "#b06000", "#9334e6", "#00838f",
-      "#c5221f", "#3949ab", "#ad1457", "#00695c", "#6a1b9a", "#455a64",
+      "#0062d1", "#da2f35", "#297a3a", "#a35200", "#8e4ec6", "#067a6e",
+      "#bd2864", "#0068d6", "#df2670", "#0d8c7d", "#763da9", "#525252",
     )
   }
 
@@ -521,9 +521,9 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val backgroundColor = try {
-      Color.parseColor(colorHex ?: "#1a73e8")
+      Color.parseColor(colorHex ?: "#0062d1")
     } catch (_: Exception) {
-      Color.parseColor("#1a73e8")
+      Color.parseColor("#0062d1")
     }
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = backgroundColor }
     canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
