@@ -131,12 +131,12 @@ export function DropdownMenu({
       ref={menuRef}
       role="menu"
       style={{ position: "fixed", zIndex: 9999 }}
-      className={`min-w-[8rem] rounded-xl border shadow-2xl overflow-hidden
+      className={`min-w-[8rem] rounded-xl border overflow-hidden
         ${tone === "overlay"
-          ? "bg-overlay border-overlay-elevated"
+          ? "bg-overlay border-overlay-elevated shadow-2xl"
           : tone === "surface"
-            ? "bg-surface border-border"
-            : "bg-surface-raised border-border"}
+            ? "bg-surface border-border shadow-md"
+            : "bg-surface-raised border-border shadow-2xl"}
         animate-in fade-in zoom-in-95 duration-100 origin-top-right
         ${className}`}
     >
