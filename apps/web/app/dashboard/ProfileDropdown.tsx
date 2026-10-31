@@ -84,7 +84,10 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
 
         <div className="p-1">
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              setOpen(false);
+              handleLogout();
+            }}
             disabled={loggingOut}
             className={`${ROW_CLASS} disabled:opacity-50`}
           >
