@@ -18,7 +18,7 @@ The remediation branch is code-complete and passes the final local regression ga
 - Backup/DR is out of scope and unresolved.
 - Android release signing/device verification is unresolved; Turnstile, CSP enforcement, cookie narrowing and some mobile appeal/screen gaps remain open decisions.
 
-Local gates now passing: web TypeScript, **1,081/1,081** web unit tests, isolated production build, website build, **281/281** full realtime Worker tests (including 1,000 clients), mobile TypeScript and documented mobile suites, and **138/138** local database assertions over the 216-migration chain. The realtime 1,000-client failure is resolved as a test-harness isolation defect; no fan-out architecture change was needed.
+Local gates now passing: web TypeScript, **1,087/1,087** web unit tests, isolated production build, website build, a clean **281/281** full realtime Worker run (including 1,000 clients), mobile TypeScript and documented mobile suites, and **138/138** local database assertions over the 216-migration chain. A later realtime rerun under system memory pressure timed out three heavy performance cases (the exact 10K case passes alone); that test-environment flake is documented. The realtime 1,000-client failure is resolved as a test-harness isolation defect; no fan-out architecture change was needed.
 
 **BACKUP / DISASTER RECOVERY: NOT ADDRESSED — explicitly deferred to a separate task, per instructions.** Production still has no verified backup/PITR and R2 versioning is disabled. This is a launch blocker outside this task’s scope; it must be handled before launch.
 
@@ -39,14 +39,14 @@ Local verification: `curl` with `Host: app.uxcommunity.in` + `x-forwarded-proto:
 
 ### 2. Verification policy (Policy A, with likes)
 
-Selected policy: unverified accounts can browse, **like**, report/block, manage their own profile/verification and delete their account. All other writes require approval: posts, comments, community chat, DMs, community creation, job applications, etc.
+Selected policy: unverified accounts can browse, **like**, report/block, manage their own account settings and verification, and delete their account. All other writes require approval: posts, comments, community chat, DMs, community creation, job applications, profile edits, etc.
 
 - `assertUserState` no longer grants the old 2-day write grace; every non-approved account is gated.
 - Chat send and DM send no longer pass `allowUnverified`; readlike routes keep it.
 - Reporting and blocking now explicitly pass `allowUnverified` (safety actions remain available).
 - Web and mobile banners in this branch and the separately committed website copy describe the policy; **neither is deployed**.
 - The admin Verifications screen labels `grace_days` as **legacy** and explains it no longer gates writes.
-- Tests: verification policy 4/4; 1,081/1,081 web unit tests pass.
+- Tests: verification policy 4/4; 1,087/1,087 web unit tests pass.
 
 ### 2a. Verification evidence privacy (proxy)
 
@@ -54,7 +54,7 @@ Selected policy: unverified accounts can browse, **like**, report/block, manage 
 - The new proxy route requires a live session and `canViewVerificationSample` (owner or admin); unauthorized callers get 404, anonymous callers 401.
 - Key-backed samples redirect to a **5-minute** signed GET and are re-signed on every image request; legacy URL-backed rows are streamed server-side with `no-store`, so the public URL is no longer returned to clients.
 - Resubmission sends `work_sample_refs`; the server resolves them to owned keys. Raw legacy URL-only refs are rejected and must be re-uploaded privately.
-- Mobile thumbnails use expo-image with a memory-only cache policy and clear that cache on sign-out.
+- Mobile thumbnails use expo-image with a memory-only cache policy (including the signed upload preview) and clear that cache on sign-out.
 - Tests: proxy/path helpers 4/4, private access 4/4, session-route audit 6/6; live authorization/expiry still requires staging.
 
 Remaining product decision: `verification_settings.grace_days` is still 2 in production and is now inert. It can be set to 0 for clarity (approval checklist).
@@ -125,7 +125,7 @@ Production migration history remains a brownfield ledger (see `MIGRATION_RECONCI
 - Event PATCH validates end > start and a newly chosen start not in the past; pure helper + 4/4 tests.
 - RSVP rejects an event that has already ended.
 - Host deletion notifies attendees who RSVPed (in-app), in addition to the existing moderated-deletion notice.
-- Report targets now check private-community visibility; outsiders get 404.
+- Report targets now check private-community visibility (404 for outsiders) and also require membership for private posts/events and community chat inside otherwise-public communities.
 - Per-target report cap: 25 reports/24h per content target, in addition to per-user limits.
 - Still deferred: event comments/likes/chat after end, event lifecycle FCM/preferences/quiet hours, mobile event push routing, notification dedupe gaps.
 
@@ -172,12 +172,12 @@ Marketing build passes. Changes are in `uxcommunity-website` and need their own 
 See `STAGING_TEST_RESULTS.md` for the full matrix. Final local regression results:
 
 - Web TypeScript: **PASS**.
-- Web unit suite: **1,081/1,081 PASS** (133 files), exit 0.
+- Web unit suite: **1,087/1,087 PASS** (134 files), exit 0.
 - Web isolated production build: **PASS** (full copy with cloned dependencies, no production env files; dummy public env only). Lint on touched files: **0 errors, 1 existing `<img>` warning**.
 - Website build: **PASS**.
 - Mobile TypeScript: **PASS**; documented realtime **71/71**, cache **7/7**, signup **12/12**.
 - Full mobile sweep: **441/444**; the three failures are pre-existing harness-load failures (`communitiesSnapshot`, `communityBootstrap`, `dmConversationsCache` import React Native Flow source under `tsx`), not changed-code failures.
-- Realtime Worker TypeScript: **PASS**. Full Worker suite: **28 files / 281 tests PASS in 1,703 s, exit 0**, including 1,000 clients (85 s) and 500×100 fan-out. Ownership suite **21/21**; zero duplicate deliveries.
+- Realtime Worker TypeScript: **PASS**. Full Worker suite clean run: **28 files / 281 tests PASS in 1,703 s, exit 0**, including 1,000 clients (85 s) and 500×100 fan-out. A later rerun under concurrent system memory pressure had one WS-open timeout in the 10K performance case (and three performance timeouts when the file was isolated under the same pressure); the exact 10K case passed alone in 41.2 s and all functional files passed. This is a test-resource flake, not a realtime source change; a clean CI/load run is still required.
 - DB local harness (216 migrations): migration integrity **10/10**, scoped permission exposure **19 ok/0 failed**, private storage **11/11**, moderation evidence **82/82**, signup consent **3/3**, appeal retention **5/5**, evidence concurrency **8/8** — **138/138**.
 - Rate-limit regression **3/3**; appeal retention **5/5**; audit/CSP/sample contract tests **7/7**.
 - Middleware local: HTTP→HTTPS **308**, cross-origin mutation **403**, same-origin reaches route, CSP header present.
@@ -195,7 +195,7 @@ See `STAGING_TEST_RESULTS.md` for the full matrix. Final local regression result
 8. **CSP is report-only** and the cookie domain must remain `.uxcommunity.in` for the current realtime cookie handshake; CSRF is checked. Enforcing CSP or narrowing the cookie requires tested nonce/script and realtime-token work.
 9. **Android release readiness is incomplete.** Release uses `signingConfigs.debug`; package `in.uxcommunity.app`, versionCode 1/versionName 1.0.0; iOS bundle id is still the placeholder `com.sachinpatil1228.myapp`. The manifest requests location, record-audio, overlay and storage/media permissions, sets `allowBackup=true`/`requestLegacyExternalStorage`, and declares only the `uxcommunity` scheme (no verified app links). `google-services.json` exists but FCM/deep-link/env behavior, a signed release build and a clean-device test are outstanding. No key was generated or uploaded.
 10. **Verification privacy is fixed in the branch, with residual origin exposure.** Owner/admin APIs return proxy paths only and the proxy re-signs 5-minute GETs; legacy rows are streamed. However, legacy objects remain publicly readable at their original R2 URLs until the approved cleanup, upload preview URLs expire after 30 minutes, and the proxy/authorization/device behavior still needs a staging test.
-11. **Realtime scale is verified only locally.** The full Worker suite passed 28 files/281 tests in 1,703 s, including 1,000 clients and 500×100 fan-out with zero duplicates; the earlier 1,000-client hello timeout was test-process resource accumulation and is fixed by Vitest forks/isolation. Platform-level staging load, open-socket revocation and multi-region behavior remain unverified.
+11. **Realtime scale is verified locally only.** A clean full Worker run passed 28 files/281 tests in 1,703 s, including 1,000 clients and 500×100 fan-out with zero duplicates; the earlier 1,000-client hello timeout was test-process resource accumulation and is fixed by Vitest forks/isolation. A later rerun under heavy system memory pressure timed out the 10K performance case, while the exact 10K case passed alone (41.2 s). Platform-level staging load, open-socket revocation and multi-region behavior remain unverified; a clean CI/load run is required.
 12. **Event-ended comments/likes/chat, event lifecycle FCM/preferences/quiet hours, mobile event routing, notification dedupe, mobile appeals screen and mobile legal links** remain deferred.
 13. **Migration history is still brownfield**; the fresh chain and 7-column RPC are fixed, but production version history was not repaired and no full column-level schema diff exists without staging.
 

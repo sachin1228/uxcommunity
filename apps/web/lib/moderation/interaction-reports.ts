@@ -23,6 +23,9 @@ export interface InteractionTarget {
   contextTitle: string | null;
   contextId: string | null;
   communityId: string | null;
+  /** Public-community content that still requires membership (private
+   *  posts/events and community chat). */
+  requiresMembership?: boolean;
   /** The notification entity a reporter thank-you is scoped to. */
   entityType: NotificationEntityType;
   entityId: string;
@@ -62,7 +65,7 @@ export async function loadInteractionTarget(
       if (!comment) return null;
       const { data: thread } = await db
         .from("community_threads")
-        .select("title, community_id")
+        .select("title, community_id, is_public")
         .eq("id", comment.thread_id)
         .maybeSingle();
       return {
@@ -72,6 +75,7 @@ export async function loadInteractionTarget(
         contextTitle: thread?.title ?? null,
         contextId: comment.thread_id,
         communityId: thread?.community_id ?? null,
+        requiresMembership: thread?.is_public !== true,
         entityType: "thread",
         entityId: comment.thread_id,
         snapshot: {
@@ -93,7 +97,7 @@ export async function loadInteractionTarget(
       if (!comment) return null;
       const { data: post } = await db
         .from("community_showcase_posts")
-        .select("title, community_id")
+        .select("title, community_id, is_public")
         .eq("id", comment.post_id)
         .maybeSingle();
       return {
@@ -103,6 +107,7 @@ export async function loadInteractionTarget(
         contextTitle: post?.title ?? null,
         contextId: comment.post_id,
         communityId: post?.community_id ?? null,
+        requiresMembership: post?.is_public !== true,
         entityType: "showcase",
         entityId: comment.post_id,
         snapshot: {
@@ -124,7 +129,7 @@ export async function loadInteractionTarget(
       if (!comment) return null;
       const { data: resource } = await db
         .from("community_resources")
-        .select("title, community_id")
+        .select("title, community_id, is_public")
         .eq("id", comment.resource_id)
         .maybeSingle();
       return {
@@ -134,6 +139,7 @@ export async function loadInteractionTarget(
         contextTitle: resource?.title ?? null,
         contextId: comment.resource_id,
         communityId: resource?.community_id ?? null,
+        requiresMembership: resource?.is_public !== true,
         entityType: "resource",
         entityId: comment.resource_id,
         snapshot: {
@@ -155,7 +161,7 @@ export async function loadInteractionTarget(
       if (!comment) return null;
       const { data: event } = await db
         .from("community_events")
-        .select("title, community_id")
+        .select("title, community_id, is_public")
         .eq("id", comment.event_id)
         .maybeSingle();
       return {
@@ -165,6 +171,7 @@ export async function loadInteractionTarget(
         contextTitle: event?.title ?? null,
         contextId: comment.event_id,
         communityId: event?.community_id ?? null,
+        requiresMembership: event?.is_public !== true,
         entityType: "event",
         entityId: comment.event_id,
         snapshot: {
@@ -196,6 +203,7 @@ export async function loadInteractionTarget(
         contextTitle: community?.name ?? null,
         contextId: message.community_id,
         communityId: message.community_id,
+        requiresMembership: true,
         entityType: "message",
         entityId: message.id,
         snapshot: {

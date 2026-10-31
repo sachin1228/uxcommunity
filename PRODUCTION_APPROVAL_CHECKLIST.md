@@ -29,9 +29,11 @@ Production-readiness remediation branch:
 - verification evidence proxy (owner/admin paths, 5-minute re-signed GETs, legacy streaming, memory-only mobile thumbnails)
 - event schedule validation, attendee cancellation notices, report visibility/caps
 
-Tests: web tsc, 1,081 web unit tests, isolated production build, website build,
+Tests: web tsc, 1,087 web unit tests, isolated production build, website build,
 mobile tsc + realtime/cache/signup tests (71/71, 7/7, 12/12), full realtime Worker
-suite 281/281 (including 1,000 clients), local 216-migration DB suites 138/138.
+suite clean run 281/281 (including 1,000 clients); later review reruns under system
+memory pressure timed out 1 and then 3 heavy performance cases, while the exact
+10K case passes alone), local 216-migration DB suites 138/138.
 No production deploy/migration/R2/secret change was performed.
 Backup/DR is deferred to a separate task.
 ```

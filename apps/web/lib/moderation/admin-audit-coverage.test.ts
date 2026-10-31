@@ -25,3 +25,16 @@ test("every audited admin route uses the shared audit helper and a known action"
     assert.match(auditSource, new RegExp(`["']${action}["']`), `${action} is in the audit action list`);
   }
 });
+
+test("deleting an account does not reference the already-deleted user as the audit subject FK", () => {
+  const source = readFileSync(
+    fileURLToPath(new URL("../../app/api/admin/users/[id]/route.ts", import.meta.url)),
+    "utf8",
+  );
+  assert.match(source, /subjectUserId:\s*null/, "delete audit leaves subject_user_id null");
+  assert.doesNotMatch(
+    source,
+    /action:\s*["']delete_user["'][\s\S]{0,400}?subjectUserId:\s*id\b/,
+    "the audit insert must not FK the deleted account",
+  );
+});

@@ -19,6 +19,7 @@ interface ReportTarget {
   user_id: string;
   community_id: string | null;
   title: string | null;
+  is_public: boolean | null;
   snapshot: Record<string, unknown>;
 }
 
@@ -100,6 +101,7 @@ async function loadTarget(
       user_id: String(row.user_id),
       community_id: (row.community_id as string | null) ?? null,
       title: (row.title as string | null) ?? null,
+      is_public: typeof row.is_public === "boolean" ? row.is_public : null,
       snapshot: contentSnapshot(contentType, row),
     },
     error: null,
@@ -171,7 +173,7 @@ export async function POST(request: NextRequest) {
   if (target.user_id === userId) {
     return NextResponse.json({ error: "You can't report your own post." }, { status: 403 });
   }
-  if (!(await canReportTarget(db, userId, target.community_id))) {
+  if (!(await canReportTarget(db, userId, target.community_id, target.is_public !== true))) {
     return NextResponse.json({ error: "That content no longer exists." }, { status: 404 });
   }
 

@@ -200,8 +200,11 @@ export async function DELETE(
         action: "delete_user",
         targetType: "user",
         targetId: id,
-        subjectUserId: id,
+        // The users row is already gone, so this cannot be a subject FK.
+        // The deleted id remains target_id and in previousState.
+        subjectUserId: null,
         previousState: {
+          deleted_user_id: id,
           is_blocked: before?.is_blocked ?? null,
           suspended_until: before?.suspended_until ?? null,
         },

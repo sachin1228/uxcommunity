@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
   if (target.authorId === userId) {
     return NextResponse.json({ error: "You cannot report your own content." }, { status: 422 });
   }
-  if (!(await canReportTarget(db, userId, target.communityId))) {
+  if (!(await canReportTarget(db, userId, target.communityId, target.requiresMembership === true))) {
     return NextResponse.json({ error: "This content is no longer available." }, { status: 404 });
   }
 

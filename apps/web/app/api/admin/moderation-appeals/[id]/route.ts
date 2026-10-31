@@ -11,7 +11,7 @@ const NOTE_MAX_LENGTH = 500;
 
 interface AppealRecord {
   id: string;
-  report_id: string;
+  report_id: string | null;
   user_id: string | null;
   target_type: string;
   target_id: string;
@@ -78,6 +78,12 @@ export async function PATCH(
   }
   if (appeal.status !== "pending") {
     return NextResponse.json({ error: "This appeal has already been reviewed." }, { status: 409 });
+  }
+  if (!appeal.report_id) {
+    return NextResponse.json(
+      { error: "The report behind this appeal is unavailable." },
+      { status: 404 },
+    );
   }
 
   const { data: report } = (await (db as unknown as SupabaseClient)

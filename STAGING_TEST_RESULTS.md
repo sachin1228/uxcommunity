@@ -29,7 +29,7 @@ The branch passes the final local regression gates (web, realtime, database, mob
 | Check | Command | Result |
 |---|---|---|
 | TypeScript | `npx tsc --noEmit` in `apps/web` | **PASS** (exit 0) |
-| Full unit suite | `cd apps/web && FILES=(${(f)"$(find . \( -name node_modules -o -name .next -o -name .open-next \) -prune -o -name '*.test.ts' -print \| sort)"}); npx tsx --tsconfig tsconfig.json --test "${FILES[@]}"` (zsh array split) | **PASS — 1,081/1,081**, 0 failed, 0 skipped, 5.01 s (133 files), exit 0 |
+| Full unit suite | `cd apps/web && FILES=(${(f)"$(find . \( -name node_modules -o -name .next -o -name .open-next \) -prune -o -name '*.test.ts' -print \| sort)"}); npx tsx --tsconfig tsconfig.json --test "${FILES[@]}"` (zsh array split) | **PASS — 1,087/1,087**, 0 failed, 0 skipped, 5.30 s (134 files), exit 0 |
 | Targeted security/deletion/schedule tests | request-origin, secure-compare, delete-credential, event-schedule, private-resume, verification policy | **PASS — 26/26** (request-origin, secure-compare, delete-credential, event-schedule, private-resume, verification policy) |
 | Production build | Isolated full-workspace copy with cloned dependencies, no `.env.local`/`.dev.vars`; dummy public env | **PASS** (exit 0, compiled + type-checked + route manifest generated) |
 | Production build in the live workspace | **Not run** | The running dev server owns `.next` and `.env.local` contains production credentials; building there would disrupt the server or create secret-bearing artifacts. |
@@ -101,12 +101,13 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 | 500×100 fan-out | **PASS — 50,000/50,000**, 0 duplicates; isolated run 68.3 s; also passed inside the full suite. |
 | Full ownership suite | **PASS — 21/21**, 193.7 s. |
 | Previously failing multi-file run | **PASS — 39/39** after test isolation; the earlier run was **38/39** with the 1,000-client `Timeout waiting for hello`. |
-| **Full Worker suite** | **PASS — 28 files / 281 tests, 0 failed, 1,703.33 s, exit 0.** Includes 1,000 clients (85.1 s), 500×100 fan-out and the ownership suite. |
+| **Full Worker suite (clean run)** | **PASS — 28 files / 281 tests, 0 failed, 1,703.33 s, exit 0.** Includes 1,000 clients (85.1 s), 500×100 fan-out and the ownership suite. |
+| **Final review reruns (same realtime source)** | A later full run under system memory pressure was **280/281** (one WS-open timeout); a subsequent clean full run was **278/281** with timeouts in `PERF 3: 100 × 500 burst`, `PERF 5: 10K index`, and `PERF 6: 100K index`. The exact 10K case alone **PASSED** in 41.2 s (P50 23.0 ms, P99 27.8 ms), and 27/28 files passed. Classified as a performance-test resource/environment flake, not a realtime code regression; a clean CI/staging run is still required. |
 | Unauthenticated production WebSocket | Closes without opening (1006 handshake rejection); no data access. |
 | Revocation on an open socket | **NOT TESTED** — no staging/test account/device. |
 | Authenticated staging socket test | **NOT TESTED** — no staging environment. |
 
-**Root cause classification:** the application fan-out path is healthy at 100/500/1,000 and 500×100 with zero duplicates, and the full Worker suite now passes end to end. The earlier 1,000-client failure was reproduced only when it ran after other Miniflare suites in the same Vitest process; the shared process retained workers/DOs/sockets across files. The test harness now uses Vitest **forks** with `isolate: true` and `fileParallelism: false`, and the previously failing multi-file set is 39/39 while the full suite is 281/281. This is a test-run isolation/resource fix, not a change to DO ownership or fan-out architecture. A staging/load run remains required for platform-level capacity confirmation.
+**Root cause classification:** the application fan-out path is healthy at 100/500/1,000 and 500×100 with zero duplicates, and a clean full Worker run passed 281/281. The earlier 1,000-client failure was reproduced only when it ran after other Miniflare suites in the same Vitest process; the shared process retained workers/DOs/sockets across files. The test harness now uses Vitest **forks** with `isolate: true` and `fileParallelism: false`, and the previously failing multi-file set is 39/39. A later full rerun under heavy concurrent system load had one (and, with the performance file isolated under the same pressure, three) WS-open/hello timeouts in the 10K/100K performance cases; the exact failing 10K case passed alone. This is a test-run resource/environment flake, not a change to DO ownership or fan-out architecture. A clean CI/staging/load run remains required for platform-level capacity confirmation.
 
 ## 7. Email and push
 
@@ -125,7 +126,7 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 - Staging E2E (signup, login, delete, reports, admin actions, appeals, private R2, signed URL expiry).
 - Real Android device auth/session/deletion/push/private media.
 - Real email/FCM delivery and notification preferences.
-- Platform-level realtime load and revocation on an open socket; the local full Worker suite passes (281/281, including 1,000 clients), but staging capacity is not proven.
+- Platform-level realtime load and revocation on an open socket; the clean local full Worker run passes (281/281, including 1,000 clients), but a rerun under system memory pressure timed out heavy performance cases and the exact 10K case passes alone. Staging capacity is not proven.
 - Production deployment, migration application, R2 deletion/purge, secret rotation.
 - Backup/DR restore (out of scope).
 
@@ -188,7 +189,7 @@ The verification evidence API was redesigned:
 - The new `/api/private/verification/[id]/[index]` route requires a live registry-backed session and calls `canViewVerificationSample` (owner or admin). Unauthorized callers get 404; anonymous callers get 401.
 - Key-backed samples redirect to a **5-minute** signed GET; every image request re-signs, so an expired URL refreshes on the next load. Legacy URL-backed rows are fetched server-side and streamed with `Cache-Control: no-store`, so the public URL is not returned in the API response.
 - The owner form displays existing samples but submits only new upload keys plus `work_sample_refs` for existing key-backed samples. The server resolves refs to keys after verifying ownership; legacy URL-only refs must be re-uploaded through the private form.
-- Mobile verification thumbnails now use `expo-image` with the session cookie and **memory-only** cache policy; logout clears the expo-image memory cache. No disk copy is intentionally created.
+- Mobile verification thumbnails now use `expo-image` with the session cookie and **memory-only** cache policy (including the short-lived signed upload preview); logout clears the expo-image memory cache. No disk copy is intentionally created.
 - Upload responses still return the newly uploaded key (needed for the immediate submit) plus a 30-minute preview URL; the key is not returned by GET and does not authorize reads.
 
 Tests: `samples.test.ts` (4/4) proves proxy paths never contain keys/URLs and parse correctly; `private-access.test.ts` (4/4) covers owner/other/admin; session-route audit (6/6) requires the verification proxy to use `getSession()` and `canViewVerificationSample`. A live proxy/authorization/expiry test still requires staging (no database/Next integration environment here).

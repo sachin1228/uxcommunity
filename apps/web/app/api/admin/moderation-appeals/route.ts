@@ -8,7 +8,7 @@ const STATUS_VALUES = new Set(["pending", "granted", "denied", "all"]);
 
 interface AppealRow {
   id: string;
-  report_id: string;
+  report_id: string | null;
   user_id: string | null;
   target_type: string;
   target_id: string;
@@ -56,7 +56,13 @@ export async function GET(request: NextRequest) {
   }
 
   const appeals = data ?? [];
-  const reportIds = [...new Set(appeals.map((appeal) => appeal.report_id))];
+  const reportIds = [
+    ...new Set(
+      appeals
+        .map((appeal) => appeal.report_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
   const userIds = [
     ...new Set(
       appeals
@@ -101,7 +107,9 @@ export async function GET(request: NextRequest) {
         is_blocked: (user as { is_blocked?: boolean } | undefined)?.is_blocked ?? false,
         suspended_until:
           (user as { suspended_until?: string | null } | undefined)?.suspended_until ?? null,
-        report: reportById.get(appeal.report_id) ?? null,
+        report: appeal.report_id
+          ? reportById.get(appeal.report_id) ?? null
+          : null,
       };
     }),
     total: count ?? 0,

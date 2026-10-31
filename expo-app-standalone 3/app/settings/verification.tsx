@@ -569,7 +569,10 @@ export default function VerificationScreen() {
                   >
                     <Image
                       source={mediaSource(sample.url)}
-                      cachePolicy={mediaCachePolicy(sample.url)}
+                      // A freshly uploaded sample's url is a short-lived signed
+                      // R2 URL, not the /api/private proxy path; its key tells
+                      // us it is still private, so keep it memory-only.
+                      cachePolicy={sample.key ? 'memory' : mediaCachePolicy(sample.url)}
                       contentFit="cover"
                       style={styles.sampleImage}
                     />
