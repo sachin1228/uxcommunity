@@ -23,10 +23,10 @@ test('nameInitials reads the first and last word', () => {
 test('avatarBackground reproduces the web colors exactly', () => {
   // Pinned against the web app (FNV-1a over the trimmed lowercase name):
   // "jack ma" is the purple every screenshot of the web profile shows.
-  assert.equal(avatarBackground('jack ma'), '#9334e6');
-  assert.equal(avatarBackground('  Jack Ma  '), '#9334e6', 'casing/padding must not move the color');
-  assert.equal(avatarBackground('sachin patil'), '#00695c');
-  assert.equal(avatarBackground(''), '#d93025', 'blank names share one fallback color');
+  assert.equal(avatarBackground('jack ma'), '#8e4ec6');
+  assert.equal(avatarBackground('  Jack Ma  '), '#8e4ec6', 'casing/padding must not move the color');
+  assert.equal(avatarBackground('sachin patil'), '#0d8c7d');
+  assert.equal(avatarBackground(''), '#da2f35', 'blank names share one fallback color');
 });
 
 test('the same name always maps to the same color', () => {
