@@ -138,7 +138,7 @@ export async function POST(
     // and is awaited before the insert, which removes a cold-isolate DB round
     // trip from the send path without weakening the guard.
     session = await timer.measure("auth", () =>
-      requireSession("user", { allowUnverified: true }),
+      requireSession("user"),
     );
   } catch (e) {
     return e as Response;
@@ -158,8 +158,8 @@ export async function POST(
   const [rateResult, access, senderProfileResult] = await Promise.all([
     timer.measure("rate_limits", () =>
       Promise.all([
-        rateLimit(`dm:send:${userId}:10s`, 5, 10),
-        rateLimit(`dm:send:${userId}:60s`, 20, 60),
+        rateLimit(`dm:send:${userId}:10s`, 5, 10, { failClosed: true }),
+        rateLimit(`dm:send:${userId}:60s`, 20, 60, { failClosed: true }),
       ]),
     ),
     timer.measure("conversation_query", () =>

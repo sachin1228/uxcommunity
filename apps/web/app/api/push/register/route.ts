@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { rateLimit } from "@/lib/auth/rate-limit";
 
 /**
  * POST /api/push/register
@@ -17,6 +18,11 @@ export async function POST(req: NextRequest) {
     session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
+  }
+
+  const limit = await rateLimit(`push:register:${session.userId}`, 30, 3600, { failClosed: true });
+  if (!limit.success) {
+    return NextResponse.json({ error: "Too many registration attempts. Try again later." }, { status: 429 });
   }
 
   let token: string;

@@ -39,7 +39,7 @@ export function VerificationBannerGate({ children }: { children: React.ReactNode
         <View style={styles.row}>
           <Feather name="lock" size={15} color={colors.mutedForeground} />
           <Text style={[styles.message, { color: colors.foreground }]}>
-            Your account is currently read-only. Verify your profile to unlock all features.
+            Your account is read-only until verification is approved. You can browse and like content.
           </Text>
           <Pressable
             accessibilityRole="button"

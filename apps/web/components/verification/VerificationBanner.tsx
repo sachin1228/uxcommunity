@@ -11,7 +11,7 @@ export function VerificationBanner({ status }: { status: string | null | undefin
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2">
       <p className="font-body text-xs text-foreground">
-        Your account is currently read-only. Verify your profile to unlock all features.
+        Your account is read-only until verification is approved. You can browse and like content.
       </p>
       <Link
         href="/dashboard/verification"

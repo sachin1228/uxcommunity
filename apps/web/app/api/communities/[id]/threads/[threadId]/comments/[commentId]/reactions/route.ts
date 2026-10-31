@@ -23,7 +23,7 @@ export async function POST(
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
 
-  const limit = await rateLimit(`comment-reaction:${userId}:60s`, 60, 60);
+  const limit = await rateLimit(`comment-reaction:${userId}:60s`, 60, 60, { failClosed: true });
   if (!limit.success) {
     return NextResponse.json({ error: "Too many reactions. Please slow down." }, { status: 429 });
   }

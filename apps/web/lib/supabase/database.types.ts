@@ -1015,6 +1015,7 @@ export type Database = {
           resolved_at: string | null;
           resolved_by: string | null;
           status: string;
+          target_snapshot: Json;
         };
         Insert: {
           community_id?: string | null;
@@ -1030,6 +1031,7 @@ export type Database = {
           resolved_at?: string | null;
           resolved_by?: string | null;
           status?: string;
+          target_snapshot?: Json;
         };
         Update: {
           community_id?: string | null;
@@ -1045,6 +1047,7 @@ export type Database = {
           resolved_at?: string | null;
           resolved_by?: string | null;
           status?: string;
+          target_snapshot?: Json;
         };
         Relationships: [
           {
@@ -3010,6 +3013,7 @@ export type Database = {
           password_hash: string;
           session_version: number;
           terms_accepted_at: string | null;
+          terms_version: string | null;
           updated_at: string;
           verification_notified_at: string | null;
           verification_reapply_at: string | null;
@@ -3029,6 +3033,7 @@ export type Database = {
           password_hash: string;
           session_version?: number;
           terms_accepted_at?: string | null;
+          terms_version?: string | null;
           updated_at?: string;
           verification_notified_at?: string | null;
           verification_reapply_at?: string | null;
@@ -3048,6 +3053,7 @@ export type Database = {
           password_hash?: string;
           session_version?: number;
           terms_accepted_at?: string | null;
+          terms_version?: string | null;
           updated_at?: string;
           verification_notified_at?: string | null;
           verification_reapply_at?: string | null;
@@ -3223,6 +3229,27 @@ export type Database = {
           p_name: string;
           p_password_hash: string;
           p_sector_id: string;
+        };
+        Returns: {
+          application_id: string;
+          user_id: string;
+        }[];
+      };
+      complete_signup_with_consent: {
+        Args: {
+          p_age_confirmed: boolean;
+          p_avatar_source: string;
+          p_avatar_url: string;
+          p_city_id: string;
+          p_email: string;
+          p_experience_level: string;
+          p_invitation_token?: string;
+          p_job_title: string;
+          p_name: string;
+          p_password_hash: string;
+          p_sector_id: string;
+          p_terms_accepted: boolean;
+          p_terms_version: string;
         };
         Returns: {
           application_id: string;

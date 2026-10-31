@@ -144,6 +144,19 @@ create or replace function public.has_function(sch text, fn text, args text[])
       where n.nspname = sch and p.proname = fn
     ) then 'ok   ' || fn || '(' || array_to_string(args, ',') || ')' || ' exists'
     else 'NOT OK ' || fn || '(' || array_to_string(args, ',') || ')' || ' exists' end $$;
+create or replace function public.has_column(sch text, tbl text, col text, description text default '')
+  returns text language sql as $$
+    select case when exists (
+      select 1 from information_schema.columns
+      where table_schema = sch and table_name = tbl and column_name = col
+    ) then 'ok   ' || description else 'NOT OK ' || description end $$;
+create or replace function public.col_is_null(sch text, tbl text, col text, description text default '')
+  returns text language sql as $$
+    select case when exists (
+      select 1 from information_schema.columns
+      where table_schema = sch and table_name = tbl and column_name = col
+        and is_nullable = 'YES'
+    ) then 'ok   ' || description else 'NOT OK ' || description end $$;
 create or replace function public.throws_ok(sql text, errcode text, errmsg text, description text default '')
   returns text language plpgsql as $$
   declare raised text;

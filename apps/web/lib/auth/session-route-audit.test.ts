@@ -84,7 +84,7 @@ test("admin API routes require the live admin session", () => {
 
 test("private R2 proxies require a live session before signing", () => {
   const privateRoutes = routeFiles(path.join(APP_ROOT, "api", "private"));
-  assert.equal(privateRoutes.length, 3, "expected the DM and two résumé proxies");
+  assert.equal(privateRoutes.length, 4, "expected the DM, two résumé and verification proxies");
 
   for (const file of privateRoutes) {
     const rel = relative(file);
@@ -100,6 +100,14 @@ test("private R2 proxies require a live session before signing", () => {
   const dm = read("app/api/private/dm/[conversationId]/[file]/route.ts");
   assert.match(dm, /\bgetSession\(\)/, "DM proxy must use getSession()");
   assert.match(dm, /canViewDmAsset\(/, "DM proxy must keep the participant check");
+
+  const verification = read("app/api/private/verification/[id]/[index]/route.ts");
+  assert.match(verification, /\bgetSession\(\)/, "verification proxy must use getSession()");
+  assert.match(
+    verification,
+    /canViewVerificationSample\(/,
+    "verification proxy must keep the owner/admin check",
+  );
 });
 
 test("the profile, applications and dashboard surfaces reject revoked accounts", () => {

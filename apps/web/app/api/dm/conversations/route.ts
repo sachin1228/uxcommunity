@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const db = createServiceClient();
 
   const [limitResult, peer] = await Promise.all([
-    rateLimit(`dm:create:${userId}:60s`, 30, 60),
+    rateLimit(`dm:create:${userId}:60s`, 30, 60, { failClosed: true }),
     loadDmPeer(db, peerUserId),
   ]);
   if (!limitResult.success) {

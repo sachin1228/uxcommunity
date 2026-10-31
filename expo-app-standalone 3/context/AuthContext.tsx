@@ -26,6 +26,7 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
+import { Image } from 'expo-image';
 import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth';
 import {
   clearSession,
@@ -223,7 +224,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSessionEpoch(cleanupEpochRef.current);
       },
       resetRealtime: resetRealtimeSession,
-      markSignedOut: () => applyUser(null),
+      markSignedOut: () => {
+        applyUser(null);
+        // Private DM/verification images are memory-only; clear the process
+        // cache when the identity ends so a shared device does not retain them.
+        void Image.clearMemoryCache();
+      },
       clearSession,
       ...clearSteps,
     }),
@@ -466,7 +472,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSessionEpoch(cleanupEpochRef.current);
       },
       resetRealtime: resetRealtimeSession,
-      markSignedOut: () => applyUser(null),
+      markSignedOut: () => {
+        applyUser(null);
+        // Private DM/verification images are memory-only; clear the process
+        // cache when the identity ends so a shared device does not retain them.
+        void Image.clearMemoryCache();
+      },
       unregisterPush: () =>
         unregisterStoredPushTokenAsync({
           shouldClear: () => sessionClock.isCurrent(cleanupEpochRef.current),

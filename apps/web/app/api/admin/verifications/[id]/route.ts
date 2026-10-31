@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createNotification } from "@/lib/notifications";
+import { recordAdminAudit } from "@/lib/moderation/admin-audit";
+import type { SessionPayload } from "@/lib/auth/session";
 import {
   sendVerificationApprovedEmail,
   sendVerificationRejectedEmail,
@@ -29,7 +31,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  let session;
+  let session: SessionPayload;
   try {
     session = await requireSession("admin");
   } catch (error) {
@@ -51,6 +53,11 @@ export async function PATCH(
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
 
   const db = createServiceClient();
+  const { data: before } = await db
+    .from("account_verification_requests")
+    .select("status, user_id")
+    .eq("id", id)
+    .maybeSingle();
   const { data, error } = await (db as any).rpc("review_account_verification", {
     p_request_id: id,
     p_action: action,
@@ -75,6 +82,27 @@ export async function PATCH(
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
   }
 
+
+  try {
+    await recordAdminAudit(db, session, {
+      action: "review_verification",
+      targetType: "verification",
+      targetId: id,
+      subjectUserId: row.user_id,
+      previousState: { status: before?.status ?? "pending" },
+      newState: {
+        status: row.verification_status,
+        reason: row.rejection_reason ?? reason ?? null,
+      },
+      reason: row.rejection_reason ?? reason ?? null,
+    });
+  } catch (auditError) {
+    console.error("[admin/verifications] audit failed:", auditError);
+    return NextResponse.json(
+      { error: "Verification was reviewed, but the moderation audit record could not be written." },
+      { status: 500 },
+    );
+  }
 
   const approved = row.verification_status === "approved";
   const title = approved ? "Your account is verified" : "Verification not approved";

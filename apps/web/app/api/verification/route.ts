@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  privateWorkSampleKeys,
-  verificationSampleDisplayUrls,
-} from "@/lib/verification/samples";
+import { verificationSamplePaths } from "@/lib/verification/samples";
 
 /**
  * GET /api/verification
@@ -66,12 +63,9 @@ export async function GET() {
     created_at: string;
   } | null;
 
-  const latestSamples = application
-    ? {
-        keys: privateWorkSampleKeys(application),
-        urls: await verificationSampleDisplayUrls(application),
-      }
-    : null;
+  const latestSamplePaths = application
+    ? verificationSamplePaths(application.id, application)
+    : [];
 
   return NextResponse.json({
     status: row.verification_status,
@@ -87,8 +81,7 @@ export async function GET() {
           status: application.status,
           linkedinUrl: application.linkedin_url,
           portfolioLinks: application.portfolio_links ?? [],
-          workSampleUrls: latestSamples?.urls ?? [],
-          workSampleKeys: latestSamples?.keys ?? [],
+          workSampleUrls: latestSamplePaths,
           rejectionReason: application.rejection_reason,
           reviewedAt: application.reviewed_at,
           createdAt: application.created_at,

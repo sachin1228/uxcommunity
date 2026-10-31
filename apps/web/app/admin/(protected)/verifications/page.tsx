@@ -163,11 +163,16 @@ export default function AdminVerificationsPage() {
           <p className="mt-0.5 font-body text-xs text-foreground-muted">
             {total} {total === 1 ? "request" : "requests"} in this view
           </p>
+          <p className="mt-1 max-w-xl font-body text-[11px] leading-4 text-foreground-subtle">
+            Policy A applies from signup: unverified accounts are read-only apart from browsing, likes,
+            reporting and account/verification actions. Legacy grace is retained for older clients and
+            no longer gates writes.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           <label htmlFor="grace-days" className="font-body text-xs text-foreground-muted">
-            Banner after
+            Legacy grace
           </label>
           <select
             id="grace-days"

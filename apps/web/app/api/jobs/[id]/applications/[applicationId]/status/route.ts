@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { applicationStatusSchema } from "@/lib/jobs/validation";
@@ -51,8 +52,19 @@ export async function POST(
     return NextResponse.json({ error: "Invalid status." }, { status: 422 });
   }
 
-  const { applicationId } = await params;
+  const { id: jobId, applicationId } = await params;
   const db = createServiceClient();
+  const { data: application } = (await (db as unknown as SupabaseClient)
+    .from("job_applications")
+    .select("job_id")
+    .eq("id", applicationId)
+    .maybeSingle()) as { data: { job_id: string } | null };
+  if (!application || application.job_id !== jobId) {
+    return NextResponse.json(
+      { error: "application_not_found", message: "This application no longer exists." },
+      { status: 404 },
+    );
+  }
   const result = await setJobApplicationStatus(db, {
     actorId: session.userId!,
     applicationId,

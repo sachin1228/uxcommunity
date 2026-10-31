@@ -96,6 +96,17 @@ test("applicant mapping preserves the profile facts the design view needs", () =
   assert.equal(mapped.role_label, "Product Designer");
   assert.equal(mapped.city_name, "Pune");
   assert.equal(mapped.resume_url, "/api/private/resume/application/application-id");
+  assert.equal("resume_key" in mapped, false);
+});
+
+test("mobile mapping strips the private key", async () => {
+  const restore = setEnv(ENV);
+  try {
+    const mapped = await withWebApplicantResumePath(applicant({ resume_key: "resumes/u/a.pdf" }));
+    assert.equal("resume_key" in mapped, false);
+  } finally {
+    restore();
+  }
 });
 
 test("job mapping leaves posts without an application untouched", () => {

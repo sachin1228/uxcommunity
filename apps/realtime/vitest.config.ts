@@ -14,5 +14,13 @@ export default defineConfig({
     // and multiplies the runner's memory footprint — the 500-socket suites have
     // been observed to OOM the runner when they overlap. Keep them sequential.
     fileParallelism: false,
+    // A single shared vitest process retained Miniflare workers, Durable
+    // Objects and sockets across files. The 1,000-client test passed alone and
+    // with the other scale tests but timed out waiting for `hello` after the
+    // earlier suites in the same process — a test-run resource accumulation,
+    // not a DO fan-out failure. Forks give each file a clean process while
+    // fileParallelism:false keeps the socket-heavy suites sequential.
+    pool: "forks",
+    isolate: true,
   },
 });

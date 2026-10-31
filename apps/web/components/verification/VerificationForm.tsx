@@ -13,21 +13,23 @@ interface LatestApplication {
   linkedinUrl: string;
   portfolioLinks: string[];
   workSampleUrls: string[];
-  workSampleKeys?: string[];
   rejectionReason: string | null;
   reviewedAt: string | null;
   createdAt: string;
 }
 
-/** One thumbnail: a private key when this form uploaded it, else a legacy URL. */
+/**
+ * A thumbnail. New uploads carry a key; existing samples use the
+ * authorization-gated proxy path returned by the server. A proxy-path sample
+ * is display/reference only and is resolved back to a key server-side.
+ */
 interface Sample {
   key: string;
   url: string;
 }
 
 function samplesFromLatest(latest: LatestApplication): Sample[] {
-  const keys = latest.workSampleKeys ?? [];
-  return latest.workSampleUrls.map((url, index) => ({ key: keys[index] ?? "", url }));
+  return latest.workSampleUrls.map((url) => ({ key: "", url }));
 }
 
 interface VerificationData {
@@ -241,10 +243,12 @@ export function VerificationForm() {
 
   async function removeSample(sample: Sample) {
     setSamples((current) => current.filter((value) => value !== sample));
-    const query = sample.key
-      ? `key=${encodeURIComponent(sample.key)}`
-      : `url=${encodeURIComponent(sample.url)}`;
-    await fetch(`/api/verification/upload?${query}`, {
+    if (!sample.key) {
+      // Existing evidence is referenced by proxy path; removing it from this
+      // form must not delete the previous request's object.
+      return;
+    }
+    await fetch(`/api/verification/upload?key=${encodeURIComponent(sample.key)}`, {
       method: "DELETE",
     }).catch(() => {});
   }
@@ -282,7 +286,7 @@ export function VerificationForm() {
           linkedin_url: linkedin.trim(),
           portfolio_links: portfolioLinks,
           work_sample_keys: samples.map((sample) => sample.key).filter(Boolean),
-          work_sample_urls: samples.filter((sample) => !sample.key).map((sample) => sample.url),
+          work_sample_refs: samples.filter((sample) => !sample.key).map((sample) => sample.url),
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -305,7 +309,6 @@ export function VerificationForm() {
           linkedinUrl: linkedin.trim(),
           portfolioLinks,
           workSampleUrls: samples.map((sample) => sample.url),
-          workSampleKeys: samples.map((sample) => sample.key).filter(Boolean),
           rejectionReason: null,
           reviewedAt: null,
           createdAt: body.submittedAt ?? new Date().toISOString(),

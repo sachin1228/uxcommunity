@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { loadEventForViewer } from "@/lib/communities/event-access";
@@ -25,6 +26,10 @@ export async function POST(
 
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
+  const limit = await rateLimit(`event:rsvp:${userId}`, 30, 60, { failClosed: true });
+  if (!limit.success) {
+    return NextResponse.json({ error: "Too many RSVP changes. Try again shortly." }, { status: 429 });
+  }
   const db = createServiceClient();
 
   // The host's compulsory join questions, answered in the confirm modal (the
@@ -43,12 +48,14 @@ export async function POST(
     is_public: boolean;
     community_id: string | null;
     max_attendees: number | null;
+    event_date: string;
+    end_date: string | null;
   }>(
     db,
     communityId,
     eventId,
     userId,
-    "id, user_id, title, cover_image_url, is_public, community_id, max_attendees",
+    "id, user_id, title, cover_image_url, is_public, community_id, max_attendees, event_date, end_date",
   );
   if (!access.ok) {
     return NextResponse.json(
@@ -57,6 +64,10 @@ export async function POST(
     );
   }
   const event = access.event;
+  const eventEnd = event.end_date ?? event.event_date;
+  if (eventEnd && Date.parse(eventEnd) <= Date.now()) {
+    return NextResponse.json({ error: "This event has ended." }, { status: 409 });
+  }
 
   // Check if already RSVPed
   const { data: existing } = await db

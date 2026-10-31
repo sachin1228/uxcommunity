@@ -39,7 +39,7 @@ select ok(
   ),
   'dm_conversations carries requested_by'
 );
-select has_index('public', 'dm_blocks', 'dm_blocks_pair_unique',
+select has_index('public', 'user_blocks', 'user_blocks_pair_unique',
   'one block row per pair');
 select has_index('public', 'dm_reports', 'dm_reports_pending_unique',
   'one open report per reporter per reported user');

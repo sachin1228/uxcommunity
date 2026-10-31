@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { requireSession } from "@/lib/auth/session";
+import { requireSession, type SessionPayload } from "@/lib/auth/session";
+import { recordAdminAudit } from "@/lib/moderation/admin-audit";
 import { getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
@@ -119,7 +120,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try { await requireSession("admin"); } catch (e) { return e as Response; }
+  let session: SessionPayload;
+  try { session = await requireSession("admin"); } catch (e) { return e as Response; }
   const { id } = await params;
 
   let body: Record<string, unknown>;
@@ -143,6 +145,11 @@ export async function PATCH(
   }
 
   const db = createServiceClient();
+  const { data: before } = await db
+    .from("communities")
+    .select("id, name, is_active")
+    .eq("id", id)
+    .maybeSingle();
   const { data, error } = await db
     .from("communities")
     .update(update)
@@ -151,6 +158,16 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: "Failed to update community." }, { status: 500 });
+  if (typeof body.is_active === "boolean") {
+    await recordAdminAudit(db, session, {
+      action: "toggle_community",
+      targetType: "community",
+      targetId: id,
+      previousState: { is_active: before?.is_active ?? null },
+      newState: { is_active: body.is_active },
+      reason: "admin_visibility_toggle",
+    });
+  }
   return NextResponse.json({ community: data });
 }
 
@@ -163,9 +180,15 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try { await requireSession("admin"); } catch (e) { return e as Response; }
+  let session: SessionPayload;
+  try { session = await requireSession("admin"); } catch (e) { return e as Response; }
   const { id } = await params;
   const db = createServiceClient();
+  const { data: before } = await db
+    .from("communities")
+    .select("id, name, is_active")
+    .eq("id", id)
+    .maybeSingle();
 
   // Collect every R2 URL the community owns BEFORE deleting: the FK cascade
   // removes the child rows, so the URLs are unrecoverable afterwards.
@@ -173,6 +196,23 @@ export async function DELETE(
 
   const { error } = await db.from("communities").delete().eq("id", id);
   if (error) return NextResponse.json({ error: "Failed to delete community." }, { status: 500 });
+
+  try {
+    await recordAdminAudit(db, session, {
+      action: "delete_community",
+      targetType: "community",
+      targetId: id,
+      previousState: { name: before?.name ?? null, is_active: before?.is_active ?? null },
+      newState: { deleted: true },
+      reason: "admin_delete",
+    });
+  } catch (auditError) {
+    console.error("[admin/communities] delete audit failed:", auditError);
+    return NextResponse.json(
+      { error: "Community was deleted, but the moderation audit record could not be written." },
+      { status: 500 },
+    );
+  }
 
   try {
     const cleanup = await cleanupCommunityMedia(db, id, urls);

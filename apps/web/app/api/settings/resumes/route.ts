@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
 import { ALL_MEDIA_LOOKUPS } from "@/lib/r2-cleanup";
 import {
@@ -111,6 +112,11 @@ export async function POST(request: NextRequest) {
     session = await requireSession("user");
   } catch (e) {
     return e as Response;
+  }
+
+  const limit = await rateLimit(`resumes:upload:${session.userId}`, 20, 3600, { failClosed: true });
+  if (!limit.success) {
+    return NextResponse.json({ error: "Too many resume uploads. Try again later." }, { status: 429 });
   }
 
   const contentType = request.headers.get("content-type") ?? "";

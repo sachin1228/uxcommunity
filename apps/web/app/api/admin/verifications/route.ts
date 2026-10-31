@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
-  verificationSampleDisplayUrls,
+  verificationSamplePaths,
   type VerificationSampleRow,
 } from "@/lib/verification/samples";
 
@@ -42,12 +42,16 @@ export async function GET(request: NextRequest) {
   }
 
   const requests = await Promise.all(
-    ((data ?? []) as Array<VerificationSampleRow & Record<string, unknown>>).map(async (row) => ({
-      ...row,
-      // Signed thumbnails only; the object keys stay server-side for admins.
-      work_sample_urls: await verificationSampleDisplayUrls(row),
-      work_sample_keys: undefined,
-    })),
+    ((data ?? []) as Array<VerificationSampleRow & Record<string, unknown>>).map(async (row) => {
+      const requestId = typeof row.id === "string" ? row.id : "";
+      return {
+        ...row,
+        // Authorization-gated proxy paths only; keys and legacy URLs stay
+        // server-side. The proxy re-signs on every image request.
+        work_sample_urls: requestId ? verificationSamplePaths(requestId, row) : [],
+        work_sample_keys: undefined,
+      };
+    }),
   );
 
   return NextResponse.json({

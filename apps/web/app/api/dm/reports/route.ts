@@ -26,7 +26,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export async function POST(req: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (e) {
     return e as Response;
   }
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const db = createServiceClient();
   const [limitResult, access] = await Promise.all([
-    rateLimit(`dm:report:${userId}:60s`, 5, 60),
+    rateLimit(`dm:report:${userId}:60s`, 5, 60, { failClosed: true }),
     loadDmConversationForUser(db, conversationId, userId),
   ]);
   if (!limitResult.success) {

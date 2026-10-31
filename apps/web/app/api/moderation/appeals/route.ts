@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
   const userId = session.userId!;
 
-  const limit = await rateLimit(`moderation-appeal:${userId}`, APPEAL_DAILY_LIMIT, 86400);
+  const limit = await rateLimit(`moderation-appeal:${userId}`, APPEAL_DAILY_LIMIT, 86400, { failClosed: true });
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many appeals today. Please try again tomorrow." },

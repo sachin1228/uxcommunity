@@ -16,7 +16,6 @@ export interface VerificationApplication {
   linkedinUrl: string;
   portfolioLinks: string[];
   workSampleUrls: string[];
-  workSampleKeys: string[];
   rejectionReason: string | null;
   reviewedAt: string | null;
   createdAt: string;
@@ -90,10 +89,12 @@ export async function uploadVerificationSample(
 }
 
 export async function deleteVerificationSample(sample: VerificationSample): Promise<void> {
-  const query = sample.key
-    ? `key=${encodeURIComponent(sample.key)}`
-    : `url=${encodeURIComponent(sample.url)}`;
-  await apiFetch(`/api/verification/upload?${query}`, { method: 'DELETE' });
+  // Proxy-path samples belong to a previous request and must not be deleted
+  // from this form; only a newly uploaded key is ours to reclaim.
+  if (!sample.key) return;
+  await apiFetch(`/api/verification/upload?key=${encodeURIComponent(sample.key)}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function submitVerification(input: {
@@ -107,7 +108,7 @@ export async function submitVerification(input: {
       linkedin_url: input.linkedinUrl,
       portfolio_links: input.portfolioLinks,
       work_sample_keys: input.workSamples.map((sample) => sample.key).filter(Boolean),
-      work_sample_urls: input.workSamples
+      work_sample_refs: input.workSamples
         .filter((sample) => !sample.key)
         .map((sample) => sample.url),
     },

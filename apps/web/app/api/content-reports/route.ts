@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { canReportTarget } from "@/lib/moderation/target-visibility";
+import type { Json } from "@/lib/supabase/database.types";
 import {
   REPORT_CONTENT_TYPE_VALUES,
   REPORT_DETAILS_MAX_LENGTH,
@@ -17,6 +19,64 @@ interface ReportTarget {
   user_id: string;
   community_id: string | null;
   title: string | null;
+  is_public: boolean | null;
+  snapshot: Record<string, unknown>;
+}
+
+const CONTENT_SELECTIONS: Record<ReportableContentType, string> = {
+  thread: "id, user_id, community_id, title, created_at, attachments, poll, links, tags, category, is_public",
+  showcase: "id, user_id, community_id, title, created_at, image_url, attachments, category, is_public",
+  resource: "id, user_id, community_id, title, created_at, description, url, resource_type, is_public",
+  event: "id, user_id, community_id, title, created_at, description, cover_image_url, event_date, end_date, location, is_online",
+};
+
+function contentSnapshot(
+  contentType: ReportableContentType,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const base = {
+    kind: contentType,
+    title: row.title ?? null,
+    community_id: row.community_id ?? null,
+    author_id: row.user_id ?? null,
+    created_at: row.created_at ?? null,
+    is_public: row.is_public ?? null,
+  };
+  switch (contentType) {
+    case "thread":
+      return {
+        ...base,
+        attachments: row.attachments ?? [],
+        poll: row.poll ?? null,
+        links: row.links ?? [],
+        tags: row.tags ?? [],
+        category: row.category ?? null,
+      };
+    case "showcase":
+      return {
+        ...base,
+        image_url: row.image_url ?? null,
+        attachments: row.attachments ?? [],
+        category: row.category ?? null,
+      };
+    case "resource":
+      return {
+        ...base,
+        description: row.description ?? null,
+        url: row.url ?? null,
+        resource_type: row.resource_type ?? null,
+      };
+    case "event":
+      return {
+        ...base,
+        description: row.description ?? null,
+        cover_image_url: row.cover_image_url ?? null,
+        event_date: row.event_date ?? null,
+        end_date: row.end_date ?? null,
+        location: row.location ?? null,
+        is_online: row.is_online ?? null,
+      };
+  }
 }
 
 /** The content row a report points at, or null when it no longer exists. */
@@ -24,19 +84,28 @@ async function loadTarget(
   db: ReturnType<typeof createServiceClient>,
   contentType: ReportableContentType,
   contentId: string,
-) {
-  const selection = "id, user_id, community_id, title";
-
-  switch (contentType) {
-    case "thread":
-      return db.from("community_threads").select(selection).eq("id", contentId).maybeSingle();
-    case "showcase":
-      return db.from("community_showcase_posts").select(selection).eq("id", contentId).maybeSingle();
-    case "resource":
-      return db.from("community_resources").select(selection).eq("id", contentId).maybeSingle();
-    case "event":
-      return db.from("community_events").select(selection).eq("id", contentId).maybeSingle();
-  }
+): Promise<{ data: ReportTarget | null; error: unknown }> {
+  const table = contentType === "thread"
+    ? "community_threads"
+    : contentType === "showcase"
+      ? "community_showcase_posts"
+      : contentType === "resource"
+        ? "community_resources"
+        : "community_events";
+  const result = await db.from(table).select(CONTENT_SELECTIONS[contentType]).eq("id", contentId).maybeSingle();
+  if (result.error || !result.data) return { data: null, error: result.error };
+  const row = result.data as unknown as Record<string, unknown>;
+  return {
+    data: {
+      id: String(row.id),
+      user_id: String(row.user_id),
+      community_id: (row.community_id as string | null) ?? null,
+      title: (row.title as string | null) ?? null,
+      is_public: typeof row.is_public === "boolean" ? row.is_public : null,
+      snapshot: contentSnapshot(contentType, row),
+    },
+    error: null,
+  };
 }
 
 /**
@@ -47,12 +116,12 @@ async function loadTarget(
 export async function POST(request: NextRequest) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { allowUnverified: true });
   } catch (error) {
     return error as Response;
   }
 
-  const reportLimit = await rateLimit(`content-report:${session.userId}`, 30, 3600);
+  const reportLimit = await rateLimit(`content-report:${session.userId}`, 30, 3600, { failClosed: true });
   if (!reportLimit.success) {
     return NextResponse.json(
       { error: "Too many reports. Please try again later." },
@@ -104,6 +173,23 @@ export async function POST(request: NextRequest) {
   if (target.user_id === userId) {
     return NextResponse.json({ error: "You can't report your own post." }, { status: 403 });
   }
+  if (!(await canReportTarget(db, userId, target.community_id, target.is_public !== true))) {
+    return NextResponse.json({ error: "That content no longer exists." }, { status: 404 });
+  }
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count: targetReports } = await db
+    .from("content_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("content_type", contentType)
+    .eq("content_id", contentId)
+    .gte("created_at", since);
+  if ((targetReports ?? 0) >= 25) {
+    return NextResponse.json(
+      { error: "This content has already been reported by many members. Our team is reviewing it." },
+      { status: 429 },
+    );
+  }
 
   const { error: insertError } = await db.from("content_reports").insert({
     reporter_id: userId,
@@ -112,6 +198,7 @@ export async function POST(request: NextRequest) {
     community_id: target.community_id,
     content_author_id: target.user_id,
     content_title: target.title,
+    target_snapshot: target.snapshot as Json,
     reason,
     details: details || null,
   });

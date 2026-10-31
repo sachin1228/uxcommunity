@@ -8,8 +8,8 @@ const STATUS_VALUES = new Set(["pending", "granted", "denied", "all"]);
 
 interface AppealRow {
   id: string;
-  report_id: string;
-  user_id: string;
+  report_id: string | null;
+  user_id: string | null;
   target_type: string;
   target_id: string;
   message: string;
@@ -56,8 +56,20 @@ export async function GET(request: NextRequest) {
   }
 
   const appeals = data ?? [];
-  const reportIds = [...new Set(appeals.map((appeal) => appeal.report_id))];
-  const userIds = [...new Set(appeals.map((appeal) => appeal.user_id))];
+  const reportIds = [
+    ...new Set(
+      appeals
+        .map((appeal) => appeal.report_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const userIds = [
+    ...new Set(
+      appeals
+        .map((appeal) => appeal.user_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
 
   const [{ data: reports }, { data: users }] = await Promise.all([
     reportIds.length
@@ -88,14 +100,16 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     appeals: appeals.map((appeal) => {
-      const user = userById.get(appeal.user_id);
+      const user = appeal.user_id ? userById.get(appeal.user_id) : undefined;
       return {
         ...appeal,
-        user_name: user?.name ?? "Member",
+        user_name: user?.name ?? (appeal.user_id ? "Member" : "Deleted user"),
         is_blocked: (user as { is_blocked?: boolean } | undefined)?.is_blocked ?? false,
         suspended_until:
           (user as { suspended_until?: string | null } | undefined)?.suspended_until ?? null,
-        report: reportById.get(appeal.report_id) ?? null,
+        report: appeal.report_id
+          ? reportById.get(appeal.report_id) ?? null
+          : null,
       };
     }),
     total: count ?? 0,

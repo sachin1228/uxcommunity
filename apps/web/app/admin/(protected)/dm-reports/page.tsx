@@ -175,6 +175,42 @@ export default function AdminDmReportsPage() {
     }
   }
 
+  async function runAccountAction(
+    report: DmReportRow,
+    action: "warn" | "suspend" | "ban",
+  ) {
+    const reason = window.prompt(`Reason for the ${action}:`);
+    if (!reason?.trim()) return;
+    let days: number | undefined;
+    if (action === "suspend") {
+      const raw = window.prompt("Suspension length in days (1-30):", "7");
+      days = Number(raw);
+      if (!Number.isFinite(days) || days < 1 || days > 30) {
+        setActionError("Suspension must be between 1 and 30 days.");
+        return;
+      }
+    }
+    setBusyId(report.id);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/dm-reports/${report.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason: reason.trim(), days }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        setActionError(payload?.error ?? "Failed to action the report.");
+        return;
+      }
+      await fetchReports();
+    } catch {
+      setActionError("Failed to action the report.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = Boolean(reasonFilter || search);
 
@@ -383,6 +419,27 @@ export default function AdminDmReportsPage() {
                                 >
                                   {busy ? <Spinner size={12} /> : <EyeOff strokeWidth={2.5} size={12} />}
                                   Dismiss
+                                </button>
+                                <button
+                                  onClick={() => void runAccountAction(report, "warn")}
+                                  disabled={busy}
+                                  className="rounded-md border border-amber-500/40 px-2.5 py-1 font-body text-xs text-amber-400 transition-colors hover:bg-amber-500/10 disabled:opacity-40"
+                                >
+                                  Warn
+                                </button>
+                                <button
+                                  onClick={() => void runAccountAction(report, "suspend")}
+                                  disabled={busy}
+                                  className="rounded-md border border-orange-500/40 px-2.5 py-1 font-body text-xs text-orange-400 transition-colors hover:bg-orange-500/10 disabled:opacity-40"
+                                >
+                                  Suspend
+                                </button>
+                                <button
+                                  onClick={() => void runAccountAction(report, "ban")}
+                                  disabled={busy}
+                                  className="rounded-md border border-destructive/40 px-2.5 py-1 font-body text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                                >
+                                  Ban
                                 </button>
                               </>
                             ) : (

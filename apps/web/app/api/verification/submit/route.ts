@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { parseR2Key } from "@/lib/r2";
 import { isOwnVerificationKey } from "@/lib/r2-private";
 import {
   normalizeLinkedInUrl,
   normalizePortfolioLinks,
   normalizeWorkSampleKeys,
-  normalizeWorkSampleUrls,
   VERIFICATION_SAMPLES_MAX,
 } from "@/lib/verification/rules";
+import {
+  parseVerificationSamplePath,
+  verificationSampleKey,
+} from "@/lib/verification/samples";
 
 /**
  * POST /api/verification/submit
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const rl = await rateLimit(`verification:submit:${userId}`, 5, 3600);
+  const rl = await rateLimit(`verification:submit:${userId}`, 5, 3600, { failClosed: true });
   if (!rl.success) {
     return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
   }
@@ -59,11 +61,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: sampleKeys.error }, { status: 422 });
   }
 
-  const samples = normalizeWorkSampleUrls(body.work_sample_urls);
-  if (samples.error) {
-    return NextResponse.json({ error: samples.error }, { status: 422 });
+  // New submissions must use the private upload flow. Legacy public URLs are
+  // still readable on old requests, but acceptance here would recreate the
+  // public-PII path the private bucket was introduced to close.
+  if (Array.isArray(body.work_sample_urls) && body.work_sample_urls.length > 0) {
+    return NextResponse.json(
+      { error: "Work samples must be uploaded through the verification form." },
+      { status: 422 },
+    );
   }
-  if (sampleKeys.keys.length + samples.urls.length > VERIFICATION_SAMPLES_MAX) {
+  const rawRefs = Array.isArray(body.work_sample_refs) ? body.work_sample_refs : [];
+  const sampleRefs = rawRefs.filter((value): value is string => typeof value === "string");
+  if (sampleRefs.length !== rawRefs.length || sampleRefs.length > VERIFICATION_SAMPLES_MAX) {
+    return NextResponse.json(
+      { error: `Upload at most ${VERIFICATION_SAMPLES_MAX} work samples.` },
+      { status: 422 },
+    );
+  }
+  const parsedRefs = sampleRefs.map(parseVerificationSamplePath);
+  if (parsedRefs.some((value) => value === null)) {
+    return NextResponse.json(
+      { error: "Work samples must be uploaded through the verification form." },
+      { status: 422 },
+    );
+  }
+  if (sampleKeys.keys.length > VERIFICATION_SAMPLES_MAX) {
     return NextResponse.json(
       { error: `Upload at most ${VERIFICATION_SAMPLES_MAX} work samples.` },
       { status: 422 },
@@ -71,15 +93,6 @@ export async function POST(request: NextRequest) {
   }
   for (const key of sampleKeys.keys) {
     if (!isOwnVerificationKey(key, userId)) {
-      return NextResponse.json(
-        { error: "Work samples must be uploaded through the verification form." },
-        { status: 422 },
-      );
-    }
-  }
-  for (const url of samples.urls) {
-    const key = parseR2Key(url);
-    if (!key || !key.startsWith(`verification/${userId}/`)) {
       return NextResponse.json(
         { error: "Work samples must be uploaded through the verification form." },
         { status: 422 },
@@ -129,14 +142,70 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Existing key-backed samples are referenced by proxy path. Resolve them
+  // server-side so the browser/phone never receives a raw private key. Legacy
+  // URL-only samples cannot be carried into a new submission; the member must
+  // re-upload them through the private form.
+  const referencedKeys: string[] = [];
+  const requestCache = new Map<string, {
+    user_id: string;
+    work_sample_keys: string[] | null;
+  } | null>();
+  for (const ref of parsedRefs) {
+    if (!ref) continue;
+    let request = requestCache.get(ref.requestId);
+    if (request === undefined) {
+      const { data: found } = (await (db as any)
+        .from("account_verification_requests")
+        .select("user_id, work_sample_keys")
+        .eq("id", ref.requestId)
+        .maybeSingle()) as {
+        data: { user_id: string; work_sample_keys: string[] | null } | null;
+      };
+      request = found;
+      requestCache.set(ref.requestId, request);
+    }
+    if (!request || request.user_id !== userId) {
+      return NextResponse.json(
+        { error: "Work samples must be uploaded through the verification form." },
+        { status: 422 },
+      );
+    }
+    const key = verificationSampleKey(
+      { work_sample_keys: request.work_sample_keys, work_sample_urls: [] },
+      ref.index,
+    );
+    if (!key) {
+      return NextResponse.json(
+        { error: "Legacy work samples must be re-uploaded through this form." },
+        { status: 422 },
+      );
+    }
+    if (!isOwnVerificationKey(key, userId)) {
+      return NextResponse.json(
+        { error: "Work samples must be uploaded through the verification form." },
+        { status: 422 },
+      );
+    }
+    referencedKeys.push(key);
+  }
+
+  const allSampleKeys = [...new Set([...sampleKeys.keys, ...referencedKeys])];
+  if (allSampleKeys.length > VERIFICATION_SAMPLES_MAX) {
+    return NextResponse.json(
+      { error: `Upload at most ${VERIFICATION_SAMPLES_MAX} work samples.` },
+      { status: 422 },
+    );
+  }
+
   const { data: inserted, error: insertError } = await (db
     .from("account_verification_requests") as any)
     .insert({
       user_id: userId,
       linkedin_url: linkedinUrl,
       portfolio_links: portfolio.links,
-      work_sample_keys: sampleKeys.keys,
-      work_sample_urls: samples.urls,
+      work_sample_keys: allSampleKeys,
+      work_sample_urls: [],
       email_verified_at: row.email_verified_at,
       status: "pending",
     })

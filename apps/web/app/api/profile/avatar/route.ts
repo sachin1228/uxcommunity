@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import { detectImageMime, extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, deleteR2AssetIfUnreferenced, uploadToR2 } from "@/lib/r2";
 
@@ -10,6 +11,11 @@ export async function POST(request: NextRequest) {
     session = await requireSession("user");
   } catch (error) {
     return error as Response;
+  }
+
+  const limit = await rateLimit(`profile:avatar:${session.userId}`, 20, 3600, { failClosed: true });
+  if (!limit.success) {
+    return NextResponse.json({ error: "Too many avatar uploads. Try again later." }, { status: 429 });
   }
 
   const contentType = request.headers.get("content-type") ?? "";

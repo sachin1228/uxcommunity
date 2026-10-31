@@ -25,7 +25,7 @@ const schema = z
 
 export async function POST(request: NextRequest) {
   const ip = getRequestClientIp(request);
-  const rl = await rateLimit(`reset-confirm:${ip}`, 10, 3600);
+  const rl = await rateLimit(`reset-confirm:${ip}`, 10, 3600, { failClosed: true });
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

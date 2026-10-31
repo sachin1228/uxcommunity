@@ -13,21 +13,21 @@ import { sendAccountDeletedEmail } from "@/lib/email";
  * Member-initiated account deletion.
  *
  * Requires the current password and the literal confirmation "DELETE" so a
- * stolen session alone cannot erase an account. Liveness is not checked:
- * a blocked or verification-restricted member must still be able to exercise
- * erasure. A JWT for an already-deleted account reaches the row lookup and
- * gets a 404.
+ * stolen session alone cannot erase an account. This route is for a live
+ * session; a blocked/suspended member whose sessions were revoked uses
+ * /delete-account and /api/account/delete/credential instead.
  */
 export async function POST(request: NextRequest) {
-  // No liveness check on purpose: a blocked member must still be able to
-  // exercise erasure. The password + DELETE confirmation below are the gate.
+  // This path still requires a registry-valid session. It intentionally does
+  // not bypass session revocation; the public credential path covers accounts
+  // that cannot hold one.
   const session = await getSessionForErasure();
   const userId = session?.userId;
   if (!session || session.role !== "user" || !userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const limit = await rateLimit(`account-delete:${userId}`, 5, 3600);
+  const limit = await rateLimit(`account-delete:${userId}`, 5, 3600, { failClosed: true });
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many deletion attempts. Try again later." },

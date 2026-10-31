@@ -18,8 +18,9 @@ const CACHE_TTL_MS = 30_000;
 let cached: { days: number; at: number } | null = null;
 
 /**
- * The admin-configured grace window. Cached briefly because every write reads
- * it; a policy change still reaches other isolates within 30s.
+ * Legacy/admin grace value. Policy A enforces read-only from signup, so this
+ * no longer gates writes or the banner; it is still read so the admin setting
+ * and older clients remain compatible. Cached briefly to avoid a query storm.
  */
 export async function getVerificationGraceDays(): Promise<number> {
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.days;
