@@ -98,30 +98,29 @@ export function Topbar({ userId, user }: Props) {
       </div>
 
       {/* Search is one button in two places, moved by `order` rather than
-          rendered twice. Wide, it heads the content column; narrow, it joins
-          the account cluster instead — a lone icon floating in the middle of a
-          phone's header reads as a mistake, and the flex spacer is what
-          separates the two sides. Both layouts keep DOM order (brand, search,
-          bell, avatar) equal to what is on screen, so tab order still matches. */}
+          rendered twice. Wide, it heads the content column and grows to the
+          feed's column width (40rem); narrow, it joins the account cluster
+          instead — a lone icon floating in the middle of a phone's header reads
+          as a mistake, and the account cluster's auto margin separates the two
+          sides. Both layouts keep DOM order (brand, search, bell, avatar) equal
+          to what is on screen, so tab order still matches. */}
       <button
         type="button"
         onClick={() => setSearchOpen(true)}
         aria-label="Search"
         aria-haspopup="dialog"
-        className="order-3 flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-lg border border-border font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent min-[500px]:order-2 sm:w-80 sm:justify-start sm:px-2.5"
+        className="order-3 flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-full border border-border font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent min-[500px]:order-2 sm:min-w-0 sm:flex-1 sm:max-w-[40rem] sm:justify-start sm:px-2.5"
       >
         <Search size={14} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
-        <span className="hidden flex-1 text-left sm:block">Search</span>
+        <span className="hidden min-w-0 flex-1 truncate text-left sm:block">Search</span>
         <kbd className="hidden rounded border border-border px-1 py-0.5 font-mono text-[10px] leading-none sm:block">
           {isApple ? "⌘K" : "Ctrl K"}
         </kbd>
       </button>
 
-      <div className="order-2 min-w-0 flex-1 min-[500px]:order-3" />
-
       {/* Messages, bell, then profile: the account controls stay pinned to the
           right edge at every width. */}
-      <div className="order-4 flex min-w-0 items-center gap-2">
+      <div className="order-4 ml-auto flex min-w-0 items-center gap-2">
         <DmTopbarButton userId={userId} />
         <LimitsRing />
         <NotificationBell userId={userId} />
