@@ -1,0 +1,49 @@
+{
+  "commit": "6b4835c8cb414984dfc8994c3d4dbb2f08b70178",
+  "migration_files": 216,
+  "distinct_versions": 204,
+  "duplicate_versions": {
+    "20260718": [
+      "20260718_add_image_url_to_master_data.sql",
+      "20260718_add_is_blocked_to_users.sql",
+      "20260718_replace_sectors_add_companies_cities.sql",
+      "20260718_seed_other_option.sql",
+      "20260718_unique_application_id_on_users.sql"
+    ],
+    "20260719": [
+      "20260719_add_avatar_to_profiles.sql",
+      "20260719_add_design_interests.sql"
+    ],
+    "20260720": [
+      "20260720_communities.sql",
+      "20260720_communities_company_experience.sql",
+      "20260720_community_last_read.sql",
+      "20260720_lottie_settings.sql",
+      "20260720_realtime_community_messages.sql"
+    ],
+    "20260721": [
+      "20260721_cleanup_orphaned_communities.sql",
+      "20260721_communities_is_active.sql"
+    ],
+    "20260924120000": [
+      "20260924120000_home_feed_member_scope.sql",
+      "20260924120000_sidebar_content_reactions_replies.sql"
+    ],
+    "20261010120000": [
+      "20261010120000_event_city.sql",
+      "20261010120000_job_application_triage.sql"
+    ]
+  },
+  "history_count": 5,
+  "repository_only_versions": 202,
+  "repository_only_files": 214,
+  "assessment_counts": {
+    "1": 2,
+    "2": 7,
+    "4": 148,
+    "5": 57,
+    "3": 2
+  },
+  "statements": 1812,
+  "dependency_rows": 1618
+}
