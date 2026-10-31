@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
   const { email, password } = parsed.data;
   const normalizedEmail = email.toLowerCase();
   const [ipLimit, emailLimit] = await Promise.all([
-    rateLimit(`account-delete-credential:ip:${ip}`, 10, 3600, { failClosed: true }),
-    rateLimit(`account-delete-credential:email:${normalizedEmail}`, 5, 3600, { failClosed: true }),
+    rateLimit(`account-delete-credential:ip:${ip}`, 10, 3600),
+    rateLimit(`account-delete-credential:email:${normalizedEmail}`, 5, 3600),
   ]);
   if (!ipLimit.success || !emailLimit.success) {
     return NextResponse.json(

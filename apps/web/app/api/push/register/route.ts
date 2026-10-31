@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return e as Response;
   }
 
-  const limit = await rateLimit(`push:register:${session.userId}`, 30, 3600, { failClosed: true });
+  const limit = await rateLimit(`push:register:${session.userId}`, 30, 3600);
   if (!limit.success) {
     return NextResponse.json({ error: "Too many registration attempts. Try again later." }, { status: 429 });
   }

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const rl = await rateLimit(`verification:submit:${userId}`, 5, 3600, { failClosed: true });
+  const rl = await rateLimit(`verification:submit:${userId}`, 5, 3600);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
   }

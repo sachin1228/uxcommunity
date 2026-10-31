@@ -29,7 +29,7 @@ function safeSignupError(error: { code?: string; message?: string }) {
 
 export async function POST(request: NextRequest) {
   const ip = getRequestClientIp(request);
-  const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600, { failClosed: true });
+  const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600);
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

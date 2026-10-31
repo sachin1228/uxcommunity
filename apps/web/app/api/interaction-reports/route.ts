@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
   const userId = session.userId!;
 
-  const limit = await rateLimit(`interaction-report:${userId}`, 30, 3600, { failClosed: true });
+  const limit = await rateLimit(`interaction-report:${userId}`, 30, 3600);
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many reports. Please try again later." },
@@ -84,8 +84,7 @@ export async function POST(request: NextRequest) {
     const targetLimit = await rateLimit(
       `interaction-report:${targetType}:${userId}`,
       10,
-      3600,
-      { failClosed: true },
+      3600
     );
     if (!targetLimit.success) {
       return NextResponse.json(

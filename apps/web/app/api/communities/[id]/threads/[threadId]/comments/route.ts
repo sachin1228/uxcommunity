@@ -109,7 +109,7 @@ export async function POST(
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  const limit = await rateLimit(`comment:create:${userId}:60s`, 20, 60, { failClosed: true });
+  const limit = await rateLimit(`comment:create:${userId}:60s`, 20, 60);
   if (!limit.success) {
     return NextResponse.json({ error: "Too many comments. Please slow down." }, { status: 429 });
   }

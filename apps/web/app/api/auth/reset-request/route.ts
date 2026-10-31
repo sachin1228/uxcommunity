@@ -11,7 +11,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   const ip = getRequestClientIp(request);
-  const rl = await rateLimit(`reset-request:${ip}`, 5, 3600, { failClosed: true }); // 5 per hour per IP
+  const rl = await rateLimit(`reset-request:${ip}`, 5, 3600); // 5 per hour per IP
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

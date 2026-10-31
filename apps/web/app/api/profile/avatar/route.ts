@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     return error as Response;
   }
 
-  const limit = await rateLimit(`profile:avatar:${session.userId}`, 20, 3600, { failClosed: true });
+  const limit = await rateLimit(`profile:avatar:${session.userId}`, 20, 3600);
   if (!limit.success) {
     return NextResponse.json({ error: "Too many avatar uploads. Try again later." }, { status: 429 });
   }

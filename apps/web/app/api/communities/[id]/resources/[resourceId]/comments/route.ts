@@ -111,7 +111,7 @@ export async function POST(
     return NextResponse.json({ error: "Comments are turned off for this resource." }, { status: 403 });
   }
 
-  const limit = await rateLimit(`resource-comment:create:${userId}:60s`, 20, 60, { failClosed: true });
+  const limit = await rateLimit(`resource-comment:create:${userId}:60s`, 20, 60);
   if (!limit.success) {
     return NextResponse.json({ error: "Too many comments. Please slow down." }, { status: 429 });
   }

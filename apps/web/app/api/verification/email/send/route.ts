@@ -27,7 +27,7 @@ export async function POST() {
   }
 
   const userId = session.userId!;
-  const rl = await rateLimit(`verification:email:${userId}`, 5, 3600, { failClosed: true });
+  const rl = await rateLimit(`verification:email:${userId}`, 5, 3600);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many codes requested. Try again later." },

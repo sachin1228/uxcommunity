@@ -158,8 +158,8 @@ export async function POST(
   const [rateResult, access, senderProfileResult] = await Promise.all([
     timer.measure("rate_limits", () =>
       Promise.all([
-        rateLimit(`dm:send:${userId}:10s`, 5, 10, { failClosed: true }),
-        rateLimit(`dm:send:${userId}:60s`, 20, 60, { failClosed: true }),
+        rateLimit(`dm:send:${userId}:10s`, 5, 10),
+        rateLimit(`dm:send:${userId}:60s`, 20, 60),
       ]),
     ),
     timer.measure("conversation_query", () =>

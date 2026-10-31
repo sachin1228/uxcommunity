@@ -58,7 +58,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
   const post = await access(db, id, postId, userId, true);
   if (!post) return NextResponse.json({ error: "Comments are not allowed on this showcase." }, { status: 403 });
-  const limit = await rateLimit(`showcase:comment:${userId}:60s`, 15, 60, { failClosed: true }); if (!limit.success) return NextResponse.json({ error: "Too many comments." }, { status: 429 });
+  const limit = await rateLimit(`showcase:comment:${userId}:60s`, 15, 60); if (!limit.success) return NextResponse.json({ error: "Too many comments." }, { status: 429 });
   let payload: Record<string, unknown>; try { payload = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const body = typeof payload.body === "string" ? payload.body.trim() : ""; const parentId = typeof payload.parent_id === "string" ? payload.parent_id : null;
   if (!body || body.length > 1000) return NextResponse.json({ error: "Comment must be 1–1000 characters." }, { status: 422 });
