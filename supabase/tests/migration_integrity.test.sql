@@ -1,7 +1,7 @@
 -- Guards the forward-only fixes that a fresh database needs.
 begin;
 create extension if not exists pgtap;
-select plan(9);
+select plan(10);
 
 select has_function('public', 'get_resource_list_aggregates', 'resource aggregate RPC exists');
 select is(
@@ -9,6 +9,11 @@ select is(
           like '%allow_replies%'),
   true,
   'resource aggregate RPC returns allow_replies'
+);
+select is(
+  (select pg_get_function_result('public.get_resource_list_aggregates(uuid,uuid[])'::regprocedure)),
+  'TABLE(id uuid, save_count bigint, comment_count bigint, bookmark_count bigint, user_saved boolean, user_bookmarked boolean, allow_replies boolean)',
+  'resource aggregate RPC has the exact seven-column contract'
 );
 select has_column('public', 'community_resources', 'allow_replies', 'resource allow_replies column exists');
 select has_function('public', 'complete_signup_with_consent', 'atomic signup consent RPC exists');

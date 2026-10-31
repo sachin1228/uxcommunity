@@ -4,7 +4,7 @@
 **Main repository:** `/Users/sachin/Documents/GitHub/uxcommunity`
 **Main revision:** `1928205f` (`Update deploy.yml`), clean working tree
 
-> **Remediation update (2026-10-31):** A remediation branch (`fix/production-readiness-remediation`) now exists with the safe code/migration/test changes described in `PRODUCTION_REMEDIATION_REPORT.md`. This document remains the baseline audit and does not itself claim any fix was applied to production. Backup/DR remains deferred to a separate task.
+> **Remediation update (2026-10-31):** The remediation branch (`fix/production-readiness-remediation`) now exists and passes the final local regression gates. Its current verdict is **READY FOR STAGING** — deploy it to a separate staging environment next; this is **not READY FOR PRODUCTION APPROVAL**. Realtime scale (including 1,000 clients) and verification evidence privacy are resolved in the branch; production migrations/deployment, staging/device tests, Android signing, secret hygiene and backup/DR remain outstanding. See `PRODUCTION_REMEDIATION_REPORT.md` and `REMAINING_BLOCKERS.md`. This document remains the baseline audit and does not itself claim any fix was applied to production.
 
 **Website repository:** `/Users/sachin/Documents/GitHub/uxcommunity-website` (`99cb5dc`)
 **Live website:** https://www.uxcommunity.in/

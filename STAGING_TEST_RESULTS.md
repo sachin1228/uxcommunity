@@ -5,6 +5,12 @@
 **Environment:** macOS 26.4, Node 24.18.0, npm, PostgreSQL 17.11 (Homebrew), local Next 16.4.3 dev server already running on port 3000, no Docker, no dedicated staging project, no Android device attached.
 **Production:** inspected read-only; **no deployment, migration, R2 operation, secret change or production test was performed.**
 
+## Verdict
+
+# READY FOR STAGING
+
+The branch passes the final local regression gates (web, realtime, database, mobile, production builds). It is ready to deploy to a **separate staging environment** and run this matrix. It is **not READY FOR PRODUCTION APPROVAL**: no staging, platform-load, email/FCM delivery or Android device test has run, and backup/DR, production migrations/deploy, signing and the approvals in `REMAINING_BLOCKERS.md` remain outstanding.
+
 ## 1. Environment status
 
 | Environment | Status |
@@ -23,10 +29,11 @@
 | Check | Command | Result |
 |---|---|---|
 | TypeScript | `npx tsc --noEmit` in `apps/web` | **PASS** (exit 0) |
-| Full unit suite | `cd apps/web && FILES=$(find . \( -name node_modules -o -name .next -o -name .open-next \) -prune -o -name '*.test.ts' -print \| sort); npx tsx --tsconfig tsconfig.json --test $FILES` | **PASS — 1,080/1,080**, 0 failed, 0 skipped, 5.28 s (133 files) |
+| Full unit suite | `cd apps/web && FILES=(${(f)"$(find . \( -name node_modules -o -name .next -o -name .open-next \) -prune -o -name '*.test.ts' -print \| sort)"}); npx tsx --tsconfig tsconfig.json --test "${FILES[@]}"` (zsh array split) | **PASS — 1,081/1,081**, 0 failed, 0 skipped, 5.01 s (133 files), exit 0 |
 | Targeted security/deletion/schedule tests | request-origin, secure-compare, delete-credential, event-schedule, private-resume, verification policy | **PASS — 26/26** (request-origin, secure-compare, delete-credential, event-schedule, private-resume, verification policy) |
-| Production build | Isolated full-workspace copy, no `.env.local`/`.dev.vars`; dummy public env | **PASS** (exit 0, compiled + type-checked + route manifest generated) |
+| Production build | Isolated full-workspace copy with cloned dependencies, no `.env.local`/`.dev.vars`; dummy public env | **PASS** (exit 0, compiled + type-checked + route manifest generated) |
 | Production build in the live workspace | **Not run** | The running dev server owns `.next` and `.env.local` contains production credentials; building there would disrupt the server or create secret-bearing artifacts. |
+| Lint on touched files | `npx eslint` on the changed routes/components/lib files | **PASS — 0 errors, 1 warning** (existing `@next/next/no-img-element` in `VerificationForm.tsx`) |
 | Middleware HTTP→HTTPS | Local dev server, `Host: app.uxcommunity.in`, `x-forwarded-proto: http` | **PASS — 308 Permanent Redirect to HTTPS** |
 | Middleware CSRF (cross-origin) | `Origin: https://evil.example`, POST `/api/auth/login` | **PASS — 403 `Cross-origin request denied`** |
 | Middleware CSRF (same-origin) | `Origin: https://app.uxcommunity.in`, POST `/api/auth/login` | **PASS — reached route validation (422)** |
@@ -49,14 +56,15 @@ Notes: the local redirect included `:3000` because the dev server's host carried
 | Check | Result |
 |---|---|
 | Fresh local schema application | **216 migrations applied** (with expected Supabase-only harness errors for `auth`, `storage`, `companies`; documented harness limitation) |
-| `supabase/tests/migration_integrity.test.sql` | **PASS — 9/9** |
+| `supabase/tests/migration_integrity.test.sql` | **PASS — 10/10** |
 | `supabase/tests/public_read_exposure.test.sql` | **PASS — 19 ok / 0 failed** (15 planned assertions; scoped seven-table denylist, default-ACL table/function probes, explicit public-read fixture, anon/authenticated denial) |
 | `supabase/tests/private_r2_storage.test.sql` | **PASS — 11/11** (after restoring `has_column`/`col_is_null` harness helpers) |
 | `supabase/tests/moderation_evidence_retention.test.sql` | **PASS — 82/82** |
 | `supabase/tests/moderation_appeals_retention.test.sql` | **PASS — 5/5** (appeal survives account deletion, anonymized, `user_deleted_at` set) |
 | `apps/web/lib/auth/rate-limit.test.ts` | **PASS — 3/3** (critical fail-closed in production; development fallback; non-critical availability fallback) |
-| `supabase/tests/moderation_evidence_concurrency.test.sql` | **PASS — 8/8** (earlier run on the same chain; not rerun after the final additive migrations) |
+| `supabase/tests/moderation_evidence_concurrency.test.sql` | **PASS — 8/8** (rerun in the final combined run) |
 | `supabase/tests/signup_consent_atomic.test.sql` | **PASS — 3/3** (false age consent refused; valid consent creates one account; timestamps/version persisted) |
+| Combined final DB run | **PASS — 138/138 assertions, 0 failed**, exit 0, across the seven suites above |
 | `npm run test:moderation` | **PASS — 75/75** |
 | `npm run test:private-storage` | **PASS — 36/36** |
 | `npm run test:signup` | **PASS — 7/7** |
@@ -65,7 +73,7 @@ Notes: the local redirect included `:3000` because the dev server's host carried
 | Staging upgrade clone with representative data | **NOT RUN** — no staging project. |
 | Production migration application | **NOT RUN** — approval required. |
 
-Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster, so `auth`/`storage` schemas and some fixtures are absent; the migration log contains expected Supabase-only errors. The 9 launch-critical assertions pass. A real Supabase staging project is still required for the complete chain and upgrade test.
+Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster, so `auth`/`storage` schemas and some fixtures are absent; the migration log contains expected Supabase-only errors. The 10 launch-critical assertions pass. A real Supabase staging project is still required for the complete chain and upgrade test.
 
 ## 5. Mobile
 
@@ -75,23 +83,30 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 | `test:mobile-realtime` | **PASS — 71/71** |
 | `test:mobile-cache` | **PASS — 7/7** |
 | `test:mobile-signup` | **PASS — 12/12** |
+| Full mobile sweep (`find … '*.test.ts'`) | **441/444**; the three failing files (`communitiesSnapshot`, `communityBootstrap`, `dmConversationsCache`) fail at load because they import React Native Flow source under `tsx`, a pre-existing harness limitation, not a changed-code failure. |
 | Android production/release artifact | **BLOCKED** — see §10 for the exact configuration gap. |
 | Package/version/network/deep links on a device | **NOT TESTED.** |
 | Mobile verification restriction copy | Updated banner text; API enforcement is server-side. |
-| Mobile private verification disk cache, mobile appeals screen, mobile legal links | **NOT FIXED** (documented deferred items). |
+| Mobile verification thumbnails | `expo-image` with the session cookie and **memory-only** cache; sign-out clears the memory cache. Device behavior still needs a test. |
+| Mobile appeals screen, mobile legal links | **NOT FIXED** (documented deferred items). |
 
 ## 6. Realtime
 
 | Check | Result |
 |---|---|
 | Worker TypeScript | **PASS** — `npx tsc --noEmit` in `apps/realtime`, exit 0. |
-| Full Worker test suite | **TIMEOUT / NOT COMPLETED** — `npm test` was killed after 600 s while running the 500×100 fan-out integration; no final pass/fail summary (npm exit 143). |
-| Critical non-performance subset | **FAIL — 38/39** — 4 files passed; `ws-ownership.test.ts` 1,000-client test failed with `Timeout waiting for hello`. Rerun was not performed (interrupted). |
-| Mobile realtime tests | **PASS — 71/71** — separate RN realtime lifecycle suite. |
+| 100 clients | **PASS — 100/100**, 0 duplicates, p50 15.2 ms, p95 19.2 ms, p99 19.3 ms. |
+| 500 clients | **PASS — 500/500**, 0 duplicates, p50 17.3 ms, p95 22.5 ms, p99 23.0 ms. |
+| 1,000 clients | **PASS — 1,000/1,000**, 0 duplicates, p50 42.9 ms, p95 60.4 ms, p99 61.6 ms. |
+| 500×100 fan-out | **PASS — 50,000/50,000**, 0 duplicates; isolated run 68.3 s; also passed inside the full suite. |
+| Full ownership suite | **PASS — 21/21**, 193.7 s. |
+| Previously failing multi-file run | **PASS — 39/39** after test isolation; the earlier run was **38/39** with the 1,000-client `Timeout waiting for hello`. |
+| **Full Worker suite** | **PASS — 28 files / 281 tests, 0 failed, 1,703.33 s, exit 0.** Includes 1,000 clients (85.1 s), 500×100 fan-out and the ownership suite. |
 | Unauthenticated production WebSocket | Closes without opening (1006 handshake rejection); no data access. |
-| Session validation endpoint | Code/live schema verified; requires `API_SECRET`, fails closed; no authenticated socket test. |
 | Revocation on an open socket | **NOT TESTED** — no staging/test account/device. |
-| 100/500/1,000 concurrent connection load tests | **NOT RUN / FAILED locally** — the local 1,000-client test failed; no staging load environment; production intentionally untouched. This must be rerun with the realtime load environment before launch. |
+| Authenticated staging socket test | **NOT TESTED** — no staging environment. |
+
+**Root cause classification:** the application fan-out path is healthy at 100/500/1,000 and 500×100 with zero duplicates, and the full Worker suite now passes end to end. The earlier 1,000-client failure was reproduced only when it ran after other Miniflare suites in the same Vitest process; the shared process retained workers/DOs/sockets across files. The test harness now uses Vitest **forks** with `isolate: true` and `fileParallelism: false`, and the previously failing multi-file set is 39/39 while the full suite is 281/281. This is a test-run isolation/resource fix, not a change to DO ownership or fan-out architecture. A staging/load run remains required for platform-level capacity confirmation.
 
 ## 7. Email and push
 
@@ -110,7 +125,7 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 - Staging E2E (signup, login, delete, reports, admin actions, appeals, private R2, signed URL expiry).
 - Real Android device auth/session/deletion/push/private media.
 - Real email/FCM delivery and notification preferences.
-- Realtime revocation on an open socket and load tests; the local 1,000-client ownership test failed with a hello timeout, and the full Worker suite timed out.
+- Platform-level realtime load and revocation on an open socket; the local full Worker suite passes (281/281, including 1,000 clients), but staging capacity is not proven.
 - Production deployment, migration application, R2 deletion/purge, secret rotation.
 - Backup/DR restore (out of scope).
 
@@ -122,7 +137,9 @@ Known local-harness limitations (not concealed): it is a bare PostgreSQL cluster
 | Moderation contract + appeal rules + appeal tokens + rate-limit | **PASS — 25/25** combined; rate-limit separately **3/3** |
 | Appeal retention after account deletion | **PASS — 5/5** |
 | CSP config + cookie policy | **PASS — 3/3** (report-only directives; HttpOnly/SameSite/domain; localhost host-only) |
-| Verification sample presentation (signed private URL, legacy URL fallback, owner keys separate) | **PASS — 3/3** |
+| Verification sample proxy paths (no keys/URLs, parser) | **PASS — 4/4** |
+| Verification private access (owner/other/admin) | **PASS — 4/4** |
+| Session-route audit requires the proxy to use `getSession()` + `canViewVerificationSample` | **PASS — 6/6** |
 | Admin event/verification route behavior end-to-end | **NOT TESTED** — contract/static test only; route integration remains blocked by no staging. |
 
 ### Exact commands used for the focused suites
@@ -142,8 +159,9 @@ bash supabase/tests/run-local.sh   supabase/tests/migration_integrity.test.sql  
 | iOS identifier | `com.sachinpatil1228.myapp` (placeholder) | Change before any iOS/App Store build; not part of Android-only launch. |
 | API endpoint | EAS sets `EXPO_PUBLIC_API_URL=https://app.uxcommunity.in` | Verify the release environment also has `EXPO_PUBLIC_REALTIME_URL=wss://rt.uxcommunity.in`; inspect `.env`/EAS secrets (not printed). |
 | FCM | `android/app/google-services.json` exists (670 bytes); `app.json` points at `./google-services.json` | Confirm the root/prebuild resource path, Firebase project, and Android app ID; validate push on a device. |
-| Deep links | scheme `uxcommunity`; manifest https intent present | Verify host/path filters and test email/app links; iOS associated domains not configured. |
+| Deep links | scheme `uxcommunity`; the manifest declares only the custom-scheme intent (no verified https app links); iOS associated domains not configured | Add/verify host-based app links if email/web links must open the app; test on a device. |
 | Permissions | Manifest requests location (coarse/fine), record audio, system alert window, storage/media permissions | Remove unused location/audio/overlay permissions if not required, or document why; retest media/notification flows. |
+| Backup / legacy storage | `allowBackup="true"`; `requestLegacyExternalStorage="true"` | Decide whether app data may be backed up; remove the legacy-storage flag if no longer needed for the target Android range, then retest. |
 | R8/ProGuard | `minifyEnabled` uses the root Gradle property; `shrinkResources` defaults false | Build with the intended release flags and test; document reproducibility. |
 | Build/signing verification | **NOT RUN** — no production signing credentials; no device. | Build a signed release on a clean machine/device once credentials are available; do not upload. |
 
@@ -163,10 +181,19 @@ bash supabase/tests/run-local.sh   supabase/tests/migration_integrity.test.sql  
 
 ## 13. Verification evidence privacy
 
-- Owner verification GET returns raw `work_sample_keys` (needed by the resubmit form) plus 15-minute signed URLs or legacy public URLs; admin verification GET strips keys and returns signed URLs. Owner keys alone do not authorize object reads; the private bucket and signed URL are the capabilities.
-- New submissions reject public `work_sample_urls`; legacy rows can still return their old public URLs until cleanup/migration, which was not performed.
-- Signed verification URLs expire after 15 minutes; the UI does not auto-refresh them, so an open page may show broken thumbnails after expiry. Legacy public evidence remains publicly readable by URL; this is a known migration/cleanup gap.
-- Mobile verification images bypass the private-media memory-only loader and use a plain image component with default disk caching (deferred finding).
+The verification evidence API was redesigned:
+
+- `GET /api/verification` returns **proxy paths** (`/api/private/verification/<requestId>/<index>`) only. It no longer returns `work_sample_keys` or legacy public URLs.
+- `GET /api/admin/verifications` returns the same proxy paths; admin responses no longer return keys or raw legacy URLs.
+- The new `/api/private/verification/[id]/[index]` route requires a live registry-backed session and calls `canViewVerificationSample` (owner or admin). Unauthorized callers get 404; anonymous callers get 401.
+- Key-backed samples redirect to a **5-minute** signed GET; every image request re-signs, so an expired URL refreshes on the next load. Legacy URL-backed rows are fetched server-side and streamed with `Cache-Control: no-store`, so the public URL is not returned in the API response.
+- The owner form displays existing samples but submits only new upload keys plus `work_sample_refs` for existing key-backed samples. The server resolves refs to keys after verifying ownership; legacy URL-only refs must be re-uploaded through the private form.
+- Mobile verification thumbnails now use `expo-image` with the session cookie and **memory-only** cache policy; logout clears the expo-image memory cache. No disk copy is intentionally created.
+- Upload responses still return the newly uploaded key (needed for the immediate submit) plus a 30-minute preview URL; the key is not returned by GET and does not authorize reads.
+
+Tests: `samples.test.ts` (4/4) proves proxy paths never contain keys/URLs and parse correctly; `private-access.test.ts` (4/4) covers owner/other/admin; session-route audit (6/6) requires the verification proxy to use `getSession()` and `canViewVerificationSample`. A live proxy/authorization/expiry test still requires staging (no database/Next integration environment here).
+
+Remaining limits: legacy objects are still publicly readable **at their original URLs** until the separate R2 cleanup/migration decision; this change stops the API from republishing those URLs but cannot revoke the origin. Upload preview URLs expire after 30 minutes and do not auto-refresh before submit; the submitted evidence uses the proxy path. Mobile device cache behavior and account-deletion/authorization changes still need a real-device test.
 
 ## 14. Staging setup checklist (not provisioned; no cost/resources created)
 
@@ -176,7 +203,28 @@ bash supabase/tests/run-local.sh   supabase/tests/migration_integrity.test.sql  
 4. Configure a Resend test recipient/domain and an FCM test device/project; never use production user emails or tokens.
 5. Set mobile `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_REALTIME_URL` to staging; build a staging/dev client; do not point a release build at production for destructive tests.
 6. Load only synthetic fixtures; no real user PII; clean up disposable accounts/content.
-7. Run the 15-item staging matrix in `REMAINING_BLOCKERS.md`/the approval checklist; record results in this file.
+7. Run the 20-item staging matrix below; record results in this file.
+
+### Required staging configuration (proposal; nothing provisioned)
+
+| Component | Required staging value/integration |
+|---|---|
+| Supabase | Separate project; `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, DB connection for migrations; synthetic data only. |
+| Cloudflare web Worker | Staging web Worker + OpenNext assets; `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_REALTIME_URL` pointing at staging; Worker secrets below. |
+| Realtime Worker | Staging Worker + `COMMUNITY_DO`, `USER_DO`, `ALERT_MONITOR` migrations; `SESSION_SECRET`, `REALTIME_PUBLISH_SECRET`, `API_URL`, `API_SECRET`. |
+| R2 | Separate public/private buckets, scoped token, staging public host (custom domain or r2.dev); private bucket with no public domain. |
+| Worker secrets | `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `REALTIME_URL`, `REALTIME_PUBLISH_SECRET`, `API_SECRET`, `UPSTASH_REDIS_REST_URL/TOKEN`, `RESEND_API_KEY`, `EMAIL_FROM`, `GIPHY_API_KEY`, `R2_*` (5 values), `ADMIN_EMAIL/PASSWORD`, `FCM_SERVICE_ACCOUNT`, `MODERATION_IMAGE_SERVICE_URL` only if used. |
+| Upstash | Separate staging database/namespace; verify fail-closed behavior with the staging keys. |
+| Resend | Test domain/key and controlled recipient; no production addresses. |
+| FCM/EAS | Separate Firebase app/project + `google-services.json`; EAS staging profile; controlled device. |
+| Mobile | `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_REALTIME_URL` pointed at staging; staging/dev client; do not reuse the production-signed release. |
+| Website | Staging deployment or local website build; its `/api/auth/me` only; legal links can point at production legal pages or staging copies. |
+
+**Minimum estimated cost (not measured):** Supabase Free `$0` for staging (no PITR/backups), Cloudflare Workers free/paid `$0–$5`, R2 free tier likely `$0` for synthetic data, Upstash/Resend/FCM/EAS free tiers `$0` within quotas. A production-grade staging DB with PITR would cost more. No paid resource was created.
+
+### 20-item staging test matrix
+
+1. Signup + atomic consent (web/Android). 2. Policy A server-side write restrictions. 3. Unverified-user restricted writes. 4. Blocked/suspended account deletion. 5. Moderation reports (all target types). 6. Admin actions + audit rows. 7. Session revocation (individual/global). 8. Realtime authentication. 9. Open WebSocket revocation. 10. Private R2 access. 11. Signed URL expiry/refresh. 12. Email delivery. 13. Push notifications. 14. Community creation/joining. 15. Community chat. 16. Direct messages. 17. Posts/comments. 18. Job applications/resume uploads. 19. Event creation/cancellation. 20. Android clean-device testing.
 
 ## 15. Verification status against the live production snapshot
 

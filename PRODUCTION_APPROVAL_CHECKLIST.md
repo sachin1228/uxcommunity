@@ -1,7 +1,7 @@
 # Production Approval Checklist
 
 **Branch:** `fix/production-readiness-remediation`
-**Status:** code complete locally; **nothing below has been executed against production.**
+**Status:** **READY FOR STAGING** — local code and regression gates pass; **nothing below has been executed against production.** Deploy to a separate staging environment and complete §8 before requesting production approval.
 **Backup / DR:** NOT ADDRESSED — explicitly deferred to a separate task. Do not apply production migrations until a recoverable backup exists (the separate task or an approved one-off dump).
 
 Each item is independently approvable. Stop and obtain approval before executing any production operation.
@@ -26,10 +26,12 @@ Production-readiness remediation branch:
 - repair fresh migration chain / resource aggregate RPC
 - audit admin actions, DM report actions, evidence snapshots, appeal retention/email
 - transactional resume attachment, reject public verification URLs, strip resume keys
+- verification evidence proxy (owner/admin paths, 5-minute re-signed GETs, legacy streaming, memory-only mobile thumbnails)
 - event schedule validation, attendee cancellation notices, report visibility/caps
 
-Tests: web tsc, 1,080 web unit tests, isolated production build, website build,
-mobile tsc + realtime/cache/signup tests, local 216-migration DB suites.
+Tests: web tsc, 1,081 web unit tests, isolated production build, website build,
+mobile tsc + realtime/cache/signup tests (71/71, 7/7, 12/12), full realtime Worker
+suite 281/281 (including 1,000 clients), local 216-migration DB suites 138/138.
 No production deploy/migration/R2/secret change was performed.
 Backup/DR is deferred to a separate task.
 ```
@@ -269,20 +271,20 @@ The file `apps/web/.open-next/cloudflare/next-env.mjs` (gitignored, untracked, m
 
 ## 7. Items not implemented — product/infrastructure decisions
 
-1. **Turnstile / CAPTCHA is not implemented.** Policy A blocks most writes, but open signup still permits account creation, likes, reports and account/verification actions. If required before launch, add Cloudflare Turnstile site/secret, server-side `siteverify` (fail closed), web/mobile widgets, and staging tests. Do not enable enforcement until keys/rollout are approved.
+1. **Turnstile / CAPTCHA is not implemented.** Policy A blocks most writes, but open signup still permits account creation, likes, reports and account/verification actions. If required before launch, add Cloudflare Turnstile site/secret, server-side `siteverify` (fail closed; test hostname/action, single-use, expired/invalid/missing), web/mobile widgets, and staging tests. Do not enable enforcement until keys/rollout are approved.
 2. **DM-origin suspend/ban has no signed appeal token.** The member is told to email `hello@uxcommunity.in`; the signed appeal system is report-scoped. Decide whether to auto-create a profile report for DM bans or accept the support-email path.
 3. **Admin audit route-level verification is incomplete.** Admin event deletion and verification decisions are wired to `moderation_audit_log`, but only a static/action-contract test exists; no staging route E2E. Direct user suspend/lift UI and some non-moderation admin edits remain outside the audited set. Add before launch if the policy requires “every moderator decision.”
-4. **CSP is report-only; cookie domain remains `.uxcommunity.in`.** CSRF checking is live in code; a strict CSP/host-only cookie/realtime-token redesign is future hardening.
-5. **Event comments/likes/chat after end, event lifecycle FCM/preferences/quiet hours, mobile event push routing, notification dedupe, mobile private-verification disk cache, mobile appeals screen, mobile legal links** remain deferred (documented in the remediation report).
+4. **CSP is report-only; cookie domain remains `.uxcommunity.in`.** CSRF checking is live in code; the session cookie must stay on the parent domain for the current realtime cookie handshake. A strict CSP/host-only cookie/realtime-token redesign is future hardening, tested in staging.
+5. **Event comments/likes/chat after end, event lifecycle FCM/preferences/quiet hours, mobile event push routing, notification dedupe, mobile appeals screen and mobile legal links** remain deferred (documented in the remediation report).
 6. **Backup/DR** remains out of scope and unaddressed. Do not apply production migrations until the separate backup task is complete or an approved one-off recoverable dump exists.
-7. **Android production signing is not configured.** `android/app/build.gradle` uses `signingConfigs.debug` for release; `app.json` Android package is `in.uxcommunity.app`, versionCode 1/versionName 1.0.0, scheme `uxcommunity`; iOS bundle identifier is still `com.sachinpatil1228.myapp`. A production upload keystore, release signing config/EAS credentials, FCM `google-services.json` validation, API/realtime env verification, deep-link host review and Play Console review are required. Do not generate or replace keys here.
-8. **Verification owner keys:** the owner GET returns raw `work_sample_keys` because the resubmit form needs them; admin responses strip keys. Keys alone do not authorize reads (private bucket/signed URL). Legacy rows still return public URLs. Accepted for this branch; reassess if the policy forbids owner key exposure.
-9. **CSP/cookies:** CSP remains report-only; the session cookie must stay `.uxcommunity.in` for the current realtime cookie handshake. Enforcing CSP or narrowing the cookie requires nonce/script work and a realtime token redesign, tested in staging.
-10. **Turnstile:** not implemented; open signup remains a bot-risk decision. Implement siteverify (hostname/action, single-use, expired/invalid/missing tests) and web/mobile widgets if required; do not enable until approved.
+7. **Android production signing is not configured.** `android/app/build.gradle` uses `signingConfigs.debug` for release; `app.json` Android package is `in.uxcommunity.app`, versionCode 1/versionName 1.0.0, scheme `uxcommunity`; iOS bundle identifier is still `com.sachinpatil1228.myapp`. The manifest requests location, record-audio, overlay and storage/media permissions, sets `allowBackup=true`/`requestLegacyExternalStorage`, and declares only the custom scheme (no verified app links); `google-services.json` is present. A production upload keystore, release signing config/EAS credentials, permission cleanup, FCM/API/realtime env verification, deep-link review and a clean-device test are required. Do not generate or replace keys here.
+8. **Verification privacy is fixed in the branch.** Owner/admin responses now return proxy paths only, the proxy re-signs 5-minute GETs, legacy rows are streamed, resubmission uses owned refs, and mobile thumbnails are memory-only. Residual work: legacy objects remain publicly readable at their original URLs until the approved R2 cleanup; upload previews expire after 30 minutes; live proxy authorization/expiry and device-cache behavior need a staging/device test.
 
 ---
 
 ## 8. Staging verification required before launch
+
+**Current verdict: READY FOR STAGING.** The next gate is deploying this branch to a separate staging environment and running the matrix. Production approval must not be requested until these results are recorded.
 
 Provision a **separate** Supabase project, R2 public/private buckets, Workers environment, Resend/FCM configuration and test recipients. Do not use production credentials or real users. Run the full matrix in `STAGING_TEST_RESULTS.md` / the audit §9, especially:
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { loadEventForViewer } from "@/lib/communities/event-access";
@@ -25,6 +26,10 @@ export async function POST(
 
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
+  const limit = await rateLimit(`event:rsvp:${userId}`, 30, 60, { failClosed: true });
+  if (!limit.success) {
+    return NextResponse.json({ error: "Too many RSVP changes. Try again shortly." }, { status: 429 });
+  }
   const db = createServiceClient();
 
   // The host's compulsory join questions, answered in the confirm modal (the

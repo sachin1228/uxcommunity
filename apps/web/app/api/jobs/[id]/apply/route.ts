@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import {
   deletePrivateObject,
   isPrivateStorageConfigured,
@@ -52,6 +53,14 @@ export async function POST(
     session = await requireSession("user");
   } catch (error) {
     return error as Response;
+  }
+
+  const limit = await rateLimit(`job:apply:${session.userId}`, 10, 3600, { failClosed: true });
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many applications. Try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)) } },
+    );
   }
 
   const contentType = request.headers.get("content-type") ?? "";

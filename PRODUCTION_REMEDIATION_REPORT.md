@@ -8,15 +8,17 @@
 
 ## Final verdict
 
-# READY FOR PR REVIEW
+# READY FOR STAGING
 
-The in-scope code and local tests are complete enough for human review. This is **not** a staging or production-readiness claim:
+The remediation branch is code-complete and passes the final local regression gates, so it is ready to be deployed to a **separate staging environment** and run through the matrix in `STAGING_TEST_RESULTS.md`. This is **not** a production-approval claim:
 
+- No staging environment is provisioned or was tested; no real Supabase/Workers/R2/email/FCM/Android E2E was performed.
 - The production migrations, deployment, R2 deletion/purge and secret rotation are not executed.
-- No verified staging environment or Android device was available.
 - The production app still has the old HTTP behavior, client grants, 6-column RPC and public R2 orphan.
 - Backup/DR is out of scope and unresolved.
-- Turnstile, CSP enforcement, cookie narrowing, mobile appeal/screen gaps and Android production signing remain open decisions.
+- Android release signing/device verification is unresolved; Turnstile, CSP enforcement, cookie narrowing and some mobile appeal/screen gaps remain open decisions.
+
+Local gates now passing: web TypeScript, **1,081/1,081** web unit tests, isolated production build, website build, **281/281** full realtime Worker tests (including 1,000 clients), mobile TypeScript and documented mobile suites, and **138/138** local database assertions over the 216-migration chain. The realtime 1,000-client failure is resolved as a test-harness isolation defect; no fan-out architecture change was needed.
 
 **BACKUP / DISASTER RECOVERY: NOT ADDRESSED — explicitly deferred to a separate task, per instructions.** Production still has no verified backup/PITR and R2 versioning is disabled. This is a launch blocker outside this task’s scope; it must be handled before launch.
 
@@ -44,7 +46,16 @@ Selected policy: unverified accounts can browse, **like**, report/block, manage 
 - Reporting and blocking now explicitly pass `allowUnverified` (safety actions remain available).
 - Web and mobile banners in this branch and the separately committed website copy describe the policy; **neither is deployed**.
 - The admin Verifications screen labels `grace_days` as **legacy** and explains it no longer gates writes.
-- Tests: verification policy 4/4; 1,080/1,080 web unit tests pass.
+- Tests: verification policy 4/4; 1,081/1,081 web unit tests pass.
+
+### 2a. Verification evidence privacy (proxy)
+
+- Owner and admin verification responses now return only authorization-gated proxy paths (`/api/private/verification/<requestId>/<index>`); no `work_sample_keys` or legacy public URLs.
+- The new proxy route requires a live session and `canViewVerificationSample` (owner or admin); unauthorized callers get 404, anonymous callers 401.
+- Key-backed samples redirect to a **5-minute** signed GET and are re-signed on every image request; legacy URL-backed rows are streamed server-side with `no-store`, so the public URL is no longer returned to clients.
+- Resubmission sends `work_sample_refs`; the server resolves them to owned keys. Raw legacy URL-only refs are rejected and must be re-uploaded privately.
+- Mobile thumbnails use expo-image with a memory-only cache policy and clear that cache on sign-out.
+- Tests: proxy/path helpers 4/4, private access 4/4, session-route audit 6/6; live authorization/expiry still requires staging.
 
 Remaining product decision: `verification_settings.grace_days` is still 2 in production and is now inert. It can be set to 0 for clarity (approval checklist).
 
@@ -77,9 +88,9 @@ Remaining product decision: `verification_settings.grace_days` is still 2 in pro
 
 - Restored `20260814030000_community_list_aggregate_rpcs.sql` to the safe 6-column definition for fresh installs (the in-place edit had introduced a forward reference to a September column).
 - Added transactional `20261031110000_fix_resource_list_aggregates.sql`: ensures `allow_replies`, drops/recreates the RPC with 7 columns, grants only service_role.
-- Added `supabase/tests/migration_integrity.test.sql` (9/9) proving the 7-column RPC, `allow_replies`, atomic consent RPC, `terms_version`, transactional apply RPC, content snapshot, appeal retention column, and the expanded audit action check.
+- Added `supabase/tests/migration_integrity.test.sql` (10/10) proving the 7-column RPC, `allow_replies`, atomic consent RPC, `terms_version`, transactional apply RPC, content snapshot, appeal retention column, and the expanded audit action check.
 - Restored the unmerged `has_column`/`col_is_null` test harness additions and the `user_blocks` index test correction.
-- Local DB: 216 migrations applied; private-storage SQL **11/11**, moderation evidence **82/82**, scoped permission exposure **19 ok/0 failed**, migration integrity **9/9**, signup consent **3/3**, appeal retention **5/5**.
+- Local DB: 216 migrations applied; private-storage SQL **11/11**, moderation evidence **82/82**, scoped permission exposure **19 ok/0 failed**, migration integrity **10/10**, signup consent **3/3**, appeal retention **5/5**, evidence concurrency **8/8** — **138/138** combined assertions.
 
 Production migration history remains a brownfield ledger (see `MIGRATION_RECONCILIATION.md`). Do not run `supabase db push`; production history still needs a controlled baseline after schema diff/approval.
 
@@ -116,7 +127,7 @@ Production migration history remains a brownfield ledger (see `MIGRATION_RECONCI
 - Host deletion notifies attendees who RSVPed (in-app), in addition to the existing moderated-deletion notice.
 - Report targets now check private-community visibility; outsiders get 404.
 - Per-target report cap: 25 reports/24h per content target, in addition to per-user limits.
-- Still deferred: event comments/likes/chat after end, event lifecycle FCM/preferences/quiet hours, mobile event push routing, notification dedupe gaps, mobile private-verification disk cache.
+- Still deferred: event comments/likes/chat after end, event lifecycle FCM/preferences/quiet hours, mobile event push routing, notification dedupe gaps.
 
 ### 10. Legal/product copy
 
@@ -137,13 +148,13 @@ Marketing build passes. Changes are in `uxcommunity-website` and need their own 
 | C-03 verification gate | **CODE FIXED — DEPLOY PENDING** | Policy A; likes/reports/account actions allowed; tests pass. |
 | C-04 sensitive grants | **MIGRATION READY — APPLY PENDING** | Scoped seven-table test + default ACL; local 19 ok/0 failed; function-default limitation documented. |
 | C-05 public R2 orphan | **PREPARED — APPROVAL PENDING** | Exact object and deletion/purge steps in checklist; object still public. |
-| C-06 migration chain/RPC | **CODE FIXED — APPLY PENDING** | Fresh DB now creates 7-column RPC; integrity 9/9. |
+| C-06 migration chain/RPC | **CODE FIXED — APPLY PENDING** | Fresh DB now creates 7-column RPC; integrity 10/10. |
 | C-07 blocked/suspended deletion | **CODE FIXED — LIVE TEST PENDING** | Credential deletion path + public form; parser tests only. |
 | C-08 admin audit gaps | **FIXED IN CODE — ROUTE E2E PENDING** | User block/delete, DM, content, community, job, event delete and verification review wired; contract test only. |
 | C-09 DM report actions | **FIXED — NO SIGNED APPEAL** | Warn/suspend/ban/dismiss/reopen + audit + UI; DM bans use support-email path. |
 | C-10 evidence snapshots | **FIXED** | Structured post/interaction snapshots; existing rows untouched. |
 | C-11 transactional resume | **CODE FIXED — DB TEST LIMITED** | New RPC; no job fixtures for an end-to-end apply test. |
-| C-12 public URLs/keys | **PARTIAL** | New verification URLs rejected; legacy read fallback remains for existing rows; admin responses strip keys, while the owner still receives own keys for the resubmit form; keys do not authorize reads. |
+| C-12 public URLs/keys | **FIXED — LIVE TEST PENDING** | Owner/admin APIs return proxy paths only; the proxy re-signs 5-minute private GETs and streams legacy objects; resubmission uses owned refs; mobile uses memory-only thumbnails. Legacy objects remain publicly readable at their original R2 URLs until the separate cleanup. |
 | C-13 secrets in artifacts | **NOT FIXED — APPROVAL** | Local `.open-next`/`.dev.vars.bak` still exist; rotate and delete; client bundle clean. |
 | C-14 consent | **FIXED (new accounts)** | Atomic RPC + test; existing accounts plan pending. |
 | C-15 legal copy | **FIXED IN WEBSITE — PUBLISH PENDING** | Terms/Guidelines/Privacy/Delete-account updated. |
@@ -158,38 +169,40 @@ Marketing build passes. Changes are in `uxcommunity-website` and need their own 
 
 ## Tests and evidence
 
-See `STAGING_TEST_RESULTS.md` for the full matrix. Highlights:
+See `STAGING_TEST_RESULTS.md` for the full matrix. Final local regression results:
 
 - Web TypeScript: **PASS**.
-- Web unit suite: **1,080/1,080 PASS** (133 files).
-- Web isolated production build: **PASS** (no production env files; dummy public env only).
+- Web unit suite: **1,081/1,081 PASS** (133 files), exit 0.
+- Web isolated production build: **PASS** (full copy with cloned dependencies, no production env files; dummy public env only). Lint on touched files: **0 errors, 1 existing `<img>` warning**.
 - Website build: **PASS**.
-- Mobile TypeScript: **PASS**; mobile realtime **71/71**, cache **7/7**, signup **12/12**.
-- Realtime Worker TypeScript: **PASS**. Full Worker suite: **TIMEOUT at 600 s** (killed during 500×100 fan-out). Targeted critical subset: **38/39**, with the 1,000-client ownership test failing `Timeout waiting for hello`; rerun not performed. This is a staging/load verification gap, not claimed as a pass.
-- DB local harness (216 migrations): migration integrity **9/9**, scoped permission exposure **19 ok/0 failed**, private storage **11/11**, moderation evidence **82/82**, signup consent **3/3**, appeal retention **5/5**.
+- Mobile TypeScript: **PASS**; documented realtime **71/71**, cache **7/7**, signup **12/12**.
+- Full mobile sweep: **441/444**; the three failures are pre-existing harness-load failures (`communitiesSnapshot`, `communityBootstrap`, `dmConversationsCache` import React Native Flow source under `tsx`), not changed-code failures.
+- Realtime Worker TypeScript: **PASS**. Full Worker suite: **28 files / 281 tests PASS in 1,703 s, exit 0**, including 1,000 clients (85 s) and 500×100 fan-out. Ownership suite **21/21**; zero duplicate deliveries.
+- DB local harness (216 migrations): migration integrity **10/10**, scoped permission exposure **19 ok/0 failed**, private storage **11/11**, moderation evidence **82/82**, signup consent **3/3**, appeal retention **5/5**, evidence concurrency **8/8** — **138/138**.
 - Rate-limit regression **3/3**; appeal retention **5/5**; audit/CSP/sample contract tests **7/7**.
 - Middleware local: HTTP→HTTPS **308**, cross-origin mutation **403**, same-origin reaches route, CSP header present.
-- Not run/blocked: staging E2E, real Android release/device flows, live email/FCM delivery, load tests, live signed-URL expiry, production deploy/migration/R2 deletion.
+- Not run/blocked: staging E2E, real Android release/device flows, live email/FCM delivery, platform-level load tests, live signed-URL expiry, production deploy/migration/R2 deletion.
 
 ## Remaining risks and deferred work
 
-1. **Backup/DR remains absent** (out of scope).
-2. **Turnstile is not implemented.** Open signup still relies on rate limits, verification gating, creation limits and reporting. Policy A blocks most writes, but bots can still create accounts and like/report. This is a product/infrastructure decision; no active bot protection is claimed.
-3. **Existing accounts with NULL consent** (1 of 2 in production) are not re-consented; production data may be test-only. Decide before launch.
-4. **DM-origin bans have no signed appeal token.** Support email is the documented fallback; profile-report escalation is the alternative.
-5. **Admin audit route-level verification is not exhaustive**: event deletion and verification review are wired and the action contract is tested, but no route integration test/second actor test exists; admin join-all and some non-moderation admin edits are intentionally outside the audit.
-6. **No direct admin suspension/lift UI**; suspension comes from a report or the DM queue, lifting from an appeal.
-7. **CSP is report-only** and the cookie domain must remain `.uxcommunity.in` for the current realtime cookie handshake; CSRF is checked. Enforcing CSP or narrowing the cookie requires tested nonce/script and realtime-token work.
-8. **Android release signing is not configured.** Release uses the debug keystore; package `in.uxcommunity.app`, versionCode 1/versionName 1.0.0; iOS bundle id is still the placeholder `com.sachinpatil1228.myapp`; FCM/deep-link/env verification and a real device build remain outstanding.
-9. **Verification privacy has accepted limits:** the owner GET returns own `work_sample_keys` for resubmit; admin responses strip keys; legacy rows return public URLs; signed URLs expire after 15 minutes without auto-refresh; mobile verification images use disk caching.
-10. **Realtime scale is not verified:** the local 1,000-client ownership test failed with a hello timeout and the full Worker suite timed out; a real staging/load run is required before claiming realtime readiness.
-10. **Account re-consent is a recommendation, not implemented:** production has one account with NULL consent; no timestamp was fabricated. See the approval checklist for a consent-gated plan.
-8. **Event-ended comments/likes/chat, event lifecycle FCM/preferences, mobile event routing, notification dedupe, mobile private-verification disk cache, mobile legal links** remain deferred.
-9. **Migration history is still brownfield**; the fresh chain is fixed, but production version history was not repaired.
-10. **No staging/device verification** was possible; treat the code as local-tested, not staging-verified.
+1. **Backup/DR remains absent** (out of scope). This is a launch prerequisite, not a staging blocker.
+2. **No staging environment exists.** All results are local; a separate Supabase/Workers/R2/email/FCM/Android environment is required to verify deployment behavior, real revocation, delivery and device flows.
+3. **Turnstile is not implemented.** Open signup still relies on rate limits, verification gating, creation limits and reporting. Policy A blocks most writes, but bots can still create accounts and like/report. This is a product/infrastructure decision; no active bot protection is claimed.
+4. **Existing accounts with NULL consent** (1 of 2 in production) are not re-consented; production data may be test-only. Decide before launch.
+5. **DM-origin bans have no signed appeal token.** Support email is the documented fallback; profile-report escalation is the alternative.
+6. **Admin audit route-level verification is not exhaustive**: event deletion and verification review are wired and the action contract is tested, but no route integration test/second actor test exists; admin join-all and some non-moderation admin edits are intentionally outside the audit.
+7. **No direct admin suspension/lift UI**; suspension comes from a report or the DM queue, lifting from an appeal.
+8. **CSP is report-only** and the cookie domain must remain `.uxcommunity.in` for the current realtime cookie handshake; CSRF is checked. Enforcing CSP or narrowing the cookie requires tested nonce/script and realtime-token work.
+9. **Android release readiness is incomplete.** Release uses `signingConfigs.debug`; package `in.uxcommunity.app`, versionCode 1/versionName 1.0.0; iOS bundle id is still the placeholder `com.sachinpatil1228.myapp`. The manifest requests location, record-audio, overlay and storage/media permissions, sets `allowBackup=true`/`requestLegacyExternalStorage`, and declares only the `uxcommunity` scheme (no verified app links). `google-services.json` exists but FCM/deep-link/env behavior, a signed release build and a clean-device test are outstanding. No key was generated or uploaded.
+10. **Verification privacy is fixed in the branch, with residual origin exposure.** Owner/admin APIs return proxy paths only and the proxy re-signs 5-minute GETs; legacy rows are streamed. However, legacy objects remain publicly readable at their original R2 URLs until the approved cleanup, upload preview URLs expire after 30 minutes, and the proxy/authorization/device behavior still needs a staging test.
+11. **Realtime scale is verified only locally.** The full Worker suite passed 28 files/281 tests in 1,703 s, including 1,000 clients and 500×100 fan-out with zero duplicates; the earlier 1,000-client hello timeout was test-process resource accumulation and is fixed by Vitest forks/isolation. Platform-level staging load, open-socket revocation and multi-region behavior remain unverified.
+12. **Event-ended comments/likes/chat, event lifecycle FCM/preferences/quiet hours, mobile event routing, notification dedupe, mobile appeals screen and mobile legal links** remain deferred.
+13. **Migration history is still brownfield**; the fresh chain and 7-column RPC are fixed, but production version history was not repaired and no full column-level schema diff exists without staging.
 
 ## Approval required
 
 Every production operation is listed with exact commands/SQL, impact, rollback and verification in `PRODUCTION_APPROVAL_CHECKLIST.md`. No production change has been executed.
+
+**Next gate:** deploy this branch to a **separate staging environment** and run the matrix in `STAGING_TEST_RESULTS.md`. Production approval is requested only after staging, backup/DR, Android signing and the remaining product decisions are complete.
 
 **BACKUP / DISASTER RECOVERY: NOT ADDRESSED — explicitly deferred to a separate task.** See `REMAINING_BLOCKERS.md` for the consolidated launch-blocker list.

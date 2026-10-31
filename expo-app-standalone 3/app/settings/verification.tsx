@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,10 +12,12 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/settings/ScreenHeader';
+import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticSelection } from '@/lib/haptics';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
+import { mediaCachePolicy, mediaSource } from '@/lib/privateMedia';
 import {
   confirmVerificationCode,
   deleteVerificationSample,
@@ -30,8 +31,9 @@ import {
 } from '@/lib/verification';
 
 function samplesFromLatest(latest: NonNullable<VerificationData['latest']>): VerificationSample[] {
-  const keys = latest.workSampleKeys ?? [];
-  return latest.workSampleUrls.map((url, index) => ({ key: keys[index] ?? '', url }));
+  // Existing samples are proxy paths (no raw keys). They are display-only and
+  // are resolved to server-side keys if the member reapplies.
+  return latest.workSampleUrls.map((url) => ({ key: '', url }));
 }
 
 function dateLabel(iso: string | null | undefined): string {
@@ -271,7 +273,6 @@ export default function VerificationScreen() {
                 linkedinUrl: linkedin.trim(),
                 portfolioLinks,
                 workSampleUrls: samples.map((sample) => sample.url),
-                workSampleKeys: samples.map((sample) => sample.key).filter(Boolean),
                 rejectionReason: null,
                 reviewedAt: null,
                 createdAt: new Date().toISOString(),
@@ -566,7 +567,12 @@ export default function VerificationScreen() {
                     key={sample.key || sample.url}
                     style={[styles.sample, { borderColor: colors.border }]}
                   >
-                    <Image source={{ uri: sample.url }} style={styles.sampleImage} />
+                    <Image
+                      source={mediaSource(sample.url)}
+                      cachePolicy={mediaCachePolicy(sample.url)}
+                      contentFit="cover"
+                      style={styles.sampleImage}
+                    />
                     <Pressable
                       onPress={() => removeSample(sample)}
                       accessibilityRole="button"

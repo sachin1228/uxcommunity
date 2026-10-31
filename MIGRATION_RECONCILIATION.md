@@ -3,6 +3,7 @@
 **Date:** 2026-10-31
 **Branch:** `fix/production-readiness-remediation`
 **Production project (read-only inspection):** `ux-community` / `eauupthwlnarkauwifmw`
+**Ledger rechecked:** 2026-10-31 (read-only `supabase migration list --linked`; still 5 remote entries)
 **Production history read via:** `supabase migration list --linked` (no writes)
 **Local schema:** disposable PostgreSQL 17 harness applying `supabase/schema.sql` + every migration in filename order.
 
@@ -63,7 +64,7 @@ New migrations in this branch use unique `20261031…` timestamps. Do not rename
 | Object | Production state | Repository expectation | Risk/action |
 |---|---|---|---|
 | `get_resource_list_aggregates(uuid,uuid[])` | **6 columns** (`id, save_count, comment_count, bookmark_count, user_saved, user_bookmarked`) | 7 columns including `allow_replies` | `20261031110000` forward migration restores the 7-column definition; production app currently reads `allow_replies` from the page row, so no current 500, but the type/drift must be closed. |
-| Fresh migration chain | Function never created after 20260814 | 7-column function after the chain | Fixed by restoring 20260814 + forward 20261031110000; integrity test 9/9. |
+| Fresh migration chain | Function never created after 20260814 | 7-column function after the chain | Fixed by restoring 20260814 + forward 20261031110000; integrity test 10/10. |
 | `moderation_audit_log` | New schema (13 columns, immutable trigger, no FKs), 0 rows | New 20261030220000/230000 | Matches; do not re-run the original migration against a legacy table. |
 | `moderation_audit_log_legacy_20261030` | Old schema (moderator_email, target_content_type/id, metadata), FK `target_user_id → users ON DELETE SET NULL`, 0 rows | Not in repo | Manual repair artifact. Keep; include in backups; do not drop in this release. |
 | `moderation_appeals` | 0 rows; original cascade FKs | New 20261031150000 changes to nullable/SET NULL + `user_deleted_at` | Migration ready; production not yet applied. |
@@ -82,7 +83,7 @@ New migrations in this branch use unique `20261031…` timestamps. Do not rename
 
 1. A fresh Supabase database must run migrations in filename order with `ON_ERROR_STOP=1` (or the real Supabase CLI, once the historical chain is clean). The local harness previously used `ON_ERROR_STOP=0`, which masked the 20260814 failure.
 2. The 20260814 file is restored to its pre-edit 6-column form; `20260911160000` adds `allow_replies`; `20261031110000` upgrades to 7 columns inside a transaction.
-3. `supabase/tests/migration_integrity.test.sql` asserts the RPC signature, `allow_replies`, `complete_signup_with_consent`, `terms_version`, `apply_to_job_with_resume`, `content_reports.target_snapshot`, `moderation_appeals.user_deleted_at` and the expanded audit action check.
+3. `supabase/tests/migration_integrity.test.sql` asserts the RPC signature, the exact seven-column `pg_get_function_result` contract, `allow_replies`, `complete_signup_with_consent`, `terms_version`, `apply_to_job_with_resume`, `content_reports.target_snapshot`, `moderation_appeals.user_deleted_at` and the expanded audit action check. Current local result: **10/10**.
 4. The local harness still logs expected Supabase-only errors (`auth`/`storage` schemas, `companies` fixtures missing) because it is a bare Postgres cluster. Those are harness limitations, not migration pass evidence; a real Supabase staging project is required for the complete chain.
 5. Do not edit already-applied migrations again. Add forward migrations; keep the old chain safe for fresh installs.
 
@@ -126,7 +127,22 @@ Apply in this order, one file at a time, transactionally where indicated:
 
 **Rollback:** keep a pre-change dump and the old 6-column function definition. The moderation repair is rename-based and preserves the legacy table; do not drop it. RPC/column migrations are additive or function-only; a forward fix is safer than a destructive downgrade. If a migration fails partway, stop, restore from the approved dump, and re-run from the last verified file.
 
-## 7. Upgrade behavior and verification plan
+## 7. New-migration idempotency / rollback
+
+| Migration | Re-run behavior | Rollback implication |
+|---|---|---|
+| `20261030240000_revoke_client_select_on_launch_tables.sql` | Idempotent revoke; service_role untouched. | Re-grant client roles only with a deliberate policy change (not recommended). |
+| `20261031090000_harden_public_default_privileges.sql` | Idempotent default ACL changes; `supabase_admin` block may notice. | Re-grant defaults only if an intentional public-read policy is added. |
+| `20261031100000_signup_consent_atomic.sql` | `add column if not exists` + `create or replace function`; safe. | Keep the column/function; old signup route can be restored separately. |
+| `20261031110000_fix_resource_list_aggregates.sql` | Transactional drop/create; safe to re-run (drops the 7-col function and recreates it). | Keep the old 6-col definition snapshot; prefer a forward fix. |
+| `20261031120000_expand_moderation_audit_actions.sql` | Drop/add action check; safe if existing actions are in the expanded list (they are). | Reverting the check would reject new audit actions. |
+| `20261031130000_report_evidence_snapshots.sql` | `add column if not exists`; safe. | Column can remain; old code ignores it. |
+| `20261031140000_apply_to_job_with_resume.sql` | `create or replace`; safe. | Drop the new RPC only after reverting the apply route. |
+| `20261031150000_moderation_appeals_retention.sql` | Add columns/change FKs/trigger replacement; rerunnable. | Restoring cascade FKs would re-introduce evidence loss; do not. |
+
+**Potential failures on current production:** the main failure risk is running the historical chain with `db push` (starting at 20260814/duplicate versions), not the eight forward migrations. The transactional RPC migration temporarily drops `get_resource_list_aggregates`; if any production object depended on it, the transaction would roll back and report the dependency. No such dependency was found in the read-only catalog; verify on staging. `20261031090000` may only be able to alter `postgres` defaults; the `supabase_admin` defaults need a platform-privileged change and are recorded as a residual risk.
+
+## 8. Upgrade behavior and verification plan
 
 - **Local fresh chain:** 216 migrations applied; integrity/permission/evidence tests pass (see `STAGING_TEST_RESULTS.md`).
 - **Staging upgrade clone:** **NOT RUN** — no staging project was available/confirmed. This is the next required step before production. The three remote-only aliases are mapped above; the remaining 202 unrecorded unique versions still need a column-level diff.
