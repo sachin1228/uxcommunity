@@ -17,8 +17,8 @@ interface Props {
 /** Rows are uniform: icon on the left, then the label. */
 const ROW_CLASS =
   "flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 " +
-  "font-body text-sm text-overlay-foreground transition-colors hover:bg-overlay-elevated";
-const ROW_ICON_CLASS = "shrink-0 text-overlay-muted";
+  "font-body text-sm text-foreground transition-colors hover:bg-accent-soft";
+const ROW_ICON_CLASS = "shrink-0 text-foreground-muted";
 
 const MENU_LINKS = [
   { href: "/dashboard/profile", label: "View profile", icon: UserCircle },
@@ -64,16 +64,16 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
         open={open}
         onClose={() => setOpen(false)}
         align="right"
-        tone="overlay"
+        tone="surface"
         className="w-60"
       >
         {/* Identity */}
-        <div className="border-b border-overlay-elevated px-4 py-3.5">
-          <p className="truncate font-body text-sm font-medium leading-tight text-overlay-foreground">{name}</p>
-          <p className="mt-1 truncate font-body text-xs leading-tight text-overlay-muted">{email}</p>
+        <div className="border-b border-border px-4 py-3.5">
+          <p className="truncate font-body text-sm font-medium leading-tight text-foreground">{name}</p>
+          <p className="mt-1 truncate font-body text-xs leading-tight text-foreground-muted">{email}</p>
         </div>
 
-        <div className="border-b border-overlay-elevated p-1">
+        <div className="border-b border-border p-1">
           {MENU_LINKS.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={() => setOpen(false)} className={ROW_CLASS}>
               <Icon strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
@@ -84,7 +84,10 @@ export function ProfileDropdown({ name, email, avatarUrl }: Props) {
 
         <div className="p-1">
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              setOpen(false);
+              handleLogout();
+            }}
             disabled={loggingOut}
             className={`${ROW_CLASS} disabled:opacity-50`}
           >
