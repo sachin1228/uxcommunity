@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const rl = await rateLimit(`verification:upload:${userId}`, 30, 3600, { failClosed: true });
+  const rl = await rateLimit(`verification:upload:${userId}`, 30, 3600);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many uploads. Try again later." }, { status: 429 });
   }

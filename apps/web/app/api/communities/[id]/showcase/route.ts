@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const userId = session.userId!;
   const db = createServiceClient();
   if (!(await member(db, id, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  const limit = await rateLimit(`showcase:create:${userId}:60s`, 5, 60, { failClosed: true });
+  const limit = await rateLimit(`showcase:create:${userId}:60s`, 5, 60);
   if (!limit.success) return NextResponse.json({ error: "Too many posts. Try again shortly." }, { status: 429 });
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const parsed = parseShowcaseBody(body);

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const limit = await rateLimit(`account-delete:${userId}`, 5, 3600, { failClosed: true });
+  const limit = await rateLimit(`account-delete:${userId}`, 5, 3600);
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many deletion attempts. Try again later." },

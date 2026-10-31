@@ -21,7 +21,7 @@ function withEnv(values: Partial<Record<(typeof envKeys)[number], string | undef
   });
 }
 
-test("critical limits fail closed when Upstash is unavailable in production", async () => {
+test("production fails open when Upstash is not configured", async () => {
   await withEnv(
     {
       UPSTASH_REDIS_REST_URL: undefined,
@@ -29,13 +29,13 @@ test("critical limits fail closed when Upstash is unavailable in production", as
       NODE_ENV: "production",
     },
     async () => {
-      const result = await rateLimit("critical:probe", 5, 60, { failClosed: true });
-      assert.equal(result.success, false);
+      const result = await rateLimit("production:missing-config", 5, 60);
+      assert.equal(result.success, true);
     },
   );
 });
 
-test("development still allows requests without local Upstash", async () => {
+test("development also allows requests without local Upstash", async () => {
   await withEnv(
     {
       UPSTASH_REDIS_REST_URL: undefined,
@@ -43,21 +43,21 @@ test("development still allows requests without local Upstash", async () => {
       NODE_ENV: "development",
     },
     async () => {
-      const result = await rateLimit("dev:probe", 5, 60, { failClosed: true });
+      const result = await rateLimit("development:missing-config", 5, 60);
       assert.equal(result.success, true);
     },
   );
 });
 
-test("non-critical endpoints retain the documented availability fallback", async () => {
+test("Redis connection errors fail open instead of blocking the request", async () => {
   await withEnv(
     {
-      UPSTASH_REDIS_REST_URL: undefined,
-      UPSTASH_REDIS_REST_TOKEN: undefined,
+      UPSTASH_REDIS_REST_URL: "http://127.0.0.1:1",
+      UPSTASH_REDIS_REST_TOKEN: "test-token",
       NODE_ENV: "production",
     },
     async () => {
-      const result = await rateLimit("read:probe", 5, 60);
+      const result = await rateLimit("production:connection-error", 7, 61);
       assert.equal(result.success, true);
     },
   );

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.userId!;
-  const rl = await rateLimit(`verification:email:confirm:${userId}`, 15, 900, { failClosed: true });
+  const rl = await rateLimit(`verification:email:confirm:${userId}`, 15, 900);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
   }

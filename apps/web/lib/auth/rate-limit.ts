@@ -6,11 +6,11 @@
  * own memory, so attempts were spread across instances and the limit never
  * triggered reliably).
  *
- * Fail-open by default for read-heavy/non-security endpoints. Authentication,
- * signup, password-reset, account-deletion and report endpoints pass
- * `{ failClosed: true }`, so a Redis outage cannot silently disable their
- * abuse controls. In development the limiter still fails open so a missing
- * local Upstash configuration does not block the app.
+ * A genuine "limit exceeded" verdict from Upstash still blocks the request.
+ * Infrastructure failures — missing configuration, an unreachable Redis, an
+ * exhausted Upstash quota — fail open and are logged, so a third-party outage
+ * cannot lock members out of login or the API. The global middleware limiter
+ * has always used this availability-oriented fallback.
  *
  * Required env vars:
  *   UPSTASH_REDIS_REST_URL
@@ -59,16 +59,8 @@ export async function rateLimit(
   key: string,
   limit: number,
   windowS: number,
-  options?: { failClosed?: boolean },
 ): Promise<RateLimitResult> {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    if (options?.failClosed && process.env.NODE_ENV === "production") {
-      return {
-        success: false,
-        remaining: 0,
-        resetAt: Date.now() + windowS * 1000,
-      };
-    }
     return {
       success: true,
       remaining: limit,
@@ -85,15 +77,7 @@ export async function rateLimit(
       resetAt: result.reset, // Upstash returns reset as Unix ms
     };
   } catch (err) {
-    console.error("[rate-limit] Redis unreachable:", err);
-    if (options?.failClosed) {
-      return {
-        success: false,
-        remaining: 0,
-        resetAt: Date.now() + windowS * 1000,
-      };
-    }
-    // Non-security endpoints stay available during a Redis outage.
+    console.error("[rate-limit] Redis unavailable; failing open:", err);
     return {
       success: true,
       remaining: 0,

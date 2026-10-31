@@ -55,7 +55,7 @@ export async function POST(
     return error as Response;
   }
 
-  const limit = await rateLimit(`job:apply:${session.userId}`, 10, 3600, { failClosed: true });
+  const limit = await rateLimit(`job:apply:${session.userId}`, 10, 3600);
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many applications. Try again later." },

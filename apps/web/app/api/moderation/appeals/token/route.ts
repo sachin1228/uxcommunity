@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const [ipLimit, userLimit] = await Promise.all([
-    rateLimit(`moderation-appeal-token:${ip}`, 10, 3600, { failClosed: true }),
-    rateLimit(`moderation-appeal:${payload.u}`, APPEAL_DAILY_LIMIT, 86400, { failClosed: true }),
+    rateLimit(`moderation-appeal-token:${ip}`, 10, 3600),
+    rateLimit(`moderation-appeal:${payload.u}`, APPEAL_DAILY_LIMIT, 86400),
   ]);
   if (!ipLimit.success || !userLimit.success) {
     return NextResponse.json(

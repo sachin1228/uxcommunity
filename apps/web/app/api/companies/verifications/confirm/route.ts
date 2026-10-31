@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
   const userId = session.userId!;
 
-  const limited = await rateLimit(`company-verify-confirm:${userId}`, 20, 600, { failClosed: true });
+  const limited = await rateLimit(`company-verify-confirm:${userId}`, 20, 600);
   if (!limited.success) {
     return NextResponse.json(
       { error: "rate_limited", message: "Too many attempts. Try again in a few minutes." },

@@ -26,7 +26,7 @@ export async function POST(
 
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
-  const limit = await rateLimit(`event:rsvp:${userId}`, 30, 60, { failClosed: true });
+  const limit = await rateLimit(`event:rsvp:${userId}`, 30, 60);
   if (!limit.success) {
     return NextResponse.json({ error: "Too many RSVP changes. Try again shortly." }, { status: 429 });
   }

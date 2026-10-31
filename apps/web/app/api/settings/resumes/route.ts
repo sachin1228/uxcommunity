@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     return e as Response;
   }
 
-  const limit = await rateLimit(`resumes:upload:${session.userId}`, 20, 3600, { failClosed: true });
+  const limit = await rateLimit(`resumes:upload:${session.userId}`, 20, 3600);
   if (!limit.success) {
     return NextResponse.json({ error: "Too many resume uploads. Try again later." }, { status: 429 });
   }

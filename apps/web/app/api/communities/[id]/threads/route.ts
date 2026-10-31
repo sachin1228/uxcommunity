@@ -106,7 +106,7 @@ export async function POST(
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  const limit = await rateLimit(`thread:create:${userId}:60s`, 10, 60, { failClosed: true });
+  const limit = await rateLimit(`thread:create:${userId}:60s`, 10, 60);
   if (!limit.success) {
     return NextResponse.json(
       { error: "Too many threads. Please try again shortly." },

@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     return error as Response;
   }
 
-  const reportLimit = await rateLimit(`content-report:${session.userId}`, 30, 3600, { failClosed: true });
+  const reportLimit = await rateLimit(`content-report:${session.userId}`, 30, 3600);
   if (!reportLimit.success) {
     return NextResponse.json(
       { error: "Too many reports. Please try again later." },
