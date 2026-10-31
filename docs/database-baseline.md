@@ -49,9 +49,10 @@ protections.
 
 No production rows, sequence counter values, historical seed data, reference
 catalogs, storage bucket rows, or application configuration rows are included.
-A new environment therefore needs deliberate configuration before signup/content
-creation: creation-limit settings, verification policy, city/sector/experience/job
-catalogs and any desired directory content. This is **not** a seeded app demo.
+A new environment needs explicit creation-limit settings, verification settings
+and active signup catalogs. See [fresh initialization](database-initialization.md)
+for the insert-only command, exact code-derived values and operator-supplied
+catalogs. Optional directory/community content remains empty.
 Do not recover those inputs by replaying historical cleanup or seed migrations.
 
 Supabase supplies its managed schemas (`auth`, `storage`, `realtime`, `extensions`,
@@ -90,8 +91,8 @@ against historical filenames; those outputs cannot pass the new workflow's valid
 
 Requirements: Node 22+, Python 3.10+, `psql`, and Docker/Podman. Apple-silicon macOS
 and supported Linux hosts can instead use the pinned CLI's experimental native
-runtime. The native path was actually exercised here; the Docker CI job is added
-but has not been run on GitHub by this implementation.
+runtime. Both the native path and the GitHub Docker workflow are exercised;
+current run evidence is recorded in [verification status](database-verification.md).
 
 ```sh
 npm run test:db
@@ -132,6 +133,10 @@ loopback identity, then:
    rejection, multiple NULL applications, false preferences, and audit immutability.
    All test fixtures are rolled back.
 7. Destroys only that disposable local stack.
+
+Initialization is separately tested after the zero-row/schema checks. It must be
+repeatable, preserve existing values, roll back conflicts and support the actual
+signup RPC. No initialization data goes into the baseline migration.
 
 Reports default to ignored `test-results/schema/`. The committed verification
 was generated with `--report-dir supabase/schema/verification`. No production
@@ -185,6 +190,15 @@ After explicit approval for production adoption:
 1. Freeze schema deployments. Confirm the exact target and approved Git revision.
    Take and verify a restorable production backup, plus a secured export of the
    existing migration ledger. Keep the export outside the active workflow.
+   Record the ledger's column definitions, all rows including statements, the
+   approved target identity, Git SHA and baseline SHA-256 in the change record.
+   Rehearse restore and adoption on a disposable copy. A successful backup
+   command alone is not proof of recoverability. Keep writers to the migration
+   ledger and every schema deployment stopped through final verification.
+   Execute approved SQL using `psql -X -v ON_ERROR_STOP=1` and a direct/session
+   connection. A failed statement must stop the operation, not continue to the
+   next block. These examples are instructions, not an executable provisioning
+   script, and must not run in CI.
 2. Refresh production metadata using the **read-only** capture endpoint and review
    every application difference against the approved baseline. Recheck uniqueness
    immediately before adding the protection; a previous zero-duplicate result
@@ -201,14 +215,16 @@ After explicit approval for production adoption:
 
 3. Separately approve and apply only the missing protection DDL. Do not apply the
    whole baseline. For the column, use a short lock timeout and verify any existing
-   column's exact definition before treating it as satisfied:
+   column's exact definition before treating it as satisfied. Run this block
+   **only if the column is absent**; if present, verify Boolean/NOT NULL/default
+   true and skip the block. An incompatible existing column is a stop condition:
 
    ```sql
    begin;
    set local lock_timeout = '2s';
    set local statement_timeout = '30s';
    alter table public.notification_preferences
-     add column if not exists community_push_enabled boolean not null default true;
+     add column community_push_enabled boolean not null default true;
    commit;
    ```
 
@@ -216,8 +232,12 @@ After explicit approval for production adoption:
    transaction-pooled SQL batch. The index build must run outside a transaction:
 
    ```sql
+   set lock_timeout = '2s';
+   set statement_timeout = '15min';
    create unique index concurrently users_application_id_unique
      on public.users (application_id);
+   reset lock_timeout;
+   reset statement_timeout;
    ```
 
    Inspect an existing index first. Do not use `IF NOT EXISTS` to hide invalid or
@@ -225,11 +245,14 @@ After explicit approval for production adoption:
    concurrent build can leave an invalid index; stop and review recovery.
 
    After confirming a valid, ready, full-table unique B-tree on exactly that
-   nullable column, attach it under a short lock timeout:
+   nullable column, with ordinary NULLS DISTINCT, no predicate/expressions/INCLUDE
+   columns, and no existing incompatible constraint, attach it under a short lock
+   timeout. If the exact constraint already exists, skip both uniqueness blocks:
 
    ```sql
    begin;
    set local lock_timeout = '2s';
+   set local statement_timeout = '30s';
    alter table public.users
      add constraint users_application_id_unique
      unique using index users_application_id_unique;
@@ -252,15 +275,28 @@ After explicit approval for production adoption:
    them as intended baseline additions. Its exit code must be zero, both
    protections must pass their contract checks, and all platform/configuration
    differences still need review. This comparison does not alter a database.
- There must be no unexplained application difference from the
-   approved baseline. Preserve all existing rows, wider counts, live legacy
+   There must be no unexplained application difference from the
+   approved baseline. Use the approved fresh/staging artifact for this exact
+   baseline revision, not an artifact containing later forward migrations.
+   Preserve all existing rows, wider counts, live legacy
    objects and deliberate configuration differences. A ledger change cannot fix
    a missing schema object. Validate on a matching staging clone first.
 5. Only after a **separate explicit approval to replace production's ledger**, use
    the following one-time transaction. This starts a new history; it neither
    reconciles old versions nor executes the baseline. Fill in the reviewed
    baseline's SHA-256 (`shasum -a 256 supabase/migrations/20261031163000_production_schema_baseline.sql`).
-   The placeholder is deliberately rejected. The statements field records adoption,
+   Obtain the **expected old-ledger digest** with the read-only query below,
+   compare its rows to the secured export, and record that approved digest before
+   starting the write transaction. This binds the replacement to the ledger you
+   reviewed; a changed ledger aborts instead of deleting newly added history:
+
+   ```sql
+   select md5(coalesce(jsonb_agg(to_jsonb(m) order by m.version)::text, '[]'))
+     as reviewed_old_ledger_md5
+   from supabase_migrations.schema_migrations m;
+   ```
+
+   The placeholders are deliberately rejected. The statements field records adoption,
    not a false assertion that creation SQL ran against existing production.
 
    ```sql
@@ -268,12 +304,41 @@ After explicit approval for production adoption:
    set local lock_timeout = '2s';
    set local statement_timeout = '30s';
    set local uxcommunity.baseline_sha256 = 'REPLACE_WITH_REVIEWED_64_HEX_SHA256';
+   set local uxcommunity.expected_old_ledger_md5 = 'REPLACE_WITH_REVIEWED_32_HEX_MD5';
+   lock table supabase_migrations.schema_migrations in access exclusive mode;
    do $$ begin
-     if current_setting('uxcommunity.baseline_sha256') !~ '^[0-9a-f]{64}$' then
-       raise exception 'Review and supply the actual approved baseline digest first';
+     if current_setting('uxcommunity.baseline_sha256') <>
+        '396520413a13d45f232fe11462b77f3854549b39bbbf329c3fe6f73da4d57830' then
+       raise exception 'Digest must match this reviewed baseline file';
+     end if;
+     if current_setting('uxcommunity.expected_old_ledger_md5') !~ '^[0-9a-f]{32}$'
+        or current_setting('uxcommunity.expected_old_ledger_md5') <>
+          (select md5(coalesce(jsonb_agg(to_jsonb(m) order by m.version)::text, '[]'))
+           from supabase_migrations.schema_migrations m) then
+       raise exception 'Ledger differs from the approved secured export';
+     end if;
+     if exists (select 1 from supabase_migrations.schema_migrations
+                where version >= '20261031163000') then
+       raise exception 'Baseline or later history already exists; stop and review';
+     end if;
+     if not exists (select 1 from pg_attribute a join pg_attrdef d
+           on d.adrelid=a.attrelid and d.adnum=a.attnum
+           where a.attrelid='public.notification_preferences'::regclass
+             and a.attname='community_push_enabled' and not a.attisdropped
+             and a.atttypid='boolean'::regtype and a.attnotnull
+             and pg_get_expr(d.adbin,d.adrelid)='true')
+        or not exists (select 1 from pg_constraint c join pg_index i
+           on i.indexrelid=c.conindid
+           where c.conrelid='public.users'::regclass
+             and c.conname='users_application_id_unique' and c.contype='u'
+             and c.convalidated and not c.condeferrable
+             and i.indisunique and i.indisvalid and i.indisready
+             and not i.indnullsnotdistinct and i.indnkeyatts=1
+             and i.indexprs is null and i.indpred is null
+             and pg_get_constraintdef(c.oid)='UNIQUE (application_id)') then
+       raise exception 'Required protections not verified; ledger replacement refused';
      end if;
    end $$;
-   lock table supabase_migrations.schema_migrations in access exclusive mode;
    delete from supabase_migrations.schema_migrations;
    insert into supabase_migrations.schema_migrations (version, name, statements)
    values (
@@ -286,8 +351,27 @@ After explicit approval for production adoption:
    ```
 
 6. Confirm exactly the one approved baseline entry exists and the pinned CLI's
-   migration list has no pending historical SQL. Only then enable future deployment
-   of new uniquely timestamped migrations through the normal reviewed workflow.
+   read-only migration list has no pending historical SQL. Pin the CLI used for
+   adoption to `supabase/cli-version`. Re-capture the schema and verify it is
+   unchanged from step 4. The ledger transaction must not execute any entry from
+   `statements` or the baseline file. Never test production with the fixture SQL
+   used by CI. Only then enable future reviewed, uniquely timestamped migrations;
+   inspect the pending list/dry run before every future remote application.
+   Rehearse one future migration on the disposable adopted ledger first. Future
+   files must sort strictly after `20261031163000`, with no duplicate versions.
+
+The DELETE is intentionally destructive **to migration metadata**. Before COMMIT
+the transaction can be rolled back. After COMMIT, the old ledger is recoverable
+only from the verified secured export; restoring it is a separately reviewed
+operation, not an automatic rollback or schema downgrade. Keeping a checksum in
+the new record does not replace that backup. Do not run any part of this adoption
+procedure merely to merge the PR. Merging does not adopt the production history.
+
+Adding a constant-default Boolean on PG 17 avoids a table rewrite but still needs
+a brief ACCESS EXCLUSIVE lock. Concurrent uniqueness construction scans users
+and waits for transactions; duplicates or timeouts can leave an invalid index.
+Attaching its constraint and replacing the ledger also acquire locks. Schedule
+and monitor the separately approved operation; do not promise zero downtime.
 
 No `migration repair` command or compatibility migration bundle is needed. Do not
 perform the ledger replacement while applications/schema deployments are racing.

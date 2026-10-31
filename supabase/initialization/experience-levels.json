@@ -1,0 +1,58 @@
+[
+  {
+    "slug": "student",
+    "name": "Students"
+  },
+  {
+    "slug": "fresher",
+    "name": "Freshers"
+  },
+  {
+    "slug": "junior",
+    "name": "Junior Designers"
+  },
+  {
+    "slug": "mid_level",
+    "name": "Mid-Level Designers"
+  },
+  {
+    "slug": "senior",
+    "name": "Senior Designers"
+  },
+  {
+    "slug": "lead",
+    "name": "Lead Designers"
+  },
+  {
+    "slug": "principal",
+    "name": "Principal Designers"
+  },
+  {
+    "slug": "staff",
+    "name": "Staff Designers"
+  },
+  {
+    "slug": "design_manager",
+    "name": "Design Managers"
+  },
+  {
+    "slug": "head_of_design",
+    "name": "Heads of Design"
+  },
+  {
+    "slug": "director",
+    "name": "Design Directors"
+  },
+  {
+    "slug": "vp",
+    "name": "VP of Design"
+  },
+  {
+    "slug": "consultant",
+    "name": "Design Consultants"
+  },
+  {
+    "slug": "freelancer",
+    "name": "Freelancers"
+  }
+]

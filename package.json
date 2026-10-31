@@ -112,13 +112,13 @@
     "test:feed-scope": "tsx --test apps/web/lib/feeds/home-feed-options.test.ts",
     "test:topbar": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/dashboard/topbar.test.ts",
     "test:video-upload": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/video/upload-guard.test.ts",
-    "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql",
-    "test:security": "npx supabase test db --file supabase/tests/public_read_exposure.test.sql",
+    "test:rpc-integration": "bash supabase/tests/run-local.sh supabase/tests/performance_rpcs.test.sql",
+    "test:security": "bash supabase/tests/run-local.sh supabase/tests/public_read_exposure.test.sql",
     "test:private-storage": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/r2-private.test.ts apps/web/lib/private-access.test.ts apps/web/lib/jobs/private-resume.test.ts apps/web/lib/direct-messages/assets.test.ts apps/web/lib/verification/rules.test.ts",
     "test:private-r2-migration": "node --test scripts/migrate-private-r2-plan.test.mjs",
     "test:private-storage-sql": "bash supabase/tests/run-local.sh supabase/tests/private_r2_storage.test.sql",
     "migrate:private-r2": "node scripts/migrate-private-r2.mjs",
-    "test:member-count": "npx supabase test db --file supabase/tests/member_count.test.sql",
+    "test:member-count": "bash supabase/tests/run-local.sh supabase/tests/member_count.test.sql",
     "k6:seed": "node k6/scripts/seed-users.js",
     "k6:cleanup": "node k6/scripts/cleanup-users.js",
     "test:k6-fixtures": "tsx --test k6/lib/fixture.test.mjs",
@@ -132,7 +132,8 @@
     "db:start": "bash scripts/db/cli.sh start",
     "db:stop": "bash scripts/db/cli.sh stop",
     "db:new": "bash scripts/db/cli.sh migration new",
-    "test:db": "python3 scripts/db/test_fresh.py"
+    "test:db": "python3 scripts/db/test_fresh.py",
+    "db:init": "python3 scripts/db/initialize.py"
   },
   "engines": {
     "node": ">=22.0.0",

@@ -110,6 +110,9 @@ npm install
 # 3. Apply database migrations
 # Start a fresh LOCAL Supabase instance using the pinned CLI
 npm run db:start
+# Initialize required settings and explicitly chosen signup catalogs:
+# Follow docs/database-initialization.md, then run:
+# npm run db:init -- --catalogs /path/to/approved-catalogs.json --include-default-experience-levels
 # Existing production requires the separate approval process in docs/database-baseline.md
 
 # 4. Start the web dev server (terminal 1)
