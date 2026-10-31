@@ -109,7 +109,7 @@ export function Topbar({ userId, user }: Props) {
         onClick={() => setSearchOpen(true)}
         aria-label="Search"
         aria-haspopup="dialog"
-        className="order-3 flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-full border border-border font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent min-[500px]:order-2 sm:min-w-0 sm:flex-1 sm:max-w-[40rem] sm:justify-start sm:px-2.5"
+        className="order-3 flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-full border border-border font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent min-[500px]:order-2 sm:min-w-0 sm:flex-1 sm:max-w-[40rem] sm:justify-start sm:px-4"
       >
         <Search size={14} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
         <span className="hidden min-w-0 flex-1 truncate text-left sm:block">Search</span>
