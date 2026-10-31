@@ -125,14 +125,14 @@ export function LimitsRing() {
         open={open}
         onClose={() => setOpen(false)}
         align="right"
-        tone="overlay"
+        tone="surface"
         className="w-72"
       >
-        <div className="border-b border-overlay-elevated px-4 py-3">
-          <p className="font-body text-sm font-medium leading-tight text-overlay-foreground">
+        <div className="border-b border-border px-4 py-3">
+          <p className="font-body text-sm font-medium leading-tight text-foreground">
             Creation limits
           </p>
-          <p className="mt-1 font-body text-xs leading-tight text-overlay-muted">
+          <p className="mt-1 font-body text-xs leading-tight text-foreground-muted">
             What you have used of this month&rsquo;s budgets.
           </p>
         </div>
@@ -144,28 +144,28 @@ export function LimitsRing() {
             return (
               <div key={row.kind}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-body text-xs text-overlay-foreground">{meta.label}</span>
+                  <span className="font-body text-xs text-foreground">{meta.label}</span>
                   <span
                     className={`font-body text-xs tabular-nums ${
-                      full ? "text-red-500" : "text-overlay-muted"
+                      full ? "text-red-500" : "text-foreground-muted"
                     }`}
                   >
                     {row.used} of {row.limit}
                   </span>
                 </div>
-                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-overlay-elevated">
+                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-accent-soft">
                   <div
-                    className={`h-full rounded-full ${full ? "bg-red-500" : "bg-overlay-foreground"}`}
+                    className={`h-full rounded-full ${full ? "bg-red-500" : "bg-foreground"}`}
                     style={{ width: `${Math.min(100, (row.used / row.limit) * 100)}%` }}
                   />
                 </div>
                 {full && (
-                  <p className="mt-1 font-body text-[11px] leading-tight text-overlay-muted">
+                  <p className="mt-1 font-body text-[11px] leading-tight text-foreground-muted">
                     {meta.freedBy}
                   </p>
                 )}
                 {row.kind === "community_joins" && (payload?.pendingJoinRequests ?? 0) > 0 && (
-                  <p className="mt-1 font-body text-[11px] leading-tight text-overlay-muted">
+                  <p className="mt-1 font-body text-[11px] leading-tight text-foreground-muted">
                     {payload?.pendingJoinRequests} join request
                     {payload?.pendingJoinRequests === 1 ? "" : "s"} still pending.
                   </p>
@@ -174,7 +174,7 @@ export function LimitsRing() {
             );
           })}
           {rows.length === 0 && (
-            <p className="font-body text-xs text-overlay-muted">Limits are unavailable right now.</p>
+            <p className="font-body text-xs text-foreground-muted">Limits are unavailable right now.</p>
           )}
         </div>
       </DropdownMenu>
