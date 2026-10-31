@@ -3,12 +3,11 @@
  *
  * Regenerate whenever supabase/migrations changes:
  *
- *   npx supabase gen types typescript --linked --schema public > \
+ *   npm run db:cli -- gen types typescript --local --schema public > \
  *     apps/web/lib/supabase/database.types.ts
  *
- * (`--linked` needs `supabase link` first. To generate without project access,
- * replay supabase/schema.sql + supabase/migrations into a scratch Postgres and
- * pass its connection string to `--db-url`.)
+ * Start the current baseline with npm run db:start first. Historical SQL and
+ * production migration history are not part of the local generation workflow.
  *
  * These types are handed to `createClient<Database>()` in
  * apps/web/lib/supabase/service.ts. Without them the `Schema` generic of

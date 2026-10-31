@@ -322,6 +322,19 @@ const tracked = execFileSync("git", ["ls-files", "-z"], {
 
 const trackedSet = new Set(tracked);
 
+// Retired SQL remains valid historical documentation through the compressed
+// backup. List member names only; never extract or execute the archived SQL.
+const archivedSqlReferences = new Set();
+const sqlBackup = "supabase/archive/legacy-sql.tar.gz";
+if (trackedSet.has(sqlBackup)) {
+  for (const member of execFileSync("tar", ["-tzf", path.join(ROOT, sqlBackup)], {
+    encoding: "utf8",
+  }).trim().split("\n")) {
+    archivedSqlReferences.add(member);
+    archivedSqlReferences.add(path.basename(member));
+  }
+}
+
 /** Third-party package names, so prose that opens with one is not read as a path. */
 const dependencyNames = new Set();
 for (const file of tracked.filter((name) => path.basename(name) === "package.json")) {
@@ -603,6 +616,7 @@ function ruleStalePath(reading) {
       if (startsWithHostname(token)) continue;
       if (UNTRACKED_SEGMENTS.some((segment) => token.includes(segment))) continue;
       if (dependencyNames.has(token.split("/")[0])) continue;
+      if (archivedSqlReferences.has(token)) continue;
       if (inUrlContext(comment.text, match.index)) continue;
       // A bare `Next.js` is a product; a bare `pool.ts` is a claim about a file.
       if (!token.includes("/") && !SELF_EVIDENT_EXTENSIONS.has(extension)) continue;

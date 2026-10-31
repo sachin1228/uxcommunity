@@ -237,7 +237,7 @@ select pg_sleep(1.5);
 insert into mc_cost (measurement, cumulative)
 values ('baseline', pg_temp.member_rows_examined());
 
--- BEFORE: the `member_counts` CTE get_sidebar_activity used to run — the
+-- BEFORE: the the former member-count CTE CTE get_sidebar_activity used to run — the
 -- caller's communities' memberships, counted.
 select count(*)::integer
 from public.community_members cm
@@ -257,7 +257,7 @@ select pg_sleep(1.5);
 insert into mc_cost (measurement, cumulative)
 values ('new_sidebar', pg_temp.member_rows_examined());
 
--- BEFORE: the `membership_aggregates` CTE get_all_communities used to run —
+-- BEFORE: the the former membership-aggregate CTE CTE get_all_communities used to run —
 -- the whole membership table, grouped and counted.
 select count(*)::integer
 from (

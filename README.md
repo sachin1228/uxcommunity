@@ -63,10 +63,10 @@ uxcommunity/
 │   ├── shared/                 TS types, constants, R2 media lookup table, video config
 │   └── design-system/          Design tokens, themes, CSS + DESIGN_GUIDELINES.md
 ├── supabase/
-│   ├── migrations/             SQL migration files (apply in order)
-│   ├── schema.sql              Partial snapshot — SQL tests need the full migration history
+│   ├── migrations/             Production-derived baseline + future migrations
+│   ├── config.toml             Pinned local Supabase configuration
 │   ├── seed.sql
-│   └── tests/                  pgTAP suites + run-local.sh
+│   └── schema/                 Read-only source catalog + schema comparison
 ├── k6/                         k6 load/stress scenarios (see k6/README.md)
 ├── docs/                       Architecture, mobile, performance and audit docs (see below)
 ├── scripts/                    Build helpers (emoji extraction, etc.)
@@ -108,7 +108,9 @@ npm install
 #    under "Environment variables" below
 
 # 3. Apply database migrations
-# Run each file in supabase/migrations/ in order via the Supabase SQL editor
+# Start a fresh LOCAL Supabase instance using the pinned CLI
+npm run db:start
+# Existing production requires the separate approval process in docs/database-baseline.md
 
 # 4. Start the web dev server (terminal 1)
 npm run dev
@@ -116,20 +118,23 @@ npm run dev
 
 ### SQL tests
 
-`supabase/tests/*.test.sql` are pgTAP files. Run them against a local database
-built from the **whole migration history** — not from `supabase/schema.sql`
-alone, which is a partial snapshot and is missing constraints that later
-migrations add, so a fixture can look green locally and fail in the SQL editor:
+The supported fresh-database check starts a disposable real Supabase instance,
+applies only the new migration stream, verifies that application tables and storage
+buckets are empty, tests the two intended protections, and compares the entire
+catalog with the saved read-only production capture:
 
 ```bash
-bash supabase/tests/run-local.sh                      # every test file
-bash supabase/tests/run-local.sh supabase/tests/sidebar_scan_bounds.test.sql
+npm run test:db
+# On Apple silicon without Docker:
+npm run test:db -- --runtime native
 ```
 
-The script boots a throwaway PostgreSQL in `/tmp` (unix socket only, no Docker,
-no Supabase CLI, nothing left behind), applies `schema.sql` and every migration
-in order, and reports each assertion. See the header of the script for the limits
-of the pgTAP stand-ins and the Supabase-only objects it cannot create.
+See `docs/database-baseline.md` for the database workflow and separate
+production-adoption instructions.
+Historical SQL is stored only as an inactive compressed reference backup.
+The baseline contains no application configuration rows or reference catalogs;
+configure those explicitly for a new environment before exercising signup and
+content creation. No historical seed or cleanup operation is part of installation.
 
 Open **http://localhost:3000**.
 
@@ -141,7 +146,7 @@ Open **http://localhost:3000**.
 | `cd apps/web && npx eslint .` | ESLint (advisory in CI while pre-existing findings are cleared) |
 | `npm run test:<suite>` | One web unit suite, e.g. `npm run test:comment-tree` (all suites are listed in `package.json`) |
 | `cd apps/realtime && npm test` | Realtime worker suites (vitest); `npm run test:perf` for the perf set |
-| `bash supabase/tests/run-local.sh` | pgTAP SQL suites against a throwaway local PostgreSQL |
+| `npm run test:db` | Empty disposable Supabase, protection tests, complete schema comparison |
 | `npm run test:k6-fixtures` | k6 fixture shape + "no credentials tracked" guards |
 
 CI (`.github/workflows/ci.yml`) runs the blocking type check and the full web

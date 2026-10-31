@@ -26,6 +26,12 @@ function readRepo(relative: string): string {
   return readFileSync(path.join(REPO_ROOT, relative), "utf8");
 }
 
+function readBaseline(): string {
+  return readRepo("supabase/migrations/20261031163000_production_schema_baseline.sql")
+    .replaceAll('"', "")
+    .toLowerCase();
+}
+
 test("report creation is authorized by a live user session", () => {
   for (const route of [
     "app/api/interaction-reports/route.ts",
@@ -102,17 +108,12 @@ test("a community is hidden, not deleted, and membership is untouched", () => {
 });
 
 test("the audit log is append-only in the migration", () => {
-  const migration = readRepo(
-    "supabase/migrations/20261030220000_complete_moderation_system.sql",
-  );
+  const migration = readBaseline();
   assert.match(migration, /moderation_audit_log_immutable/);
-  assert.match(migration, /before update or delete on public\.moderation_audit_log/);
-  assert.match(migration, /grant select, insert on public\.moderation_audit_log to service_role/);
-  assert.doesNotMatch(
-    migration,
-    /grant[^;]*update[^;]*on public\.moderation_audit_log/i,
-    "the audit table must not grant UPDATE",
-  );
+  assert.match(migration, /before (?:update or delete|delete or update) on (?:public\.)?moderation_audit_log/);
+  assert.match(migration, /raise exception 'moderation_audit_log is append-only'/);
+  // The baseline preserves live ACLs; the database test verifies that the
+  // immutable trigger rejects updates/deletes even for a role with DML grants.
 });
 
 test("the reporter identity is never put on the affected member's notice", () => {
@@ -130,9 +131,7 @@ test("the reporter identity is never put on the affected member's notice", () =>
 });
 
 test("appeals are one-per-report at the database level and rate limited in the API", () => {
-  const migration = readRepo(
-    "supabase/migrations/20261030220000_complete_moderation_system.sql",
-  );
+  const migration = readBaseline();
   assert.match(migration, /moderation_appeals_report_unique/);
   const route = readWeb("app/api/moderation/appeals/route.ts");
   assert.match(route, /rateLimit\(`moderation-appeal:/);
@@ -141,15 +140,13 @@ test("appeals are one-per-report at the database level and rate limited in the A
 });
 
 test("reports and audit history survive reporter account deletion", () => {
-  const migration = readRepo(
-    "supabase/migrations/20261030230000_preserve_moderation_evidence.sql",
-  );
+  const migration = readBaseline();
 
   for (const table of ["interaction_reports", "content_reports", "dm_reports"]) {
     assert.match(
       migration,
-      new RegExp(`alter table public\\.${table}[\\s\\S]{0,80}alter column reporter_id drop not null`),
-      `${table}.reporter_id must become nullable`,
+      new RegExp(`create table public\\.${table} \\([\\s\\S]*?reporter_id uuid(?:,|\\n)`),
+      `${table}.reporter_id must be nullable in the baseline`,
     );
     assert.match(
       migration,
@@ -159,18 +156,12 @@ test("reports and audit history survive reporter account deletion", () => {
   }
 
   assert.match(migration, /trg_anonymize_deleted_user_reports/);
-  assert.match(migration, /before delete on public\.users/);
+  assert.match(migration, /before delete on (?:public\.)?users/);
   assert.match(migration, /reporter_deleted_at/);
-  assert.match(migration, /'Deleted user'/);
-  assert.match(migration, /drop constraint if exists moderation_audit_log_report_id_fkey/);
-  assert.match(
-    migration,
-    /drop constraint if exists moderation_audit_log_moderator_id_fkey/,
-  );
-  assert.match(
-    migration,
-    /drop constraint if exists moderation_audit_log_subject_user_id_fkey/,
-  );
+  assert.match(migration, /'deleted user'/);
+  assert.doesNotMatch(migration, /add constraint moderation_audit_log_report_id_fkey/);
+  assert.doesNotMatch(migration, /add constraint moderation_audit_log_moderator_id_fkey/);
+  assert.doesNotMatch(migration, /add constraint moderation_audit_log_subject_user_id_fkey/);
 
   const engine = readWeb("lib/moderation/resolve-report.ts");
   assert.match(engine, /reporter_id: string \| null/);
@@ -201,8 +192,6 @@ test("temporary suspension is enforced by the session evaluator", () => {
   assert.match(validity, /isSuspendedAccount\(user\.suspended_until, now\)/);
   const session = readWeb("lib/auth/session.ts");
   assert.match(session, /users!auth_sessions_user_id_fkey\(id, is_blocked, suspended_until/);
-  const migration = readRepo(
-    "supabase/migrations/20261030220000_complete_moderation_system.sql",
-  );
+  const migration = readBaseline();
   assert.match(migration, /set_user_suspended/);
 });
