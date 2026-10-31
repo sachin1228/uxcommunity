@@ -217,7 +217,7 @@ Remaining limits: legacy objects are still publicly readable **at their original
 | Worker secrets | `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `REALTIME_URL`, `REALTIME_PUBLISH_SECRET`, `API_SECRET`, `UPSTASH_REDIS_REST_URL/TOKEN`, `RESEND_API_KEY`, `EMAIL_FROM`, `GIPHY_API_KEY`, `R2_*` (5 values), `ADMIN_EMAIL/PASSWORD`, `FCM_SERVICE_ACCOUNT`, `MODERATION_IMAGE_SERVICE_URL` only if used. |
 | Upstash | Separate staging database/namespace; verify fail-closed behavior with the staging keys. |
 | Resend | Test domain/key and controlled recipient; no production addresses. |
-| FCM/EAS | Separate Firebase app/project + `google-services.json`; EAS staging profile; controlled device. |
+| FCM/EAS | Separate Firebase application/project + `google-services.json`; EAS staging profile; controlled device. |
 | Mobile | `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_REALTIME_URL` pointed at staging; staging/dev client; do not reuse the production-signed release. |
 | Website | Staging deployment or local website build; its `/api/auth/me` only; legal links can point at production legal pages or staging copies. |
 

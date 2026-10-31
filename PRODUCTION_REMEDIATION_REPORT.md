@@ -30,7 +30,7 @@ Local gates now passing: web TypeScript, **1,087/1,087** web unit tests, isolate
 |---|---|
 | HTTP→HTTPS 308 redirect at the Worker/middleware layer, local-host exemption, `x-forwarded-proto`/`cf-visitor` support | `apps/web/middleware.ts`, `apps/web/lib/security/request-origin.ts` + test |
 | Same-origin mutation guard (Origin/Sec-Fetch-Site); native/server requests without Origin remain allowed; internal Worker calls with API_SECRET still work | same |
-| Report-only CSP (app and marketing site); HSTS/XFO/nosniff/referrer/permissions already present | `apps/web/next.config.js`, `uxcommunity-website/next.config.js` |
+| Report-only CSP (app and marketing site); HSTS/XFO/nosniff/referrer/permissions already present | `apps/web/next.config.js`, and the website repository's next.config.js |
 | Timing-safe admin email/password comparison | `apps/web/lib/auth/secure-compare.ts` + test, `app/api/auth/login/route.ts` |
 | Fail-closed rate limits for login, signup, password reset/change, account deletion, reports, appeals, verification, chat/DM/content writes and company verification; read/typing/safety/global limits remain availability-oriented | `apps/web/lib/auth/rate-limit.ts`, critical call sites |
 | No HSTS preload enabled | intentionally not changed |
