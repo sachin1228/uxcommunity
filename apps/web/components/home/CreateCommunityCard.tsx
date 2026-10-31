@@ -16,9 +16,13 @@ export function CreateCommunityCard() {
   return (
     <section
       aria-labelledby="home-create-community-heading"
-      className="overflow-hidden rounded-xl border border-white/10 bg-overlay shadow-sm"
+      className="relative overflow-hidden rounded-xl border border-white/10 bg-overlay shadow-sm"
     >
-      <div className="px-4 pt-5 text-center">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(58%_100%_at_50%_0%,rgba(255,255,255,0.12),transparent_72%)]"
+      />
+      <div className="relative px-4 pt-5 text-center">
         <h2
           id="home-create-community-heading"
           className="mb-3 font-display text-[15px] font-semibold leading-snug text-overlay-foreground"
