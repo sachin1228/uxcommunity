@@ -51,7 +51,7 @@ Legend for “Type”: **CODE** = implementation/test change; **CONFIG** = produ
 | Jobs/resume | Transactional RPC + strict public-URL rejection + key stripping; no live job fixtures. |
 | Events/reports | Core validation/visibility/caps fixed; remaining gaps (RB-15). |
 | Rate limits | Abuse-sensitive writes fail closed (including job apply, resume/avatar upload, push register, RSVP); global/read limits remain availability-oriented. |
-| Realtime scale | **Local full Worker suite PASS (281/281); platform staging/load pending (RB-23).** |
+| Realtime scale | **Clean local Worker run PASS (281/281); later performance reruns flaked under memory pressure; platform staging/load pending (RB-23).** |
 | Secrets | Local artifacts found and documented; no rotation/deletion. |
 | Android | Debug signing only; see RB-09. |
 
