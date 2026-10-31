@@ -1,0 +1,1619 @@
+file,schema,relation,first_declared_by,method,order_warning
+20260718_replace_sectors_add_companies_cities.sql,public,designer_profiles,schema.sql,parsed SQL,False
+20260720_communities_company_experience.sql,public,pg_policies,not declared / alias / CTE,conservative body scan,False
+20260721_cleanup_orphaned_communities.sql,public,cities,schema.sql,parsed SQL,False
+20260721_cleanup_orphaned_communities.sql,public,companies,20260929120000_company_verified_domains.sql,parsed SQL,True
+20260721_cleanup_orphaned_communities.sql,public,design_interests,20260719_add_design_interests.sql,parsed SQL,False
+20260721_cleanup_orphaned_communities.sql,public,design_sectors,schema.sql,parsed SQL,False
+20260721_cleanup_orphaned_communities.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed SQL,False
+20260724_message_soft_delete.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260726000000_community_threads.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260726000001_thread_votes.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260726000002_thread_comments.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260726200000_community_events.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260726200002_event_comments.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260727000000_community_rules.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20260727000000_community_rules.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260727200000_community_resources.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260727200001_resource_saves.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260727200002_resource_comments.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260728000001_notifications.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260812000000_persist_thread_interactions.sql,public,pg_policies,not declared / alias / CTE,conservative body scan,False
+20260813000001_repair_resource_comments_and_feed_indexes.sql,public,pg_constraint,not declared / alias / CTE,conservative body scan,False
+20260813000001_repair_resource_comments_and_feed_indexes.sql,public,pg_policies,not declared / alias / CTE,conservative body scan,False
+20260813000001_repair_resource_comments_and_feed_indexes.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260813000001_repair_resource_comments_and_feed_indexes.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed SQL,False
+20260813020000_atomic_signup_completion.sql,public,cities,schema.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,True
+20260813020000_atomic_signup_completion.sql,public,design_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,design_sectors,schema.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,invitations,schema.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,user_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260813020000_atomic_signup_completion.sql,public,users,schema.sql,conservative body scan,False
+20260813030000_event_saves_realtime.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260813040000_fix_event_like_realtime.sql,public,event_saves,20260728000000_event_saves.sql,parsed SQL,False
+20260813040000_fix_event_like_realtime.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260813050000_home_feed_interaction_aggregates.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260813050000_home_feed_interaction_aggregates.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed SQL,False
+20260814000000_separate_event_likes_and_saves.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,event_saves,20260728000000_event_saves.sql,parsed SQL,False
+20260814000000_separate_event_likes_and_saves.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260814000000_separate_event_likes_and_saves.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260814000000_separate_event_likes_and_saves.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_comment_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_ids,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_interactions,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_like_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_rsvp_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_save_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_bookmark_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_comment_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_ids,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_interactions,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_save_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_comment_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_ids,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_interactions,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_save_state,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_vote_counts,not declared / alias / CTE,parsed routine body,False
+20260814010000_optimize_home_feed_interactions.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260814020000_get_community_message_page.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260814020000_get_community_message_page.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,True
+20260814020000_get_community_message_page.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260814020000_get_community_message_page.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260814020000_get_community_message_page.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260814020000_get_community_message_page.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260814020000_get_community_message_page.sql,public,users,schema.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,ids,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,latest_messages,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,member_counts,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,memberships,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,message_stats,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260814025000_sidebar_showcase_performance.sql,public,users,schema.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,bookmarks,not declared / alias / CTE,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,requested,not declared / alias / CTE,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,rsvps,not declared / alias / CTE,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260814030000_community_list_aggregate_rpcs.sql,public,votes,not declared / alias / CTE,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260814040000_showcase_list_aggregate_rpc.sql,public,users,schema.sql,parsed routine body,False
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,True
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260814050000_fix_message_after_and_active_event_pagination.sql,public,users,schema.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,community_resources,20260727200000_community_resources.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,community_threads,20260726000000_community_threads.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,event_rsvps,20260726200000_community_events.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,event_saves,20260728000000_event_saves.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,page,not declared / alias / CTE,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,resource_comments,20260727200002_resource_comments.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,resource_saves,20260727200001_resource_saves.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,thread_comments,20260726000002_thread_comments.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,thread_saves,20260728_thread_saves.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,thread_votes,20260726000001_thread_votes.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260814060000_community_read_page_rpcs.sql,public,users,schema.sql,conservative body scan,False
+20260814060000_community_read_page_rpcs.sql,public,users,schema.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,cities,schema.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,True
+20260815000000_optimize_all_communities.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260815000000_optimize_all_communities.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260815100000_thread_resource_list_cursors.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,community_resources,20260727200000_community_resources.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,community_threads,20260726000000_community_threads.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,page,not declared / alias / CTE,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,resource_comments,20260727200002_resource_comments.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,resource_saves,20260727200001_resource_saves.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,thread_comments,20260726000002_thread_comments.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,thread_saves,20260728_thread_saves.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,thread_votes,20260726000001_thread_votes.sql,conservative body scan,False
+20260815100000_thread_resource_list_cursors.sql,public,users,schema.sql,conservative body scan,False
+20260815110000_public_showcase.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260815110000_public_showcase.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260815110000_public_showcase.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260815110000_public_showcase.sql,public,users,schema.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,thread_votes,20260726000001_thread_votes.sql,parsed routine body,False
+20260815120000_showcase_list_is_public.sql,public,users,schema.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,community_threads,20260726000000_community_threads.sql,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_comment_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_ids,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_interactions,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_like_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_rsvp_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_save_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,page,not declared / alias / CTE,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,requested,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_bookmark_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_comment_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_ids,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_interactions,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_save_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_comment_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_comments,20260726000002_thread_comments.sql,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_ids,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_interactions,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_like_counts,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_likes,not declared / alias / CTE,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_save_state,not declared / alias / CTE,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_saves,20260728_thread_saves.sql,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,users,schema.sql,conservative body scan,False
+20260816020000_rename_thread_votes_to_thread_likes.sql,public,users,schema.sql,parsed routine body,False
+20260826000000_event_attendee_previews.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260826000000_event_attendee_previews.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260826000000_event_attendee_previews.sql,public,users,schema.sql,parsed routine body,False
+20260826010000_remove_generated_avatars.sql,public,cities,schema.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,True
+20260826010000_remove_generated_avatars.sql,public,design_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,design_sectors,schema.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,invitations,schema.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,user_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260826010000_remove_generated_avatars.sql,public,users,schema.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,cities,schema.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,cities,schema.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20260827000000_remove_company_data.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,design_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,design_sectors,schema.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,invitations,schema.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260827000000_remove_company_data.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260827000000_remove_company_data.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260827000000_remove_company_data.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260827000000_remove_company_data.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20260827000000_remove_company_data.sql,public,user_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,users,schema.sql,conservative body scan,False
+20260827000000_remove_company_data.sql,public,users,schema.sql,parsed routine body,False
+20260827120000_edit_community_messages.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260827120000_edit_community_messages.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260827120000_edit_community_messages.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260827120000_edit_community_messages.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260827120000_edit_community_messages.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260827120000_edit_community_messages.sql,public,users,schema.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260829000000_home_feed_threads_only.sql,public,users,schema.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,cities,schema.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,community_join_requests,20260728000002_user_created_communities.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,pending_requests,not declared / alias / CTE,parsed routine body,False
+20260830000000_private_community_join_requests.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260830100000_remove_standalone_public_posts.sql,public,users,schema.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,community_resources,20260727200000_community_resources.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,community_threads,20260726000000_community_threads.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,page,not declared / alias / CTE,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,resource_comments,20260727200002_resource_comments.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,resource_saves,20260727200001_resource_saves.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,thread_comments,20260726000002_thread_comments.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,thread_likes,not declared / alias / CTE,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,thread_saves,20260728_thread_saves.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260830110000_keep_is_public_in_responses.sql,public,users,schema.sql,conservative body scan,False
+20260830110000_keep_is_public_in_responses.sql,public,users,schema.sql,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260830120000_remove_showcase_post_type_project_url_tags.sql,public,users,schema.sql,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260830130000_remove_showcase_description.sql,public,users,schema.sql,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260830140000_add_showcase_allow_replies.sql,public,users,schema.sql,parsed routine body,False
+20260903000000_auto_join_and_other_community_cleanup.sql,public,cities,schema.sql,conservative body scan,False
+20260903000000_auto_join_and_other_community_cleanup.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20260903000000_auto_join_and_other_community_cleanup.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260903000000_auto_join_and_other_community_cleanup.sql,public,design_sectors,schema.sql,conservative body scan,False
+20260903100000_sync_community_images_with_master_data.sql,public,cities,schema.sql,parsed SQL,False
+20260903100000_sync_community_images_with_master_data.sql,public,design_interests,20260719_add_design_interests.sql,parsed SQL,False
+20260903100000_sync_community_images_with_master_data.sql,public,design_sectors,schema.sql,parsed SQL,False
+20260903100000_sync_community_images_with_master_data.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed SQL,False
+20260903110000_community_display_picture_lottie.sql,public,cities,schema.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260903110000_community_display_picture_lottie.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260904120000_chat_mentions.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260904120000_chat_mentions.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260904120000_chat_mentions.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260904120000_chat_mentions.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260904120000_chat_mentions.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260904120000_chat_mentions.sql,public,users,schema.sql,parsed routine body,False
+20260905120000_add_thread_poll_and_widen_title.sql,public,pg_constraint,not declared / alias / CTE,conservative body scan,False
+20260905130000_thread_poll_votes.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260909100000_showcase_rich_posts.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,pg_constraint,not declared / alias / CTE,conservative body scan,False
+20260909100000_showcase_rich_posts.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260909100000_showcase_rich_posts.sql,public,users,schema.sql,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,likes,not declared / alias / CTE,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260911130000_remove_showcase_stage.sql,public,users,schema.sql,parsed routine body,False
+20260911150000_resource_card_comments.sql,public,pg_constraint,not declared / alias / CTE,conservative body scan,False
+20260911150000_resource_card_comments.sql,public,pg_policies,not declared / alias / CTE,conservative body scan,False
+20260911150000_resource_card_comments.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260911150000_resource_card_comments.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed SQL,False
+20260913120000_add_job_titles.sql,public,cities,schema.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,cities,schema.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,design_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,design_sectors,schema.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,invitations,schema.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed SQL,False
+20260913120000_add_job_titles.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260913120000_add_job_titles.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260913120000_add_job_titles.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260913120000_add_job_titles.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20260913120000_add_job_titles.sql,public,user_interests,20260719_add_design_interests.sql,conservative body scan,False
+20260913120000_add_job_titles.sql,public,users,schema.sql,conservative body scan,False
+20260913150000_community_ownership_on_user_delete.sql,public,cities,schema.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20260913150000_community_ownership_on_user_delete.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260913150000_community_ownership_on_user_delete.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,lottie_settings,20260720_lottie_settings.sql,conservative body scan,False
+20260913150000_community_ownership_on_user_delete.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260913150000_community_ownership_on_user_delete.sql,public,requests,not declared / alias / CTE,conservative body scan,False
+20260913150000_community_ownership_on_user_delete.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20260913150000_community_ownership_on_user_delete.sql,public,users,schema.sql,conservative body scan,False
+20260916130000_profile_feed_page.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260916130000_profile_feed_page.sql,public,users,schema.sql,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,latest_messages,not declared / alias / CTE,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,member_counts,not declared / alias / CTE,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,memberships,not declared / alias / CTE,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,message_stats,not declared / alias / CTE,parsed routine body,False
+20260917120000_sidebar_unread_mentions.sql,public,users,schema.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,area_flags,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,content_items,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,content_stats,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,latest_content,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,latest_messages,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,member_counts,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,memberships,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,message_stats,not declared / alias / CTE,parsed routine body,False
+20260917130000_sidebar_unread_content.sql,public,users,schema.sql,parsed routine body,False
+20260918120000_push_tokens.sql,public,push_tokens,20260918120000_push_tokens.sql,parsed SQL,False
+20260918140000_notification_preferences.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260918140000_notification_preferences.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260918140000_notification_preferences.sql,public,notification_preferences,20260918140000_notification_preferences.sql,parsed SQL,False
+20260918140000_notification_preferences.sql,public,push_throttle,20260918140000_notification_preferences.sql,parsed SQL,False
+20260923120000_comment_reactions_all_kinds.sql,public,on,not declared / alias / CTE,conservative body scan,False
+20260923120000_comment_reactions_all_kinds.sql,public,public,not declared / alias / CTE,conservative body scan,False
+20260923120000_comment_reactions_all_kinds.sql,public,users,schema.sql,conservative body scan,False
+20260923210000_message_page_content_reactions.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,interesting_content,not declared / alias / CTE,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260923210000_message_page_content_reactions.sql,public,users,schema.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260924120000_home_feed_member_scope.sql,public,users,schema.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,area_flags,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,content_items,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,content_stats,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,content_titles,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,latest_content,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,latest_messages,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,member_counts,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,memberships,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,message_stats,not declared / alias / CTE,parsed routine body,False
+20260924120000_sidebar_content_reactions_replies.sql,public,users,schema.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,cities,schema.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20260924130000_event_chat_communities.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20260924130000_event_chat_communities.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20260924130000_event_chat_communities.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,membership_aggregates,not declared / alias / CTE,parsed routine body,False
+20260924130000_event_chat_communities.sql,public,pg_constraint,not declared / alias / CTE,conservative body scan,False
+20260924130000_event_chat_communities.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260924140000_event_chat_showcase_off.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20260924140000_event_chat_showcase_off.sql,public,false,not declared / alias / CTE,conservative body scan,False
+20260924140000_event_chat_showcase_off.sql,public,information_schema,not declared / alias / CTE,conservative body scan,False
+20260925010000_feed_community_dp_master.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,cities,schema.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260925010000_feed_community_dp_master.sql,public,users,schema.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,cities,schema.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260925020000_profile_feed_community_dp_master.sql,public,users,schema.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,cities,schema.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,my_communities,not declared / alias / CTE,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20260925030000_home_feed_scope_visibility.sql,public,users,schema.sql,parsed routine body,False
+20260925120000_fix_naive_event_timestamps.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20260925120000_fix_naive_event_timestamps.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20260925120000_fix_naive_event_timestamps.sql,public,e,not declared / alias / CTE,conservative body scan,False
+20260925120000_fix_naive_event_timestamps.sql,public,notification_preferences,20260918140000_notification_preferences.sql,parsed SQL,False
+20260926000000_close_public_read_exposure.sql,public,anon,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,here,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,pg_class,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,pg_namespace,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,pg_policies,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,pg_publication,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,pg_publication_tables,not declared / alias / CTE,conservative body scan,False
+20260926000000_close_public_read_exposure.sql,public,supabase,not declared / alias / CTE,conservative body scan,False
+20260926120000_sidebar_scan_bounds.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,content_items,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,content_stats,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,content_titles,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,latest_content,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,latest_content_reaction,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,latest_message_reaction,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,latest_messages,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,member_counts,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,memberships,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,message_stats,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,pinned_content_ids,not declared / alias / CTE,parsed routine body,False
+20260926120000_sidebar_scan_bounds.sql,public,users,schema.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,cities,schema.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20260927120000_community_member_count.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20260927120000_community_member_count.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,community_members,20260720_communities.sql,parsed SQL,False
+20260927120000_community_member_count.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,content_items,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,content_stats,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,content_titles,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,design_sectors,schema.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,latest_content,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,latest_content_reaction,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,latest_message_reaction,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,latest_messages,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,memberships,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260927120000_community_member_count.sql,public,message_stats,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,one,not declared / alias / CTE,conservative body scan,False
+20260927120000_community_member_count.sql,public,pinned_content_ids,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20260927120000_community_member_count.sql,public,users,schema.sql,parsed routine body,False
+20260928120000_community_members_page.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20260928120000_community_members_page.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260928120000_community_members_page.sql,public,users,schema.sql,conservative body scan,False
+20260928130000_admin_community_members_page.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20260928130000_admin_community_members_page.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20260928130000_admin_community_members_page.sql,public,users,schema.sql,conservative body scan,False
+20260928140000_notification_dedupe.sql,public,merged,not declared / alias / CTE,parsed SQL,False
+20260928140000_notification_dedupe.sql,public,notifications,20260728000001_notifications.sql,conservative body scan,False
+20260928140000_notification_dedupe.sql,public,notifications,20260728000001_notifications.sql,parsed SQL,False
+20260928140000_notification_dedupe.sql,public,ranked,not declared / alias / CTE,parsed SQL,False
+20260928140000_notification_dedupe.sql,public,then,not declared / alias / CTE,conservative body scan,False
+20260928170000_message_page_content_reactions_once.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,interesting_content,not declared / alias / CTE,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20260928170000_message_page_content_reactions_once.sql,public,users,schema.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,companies,20260929120000_company_verified_domains.sql,parsed SQL,False
+20260929120000_company_verified_domains.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed SQL,False
+20260929120000_company_verified_domains.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,company_email_verifications,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,company_email_verifications,20260929120000_company_verified_domains.sql,parsed SQL,False
+20260929120000_company_verified_domains.sql,public,company_email_verifications,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,company_members,20260929120000_company_verified_domains.sql,parsed SQL,False
+20260929120000_company_verified_domains.sql,public,company_members,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,lateral,not declared / alias / CTE,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,membership,not declared / alias / CTE,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,p_code_hash,not declared / alias / CTE,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,that,not declared / alias / CTE,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,users,schema.sql,conservative body scan,False
+20260929120000_company_verified_domains.sql,public,users,schema.sql,parsed routine body,False
+20260929120000_company_verified_domains.sql,public,v_company_id,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,company_email_verifications,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,lateral,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,membership,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,p_code_hash,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,that,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,users,schema.sql,conservative body scan,False
+20260929130000_company_directory_hints.sql,public,v_company_id,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,best,not declared / alias / CTE,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,claims,not declared / alias / CTE,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,company_aliases,20260929150000_company_domain_stewardship.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,company_aliases,20260929150000_company_domain_stewardship.sql,parsed SQL,False
+20260929150000_company_domain_stewardship.sql,public,company_domain_delegations,20260929150000_company_domain_stewardship.sql,parsed SQL,False
+20260929150000_company_domain_stewardship.sql,public,company_domain_delegations,20260929150000_company_domain_stewardship.sql,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,company_domain_steward,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,company_email_verifications,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,company_relationships,20260929150000_company_domain_stewardship.sql,parsed SQL,False
+20260929150000_company_domain_stewardship.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,domain_evidence,20260929150000_company_domain_stewardship.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,domain_evidence,20260929150000_company_domain_stewardship.sql,parsed SQL,False
+20260929150000_company_domain_stewardship.sql,public,domain_evidence,20260929150000_company_domain_stewardship.sql,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,lateral,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,matched,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,membership,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,p_code_hash,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,pg_extension,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,pg_namespace,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,ranked,not declared / alias / CTE,parsed routine body,False
+20260929150000_company_domain_stewardship.sql,public,scored,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,users,schema.sql,conservative body scan,False
+20260929150000_company_domain_stewardship.sql,public,v_company_id,not declared / alias / CTE,conservative body scan,False
+20260929152000_company_domain_review.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929152000_company_domain_review.sql,public,company_domain_reviews,20260929152000_company_domain_review.sql,conservative body scan,False
+20260929152000_company_domain_review.sql,public,company_domain_reviews,20260929152000_company_domain_review.sql,parsed SQL,False
+20260929152000_company_domain_review.sql,public,company_domain_reviews,20260929152000_company_domain_review.sql,parsed routine body,False
+20260929152000_company_domain_review.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20260929152000_company_domain_review.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20260929152000_company_domain_review.sql,public,domain_evidence,20260929150000_company_domain_stewardship.sql,conservative body scan,False
+20260929152000_company_domain_review.sql,public,domain_evidence,20260929150000_company_domain_stewardship.sql,parsed routine body,False
+20260929152000_company_domain_review.sql,public,last_review,not declared / alias / CTE,parsed routine body,False
+20260929152000_company_domain_review.sql,public,observed,not declared / alias / CTE,parsed routine body,False
+20260929152000_company_domain_review.sql,public,users,schema.sql,conservative body scan,False
+20260929152000_company_domain_review.sql,public,v_max,not declared / alias / CTE,parsed routine body,False
+20260930100000_drop_duplicate_member_count_triggers.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20260930100000_drop_duplicate_member_count_triggers.sql,public,community_members,20260720_communities.sql,parsed SQL,False
+20261001000001_message_removal_attribution.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,interesting_content,not declared / alias / CTE,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20261001000001_message_removal_attribution.sql,public,users,schema.sql,parsed routine body,False
+20261005140000_report_review_and_undo.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,community_resources,20260727200000_community_resources.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,community_threads,20260726000000_community_threads.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,content_removals,20261005140000_report_review_and_undo.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,content_reports,20261005120000_content_reports.sql,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,grouped,not declared / alias / CTE,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,live,not declared / alias / CTE,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,report_groups,not declared / alias / CTE,parsed SQL,False
+20261005140000_report_review_and_undo.sql,public,users,schema.sql,parsed SQL,False
+20261007120000_profile_identity_edit.sql,public,cities,schema.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,community_admin_permissions,20260904000000_community_admins.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,does,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,profile_field_changes,20261007120000_profile_identity_edit.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,profile_field_changes,20261007120000_profile_identity_edit.sql,parsed SQL,False
+20261007120000_profile_identity_edit.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,upserted,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,users,schema.sql,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,v_city_id,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,v_experience_level,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,v_name,not declared / alias / CTE,conservative body scan,False
+20261007120000_profile_identity_edit.sql,public,v_sector_id,not declared / alias / CTE,conservative body scan,False
+20261007130000_company_directory_mnc_seed.sql,public,_mnc_seed,not declared / alias / CTE,conservative body scan,False
+20261007130000_company_directory_mnc_seed.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007130000_company_directory_mnc_seed.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007130000_company_directory_mnc_seed.sql,public,information_schema,not declared / alias / CTE,conservative body scan,False
+20261007130000_company_directory_mnc_seed.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261007140000_company_directory_admin.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007140000_company_directory_admin.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261007140000_company_directory_admin.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007140000_company_directory_admin.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261007140000_company_directory_admin.sql,public,company_members,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261007140000_company_directory_admin.sql,public,filtered,not declared / alias / CTE,parsed routine body,False
+20261007150000_company_directory_design_first.sql,public,_design_first,not declared / alias / CTE,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,browse,not declared / alias / CTE,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,company_aliases,20260929150000_company_domain_stewardship.sql,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,d,not declared / alias / CTE,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,lateral,not declared / alias / CTE,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,matched,not declared / alias / CTE,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,scored,not declared / alias / CTE,conservative body scan,False
+20261007150000_company_directory_design_first.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261007160000_company_directory_featured_admin.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007160000_company_directory_featured_admin.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261007160000_company_directory_featured_admin.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261007160000_company_directory_featured_admin.sql,public,company_members,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261007160000_company_directory_featured_admin.sql,public,filtered,not declared / alias / CTE,parsed routine body,False
+20261007160000_company_directory_featured_admin.sql,public,o,not declared / alias / CTE,conservative body scan,False
+20261007160000_company_directory_featured_admin.sql,public,ordered,not declared / alias / CTE,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,company_domain_steward,not declared / alias / CTE,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,company_domains,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,company_email_verifications,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,domain_evidence,20260929150000_company_domain_stewardship.sql,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,membership,not declared / alias / CTE,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,p_code_hash,not declared / alias / CTE,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261007170000_company_mailbox_proof_joins.sql,public,v_company_id,not declared / alias / CTE,conservative body scan,False
+20261008120000_event_host_is_going.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20261008120000_event_host_is_going.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20261008120000_event_host_is_going.sql,public,event_rsvps,20260726200000_community_events.sql,conservative body scan,False
+20261008120000_event_host_is_going.sql,public,event_rsvps,20260726200000_community_events.sql,parsed SQL,False
+20261008130000_drop_general_community.sql,public,cities,schema.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,design_interests,20260719_add_design_interests.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261008130000_drop_general_community.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,cities,schema.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,cities,schema.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20261008140000_remove_design_interests.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,invitations,schema.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,my_communities,not declared / alias / CTE,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20261008140000_remove_design_interests.sql,public,users,schema.sql,conservative body scan,False
+20261008140000_remove_design_interests.sql,public,users,schema.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20261009100000_member_feed_page.sql,public,cities,schema.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,my_communities,not declared / alias / CTE,parsed routine body,False
+20261009100000_member_feed_page.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20261009100000_member_feed_page.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20261009100000_member_feed_page.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20261009100000_member_feed_page.sql,public,users,schema.sql,parsed routine body,False
+20261009120000_jobs.sql,public,cities,schema.sql,conservative body scan,False
+20261009120000_jobs.sql,public,cities,schema.sql,parsed routine body,False
+20261009120000_jobs.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261009120000_jobs.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009120000_jobs.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009120000_jobs.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261009120000_jobs.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261009120000_jobs.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261009120000_jobs.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261009120000_jobs.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261009120000_jobs.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261009120000_jobs.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261009120000_jobs.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261009120000_jobs.sql,public,job_applications,20261009120000_jobs.sql,parsed SQL,False
+20261009120000_jobs.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261009120000_jobs.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261009120000_jobs.sql,public,job_posts,20261009120000_jobs.sql,parsed SQL,False
+20261009120000_jobs.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261009120000_jobs.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261009120000_jobs.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261009120000_jobs.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261009120000_jobs.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261009120000_jobs.sql,public,users,schema.sql,conservative body scan,False
+20261009120000_jobs.sql,public,users,schema.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,cities,schema.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,company_members,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261009140000_company_display_domain.sql,public,users,schema.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,cities,schema.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261009160000_job_poster_company.sql,public,users,schema.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,cities,schema.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,cities,schema.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,p_actor_id,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,p_city_id,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,p_sector_id,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,removed,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,updated,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,users,schema.sql,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,users,schema.sql,parsed routine body,False
+20261009170000_job_lifecycle.sql,public,v_experience,not declared / alias / CTE,conservative body scan,False
+20261009170000_job_lifecycle.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,cities,schema.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,cities,schema.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,p_actor_id,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,p_city_id,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,p_sector_id,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,updated,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,users,schema.sql,conservative body scan,False
+20261009180000_job_expiry.sql,public,users,schema.sql,parsed routine body,False
+20261009180000_job_expiry.sql,public,v_experience,not declared / alias / CTE,conservative body scan,False
+20261009180000_job_expiry.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261010120000_event_city.sql,public,cities,schema.sql,conservative body scan,False
+20261010120000_event_city.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261010120000_event_city.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20261010120000_event_city.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261010120000_event_city.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261010120000_event_city.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,conservative body scan,False
+20261010120000_event_city.sql,public,event_rsvps,20260726200000_community_events.sql,conservative body scan,False
+20261010120000_event_city.sql,public,event_saves,20260728000000_event_saves.sql,conservative body scan,False
+20261010120000_event_city.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261010120000_event_city.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261010120000_event_city.sql,public,page,not declared / alias / CTE,conservative body scan,False
+20261010120000_event_city.sql,public,users,schema.sql,conservative body scan,False
+20261010120000_job_application_triage.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261010120000_job_application_triage.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261010120000_job_application_triage.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261010120000_job_application_triage.sql,public,updated,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,cities,schema.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,cities,schema.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,companies,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,company_members,20260929120000_company_verified_domains.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,p_actor_id,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,p_city_id,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,p_sector_id,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,updated,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,users,schema.sql,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,users,schema.sql,parsed routine body,False
+20261010130000_job_wildcard_criteria.sql,public,v_experience,not declared / alias / CTE,conservative body scan,False
+20261010130000_job_wildcard_criteria.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261010150000_city_event_filters.sql,public,cities,schema.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,event_rsvps,20260726200000_community_events.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,event_saves,20260728000000_event_saves.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261010150000_city_event_filters.sql,public,page,not declared / alias / CTE,conservative body scan,False
+20261010150000_city_event_filters.sql,public,users,schema.sql,conservative body scan,False
+20261010160000_company_page_display_domain.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261010160000_company_page_display_domain.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261010160000_company_page_display_domain.sql,public,company_members,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261010160000_company_page_display_domain.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261010160000_company_page_display_domain.sql,public,users,schema.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20261010170000_profile_feed_saved_bookmarks.sql,public,users,schema.sql,parsed routine body,False
+20261010200000_member_resumes_and_email_prefs.sql,public,member_resumes,20261010200000_member_resumes_and_email_prefs.sql,parsed SQL,False
+20261012100000_direct_messages.sql,public,as,not declared / alias / CTE,conservative body scan,False
+20261012100000_direct_messages.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261012100000_direct_messages.sql,public,dm_conversations,20261012100000_direct_messages.sql,conservative body scan,False
+20261012100000_direct_messages.sql,public,dm_conversations,20261012100000_direct_messages.sql,parsed SQL,False
+20261012100000_direct_messages.sql,public,dm_conversations,20261012100000_direct_messages.sql,parsed routine body,False
+20261012100000_direct_messages.sql,public,dm_message_reactions,20261012100000_direct_messages.sql,parsed SQL,False
+20261012100000_direct_messages.sql,public,dm_message_reactions,20261012100000_direct_messages.sql,parsed routine body,False
+20261012100000_direct_messages.sql,public,dm_messages,20261012100000_direct_messages.sql,parsed SQL,False
+20261012100000_direct_messages.sql,public,dm_messages,20261012100000_direct_messages.sql,parsed routine body,False
+20261012100000_direct_messages.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20261012100000_direct_messages.sql,public,mine,not declared / alias / CTE,parsed routine body,False
+20261012100000_direct_messages.sql,public,participant,not declared / alias / CTE,parsed routine body,False
+20261012100000_direct_messages.sql,public,users,schema.sql,parsed routine body,False
+20261012120000_dm_hardening.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261012120000_dm_hardening.sql,public,dm_conversations,20261012100000_direct_messages.sql,conservative body scan,False
+20261012120000_dm_hardening.sql,public,dm_conversations,20261012100000_direct_messages.sql,parsed routine body,False
+20261012120000_dm_hardening.sql,public,dm_message_reactions,20261012100000_direct_messages.sql,parsed routine body,False
+20261012120000_dm_hardening.sql,public,dm_messages,20261012100000_direct_messages.sql,conservative body scan,False
+20261012120000_dm_hardening.sql,public,dm_messages,20261012100000_direct_messages.sql,parsed routine body,False
+20261012120000_dm_hardening.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20261012120000_dm_hardening.sql,public,participant,not declared / alias / CTE,parsed routine body,False
+20261012120000_dm_hardening.sql,public,users,schema.sql,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,dm_conversations,20261012100000_direct_messages.sql,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,dm_message_reactions,20261012100000_direct_messages.sql,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,dm_messages,20261012100000_direct_messages.sql,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,mine,not declared / alias / CTE,parsed routine body,False
+20261012130000_dm_sidebar_reaction_preview.sql,public,users,schema.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,cities,schema.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,community_join_requests,20260728000002_user_created_communities.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261012140000_explore_pending_join_request.sql,public,profile,not declared / alias / CTE,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,interesting_content,not declared / alias / CTE,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20261013100000_community_message_compound_cursor.sql,public,users,schema.sql,parsed routine body,False
+20261013120000_creation_limits.sql,public,as,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,cities,schema.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,community_admin_permissions,20260904000000_community_admins.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,community_threads,20260726000000_community_threads.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,creation_limits,20261013120000_creation_limits.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,creation_limits,20261013120000_creation_limits.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,dm_conversations,20261012100000_direct_messages.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,does,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,explore,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,job_posts,20261009120000_jobs.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,live,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,profile_field_changes,20261007120000_profile_identity_edit.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,upserted,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,usage_counters,20261013120000_creation_limits.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,usage_counters,20261013120000_creation_limits.sql,parsed SQL,False
+20261013120000_creation_limits.sql,public,users,schema.sql,conservative body scan,False
+20261013120000_creation_limits.sql,public,v_city_id,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,v_experience_level,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,v_name,not declared / alias / CTE,conservative body scan,False
+20261013120000_creation_limits.sql,public,v_sector_id,not declared / alias / CTE,conservative body scan,False
+20261014120000_creation_limits_resources.sql,public,community_resources,20260727200000_community_resources.sql,parsed SQL,False
+20261014120000_creation_limits_resources.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed SQL,False
+20261014120000_creation_limits_resources.sql,public,community_threads,20260726000000_community_threads.sql,parsed SQL,False
+20261014140000_creation_limits_live_slots.sql,public,cities,schema.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261014140000_creation_limits_live_slots.sql,public,community_admin_permissions,20260904000000_community_admins.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261014140000_creation_limits_live_slots.sql,public,creation_limits,20261013120000_creation_limits.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,does,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,explore,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,profile_field_changes,20261007120000_profile_identity_edit.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,upserted,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,users,schema.sql,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,v_city_id,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,v_experience_level,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,v_name,not declared / alias / CTE,conservative body scan,False
+20261014140000_creation_limits_live_slots.sql,public,v_sector_id,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,cities,schema.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261014160000_creation_limits_own_community.sql,public,community_admin_permissions,20260904000000_community_admins.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261014160000_creation_limits_own_community.sql,public,creation_limits,20261013120000_creation_limits.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,design_sectors,schema.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,does,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,experience_levels,20260720_communities_company_experience.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,explore,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,job_titles,20260913120000_add_job_titles.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,profile_field_changes,20261007120000_profile_identity_edit.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,set,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,slot,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,unnest,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,upserted,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,users,schema.sql,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,v_city_id,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,v_experience_level,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,v_job_title,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,v_name,not declared / alias / CTE,conservative body scan,False
+20261014160000_creation_limits_own_community.sql,public,v_sector_id,not declared / alias / CTE,conservative body scan,False
+20261015100000_dm_requests_blocks_reports.sql,public,as,not declared / alias / CTE,conservative body scan,False
+20261015100000_dm_requests_blocks_reports.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_blocks,20261015100000_dm_requests_blocks_reports.sql,conservative body scan,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_blocks,20261015100000_dm_requests_blocks_reports.sql,parsed SQL,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_blocks,20261015100000_dm_requests_blocks_reports.sql,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_conversations,20261012100000_direct_messages.sql,conservative body scan,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_conversations,20261012100000_direct_messages.sql,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_message_reactions,20261012100000_direct_messages.sql,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_messages,20261012100000_direct_messages.sql,conservative body scan,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_messages,20261012100000_direct_messages.sql,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_report_queue,not declared / alias / CTE,parsed SQL,False
+20261015100000_dm_requests_blocks_reports.sql,public,dm_reports,20261015100000_dm_requests_blocks_reports.sql,parsed SQL,False
+20261015100000_dm_requests_blocks_reports.sql,public,latest_reactions,not declared / alias / CTE,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,mine,not declared / alias / CTE,parsed routine body,False
+20261015100000_dm_requests_blocks_reports.sql,public,the,not declared / alias / CTE,conservative body scan,False
+20261015100000_dm_requests_blocks_reports.sql,public,users,schema.sql,parsed SQL,False
+20261015100000_dm_requests_blocks_reports.sql,public,users,schema.sql,parsed routine body,False
+20261015120000_job_feed_cursor.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261015140000_event_room_link_repair.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261015140000_event_room_link_repair.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20261015140000_event_room_link_repair.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20261015140000_event_room_link_repair.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20261015140000_event_room_link_repair.sql,public,lottie_settings,20260720_lottie_settings.sql,conservative body scan,False
+20261015140000_event_room_link_repair.sql,public,re,not declared / alias / CTE,conservative body scan,False
+20261015140000_event_room_link_repair.sql,public,these,not declared / alias / CTE,conservative body scan,False
+20261015140000_event_room_link_repair.sql,public,users,schema.sql,conservative body scan,False
+20261015160000_profile_feed_own_only.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,cities,schema.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20261015160000_profile_feed_own_only.sql,public,users,schema.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20261015180000_library_curation.sql,public,cities,schema.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,community_resources,20260727200000_community_resources.sql,conservative body scan,False
+20261015180000_library_curation.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,conservative body scan,False
+20261015180000_library_curation.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,community_threads,20260726000000_community_threads.sql,conservative body scan,False
+20261015180000_library_curation.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,library_items,20261015180000_library_curation.sql,conservative body scan,False
+20261015180000_library_curation.sql,public,library_items,20261015180000_library_curation.sql,parsed SQL,False
+20261015180000_library_curation.sql,public,library_items,20261015180000_library_curation.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,my_communities,not declared / alias / CTE,parsed routine body,False
+20261015180000_library_curation.sql,public,o,not declared / alias / CTE,conservative body scan,False
+20261015180000_library_curation.sql,public,ordered,not declared / alias / CTE,conservative body scan,False
+20261015180000_library_curation.sql,public,ranked,not declared / alias / CTE,parsed routine body,False
+20261015180000_library_curation.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20261015180000_library_curation.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20261015180000_library_curation.sql,public,users,schema.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,community_messages,20260720_communities.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,content_reactions,20260923200000_content_notification_reactions_replies.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,interesting_content,not declared / alias / CTE,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,message_page,not declared / alias / CTE,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,message_reactions,20260722000000_message_reactions.sql,parsed routine body,False
+20261019100000_reply_preview_author_id.sql,public,users,schema.sql,parsed routine body,False
+20261020120000_event_lifecycle_notifications.sql,public,event_notification_deliveries,20261020120000_event_lifecycle_notifications.sql,parsed SQL,False
+20261021150000_home_feed_unified_scope.sql,public,candidates,not declared / alias / CTE,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,cities,schema.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,communities,20260720_communities.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,community_events,20260726200000_community_events.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,community_members,20260720_communities.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,community_threads,20260726000000_community_threads.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,event_comments,20260726200002_event_comments.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,event_likes,20260814000000_separate_event_likes_and_saves.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,event_rsvps,20260726200000_community_events.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,event_saves,20260728000000_event_saves.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,my_communities,not declared / alias / CTE,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,page,not declared / alias / CTE,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,showcase_comments,20260812190000_community_showcase.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,showcase_likes,20260812190000_community_showcase.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,showcase_saves,20260812190000_community_showcase.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,thread_comments,20260726000002_thread_comments.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,thread_likes,not declared / alias / CTE,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,thread_saves,20260728_thread_saves.sql,parsed routine body,False
+20261021150000_home_feed_unified_scope.sql,public,users,schema.sql,parsed routine body,False
+20261022190000_creation_limits_refund.sql,public,communities,20260720_communities.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,community_events,20260726200000_community_events.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,community_members,20260720_communities.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,community_resources,20260727200000_community_resources.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,community_threads,20260726000000_community_threads.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,content_removals,20261005140000_report_review_and_undo.sql,parsed routine body,False
+20261022190000_creation_limits_refund.sql,public,creation_limits,20261013120000_creation_limits.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261022190000_creation_limits_refund.sql,public,slot,not declared / alias / CTE,conservative body scan,False
+20261026130000_account_verification.sql,public,account_verification_requests,20261026130000_account_verification.sql,conservative body scan,False
+20261026130000_account_verification.sql,public,of,not declared / alias / CTE,conservative body scan,False
+20261026130000_account_verification.sql,public,users,schema.sql,conservative body scan,False
+20261030140000_global_blocks_and_interaction_reports.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20261030140000_global_blocks_and_interaction_reports.sql,public,dm_blocks,20261015100000_dm_requests_blocks_reports.sql,parsed SQL,False
+20261030140000_global_blocks_and_interaction_reports.sql,public,interaction_report_queue,not declared / alias / CTE,parsed SQL,False
+20261030140000_global_blocks_and_interaction_reports.sql,public,interaction_reports,20261030140000_global_blocks_and_interaction_reports.sql,parsed SQL,False
+20261030140000_global_blocks_and_interaction_reports.sql,public,user_blocks,not declared / alias / CTE,parsed SQL,False
+20261030140000_global_blocks_and_interaction_reports.sql,public,users,schema.sql,parsed SQL,False
+20261030200000_private_r2_storage.sql,public,cities,schema.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,companies,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,company_domains,20260929120000_company_verified_domains.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,design_sectors,schema.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,designer_profiles,schema.sql,conservative body scan,False
+20261030200000_private_r2_storage.sql,public,designer_profiles,schema.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,experience_levels,20260720_communities_company_experience.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261030200000_private_r2_storage.sql,public,job_applications,20261009120000_jobs.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,job_posts,20261009120000_jobs.sql,conservative body scan,False
+20261030200000_private_r2_storage.sql,public,job_posts,20261009120000_jobs.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,job_titles,20260913120000_add_job_titles.sql,parsed routine body,False
+20261030200000_private_r2_storage.sql,public,users,schema.sql,parsed routine body,False
+20261030210000_session_revocation.sql,public,auth_sessions,20261030210000_session_revocation.sql,conservative body scan,False
+20261030210000_session_revocation.sql,public,auth_sessions,20261030210000_session_revocation.sql,parsed SQL,False
+20261030210000_session_revocation.sql,public,password_resets,schema.sql,conservative body scan,False
+20261030210000_session_revocation.sql,public,users,schema.sql,conservative body scan,False
+20261030220000_complete_moderation_system.sql,public,auth_sessions,20261030210000_session_revocation.sql,conservative body scan,False
+20261030220000_complete_moderation_system.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20261030220000_complete_moderation_system.sql,public,interaction_report_queue,not declared / alias / CTE,parsed SQL,False
+20261030220000_complete_moderation_system.sql,public,interaction_reports,20261030140000_global_blocks_and_interaction_reports.sql,parsed SQL,False
+20261030220000_complete_moderation_system.sql,public,moderation_appeals,20261030220000_complete_moderation_system.sql,parsed SQL,False
+20261030220000_complete_moderation_system.sql,public,moderation_audit_log,20261030220000_complete_moderation_system.sql,parsed SQL,False
+20261030220000_complete_moderation_system.sql,public,users,schema.sql,conservative body scan,False
+20261030220000_complete_moderation_system.sql,public,users,schema.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,communities,20260720_communities.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,community_events,20260726200000_community_events.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,community_resources,20260727200000_community_resources.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,community_showcase_posts,20260812190000_community_showcase.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,community_threads,20260726000000_community_threads.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,content_removals,20261005140000_report_review_and_undo.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,content_reports,20261005120000_content_reports.sql,conservative body scan,False
+20261030230000_preserve_moderation_evidence.sql,public,content_reports,20261005120000_content_reports.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,dm_report_queue,not declared / alias / CTE,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,dm_reports,20261015100000_dm_requests_blocks_reports.sql,conservative body scan,False
+20261030230000_preserve_moderation_evidence.sql,public,dm_reports,20261015100000_dm_requests_blocks_reports.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,grouped,not declared / alias / CTE,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,interaction_report_queue,not declared / alias / CTE,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,interaction_reports,20261030140000_global_blocks_and_interaction_reports.sql,conservative body scan,False
+20261030230000_preserve_moderation_evidence.sql,public,interaction_reports,20261030140000_global_blocks_and_interaction_reports.sql,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,live,not declared / alias / CTE,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,report_groups,not declared / alias / CTE,parsed SQL,False
+20261030230000_preserve_moderation_evidence.sql,public,users,schema.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,account_verification_requests,20261026130000_account_verification.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,content_removals,20261005140000_report_review_and_undo.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,content_reports,20261005120000_content_reports.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,fcm_tokens,20261023120000_fcm_tokens.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,member_resumes,20261010200000_member_resumes_and_email_prefs.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,verification_email_codes,20261026130000_account_verification.sql,parsed SQL,False
+20261030240000_revoke_client_select_on_launch_tables.sql,public,verification_settings,20261026140000_verification_grace_days.sql,parsed SQL,False
+20261031090000_harden_public_default_privileges.sql,public,public,not declared / alias / CTE,conservative body scan,False
+20261031100000_signup_consent_atomic.sql,public,complete_signup,not declared / alias / CTE,conservative body scan,False
+20261031100000_signup_consent_atomic.sql,public,this,not declared / alias / CTE,conservative body scan,False
+20261031100000_signup_consent_atomic.sql,public,users,schema.sql,conservative body scan,False
+20261031110000_fix_resource_list_aggregates.sql,public,bookmarks,not declared / alias / CTE,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,comments,not declared / alias / CTE,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,community_resources,20260727200000_community_resources.sql,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,requested,not declared / alias / CTE,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,resource_bookmarks,20260727300000_resource_bookmarks.sql,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,resource_comments,20260727200002_resource_comments.sql,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,resource_saves,20260727200001_resource_saves.sql,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,resources,not declared / alias / CTE,parsed routine body,False
+20261031110000_fix_resource_list_aggregates.sql,public,saves,not declared / alias / CTE,parsed routine body,False
+20261031140000_apply_to_job_with_resume.sql,public,apply_to_job,not declared / alias / CTE,conservative body scan,False
+20261031140000_apply_to_job_with_resume.sql,public,job_applications,20261009120000_jobs.sql,conservative body scan,False
+20261031150000_moderation_appeals_retention.sql,public,content_reports,20261005120000_content_reports.sql,conservative body scan,False
+20261031150000_moderation_appeals_retention.sql,public,dm_reports,20261015100000_dm_requests_blocks_reports.sql,conservative body scan,False
+20261031150000_moderation_appeals_retention.sql,public,interaction_reports,20261030140000_global_blocks_and_interaction_reports.sql,conservative body scan,False
+20261031150000_moderation_appeals_retention.sql,public,moderation_appeals,20261030220000_complete_moderation_system.sql,conservative body scan,False

@@ -1,0 +1,284 @@
+{
+  "aggregate_invariants": {
+    "missing_host_going": 0,
+    "mnc_seed_companies": 573,
+    "company_communities": 0,
+    "general_communities": 0,
+    "dangling_event_links": 0,
+    "events_without_rooms": 0,
+    "interest_communities": 0,
+    "design_first_companies": 35,
+    "negative_member_counts": 0,
+    "duplicate_notifications": 0,
+    "member_count_mismatches": 0,
+    "orphaned_user_communities": 0,
+    "inactive_experience_levels": 0,
+    "resource_comments_over_2000": 0,
+    "resource_comments_invalid_1_5000": 0,
+    "duplicate_user_application_groups": 0
+  },
+  "event_invariants": {
+    "report_orphans": 0,
+    "event_rooms_showcase_on": 0,
+    "event_rooms_not_chat_only": 0,
+    "client_readable_column_grants": 0
+  },
+  "settings": {
+    "creation_limits": [
+      {
+        "kind": "communities_total",
+        "period": "total",
+        "limit_count": 5
+      },
+      {
+        "kind": "community_joins",
+        "period": "standing",
+        "limit_count": 10
+      },
+      {
+        "kind": "dms_monthly",
+        "period": "month",
+        "limit_count": 5
+      },
+      {
+        "kind": "events_monthly",
+        "period": "month",
+        "limit_count": 5
+      },
+      {
+        "kind": "jobs_monthly",
+        "period": "month",
+        "limit_count": 3
+      },
+      {
+        "kind": "posts_daily",
+        "period": "day",
+        "limit_count": 3
+      }
+    ],
+    "verification_grace_days": 7
+  },
+  "seed_comparison": [
+    {
+      "seed_set": "cities",
+      "expected_rows": 71,
+      "missing_current_seed_rows": 31,
+      "missing_expected_values": [
+        {
+          "name": "Agra"
+        },
+        {
+          "name": "Amritsar"
+        },
+        {
+          "name": "Aurangabad"
+        },
+        {
+          "name": "Bhubaneswar"
+        },
+        {
+          "name": "Faridabad"
+        },
+        {
+          "name": "Guwahati"
+        },
+        {
+          "name": "Gwalior"
+        },
+        {
+          "name": "Howrah"
+        },
+        {
+          "name": "Jabalpur"
+        },
+        {
+          "name": "Jodhpur"
+        },
+        {
+          "name": "Kanpur"
+        },
+        {
+          "name": "Kota"
+        },
+        {
+          "name": "Ludhiana"
+        },
+        {
+          "name": "Madurai"
+        },
+        {
+          "name": "Mangaluru"
+        },
+        {
+          "name": "Meerut"
+        },
+        {
+          "name": "Mysuru"
+        },
+        {
+          "name": "Nashik"
+        },
+        {
+          "name": "Navi Mumbai"
+        },
+        {
+          "name": "Patna"
+        },
+        {
+          "name": "Prayagraj"
+        },
+        {
+          "name": "Raipur"
+        },
+        {
+          "name": "Rajkot"
+        },
+        {
+          "name": "Ranchi"
+        },
+        {
+          "name": "Srinagar"
+        },
+        {
+          "name": "Surat"
+        },
+        {
+          "name": "São Paulo"
+        },
+        {
+          "name": "Thane"
+        },
+        {
+          "name": "Vadodara"
+        },
+        {
+          "name": "Vijayawada"
+        },
+        {
+          "name": "Visakhapatnam"
+        }
+      ]
+    },
+    {
+      "seed_set": "design_sectors",
+      "expected_rows": 20,
+      "missing_current_seed_rows": 1,
+      "missing_expected_values": [
+        {
+          "name": "SaaS & Enterprise Software"
+        }
+      ]
+    },
+    {
+      "seed_set": "experience_levels",
+      "expected_rows": 14,
+      "missing_current_seed_rows": 14,
+      "missing_expected_values": [
+        {
+          "name": "Design Consultants",
+          "slug": "consultant"
+        },
+        {
+          "name": "Design Managers",
+          "slug": "design_manager"
+        },
+        {
+          "name": "Design Directors",
+          "slug": "director"
+        },
+        {
+          "name": "Freelancers",
+          "slug": "freelancer"
+        },
+        {
+          "name": "Freshers",
+          "slug": "fresher"
+        },
+        {
+          "name": "Heads of Design",
+          "slug": "head_of_design"
+        },
+        {
+          "name": "Junior Designers",
+          "slug": "junior"
+        },
+        {
+          "name": "Lead Designers",
+          "slug": "lead"
+        },
+        {
+          "name": "Mid-Level Designers",
+          "slug": "mid_level"
+        },
+        {
+          "name": "Principal Designers",
+          "slug": "principal"
+        },
+        {
+          "name": "Senior Designers",
+          "slug": "senior"
+        },
+        {
+          "name": "Staff Designers",
+          "slug": "staff"
+        },
+        {
+          "name": "Students",
+          "slug": "student"
+        },
+        {
+          "name": "VP of Design",
+          "slug": "vp"
+        }
+      ]
+    },
+    {
+      "seed_set": "job_titles",
+      "expected_rows": 6,
+      "missing_current_seed_rows": 0,
+      "missing_expected_values": []
+    },
+    {
+      "seed_set": "companies",
+      "expected_rows": 573,
+      "missing_current_seed_rows": 0,
+      "missing_expected_values": []
+    },
+    {
+      "seed_set": "company_domains",
+      "expected_rows": 573,
+      "missing_current_seed_rows": 0,
+      "missing_expected_values": []
+    }
+  ],
+  "storage_buckets": [],
+  "total_storage_buckets": 0,
+  "current_experience_levels": [
+    {
+      "name": "Freelance designers",
+      "slug": "freelance_designers",
+      "is_active": true
+    },
+    {
+      "name": "Junior Designer (0-2 years)",
+      "slug": "junior",
+      "is_active": true
+    },
+    {
+      "name": "Mid-level Designers (3-5 years)",
+      "slug": "mid_level",
+      "is_active": true
+    },
+    {
+      "name": "Senior designers (5-8 years)",
+      "slug": "principal",
+      "is_active": true
+    },
+    {
+      "name": "Design Leadership (8–15+ years)",
+      "slug": "senior",
+      "is_active": true
+    }
+  ],
+  "interpretation": "Mutable current reference data; absence/difference does not prove historical non-execution. No member-level rows exported."
+}
