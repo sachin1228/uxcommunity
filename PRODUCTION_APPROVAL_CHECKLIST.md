@@ -1,8 +1,8 @@
 # Production Approval Checklist
 
 **Branch:** `fix/production-readiness-remediation`
-**Status:** **READY FOR STAGING** — local code and regression gates pass; **nothing below has been executed against production.** Deploy to a separate staging environment and complete §8 before requesting production approval.
-**Backup / DR:** NOT ADDRESSED — explicitly deferred to a separate task. Do not apply production migrations until a recoverable backup exists (the separate task or an approved one-off dump).
+**Status:** **READY FOR STAGING** — local code and regression gates pass. The eight DB migrations were applied manually to linked production on 2026-10-31; **deployment, R2 and secret changes have not been executed.** Deploy to a separate staging environment and complete §8 before requesting production approval.
+**Backup / DR:** NOT ADDRESSED — explicitly deferred to a separate task. The migrations ran without a full recoverable dump because Docker was unavailable; a local schema-object snapshot was retained. Treat the production database as operating without a full backup.
 
 Each item is independently approvable. Stop and obtain approval before executing any production operation.
 
@@ -34,20 +34,23 @@ mobile tsc + realtime/cache/signup tests (71/71, 7/7, 12/12), full realtime Work
 suite clean run 281/281 (including 1,000 clients); later review reruns under system
 memory pressure timed out 1 and then 3 heavy performance cases, while the exact
 10K case passes alone), local 216-migration DB suites 138/138.
-No production deploy/migration/R2/secret change was performed.
-Backup/DR is deferred to a separate task.
+The eight DB migrations were applied manually to production on 2026-10-31; no
+production deployment, R2 or secret change was performed. The migration ledger
+was not repaired, and no full dump was available. Backup/DR is deferred.
 ```
 
 **Approval required:** yes (publishing/pushing/opening PR). No merge/deploy until the items below are approved.
 
 ---
 
-## 1. Production migrations — apply in this exact order
+## 1. Production migrations — already applied 2026-10-31; do not rerun
 
-**Preconditions:**
+**Status:** all eight files below were applied manually in order against linked `ux-community` on 2026-10-31. Verification passed: terms_version, target_snapshot, 7-column RPC, audit actions, appeal retention, zero client SELECT on the seven tables, and service_role access. The migration ledger was not repaired.
 
-- A recoverable independent backup exists (separate task or approved one-off dump).
-- Staging clone has applied the same sequence successfully.
+**Preconditions originally required (not met for this execution):**
+
+- A recoverable independent backup exists (separate task or approved one-off dump) — **no full dump was available; only a local schema-object snapshot was retained.**
+- Staging clone has applied the same sequence successfully — **not done.**
 - Run during a low-write window; use one SQL editor/psql session per file; stop on the first error.
 - **Do not run `supabase db push` or `db reset`.**
 - **Do not re-run** `20261030220000_complete_moderation_system.sql` or `20261030230000_preserve_moderation_evidence.sql`; production is already in the repaired state (new `moderation_audit_log` + `moderation_audit_log_legacy_20261030`, both 0 rows).
@@ -67,7 +70,7 @@ The three remote-only ledger versions (`20261005140518`, `20261008145053`, `2026
 | 7 | `20261031140000_apply_to_job_with_resume.sql` | Transactional resume-apply RPC | Additive |
 | 8 | `20261031150000_moderation_appeals_retention.sql` | Appeal retention columns/FKs + anonymization trigger | Additive; FKs can be restored |
 
-**Deploy order:** migrations **before** the web Worker, then realtime. The new web code calls `complete_signup_with_consent` and `apply_to_job_with_resume`, inserts `target_snapshot`, and writes new audit actions; deploying it first would fail those paths.
+**Deploy order:** migrations are already applied; deploy the web Worker next, then realtime. The new web code calls `complete_signup_with_consent` and `apply_to_job_with_resume`, inserts `target_snapshot`, and writes new audit actions; deploying it first would fail those paths.
 
 **Exact verification SQL (run after each group, as postgres):**
 

@@ -3,13 +3,13 @@
 **Date:** 2026-10-31
 **Branch:** `fix/production-readiness-remediation`
 **Environment:** macOS 26.4, Node 24.18.0, npm, PostgreSQL 17.11 (Homebrew), local Next 16.4.3 dev server already running on port 3000, no Docker, no dedicated staging project, no Android device attached.
-**Production:** inspected read-only; **no deployment, migration, R2 operation, secret change or production test was performed.**
+**Production:** the eight DB migrations were applied manually on 2026-10-31; **no deployment, R2 operation, secret change or production test was performed.** No staging validation or full backup was available.
 
 ## Verdict
 
 # READY FOR STAGING
 
-The branch passes the final local regression gates (web, realtime, database, mobile, production builds). It is ready to deploy to a **separate staging environment** and run this matrix. It is **not READY FOR PRODUCTION APPROVAL**: no staging, platform-load, email/FCM delivery or Android device test has run, and backup/DR, production migrations/deploy, signing and the approvals in `REMAINING_BLOCKERS.md` remain outstanding.
+The branch passes the final local regression gates (web, realtime, database, mobile, production builds). It is ready to deploy to a **separate staging environment** and run this matrix. It is **not READY FOR PRODUCTION APPROVAL**: no staging, platform-load, email/FCM delivery or Android device test has run; the eight DB migrations were applied manually without staging or a full backup; deployment, backup/DR, signing and the approvals in `REMAINING_BLOCKERS.md` remain outstanding.
 
 ## 1. Environment status
 
@@ -171,7 +171,7 @@ bash supabase/tests/run-local.sh   supabase/tests/migration_integrity.test.sql  
 - Live read-only ACL inspection confirmed the seven sensitive tables still carry client grants today; `member_resumes` is authenticated-only with own-row policies, the other six have no policies, and all seven have RLS enabled. No other public table currently grants anon/authenticated SELECT.
 - The remediation test is scoped to those seven (not a blanket public-table zero), creates an explicit anon public-read fixture to prove intentional public reads can still be granted, and probes the default ACL. Local result: **19 ok / 0 failed**.
 - PostgreSQL gives every new function a built-in `PUBLIC EXECUTE`; `ALTER DEFAULT PRIVILEGES` cannot remove it. The migration removes project-level client function defaults and grants service_role, but future sensitive functions still need explicit revokes. The test checks a representative sensitive RPC; this is documented as a convention/limitation, not a global guarantee.
-- Three remote-only migration versions were fetched read-only into a temp dir and mapped to local equivalents; no production ledger write or migration execution occurred. See `MIGRATION_RECONCILIATION.md`.
+- Three remote-only migration versions were fetched read-only into a temp dir and mapped to local equivalents; no production ledger write was made for those aliases. See `MIGRATION_RECONCILIATION.md`.
 
 ## 12. CSP, CSRF, cookies and rate limits
 
@@ -229,12 +229,11 @@ Remaining limits: legacy objects are still publicly readable **at their original
 
 ## 15. Verification status against the live production snapshot
 
-The code changes are **local-tested**, not production-deployed. At the audit snapshot production still showed:
+The app code is **local-tested**, not production-deployed. After the 2026-10-31 manual DB migration, production has:
 
-- `http://app.uxcommunity.in/login` served over HTTP (the new middleware is not deployed);
-- one public `verification/` orphan (not deleted);
-- seven sensitive tables with client grants (REVOKE migration not applied);
-- `get_resource_list_aggregates` with 6 columns (forward migration not applied);
-- no verified backup/PITR and R2 versioning disabled.
+- the 7-column `get_resource_list_aggregates`;
+- `users.terms_version`, `content_reports.target_snapshot`, `complete_signup_with_consent`, `apply_to_job_with_resume`, expanded audit actions and nullable appeal FKs;
+- zero client SELECT on the seven sensitive tables; service_role retains all seven;
+- the unrepaired upstream `supabase_admin` default ACL still grants client function/table defaults; the `postgres` defaults are hardened.
 
-These are intentionally left for the approval checklist; they are **not** claims of live remediation.
+The app still serves the old deployment (HTTP behavior and app-side Policy A inactive); the public `verification/` orphan remains; the production migration ledger is unrepaired; no verified backup/PITR exists and R2 versioning is disabled. Staging validation has not run. These are **not** claims of production readiness.

@@ -59,23 +59,27 @@ These groups share a version prefix. The SQL editor/globbing order is determinis
 
 New migrations in this branch use unique `20261031…` timestamps. Do not rename historical files without a production baseline decision.
 
-## 4. Production schema drift (verified objects)
+## 3a. Production execution — 2026-10-31
+
+The eight remediation migrations were applied manually in order to linked `ux-community` via the authenticated Supabase CLI. Verification returned: 7-column resource RPC, `terms_version`, `content_reports.target_snapshot`, `complete_signup_with_consent`, `apply_to_job_with_resume`, expanded audit actions, nullable `moderation_appeals.user_id` + `user_deleted_at`, zero `anon`/`authenticated` SELECT on the seven sensitive tables and service_role SELECT on all seven. The production ledger was **not** repaired. A full logical dump was unavailable because Docker is not installed; a local schema-object snapshot is retained in `/tmp/uxc-prechange-objects.txt`. `supabase_admin` default ACLs remain permissive; `postgres` defaults are hardened. The app has not been deployed.
+
+## 4. Production schema drift (pre-execution audit snapshot; current applied state is in §3a)
 
 | Object | Production state | Repository expectation | Risk/action |
 |---|---|---|---|
-| `get_resource_list_aggregates(uuid,uuid[])` | **6 columns** (`id, save_count, comment_count, bookmark_count, user_saved, user_bookmarked`) | 7 columns including `allow_replies` | `20261031110000` forward migration restores the 7-column definition; production app currently reads `allow_replies` from the page row, so no current 500, but the type/drift must be closed. |
+| `get_resource_list_aggregates(uuid,uuid[])` | **6 columns** at audit time; **7 columns after 2026-10-31 execution** | 7 columns including `allow_replies` | Applied successfully. |
 | Fresh migration chain | Function never created after 20260814 | 7-column function after the chain | Fixed by restoring 20260814 + forward 20261031110000; integrity test 10/10. |
 | `moderation_audit_log` | New schema (13 columns, immutable trigger, no FKs), 0 rows | New 20261030220000/230000 | Matches; do not re-run the original migration against a legacy table. |
 | `moderation_audit_log_legacy_20261030` | Old schema (moderator_email, target_content_type/id, metadata), FK `target_user_id → users ON DELETE SET NULL`, 0 rows | Not in repo | Manual repair artifact. Keep; include in backups; do not drop in this release. |
-| `moderation_appeals` | 0 rows; original cascade FKs | New 20261031150000 changes to nullable/SET NULL + `user_deleted_at` | Migration ready; production not yet applied. |
-| `content_reports.target_snapshot` | Absent until 20261031130000 | New evidence column | Apply before deploying the evidence-capturing route. |
-| `users.terms_version` | Absent until 20261031100000 | New versioned consent column | Apply before deploying the atomic signup route. |
-| Client grants on seven sensitive tables | Present (`anon`/`authenticated` full DML on six; `member_resumes` authenticated) | REVOKE migration on branch | Apply 20261030240000 + default-ACL migration; RLS currently blocks the no-policy tables, so this is defense-in-depth, not a current row leak. |
-| `moderation_audit_log` action check | Original 11 actions | New 20-action set | Apply 20261031120000 before deploying the newly audited admin routes. |
-| `apply_to_job_with_resume` | Absent | New 20261031140000 | Apply before deploying the transactional apply route. |
+| `moderation_appeals` | 0 rows; original cascade FKs | New 20261031150000 changes to nullable/SET NULL + `user_deleted_at` | Applied 2026-10-31; `user_id` nullable and `user_deleted_at` present. |
+| `content_reports.target_snapshot` | Absent at audit time; **present after 2026-10-31 execution** | New evidence column | Applied. |
+| `users.terms_version` | Absent at audit time; **present after 2026-10-31 execution** | New versioned consent column | Applied; existing rows remain NULL. |
+| Client grants on seven sensitive tables | Present at audit time; **zero client SELECT after 2026-10-31** | REVOKE migration on branch | Applied; service_role retains SELECT on all seven. |
+| `moderation_audit_log` action check | Original 11 actions at audit time; **expanded after 2026-10-31** | New action set | Applied. |
+| `apply_to_job_with_resume` | Absent at audit time; **present after 2026-10-31** | New 20261031140000 | Applied; service_role execute only. |
 | `verification_settings.grace_days` | `2` | Policy A ignores it for writes | Product decision: leave legacy value or set to 0 with approval; no code change required. |
 
-**Verified schema checks performed live (read-only):** 91 public tables/views, RLS flags, 20 policies, default ACL, sensitive-table ACLs, audit/appeal/auth-session tables, reporter `SET NULL` FKs, moderation audit trigger, source `get_resource_list_aggregates` definition (still 6 columns in production), live `get_resource_list_page` body, and `supabase_realtime` publication (empty).
+**Verified schema checks performed live:** 91 public tables/views, RLS flags, 20 policies, default ACL, sensitive-table ACLs, audit/appeal/auth-session tables, reporter `SET NULL` FKs, moderation audit trigger, source `get_resource_list_aggregates` definition, live `get_resource_list_page` body, and `supabase_realtime` publication (empty). Post-execution verification is recorded in §3a.
 
 **Object inventory comparison:** the live object list is consistent with the repository's `create table/view` statements plus `schema.sql`, the retired objects, and the one manual repair artifact `moderation_audit_log_legacy_20261030`. A name-only comparison flags some retired/supabase-only objects; it is not a substitute for a column-level staging diff. The full column/constraint/trigger diff for all 216 migrations was **not completed**; a real Supabase staging clone is required. Production schema access was available, but a full schema diff without a controlled staging environment is incomplete.
 

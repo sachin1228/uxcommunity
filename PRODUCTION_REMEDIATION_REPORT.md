@@ -13,8 +13,8 @@
 The remediation branch is code-complete and passes the final local regression gates, so it is ready to be deployed to a **separate staging environment** and run through the matrix in `STAGING_TEST_RESULTS.md`. This is **not** a production-approval claim:
 
 - No staging environment is provisioned or was tested; no real Supabase/Workers/R2/email/FCM/Android E2E was performed.
-- The production migrations, deployment, R2 deletion/purge and secret rotation are not executed.
-- The production app still has the old HTTP behavior, client grants, 6-column RPC and public R2 orphan.
+- The eight production migrations were applied manually to linked production `ux-community` on 2026-10-31; deployment, R2 deletion/purge and secret rotation remain unexecuted.
+- The production app still runs the old code/deployment (HTTP behavior and app-side Policy A remain inactive), but the database now has the new RPCs, columns, audit actions and permission revokes. The migration ledger was not repaired; a full logical backup was unavailable because Docker was absent (a schema-object snapshot was retained locally).
 - Backup/DR is out of scope and unresolved.
 - Android release signing/device verification is unresolved; Turnstile, CSP enforcement, cookie narrowing and some mobile appeal/screen gaps remain open decisions.
 
@@ -46,7 +46,7 @@ Selected policy: unverified accounts can browse, **like**, report/block, manage 
 - Reporting and blocking now explicitly pass `allowUnverified` (safety actions remain available).
 - Web and mobile banners in this branch and the separately committed website copy describe the policy; **neither is deployed**.
 - The admin Verifications screen labels `grace_days` as **legacy** and explains it no longer gates writes.
-- Tests: verification policy 4/4; 1,087/1,087 web unit tests pass.
+- Verification policy 4/4; 1,087/1,087 web unit tests pass.
 
 ### 2a. Verification evidence privacy (proxy)
 
@@ -82,7 +82,7 @@ Remaining product decision: `verification_settings.grace_days` is still 2 in pro
 - Extended `public_read_exposure.test.sql` with a future-table regression probe.
 - Local result: **19 ok / 0 failed** (15 planned assertions); the seven sensitive tables are the scoped denylist, a new table gets no inherited client grant, service_role works, and an explicitly granted public-read fixture remains readable.
 - **PostgreSQL limitation:** default privileges cannot remove a new function's built-in `PUBLIC EXECUTE`. The migration removes project-level anon/authenticated defaults and grants service_role, but every function migration must still explicitly revoke PUBLIC/anon/authenticated. The test checks a representative sensitive RPC; it does not claim a global function guarantee. The current Data API public-read allowlist is empty (the app is service-role-only).
-- Production is still unchanged until the migration is approved/applied.
+- Production migration was applied manually on 2026-10-31; the production app deployment and staging validation remain pending.
 
 ### 6. Migration chain and `get_resource_list_aggregates`
 

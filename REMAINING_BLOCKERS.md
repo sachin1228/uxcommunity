@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-31
 **Branch:** `fix/production-readiness-remediation`
-**Overall status:** **READY FOR STAGING** — the code and local regression gates pass; deploy to a separate staging environment next. This is **not READY FOR PRODUCTION APPROVAL**: staging, backup/DR, Android signing, production migration/deploy and the approvals below are still outstanding.
+**Overall status:** **READY FOR STAGING** — the code and local regression gates pass; deploy to a separate staging environment next. This is **not READY FOR PRODUCTION APPROVAL**: staging, backup/DR, Android signing, production deployment and the approvals below remain outstanding. The eight DB migrations were applied manually to linked production on 2026-10-31 without staging or a full dump; the ledger is unrepaired.
 
 Legend for “Type”: **CODE** = implementation/test change; **CONFIG** = production/infra configuration; **INFRA** = provisioning; **PRODUCT** = policy decision; **APPROVAL** = manual production action; **TEST** = verification activity.
 
@@ -10,8 +10,8 @@ Legend for “Type”: **CODE** = implementation/test change; **CONFIG** = produ
 
 | ID | Severity | Issue and evidence | Required action | Type | Timing |
 |---|---|---|---|---|---|
-| RB-01 | **CRITICAL** | **No recoverable backup/DR.** Supabase PITR false and zero physical backups; R2 versioning disabled; backup work is explicitly out of scope. Evidence: `supabase backups list --linked`, Management API `backups=0`, `pitr_enabled=false`. | Complete the separate backup/DR task; prove a restore of DB + both R2 buckets; define RPO/RTO. Do not apply production migrations before a recoverable dump exists. | INFRA / APPROVAL | Before production deployment |
-| RB-02 | **CRITICAL** | **Production migrations are not applied.** Eight remediation migrations are unapplied; app code expects the new RPCs/columns/audit actions. Applying web code first would break signup, job apply, content reports and audit writes. | Follow the exact order in `PRODUCTION_APPROVAL_CHECKLIST.md` §1 after backup + staging validation. | APPROVAL | Before production deployment |
+| RB-01 | **CRITICAL** | **No recoverable backup/DR.** Supabase PITR false and zero physical backups; R2 versioning disabled; backup work is explicitly out of scope. Evidence: `supabase backups list --linked`, Management API `backups=0`, `pitr_enabled=false`. The eight migrations were nonetheless applied manually on 2026-10-31 using a local schema-object snapshot; a full logical dump was blocked by the missing Docker dependency. | Complete the separate backup/DR task; prove a restore of DB + both R2 buckets; define RPO/RTO. Treat this migration as running without a recoverable full backup. | INFRA / APPROVAL | Before production deployment |
+| RB-02 | **CRITICAL** | **Production migrations were applied manually on 2026-10-31.** The eight files were executed in order against linked `ux-community`; schema verification passed (terms_version, target_snapshot, 7-column RPC, audit actions, appeals retention, zero client grants on the seven tables, service_role access). The production migration ledger was **not** repaired, and the app has not been deployed. | Do not rerun the files or `db push`; verify the app deployment, then establish a staging/ledger baseline. | APPROVAL | Before production deployment |
 | RB-03 | **HIGH** | **Production code is not deployed.** HTTP login still returns 200 over plaintext, Policy A is not active, CSRF/CSP/rate-limit changes are branch-only. Evidence: live `http://app.uxcommunity.in/login` 200. | Merge/publish and deploy web + realtime via the approved workflow; verify HTTP→308 and HTTPS login. | APPROVAL / CONFIG | Before launch |
 | RB-04 | **HIGH** | **One sensitive public R2 orphan** remains: `drafthub/verification/2e98842e-b3f3-4a9a-8517-380ee74bd613/2a81b3cd-3b6e-4ed9-882b-1ceef541d400.png` (878,801 B), public on `media.uxcommunity.in` and r2.dev; no DB row/user. | Preserve to private bucket, delete exact object, purge both URLs; verify 404/403. Checklist §3. | APPROVAL / CONFIG | Before launch |
 | RB-05 | **HIGH** | **Seven sensitive tables still grant client roles in production** (`content_reports`, `content_removals`, `fcm_tokens`, `account_verification_requests`, `verification_email_codes`, `verification_settings` full; `member_resumes` authenticated). RLS currently blocks rows. | Apply `20261030240000` + `20261031090000` after staging validation; verify the scoped seven-table test. | APPROVAL | Before launch |
@@ -40,9 +40,9 @@ Legend for “Type”: **CODE** = implementation/test change; **CONFIG** = produ
 |---|---|
 | HTTPS | Code/local test PASS; production not deployed. |
 | Policy A | Code/local test PASS; production enforcement not active until deploy. |
-| Sensitive grants | Migration/test ready; production not applied. |
+| Sensitive grants | **Applied to production 2026-10-31; zero client SELECT on the seven tables; service_role retains all seven.** |
 | R2 orphan | Exact operation prepared; not deleted/purged. |
-| Migration chain/RPC | Fresh chain + 7-column RPC verified locally (10/10); production old until migration. |
+| Migration chain/RPC | Fresh chain + 7-column RPC verified locally (10/10); production now has the 7-column RPC; ledger unrepaired. |
 | Blocked/suspended deletion | Credential route implemented; parser test only; live test blocked by no staging. |
 | Admin audit | Major actions + event/verification wired; no route E2E; see RB-16. |
 | DM actions | Warn/suspend/ban/dismiss/reopen wired; appeal token gap (RB-12). |
