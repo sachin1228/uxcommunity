@@ -419,6 +419,11 @@ jobs:
       # product while every other check stays green, which is exactly how this
       # went unnoticed. Both come from the same GitHub secrets the step above
       # pushed, so the failure names the secret that is wrong.
+      # The authenticated checks present a real registry session: since #730 the
+      # Worker refuses a token whose sid/sv has no live auth_sessions row, so the
+      # harness provisions a disposable sentinel user + 10-minute session through
+      # the service role and deletes both in a `finally`. The project URL comes
+      # from wrangler.toml so it cannot drift from the app's runtime value.
       - name: Smoke-test the deployed realtime worker
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
@@ -426,6 +431,8 @@ jobs:
           REALTIME_URL: ${{ secrets.REALTIME_URL }}
           API_URL: ${{ secrets.API_URL }}
           API_SECRET: ${{ secrets.API_SECRET }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
-          node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"
+          supabase_url=$(awk -F'"' '/^NEXT_PUBLIC_SUPABASE_URL/{print $2}' apps/web/wrangler.toml)
+          SUPABASE_URL="$supabase_url" node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"

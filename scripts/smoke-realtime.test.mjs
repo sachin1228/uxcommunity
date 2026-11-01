@@ -23,10 +23,15 @@ import {
   membershipProbeUrl,
   parseDevVars,
   parseFrame,
+  provisionSmokeSession,
+  releaseSmokeSession,
   resolveMembershipConfig,
   resolveSecrets,
+  resolveSupabaseConfig,
   SENTINEL_COMMUNITY_ID,
   SENTINEL_USER_ID,
+  smokeSessionRow,
+  smokeUserRow,
   toWebSocketOrigin,
   TOKEN_TTL_SECONDS,
 } from "./smoke-realtime.mjs";
@@ -171,13 +176,15 @@ test("the web app's own misconfiguration is reported, not swallowed", () => {
 
 // ── The token the Worker must accept ────────────────────────────────────────
 
-test("the minted token verifies against the same secret and carries a userId", async () => {
+test("the minted token verifies against the same secret and carries the registry claims", async () => {
   const secret = "smoke-secret-value";
-  const token = await buildSmokeToken(secret);
+  const token = await buildSmokeToken(secret, { sid: "session-id", sv: 1 });
 
   const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
   assert.equal(payload.userId, SENTINEL_USER_ID);
   assert.equal(payload.role, "user");
+  assert.equal(payload.sid, "session-id");
+  assert.equal(payload.sv, 1);
 
   // The Worker drops the socket when `payload.userId` is absent (handleUpgrade),
   // so a token without it would look like an auth failure in production.
@@ -185,6 +192,105 @@ test("the minted token verifies against the same secret and carries a userId", a
   assert.ok(typeof payload.exp === "number" && payload.exp - payload.iat === TOKEN_TTL_SECONDS);
 
   await assert.rejects(() => jwtVerify(token, new TextEncoder().encode("a-different-secret")));
+});
+
+test("a token cannot be minted without the live session the Worker demands", async () => {
+  for (const session of [undefined, null, {}, { sid: "sid" }, { sv: 1 }]) {
+    await assert.rejects(
+      () => buildSmokeToken("secret", session),
+      /live session/,
+      `${JSON.stringify(session)} must not mint a token`,
+    );
+  }
+});
+
+// ── The disposable session the authenticated checks borrow ─────────────────
+
+test("the service-role pair resolves from the environment, then local files", () => {
+  const fromEnv = resolveSupabaseConfig(
+    { NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co/", SUPABASE_SERVICE_ROLE_KEY: "key" },
+    { NEXT_PUBLIC_SUPABASE_URL: "https://file.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "file-key" },
+  );
+  assert.deepEqual(fromEnv, {
+    url: "https://project.supabase.co",
+    serviceKey: "key",
+    missing: [],
+  });
+
+  const fromFiles = resolveSupabaseConfig({}, {
+    SUPABASE_URL: "https://file.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "file-key",
+  });
+  assert.equal(fromFiles.url, "https://file.supabase.co");
+  assert.equal(fromFiles.serviceKey, "file-key");
+  assert.deepEqual(resolveSupabaseConfig({}, null).missing, [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+  ]);
+});
+
+test("the fixture rows are the shape the registry validates", () => {
+  const user = smokeUserRow();
+  assert.equal(user.id, SENTINEL_USER_ID);
+  assert.equal(user.is_blocked, false);
+  assert.equal(user.session_version, 1);
+
+  const session = smokeSessionRow(1_000);
+  assert.equal(session.user_id, SENTINEL_USER_ID);
+  assert.equal(session.role, "user");
+  assert.equal(session.session_version, 1);
+  assert.ok(Date.parse(session.expires_at) > 1_000);
+});
+
+test("provisioning upserts the user, clears strays and returns the new session", async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    if (url.endsWith("/rest/v1/auth_sessions") && init.method === "POST") {
+      return new Response(JSON.stringify([{ id: "new-session" }]), { status: 201 });
+    }
+    return new Response(null, { status: 204 });
+  };
+
+  const session = await provisionSmokeSession(
+    { url: "https://project.supabase.co", serviceKey: "service" },
+    { fetchImpl },
+  );
+  assert.deepEqual(session, { sid: "new-session", sv: 1 });
+
+  assert.equal(calls.length, 3);
+  assert.match(calls[0].url, /\/rest\/v1\/users\?on_conflict=id$/);
+  assert.equal(calls[0].init.headers.Prefer, "resolution=merge-duplicates,return=minimal");
+  assert.match(calls[1].url, /\/rest\/v1\/auth_sessions\?user_id=eq\./);
+  assert.equal(calls[1].init.method, "DELETE");
+  assert.equal(calls[2].init.headers.Prefer, "return=representation");
+  assert.equal(calls[2].init.headers.Authorization, "Bearer service");
+});
+
+test("release removes the session and the user, and reports failures", async () => {
+  const calls = [];
+  const okFetch = async (url, init) => {
+    calls.push({ url, init });
+    return new Response(null, { status: 204 });
+  };
+  const none = await releaseSmokeSession(
+    { url: "https://project.supabase.co", serviceKey: "service" },
+    { sid: "s1" },
+    { fetchImpl: okFetch },
+  );
+  assert.deepEqual(none, []);
+  assert.match(calls[0].url, /auth_sessions\?id=eq\.s1$/);
+  assert.match(calls[1].url, /users\?id=eq\./);
+
+  const failingFetch = async () => new Response("nope", { status: 500 });
+  const failures = await releaseSmokeSession(
+    { url: "https://project.supabase.co", serviceKey: "service" },
+    { sid: "s1" },
+    { fetchImpl: failingFetch },
+  );
+  assert.equal(failures.length, 2);
+  assert.match(failures[0], /smoke session/);
+  assert.match(failures[1], /smoke user/);
 });
 
 // ── Frame parsing ───────────────────────────────────────────────────────────
