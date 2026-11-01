@@ -166,3 +166,7 @@ __pycache__/
 *-adminsdk-*.json
 *service-account*.json
 
+
+# Isolated local development stack (environment.json holds service-role keys
+# and local passwords) — never commit
+.local/
