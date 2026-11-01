@@ -26,7 +26,7 @@ import { useColors } from '@/hooks/useColors';
 import { hapticSelection } from '@/lib/haptics';
 
 /**
- * The app's bottom bar, as a floating capsule over the content.
+ * The app's bottom bar, docked to the bottom edge and bleeding to both sides.
  *
  * The selected item is marked twice: a soft capsule slides beneath it and its
  * icon swaps to the filled counterpart. Nothing about the layout changes with
@@ -201,16 +201,18 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
 
   const isIOS = Platform.OS === 'ios';
   const isDark = colors.isDark;
-  const bottomInset = insets.bottom + (Platform.OS === 'web' ? 12 : 8);
+  const bottomInset = Platform.OS === 'web' ? 0 : insets.bottom;
 
   return (
-    <View style={[styles.wrap, { paddingBottom: bottomInset }]} pointerEvents="box-none">
+    <View style={styles.wrap} pointerEvents="box-none">
       <View
         style={[
           styles.bar,
           {
             backgroundColor: isIOS ? 'transparent' : colors.surface,
             borderColor: colors.border,
+            height: BAR_HEIGHT + bottomInset,
+            paddingBottom: bottomInset,
           },
         ]}
       >
@@ -302,16 +304,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 16,
-    alignItems: 'center',
   },
   bar: {
     width: '100%',
-    maxWidth: 560,
-    height: BAR_HEIGHT,
-    borderRadius: BAR_RADIUS,
+    borderTopLeftRadius: BAR_RADIUS,
+    borderTopRightRadius: BAR_RADIUS,
     borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
     shadowColor: '#000000',
     shadowOpacity: 0.32,
     shadowRadius: 18,
@@ -320,13 +320,13 @@ const styles = StyleSheet.create({
   },
   blurClip: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: BAR_RADIUS,
+    borderTopLeftRadius: BAR_RADIUS,
+    borderTopRightRadius: BAR_RADIUS,
     overflow: 'hidden',
   },
   track: {
-    flex: 1,
     flexDirection: 'row',
-    height: '100%',
+    height: BAR_HEIGHT,
   },
   pill: {
     position: 'absolute',
