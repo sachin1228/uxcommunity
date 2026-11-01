@@ -33,10 +33,10 @@ import { hapticSelection } from '@/lib/haptics';
  * shifts while the highlight travels.
  */
 
-const BAR_HEIGHT = 64;
+const BAR_HEIGHT = 68;
 const ICON_SIZE = 20;
 const LABEL_LINE_HEIGHT = 13;
-const ICON_LABEL_GAP = 8;
+const ICON_LABEL_GAP = 10;
 const ICON_PILL_WIDTH = 60;
 const ICON_PILL_HEIGHT = 32;
 
