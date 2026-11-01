@@ -3,10 +3,10 @@
 import { useEffect, useId, useRef, type CSSProperties } from "react";
 
 /**
- * The rail's pass card: a phone rising out of the dark with a community pass on
- * its screen. The fold-in, the shimmer across the pass and the hold cue are
- * ported from accessgrid.com's hero phone, retimed to the same numbers and
- * redrawn in our tokens — light device, brand-gradient pass, white ink.
+ * The rail's phone: the app's chat list rising out of the dark. The fold-in and
+ * the shimmer across the glass are ported from accessgrid.com's hero phone,
+ * retimed to the same numbers and rebuilt with our overlay surface and Geist
+ * type — a dark device, a real screen, no invented content.
  *
  * Purely decorative, so the whole block is hidden from assistive tech.
  */
@@ -26,30 +26,9 @@ const PERSPECTIVE = 3800;
 const PIVOT = 77;
 const TAP_AT = 0.74;
 const TAP_TILT = 2;
-const SHIMMER_OPACITY = 0.22;
+const SHIMMER_OPACITY = 0.1;
 const SHIMMER_MS = 900;
 const SHIMMER_LEAD = 100;
-const HOLD_DELAY = 250;
-const HOLD_MS = 400;
-
-/** The pass's contour lines, generated once and shared by every render. */
-const CONTOUR_LINES = (() => {
-  const width = 299;
-  const height = 199;
-  const lines: string[] = [];
-  for (let y = 8; y <= height - 6; y += 5) {
-    const amplitude = 3.4 + 2.6 * Math.sin(y / 21);
-    let d = `M0 ${y.toFixed(2)}`;
-    for (let x = 0; x <= width; x += 14) {
-      const dy =
-        amplitude * Math.sin(x / 27 + y / 16) +
-        amplitude * 0.55 * Math.sin(x / 11.5 - y / 8);
-      d += `L${x} ${(y + dy).toFixed(2)}`;
-    }
-    lines.push(d);
-  }
-  return lines;
-})();
 
 const unit = (value: number) => `calc(var(--device-w) * ${value} / 337)`;
 
@@ -58,7 +37,6 @@ export function CommunityPhoneCard() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const phoneRef = useRef<HTMLDivElement | null>(null);
   const bandRef = useRef<HTMLSpanElement | null>(null);
-  const holdRef = useRef<HTMLDivElement | null>(null);
   const playedRef = useRef(false);
   const gridId = useId().replace(/:/g, "");
 
@@ -85,7 +63,6 @@ export function CommunityPhoneCard() {
             fill: "backwards",
           }),
         );
-        if (holdRef.current) holdRef.current.style.opacity = "1";
         return;
       }
 
@@ -147,26 +124,6 @@ export function CommunityPhoneCard() {
             band.style.willChange = "";
           },
           () => {},
-        );
-      }
-
-      if (holdRef.current) {
-        const wait = screenAt + HOLD_DELAY;
-        const total = wait + HOLD_MS;
-        animations.push(
-          holdRef.current.animate(
-            [
-              { offset: 0, opacity: 0, transform: "translateY(4px)" },
-              {
-                offset: wait / total,
-                opacity: 0,
-                transform: "translateY(4px)",
-                easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
-              },
-              { offset: 1, opacity: 1, transform: "translateY(0)" },
-            ],
-            { duration: total, fill: "backwards" },
-          ),
         );
       }
     };
@@ -253,7 +210,7 @@ export function CommunityPhoneCard() {
             style={{ borderRadius: unit(60) }}
           >
             <div
-              className="absolute overflow-hidden bg-[#0E0E10] ring-1 ring-inset ring-white/[0.06]"
+              className="absolute overflow-hidden bg-[#101013] ring-1 ring-inset ring-white/[0.06]"
               style={{ inset: unit(8), borderRadius: unit(52) }}
             >
               {/* status bar */}
@@ -309,106 +266,23 @@ export function CommunityPhoneCard() {
                 }}
               />
 
-              {/* the pass */}
-              <div
-                className="absolute overflow-hidden shadow-[0_2px_5px_rgba(0,0,0,0.10)]"
-                style={{
-                  left: unit(11),
-                  top: unit(79),
-                  width: unit(299),
-                  height: unit(199),
-                  borderRadius: unit(16),
-                }}
-              >
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,#34363E_0%,#26282F_38%,#1B1D23_100%)]" />
-                <svg
-                  className="absolute inset-0 h-full w-full [mask-image:linear-gradient(to_bottom,#000_58%,transparent_96%)]"
-                  viewBox="0 0 299 199"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  {CONTOUR_LINES.map((d, index) => (
-                    <path
-                      key={index}
-                      d={d}
-                      fill="none"
-                      stroke="rgba(255,255,255,0.16)"
-                      strokeWidth="0.9"
-                    />
-                  ))}
-                </svg>
-                <span
-                  className="absolute block size-[14px] text-white"
-                  style={{ left: unit(11), top: unit(11) }}
-                >
-                  <svg viewBox="0 0 16 16" fill="none" className="size-full">
-                    <path
-                      fill="currentColor"
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      transform="translate(-0.8 -0.8) scale(1.1)"
-                      d="M14.666 7C14.666 3.667 11.999 2 7.999 2C3.999 2 1.332 3.667 1.332 7C1.332 10.333 3.999 12 7.999 12V14C7.999 14 14.666 12 14.666 7Z M4.583 7a.75.75 0 1 0 1.5 0a.75.75 0 1 0-1.5 0Z M7.25 7a.75.75 0 1 0 1.5 0a.75.75 0 1 0-1.5 0Z M9.917 7a.75.75 0 1 0 1.5 0a.75.75 0 1 0-1.5 0Z"
-                    />
-                  </svg>
-                </span>
-                <div
-                  className="absolute inset-x-0 bottom-0 font-body"
-                  style={{ padding: unit(11) }}
-                >
-                  <p
-                    className="font-medium leading-none tracking-[0.04em] text-white/60"
-                    style={{ fontSize: unit(9) }}
-                  >
-                    Community
-                  </p>
-                  <p
-                    className="mt-[2px] font-display font-semibold leading-none tracking-tight text-white"
-                    style={{ fontSize: unit(15) }}
-                  >
-                    uxcommunity
-                  </p>
-                </div>
+              {/* the app screen, clipped by the device */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/home/illustrations/app-chat-preview.webp"
+                alt=""
+                width={604}
+                height={1212}
+                loading="eager"
+                decoding="async"
+                className="absolute inset-x-0 h-auto w-full"
+                style={{ top: unit(42) }}
+              />
 
-                <span
-                  ref={bandRef}
-                  className="pointer-events-none absolute -left-[20%] -right-[20%] top-0 h-[70%] bg-[linear-gradient(to_top,transparent,#fff_50%,transparent)] opacity-0"
-                />
-                <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/[0.12]" />
-              </div>
-
-              {/* the hold cue */}
-              <div
-                ref={holdRef}
-                className="absolute left-1/2 flex -translate-x-1/2 flex-col items-center"
-                style={{ top: unit(312), gap: unit(16) }}
-              >
-                <span
-                  className="flex items-center justify-center rounded-full border-[1.5px] border-[#EDEDED] text-[#EDEDED]"
-                  style={{ width: unit(46), height: unit(46) }}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M2 6.2 4.8 9 10 3.4"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-                <span
-                  className="font-body font-medium leading-none text-[#737373]"
-                  style={{ fontSize: unit(14) }}
-                >
-                  You&rsquo;re in.
-                </span>
-              </div>
+              <span
+                ref={bandRef}
+                className="pointer-events-none absolute -left-[20%] -right-[20%] top-0 h-[55%] bg-[linear-gradient(to_top,transparent,#fff_50%,transparent)] opacity-0"
+              />
             </div>
           </div>
         </div>
