@@ -3,12 +3,14 @@
 import { useEffect, useId, useRef, type CSSProperties } from "react";
 
 /**
- * The rail's phone: the app's chat list rising out of the dark. The fold-in and
- * the shimmer across the glass are ported from accessgrid.com's hero phone,
- * retimed to the same numbers and rebuilt with our overlay surface and Geist
- * type — a dark device, a real screen, no invented content.
+ * The rail's launch card: the app's chat list rising out of the dark under a
+ * "Mobile app launching soon!" heading. The fold-in and the shimmer across the
+ * glass are ported from accessgrid.com's hero phone, retimed to the same
+ * numbers and rebuilt with our overlay surface and Geist type — a dark device,
+ * a real screen, no invented content.
  *
- * Purely decorative, so the whole block is hidden from assistive tech.
+ * The heading is real copy, so only the device itself is hidden from assistive
+ * tech.
  */
 
 /** The device's width is the unit everything else is cut from. */
