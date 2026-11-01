@@ -1,0 +1,18 @@
+{
+  "source_commit": "6b4835c8cb414984dfc8994c3d4dbb2f08b70178",
+  "checks": [
+    "216 source files match pinned main byte-for-byte and SHA-256 inventory",
+    "All per-file inventories and assessments reconcile",
+    "Five remote SQL records match main counterparts after normalization",
+    "All 107 expected routines match normalized production definitions",
+    "Live captures confirm read-only role and transaction",
+    "All five saved SQL files parse as SELECT-only",
+    "Relative report/source links resolve",
+    "Artifacts contain no configured secrets or token-pattern matches",
+    "No application or historical migration modifications"
+  ],
+  "application_tests": "Not run; report-only change. Local replay is evidence collection, not a successful migration test.",
+  "postgres_local_version": "17.11 (Homebrew)",
+  "pglast_parser_version": "18",
+  "artifacts_have_member_rows": false
+}

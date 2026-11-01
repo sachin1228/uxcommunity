@@ -1,0 +1,6 @@
+-- Read-only audit SELECTs; captured via Supabase /database/query/read-only.
+-- For psql, use a read-only login plus PGOPTIONS=-cdefault_transaction_read_only=on.
+-- No application stored routine is invoked by these catalog/probe queries.
+select 'master_data' category,jsonb_build_object('experience_levels',(select jsonb_agg(jsonb_build_object('slug',slug,'name',name,'is_active',is_active) order by slug) from public.experience_levels),'storage_bucket_count',(select count(*) from storage.buckets)) data
+union all select 'other_objects',jsonb_build_object('event_triggers',(select jsonb_agg(jsonb_build_object('name',evtname,'event',evtevent,'enabled',evtenabled,'owner',pg_get_userbyid(evtowner),'function',evtfoid::regproc::text)) from pg_event_trigger),'rules',(select jsonb_agg(jsonb_build_object('schema',schemaname,'table',tablename,'name',rulename,'definition',definition)) from pg_rules where schemaname='public' and rulename<>'_RETURN'),'foreign_servers',(select jsonb_agg(jsonb_build_object('name',srvname,'owner',pg_get_userbyid(srvowner),'option_keys',(select jsonb_agg(split_part(x,'=',1)) from unnest(srvoptions) x))) from pg_foreign_server))
+union all select 'meta',jsonb_build_object('captured_at',now(),'role',current_user,'read_only',current_setting('transaction_read_only'));
