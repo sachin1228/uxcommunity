@@ -27,17 +27,22 @@ import { hapticSelection } from '@/lib/haptics';
 /**
  * The app's bottom bar, docked to the bottom edge and bleeding to both sides.
  *
- * The selected item is marked twice: a soft capsule slides beneath it and its
- * icon swaps to the filled counterpart. Nothing about the layout changes with
+ * The selected icon sits in a soft pill that slides between items, and its
+ * glyph swaps to the filled counterpart. Nothing about the layout changes with
  * the selection — the icons and labels share one fixed grid — so the bar never
  * shifts while the highlight travels.
  */
 
 const BAR_HEIGHT = 64;
-const BAR_RADIUS = BAR_HEIGHT / 2;
 const ICON_SIZE = 24;
-const PILL_HORIZONTAL_INSET = 4;
-const PILL_VERTICAL_INSET = 6;
+const LABEL_LINE_HEIGHT = 13;
+const ICON_LABEL_GAP = 2;
+const ICON_PILL_WIDTH = 64;
+const ICON_PILL_HEIGHT = 32;
+
+/** The icon's centre, measured from the top of the fixed-height track. */
+const ICON_CENTER_Y =
+  (BAR_HEIGHT - (ICON_SIZE + ICON_LABEL_GAP + LABEL_LINE_HEIGHT)) / 2 + ICON_SIZE / 2;
 
 const SLIDE_SPRING = { damping: 22, stiffness: 240, mass: 0.7 };
 const SQUASH_SPRING = { damping: 16, stiffness: 240, mass: 0.6 };
@@ -189,7 +194,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: position.value * itemWidth },
+      { translateX: position.value * itemWidth + (itemWidth - ICON_PILL_WIDTH) / 2 },
       { scaleX: squash.value },
     ],
   }));
@@ -218,10 +223,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
             <Animated.View
               style={[
                 styles.pill,
-                {
-                  width: itemWidth - PILL_HORIZONTAL_INSET * 2,
-                  backgroundColor: colors.accentSoft,
-                },
+                { backgroundColor: colors.accentSoft },
                 pillStyle,
               ]}
             />
@@ -299,21 +301,22 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: 'absolute',
-    left: PILL_HORIZONTAL_INSET,
-    top: PILL_VERTICAL_INSET,
-    bottom: PILL_VERTICAL_INSET,
-    borderRadius: BAR_RADIUS,
+    left: 0,
+    width: ICON_PILL_WIDTH,
+    height: ICON_PILL_HEIGHT,
+    top: ICON_CENTER_Y - ICON_PILL_HEIGHT / 2,
+    borderRadius: ICON_PILL_HEIGHT / 2,
   },
   item: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: ICON_LABEL_GAP,
   },
   label: {
     fontFamily: 'Geist_500Medium',
     fontSize: 11,
-    lineHeight: 13,
+    lineHeight: LABEL_LINE_HEIGHT,
   },
   itemPressed: {
     opacity: 0.7,
