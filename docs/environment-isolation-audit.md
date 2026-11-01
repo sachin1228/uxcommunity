@@ -1,5 +1,9 @@
 # Environment dependency and isolation audit
 
+This document preserves the Phase 1 source snapshot. See the current
+[implementation and verification status](environment-isolation-implementation.md)
+for changes made after the audit.
+
 Audit date: **1 November 2026 (Asia/Kolkata)**. Source revision:
 `48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a` (`main`, also confirmed on origin).
 Scope: **Phase 1 only**. The result is documentation for review; environment
@@ -83,7 +87,7 @@ private upload functionality is incomplete rather than demonstrably isolated.
 
 ### F01 — Critical: PR previews receive production credentials
 
-[`.github/workflows/preview.yml`](../.github/workflows/preview.yml#L23) runs on
+[`.github/workflows/preview.yml`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/.github/workflows/preview.yml#L23) runs on
 PR open/synchronize/reopen and only skips deploy when the PR has `skip-preview`.
 It copies the production `[vars]`, service-role DB key, `SESSION_SECRET`, admin
 credentials, Resend, Upstash and R2 secrets into a new Worker (lines 47–85).
@@ -110,23 +114,23 @@ with this configuration while it remains in place.
 
 ### F03 — High: storage and cache require separate isolation work
 
-[`lib/r2.ts`](../apps/web/lib/r2.ts#L122) always constructs an AWS S3 client with
+[`lib/r2.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/r2.ts#L122) always constructs an AWS S3 client with
 `https://<account>.r2.cloudflarestorage.com`. Wrangler's local R2 simulation does
 **not** intercept this HTTP client. Private media reuses the client in
-[`r2-private.ts`](../apps/web/lib/r2-private.ts#L25). Both need a deliberate local
+[`r2-private.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/r2-private.ts#L25). Both need a deliberate local
 adapter, including direct uploads and private downloads.
 
-[`wrangler.toml`](../apps/web/wrangler.toml#L30) also binds a self-reference to
+[`wrangler.toml`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/wrangler.toml#L30) also binds a self-reference to
 `uxcommunity-web` and the cache bucket `uxcommunity-web-next-cache` (line 48).
 Preview only overrides the Worker name; these configured targets remain
 production targets. The cache is a third bucket to isolate alongside public
 and private media. Actual deployed preview bindings need authenticated review.
-[`scripts/r2-cors.json`](../scripts/r2-cors.json) includes production origins and
+[`scripts/r2-cors.json`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/scripts/r2-cors.json) includes production origins and
 a wildcard Workers preview origin; deployed CORS must be inspected separately.
 
 ### F04 — High: there is no complete staging stack
 
-[`apps/realtime/wrangler.staging.toml`](../apps/realtime/wrangler.staging.toml)
+[`apps/realtime/wrangler.staging.toml`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/realtime/wrangler.staging.toml)
 names `uxcommunity-realtime-staging`, binds `Room` and `UserDO`, and has migration
 tags v1–v3. Separate Worker identity is a useful basis for separate DO storage;
 binding class names being equal does not mean namespaces are shared. However,
@@ -142,27 +146,27 @@ be reconciled before use; do not redeploy it blindly over a live Worker.
 
 ### F05 — High: mobile test builds use production
 
-[`eas.json`](<../expo-app-standalone 3/eas.json>) sends development, preview and
+[`eas.json`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/expo-app-standalone%203/eas.json) sends development, preview and
 production builds to `https://app.uxcommunity.in`. The ignored mobile `.env`
 also points to production realtime. API and realtime environment variables are
 read separately, so changing one can leave a mixed environment. Static
-[`app.json`](<../expo-app-standalone 3/app.json>) defines one app identity per OS,
+[`app.json`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/expo-app-standalone%203/app.json) defines one app identity per OS,
 one scheme, one Firebase configuration and one EAS project.
 
-[`sessionStorage.ts`](<../expo-app-standalone 3/lib/sessionStorage.ts>) and mobile
+[`sessionStorage.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/expo-app-standalone%203/lib/sessionStorage.ts) and mobile
 push storage use fixed keys. Builds need separate app identities and environment
 storage keys so a test client cannot reuse production sessions or device state.
 
 ### F06 — High: disabling realtime publishing does not isolate previews
 
 The preview workflow omits `REALTIME_URL` and `REALTIME_PUBLISH_SECRET`, so
-[`publish.ts`](../apps/web/lib/realtime/publish.ts#L29) will skip server publish.
+[`publish.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/realtime/publish.ts#L29) will skip server publish.
 However it copies `NEXT_PUBLIC_REALTIME_URL` from production into the browser
 bundle. A browser can attempt to connect to production realtime; membership
 and session validity determine whether it succeeds. Its REST writes already
 go to production DB regardless of realtime publishing.
 
-[`cookie-domain.ts`](../apps/web/lib/auth/cookie-domain.ts#L15) assigns
+[`cookie-domain.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/auth/cookie-domain.ts#L15) assigns
 `.uxcommunity.in` to **any** matching subdomain. A staging domain under that
 parent would receive production cookies, and can overwrite cookies under the
 current name/domain policy. Distinct signing keys alone do not prevent cookie
@@ -171,22 +175,22 @@ plan for the existing production parent cookie, or a separate registrable domain
 
 ### F07 — Critical: push and email have no environment delivery boundary
 
-[`push/expo.ts`](../apps/web/lib/push/expo.ts#L394) sends directly to Expo with
+[`push/expo.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/push/expo.ts#L394) sends directly to Expo with
 device tokens and no provider credential header. Missing `FCM_SERVICE_ACCOUNT`
 is therefore **not** a push-off switch. Chat, DM and activity senders can fall
 back to Expo; membership and `/api/push/test` also send. Recipient token reads
 and dead-token/receipt cleanup use the configured DB. With shared production
 DB access, a preview action can notify real users or mutate their token rows.
 
-[`email/index.ts`](../apps/web/lib/email/index.ts#L47) sends to its supplied
+[`email/index.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/email/index.ts#L47) sends to its supplied
 recipient with the configured Resend key. There is no nonproduction recipient
 restriction or capture mode. Password reset, signup, verification, moderation,
 account deletion and health alerts require isolation as well as cron emails.
 
 ### F08 — High: cron isolation must include internal API calls
 
-[`apps/realtime/wrangler.toml`](../apps/realtime/wrangler.toml#L63) declares
-three schedules. [`src/index.ts`](../apps/realtime/src/index.ts#L122) dispatches
+[`apps/realtime/wrangler.toml`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/realtime/wrangler.toml#L63) declares
+three schedules. [`src/index.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/realtime/src/index.ts#L122) dispatches
 them through `API_URL` / `API_SECRET`. Retention deletes old DB messages and R2
 objects; minute jobs can send push/email. Internal routes authenticate a shared
 secret but do not assert environment identity. A staging Worker with production
@@ -196,7 +200,7 @@ but does not protect manual calls or a misconfigured future schedule.
 
 ### F09 — High: production deployment does not require explicit approval
 
-[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml#L18) deploys
+[`.github/workflows/deploy.yml`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/.github/workflows/deploy.yml#L18) deploys
 both production Workers on every main push and allows manual dispatch from a
 selected ref. The job has no `environment:` approval gate or main-ref condition
 on manual runs. Live GitHub `Production` environment metadata also has no
@@ -213,12 +217,12 @@ mixed-configuration window that the rollout plan must address.
 ### F10 — High: DB tooling protections are incomplete outside fresh tests
 
 Useful existing foundations are the pinned CLI, schema-only baseline,
-[`test_fresh.py`](../scripts/db/test_fresh.py#L43) using an unlinked temporary
+[`test_fresh.py`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/scripts/db/test_fresh.py#L43) using an unlinked temporary
 workdir and sanitized credentials, and the loopback/identity checks in
-[`initialize.py`](../scripts/db/initialize.py#L90). Database CI uses disposable
+[`initialize.py`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/scripts/db/initialize.py#L90). Database CI uses disposable
 Supabase instances without production secrets. These can be reused.
 
-However [`cli.sh`](../scripts/db/cli.sh) validates filenames and then forwards
+However [`cli.sh`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/scripts/db/cli.sh) validates filenames and then forwards
 arbitrary CLI arguments; it does not prohibit remote link/push/reset/repair.
 The ignored production link increases this risk. The existing
 [adoption documentation](database-adoption-review.md) requires separate approval
@@ -230,9 +234,9 @@ to existing production during this task.
 
 `k6/scripts/seed-users.js` and `cleanup-users.js` accept arbitrary supplied DB
 URLs; cleanup deletes matching users and cascading records. The E2E
-[`seed-member.mjs`](../apps/web/e2e/seed-member.mjs#L134) refuses remote hosts by
+[`seed-member.mjs`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/e2e/seed-member.mjs#L134) refuses remote hosts by
 default but permits **any** remote target with `E2E_SEED_ALLOW_REMOTE=1`.
-[`assertStagingTarget`](../k6/lib/realtime-fanout.mjs#L157) accepts any Workers
+[`assertStagingTarget`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/k6/lib/realtime-fanout.mjs#L157) accepts any Workers
 subdomain or host containing `staging`/`localhost`, with an additional override.
 A production Workers URL can pass that heuristic.
 
@@ -249,7 +253,7 @@ review. They were not used in this audit.
 
 Upstash uses the configured remote credential with no environment prefix in the
 app's limiter keys. Missing/unavailable Redis fails open
-([`rate-limit.ts`](../apps/web/lib/auth/rate-limit.ts#L63)); it does not establish
+([`rate-limit.ts`](https://github.com/sachin1228/uxcommunity/blob/48215d4f0d6ef724bc058f51ca5f22caaf1e3b9a/apps/web/lib/auth/rate-limit.ts#L63)); it does not establish
 a safe local limiter. Next cache keys likewise rely on bucket/runtime isolation.
 Session, master-data and client caches also need environment separation where
 state can persist across builds/accounts.
