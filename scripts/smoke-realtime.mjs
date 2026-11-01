@@ -39,6 +39,18 @@
  *   not touch a real member's state, and reusing one instance means the check
  *   does not mint a new Durable Object on every deploy.
  *
+ * WHY THE SMOKE SESSION IS A REAL ROW (added with immediate revocation, #730)
+ *   The Worker now verifies every token against the session registry, not just
+ *   the signature: a `sid` that no live `auth_sessions` row backs is refused at
+ *   the handshake. A self-minted token therefore cannot pass any more. The
+ *   harness provisions a disposable sentinel user + 10-minute session through
+ *   the Supabase service role (the same credential CI already holds), mints the
+ *   JWT from that row, and deletes both in a `finally` — so the deploy still
+ *   fails loudly on a broken socket layer, and production keeps no fixture data.
+ *   Without SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY the authenticated checks
+ *   cannot run: the harness fails by naming the missing variable rather than
+ *   skipping the gate.
+ *
  * WHY THE TOKEN TRAVELS IN THE QUERY, NOT A COOKIE
  *   The browser authenticates the handshake with the `uxcommunity_session`
  *   cookie, which the Worker also accepts. Node's standard WebSocket API cannot
@@ -59,6 +71,11 @@
  *   absent, because a local run may legitimately have no web app to check
  *   against — CI passes both, so it always runs there.
  *
+ *   NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY
+ *   are required for the authenticated checks: they provision and remove the
+ *   disposable session row. CI passes them explicitly; local runs can set them
+ *   in the environment or in apps/web/.dev.vars (read first).
+ *
  * EXIT CODE
  *   1 when any check fails, 0 when the path is proven. CI blocks on it.
  */
@@ -70,11 +87,17 @@ import { SignJWT } from "jose";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEV_VARS_PATH = path.join(ROOT, "apps", "realtime", ".dev.vars");
+const WEB_DEV_VARS_PATH = path.join(ROOT, "apps", "web", ".dev.vars");
 
 /** Stable identity for the probe — never a real member. */
 export const SENTINEL_USER_ID = "00000000-0000-0000-0000-0000000000ff";
 /** Sentinel community for the membership probe — never a real community. */
 export const SENTINEL_COMMUNITY_ID = "00000000-0000-0000-0000-0000000000cc";
+
+/** Fixture identity for the disposable live session (created, then deleted). */
+const SMOKE_USER_NAME = "Realtime Smoke";
+const SMOKE_USER_EMAIL = "realtime-smoke@uxcommunity.invalid";
+const SMOKE_SESSION_TTL_SECONDS = 600;
 /** The logical room the socket subscribes to; the Worker routes it to UserDO. */
 export const LOGICAL_ROOM_PREFIX = "notifications:";
 /** Short enough that a leaked URL token is useless almost immediately. */
@@ -152,13 +175,142 @@ export function resolveSecrets(env, devVars) {
   };
 }
 
-/** Mint the same session JWT the web app issues, for the sentinel user. */
-export async function buildSmokeToken(sessionSecret, userId = SENTINEL_USER_ID) {
-  return new SignJWT({ userId, email: "realtime-smoke@uxcommunity.invalid", role: "user" })
+/**
+ * Mint the same session JWT the web app issues, for the sentinel user.
+ *
+ * `session` is the live registry row created by `provisionSmokeSession`: since
+ * immediate revocation (#730) the Worker refuses a signature-only token, so a
+ * missing sid/sv must fail here rather than look like a broken handshake.
+ */
+export async function buildSmokeToken(sessionSecret, session, userId = SENTINEL_USER_ID) {
+  if (!session?.sid || typeof session.sv !== "number") {
+    throw new Error(
+      "buildSmokeToken needs a live session (sid + sv) — the realtime Worker rejects tokens without registry claims",
+    );
+  }
+  return new SignJWT({
+    userId,
+    email: SMOKE_USER_EMAIL,
+    role: "user",
+    sid: session.sid,
+    sv: session.sv,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${TOKEN_TTL_SECONDS}s`)
     .sign(new TextEncoder().encode(sessionSecret));
+}
+
+// ── The disposable session behind the authenticated checks ──────────────────
+
+/** Resolve the service-role client that owns the smoke fixture. */
+export function resolveSupabaseConfig(env, devVars) {
+  const url = (env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL
+    || devVars?.NEXT_PUBLIC_SUPABASE_URL || devVars?.SUPABASE_URL || "")
+    .trim()
+    .replace(/\/+$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || devVars?.SUPABASE_SERVICE_ROLE_KEY || "";
+  const missing = [];
+  if (!url) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+  if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  return { url, serviceKey, missing };
+}
+
+/** The sentinel user row — the session registry needs a live account. */
+export function smokeUserRow(userId = SENTINEL_USER_ID) {
+  return {
+    id: userId,
+    name: SMOKE_USER_NAME,
+    email: SMOKE_USER_EMAIL,
+    // Never used to sign in: the harness mints the JWT directly.
+    password_hash: "smoke-fixture-not-a-login",
+    is_blocked: false,
+    verification_status: "approved",
+    session_version: 1,
+  };
+}
+
+/** The registry row the Worker validates the handshake against. */
+export function smokeSessionRow(now = Date.now()) {
+  return {
+    user_id: SENTINEL_USER_ID,
+    role: "user",
+    session_version: 1,
+    expires_at: new Date(now + SMOKE_SESSION_TTL_SECONDS * 1000).toISOString(),
+    user_agent: "smoke-realtime",
+  };
+}
+
+async function supabaseRequest(config, route, init, fetchImpl = fetch) {
+  const response = await fetchImpl(`${config.url}/rest/v1/${route}`, {
+    ...init,
+    headers: {
+      apikey: config.serviceKey,
+      Authorization: `Bearer ${config.serviceKey}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `${init.method ?? "GET"} /rest/v1/${route.split("?")[0]} answered ${response.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
+    );
+  }
+  return response;
+}
+
+/**
+ * Create the fixture user + a 10-minute session and return its claims.
+ *
+ * Stray sessions from a run that died before cleanup are removed first, so the
+ * fixture cannot accumulate across deploys.
+ */
+export async function provisionSmokeSession(config, { fetchImpl = fetch, now = Date.now() } = {}) {
+  await supabaseRequest(config, "users?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(smokeUserRow()),
+  }, fetchImpl);
+
+  await supabaseRequest(config, `auth_sessions?user_id=eq.${SENTINEL_USER_ID}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  }, fetchImpl);
+
+  const response = await supabaseRequest(config, "auth_sessions", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(smokeSessionRow(now)),
+  }, fetchImpl);
+
+  const rows = await response.json().catch(() => null);
+  const sid = Array.isArray(rows) ? rows[0]?.id : null;
+  if (typeof sid !== "string" || !sid) {
+    throw new Error("auth_sessions insert did not return a session id");
+  }
+  return { sid, sv: 1 };
+}
+
+/** Remove the session and the fixture user; returns the failures, never throws. */
+export async function releaseSmokeSession(config, session, { fetchImpl = fetch } = {}) {
+  const failures = [];
+  const targets = [
+    [`auth_sessions?id=eq.${encodeURIComponent(session.sid)}`, "smoke session"],
+    [`users?id=eq.${SENTINEL_USER_ID}`, "smoke user"],
+  ];
+  for (const [route, label] of targets) {
+    try {
+      await supabaseRequest(config, route, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      }, fetchImpl);
+    } catch (error) {
+      failures.push(`${label}: ${error.message}`);
+    }
+  }
+  return failures;
 }
 
 /** Parse one server frame; null for anything that is not a JSON object. */
@@ -492,17 +644,25 @@ function argValue(flag) {
 }
 
 function readDevVarsIfPresent() {
-  try {
-    return parseDevVars(readFileSync(DEV_VARS_PATH, "utf-8"));
-  } catch {
-    return null;
+  const merged = {};
+  // Web first, realtime second: the realtime file owns the local SESSION_SECRET
+  // and publish secret, while the web file carries the Supabase service key.
+  for (const file of [WEB_DEV_VARS_PATH, DEV_VARS_PATH]) {
+    try {
+      Object.assign(merged, parseDevVars(readFileSync(file, "utf-8")));
+    } catch {
+      // Missing is fine; the other file or the environment still applies.
+    }
   }
+  return Object.keys(merged).length ? merged : null;
 }
 
 async function main() {
   if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log("Usage: node scripts/smoke-realtime.mjs --url <https origin> [--attempts N]");
-    console.log("  Env: SESSION_SECRET, REALTIME_PUBLISH_SECRET (required), API_URL, API_SECRET (community-socket check)");
+    console.log(
+      "  Env: SESSION_SECRET, REALTIME_PUBLISH_SECRET, NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (required); API_URL, API_SECRET (community-socket check)",
+    );
     return;
   }
 
@@ -524,8 +684,16 @@ async function main() {
     return;
   }
 
+  const supabase = resolveSupabaseConfig(process.env, devVars);
+  if (supabase.missing.length) {
+    console.error(
+      `✗ missing ${supabase.missing.join(", ")} — the realtime Worker validates every socket against a live session row, so the authenticated checks cannot run without it`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   console.log(`Realtime smoke test → ${wsOrigin} (secrets from ${secrets.source})`);
-  const token = await buildSmokeToken(secrets.sessionSecret);
 
   // Fail-closed check first, and as the wait for the new version to answer:
   // an unauthenticated upgrade must never be accepted.
@@ -549,30 +717,42 @@ async function main() {
     });
   }
 
-  let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      await proveRealtimePath({
-        httpOrigin,
-        wsOrigin,
-        token,
-        publishSecret: secrets.publishSecret,
-        report: (line) => console.log(`  ok   ${line}`),
-      });
-      console.log("Realtime smoke test passed.");
-      return;
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts) {
-        console.log(`  ...  attempt ${attempt} failed (${error.message}); retrying`);
-        await sleep(2_000);
+  const session = await provisionSmokeSession(supabase);
+  try {
+    const token = await buildSmokeToken(secrets.sessionSecret, session);
+
+    let lastError;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        await proveRealtimePath({
+          httpOrigin,
+          wsOrigin,
+          token,
+          publishSecret: secrets.publishSecret,
+          report: (line) => console.log(`  ok   ${line}`),
+        });
+        console.log("Realtime smoke test passed.");
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) {
+          console.log(`  ...  attempt ${attempt} failed (${error.message}); retrying`);
+          await sleep(2_000);
+        }
       }
     }
-  }
 
-  console.error(`  FAIL ${lastError.message}`);
-  console.error(`Realtime smoke test FAILED after ${attempts} attempt(s) against ${wsOrigin}.`);
-  process.exitCode = 1;
+    console.error(`  FAIL ${lastError.message}`);
+    console.error(`Realtime smoke test FAILED after ${attempts} attempt(s) against ${wsOrigin}.`);
+    process.exitCode = 1;
+  } finally {
+    const cleanupFailures = await releaseSmokeSession(supabase, session);
+    for (const failure of cleanupFailures) {
+      console.warn(
+        `  warn smoke fixture cleanup failed (${failure}) — the next run removes it`,
+      );
+    }
+  }
 }
 
 // Only run when invoked directly, so the helpers above stay importable.
