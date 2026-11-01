@@ -307,8 +307,6 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: '100%',
-    borderTopLeftRadius: BAR_RADIUS,
-    borderTopRightRadius: BAR_RADIUS,
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'column',
     justifyContent: 'flex-end',
@@ -320,8 +318,6 @@ const styles = StyleSheet.create({
   },
   blurClip: {
     ...StyleSheet.absoluteFillObject,
-    borderTopLeftRadius: BAR_RADIUS,
-    borderTopRightRadius: BAR_RADIUS,
     overflow: 'hidden',
   },
   track: {
