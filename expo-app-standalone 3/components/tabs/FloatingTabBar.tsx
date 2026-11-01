@@ -34,7 +34,7 @@ import { hapticSelection } from '@/lib/haptics';
  */
 
 const BAR_HEIGHT = 64;
-const ICON_SIZE = 22;
+const ICON_SIZE = 20;
 const LABEL_LINE_HEIGHT = 13;
 const ICON_LABEL_GAP = 8;
 const ICON_PILL_WIDTH = 60;
