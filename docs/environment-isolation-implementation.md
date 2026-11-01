@@ -71,6 +71,7 @@ build/runtime agreement without returning credentials.
 | Deployment credential guard unit suites | 63 tests passed with stub providers. |
 | Web/realtime TypeScript | Passed with the final runtime helper and staging binding types. |
 | OpenNext build using staging configuration | Passed with the dedicated staging manifest; staging web and realtime Workers deployed. Production was not deployed. |
+| Local supervisor lifecycle | Passed: a fresh supervisor started web/realtime/storage and SIGTERM closed all three listening ports. |
 | Local end-to-end smoke | Passed: login, authenticated API, application avatar upload/media delivery, two-user DO chat delivery and refused cron endpoints. |
 | Production continuity | Read-only API snapshots show identical production Worker modification timestamps and binding/settings objects; production schedules retained. No production application writes or deployment performed. |
 | Live staging smoke | Passed: authenticated diagnostic/runtime agreement, login, cookie and mobile bearer API sessions, avatar upload/public media, two-user DO chat delivery, and four internal cron endpoints refused. |

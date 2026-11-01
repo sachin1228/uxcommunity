@@ -98,8 +98,25 @@ async function dev() {
   const childEnv={...safeProcess(),...env};
   const children=[spawn('npm',['exec','--workspace=apps/web','--','next','dev','-p',new URL(env.NEXT_PUBLIC_APP_URL).port,'-H','127.0.0.1'],{cwd:root,env:childEnv,stdio:'inherit',detached:true}),
     spawn('npm',['exec','--workspace=apps/realtime','--','wrangler','dev','--config','wrangler.development.toml','--ip','127.0.0.1','--port',new URL(env.NEXT_PUBLIC_REALTIME_URL).port],{cwd:root,env:childEnv,stdio:'inherit',detached:true})];
+  // Miniflare also installs process exit/signal hooks. This synchronous hook
+  // closes our detached groups even when another hook exits before async cleanup.
+  process.prependOnceListener('exit',()=>{for(const child of children){try{process.kill(-child.pid,'SIGKILL');}catch{}}});
   let stopping=false;
-  const stop=async()=>{if(stopping)return;stopping=true;for(const child of children){try{process.kill(-child.pid,'SIGTERM');}catch{}}const tree=execFileSync('ps',['-axo','pid=,ppid='],{encoding:'utf8'}).trim().split('\n').map(line=>line.trim().split(/\s+/).map(Number));const owned=new Set(children.map(c=>c.pid));let changed=true;while(changed){changed=false;for(const [pid,ppid] of tree)if(owned.has(ppid)&&!owned.has(pid)){owned.add(pid);changed=true;}}for(const pid of [...owned].reverse()){try{process.kill(pid,'SIGTERM');}catch{}}await storage.close();};
+  const stop=async()=>{
+    if(stopping)return;
+    stopping=true;
+    // Snapshot descendants before signalling npm: children may otherwise be reparented.
+    const tree=execFileSync('ps',['-axo','pid=,ppid='],{encoding:'utf8'}).trim().split('\n').map(line=>line.trim().split(/\s+/).map(Number));
+    const owned=new Set(children.map(c=>c.pid));
+    let changed=true;
+    while(changed){changed=false;for(const [pid,ppid] of tree)if(owned.has(ppid)&&!owned.has(pid)){owned.add(pid);changed=true;}}
+    for(const pid of [...owned].reverse()){try{process.kill(pid,'SIGTERM');}catch{}}
+    for(const child of children){try{process.kill(-child.pid,'SIGTERM');}catch{}}
+    await storage.close();
+    await new Promise(resolve=>setTimeout(resolve,1500));
+    // These detached groups were created by this supervisor, never a shared dev group.
+    for(const child of children){try{process.kill(-child.pid,'SIGKILL');}catch{}}
+  };
   process.on('SIGINT',()=>void stop());process.on('SIGTERM',()=>void stop());
   for(const child of children){child.on('error',()=>{process.exitCode=1;void stop();});child.on('exit',code=>{if(!stopping && code)process.exitCode=code;void stop();});}
 }
