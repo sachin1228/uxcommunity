@@ -39,6 +39,7 @@ export function CommunityPhoneCard() {
   const bandRef = useRef<HTMLSpanElement | null>(null);
   const playedRef = useRef(false);
   const gridId = useId().replace(/:/g, "");
+  const headingId = useId().replace(/:/g, "");
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -148,8 +149,8 @@ export function CommunityPhoneCard() {
   return (
     <section
       ref={panelRef}
-      aria-hidden="true"
-      className="relative h-[340px] overflow-hidden rounded-xl border border-white/10 bg-overlay"
+      aria-labelledby={headingId}
+      className="relative h-[380px] overflow-hidden rounded-xl border border-white/10 bg-overlay"
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_100%_at_50%_0%,rgba(255,255,255,0.10),transparent_72%)]" />
 
@@ -176,9 +177,17 @@ export function CommunityPhoneCard() {
         <rect width="100%" height="100%" fill={`url(#${gridId})`} />
       </svg>
 
+      <h2
+        id={headingId}
+        className="relative px-4 pt-5 text-center font-display text-[15px] font-semibold leading-snug text-overlay-foreground"
+      >
+        Mobile app launching soon!
+      </h2>
+
       <div
         ref={stageRef}
-        className="pointer-events-none absolute left-1/2 top-[18px] h-[322px] w-[calc(var(--device-w)_+_8px)] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_52px),transparent)]"
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-[56px] h-[324px] w-[calc(var(--device-w)_+_8px)] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_52px),transparent)]"
         style={{ "--device-w": `${DEVICE_WIDTH}px` } as CSSProperties}
       >
         <div
