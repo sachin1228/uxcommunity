@@ -1,3 +1,4 @@
+import { CommunityPhoneCard } from "@/components/home/CommunityPhoneCard";
 import { CreateCommunityCard } from "@/components/home/CreateCommunityCard";
 import { SuggestedCommunitiesCard } from "@/components/home/SuggestedCommunitiesCard";
 import type { SuggestedCommunity } from "@/lib/home/suggested";
@@ -24,6 +25,7 @@ export function HomeSidebar({ suggested }: HomeSidebarProps) {
       className="hidden w-72 shrink-0 flex-col gap-4 self-stretch pt-8 xl:flex"
     >
       <CreateCommunityCard />
+      <CommunityPhoneCard />
       {/* LinkedIn-style rail: the cards above scroll away with the feed, then
           this one pins below the topbar — self-stretch above gives it the
           travel. top-4 keeps the same gap the feed's floating switcher has
