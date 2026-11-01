@@ -23,7 +23,8 @@ concurrency:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    if: github.event.action != 'closed'
+    # Database-only maintenance can run CI without accessing deployment secrets.
+    if: github.event.action != 'closed' && !contains(github.event.pull_request.labels.*.name, 'skip-preview')
     permissions:
       contents: read
       pull-requests: write

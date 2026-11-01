@@ -1,0 +1,56 @@
+name: Database baseline
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'scripts/db/**'
+      - 'docs/database*.md'
+      - '.github/workflows/database.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Test empty Supabase and compare complete catalogs
+        run: |
+          python3 scripts/db/test_compare.py
+          python3 scripts/db/test_migrations.py
+          python3 scripts/db/test_initialization.py
+          python3 scripts/db/test_fresh.py --runtime docker supabase/tests/performance_rpcs.test.sql supabase/tests/public_read_exposure.test.sql supabase/tests/member_count.test.sql
+      - name: Upload schema comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-schema-comparison
+          path: test-results/schema/
+
+  production-compatible-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Test disposable Supabase PostgreSQL 17.6 with production locale
+        run: python3 scripts/db/test_fresh.py --runtime docker --production-compatible --report-dir test-results/staging supabase/tests/performance_rpcs.test.sql supabase/tests/public_read_exposure.test.sql supabase/tests/member_count.test.sql
+      - name: Upload complete staging comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-compatible-staging-comparison
+          path: test-results/staging/

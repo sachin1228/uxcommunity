@@ -124,7 +124,7 @@ Unit suites live next to the code as `*.test.ts` (50 files, run with `tsx --test
 ```bash
 npm run test:comment-tree      # one suite, e.g. comment tree helpers
 cd apps/realtime && npm test   # realtime worker suites (vitest)
-bash supabase/tests/run-local.sh   # SQL suites for the community APIs, including session_revocation.test.sql
+npm run test:db                # Fresh Supabase baseline and complete schema comparison
 ```
 
 `npm run test:*` in the root `package.json` lists every suite. CI (`.github/workflows/ci.yml`) runs a blocking `tsc --noEmit` and the whole web unit suite; ESLint is advisory while pre-existing findings are cleared.

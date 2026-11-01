@@ -15,13 +15,31 @@ select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','
 select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','integer','boolean']);
 select has_function('public', 'get_profile_feed_page', array['uuid','text','timestamptz','integer']);
 
+-- Self-contained rollback-only fixtures; a fresh baseline has no old seed rows.
+create temporary table rpc_fixture as
+select gen_random_uuid() user_id, gen_random_uuid() city_id,
+       gen_random_uuid() other_city_id, gen_random_uuid() community_id,
+       gen_random_uuid() other_community_id;
+insert into public.users(id,name,email,password_hash)
+select user_id, 'RPC fixture', user_id::text || '@rpc.example.test', 'fixture-only'
+from rpc_fixture;
+insert into public.cities(id,name)
+select city_id, 'RPC fixture ' || city_id::text from rpc_fixture
+union all select other_city_id, 'RPC fixture ' || other_city_id::text from rpc_fixture;
+insert into public.communities(id,name,type,reference_id)
+select community_id, 'Joined RPC fixture', 'city', city_id from rpc_fixture
+union all select other_community_id, 'Unjoined RPC fixture', 'city', other_city_id from rpc_fixture;
+insert into public.community_members(community_id,user_id,joined_at)
+select community_id, user_id, now() - interval '1 day' from rpc_fixture;
+
 create temporary table rpc_test_context as
 select community_id, user_id, joined_at
 from public.community_members
+where user_id = (select user_id from rpc_fixture)
 order by joined_at
 limit 1;
 
-select ok(exists(select 1 from rpc_test_context), 'seeded test database has a community member fixture');
+select ok(exists(select 1 from rpc_test_context), 'the test creates its own community member fixture');
 
 insert into public.community_messages (community_id, user_id, content, created_at)
 select context.community_id, context.user_id, 'rpc pagination fixture ' || series.value,
@@ -79,15 +97,7 @@ select ok(
 --   * an unjoined community contributes its public posts to the public feed
 --     only.
 create temporary table rpc_test_other_community as
-select community.id as community_id
-from public.communities community
-where not exists (
-  select 1 from public.community_members member
-  where member.community_id = community.id
-    and member.user_id = (select user_id from rpc_test_context)
-)
-order by community.id
-limit 1;
+select other_community_id as community_id from rpc_fixture;
 
 insert into public.community_threads
   (community_id, user_id, title, category, tags, is_public, created_at)

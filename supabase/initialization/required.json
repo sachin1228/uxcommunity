@@ -1,0 +1,38 @@
+{
+  "creation_limits": [
+    {
+      "kind": "posts_daily",
+      "limit_count": 3,
+      "period": "day"
+    },
+    {
+      "kind": "events_monthly",
+      "limit_count": 5,
+      "period": "month"
+    },
+    {
+      "kind": "jobs_monthly",
+      "limit_count": 3,
+      "period": "month"
+    },
+    {
+      "kind": "dms_monthly",
+      "limit_count": 5,
+      "period": "month"
+    },
+    {
+      "kind": "communities_total",
+      "limit_count": 5,
+      "period": "total"
+    },
+    {
+      "kind": "community_joins",
+      "limit_count": 10,
+      "period": "standing"
+    }
+  ],
+  "verification_settings": {
+    "id": true,
+    "grace_days": 0
+  }
+}
