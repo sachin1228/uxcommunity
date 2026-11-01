@@ -5,6 +5,7 @@ on:
     paths:
       - 'supabase/**'
       - 'scripts/db/**'
+      - 'docs/database*.md'
       - '.github/workflows/database.yml'
   workflow_dispatch:
 

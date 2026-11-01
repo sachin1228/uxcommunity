@@ -105,8 +105,9 @@ blocking assertions, not part of the platform exception category.
   capture; adoption still requires a new read-only comparison, uniqueness
   preflight, secured backups, deployment freeze and explicit approval.
 - Cities, design sectors and job titles require operator-approved installation
-  input because current code defines no universal defaults. A local initializer
-  does not provision hosted environments or external R2/Redis/email services.
+  input because current code defines no universal defaults. Hosted installation
+  initialization requires an operator to review/apply the offline SQL export;
+  external R2/Redis/email services are not provisioned by this database workflow.
 - Schema equality and the tested signup/protection flows do not establish every
   unrelated application workflow. Archived-seed-specific SQL suites remain in
   the repository; they must not be used to demand historical catalog rows from

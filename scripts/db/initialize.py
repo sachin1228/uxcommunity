@@ -97,8 +97,13 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=Path, default=ROOT / 'supabase/initialization/required.json')
     parser.add_argument('--catalogs', type=Path, required=True)
     parser.add_argument('--include-default-experience-levels', action='store_true')
+    parser.add_argument('--sql-output', type=Path, help='Generate reviewable initialization SQL offline; connect to no database')
     args = parser.parse_args()
     inputs = load_inputs(json.loads(args.config.read_text()), json.loads(args.catalogs.read_text()), args.include_default_experience_levels)
+    if args.sql_output:
+        args.sql_output.write_text('-- Explicit fresh-environment configuration/catalog initialization.\n-- Review inputs and target; never use as production adoption or a migration.\n' + initialization_sql(inputs) + '\n')
+        print('Wrote initialization SQL for review; no database connection or execution: ' + str(args.sql_output))
+        raise SystemExit(0)
     if any((ROOT / path).exists() for path in ('supabase/.temp/project-ref', 'supabase/.link.json')):
         raise RuntimeError('Remove the old local project link before initializing a fresh environment')
     env = {k: v for k, v in os.environ.items() if not k.startswith(('PG', 'SUPABASE_'))}

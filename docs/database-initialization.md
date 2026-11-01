@@ -77,7 +77,8 @@ npm run db:init -- --catalogs /tmp/uxcommunity-catalogs.json \
 
 The command discovers and verifies **this checkout's unlinked local stack**;
 it accepts no remote URL or production credentials. Remove stale gitignored
-`supabase/.temp/project-ref` or `supabase/.link.json` linkage before using it. It inserts only missing
+`supabase/.temp/project-ref` linkage, or the CLI-generated .link.json file inside
+`supabase/`, before using it. It inserts only missing
 keys in one transaction, never updates/deletes rows, and serializes concurrent
 initialization calls. Matching existing rows keep their IDs and timestamps.
 Conflicting budgets, verification values, labels or inactive choices abort the
@@ -85,10 +86,21 @@ entire transaction with an explicit error. Review and align the input with the
 existing approved setting; configuration changes belong in the normal admin
 workflow. There is no force-overwrite flag.
 
-For a newly hosted installation, have its operator apply the reviewed,
-insert-only input through that environment's approved provisioning process.
-This PR's command intentionally supports local stacks only; production adoption
-is a different operation and must not run initialization on existing data.
+For a newly hosted installation, generate the same validated, insert-only SQL
+**offline** for its operator to review:
+
+```sh
+npm run db:init -- --catalogs /tmp/uxcommunity-catalogs.json \
+  --include-default-experience-levels --sql-output /tmp/fresh-app-initialization.sql
+```
+
+This export connects to no database. After the baseline is installed in that
+new environment, its operator must verify the target is the new installation
+and apply the reviewed file with `psql -X -v ON_ERROR_STOP=1` through that
+environment's approved provisioning process. Do not commit environment-specific
+inputs or generated SQL, put them in migrations, wire them into automatic
+seeding, or apply them as existing-production adoption. Direct execution by
+this PR's command supports verified local stacks only; no remote URL is accepted.
 
 ## Optional content and external prerequisites
 
