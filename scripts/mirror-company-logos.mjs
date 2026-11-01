@@ -1,3 +1,4 @@
+import { requireLocalDatabase, requireLocalStorage } from "./environments/maintenance.mjs";
 /**
  * Mirrors company logos into R2.
  *
@@ -80,9 +81,12 @@ if (missing.length > 0 && !(dryRun && missing.every((name) => name.startsWith("R
   process.exit(1);
 }
 
+requireLocalDatabase(process.env.NEXT_PUBLIC_SUPABASE_URL);
+requireLocalStorage();
 const r2 = new S3Client({
   region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: process.env.R2_ENDPOINT,
+  forcePathStyle: true,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,

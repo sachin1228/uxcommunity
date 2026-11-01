@@ -273,7 +273,7 @@ export function setSessionCookie(res: NextResponse, token: string, host?: string
     sessionCookieOptions({
       host,
       appUrl: process.env.NEXT_PUBLIC_APP_URL,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" && process.env.APP_ENV !== "development",
       maxAge: EXPIRY_SECONDS,
     }),
   );
@@ -287,7 +287,7 @@ export function clearSessionCookie(res: NextResponse, host?: string) {
       sessionCookieOptions({
         host,
         appUrl: process.env.NEXT_PUBLIC_APP_URL,
-        secure: process.env.NODE_ENV === "production",
+        secure: process.env.NODE_ENV === "production" && process.env.APP_ENV !== "development",
         maxAge: 0,
       }),
     );

@@ -1,0 +1,37 @@
+name: Deploy isolated staging
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate and test isolation
+        run: npm run test:environments
+      - name: Prepare private staging manifest
+        env:
+          STAGING_CONFIGURATION: ${{ secrets.STAGING_CONFIGURATION }}
+        run: |
+          umask 077
+          mkdir -p .local/staging
+          printf '%s' "$STAGING_CONFIGURATION" > .local/staging/environment.json
+      - name: Deploy staging only
+        env:
+          CLOUDFLARE_STAGING_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_STAGING_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+        run: node --import tsx scripts/environments/staging.mjs deploy

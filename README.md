@@ -1,5 +1,13 @@
 # uxcommunity/ — a home for designers
 
+Development now uses an isolated local Supabase stack, Miniflare R2, local Durable
+Objects and captured email. Start with `npm run env:setup`, `npm run env:seed`,
+then `npm run dev`. Existing production-linked files are quarantined outside the
+repository by setup. Never copy production credentials into local configuration.
+See `docs/environments.md` and the
+`docs/environment-isolation-implementation.md`. Production
+releases require the manual approval workflow; PR previews are disabled.
+
 A platform for UI/UX, product, and social media designers. Designers sign up directly, complete their profile, and get access to real-time community chat; admins review applications, manage members and master data, and moderate communities
 
 ## What the app does today
@@ -100,24 +108,11 @@ uxcommunity/
 
 ## Local setup
 
-```bash
-# 1. Install all workspace dependencies
-npm install
-
-# 2. Create apps/web/.env.local (gitignored) and fill in every value listed
-#    under "Environment variables" below
-
-# 3. Apply database migrations
-# Start a fresh LOCAL Supabase instance using the pinned CLI
-npm run db:start
-# Initialize required settings and explicitly chosen signup catalogs:
-# Follow docs/database-initialization.md, then run:
-# npm run db:init -- --catalogs /path/to/approved-catalogs.json --include-default-experience-levels
-# Existing production requires the separate approval process in docs/database-baseline.md
-
-# 4. Start the web dev server (terminal 1)
-npm run dev
-```
+Run `npm ci`, `npm run env:setup`, `npm run env:seed`, then `npm run dev`.
+Setup creates an unlinked local Supabase stack and independent credentials. The
+launcher starts web, realtime and local R2/mail capture together. See
+`docs/environments.md` for prerequisites, worktree ports,
+mobile builds and staging. Do not copy production credentials into local files.
 
 ### SQL tests
 
@@ -155,63 +150,19 @@ Open **http://localhost:3000**.
 CI (`.github/workflows/ci.yml`) runs the blocking type check and the full web
 unit suite (50 `*.test.ts` files, executed with `tsx --test`).
 
-### Realtime locally (chat, typing indicator, reactions)
+### Realtime locally
 
-Realtime runs on a separate Cloudflare worker in `apps/realtime` (Durable Objects). To have it work locally you need **two terminals** — one for the web app, one for the realtime worker:
-
-```bash
-# Terminal 1 — web app
-npm run dev
-
-# Terminal 2 — realtime worker
-cd apps/realtime && npx wrangler dev   # serves ws://localhost:8787
-```
-
-The web app's client connects to `ws://localhost:8787` and the server-side fan-out publishes to `http://localhost:8787/publish`. In addition to the values listed under **Environment variables** below, `apps/web/.env.local` needs:
-
-| Variable | Value |
-|---|---|
-| `NEXT_PUBLIC_REALTIME_URL` | `http://localhost:8787` |
-| `REALTIME_URL` | `http://localhost:8787` |
-| `REALTIME_PUBLISH_SECRET` | any value — must match the worker's |
-
-And `apps/realtime/.dev.vars` (gitignored, create by hand):
-
-```
-SESSION_SECRET=<SAME value as apps/web/.env.local>
-REALTIME_PUBLISH_SECRET=<SAME value as apps/web/.env.local>
-API_URL=<the web app origin, e.g. http://localhost:3000>
-API_SECRET=<any value — must match the web app's>
-```
-
-The worker uses `API_URL` + `API_SECRET` for its internal membership checks, so both files must agree on `API_SECRET` as well.
-
-> The worker verifies WebSocket handshakes with the same JWT the web app signs. If `SESSION_SECRET` differs between the two files, the worker rejects every connection with a silent 401: nothing arrives live, and chat/notifications only catch up on load, focus, or the next sidebar fetch.
-
-**Troubleshooting:** if messages, typing, and reactions only appear after a reload or tab focus, the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
-
-That check is automated — the same view, driven headlessly against a running app + worker:
-
-```bash
-npm run test:e2e-realtime                                        # the dashboard, as it stands
-npm run test:e2e-realtime -- --strict                            # also gate on no cancelled/duplicate sockets
-npm run test:e2e-realtime -- --path /dashboard/communities/<id>  # cover the community chat rooms
-npm run test:e2e-realtime -- --mock-communities 3                # cover the community fan-out and its 403 refusal
-E2E_SEED_ALLOW_REMOTE=1 npm run test:e2e-realtime -- --seed-member --seed-communities 3   # accepted community sockets
-```
-
-It signs in, loads the page and records every handshake over the Chrome DevTools Protocol: that the socket is authorized by the session cookie (proved against the Worker's own socket count rather than the DevTools header — Chrome hides `Cookie` on cross-origin handshakes), that each room opens exactly one socket, and that nothing is refused or torn down. The session comes from whichever of `E2E_SESSION_COOKIE`, `E2E_EMAIL` + `E2E_PASSWORD`, or `SESSION_SECRET` (from `apps/web/.dev.vars`) is configured — the last one covers the socket lifecycle without an account, and `--seed-member` overrides all of them. `--strict` is meant for a production build or a deployed target: under `next dev`, React StrictMode deliberately cancels one in-flight handshake per community room.
-
-`--seed-member` covers the sockets that should be *accepted*, with no account and no credentials to configure: `apps/web/e2e/seed-member.mjs` writes a throwaway member plus N private communities and their memberships into the database the app reads (the service-role key is already in `apps/web/.env.local`; the member's password hash is a secret the seeder throws away), the test mints that member's session from `SESSION_SECRET`, and the dashboard loads as them. Each seeded community must produce a live **101** socket, and the Worker's own Durable Object for that room must hold the socket *and* a subscription on it — neither of which the client can fake. The rows are deleted again when the run ends (`--keep-seed` leaves them; `node apps/web/e2e/seed-member.mjs --cleanup` removes them by hand, `--dry-run` prints what would be written and where). The local app usually points at the same Supabase project the deployed app uses, so seeding anything that is not a loopback database stops before writing and says which project it would have touched; set `E2E_SEED_ALLOW_REMOTE=1` to acknowledge that.
-
-Without database access at all, `--mock-communities 3` answers the sidebar's own `/api/communities` fetch with three synthetic communities, so the client fans out one chat socket per community exactly as it does for a member. The Worker refuses those (the session is not a member) and the test asserts the refusal is a **403** and never a **401** — since the socket URL carries no token, a 403 is proof the session cookie authenticated the handshake while membership was denied, and a 401 would mean the cookie never arrived.
-
-In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `apps/web/wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
+`npm run dev` starts the local Worker and validates that its API/database/storage
+endpoints belong to the local stack. Environment files are generated together by
+`npm run env:setup`; do not point a local Worker at production membership or session
+endpoints. Use `npm run env:smoke` with the local stack running to verify authenticated
+API access, application uploads and DO chat fanout. Browser E2E fixture seeding is
+local-only; the former remote override no longer authorizes a shared database.
 
 ### Event host-going regression
 
 ```bash
-E2E_SEED_ALLOW_REMOTE=1 npm run test:e2e-event-host-going   # against the project apps/web/.env.local points at
+npm run test:e2e-event-host-going   # against the project apps/web/.env.local points at
 npm run test:e2e-event-host-going -- --url http://localhost:3000
 npm run test:e2e-event-host-going -- --keep-seed            # leave the event and seed for inspection
 ```
@@ -235,7 +186,7 @@ npm run test:smoke-realtime                             # the harness's own help
 
 ### Deploy credentials
 
-Both workflows authenticate to Cloudflare with two repository secrets (`Settings → Secrets and variables → Actions`): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Either kind of token works — a user token (My Profile → API Tokens) or an account-owned one (Manage account → Account API tokens) — as long as it is scoped to the account in `CLOUDFLARE_ACCOUNT_ID`; the guard proves both kinds, because `/user/tokens/verify` answers `401 code 1000 Invalid API Token` for a healthy account-owned token, and only `/accounts/:id/tokens/verify` recognizes it. The **Edit Cloudflare Workers** template covers the two Worker deploys; the web deploy additionally needs **Workers R2 Storage: Edit**, because `opennextjs-cloudflare deploy` reads — and, when it is missing, creates — the incremental-cache bucket before it publishes.
+The approved production workflow authenticates to Cloudflare with two production secrets (`Settings → Secrets and variables → Actions`): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Either kind of token works — a user token (My Profile → API Tokens) or an account-owned one (Manage account → Account API tokens) — as long as it is scoped to the account in `CLOUDFLARE_ACCOUNT_ID`; the guard proves both kinds, because `/user/tokens/verify` answers `401 code 1000 Invalid API Token` for a healthy account-owned token, and only `/accounts/:id/tokens/verify` recognizes it. The **Edit Cloudflare Workers** template covers the two Worker deploys; the web deploy additionally needs **Workers R2 Storage: Edit**, because `opennextjs-cloudflare deploy` reads — and, when it is missing, creates — the incremental-cache bucket before it publishes.
 
 Give the token **no expiry**, or rotate it before its TTL lapses. An expired token does not degrade gracefully: on 2026-10-08 the credential stopped being accepted between 19:33 UTC and 09:02 UTC, and every Cloudflare call in CI answered `401 {"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}`. What surfaced first was the web deploy failing with `Failed to provision remote R2 bucket "uxcommunity-web-next-cache" ... Authentication error` — a message that reads like an OpenNext or R2 problem and is neither: the realtime deploy one step before it had failed on the same token, and the preview cleanup job could not even `wrangler delete` a worker. Nothing in either workflow had asked the credential to prove it still worked.
 
@@ -356,7 +307,7 @@ To repair it:
    the web Worker's secrets from these repository secrets (deploy.yml → "Set
    web worker secrets"), so a value changed only in the Cloudflare dashboard
    never reaches the Worker.
-3. Update the same values in every local env file — `apps/web/.dev.vars`,
+3. Keep production values out of every local env file — `apps/web/.dev.vars`,
    `apps/web/.env.local` and `apps/web/.env` — or local uploads keep failing
    while production works.
 4. Run `npm run verify:r2` until it passes, then deploy — the deploy itself

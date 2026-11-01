@@ -1,3 +1,4 @@
+import { requireLocalDatabase, requireLocalStorage } from "./environments/maintenance.mjs";
 /**
  * Uploads generated city images to R2 and updates image_url in Supabase.
  * Run from repo root: node scripts/upload-city-images.mjs
@@ -34,9 +35,12 @@ const FILE_TO_NAME = {
 };
 
 // ── R2 client ──────────────────────────────────────────────────────────────
+requireLocalDatabase(process.env.NEXT_PUBLIC_SUPABASE_URL);
+requireLocalStorage();
 const r2 = new S3Client({
   region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: process.env.R2_ENDPOINT,
+  forcePathStyle: true,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,

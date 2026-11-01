@@ -81,6 +81,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { assertStagingTarget } from "../k6/lib/realtime-fanout.mjs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SignJWT } from "jose";
@@ -111,6 +112,23 @@ const DEFAULT_ATTEMPTS = 2;
 const POLL_INTERVAL_MS = 100;
 
 // ── Pure helpers (unit-tested in scripts/smoke-realtime.test.mjs) ────────────
+
+/** Reject mixed targets before the smoke harness creates any session rows. */
+export function validateSmokeEnvironment(env, targets) {
+  if (env.APP_ENV === "production") {
+    if (env.GITHUB_ACTIONS !== "true" || !/^[a-f0-9]{40}$/.test(env.APPROVED_PRODUCTION_SMOKE_SHA ?? "") || env.APPROVED_PRODUCTION_SMOKE_SHA !== env.GITHUB_SHA) {
+      throw new Error("Production smoke writes require the exact SHA approved by the production release workflow");
+    }
+    return;
+  }
+  if (!["development", "staging"].includes(env.APP_ENV)) throw new Error("An explicit smoke data environment is required");
+  for (const target of targets.filter(Boolean)) {
+    const url = new URL(target), local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (env.APP_ENV === "development" ? !local : local) throw new Error("Smoke target belongs to another environment");
+    const verdict = assertStagingTarget(target, { allowedOrigins: (env.STAGING_ALLOWED_ORIGINS ?? "").split(",") });
+    if (!verdict.ok) throw new Error(verdict.reason);
+  }
+}
 
 /**
  * Normalize a realtime origin to the `ws://` / `wss://` form the WebSocket
@@ -244,6 +262,7 @@ export function smokeSessionRow(now = Date.now()) {
 async function supabaseRequest(config, route, init, fetchImpl = fetch) {
   const response = await fetchImpl(`${config.url}/rest/v1/${route}`, {
     ...init,
+    redirect: "error",
     headers: {
       apikey: config.serviceKey,
       Authorization: `Bearer ${config.serviceKey}`,
@@ -503,7 +522,7 @@ async function proveMembershipEndpoint({ apiUrl, apiSecret, report }) {
   try {
     response = await fetch(url, {
       headers: { Authorization: `Bearer ${apiSecret}` },
-      redirect: "follow",
+      redirect: "error",
       signal: AbortSignal.timeout(FRAME_TIMEOUT_MS),
     });
     body = await response.text();
@@ -693,6 +712,9 @@ async function main() {
     return;
   }
 
+  const membership = resolveMembershipConfig(process.env, devVars);
+  validateSmokeEnvironment({ ...devVars, ...process.env }, [httpOrigin, supabase.url, membership.apiUrl]);
+
   console.log(`Realtime smoke test → ${wsOrigin} (secrets from ${secrets.source})`);
 
   // Fail-closed check first, and as the wait for the new version to answer:
@@ -704,7 +726,6 @@ async function main() {
   // path, prove the layer every USER-scoped check above skips: community rooms
   // are authorized against API_URL/API_SECRET, so a wrong pair there refuses
   // every community socket in the product while everything else stays green.
-  const membership = resolveMembershipConfig(process.env, devVars);
   if (membership.missing.length) {
     console.log(
       `  skip membership endpoint check (no ${membership.missing.join(", ")} in the environment or apps/realtime/.dev.vars)`,

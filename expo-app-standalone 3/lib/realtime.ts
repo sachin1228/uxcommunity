@@ -1,3 +1,4 @@
+import { validateMobileEnvironment } from "./environment";
 /**
  * Cloudflare Realtime client for React Native / Expo — the app-facing wrapper
  * around `lib/realtimeCore.ts`.
@@ -37,6 +38,8 @@ export type {
   RealtimeStatusHandler,
   RealtimeUser,
 } from './realtimeCore';
+
+validateMobileEnvironment();
 
 const REALTIME_URL = process.env.EXPO_PUBLIC_REALTIME_URL ?? '';
 

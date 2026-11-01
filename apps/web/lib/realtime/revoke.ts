@@ -1,3 +1,4 @@
+import { assertServiceUrl, fetchIsolatedService } from "@uxcommunity/shared";
 import { logEvent } from "@/lib/observability/log";
 
 const REQUEST_TIMEOUT_MS = 1_200;
@@ -45,6 +46,7 @@ export async function revokeRealtimeSessions(
   if (!revocation.userId) return true;
 
   const baseUrl = realtimeUrl();
+  if (baseUrl) assertServiceUrl(baseUrl, process.env);
   const secret = process.env.REALTIME_PUBLISH_SECRET;
   if (!baseUrl || !secret) {
     // Realtime may be undeployed in local development. The session row is still
@@ -63,7 +65,7 @@ export async function revokeRealtimeSessions(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`${baseUrl}/revoke`, {
+      const response = await fetchIsolatedService(`${baseUrl}/revoke`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -72,7 +74,7 @@ export async function revokeRealtimeSessions(
         body,
         signal: controller.signal,
         cache: "no-store",
-      });
+      }, process.env);
 
       if (response.ok) return true;
 

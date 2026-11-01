@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { assertServiceUrl, dataEnvironment, fetchIsolatedService } from "@uxcommunity/shared";
 import type { Database } from "@/lib/supabase/database.types";
 
 /** Service-role client typed with the generated database schema. */
@@ -19,6 +20,7 @@ export type ServiceClient = SupabaseClient<Database>;
 let _client: ServiceClient | null = null;
 
 export function createServiceClient() {
+  assertServiceUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env);
   if (_client) return _client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -32,6 +34,18 @@ export function createServiceClient() {
 
   _client = createClient<Database>(url, key, {
     auth: { persistSession: false },
+    ...(dataEnvironment(process.env) !== "production" ? {
+      global: { fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        try {
+          const response = await fetchIsolatedService(input, init ?? {}, process.env);
+          if (!response.ok) console.error("[supabase] isolated request failed", { status: response.status });
+          return response;
+        } catch (error) {
+          console.error("[supabase] isolated request could not complete", error instanceof Error ? error.message : "Unknown failure");
+          throw error;
+        }
+      } },
+    } : {}),
   });
 
   return _client;
