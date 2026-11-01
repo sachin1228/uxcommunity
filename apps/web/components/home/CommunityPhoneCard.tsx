@@ -231,34 +231,34 @@ export function CommunityPhoneCard() {
         >
           {/* side buttons, just proud of the frame */}
           <span
-            className="absolute left-[-2px] w-[3px] rounded-full bg-[#CFCFD5]"
+            className="absolute left-[-2px] w-[3px] rounded-full bg-[#2D2D34]"
             style={{ top: unit(144), height: unit(33) }}
           />
           <span
-            className="absolute left-[-2px] w-[3px] rounded-full bg-[#CFCFD5]"
+            className="absolute left-[-2px] w-[3px] rounded-full bg-[#2D2D34]"
             style={{ top: unit(201), height: unit(51) }}
           />
           <span
-            className="absolute left-[-2px] w-[3px] rounded-full bg-[#CFCFD5]"
+            className="absolute left-[-2px] w-[3px] rounded-full bg-[#2D2D34]"
             style={{ top: unit(268), height: unit(51) }}
           />
           <span
-            className="absolute right-[-2px] w-[3px] rounded-full bg-[#CFCFD5]"
+            className="absolute right-[-2px] w-[3px] rounded-full bg-[#2D2D34]"
             style={{ top: unit(219), height: unit(84) }}
           />
 
           {/* frame */}
           <div
-            className="absolute inset-0 bg-[linear-gradient(180deg,#F5F5F6_0%,#E9E9EB_48%,#CFCFD5_100%)] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.75),0_0_0_1px_rgba(255,255,255,0.14),inset_0_0_0_1px_rgba(255,255,255,0.7)]"
+            className="absolute inset-0 bg-[linear-gradient(155deg,#3A3A42_0%,#26262C_26%,#17171A_62%,#24242A_100%)] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
             style={{ borderRadius: unit(60) }}
           >
             <div
-              className="absolute overflow-hidden bg-[#F4F4F5] ring-1 ring-inset ring-black/[0.07]"
+              className="absolute overflow-hidden bg-[#0E0E10] ring-1 ring-inset ring-white/[0.06]"
               style={{ inset: unit(8), borderRadius: unit(52) }}
             >
               {/* status bar */}
               <div
-                className="absolute inset-x-0 flex items-start justify-between font-body font-semibold text-[#B8B9C1]"
+                className="absolute inset-x-0 flex items-start justify-between font-body font-semibold text-[#737373]"
                 style={{
                   top: unit(21),
                   paddingInline: unit(24),
@@ -300,7 +300,7 @@ export function CommunityPhoneCard() {
 
               {/* dynamic island */}
               <span
-                className="absolute left-1/2 -translate-x-1/2 rounded-full bg-[#D9D9DE]"
+                className="absolute left-1/2 -translate-x-1/2 rounded-full bg-[#1B1B1F] ring-1 ring-white/[0.06]"
                 style={{
                   top: unit(14),
                   width: unit(96),
@@ -320,7 +320,7 @@ export function CommunityPhoneCard() {
                   borderRadius: unit(16),
                 }}
               >
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,#30323A_0%,#24262D_38%,#1D1F26_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,#34363E_0%,#26282F_38%,#1B1D23_100%)]" />
                 <svg
                   className="absolute inset-0 h-full w-full [mask-image:linear-gradient(to_bottom,#000_58%,transparent_96%)]"
                   viewBox="0 0 299 199"
@@ -373,7 +373,7 @@ export function CommunityPhoneCard() {
                   ref={bandRef}
                   className="pointer-events-none absolute -left-[20%] -right-[20%] top-0 h-[70%] bg-[linear-gradient(to_top,transparent,#fff_50%,transparent)] opacity-0"
                 />
-                <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/10" />
+                <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/[0.12]" />
               </div>
 
               {/* the hold cue */}
@@ -383,7 +383,7 @@ export function CommunityPhoneCard() {
                 style={{ top: unit(312), gap: unit(16) }}
               >
                 <span
-                  className="flex items-center justify-center rounded-full border-[1.5px] border-[#0A0A0A] text-[#0A0A0A]"
+                  className="flex items-center justify-center rounded-full border-[1.5px] border-[#EDEDED] text-[#EDEDED]"
                   style={{ width: unit(46), height: unit(46) }}
                 >
                   <svg
@@ -403,7 +403,7 @@ export function CommunityPhoneCard() {
                   </svg>
                 </span>
                 <span
-                  className="font-body font-medium leading-none text-[#525252]"
+                  className="font-body font-medium leading-none text-[#737373]"
                   style={{ fontSize: unit(14) }}
                 >
                   You&rsquo;re in.
