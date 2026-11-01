@@ -210,8 +210,14 @@ export function CommunityPhoneCard() {
             style={{ borderRadius: unit(60) }}
           >
             <div
-              className="absolute overflow-hidden bg-[#101013] ring-1 ring-inset ring-white/[0.06]"
-              style={{ inset: unit(8), borderRadius: unit(52) }}
+              className="absolute overflow-hidden bg-background ring-1 ring-inset ring-white/[0.06]"
+              style={{
+                inset: unit(8),
+                borderRadius: unit(52),
+                // The device always shows the app's dark theme, whatever the
+                // page theme is behind it.
+                "--color-background": "#09090B",
+              } as CSSProperties}
             >
               {/* status bar */}
               <div
