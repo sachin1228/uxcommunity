@@ -28,7 +28,7 @@ identify configuration and compare copies; none are included in these documents.
 | Tracked source, all four workflows, package scripts, Wrangler/OpenNext, Supabase and mobile configuration | Inspected at the revision above. References below use repository paths and source line numbers. |
 | Ignored environment files in this checkout | Inspected variable names, configured hosts, bucket names, presence and equality of copies. A configured credential is not proof that it is still valid. |
 | GitHub public repository metadata, read-only API | Repository is public; all four checked-in workflows are active. Environments `Preview`, `Preview – uxcommunity`, and `Production` each report `protection_rules: []` and no deployment branch policy. Repository ruleset listing is empty. |
-| GitHub secret metadata and classic main-branch protection | Requests returned HTTP 401; `gh` is unauthenticated. Secret scopes/values, classic branch protection, and historical run artifacts were not verified. The connected GitHub tool can manage this PR but does not expose those administration endpoints. |
+| GitHub secret metadata and classic main-branch protection | Requests returned HTTP 401; `gh` is unauthenticated. Secret scopes/values, classic branch protection, and historical run artifacts were not verified. The connected GitHub tool can read this PR, but write attempts return HTTP 403 and it does not expose those administration endpoints. |
 | Cloudflare live inventory, GET requests only | Saved Wrangler OAuth credential expired on 30 October 2026. Inventory requests returned HTTP 401; other requests in the same read-only batch returned HTTP 429. Stopped without refresh or retry. Live Worker bindings, DO namespace IDs, buckets, D1 databases, routes, schedules, deployments and token policies remain unverified. |
 | Supabase live project and production data | No database queries or management calls made. Current configuration and the committed 31 October schema artifacts were inspected. Those artifacts are historical evidence, not a new production check. |
 | Vercel, Resend, Upstash, Firebase/Expo dashboards | No live account inventory obtained. Repository inspection identifies consumers; dashboard-side integration status, credentials and policies remain open items. |
@@ -290,8 +290,8 @@ below, so these local checks are the validation evidence for this audit.
 ## Review and PR handling
 
 This audit PR must not launch the unsafe preview pipeline. Its commits use
-`[skip ci]` so opening the PR cannot race ahead of a label, and the PR receives
-`skip-preview` as a second guard. Draft status alone does not skip this workflow.
+`[skip ci]` so opening the PR cannot race ahead of a label. When opening the PR,
+apply `skip-preview` as a second guard. Draft status alone does not skip this workflow.
 [GitHub's documented skip behavior](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs)
 covers push/pull-request events; it can leave required checks pending. Do not
 remove the marker, push a new unguarded commit, or manually dispatch deploy jobs
