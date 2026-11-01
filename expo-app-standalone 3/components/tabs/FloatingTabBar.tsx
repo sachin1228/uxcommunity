@@ -10,7 +10,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions } from '@react-navigation/native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import Animated, {
@@ -199,8 +198,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
     setTrackWidth(event.nativeEvent.layout.width);
   }, []);
 
-  const isIOS = Platform.OS === 'ios';
-  const isDark = colors.isDark;
   const bottomInset = Platform.OS === 'web' ? 0 : insets.bottom;
 
   return (
@@ -209,33 +206,13 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
         style={[
           styles.bar,
           {
-            backgroundColor: isIOS ? 'transparent' : colors.surface,
+            backgroundColor: colors.background,
             borderColor: colors.border,
             height: BAR_HEIGHT + bottomInset,
             paddingBottom: bottomInset,
           },
         ]}
       >
-        {isIOS ? (
-          <View style={styles.blurClip}>
-            <BlurView
-              intensity={80}
-              tint={isDark ? 'dark' : 'light'}
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(18, 18, 20, 0.72)'
-                    : 'rgba(255, 255, 255, 0.72)',
-                },
-              ]}
-            />
-          </View>
-        ) : null}
-
         <View style={styles.track} onLayout={onTrackLayout}>
           {itemWidth > 0 ? (
             <Animated.View
@@ -315,10 +292,6 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
-  },
-  blurClip: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
   },
   track: {
     flexDirection: 'row',
