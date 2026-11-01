@@ -33,9 +33,9 @@ import { hapticSelection } from '@/lib/haptics';
  * shifts while the highlight travels.
  */
 
-const BAR_HEIGHT = 68;
-const ICON_SIZE = 20;
-const LABEL_LINE_HEIGHT = 13;
+const BAR_HEIGHT = 70;
+const ICON_SIZE = 21;
+const LABEL_LINE_HEIGHT = 14;
 const ICON_LABEL_GAP = 10;
 const ICON_PILL_WIDTH = 60;
 const ICON_PILL_HEIGHT = 32;
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Geist_500Medium',
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: LABEL_LINE_HEIGHT,
   },
   itemPressed: {
