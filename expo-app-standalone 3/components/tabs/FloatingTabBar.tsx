@@ -38,7 +38,7 @@ const ICON_SIZE = 24;
 const LABEL_LINE_HEIGHT = 16;
 const ICON_LABEL_GAP = 10;
 const ICON_PILL_WIDTH = 60;
-const ICON_PILL_HEIGHT = 40;
+const ICON_PILL_HEIGHT = 36;
 
 /** The icon's centre, measured from the top of the fixed-height track. */
 const ICON_CENTER_Y =
