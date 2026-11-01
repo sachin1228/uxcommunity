@@ -111,16 +111,16 @@ test("an unset or unusable target is refused before anything is written", () => 
   assert.throws(() => resolveSeedTarget({ env: { SUPABASE_URL: "not a url" }, envText: "" }), /not an http\(s\) URL/);
 });
 
-test("seeding into a shared project needs E2E_SEED_ALLOW_REMOTE, seeding locally does not", () => {
+test("remote seeding remains refused even with the old override", () => {
   const remote = { supabaseUrl: "https://shared.supabase.co", serviceKey: "key", host: "shared.supabase.co", local: false };
   const local = { supabaseUrl: "http://127.0.0.1:54321", serviceKey: "key", host: "127.0.0.1", local: true };
 
   assert.equal(remoteSeedRefusal(local, {}), null);
-  assert.equal(remoteSeedRefusal(remote, { E2E_SEED_ALLOW_REMOTE: "1" }), null);
+  assert.ok(remoteSeedRefusal(remote, { E2E_SEED_ALLOW_REMOTE: "1" }));
 
   const refusal = remoteSeedRefusal(remote, {});
-  assert.ok(refusal, "a remote target must be refused without the opt-in");
-  assert.match(refusal, /E2E_SEED_ALLOW_REMOTE=1/);
+  assert.ok(refusal, "a remote target must always be refused");
+  assert.match(refusal, /isolated local development stack/);
   assert.match(refusal, /shared\.supabase\.co/, "the refusal must name the project it would write to");
 });
 

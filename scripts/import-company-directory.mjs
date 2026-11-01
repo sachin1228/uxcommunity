@@ -683,6 +683,7 @@ function copyList(rows, columns) {
 /* ── Running psql ────────────────────────────────────────────────────────── */
 
 function psql(script, { label }) {
+  requireLocalPostgres();
   const result = spawnSync(PSQL[0], PSQL.slice(1), {
     encoding: "utf8",
     input: script,

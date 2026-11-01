@@ -1,45 +1,13 @@
 import { createServer } from 'node:http';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { signedRequest } from '../../packages/shared/src/storage-signature.mjs';
+export { signedRequest } from '../../packages/shared/src/storage-signature.mjs';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 const xml = value => String(value).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
 const unxml = value => value.replace(/&(lt|gt|amp|quot|apos);/g, (_, c) => ({lt:'<',gt:'>',amp:'&',quot:'"',apos:"'"}[c]));
-const hash = value => createHash('sha256').update(value).digest('hex');
-const hmac = (key, value) => createHmac('sha256', key).update(value).digest();
-const encode = value => encodeURIComponent(value).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-
-/** Verify SDK headers and presigned URLs; private objects are never unsigned. */
-export function signedRequest(req, url, body, secret) {
-  const query = url.searchParams;
-  const authorization = req.headers.authorization ?? '';
-  const credential = query.get('X-Amz-Credential') ?? /Credential=([^, ]+)/.exec(authorization)?.[1];
-  const signedHeaders = query.get('X-Amz-SignedHeaders') ?? /SignedHeaders=([^, ]+)/.exec(authorization)?.[1];
-  const signature = query.get('X-Amz-Signature') ?? /Signature=([a-f0-9]+)/.exec(authorization)?.[1];
-  const date = query.get('X-Amz-Date') ?? req.headers['x-amz-date'];
-  if (!credential || !signedHeaders || !signature || !date) return false;
-  const [access, day, region, service, ending] = credential.split('/');
-  if (access !== 'local-development' || service !== 's3' || ending !== 'aws4_request') return false;
-  const timestamp = Date.parse(date.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'));
-  const age = (Date.now() - timestamp) / 1000;
-  const expires = query.has('X-Amz-Signature') ? Number(query.get('X-Amz-Expires')) : 300;
-  if (!Number.isFinite(age) || age < -300 || !Number.isFinite(expires) || expires < 1 || expires > 3600 || age > expires) return false;
-  const canonicalQuery = [...query].filter(([k]) => k !== 'X-Amz-Signature')
-    .map(([k,v]) => [encode(k), encode(v)]).sort(([a,av],[b,bv]) => a.localeCompare(b, 'en', { sensitivity:'variant' }) || av.localeCompare(bv))
-    .map(([k,v]) => `${k}=${v}`).join('&');
-  // AWS sorts encoded query bytes, not locale collation.
-  const orderedQuery = canonicalQuery.split('&').sort().join('&');
-  const headers = signedHeaders.split(';').map(name => `${name}:${String(req.headers[name] ?? '').trim().replace(/\s+/g,' ')}\n`).join('');
-  const payload = query.get('X-Amz-Content-Sha256') ?? req.headers['x-amz-content-sha256'] ?? 'UNSIGNED-PAYLOAD';
-  if (payload !== 'UNSIGNED-PAYLOAD' && payload !== hash(body)) return false;
-  const canonical = [req.method, url.pathname, orderedQuery, headers, signedHeaders, payload].join('\n');
-  const scope = `${day}/${region}/s3/aws4_request`;
-  const key = hmac(hmac(hmac(hmac(`AWS4${secret}`, day), region), 's3'), 'aws4_request');
-  const expected = hmac(key, `AWS4-HMAC-SHA256\n${date}\n${scope}\n${hash(canonical)}`).toString('hex');
-  return signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-}
-
 /** Loopback-only S3 protocol adapter over real Miniflare R2 storage. */
-export async function startStorage({ secret, apiSecret, persist, port = 8788 }) {
+export async function startStorage({ secret, apiSecret, persist, port = 8788, allowedOrigins = ['http://localhost:3000','http://127.0.0.1:3000'] }) {
+  if (allowedOrigins.some(origin => !['localhost','127.0.0.1','[::1]'].includes(new URL(origin).hostname))) throw new Error('Local CORS must use loopback');
   if (!secret || secret.length < 32) throw new Error('Local storage secret is required');
   const mf = new Miniflare({ ...convertV4MiniflareOptions({ name: 'uxcommunity-local-storage', compatibilityDate: '2026-08-01', modules: true, script: 'export default { fetch() { return new Response("local"); } }',
     r2Buckets: ['MEDIA', 'PRIVATE'] }), ...(persist ? { resourcePersistencePath: persist } : {}), host: '127.0.0.1', telemetry: { enabled: false } });
@@ -81,7 +49,7 @@ export async function startStorage({ secret, apiSecret, persist, port = 8788 }) 
       if (!signed && !publicRead) { res.writeHead(403).end(); return; }
       // Anonymous CORS reads are public media only; signed uploads are exact local origins.
       const origin = req.headers.origin;
-      if (origin && ['http://localhost:3000','http://127.0.0.1:3000'].includes(origin)) {
+      if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Headers', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,DELETE');
@@ -130,7 +98,7 @@ export async function startStorage({ secret, apiSecret, persist, port = 8788 }) 
         res.setHeader('Content-Type', object.httpMetadata?.contentType ?? 'application/octet-stream');
         res.setHeader('Cache-Control', object.httpMetadata?.cacheControl ?? 'private, no-store');
         res.setHeader('ETag', object.httpEtag);
-        if (object.range) {
+        if (req.headers.range && object.range) {
           const offset = object.range.offset ?? 0; const length = object.range.length ?? object.size - offset;
           res.statusCode = 206;
           res.setHeader('Content-Range', `bytes ${offset}-${offset+length-1}/${object.size}`);
@@ -147,7 +115,7 @@ export async function startStorage({ secret, apiSecret, persist, port = 8788 }) 
   server.prependListener('request', (req, res) => {
     if (req.method !== 'OPTIONS') return;
     const origin = req.headers.origin;
-    if (['http://localhost:3000','http://127.0.0.1:3000'].includes(origin)) {
+    if (allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Headers', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,DELETE');

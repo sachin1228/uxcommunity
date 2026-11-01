@@ -154,28 +154,18 @@ export function userIdForIndex(index, prefix = "h3k6") {
  * target. The previous revision defaulted to `wss://rt.uxcommunity.in`
  * (production) and only mentioned staging in a comment.
  */
-export function assertStagingTarget(rawUrl, { allowNonStaging = false } = {}) {
-  let host;
-  try {
-    host = new URL(rawUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:")).hostname;
-  } catch {
-    return { ok: false, reason: `REALTIME_URL is not a valid URL: ${rawUrl}` };
+export function assertStagingTarget(rawUrl, { allowedOrigins = (process.env.STAGING_ALLOWED_ORIGINS ?? '').split(',') } = {}) {
+  let url;
+  try { url = new URL(rawUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:')); }
+  catch { return { ok: false, reason: 'Invalid test target URL' }; }
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (url.username || url.password || !['http:', 'https:'].includes(url.protocol)) return { ok: false, reason: 'Invalid test target' };
+  if (['localhost','127.0.0.1','[::1]'].includes(host)) return { ok: true, host };
+  const production = host === 'uxcommunity.in' || host.endsWith('.uxcommunity.in') || host.startsWith('uxcommunity-web.') || host.startsWith('uxcommunity-realtime.');
+  if (production || url.protocol !== 'https:' || !allowedOrigins.map(s => s.trim()).includes(url.origin)) {
+    return { ok: false, host, reason: 'Test target must be local or an explicitly allowed staging origin; overrides cannot authorize production' };
   }
-
-  const looksLikeStaging =
-    host.includes("staging") ||
-    host.includes("localhost") ||
-    host.endsWith(".workers.dev");
-
-  if (looksLikeStaging || allowNonStaging) return { ok: true, host };
-  return {
-    ok: false,
-    host,
-    reason:
-      `${host} does not look like a staging target. This test opens thousands of ` +
-      "sockets and publishes real events, so it must not be pointed at production. " +
-      "Set ALLOW_NON_STAGING=1 only if you are certain the target is disposable.",
-  };
+  return { ok: true, host };
 }
 
 /**

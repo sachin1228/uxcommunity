@@ -17,6 +17,7 @@ test('real SDK uploads, presigning, private access and cleanup use only local R2
     const range=await client.send(new GetObjectCommand({Bucket,Key,Range:'bytes=0-4'}));assert.equal(await range.Body.transformToString(),'local');
     const url=await getSignedUrl(client,new PutObjectCommand({Bucket,Key:'direct.txt'}),{expiresIn:60});
     assert.equal((await fetch(url,{method:'PUT',body:'direct'})).status,200);
+    assert.equal((await fetch(`${endpoint}/${Bucket}/direct.txt`)).status,200);
     await client.send(new CopyObjectCommand({Bucket,Key:'copy.txt',CopySource:`${Bucket}/direct.txt`}));
     const listed=await client.send(new ListObjectsV2Command({Bucket}));assert.equal(listed.Contents.length,3);
     const privateBucket='uxcommunity-development-private';

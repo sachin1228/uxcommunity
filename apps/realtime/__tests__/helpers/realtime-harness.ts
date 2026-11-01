@@ -82,7 +82,7 @@ export const vars: Record<string, string> = Object.fromEntries(
     .filter(Boolean)
     .map((l) => {
       const [k, ...v] = l.split("=");
-      return [k.trim(), v.join("=").trim()];
+      return [k.trim(), v.join("=").trim().replace(/^["']|["']$/g, "")];
     }),
 );
 
