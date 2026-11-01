@@ -37,7 +37,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(41);
 
 -- ─── Helpers ────────────────────────────────────────────────
 
@@ -73,6 +73,18 @@ insert into public.users (id, name, email, password_hash)
 select user_id, 'C-1 counter fixture ' || position,
        format('%s@member-count.test', user_id), 'x'
 from mc_users;
+
+-- An independent community exists before the main counter scenarios. Its
+-- fixture replaces the old seeded UUIDs and is rolled back with this file.
+create temporary table mc_existing_fixture as
+select gen_random_uuid() community_id, gen_random_uuid() city_id;
+insert into public.cities(id,name)
+select city_id, 'Independent counter fixture ' || city_id::text from mc_existing_fixture;
+insert into public.communities(id,name,type,reference_id)
+select community_id, 'Independent counter fixture', 'city', city_id from mc_existing_fixture;
+insert into public.community_members(community_id,user_id)
+select f.community_id, u.user_id from mc_existing_fixture f, mc_users u
+where u.position in (1,7);
 
 -- Explore resolves a city community through its master-data row and drops
 -- the community when the reference is missing, so each fixture community gets
@@ -112,13 +124,13 @@ select ok(
     where table_schema = 'public'
       and table_name = 'communities'
       and column_name = 'member_count'
-      and data_type = 'integer'
+      and data_type = 'bigint'
       and is_nullable = 'NO'
   ),
-  'communities.member_count exists as a not-null integer'
+  'communities.member_count preserves the production not-null bigint'
 );
 
-select has_function('public', 'sync_community_member_count');
+select has_function('public', 'sync_community_member_count', array[]::text[]);
 
 -- The live project once carried a hand-applied second stack here
 -- (community_members_increment_count / community_members_decrement_count →
@@ -178,7 +190,7 @@ select ok(
 
 -- ─── 2. A community starts empty ────────────────────────────
 
-select is((select main_count from mc), 0, 'a new community starts at member_count 0');
+select is((select main_count from mc), 0::bigint, 'a new community starts at member_count 0');
 
 -- ─── 3. Joins ───────────────────────────────────────────────
 
@@ -187,7 +199,7 @@ select f.community_id, u.user_id
 from mc_fixture f, mc_users u
 where u.position = 1;
 
-select is((select main_count from mc), 1, 'the first member to join increments the counter');
+select is((select main_count from mc), 1::bigint, 'the first member to join increments the counter');
 
 insert into public.community_members (community_id, user_id)
 select f.community_id, u.user_id
@@ -196,7 +208,7 @@ where u.position between 2 and 5;
 
 select is(
   (select main_count from mc),
-  5,
+  5::bigint,
   'a multi-row join increments once per membership row, not once per statement'
 );
 
@@ -208,7 +220,7 @@ from mc_fixture f, mc_users u
 where u.position = 1
 on conflict (community_id, user_id) do nothing;
 
-select is((select main_count from mc), 5, 'a duplicate join is ignored and does not increment twice');
+select is((select main_count from mc), 5::bigint, 'a duplicate join is ignored and does not increment twice');
 
 -- The invite route's plain insert leaves idempotency to the primary key: a
 -- repeat must fail loudly rather than count a second time.
@@ -223,7 +235,7 @@ select throws_ok(
   'a non-idempotent duplicate join fails on the primary key'
 );
 
-select is((select main_count from mc), 5, 'the rejected duplicate join leaves the counter untouched');
+select is((select main_count from mc), 5::bigint, 'the rejected duplicate join leaves the counter untouched');
 
 -- ─── 4. Updates that do not change membership ───────────────
 
@@ -234,7 +246,7 @@ where community_id = (select community_id from mc_fixture)
 
 select is(
   (select main_count from mc),
-  5,
+  5::bigint,
   'role, mute, read and archive updates leave the counter alone'
 );
 
@@ -244,13 +256,13 @@ delete from public.community_members
 where community_id = (select community_id from mc_fixture)
   and user_id = (select user_id from mc_users where position = 5);
 
-select is((select main_count from mc), 4, 'leaving decrements the counter');
+select is((select main_count from mc), 4::bigint, 'leaving decrements the counter');
 
 delete from public.community_members
 where community_id = (select community_id from mc_fixture)
   and user_id = (select user_id from mc_users where position = 3);
 
-select is((select main_count from mc), 3, 'a kick (a manager removes a member) decrements the counter');
+select is((select main_count from mc), 3::bigint, 'a kick (a manager removes a member) decrements the counter');
 
 -- ─── 6. The cascade from a deleted user ─────────────────────
 -- No application code runs on this path: the FK cascade deletes the rows, and
@@ -258,7 +270,7 @@ select is((select main_count from mc), 3, 'a kick (a manager removes a member) d
 
 delete from public.users where id = (select user_id from mc_users where position = 2);
 
-select is((select main_count from mc), 2, 'deleting a user decrements the communities they were in');
+select is((select main_count from mc), 2::bigint, 'deleting a user decrements the communities they were in');
 
 -- ─── 7. A membership moved between communities ──────────────
 -- No route writes community_id, but a future one must not be able to leave two
@@ -269,8 +281,8 @@ set community_id = (select other_community_id from mc_fixture)
 where community_id = (select community_id from mc_fixture)
   and user_id = (select user_id from mc_users where position = 1);
 
-select is((select main_count from mc), 1, 'moving a membership out decrements the source counter');
-select is((select other_count from mc), 1, 'moving a membership in increments the destination counter');
+select is((select main_count from mc), 1::bigint, 'moving a membership out decrements the source counter');
+select is((select other_count from mc), 1::bigint, 'moving a membership in increments the destination counter');
 
 -- ─── 8. A membership rolled back with its transaction ───────
 
@@ -281,11 +293,11 @@ select f.community_id, u.user_id
 from mc_fixture f, mc_users u
 where u.position = 6;
 
-select is((select main_count from mc), 2, 'a membership is counted as soon as it lands in the transaction');
+select is((select main_count from mc), 2::bigint, 'a membership is counted as soon as it lands in the transaction');
 
 rollback to savepoint mc_failed_membership;
 
-select is((select main_count from mc), 1, 'rolling the membership back rolls the counter back with it');
+select is((select main_count from mc), 1::bigint, 'rolling the membership back rolls the counter back with it');
 
 -- ─── 9. Every community agrees with its members ─────────────
 -- Presupposes the seeded fixtures: their memberships were inserted after the
@@ -321,7 +333,7 @@ alter table public.community_members enable trigger user;
 
 select is(
   (select main_count from mc),
-  1,
+  1::bigint,
   'memberships written with the counter triggers disabled are not counted (the pre-migration state)'
 );
 
@@ -349,7 +361,7 @@ from (
 where counted.id = c.id
   and c.member_count is distinct from coalesce(counted.total, 0);
 
-select is((select main_count from mc), 4, 'the backfill reconciles memberships that predate the counter');
+select is((select main_count from mc), 4::bigint, 'the backfill reconciles memberships that predate the counter');
 
 -- ─── 10b. Reconciling a counter a second stack inflated ──────
 -- The drift the live project actually hit: a hand-applied second trigger pair
@@ -365,7 +377,7 @@ update public.communities
 set member_count = member_count * 2
 where id = (select community_id from mc_fixture);
 
-select is((select main_count from mc), 8, 'the fixture is now double-counted, as iasiso was');
+select is((select main_count from mc), 8::bigint, 'the fixture is now double-counted, as iasiso was');
 
 -- Step 2 of 20260927120000_community_member_count.sql, verbatim.
 update public.communities as c
@@ -381,11 +393,11 @@ from (
 where counted.id = c.id
   and c.member_count is distinct from coalesce(counted.total, 0);
 
-select is((select main_count from mc), 4, 'the backfill reconciles a double-counted community');
+select is((select main_count from mc), 4::bigint, 'the backfill reconciles a double-counted community');
 
 rollback to savepoint mc_double_counted;
 
-select is((select main_count from mc), 4, 'rolling the inflation back restores the correct counter');
+select is((select main_count from mc), 4::bigint, 'rolling the inflation back restores the correct counter');
 
 -- ─── 11. The read models ────────────────────────────────────
 -- The viewer below is position 6: a member of the main community (its
@@ -483,14 +495,14 @@ select is(
 
 select is(
   (
-    select (entry ->> 'member_count')::integer
+    select (entry ->> 'member_count')::bigint
     from jsonb_array_elements(
-      public.get_sidebar_activity('11111111-1111-1111-1111-111111111111'::uuid)
+      public.get_sidebar_activity((select user_id from mc_users where position=1))
     ) as entry
-    where entry ->> 'community_id' = 'aaaaaaaa-0000-0000-0000-00000000000a'
+    where entry ->> 'community_id' = (select community_id::text from mc_existing_fixture)
   ),
-  2,
-  'a community seeded before this test file reports its seeded members'
+  2::bigint,
+  'an independent community retains both members through the counter scenarios'
 );
 
 -- ─── 12. Deleting a community with members ──────────────────
@@ -515,7 +527,7 @@ select is(
 select has_index('public', 'community_members', 'community_members_pkey',
   'the (community_id, user_id) primary key still serves per-community membership reads');
 
-select has_index('public', 'community_members', 'idx_community_members_user',
+select has_index('public', 'community_members', 'idx_community_members_user_community',
   'the per-user membership index is still needed (sidebar, push recipients, admin)');
 
 select has_index('public', 'communities', 'idx_communities_active_name',

@@ -14,7 +14,7 @@ created by initialization.
 | `posts_daily` | 3 / `day` | `apps/web/lib/creation-limits.ts`, `CREATION_LIMIT_MESSAGES.posts_daily`; baseline `enforce_post_creation_limit` and `creation_window_start` |
 | `events_monthly` | 5 / `month` | Same messages module, `events_monthly`; baseline `enforce_event_creation_limit` |
 | `jobs_monthly` | 3 / `month` | Same messages module, `jobs_monthly`; baseline `enforce_job_creation_limit` |
-| `dms_monthly` | 5 / `month` | Same messages module, `dms_monthly`; baseline `get_or_create_dm`, `bump_usage_counter` |
+| `dms_monthly` | 5 / `month` | Same messages module, `dms_monthly`; baseline `get_or_create_dm_conversation`, `bump_usage_counter` |
 | `communities_total` | 5 / `total` | Same messages module, `communities_total`; baseline `enforce_community_creation_limit` (live owned communities) |
 | `community_joins` | 10 / `standing` | Same messages module; `apps/web/lib/communities/join-slots.ts` `JOIN_LIMIT`; baseline `enforce_membership_cap` (live memberships) |
 | `verification_settings` | `id=true`, `grace_days=0` | `apps/web/lib/verification/policy.ts` `DEFAULT_VERIFICATION_GRACE_DAYS`; `settings.ts` and admin verification-settings route use the singleton. Policy A still makes unapproved members read-only immediately. |
@@ -77,7 +77,7 @@ npm run db:init -- --catalogs /tmp/uxcommunity-catalogs.json \
 
 The command discovers and verifies **this checkout's unlinked local stack**;
 it accepts no remote URL or production credentials. Remove stale gitignored
-`supabase/.temp/project-ref` linkage before using it. It inserts only missing
+`supabase/.temp/project-ref` or `supabase/.link.json` linkage before using it. It inserts only missing
 keys in one transaction, never updates/deletes rows, and serializes concurrent
 initialization calls. Matching existing rows keep their IDs and timestamps.
 Conflicting budgets, verification values, labels or inactive choices abort the

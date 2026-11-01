@@ -17,10 +17,10 @@ PERIODS = dict(posts_daily='day', events_monthly='month', jobs_monthly='month',
 
 def load_inputs(config, catalogs, include_levels=False):
     """Reject incomplete inputs before any database connection or write."""
-    if set(config) != {'creation_limits', 'verification_settings'}:
+    if not isinstance(config, dict) or set(config) != {'creation_limits', 'verification_settings'}:
         raise ValueError('Configuration must contain creation_limits and verification_settings only')
     limits = config['creation_limits']
-    if not isinstance(limits, list) or len(limits) != 6:
+    if not isinstance(limits, list) or len(limits) != 6 or not all(isinstance(r, dict) for r in limits):
         raise ValueError('All six creation budgets are required')
     if {r.get('kind') for r in limits} != set(PERIODS):
         raise ValueError('Creation budget kinds must match the current application')
@@ -28,9 +28,9 @@ def load_inputs(config, catalogs, include_levels=False):
         if set(row) != {'kind', 'limit_count', 'period'} or type(row['limit_count']) is not int or not 0 < row['limit_count'] < 2147483648 or row['period'] != PERIODS[row['kind']]:
             raise ValueError('Invalid creation budget: ' + str(row))
     setting = config['verification_settings']
-    if set(setting) != {'id', 'grace_days'} or setting['id'] is not True or type(setting['grace_days']) is not int or not 0 <= setting['grace_days'] <= 30:
+    if not isinstance(setting, dict) or set(setting) != {'id', 'grace_days'} or setting['id'] is not True or type(setting['grace_days']) is not int or not 0 <= setting['grace_days'] <= 30:
         raise ValueError('Verification setting requires id=true and grace_days between 0 and 30')
-    if set(catalogs) != set(CATALOGS):
+    if not isinstance(catalogs, dict) or set(catalogs) != set(CATALOGS) or not all(isinstance(rows, list) for rows in catalogs.values()):
         raise ValueError('Catalog input must contain cities, design_sectors, experience_levels, job_titles')
     catalogs = {key: list(rows) for key, rows in catalogs.items()}
     if include_levels:
@@ -74,7 +74,10 @@ def initialization_sql(inputs):
             differences += ' or not t.is_active'
         # A conflict aborts the whole transaction, including newly inserted rows.
         # It cannot silently reset an administrator's values or reactivate options.
-        sql += [f"do $conflict$ begin if exists(select 1 from jsonb_to_recordset({literal}) as i({definitions}) join public.{table} t using ({key}) where {differences}) then raise exception 'Initialization conflict in {table}; existing values preserved. Review inputs; no rows committed.'; end if; end $conflict$;"]
+        body = f"begin if exists(select 1 from jsonb_to_recordset({literal}) as i({definitions}) join public.{table} t using ({key}) where {differences}) then raise exception 'Initialization conflict in {table}; existing values preserved. Review inputs; no rows committed.'; end if; end"
+        # Quote the entire DO body too: an operator-supplied name can contain
+        # dollar delimiters, apostrophes or backslashes without becoming SQL.
+        sql += ["do '" + body.replace("'", "''") + "';"]
     sql += ['commit;']
     return '\n'.join(sql)
 
@@ -96,7 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--include-default-experience-levels', action='store_true')
     args = parser.parse_args()
     inputs = load_inputs(json.loads(args.config.read_text()), json.loads(args.catalogs.read_text()), args.include_default_experience_levels)
-    if (ROOT / 'supabase/.temp/project-ref').exists():
+    if any((ROOT / path).exists() for path in ('supabase/.temp/project-ref', 'supabase/.link.json')):
         raise RuntimeError('Remove the old local project link before initializing a fresh environment')
     env = {k: v for k, v in os.environ.items() if not k.startswith(('PG', 'SUPABASE_'))}
     status = json.loads(subprocess.check_output(['bash', str(ROOT / 'scripts/db/cli.sh'), 'status', '--output-format', 'json'], env=env, text=True))

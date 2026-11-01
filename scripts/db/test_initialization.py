@@ -11,7 +11,7 @@ from initialize import CATALOGS, initialize, load_inputs
 def fixture_inputs():
     config = json.loads((ROOT / 'supabase/initialization/required.json').read_text())
     # Fictional test options, never shipped as installation defaults.
-    catalogs = {'cities': [{'name': "Test O'Brien \\ City"}],
+    catalogs = {'cities': [{'name': "Test O'Brien \\ $conflict$ City"}],
                 'design_sectors': [{'name': 'Test sector'}],
                 'experience_levels': [],
                 'job_titles': [{'slug': 'test_designer', 'name': 'Test Designer'}]}

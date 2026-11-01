@@ -31,7 +31,9 @@ def verify_adoption(psql, query, env, command, project, log, baseline):
         raise RuntimeError('Adoption did not reject the wrong ledger digest')
     if query('select count(*) from supabase_migrations.schema_migrations') != '5':
         raise RuntimeError('Failed adoption modified the old ledger')
-    subprocess.run(psql, input=sql.replace('REPLACE_WITH_REVIEWED_32_HEX_MD5', old), env=env, text=True, capture_output=True, check=True)
+    result = subprocess.run(psql, input=sql.replace('REPLACE_WITH_REVIEWED_32_HEX_MD5', old), env=env, text=True, capture_output=True)
+    if result.returncode:
+        raise RuntimeError('Documented local adoption rehearsal failed: ' + result.stderr)
     if query('select count(*) from public.users') != '1':
         raise RuntimeError('Adoption affected application rows')
     actual = json.loads(query("select jsonb_agg(version) from supabase_migrations.schema_migrations"))

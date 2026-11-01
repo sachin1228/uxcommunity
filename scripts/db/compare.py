@@ -81,6 +81,8 @@ def tokens(sql):
 
 
 def acl(value, category, owner):
+    if value == '{}':
+        return {}
     if value is None:
         if category == 'routines':
             return {'': {'X': False}, owner: {'X': False}}
@@ -127,7 +129,8 @@ def compare(production, fresh, *, exact=False):
                 counts[category]['equal'] += 1
                 continue
             row = p or f
-            application = row.get('schema', row.get('schemaname')) == 'public' and category not in ('default_privileges', 'schemas')
+            application = (row.get('schema', row.get('schemaname')) == 'public'
+                           or category == 'schemas' and row.get('name') == 'public')
             scope = 'application' if application else 'supabase_platform_or_database_configuration'
             status = 'missing_from_fresh' if f is None else 'fresh_only' if p is None else 'different'
             fields_changed = []
@@ -136,7 +139,8 @@ def compare(production, fresh, *, exact=False):
                 fields_changed = sorted(k for k in pn.keys() | fn.keys() if pn.get(k) != fn.get(k))
             representation = False
             if category == 'relations' and name == 'public|report_groups' and fields_changed == ['view_definition']:
-                # PG 17.11 adds redundant output labels to non-leading UNION arms.
+                # A DDL/deparser round trip adds redundant output labels to
+                # non-leading UNION arms (also observed on matching PG 17.6).
                 # Those labels do not determine UNION output names; all view columns
                 # are compared independently. Retain this difference in the report.
                 stripped = re.sub(r"(SELECT '(?:showcase|resource|event)'::text) AS text,", r'\1,', f['view_definition'])

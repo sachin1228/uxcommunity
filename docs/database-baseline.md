@@ -155,7 +155,7 @@ and its JSON containing exact source/result values for **every** difference.
 
 The verified application result is **zero unexpected differences**, plus the two
 requested protections (one column, one constraint and its backing index). There
-is one explicitly reported PostgreSQL deparser difference: PG 17.11 adds redundant
+is one explicitly reported DDL/deparser round-trip difference: redundant
 `AS text` labels to non-leading UNION arms of `report_groups`; output columns are
 also independently compared. This rendering change does not change UNION output
 names or the query's meaning.
@@ -169,7 +169,12 @@ Managed internals are neither silently normalized away nor overwritten to force
 a match. The report does **not** claim global database equality or validation of
 all application workflows. Existing production's locale is preserved on adoption;
 verify locale-sensitive behavior on a matching staging environment before that
-separate step.
+separate step. The matching PostgreSQL 17.6 staging check now passes with
+`en_US.UTF-8`; its **351** platform differences are separately recorded in the
+[staging report](../supabase/schema/staging-verification/schema-comparison.md).
+The GitHub current-image Docker test also uses `en_US.UTF-8`; `C.UTF-8` describes
+the earlier macOS native artifact only. The deparser-only view difference occurs
+on both tested PostgreSQL minors and remains explicitly reported.
 
 ACL comparisons preserve privilege-to-grant-option associations. Equivalent
 explicit/implicit owner defaults and grantor spelling are normalized; no client

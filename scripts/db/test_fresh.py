@@ -101,7 +101,10 @@ def run(args):
         psql = ['psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '--dbname', url]
 
         def query(sql):
-            return subprocess.check_output(psql + ['-A', '-t', '-c', sql], env=env, text=True).strip()
+            completed = subprocess.run(psql + ['-A', '-t', '-c', sql], env=env, text=True, capture_output=True)
+            if completed.returncode:
+                raise RuntimeError('Local SQL failed: ' + completed.stderr)
+            return completed.stdout.strip()
 
         # All migration history reads below are LOCAL only; no remote ledger is queried.
         recorded = json.loads(query("select coalesce(jsonb_agg(version order by version),'[]'::jsonb) from supabase_migrations.schema_migrations"))
@@ -150,7 +153,9 @@ def run(args):
         recorded = json.loads(query("select coalesce(jsonb_agg(version order by version),'[]'::jsonb) from supabase_migrations.schema_migrations"))
         if recorded != versions:
             raise RuntimeError('Forward migration history differs from active files')
-        subprocess.run(psql + ['-f', str(ROOT / 'scripts/db/test_protections.sql')], env=env, check=True, capture_output=True, text=True)
+        completed = subprocess.run(psql + ['-f', str(ROOT / 'scripts/db/test_protections.sql')], env=env, capture_output=True, text=True)
+        if completed.returncode:
+            raise RuntimeError('Protection test failed: ' + completed.stderr)
         if any(int(query('select count(*) from public.' + table)) for table in ('users', 'applications', 'notification_preferences', 'moderation_audit_log')):
             raise RuntimeError('Protection test fixtures were not rolled back')
         initialization = verify_initialization(url, query)
@@ -158,12 +163,21 @@ def run(args):
         if compare(fresh, initialized, exact=True)['unexpected_application_differences'] and len(files) == 1:
             raise RuntimeError('Initialization changed application schema')
         if args.sql_tests:
-            subprocess.run(psql + ['-c', 'create extension if not exists pgtap'], env=env, check=True, capture_output=True)
+            completed = subprocess.run(psql + ['-c', 'create extension if not exists pgtap with schema extensions'], env=env, capture_output=True, text=True)
+            if completed.returncode:
+                raise RuntimeError('pgTAP setup failed: ' + completed.stderr)
+            failures = []
             for test in args.sql_tests:
                 path = Path(test).resolve()
-                completed = subprocess.run(psql + ['-f', str(path)], env=env, check=True, capture_output=True, text=True)
-                if re.search(r'^\s*not ok\b', completed.stdout, re.M | re.I):
-                    raise RuntimeError('pgTAP assertion failure in ' + str(path))
+                completed = subprocess.run(psql + ['-A', '-t', '-f', str(path)], env=env, capture_output=True, text=True)
+                (output / (path.name + '.tap')).write_text(completed.stdout + completed.stderr)
+                plans = re.findall(r'^1\.\.(\d+)\s*$', completed.stdout, re.M)
+                assertions = re.findall(r'^(?:not )?ok \d+\b', completed.stdout, re.M)
+                if (completed.returncode or re.search(r'^\s*not ok\b', completed.stdout, re.M | re.I)
+                        or len(plans) != 1 or len(assertions) != int(plans[0])):
+                    failures.append(path.name)
+            if failures:
+                raise RuntimeError('pgTAP failures: ' + ', '.join(failures) + '; full TAP output: ' + str(output))
         (output / 'verification.json').write_text(json.dumps({
             'cli_version': version, 'runtime': status['runtime'],
             'production_capture': source['meta'], 'fresh_capture': fresh['meta'],
@@ -173,6 +187,7 @@ def run(args):
             'protection_behavior_tests': 'passed; fixture transaction rolled back',
             'initialization_tests': initialization,
             'adoption_rehearsal': adoption,
+            'sql_tests_passed': [Path(p).name for p in args.sql_tests],
             'stored_routine_validation': 'all public definitions validated with check_function_bodies=on; no RPC invoked',
             'unexpected_application_differences': result['unexpected_application_differences'],
             'platform_difference_count': result['platform_difference_count'],

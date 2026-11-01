@@ -35,6 +35,15 @@ class ComparisonSafety(unittest.TestCase):
         self.assertEqual(compare(fresh, fresh, exact=True)['unexpected_application_differences'], 0)
         self.assertTrue(compare(fresh, fresh, exact=True)['intended_protections_present'])
 
+    def test_public_schema_and_default_grants_are_blocking(self):
+        source = json.loads((ROOT / 'supabase/schema/verification/fresh-catalog.json').read_text())
+        for category in ('schemas', 'default_privileges'):
+            with self.subTest(category=category):
+                fresh = copy.deepcopy(source)
+                row = next(r for r in fresh[category] if r.get('schema', r.get('name')) == 'public')
+                row['acl'] = '{}'
+                self.assertEqual(compare(source, fresh, exact=True)['unexpected_application_differences'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
