@@ -6,6 +6,7 @@ import {
 } from "../src/session-validation";
 
 const env = {
+  APP_ENV: "production",
   API_URL: "https://app.example.test",
   API_SECRET: "api-secret",
   SESSION_SECRET: "session-secret",

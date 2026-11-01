@@ -161,7 +161,7 @@ export function assertStagingTarget(rawUrl, { allowedOrigins = (process.env.STAG
   const host = url.hostname.toLowerCase().replace(/\.$/, '');
   if (url.username || url.password || !['http:', 'https:'].includes(url.protocol)) return { ok: false, reason: 'Invalid test target' };
   if (['localhost','127.0.0.1','[::1]'].includes(host)) return { ok: true, host };
-  const production = host === 'uxcommunity.in' || host.endsWith('.uxcommunity.in') || host.startsWith('uxcommunity-web.') || host.startsWith('uxcommunity-realtime.');
+  const production = host === 'eauupthwlnarkauwifmw.supabase.co' || host === 'uxcommunity.in' || host.endsWith('.uxcommunity.in') || host.startsWith('uxcommunity-web.') || host.startsWith('uxcommunity-realtime.');
   if (production || url.protocol !== 'https:' || !allowedOrigins.map(s => s.trim()).includes(url.origin)) {
     return { ok: false, host, reason: 'Test target must be local or an explicitly allowed staging origin; overrides cannot authorize production' };
   }

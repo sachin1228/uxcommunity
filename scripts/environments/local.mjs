@@ -11,7 +11,9 @@ import { startStorage } from './storage.mjs';
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const work = resolve(root, '.local/development');
 const cliVersion = (await readFile(resolve(root,'supabase/cli-version'),'utf8')).trim();
-const safeProcess = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(PG|SUPABASE_|R2_|REALTIME_|NEXT_PUBLIC_|EXPO_PUBLIC_|UPSTASH_|RESEND_|FCM_|SESSION_SECRET$|API_SECRET$|API_URL$|ADMIN_|GIPHY_|APP_ENV$|NODE_ENV$|COMPANY_VERIFICATION_|CLOUDFLARE_)/.test(k)));
+const inheritedKeys = new Set(['PATH','HOME','SHELL','LANG','LC_ALL','LC_CTYPE','TERM','TMPDIR','TMP','TEMP','USER','LOGNAME','XDG_CACHE_HOME','XDG_CONFIG_HOME','SSL_CERT_FILE','SSL_CERT_DIR','NODE_EXTRA_CA_CERTS']);
+const safeProcess = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => inheritedKeys.has(key)));
+
 const run = (command,args,options={}) => {
   const result = spawnSync(command,args,{ cwd:root, env:safeProcess(), encoding:'utf8', ...options });
   if (result.status !== 0) throw new Error(`${command} failed; local operation stopped`);

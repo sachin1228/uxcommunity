@@ -1,4 +1,4 @@
-import { assertServiceUrl } from "@uxcommunity/shared";
+import { assertServiceUrl, fetchIsolatedService } from "@uxcommunity/shared";
 import { logEvent } from "@/lib/observability/log";
 
 const REQUEST_TIMEOUT_MS = 1_200;
@@ -65,17 +65,16 @@ export async function revokeRealtimeSessions(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`${baseUrl}/revoke`, {
+      const response = await fetchIsolatedService(`${baseUrl}/revoke`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${secret}`,
         },
         body,
-        ...(process.env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
         signal: controller.signal,
         cache: "no-store",
-      });
+      }, process.env);
 
       if (response.ok) return true;
 

@@ -18,6 +18,7 @@ import test from "node:test";
 import { jwtVerify } from "jose";
 
 import {
+  validateSmokeEnvironment,
   buildSmokeToken,
   classifyMembershipProbe,
   membershipProbeUrl,
@@ -301,4 +302,15 @@ test("frame parsing ignores non-JSON and non-object frames instead of throwing",
   assert.equal(parseFrame("{not json"), null);
   assert.equal(parseFrame("null"), null);
   assert.equal(parseFrame("[1,2,3]"), null);
+});
+
+
+test("smoke session writes reject mixed environments and require production release approval", () => {
+  assert.throws(() => validateSmokeEnvironment({}, ["http://localhost"]));
+  assert.throws(() => validateSmokeEnvironment({APP_ENV:"development"}, ["https://eauupthwlnarkauwifmw.supabase.co"]));
+  assert.throws(() => validateSmokeEnvironment({APP_ENV:"staging",STAGING_ALLOWED_ORIGINS:"https://app.uxcommunity.in"}, ["https://app.uxcommunity.in"]));
+  assert.throws(() => validateSmokeEnvironment({APP_ENV:"production"}, ["https://rt.uxcommunity.in"]));
+  assert.doesNotThrow(() => validateSmokeEnvironment({APP_ENV:"development"}, ["http://localhost:3000","http://127.0.0.1:54321"]));
+  const sha="a".repeat(40);
+  assert.doesNotThrow(() => validateSmokeEnvironment({APP_ENV:"production",GITHUB_ACTIONS:"true",GITHUB_SHA:sha,APPROVED_PRODUCTION_SMOKE_SHA:sha}, ["https://rt.uxcommunity.in"]));
 });

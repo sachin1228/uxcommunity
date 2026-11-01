@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 import { assertServiceUrl, assertMediaEnvironment, assertWebEnvironment, deliveryEnabled, jobsEnabled } from '../../packages/shared/src/environment.ts';
 import { requireLocalDatabase, requireLocalPostgres } from './maintenance.mjs';
@@ -57,4 +58,31 @@ test('mobile profiles reject production aliases and keep nonproduction sessions 
   } finally {
     for(const k of Object.keys(process.env))if(!(k in saved))delete process.env[k];Object.assign(process.env,saved);
   }
+});
+
+
+test('nonproduction native identity omits production Firebase configuration and its package-specific plugin', () => {
+  const require=createRequire(import.meta.url), config=require('../../expo-app-standalone 3/app.json').expo;
+  const configure=require('../../expo-app-standalone 3/app.config.js');const prior=process.env.EXPO_PUBLIC_APP_ENV;
+  try {
+    process.env.EXPO_PUBLIC_APP_ENV='production';assert.equal(configure({config}),config);
+    for(const mode of ['development','staging']){
+      process.env.EXPO_PUBLIC_APP_ENV=mode;const result=configure({config});
+      assert.equal(result.android.googleServicesFile,undefined);assert.ok(result.android.package.endsWith(`.${mode}`));assert.ok(result.ios.bundleIdentifier.endsWith(`.${mode}`));
+      assert.ok(!result.plugins.includes('./plugins/withChatNotifications'));
+    }
+  } finally {if(prior===undefined)delete process.env.EXPO_PUBLIC_APP_ENV;else process.env.EXPO_PUBLIC_APP_ENV=prior;}
+});
+
+test('staging realtime calls its web binding instead of public or production endpoints', async () => {
+  const {fetchWebService}=await import('../../apps/realtime/src/web-service.ts');
+  const original=globalThis.fetch;let boundCalls=0;
+  globalThis.fetch=()=>{throw new Error('Public transport must not run');};
+  const env={APP_ENV:'staging',STAGING_ALLOWED_ORIGINS:'https://staging.example.invalid',WEB_SERVICE:{fetch:async()=>{boundCalls++;return new Response('bound');}}};
+  try {
+    assert.equal(await (await fetchWebService(env,'https://staging.example.invalid/api/internal/session/validate',{})).text(),'bound');
+    assert.equal(boundCalls,1);
+    await assert.rejects(()=>fetchWebService(env,'https://app.uxcommunity.in/api/internal/session/validate',{}));assert.equal(boundCalls,1);
+    assert.throws(()=>fetchWebService({...env,WEB_SERVICE:undefined},'https://staging.example.invalid',{}));
+  } finally {globalThis.fetch=original;}
 });

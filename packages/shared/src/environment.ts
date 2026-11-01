@@ -40,6 +40,17 @@ export function assertServiceUrl(value: string | undefined, env: EnvironmentValu
   return value;
 }
 
+/** Never follow a nonproduction credentialed request to another destination. */
+export async function fetchIsolatedService(input: RequestInfo | URL, init: RequestInit, env: EnvironmentValues, transport: typeof fetch = fetch): Promise<Response> {
+  const target = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  assertServiceUrl(target, env);
+  const isolated = dataEnvironment(env) !== "production";
+  // workerd supports manual/follow, but rejects the standard error redirect mode.
+  const response = await transport(input, { ...init, ...(isolated ? { redirect: "manual" } : {}) });
+  if (isolated && response.status >= 300 && response.status < 400) throw new Error("Isolated service redirect refused");
+  return response;
+}
+
 export function assertMediaEnvironment(env: EnvironmentValues): void {
   const mode = dataEnvironment(env);
   if (mode === "production") return;
@@ -82,6 +93,7 @@ export function assertWebEnvironment(env: EnvironmentValues): void {
   }
   if (mode !== "production") {
     assertMediaEnvironment(env);
+    if (env.MODERATION_IMAGE_SERVICE_URL) assertServiceUrl(env.MODERATION_IMAGE_SERVICE_URL, env);
     if (env.UPSTASH_REDIS_REST_TOKEN) assertServiceUrl(env.UPSTASH_REDIS_REST_URL, env);
     if (env.RESEND_API_KEY || env.FCM_SERVICE_ACCOUNT || env.GIPHY_API_KEY) {
       throw new Error("Nonproduction must use local/captured providers, not live provider credentials");

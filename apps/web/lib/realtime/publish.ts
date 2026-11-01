@@ -1,4 +1,4 @@
-import { assertServiceUrl } from "@uxcommunity/shared";
+import { assertServiceUrl, fetchIsolatedService } from "@uxcommunity/shared";
 import "server-only";
 import { logEvent } from "@/lib/observability/log";
 import { isRetryableStatus, retryWithBackoff } from "./publish-retry";
@@ -58,16 +58,15 @@ async function postPublish(body: unknown, eventCount: number): Promise<void> {
   try {
     const response = await retryWithBackoff(
       () =>
-        fetch(`${assertServiceUrl(REALTIME_URL, process.env)}/publish`, {
+        fetchIsolatedService(`${assertServiceUrl(REALTIME_URL, process.env)}/publish`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-realtime-publish-secret": REALTIME_PUBLISH_SECRET,
           },
           body: JSON.stringify(body),
-          ...(process.env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
           signal: AbortSignal.timeout(3000),
-        }),
+        }, process.env),
       {
         attempts: PUBLISH_RETRY_ATTEMPTS,
         baseDelayMs: PUBLISH_RETRY_BASE_MS,

@@ -1,3 +1,4 @@
+import { fetchWebService } from "./web-service";
 import type { Env } from "./env";
 import { resolveMembershipConfig } from "./membership-config";
 
@@ -22,19 +23,21 @@ export async function validateSessionWithApi(
   if (!config.configured || !config.apiUrl || !env.API_SECRET) return false;
 
   try {
-    const response = await fetch(`${config.apiUrl}/api/internal/session/validate`, {
+    const response = await fetchWebService(env, `${config.apiUrl}/api/internal/session/validate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.API_SECRET}`,
       },
       body: JSON.stringify(claims),
-      ...(env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
-          signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
+      signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
       cache: "no-store",
     });
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      if (env.APP_ENV !== "production") console.error("[session] isolated validation failed", { status: response.status });
+      return false;
+    }
 
     const body = (await response.json()) as {
       ok?: unknown;
@@ -47,7 +50,8 @@ export async function validateSessionWithApi(
       body.userId === claims.userId &&
       body.sessionVersion === claims.sv
     );
-  } catch {
+  } catch (error) {
+    if (env.APP_ENV !== "production") console.error("[session] isolated validation could not complete", error instanceof Error ? error.message : "Unknown failure");
     return false;
   }
 }

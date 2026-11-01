@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "cloudflare:build": "opennextjs-cloudflare build",
-    "preview": "npm run cloudflare:build && opennextjs-cloudflare preview",
+    "preview": "node --import tsx ../../scripts/environments/local.mjs dev",
     "deploy": "node ../../scripts/environments/release.mjs",
     "upload": "node ../../scripts/environments/release.mjs",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"

@@ -16,7 +16,10 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_APP_ENV": "staging"
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_API_URL": "https://uxcommunity-web-staging.patilsachin1228.workers.dev",
+        "EXPO_PUBLIC_REALTIME_URL": "https://uxcommunity-web-staging.patilsachin1228.workers.dev/_realtime",
+        "EXPO_PUBLIC_STAGING_ORIGIN": "https://uxcommunity-web-staging.patilsachin1228.workers.dev"
       }
     },
     "production": {

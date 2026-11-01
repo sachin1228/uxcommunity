@@ -10,9 +10,17 @@ const env=staging ? JSON.parse(await readFile(resolve(root,'.local/staging/envir
 assertWebEnvironment(env);
 if (staging && env.APP_ENV!=='staging') throw new Error('Only staging is accepted');
 const base=env.NEXT_PUBLIC_APP_URL;
+if (staging) {
+  assert.equal((await fetch(`${base}/_isolation/check`)).status,403,'Isolation diagnostics require authorization');
+  const r=await fetch(`${base}/_isolation/check`,{headers:{Authorization:`Bearer ${env.API_SECRET}`}});
+  assert.equal(r.status,200,'Live staging environment identity');const check=await r.json();
+  assert.equal(check.database,env.NEXT_PUBLIC_SUPABASE_URL);assert.equal(check.databaseStatus,200);assert.equal(check.fixtureExists,true);
+  assert.ok(Object.values(check.runtimeMatches).every(Boolean),'Staging build/runtime secrets and allowlist agree');
+}
+
 const request=async(path,init={})=>fetch(`${base}${path}`,{...init,redirect:'error',signal:AbortSignal.timeout(30000)});
 const login=await request('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:`designer@${env.APP_ENV}.invalid`,password:env.DEV_USER_PASSWORD})});
-assert.equal(login.status,200,'Local fixture login');
+assert.equal(login.status,200,`${env.APP_ENV} fixture login`);
 const cookie=login.headers.get('set-cookie')?.match(/uxcommunity_session=([^;]+)/)?.[0];
 assert.ok(cookie,'Session cookie');
 const me=await request('/api/auth/me',{headers:{Cookie:cookie}});

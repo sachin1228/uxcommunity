@@ -12,6 +12,8 @@ const ref=env.STAGING_DATABASE_REF;
 if(env.APP_ENV!=='staging' || !/^[a-z]{20}$/.test(ref ?? '') || ref==='eauupthwlnarkauwifmw' || env.NEXT_PUBLIC_SUPABASE_URL!==`https://${ref}.supabase.co`)throw new Error('Explicit independent staging project reference required');
 const action=process.argv[2];
 const cleanEnv=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('PG') && !k.startsWith('SUPABASE_')));
+if(process.env.STAGING_SUPABASE_ACCESS_TOKEN)cleanEnv.SUPABASE_ACCESS_TOKEN=process.env.STAGING_SUPABASE_ACCESS_TOKEN;
+if(process.env.CI==='true' && !cleanEnv.SUPABASE_ACCESS_TOKEN)throw new Error('A staging-scoped Supabase operator token is required in CI');
 const cliVersion=(await readFile(resolve(root,'supabase/cli-version'),'utf8')).trim();
 const run=(command,args,extra={})=>{const r=spawnSync(command,args,{cwd:root,env:{...cleanEnv,...extra},stdio:'inherit'});if(r.status!==0)throw new Error('Staging database operation failed');};
 if(action==='plan' || action==='migrate') {
