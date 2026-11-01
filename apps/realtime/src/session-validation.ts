@@ -29,7 +29,8 @@ export async function validateSessionWithApi(
         Authorization: `Bearer ${env.API_SECRET}`,
       },
       body: JSON.stringify(claims),
-      signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
+      ...(env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
+          signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
       cache: "no-store",
     });
 

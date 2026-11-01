@@ -26,14 +26,13 @@ else if(action==='deploy' || action==='provision-storage') {
     console.info('Dedicated staging buckets created. Configure public media delivery; keep private bucket public access disabled.');
   } else {
     if(process.env.CI!=='true')throw new Error('Deploy through the staging workflow; local development files are not overwritten');
-    const vars=Object.entries(manifest).map(([k,v])=>`${k}=${JSON.stringify(v)}`).join('\n')+'\n';
+    const vars=Object.entries(manifest).filter(([k])=>k.startsWith('NEXT_PUBLIC_') || k==='APP_ENV').map(([k,v])=>`${k}=${JSON.stringify(v)}`).join('\n')+'\n';
     await writeFile(resolve(root,'apps/web/.env.production.local'),vars,{mode:0o600});
-    await writeFile(resolve(root,'apps/web/.dev.vars'),vars,{mode:0o600});
-    const rt={APP_ENV:'staging',API_URL:manifest.NEXT_PUBLIC_APP_URL,API_SECRET:manifest.API_SECRET,SESSION_SECRET:manifest.SESSION_SECRET,REALTIME_PUBLISH_SECRET:manifest.REALTIME_PUBLISH_SECRET,STAGING_ALLOWED_ORIGINS:manifest.STAGING_ALLOWED_ORIGINS};
+    const rt={API_URL:manifest.NEXT_PUBLIC_APP_URL,API_SECRET:manifest.API_SECRET,SESSION_SECRET:manifest.SESSION_SECRET,REALTIME_PUBLISH_SECRET:manifest.REALTIME_PUBLISH_SECRET,STAGING_ALLOWED_ORIGINS:manifest.STAGING_ALLOWED_ORIGINS};
     run(['wrangler','deploy','--config','wrangler.staging.toml'],resolve(root,'apps/realtime'));
     run(['wrangler','secret','bulk','--config','wrangler.staging.toml'],resolve(root,'apps/realtime'),JSON.stringify(rt));
     run(['opennextjs-cloudflare','build','--config','wrangler.staging.toml'],resolve(root,'apps/web'));
     run(['opennextjs-cloudflare','deploy','--config','wrangler.staging.toml'],resolve(root,'apps/web'));
-    run(['wrangler','secret','bulk','--config','wrangler.staging.toml'],resolve(root,'apps/web'),JSON.stringify(manifest));
+    run(['wrangler','secret','bulk','--config','wrangler.staging.toml'],resolve(root,'apps/web'),JSON.stringify(Object.fromEntries(Object.entries(manifest).filter(([key])=>!['APP_ENV','NEXT_PUBLIC_APP_ENV','DEV_USER_PASSWORD','STAGING_DATABASE_REF'].includes(key)))));
   }
 } else throw new Error('Use validate, provision-storage or deploy');

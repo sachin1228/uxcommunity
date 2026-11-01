@@ -15,9 +15,12 @@
   "ADMIN_PASSWORD": "",
   "EMAIL_FROM": "UXCommunity <mail@staging.invalid>",
   "R2_ACCOUNT_ID": "",
-  "R2_ACCESS_KEY_ID": "",
+  "R2_ACCESS_KEY_ID": "staging-runtime",
   "R2_SECRET_ACCESS_KEY": "",
+  "R2_ENDPOINT": "",
   "R2_BUCKET_NAME": "uxcommunity-staging-media",
   "R2_PRIVATE_BUCKET_NAME": "uxcommunity-staging-private",
-  "R2_PUBLIC_URL": ""
+  "R2_PUBLIC_URL": "",
+  "STAGING_DATABASE_REF": "",
+  "DEV_USER_PASSWORD": ""
 }

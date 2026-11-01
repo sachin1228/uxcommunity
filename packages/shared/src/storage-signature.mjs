@@ -33,4 +33,3 @@ export function signedRequest(req, url, body, secret, accessKey = 'local-develop
   const expected = hmac(key, `AWS4-HMAC-SHA256\n${date}\n${scope}\n${hash(canonical)}`).toString('hex');
   return signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
-

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { assertServiceUrl } from "@uxcommunity/shared";
+import { assertServiceUrl, dataEnvironment } from "@uxcommunity/shared";
 import type { Database } from "@/lib/supabase/database.types";
 
 /** Service-role client typed with the generated database schema. */
@@ -34,6 +34,12 @@ export function createServiceClient() {
 
   _client = createClient<Database>(url, key, {
     auth: { persistSession: false },
+    ...(dataEnvironment(process.env) !== "production" ? {
+      global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+        assertServiceUrl(input instanceof Request ? input.url : String(input), process.env);
+        return fetch(input, { ...init, redirect: "error" });
+      } },
+    } : {}),
   });
 
   return _client;

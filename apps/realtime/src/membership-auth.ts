@@ -200,6 +200,7 @@ export class MembershipAuthorizer {
           headers: {
             Authorization: `Bearer ${env.API_SECRET}`,
           },
+          ...(env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
           signal: AbortSignal.timeout(MEMBERSHIP_API_TIMEOUT_MS),
         },
       );

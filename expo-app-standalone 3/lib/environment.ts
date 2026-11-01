@@ -13,8 +13,9 @@ export function validateMobileEnvironment(): void {
   const a = new URL(api), r = new URL(realtime);
   if (a.username || r.username || a.password || r.password) throw new Error('Invalid mobile endpoint');
   if (mode === 'production') return;
-  const hosts = [a.hostname, r.hostname];
-  if (hosts.some(h => h === 'uxcommunity.in' || h.endsWith('.uxcommunity.in') || h.startsWith('uxcommunity-web.') || h.startsWith('uxcommunity-realtime.'))) {
+  const hosts = [a.hostname, r.hostname].map(h => h.toLowerCase().replace(/\.$/, ''));
+  if (![a,r].every(u => ['http:','https:','ws:','wss:'].includes(u.protocol) && !u.hash)) throw new Error('Invalid mobile endpoint protocol');
+  if (hosts.some(h => h === 'eauupthwlnarkauwifmw.supabase.co' || h === 'uxcommunity.in' || h.endsWith('.uxcommunity.in') || h.startsWith('uxcommunity-web.') || h.startsWith('uxcommunity-realtime.'))) {
     throw new Error('Production mobile destination refused');
   }
   if (mode === 'development' && hosts.some(h => !['localhost','127.0.0.1','[::1]'].includes(h))) {

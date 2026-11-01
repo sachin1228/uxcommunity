@@ -65,6 +65,7 @@ async function postPublish(body: unknown, eventCount: number): Promise<void> {
             "x-realtime-publish-secret": REALTIME_PUBLISH_SECRET,
           },
           body: JSON.stringify(body),
+          ...(process.env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
           signal: AbortSignal.timeout(3000),
         }),
       {

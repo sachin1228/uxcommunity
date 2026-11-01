@@ -6,7 +6,7 @@ import { requireLocalDatabase, requireLocalPostgres } from './maintenance.mjs';
 test('missing data environment and production aliases fail before network access', () => {
   assert.throws(()=>assertServiceUrl('http://localhost:3000',{}));
   for(const mode of ['development','staging']) {
-    for(const url of ['https://eauupthwlnarkauwifmw.supabase.co','https://app.uxcommunity.in','https://rt.uxcommunity.in','https://media.uxcommunity.in','https://uxcommunity-web.example.workers.dev']) {
+    for(const url of ['https://eauupthwlnarkauwifmw.supabase.co','https://app.uxcommunity.in','https://app.uxcommunity.in.','https://rt.uxcommunity.in','https://media.uxcommunity.in','https://uxcommunity-web.example.workers.dev']) {
       assert.throws(()=>assertServiceUrl(url,{APP_ENV:mode,STAGING_ALLOWED_ORIGINS:url}),url);
     }
   }
@@ -27,6 +27,7 @@ test('nonproduction push/email and cron remain off even with permissive flags', 
     assert.equal(deliveryEnabled(env),false);assert.equal(jobsEnabled(env),false);
     assert.throws(()=>assertWebEnvironment({...env,NEXT_PUBLIC_APP_ENV:'production'}));
   }
+  assert.equal(deliveryEnabled({}),false);assert.equal(jobsEnabled({}),false);
   assert.equal(deliveryEnabled({APP_ENV:'production'}),true);
   assert.equal(jobsEnabled({APP_ENV:'production'}),true);
 });
@@ -35,4 +36,25 @@ test('maintenance rejects remote targets and libpq service escape hatches', () =
   assert.doesNotThrow(()=>requireLocalDatabase('http://127.0.0.1:54321'));
   for(const env of [{PGHOST:'production.invalid'},{PGHOST:'localhost',PGHOSTADDR:'1.2.3.4'},{PGHOST:'localhost',PGSERVICE:'production'},{PGHOST:'localhost',PGDATABASE:'postgresql://production/db'}])assert.throws(()=>requireLocalPostgres(env));
   assert.doesNotThrow(()=>requireLocalPostgres({PGHOST:'/tmp/local-socket',PGDATABASE:'local'}));
+});
+
+test('mobile profiles reject production aliases and keep nonproduction sessions separate', async () => {
+  const saved={...process.env};
+  try {
+    for (const [id,mode,api,rt,origin,expected] of [
+      ['local','development','http://localhost:3000','http://localhost:8787',undefined,true],
+      ['stage','staging','https://staging.example.invalid','https://staging.example.invalid/_realtime','https://staging.example.invalid',true],
+      ['dot','staging','https://app.uxcommunity.in.','https://app.uxcommunity.in./_realtime','https://app.uxcommunity.in.',false],
+      ['db','staging','https://eauupthwlnarkauwifmw.supabase.co','https://eauupthwlnarkauwifmw.supabase.co','https://eauupthwlnarkauwifmw.supabase.co',false],
+      ['remote','development','https://example.invalid','http://localhost:8787',undefined,false],
+    ]) {
+      process.env.EXPO_PUBLIC_APP_ENV=mode;process.env.EXPO_PUBLIC_API_URL=api;process.env.EXPO_PUBLIC_REALTIME_URL=rt;
+      if(origin)process.env.EXPO_PUBLIC_STAGING_ORIGIN=origin;else delete process.env.EXPO_PUBLIC_STAGING_ORIGIN;
+      const mod=await import(new URL(`../../expo-app-standalone%203/lib/environment.ts?isolation=${id}`,import.meta.url));
+      if(expected){assert.doesNotThrow(mod.validateMobileEnvironment);assert.equal(mod.mobilePushEnabled,false);assert.ok(mod.mobileEnvironmentKey('session').endsWith(`.${mode}`));}
+      else assert.throws(mod.validateMobileEnvironment);
+    }
+  } finally {
+    for(const k of Object.keys(process.env))if(!(k in saved))delete process.env[k];Object.assign(process.env,saved);
+  }
 });

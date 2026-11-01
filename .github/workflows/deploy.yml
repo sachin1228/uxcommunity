@@ -1,20 +1,8 @@
 name: Deploy to Cloudflare
 
-# Deploys the web worker (uxcommunity-web) and realtime worker
-# (uxcommunity-realtime) on every push to main. Mirrors the manual flow:
-#
-#   cd apps/web && npm run deploy
-#   cd apps/realtime && npx wrangler deploy
-#
-# Secrets are read from GitHub Actions secrets (Settings → Secrets and
-# variables → Actions). Build-time NEXT_PUBLIC_* values are written into
-# .env.production.local; the runtime values are written into .dev.vars and
-# pushed onto each Worker by the explicit "Set … secrets" steps below.
-# `wrangler deploy` never uploads .dev.vars by itself — it is a local-dev
-# file — so those steps are what make a rotated repository secret actually
-# reach production. The "Verify required secrets are set" step refuses to
-# start when a pushed name is missing, because the push reads .dev.vars
-# verbatim and an empty value would blank a live Worker secret.
+# Releases the exact approved main SHA through the protected Production environment.
+# Public build settings use dotenv; runtime/build secrets use private JSON files
+# and structured process environment. No main-push deployment or DB migration.
 on:
   workflow_dispatch:
     inputs:
@@ -55,7 +43,7 @@ jobs:
         run: |
           # Every name here is pushed onto a Worker by this workflow (the
           # "Set … secrets" steps) or read by a verify step below. The push
-          # writes .dev.vars verbatim, so a missing GitHub secret would
+          # writes .production-runtime.json verbatim, so a missing GitHub secret would
           # overwrite a working Worker secret with an empty value — it has to
           # stop the run here instead, naming the secret to add.
           for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID \
@@ -138,62 +126,41 @@ jobs:
 
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files
-        working-directory: apps/web
-        run: |
-          # Build-time env. NEXT_PUBLIC_* vars are INLINED into the client
-          # bundle by `next build`, so they must be present in the build
-          # environment — wrangler.toml [vars] only reach the worker at
-          # runtime (server-side), never the client JS. Mirror them from
-          # wrangler.toml into .env.production.local so the client bundle
-          # (app URL, realtime WebSocket URL, Supabase project URL) is built
-          # with the same values the worker gets at runtime. Supabase is
-          # reached only through the server-side service-role client, so
-          # there is no anon key to inline.
-          cat > .env.production.local <<EOF
-          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-          EOF
-          awk '/^\[vars\]/{f=1;next}/^\[/{f=0}f && /^[A-Z_]+ = /{gsub(/^ +/,""); split($0,a," = "); gsub(/"/,"",a[2]); print a[1]"="a[2]}' wrangler.toml >> .env.production.local
-
-          # Runtime secret VALUES for the web Worker, pushed by the "Set web
-          # worker secrets" step below (`wrangler` never uploads .dev.vars
-          # itself — the file is local tooling). Same values as the local
-          # apps/web/.dev.vars.
-          cat > .dev.vars <<EOF
-          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Same value the realtime Worker gets, from the same GitHub secret:
-          # the internal membership endpoint only accepts this exact secret.
-          API_SECRET=${{ secrets.API_SECRET }}
-          REALTIME_URL=${{ secrets.REALTIME_URL }}
-          REALTIME_PUBLISH_SECRET=${{ secrets.REALTIME_PUBLISH_SECRET }}
-          UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
-          GIPHY_API_KEY=${{ secrets.GIPHY_API_KEY }}
-          R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
-          R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
-          R2_PRIVATE_BUCKET_NAME=${{ secrets.R2_PRIVATE_BUCKET_NAME }}
-          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          INVITATION_EXPIRY_DAYS=${{ secrets.INVITATION_EXPIRY_DAYS || '7' }}
-          EOF
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          API_SECRET: ${{ secrets.API_SECRET }}
+          REALTIME_URL: ${{ secrets.REALTIME_URL }}
+          REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
+          API_URL: ${{ secrets.API_URL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          R2_PRIVATE_BUCKET_NAME: ${{ secrets.R2_PRIVATE_BUCKET_NAME }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          INVITATION_EXPIRY_DAYS: ${{ secrets.INVITATION_EXPIRY_DAYS }}
+        run: node scripts/environments/production-env.mjs
 
       # ── The media credential every upload route uses ────────────────────
       # Threads, showcase, events, avatars and chat attachments all write
       # through one S3-compatible client in apps/web/lib/r2.ts, built from
       # R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY — the values written into
-      # .dev.vars above and uploaded as Worker secrets below. Nothing used to
+      # .production-runtime.json above and uploaded as Worker secrets below. Nothing used to
       # ask that credential to prove it still worked: on 2026-10-09 a rejected
       # key surfaced hours later as a 500 on the first user upload, and the
       # only trace was `Unauthorized: Unauthorized` inside the AWS SDK stack.
       # This PUTs a probe object, reads it back and deletes it, so a revoked,
       # rolled or wrong-account key fails here in seconds naming the secret.
       # Passed from the repository secrets rather than read back out of
-      # .dev.vars, so it proves the value the deploy is about to push.
+      # .production-runtime.json, so it proves the value the deploy is about to push.
       - name: Verify R2 media credentials
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -221,13 +188,13 @@ jobs:
       # ── The other secrets the deploy is about to push ───────────────────
       # The R2 outage on 2026-10-09 was one credential dying unnoticed. The
       # audit that followed found the same blind spot on every other secret
-      # this workflow writes into .dev.vars: the deploy uploads them whether or
+      # this workflow writes into .production-runtime.json: the deploy uploads them whether or
       # not they are still accepted, and each failure hides in a different
       # place — Supabase 401s every API route, Resend makes password resets
       # vanish silently, Upstash turns every rate limit OFF (the limiter fails
       # open by design), GIPHY breaks GIF search. Each one now proves itself
       # with a single read-only request before the build. Passed from the
-      # repository secrets, not read back out of .dev.vars, so it proves the
+      # repository secrets, not read back out of .production-runtime.json, so it proves the
       # values this deploy is about to push.
       - name: Verify service credentials
         env:
@@ -248,10 +215,6 @@ jobs:
       # WebSocket ever connects, so messages only appear on load/focus).
       # Check the generated .env.production.local so the guard sits right
       # before next build.
-      - name: Include server configuration in the build environment
-        working-directory: apps/web
-        run: cat .dev.vars >> .env.production.local
-
       - name: Verify client build-time env vars
         working-directory: apps/web
         shell: bash
@@ -275,7 +238,7 @@ jobs:
         env:
           # 2-core GitHub runners can OOM during next build + esbuild bundling.
           NODE_OPTIONS: --max-old-space-size=4096
-        run: npx opennextjs-cloudflare build
+        run: node ../../scripts/environments/production-env.mjs build
 
       # Blocking: a type error or a failing unit test must stop the deploy.
       # `next build` already fails on type errors (next.config.js no longer
@@ -301,11 +264,11 @@ jobs:
       - name: Deploy web worker
         working-directory: apps/web
         # --keep-vars: preserve any vars/secrets set in the Cloudflare
-        # dashboard that aren't in .dev.vars (e.g. NEXT_PUBLIC_*).
+        # dashboard that aren't in .production-runtime.json (e.g. NEXT_PUBLIC_*).
         run: npx opennextjs-cloudflare deploy -- --keep-vars
 
       # ── The web Worker's secrets ──────────────────────────────────────────
-      # The values written into .dev.vars above, pushed onto uxcommunity-web.
+      # The values written into .production-runtime.json above, pushed onto uxcommunity-web.
       #
       # WHY THIS STEP EXISTS (this is load-bearing): nothing used to push the
       # web Worker's secrets at all. The workflow verified the repository R2
@@ -317,7 +280,7 @@ jobs:
       # the equivalent push for its ephemeral workers; this is the same idea
       # for the real one.
       #
-      # `wrangler secret bulk` reads the same .dev.vars, updates the Worker's
+      # `wrangler secret bulk` reads the same .production-runtime.json, updates the Worker's
       # secrets in ONE request (one new version) and never deletes names the
       # file does not mention, so secrets set by hand that are not in the
       # repository are left alone. It publishes the version it creates — the
@@ -328,10 +291,10 @@ jobs:
       # has already stopped.
       - name: Set web worker secrets
         working-directory: apps/web
-        run: npx wrangler secret bulk .dev.vars --name uxcommunity-web
+        run: npx wrangler secret bulk .production-runtime.json --name uxcommunity-web
 
       # The Firebase service-account JSON keeps its private key across
-      # multiple lines; .dev.vars is dotenv, so it is pushed straight from the
+      # multiple lines; .production-runtime.json is dotenv, so it is pushed straight from the
       # repository secret instead.
       #
       # The value travels through `env:`, NOT through `${{ }}` inside the shell
@@ -393,15 +356,11 @@ jobs:
       # missing or unreachable, or API_SECRET not matching the web app's, every
       # community socket is refused rather than silently let in. They are
       # therefore verified above and pushed here on every deploy, and API_SECRET
-      # is written into the web Worker's .dev.vars above from the same GitHub
+      # is written into the web Worker's .production-runtime.json above from the same GitHub
       # secret, so the two Workers cannot drift apart.
       - name: Set realtime worker secrets
         working-directory: apps/realtime
-        run: |
-          printf '%s' "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
-          printf '%s' "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
-          printf '%s' "${{ secrets.API_URL }}" | npx wrangler secret put API_URL
-          printf '%s' "${{ secrets.API_SECRET }}" | npx wrangler secret put API_SECRET
+        run: npx wrangler secret bulk .production-secrets.json
 
       # The smoke check chooses the origin it probes, mints the session token and
       # picks which secrets to sign with — a mistake there would fail a HEALTHY

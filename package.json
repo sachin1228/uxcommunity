@@ -16,7 +16,7 @@
     "preview": "npm run preview --workspace=apps/web",
     "cloudflare:build": "npm run cloudflare:build --workspace=apps/web",
     "deploy:web": "npm run deploy --workspace=apps/web",
-    "deploy:realtime": "wrangler deploy --config apps/realtime/wrangler.toml",
+    "deploy:realtime": "node scripts/environments/release.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "smoke:realtime": "node scripts/smoke-realtime.mjs",
     "test:smoke-realtime": "node --test scripts/smoke-realtime.test.mjs",
@@ -137,7 +137,8 @@
     "env:setup": "node --import tsx scripts/environments/local.mjs setup",
     "env:stop": "node --import tsx scripts/environments/local.mjs stop",
     "env:seed": "node --import tsx scripts/environments/seed.mjs",
-    "test:environments": "node --import tsx --test scripts/environments/*.test.mjs"
+    "test:environments": "node --import tsx --test scripts/environments/*.test.mjs",
+    "env:smoke": "node --import tsx scripts/environments/smoke.mjs"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -149,6 +150,7 @@
   "devDependencies": {
     "playwright": "^1.63.0",
     "tsx": "^4.20.6",
-    "miniflare": "5.20260811.1-alpha"
+    "miniflare": "5.20260811.1-alpha",
+    "ws": "8.21.0"
   }
 }

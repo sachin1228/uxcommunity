@@ -20,6 +20,14 @@ binding = "IMAGES"
 binding = "NEXT_INC_CACHE_R2_BUCKET"
 bucket_name = "uxcommunity-staging-next-cache"
 
+[[r2_buckets]]
+binding = "MEDIA_R2_BUCKET"
+bucket_name = "uxcommunity-staging-media"
+
+[[r2_buckets]]
+binding = "PRIVATE_R2_BUCKET"
+bucket_name = "uxcommunity-staging-private"
+
 [vars]
 APP_ENV = "staging"
 NEXT_PUBLIC_APP_ENV = "staging"

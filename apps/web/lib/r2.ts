@@ -25,6 +25,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { assertMediaEnvironment, dataEnvironment } from "@uxcommunity/shared";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { useR2Bindings, type MediaBindings } from "./r2-bindings";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
 // Attachment URL extraction lives in the shared package so the app, the
@@ -132,14 +134,16 @@ export function getR2Client(): S3Client {
     );
   }
 
-  return new S3Client({
+  const mode = dataEnvironment(process.env);
+  const client = new S3Client({
     region: "auto",
-    endpoint: dataEnvironment(process.env) === "development"
+    endpoint: mode !== "production"
       ? process.env.R2_ENDPOINT : `https://${accountId}.r2.cloudflarestorage.com`,
-    forcePathStyle: dataEnvironment(process.env) === "development",
-    ...(dataEnvironment(process.env) === "development" ? { requestChecksumCalculation: "WHEN_REQUIRED" as const } : {}),
+    forcePathStyle: mode !== "production",
+    ...(mode !== "production" ? { requestChecksumCalculation: "WHEN_REQUIRED" as const } : {}),
     credentials: { accessKeyId, secretAccessKey },
   });
+  return mode === "staging" ? useR2Bindings(client, getCloudflareContext().env as unknown as MediaBindings) : client;
 }
 
 function getBucket(): string {

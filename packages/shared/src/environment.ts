@@ -23,11 +23,12 @@ export function assertServiceUrl(value: string | undefined, env: EnvironmentValu
     throw new Error("Invalid service URL");
   }
   if (mode === "production") return value;
-  const host = url.hostname.toLowerCase();
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
   if (mode === "development") {
     if (!isLoopback(host)) throw new Error("Development services must use loopback");
     return value;
   }
+  if (url.protocol !== "https:" && url.protocol !== "wss:") throw new Error("Staging services require TLS");
   if (isLoopback(host) || host === "uxcommunity.in" || host.endsWith(".uxcommunity.in") ||
       host === "eauupthwlnarkauwifmw.supabase.co" || host.startsWith("uxcommunity-web.") ||
       host.startsWith("uxcommunity-realtime.")) {
@@ -52,18 +53,21 @@ export function assertMediaEnvironment(env: EnvironmentValues): void {
     if (env.R2_ACCESS_KEY_ID !== "local-development" || env.R2_ACCOUNT_ID !== "local") {
       throw new Error("Development storage requires local credentials");
     }
-  } else if (env.R2_ENDPOINT) {
-    throw new Error("Staging uses its own R2 account endpoint, not an override");
+  } else {
+    assertServiceUrl(env.R2_ENDPOINT, env);
+    if (env.R2_ENDPOINT !== `${env.NEXT_PUBLIC_APP_URL}/_s3` || env.R2_PUBLIC_URL !== `${env.NEXT_PUBLIC_APP_URL}/_media` || env.R2_ACCESS_KEY_ID !== "staging-runtime" || (env.R2_SECRET_ACCESS_KEY?.length ?? 0) < 32) {
+      throw new Error("Staging storage must use its own bound buckets and signing key");
+    }
   }
 }
 
 export function deliveryEnabled(env: EnvironmentValues): boolean {
   // Nonproduction delivery is deliberately not configurable by a permissive flag.
-  return dataEnvironment(env) === "production";
+  return env.APP_ENV === "production";
 }
 
 export function jobsEnabled(env: EnvironmentValues): boolean {
-  return dataEnvironment(env) === "production";
+  return env.APP_ENV === "production";
 }
 
 export function assertWebEnvironment(env: EnvironmentValues): void {

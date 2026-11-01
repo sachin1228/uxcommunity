@@ -72,6 +72,7 @@ export async function revokeRealtimeSessions(
           Authorization: `Bearer ${secret}`,
         },
         body,
+        ...(process.env.APP_ENV !== "production" ? { redirect: "error" as const } : {}),
         signal: controller.signal,
         cache: "no-store",
       });
