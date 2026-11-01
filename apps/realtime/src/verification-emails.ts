@@ -1,3 +1,4 @@
+import { jobsEnabled } from "../../../packages/shared/src/environment";
 import { logEvent } from "./log";
 import type { Env } from "./env";
 
@@ -10,6 +11,7 @@ import type { Env } from "./env";
  * send the same member the email twice.
  */
 export async function runVerificationReapplyEmails(env: Env): Promise<void> {
+  if (!jobsEnabled({ APP_ENV: env.APP_ENV })) return;
   if (!env.API_URL || !env.API_SECRET) {
     logEvent("error", { event: "realtime.verification_reapply.config_missing" });
     return;

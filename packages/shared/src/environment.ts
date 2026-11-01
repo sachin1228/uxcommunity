@@ -1,0 +1,86 @@
+/** Data environment, independent of Next's build optimization mode. */
+export type DataEnvironment = "development" | "staging" | "production";
+export type EnvironmentValues = Record<string, string | undefined>;
+
+export function dataEnvironment(env: EnvironmentValues): DataEnvironment {
+  const value = env.APP_ENV;
+  if (value !== "development" && value !== "staging" && value !== "production") {
+    throw new Error("APP_ENV must explicitly select development, staging or production");
+  }
+  return value;
+}
+
+export function isLoopback(host: string): boolean {
+  return ["localhost", "127.0.0.1", "[::1]", "::1"].includes(host.toLowerCase());
+}
+
+/** Reject production aliases and require exact, reviewed staging origins. */
+export function assertServiceUrl(value: string | undefined, env: EnvironmentValues): string {
+  const mode = dataEnvironment(env);
+  if (!value) throw new Error("Missing service URL");
+  const url = new URL(value);
+  if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.hash) {
+    throw new Error("Invalid service URL");
+  }
+  if (mode === "production") return value;
+  const host = url.hostname.toLowerCase();
+  if (mode === "development") {
+    if (!isLoopback(host)) throw new Error("Development services must use loopback");
+    return value;
+  }
+  if (isLoopback(host) || host === "uxcommunity.in" || host.endsWith(".uxcommunity.in") ||
+      host === "eauupthwlnarkauwifmw.supabase.co" || host.startsWith("uxcommunity-web.") ||
+      host.startsWith("uxcommunity-realtime.")) {
+    throw new Error("Production/local destination refused in staging");
+  }
+  const origin = url.origin.replace(/^ws/, "http");
+  const allowed = (env.STAGING_ALLOWED_ORIGINS ?? "").split(",").map(s => s.trim());
+  if (!allowed.includes(origin)) throw new Error("Service origin is not in STAGING_ALLOWED_ORIGINS");
+  return value;
+}
+
+export function assertMediaEnvironment(env: EnvironmentValues): void {
+  const mode = dataEnvironment(env);
+  if (mode === "production") return;
+  const prefix = `uxcommunity-${mode}-`;
+  if (env.R2_BUCKET_NAME !== `${prefix}media` || env.R2_PRIVATE_BUCKET_NAME !== `${prefix}private`) {
+    throw new Error("Public/private media buckets must belong to the selected environment");
+  }
+  assertServiceUrl(env.R2_PUBLIC_URL, env);
+  if (mode === "development") {
+    assertServiceUrl(env.R2_ENDPOINT, env);
+    if (env.R2_ACCESS_KEY_ID !== "local-development" || env.R2_ACCOUNT_ID !== "local") {
+      throw new Error("Development storage requires local credentials");
+    }
+  } else if (env.R2_ENDPOINT) {
+    throw new Error("Staging uses its own R2 account endpoint, not an override");
+  }
+}
+
+export function deliveryEnabled(env: EnvironmentValues): boolean {
+  // Nonproduction delivery is deliberately not configurable by a permissive flag.
+  return dataEnvironment(env) === "production";
+}
+
+export function jobsEnabled(env: EnvironmentValues): boolean {
+  return dataEnvironment(env) === "production";
+}
+
+export function assertWebEnvironment(env: EnvironmentValues): void {
+  const mode = dataEnvironment(env);
+  if (env.NODE_ENV === "development" && mode !== "development") throw new Error("Development server cannot use a remote environment");
+  if (env.NEXT_PUBLIC_APP_ENV !== mode) throw new Error("Build/runtime environment mismatch");
+  for (const key of ["NEXT_PUBLIC_APP_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_REALTIME_URL", "REALTIME_URL"]) {
+    assertServiceUrl(env[key], env);
+  }
+  for (const key of ["SESSION_SECRET", "API_SECRET", "REALTIME_PUBLISH_SECRET", "SUPABASE_SERVICE_ROLE_KEY"]) {
+    if (!env[key]) throw new Error(`Missing ${key}`);
+  }
+  if (mode !== "production") {
+    assertMediaEnvironment(env);
+    if (env.UPSTASH_REDIS_REST_TOKEN) assertServiceUrl(env.UPSTASH_REDIS_REST_URL, env);
+    if (env.RESEND_API_KEY || env.FCM_SERVICE_ACCOUNT || env.GIPHY_API_KEY) {
+      throw new Error("Nonproduction must use local/captured providers, not live provider credentials");
+    }
+  }
+}

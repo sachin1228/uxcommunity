@@ -19,6 +19,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  APP_ENV: production # Existing suites verify production behavior with dummy fixtures.
+
 jobs:
   typecheck:
     name: TypeScript

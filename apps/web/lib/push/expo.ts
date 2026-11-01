@@ -1,3 +1,4 @@
+import { deliveryEnabled } from "@uxcommunity/shared";
 /**
  * Expo Push Service client.
  *
@@ -577,6 +578,7 @@ interface DeliveryRun {
  *     transientFailures — see `closeAccounting`.
  */
 async function runDelivery(messages: ExpoPushMessage[], deps: ExpoPushDeps): Promise<DeliveryRun> {
+  if (!deliveryEnabled(process.env)) messages = [];
   const cfg = clampPushDeliveryConfig({ ...loadPushDeliveryConfig(), ...deps.config });
   const clock = deps.clock ?? (() => Date.now());
   const sleep =

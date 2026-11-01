@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { assertServiceUrl, dataEnvironment, deliveryEnabled } from "@uxcommunity/shared";
 import { appLink } from "./layout";
 import { renderEmail, type EmailBlock, type RenderedEmail } from "./document";
 import {
@@ -45,6 +46,18 @@ const getAppUrl = () => {
 const signupExpiryDays = () => Number(process.env.SIGNUP_EXPIRY_DAYS ?? 7);
 
 async function send(to: string, email: RenderedEmail): Promise<void> {
+  if (!deliveryEnabled(process.env)) {
+    if (dataEnvironment(process.env) === "development") {
+      const endpoint = assertServiceUrl(process.env.R2_ENDPOINT, process.env);
+      const response = await fetch(`${endpoint}/__mail`, {
+        method: "POST", headers: { authorization: `Bearer ${process.env.API_SECRET}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ to, ...email }), redirect: "error",
+      });
+      if (!response.ok) throw new Error("Local mailbox capture failed");
+    }
+    console.info("[email] delivery captured", { subject: email.subject });
+    return;
+  }
   // Both bodies go out on every send: `html` is what a mail client shows, and
   // `text` is what a client with HTML off, a smartwatch, or a filter scoring
   // the message reads instead.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { requireLocalDatabase } from "../../scripts/environments/maintenance.mjs";
 /**
  * k6/scripts/seed-users.js
  *
@@ -83,6 +84,7 @@ async function createSessionToken(userId, email) {
     .sign(secret);
 }
 
+requireLocalDatabase(SUPABASE_URL);
 const db = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });

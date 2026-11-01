@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { assertServiceUrl } from "@uxcommunity/shared";
 import type { Database } from "@/lib/supabase/database.types";
 
 /** Service-role client typed with the generated database schema. */
@@ -19,6 +20,7 @@ export type ServiceClient = SupabaseClient<Database>;
 let _client: ServiceClient | null = null;
 
 export function createServiceClient() {
+  assertServiceUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env);
   if (_client) return _client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

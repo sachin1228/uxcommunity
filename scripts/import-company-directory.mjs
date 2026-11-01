@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { requireLocalPostgres } from "./environments/maintenance.mjs";
 
 /**
  * Loads a generated company-directory export into the database.

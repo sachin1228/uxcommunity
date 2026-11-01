@@ -16,9 +16,14 @@ name: Deploy to Cloudflare
 # start when a pushed name is missing, because the push reads .dev.vars
 # verbatim and an empty value would blank a live Worker secret.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      approved_sha:
+        description: 'Exact main commit approved for production release'
+        required: true
+      confirmation:
+        description: 'Type DEPLOY_PRODUCTION to approve this release'
+        required: true
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -26,6 +31,8 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY_PRODUCTION' && inputs.approved_sha == github.sha
+    environment: Production
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -241,6 +248,10 @@ jobs:
       # WebSocket ever connects, so messages only appear on load/focus).
       # Check the generated .env.production.local so the guard sits right
       # before next build.
+      - name: Include server configuration in the build environment
+        working-directory: apps/web
+        run: cat .dev.vars >> .env.production.local
+
       - name: Verify client build-time env vars
         working-directory: apps/web
         shell: bash
@@ -277,6 +288,8 @@ jobs:
 
       - name: Run unit tests
         working-directory: apps/web
+        env:
+          APP_ENV: production
         run: |
           npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
           npx tsx --test lib/request-cache.test.ts

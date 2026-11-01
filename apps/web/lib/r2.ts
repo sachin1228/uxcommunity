@@ -24,6 +24,7 @@ import {
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { assertMediaEnvironment, dataEnvironment } from "@uxcommunity/shared";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
 // Attachment URL extraction lives in the shared package so the app, the
@@ -120,6 +121,7 @@ export async function sendR2Command<T>(run: () => Promise<T>): Promise<T> {
 }
 
 export function getR2Client(): S3Client {
+  assertMediaEnvironment(process.env);
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
@@ -132,7 +134,10 @@ export function getR2Client(): S3Client {
 
   return new S3Client({
     region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint: dataEnvironment(process.env) === "development"
+      ? process.env.R2_ENDPOINT : `https://${accountId}.r2.cloudflarestorage.com`,
+    forcePathStyle: dataEnvironment(process.env) === "development",
+    ...(dataEnvironment(process.env) === "development" ? { requestChecksumCalculation: "WHEN_REQUIRED" as const } : {}),
     credentials: { accessKeyId, secretAccessKey },
   });
 }

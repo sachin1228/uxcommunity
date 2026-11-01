@@ -1,3 +1,4 @@
+import { requireLocalDatabase } from "../../scripts/environments/maintenance.mjs";
 /**
  * Live regression test for the "I'm going" RSVP revert bug.
  *
@@ -45,6 +46,7 @@ if (!SB_URL || !SB_KEY) {
   console.error("FAIL: Supabase env missing");
   process.exit(1);
 }
+requireLocalDatabase(SB_URL);
 const db = createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
 
 // A k6 seed user (see k6/README.md). Email and password are resolved from the

@@ -1,4 +1,6 @@
 export interface Env {
+  APP_ENV?: string;
+  STAGING_ALLOWED_ORIGINS?: string;
   /** Community-scoped Durable Objects (chat:${communityId}, etc.) */
   COMMUNITY_DO: DurableObjectNamespace;
   /** User-scoped Durable Objects (user:${userId}) */

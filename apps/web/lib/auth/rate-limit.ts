@@ -1,3 +1,4 @@
+import { dataEnvironment, assertServiceUrl } from "@uxcommunity/shared";
 /**
  * Redis-backed sliding-window rate limiter using Upstash.
  *
@@ -55,11 +56,28 @@ export interface RateLimitResult {
  * @param limit    Max requests allowed in the window.
  * @param windowS  Window duration in seconds.
  */
+const localWindows = new Map<string, { count: number; resetAt: number }>();
+
 export async function rateLimit(
   key: string,
   limit: number,
   windowS: number,
 ): Promise<RateLimitResult> {
+  const mode = dataEnvironment(process.env);
+  if (mode !== "production" && !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const now = Date.now();
+    for (const [k, v] of localWindows) if (v.resetAt <= now) localWindows.delete(k);
+    const identity = `${key}:${limit}:${windowS}`;
+    const window = localWindows.get(identity) ?? { count: 0, resetAt: now + windowS * 1000 };
+    if (localWindows.size >= 10000 && !localWindows.has(identity)) {
+      return { success: false, remaining: 0, resetAt: now + windowS * 1000 };
+    }
+    window.count++;
+    localWindows.set(identity, window);
+    return { success: window.count <= limit, remaining: Math.max(0, limit - window.count), resetAt: window.resetAt };
+  }
+  if (mode !== "production") assertServiceUrl(process.env.UPSTASH_REDIS_REST_URL, process.env);
+  key = mode === "production" ? key : `${mode}:${key}`;
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     return {
       success: true,

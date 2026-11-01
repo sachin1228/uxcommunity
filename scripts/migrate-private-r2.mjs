@@ -28,6 +28,7 @@
  * R2_PRIVATE_BUCKET_NAME.
  */
 
+import { requireLocalDatabase, requireLocalStorage } from "./environments/maintenance.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -89,13 +90,15 @@ function required(values, name) {
 }
 
 function makeClients(values) {
-  const endpoint = `https://${required(values, "R2_ACCOUNT_ID")}.r2.cloudflarestorage.com`;
+  requireLocalDatabase(values.NEXT_PUBLIC_SUPABASE_URL);
+  requireLocalStorage(values);
+  const endpoint = values.R2_ENDPOINT;
   const credentials = {
     accessKeyId: required(values, "R2_ACCESS_KEY_ID"),
     secretAccessKey: required(values, "R2_SECRET_ACCESS_KEY"),
   };
   return {
-    s3: new S3Client({ region: "auto", endpoint, credentials }),
+    s3: new S3Client({ region: "auto", endpoint, forcePathStyle: true, credentials }),
     publicBucket: required(values, "R2_BUCKET_NAME"),
     // Only apply/purge need the private bucket; a read-only plan can run
     // before the bucket exists.

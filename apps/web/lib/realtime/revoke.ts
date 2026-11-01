@@ -1,3 +1,4 @@
+import { assertServiceUrl } from "@uxcommunity/shared";
 import { logEvent } from "@/lib/observability/log";
 
 const REQUEST_TIMEOUT_MS = 1_200;
@@ -45,6 +46,7 @@ export async function revokeRealtimeSessions(
   if (!revocation.userId) return true;
 
   const baseUrl = realtimeUrl();
+  if (baseUrl) assertServiceUrl(baseUrl, process.env);
   const secret = process.env.REALTIME_PUBLISH_SECRET;
   if (!baseUrl || !secret) {
     // Realtime may be undeployed in local development. The session row is still

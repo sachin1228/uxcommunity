@@ -1,0 +1,6 @@
+{
+  "cities": [{ "name": "Development City" }],
+  "design_sectors": [{ "name": "Development Design" }],
+  "experience_levels": [],
+  "job_titles": [{ "slug": "development_designer", "name": "Development Designer" }]
+}

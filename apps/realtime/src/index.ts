@@ -1,3 +1,4 @@
+import { assertServiceUrl, jobsEnabled } from "../../../packages/shared/src/environment";
 import { jwtVerify } from "jose";
 import type { Env } from "./env";
 import {
@@ -122,6 +123,7 @@ export default {
    *     app owns the clocks, the ledgers and the push.
    */
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    if (!jobsEnabled({ APP_ENV: env.APP_ENV })) return;
     if (controller.cron === RETENTION_SWEEP_CRON) {
       await runRetentionSweep(env);
       return;
@@ -146,6 +148,7 @@ export default {
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    assertServiceUrl(env.API_URL, { APP_ENV: env.APP_ENV, STAGING_ALLOWED_ORIGINS: env.STAGING_ALLOWED_ORIGINS });
     const url = new URL(request.url);
 
     if (url.pathname === "/ws") {

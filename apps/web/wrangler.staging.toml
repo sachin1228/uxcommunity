@@ -1,0 +1,28 @@
+name = "uxcommunity-web-staging"
+main = "staging-worker.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = true
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "uxcommunity-web-staging"
+
+[[services]]
+binding = "REALTIME_SERVICE"
+service = "uxcommunity-realtime-staging"
+
+[images]
+binding = "IMAGES"
+
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "uxcommunity-staging-next-cache"
+
+[vars]
+APP_ENV = "staging"
+NEXT_PUBLIC_APP_ENV = "staging"
+
+[triggers]
+crons = []

@@ -69,6 +69,8 @@ bucket_name = "uxcommunity-web-next-cache"
 # deletes secrets it does not mention: a hand-set secret whose name is not in
 # the repository survives deploys.
 [vars]
+APP_ENV = "production"
+NEXT_PUBLIC_APP_ENV = "production"
 NEXT_PUBLIC_APP_URL = "https://app.uxcommunity.in"
 # Only the project URL is public now: the app reaches Supabase exclusively
 # through the server-side service-role client, so it never ships an anon key.

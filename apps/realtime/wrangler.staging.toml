@@ -8,6 +8,7 @@ workers_dev = true
 bindings = [
   { name = "COMMUNITY_DO", class_name = "Room" },
   { name = "USER_DO", class_name = "UserDO" },
+  { name = "ALERT_MONITOR", class_name = "AlertMonitor" },
 ]
 
 [[migrations]]
@@ -21,3 +22,13 @@ new_sqlite_classes = ["UserDO"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = []
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["AlertMonitor"]
+
+[vars]
+APP_ENV = "staging"
+
+[triggers]
+crons = []

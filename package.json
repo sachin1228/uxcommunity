@@ -9,7 +9,7 @@
     "postinstall": "node scripts/extract-emoji.mjs",
     "prebuild": "node scripts/extract-emoji.mjs",
     "emoji:update": "node scripts/update-emoji.mjs",
-    "dev": "npm run dev --workspace=apps/web",
+    "dev": "node --import tsx scripts/environments/local.mjs dev",
     "dev:realtime": "npm run dev --workspace=apps/realtime",
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
@@ -133,7 +133,11 @@
     "db:stop": "bash scripts/db/cli.sh stop",
     "db:new": "bash scripts/db/cli.sh migration new",
     "test:db": "python3 scripts/db/test_fresh.py",
-    "db:init": "python3 scripts/db/initialize.py"
+    "db:init": "python3 scripts/db/initialize.py",
+    "env:setup": "node --import tsx scripts/environments/local.mjs setup",
+    "env:stop": "node --import tsx scripts/environments/local.mjs stop",
+    "env:seed": "node --import tsx scripts/environments/seed.mjs",
+    "test:environments": "node --import tsx --test scripts/environments/*.test.mjs"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -144,6 +148,7 @@
   },
   "devDependencies": {
     "playwright": "^1.63.0",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "miniflare": "5.20260811.1-alpha"
   }
 }

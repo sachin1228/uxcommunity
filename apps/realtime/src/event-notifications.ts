@@ -1,3 +1,4 @@
+import { jobsEnabled } from "../../../packages/shared/src/environment";
 import { logEvent } from "./log";
 import type { Env } from "./env";
 
@@ -20,6 +21,7 @@ import type { Env } from "./env";
  * minutes) means the next tick can still deliver what this one missed.
  */
 export async function runEventLifecycleNotifications(env: Env): Promise<void> {
+  if (!jobsEnabled({ APP_ENV: env.APP_ENV })) return;
   if (!env.API_URL || !env.API_SECRET) {
     logEvent("error", { event: "realtime.event_lifecycle.config_missing" });
     return;
