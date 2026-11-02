@@ -143,12 +143,13 @@ existing bucket or change public-access settings automatically.
 
 After authenticated resource review, create a GitHub `staging` environment with
 `STAGING_CONFIGURATION` (the completed manifest JSON),
-`CLOUDFLARE_STAGING_API_TOKEN` and `CLOUDFLARE_STAGING_ACCOUNT_ID`. Every merge
-to `main` deploys staging automatically through **Deploy isolated staging**,
-which remains manually dispatchable for re-runs. It validates the manifest, tests
-isolation and targets only staging configurations. Database migrations stay
-manual on staging (`staging-db.mjs migrate`) so they can be applied separately
-from the code deploy. Existing DO migration tags
+`CLOUDFLARE_STAGING_API_TOKEN`, `CLOUDFLARE_STAGING_ACCOUNT_ID`,
+`STAGING_DATABASE_PASSWORD` and `STAGING_SUPABASE_ACCESS_TOKEN`. Every merge to
+`main` plans and applies pending migrations, then deploys staging automatically
+through **Deploy isolated staging**, which remains manually dispatchable for
+re-runs. The migration wrapper refuses the production project; it can only touch
+the independent staging database. It validates the manifest, tests
+isolation and targets only staging configurations. Existing DO migration tags
 are preserved; the staging monitor class uses its own v4 migration. Inspect live
 namespace IDs and existing migration state before the first deployment.
 
