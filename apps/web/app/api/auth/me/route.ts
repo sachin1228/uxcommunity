@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import {
-  getVerificationGraceDays,
+  getNewAccountGraceDays,
   isVerificationBannerVisible,
 } from "@/lib/verification/settings";
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       .select("id, avatar_url")
       .eq("user_id", user.id)
       .maybeSingle(),
-    getVerificationGraceDays(),
+    getNewAccountGraceDays(),
   ]);
 
   const verificationStatus =

@@ -58,6 +58,47 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
+function GraceField({
+  id,
+  label,
+  value,
+  status,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  status: "saving" | "saved" | null;
+  disabled: boolean;
+  onChange: (days: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <label htmlFor={id} className="font-body text-xs text-foreground-muted">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        disabled={disabled}
+        className="field h-8 w-32 px-2 font-body text-xs text-foreground disabled:opacity-60"
+      >
+        <option value={0}>Immediately</option>
+        {Array.from({ length: 30 }, (_, index) => index + 1).map((days) => (
+          <option key={days} value={days}>
+            {days} {days === 1 ? "day" : "days"}
+          </option>
+        ))}
+      </select>
+      <span className="w-12 font-body text-[11px] text-foreground-subtle">
+        {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : ""}
+      </span>
+    </div>
+  );
+}
+
 export default function AdminVerificationsPage() {
   const [status, setStatus] = useState<Status | "all">("pending");
   const [page, setPage] = useState(1);
@@ -70,8 +111,9 @@ export default function AdminVerificationsPage() {
   const [reason, setReason] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [graceDays, setGraceDays] = useState(0);
-  const [graceSaving, setGraceSaving] = useState(false);
-  const [graceSaved, setGraceSaved] = useState(false);
+  const [newAccountGraceDays, setNewAccountGraceDays] = useState(0);
+  const [graceSaving, setGraceSaving] = useState<"legacy" | "new" | null>(null);
+  const [graceSaved, setGraceSaved] = useState<"legacy" | "new" | null>(null);
   const [graceError, setGraceError] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
@@ -104,7 +146,10 @@ export default function AdminVerificationsPage() {
       try {
         const res = await fetch("/api/admin/verification-settings");
         const body = await res.json();
-        if (active && res.ok) setGraceDays(body.graceDays ?? 0);
+        if (active && res.ok) {
+          setGraceDays(body.graceDays ?? 0);
+          setNewAccountGraceDays(body.newAccountGraceDays ?? 0);
+        }
       } catch {
         // A failed read leaves the current default; saving still works.
       }
@@ -114,24 +159,25 @@ export default function AdminVerificationsPage() {
     };
   }, []);
 
-  async function updateGrace(days: number) {
-    setGraceSaving(true);
-    setGraceSaved(false);
+  async function updateGrace(scope: "legacy" | "new", days: number) {
+    setGraceSaving(scope);
+    setGraceSaved(null);
     setGraceError(null);
     try {
       const res = await fetch("/api/admin/verification-settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days }),
+        body: JSON.stringify({ scope, days }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Failed to save the setting.");
-      setGraceDays(days);
-      setGraceSaved(true);
+      if (scope === "legacy") setGraceDays(days);
+      else setNewAccountGraceDays(days);
+      setGraceSaved(scope);
     } catch (saveError) {
       setGraceError(saveError instanceof Error ? saveError.message : "Failed to save the setting.");
     } finally {
-      setGraceSaving(false);
+      setGraceSaving(null);
     }
   }
 
@@ -166,31 +212,28 @@ export default function AdminVerificationsPage() {
           <p className="mt-1 max-w-xl font-body text-[11px] leading-4 text-foreground-subtle">
             New accounts can write for the grace period below, then become read-only apart from
             browsing, likes, reporting and account/verification actions until an admin approves
-            them. 0 days applies the read-only gate immediately.
+            them. 0 days applies the read-only gate immediately. Legacy grace is kept for older
+            clients and no longer gates writes.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="grace-days" className="font-body text-xs text-foreground-muted">
-            New-account grace
-          </label>
-          <select
-            id="grace-days"
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <GraceField
+            id="legacy-grace-days"
+            label="Legacy grace"
             value={graceDays}
-            onChange={(event) => void updateGrace(Number(event.target.value))}
-            disabled={graceSaving}
-            className="field h-8 w-32 px-2 font-body text-xs text-foreground disabled:opacity-60"
-          >
-            <option value={0}>Immediately</option>
-            {Array.from({ length: 30 }, (_, index) => index + 1).map((days) => (
-              <option key={days} value={days}>
-                {days} {days === 1 ? "day" : "days"}
-              </option>
-            ))}
-          </select>
-          <span className="w-12 font-body text-[11px] text-foreground-subtle">
-            {graceSaving ? "Saving…" : graceSaved ? "Saved" : ""}
-          </span>
+            status={graceSaving === "legacy" ? "saving" : graceSaved === "legacy" ? "saved" : null}
+            disabled={graceSaving !== null}
+            onChange={(days) => void updateGrace("legacy", days)}
+          />
+          <GraceField
+            id="new-account-grace-days"
+            label="New-account grace"
+            value={newAccountGraceDays}
+            status={graceSaving === "new" ? "saving" : graceSaved === "new" ? "saved" : null}
+            disabled={graceSaving !== null}
+            onChange={(days) => void updateGrace("new", days)}
+          />
         </div>
       </div>
 

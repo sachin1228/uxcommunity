@@ -17,7 +17,7 @@ created by initialization.
 | `dms_monthly` | 5 / `month` | Same messages module, `dms_monthly`; baseline `get_or_create_dm_conversation`, `bump_usage_counter` |
 | `communities_total` | 5 / `total` | Same messages module, `communities_total`; baseline `enforce_community_creation_limit` (live owned communities) |
 | `community_joins` | 10 / `standing` | Same messages module; `apps/web/lib/communities/join-slots.ts` `JOIN_LIMIT`; baseline `enforce_membership_cap` (live memberships) |
-| `verification_settings` | `id=true`, `grace_days=0` | `apps/web/lib/verification/policy.ts` `DEFAULT_VERIFICATION_GRACE_DAYS`; `settings.ts` and admin verification-settings route use the singleton. The window runs from `users.created_at`; 0 applies the read-only gate immediately. |
+| `verification_settings` | `id=true`, `grace_days=0`, `new_account_grace_days=0` | `apps/web/lib/verification/policy.ts` `DEFAULT_VERIFICATION_GRACE_DAYS`; `settings.ts` and admin verification-settings route use the singleton. `new_account_grace_days` runs from `users.created_at` and 0 applies the read-only gate immediately; `grace_days` stays the legacy admin value. |
 
 These values come from current consumers and live function definitions, not old
 seed records. `creation-usage.ts` requires all six budget kinds. SQL checks require

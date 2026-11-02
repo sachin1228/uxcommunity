@@ -47,10 +47,10 @@ export function isVerificationBannerVisible(input: {
 /**
  * Should writes be refused for this member right now?
  *
- * Policy A still requires approval, but the admin-set grace window runs from
- * signup: a non-approved account may write until `created_at + graceDays`.
- * An unknown status, a zero-day window, or an unreadable signup date applies
- * the gate at once.
+ * Policy A still requires approval, but the admin-set new-account grace window
+ * runs from signup: a non-approved account may write until
+ * `created_at + graceDays`. An unknown status, a zero-day window, or an
+ * unreadable signup date applies the gate at once.
  */
 export function isVerificationRestricted(input: {
   status: string | null | undefined;

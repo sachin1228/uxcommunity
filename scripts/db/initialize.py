@@ -28,8 +28,10 @@ def load_inputs(config, catalogs, include_levels=False):
         if set(row) != {'kind', 'limit_count', 'period'} or type(row['limit_count']) is not int or not 0 < row['limit_count'] < 2147483648 or row['period'] != PERIODS[row['kind']]:
             raise ValueError('Invalid creation budget: ' + str(row))
     setting = config['verification_settings']
-    if not isinstance(setting, dict) or set(setting) != {'id', 'grace_days'} or setting['id'] is not True or type(setting['grace_days']) is not int or not 0 <= setting['grace_days'] <= 30:
-        raise ValueError('Verification setting requires id=true and grace_days between 0 and 30')
+    if not isinstance(setting, dict) or set(setting) != {'id', 'grace_days', 'new_account_grace_days'}:
+        raise ValueError('Verification setting requires id=true, grace_days and new_account_grace_days')
+    if setting['id'] is not True or any(type(setting[key]) is not int or not 0 <= setting[key] <= 30 for key in ('grace_days', 'new_account_grace_days')):
+        raise ValueError('Verification grace days must be between 0 and 30')
     if not isinstance(catalogs, dict) or set(catalogs) != set(CATALOGS) or not all(isinstance(rows, list) for rows in catalogs.values()):
         raise ValueError('Catalog input must contain cities, design_sectors, experience_levels, job_titles')
     catalogs = {key: list(rows) for key, rows in catalogs.items()}
@@ -57,7 +59,7 @@ def initialization_sql(inputs):
     # All identifiers/types below are fixed. JSON is a SQL string literal with
     # quotes escaped; standard_conforming_strings prevents backslash escapes.
     groups = [('creation_limits', ('kind', 'limit_count', 'period'), 'kind', 'text,integer,text'),
-              ('verification_settings', ('id', 'grace_days'), 'id', 'boolean,integer')]
+              ('verification_settings', ('id', 'grace_days', 'new_account_grace_days'), 'id', 'boolean,integer,integer')]
     groups += [(t, ('slug', 'name') if t in ('experience_levels', 'job_titles') else ('name',),
                 'slug' if t in ('experience_levels', 'job_titles') else 'name',
                 'text,text' if t in ('experience_levels', 'job_titles') else 'text') for t in CATALOGS]

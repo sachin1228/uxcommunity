@@ -343,19 +343,19 @@ async function assertUserState(
   options?: { allowUnverified?: boolean },
 ): Promise<void> {
   // Product policy: approval unlocks writes, with an admin-set grace window
-  // measured from signup (verification_settings.grace_days). Once the window
-  // closes, the account is read-only apart from the explicitly-opted-in
-  // actions (browsing, likes, reporting, account and verification management,
-  // account deletion).
+  // measured from signup (verification_settings.new_account_grace_days). Once
+  // the window closes, the account is read-only apart from the explicitly-
+  // opted-in actions (browsing, likes, reporting, account and verification
+  // management, account deletion). The legacy grace value is not consulted.
   if (state.verification_status === "approved" || options?.allowUnverified) {
     return;
   }
 
   // Lazy import keeps this module edge-compatible.
-  const { getVerificationGraceDays, isVerificationRestricted } = await import(
+  const { getNewAccountGraceDays, isVerificationRestricted } = await import(
     "@/lib/verification/settings"
   );
-  const graceDays = await getVerificationGraceDays();
+  const graceDays = await getNewAccountGraceDays();
   if (
     isVerificationRestricted({
       status: state.verification_status,
