@@ -17,8 +17,8 @@ else if(action==='deploy' || action==='provision-storage') {
   if(!token || !account)throw new Error('Explicit staging deployment credentials required; production credentials are never a fallback');
   if(account!==manifest.R2_ACCOUNT_ID)throw new Error('Staging media and deployment account mismatch');
   const env={...Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^(PG|SUPABASE_|R2_|REALTIME_|NEXT_PUBLIC_|EXPO_PUBLIC_|UPSTASH_|RESEND_|FCM_|SESSION_SECRET$|API_SECRET$|API_URL$|ADMIN_|GIPHY_|APP_ENV$|CLOUDFLARE_)/.test(k))),...manifest,CLOUDFLARE_API_TOKEN:token,CLOUDFLARE_ACCOUNT_ID:account};
-  const run=(args,cwd=root,input)=>{
-    const r=spawnSync('npx',args,{cwd,env,stdio:input ? ['pipe','inherit','inherit']:'inherit',input});
+  const run=(args,cwd=root,input,extraEnv={})=>{
+    const r=spawnSync('npx',args,{cwd,env:{...env,...extraEnv},stdio:input ? ['pipe','inherit','inherit']:'inherit',input});
     if(r.status!==0)throw new Error('Staging command failed; deployment stopped');
   };
   if(action==='provision-storage') {
@@ -32,7 +32,11 @@ else if(action==='deploy' || action==='provision-storage') {
     run(['wrangler','deploy','--config','wrangler.staging.toml'],resolve(root,'apps/realtime'));
     run(['wrangler','secret','bulk','--config','wrangler.staging.toml'],resolve(root,'apps/realtime'),JSON.stringify(rt));
     run(['opennextjs-cloudflare','build','--config','wrangler.staging.toml'],resolve(root,'apps/web'));
-    run(['opennextjs-cloudflare','deploy','--config','wrangler.staging.toml'],resolve(root,'apps/web'));
+    // The staging token is scoped to specific Workers and the cache bucket.
+    // OpenNext's deploy also populates the incremental cache through a temporary
+    // worker that this token cannot run. Deploy the built Worker directly; the
+    // cache bucket is already provisioned and stays bound at runtime.
+    run(['wrangler','deploy','--config','wrangler.staging.toml'],resolve(root,'apps/web'),undefined,{OPEN_NEXT_DEPLOY:'true'});
     run(['wrangler','secret','bulk','--config','wrangler.staging.toml'],resolve(root,'apps/web'),JSON.stringify(Object.fromEntries(Object.entries(manifest).filter(([key])=>!['APP_ENV','NEXT_PUBLIC_APP_ENV','DEV_USER_PASSWORD','STAGING_DATABASE_REF'].includes(key)))));
   }
 } else throw new Error('Use validate, provision-storage or deploy');
