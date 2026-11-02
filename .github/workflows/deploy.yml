@@ -283,6 +283,8 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
+          # A secret pasted from a CLI can carry a trailing newline.
+          SUPABASE_DB_URL=$(printf '%s' "$SUPABASE_DB_URL" | tr -d '\r\n')
           cli_version=$(tr -d '[:space:]' < supabase/cli-version)
           supabase() { npx --yes "supabase@${cli_version}" "$@"; }
 
