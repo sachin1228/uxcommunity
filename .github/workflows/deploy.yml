@@ -409,4 +409,7 @@ jobs:
         run: |
           origin=$(awk -F'"' '/^NEXT_PUBLIC_REALTIME_URL/{print $2}' apps/web/wrangler.toml)
           supabase_url=$(awk -F'"' '/^NEXT_PUBLIC_SUPABASE_URL/{print $2}' apps/web/wrangler.toml)
-          SUPABASE_URL="$supabase_url" node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}"
+          # The Worker version and its Durable Objects can still be propagating
+          # immediately after deploy; give them a moment before the smoke.
+          sleep 15
+          SUPABASE_URL="$supabase_url" node scripts/smoke-realtime.mjs --url "${origin:-$REALTIME_URL}" --attempts 4
