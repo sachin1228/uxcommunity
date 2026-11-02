@@ -83,9 +83,9 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { logout, user } = useAuth();
-  // The verification option appears with the banner. Policy A makes every
-  // non-approved account read-only from signup; approved accounts have nothing
-  // to do here.
+  // The verification option appears with the banner. The server opens the
+  // read-only gate after the admin-set signup grace window closes; approved
+  // accounts have nothing to do here.
   const rows = ROWS.filter(
     (row) => row.href !== '/settings/verification' || user?.verificationBannerVisible === true,
   );

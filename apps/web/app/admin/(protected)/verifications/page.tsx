@@ -164,15 +164,15 @@ export default function AdminVerificationsPage() {
             {total} {total === 1 ? "request" : "requests"} in this view
           </p>
           <p className="mt-1 max-w-xl font-body text-[11px] leading-4 text-foreground-subtle">
-            Policy A applies from signup: unverified accounts are read-only apart from browsing, likes,
-            reporting and account/verification actions. Legacy grace is retained for older clients and
-            no longer gates writes.
+            New accounts can write for the grace period below, then become read-only apart from
+            browsing, likes, reporting and account/verification actions until an admin approves
+            them. 0 days applies the read-only gate immediately.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <label htmlFor="grace-days" className="font-body text-xs text-foreground-muted">
-            Legacy grace
+            New-account grace
           </label>
           <select
             id="grace-days"
