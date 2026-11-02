@@ -52,8 +52,7 @@ jobs:
           # secret with an empty value — it has to stop the run here instead,
           # naming the secret to add.
           for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID \
-            SESSION_SECRET SUPABASE_SERVICE_ROLE_KEY \
-            SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF \
+            SESSION_SECRET SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_URL \
             REALTIME_URL REALTIME_PUBLISH_SECRET \
             API_URL API_SECRET \
             UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN \
@@ -71,9 +70,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           REALTIME_URL: ${{ secrets.REALTIME_URL }}
           REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
           API_URL: ${{ secrets.API_URL }}
@@ -280,23 +277,26 @@ jobs:
       # previously deployed Worker keeps working if this run is rolled back.
       - name: Apply pending database migrations
         shell: bash
+        # SUPABASE_DB_URL is the project's session-pooler Postgres URI, which is
+        # IPv4-safe on GitHub runners. The value is masked and never logged.
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           cli_version=$(tr -d '[:space:]' < supabase/cli-version)
           supabase() { npx --yes "supabase@${cli_version}" "$@"; }
 
-          supabase db push --project-ref "$SUPABASE_PROJECT_REF" --skip-vault --dry-run \
-            | tee /tmp/pending-migrations.txt
+          if ! supabase db push --db-url "$SUPABASE_DB_URL" --skip-vault --dry-run \
+            | tee /tmp/pending-migrations.txt; then
+            echo "::error::The migration dry run failed. If it reports remote versions missing from the local directory, production still needs the one-time baseline ledger adoption (docs/database-baseline.md step 5)."
+            exit 1
+          fi
           if grep -q '20261031163000' /tmp/pending-migrations.txt; then
             echo "::error::Production still needs the one-time baseline ledger adoption (docs/database-baseline.md step 5). Refusing to replay the baseline."
             exit 1
           fi
 
-          supabase db push --project-ref "$SUPABASE_PROJECT_REF" --skip-vault --yes
+          supabase db push --db-url "$SUPABASE_DB_URL" --skip-vault --yes
 
       - name: Deploy web worker
         working-directory: apps/web

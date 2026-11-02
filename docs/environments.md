@@ -208,17 +208,16 @@ secret updates use JSON bulk operations. This preserves quote, dollar and
 backslash characters. Deployment remains an explicitly approved operation.
 
 Production deploys apply pending reviewed migrations before the Workers are
-released. The release workflow authenticates with Production-environment
-`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` and `SUPABASE_PROJECT_REF` (add
-all three to that environment's secrets), runs the pinned CLI's `db push
---dry-run` first, refuses to continue while the baseline is still pending, then
-applies with `db push --yes`. Staging stays a
-manual step through `staging-db.mjs`; the local migration wrapper rejects remote
-operations. The one-time baseline ledger adoption and the protection DDL still
-require the separate explicit approval and backup procedure in
-[database adoption review](database-adoption-review.md); the workflow never
-repairs or replays the ledger. Never apply the fresh baseline, a local reset,
-fixture seed, or D1 migration to existing production.
+released. The release workflow authenticates with one Production-environment
+`SUPABASE_DB_URL` secret (the project's session-pooler Postgres URI), runs the
+pinned CLI's `db push --dry-run` first, refuses to continue while the baseline
+or unknown remote history is still pending, then applies with `db push --yes`.
+Staging stays a manual step through `staging-db.mjs`; the local migration
+wrapper rejects remote operations. The one-time baseline ledger adoption and the
+protection DDL still require the separate explicit approval and backup
+procedure in [database adoption review](database-adoption-review.md); the
+workflow never repairs or replays the ledger. Never apply the fresh baseline, a
+local reset, fixture seed, or D1 migration to existing production.
 
 Migrations that ship through the deploy must be additive and backward compatible
 (expand/contract): the previously deployed Worker can keep serving while the
