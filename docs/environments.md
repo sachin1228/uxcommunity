@@ -53,6 +53,11 @@ existing content. Cleanup/reset is never automatic. Local migration tooling
 refuses remote links, DB URLs, push/repair operations and resets without an
 explicit local flag. Disposable schema verification remains `npm run test:db`.
 
+After pulling new migration files, apply the pending versions to the running
+stack with `npm run db:migrate:local`. It reads the loopback stack from
+`.local/development`, syncs the active migration files, and pushes with the
+pinned CLI; a non-development manifest or non-loopback database URL is refused.
+
 ### Storage, mail and notifications
 
 Media uses dedicated local public/private R2 buckets through a loopback S3
