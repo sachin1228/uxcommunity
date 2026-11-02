@@ -14,7 +14,7 @@ import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
 import { secureEqual } from "@/lib/auth/secure-compare";
 import { isSignupIncomplete } from "@/lib/auth/signup-status";
 import {
-  getVerificationGraceDays,
+  getNewAccountGraceDays,
   isVerificationBannerVisible,
 } from "@/lib/verification/settings";
 
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
     sv: issued.sessionVersion,
   });
 
-  const graceDays = await getVerificationGraceDays();
+  const graceDays = await getNewAccountGraceDays();
   const verificationBannerVisible = isVerificationBannerVisible({
     status: row.verification_status,
     createdAt: row.created_at,

@@ -1,5 +1,9 @@
 # Production adoption safety review — no production operations performed
 
+**Status (2026-11-03):** the production adoption reviewed here was completed.
+The prohibitions below applied to the pre-adoption period; later migrations run
+through the release workflow in [Deployment](DEPLOYMENT.md).
+
 Reviewed `docs/database-baseline.md` against the current baseline and pinned CLI.
 The baseline file remains unchanged. No production SQL, connection with write
 permissions, ledger read/repair, deployment or production adoption occurred.

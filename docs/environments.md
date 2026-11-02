@@ -53,6 +53,11 @@ existing content. Cleanup/reset is never automatic. Local migration tooling
 refuses remote links, DB URLs, push/repair operations and resets without an
 explicit local flag. Disposable schema verification remains `npm run test:db`.
 
+After pulling new migration files, apply the pending versions to the running
+stack with `npm run db:migrate:local`. It reads the loopback stack from
+`.local/development`, syncs the active migration files, and pushes with the
+pinned CLI; a non-development manifest or non-loopback database URL is refused.
+
 ### Storage, mail and notifications
 
 Media uses dedicated local public/private R2 buckets through a loopback S3
@@ -137,12 +142,12 @@ account. The script stops on a failed command; it does not delete/recreate an
 existing bucket or change public-access settings automatically.
 
 After authenticated resource review, create a GitHub `staging` environment with
-`STAGING_CONFIGURATION` (the completed manifest JSON),
-`CLOUDFLARE_STAGING_API_TOKEN` and `CLOUDFLARE_STAGING_ACCOUNT_ID`. Run the manual
-**Deploy isolated staging** workflow from main. It validates the manifest, tests
-isolation and targets only staging configurations. Existing DO migration tags
-are preserved; the staging monitor class uses its own v4 migration. Inspect live
-namespace IDs and existing migration state before the first deployment.
+the five secrets listed in [Deployment](DEPLOYMENT.md). Every merge to `main`
+migrates and deploys staging automatically; the workflow remains manually
+dispatchable for re-runs. It validates the manifest and isolation tests and
+targets only staging configurations. Existing DO migration tags are preserved;
+the staging monitor class uses its own v4 migration. Inspect live namespace IDs
+and existing migration state before the first deployment.
 
 The workflow does not create a Supabase project, domain, Redis service or test
 accounts. The separately provisioned staging D1 database is empty and unbound;
@@ -157,9 +162,11 @@ project reference rather than a shared linked project. Use staging-scoped
 Supabase operator credentials for ongoing automation. In CI, supply the separate
 `STAGING_SUPABASE_ACCESS_TOKEN`; no production token is a fallback.
 
+The deploy workflow runs `staging-db.mjs plan` and `migrate` before deploying, so
+manual migration application is not part of the normal flow (see
+[Deployment](DEPLOYMENT.md)). Fixtures and smoke remain manual:
+
 ```sh
-node --import tsx scripts/environments/staging-db.mjs plan
-node --import tsx scripts/environments/staging-db.mjs migrate
 node --import tsx scripts/environments/staging-db.mjs seed
 node --import tsx scripts/environments/smoke.mjs --staging
 ```
@@ -192,26 +199,20 @@ and production Firebase configuration are unchanged by the nonproduction config.
 
 ## Production release and recovery
 
-Main pushes and PR merges no longer deploy. Production requires the manual
-**Deploy to Cloudflare** workflow, `confirmation=DEPLOY_PRODUCTION`, and
-`approved_sha` equal to the exact main revision. The job references `Production`.
-Configure its required reviewers, branch policy, bypass restrictions and
-environment-scoped secrets in GitHub before enabling releases. Remove production
-credentials from repository-wide preview/development scopes; code alone cannot
-change that account setting. The PR preview workflow deploys no resources and
-reads no secrets. Supported direct npm deploy/upload commands refuse to publish.
+Staging deploys automatically on every merge to `main`; production releases are
+manual and approved. The workflow, migration order, secrets and rollback rules
+are in [Deployment](DEPLOYMENT.md). Keep the `Production` environment's
+reviewers, branch policy, bypass restrictions and secrets configured before
+enabling releases. Remove production credentials from repository-wide
+preview/development scopes; code alone cannot change that account setting. The
+PR preview workflow deploys no resources and reads no secrets. Supported direct
+npm deploy/upload commands refuse to publish.
 
 Production secret values pass through structured step environment variables and
 private JSON files, not interpolated shell code. Build secrets are inherited by
 the build process; only public settings are written to its dotenv file. Worker
 secret updates use JSON bulk operations. This preserves quote, dollar and
 backslash characters. Deployment remains an explicitly approved operation.
-
-No production migration runs in deployment. The local migration wrapper rejects
-remote operations. Production protection DDL and ledger adoption still require
-the separate explicit approval and backup procedure in
-[database adoption review](database-adoption-review.md). Never apply the fresh
-baseline, a local reset, fixture seed, or D1 migration to existing production.
 
 Before any separately approved production schema operation, record the target,
 SQL/checksum and Git SHA; confirm backup/PITR coverage and RPO/RTO; secure a

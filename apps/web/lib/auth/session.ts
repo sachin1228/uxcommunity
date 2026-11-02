@@ -342,17 +342,29 @@ async function assertUserState(
   state: ActiveUserState,
   options?: { allowUnverified?: boolean },
 ): Promise<void> {
-  // Product policy: until approval, the account is read-only apart from the
-  // explicitly-opted-in actions (browsing, likes, reporting, account and
-  // verification management, account deletion). The old grace window is
-  // deliberately not consulted here: it let an unapproved account post/chat
-  // for two days, which contradicted the banner and Terms and defeated the
-  // verification gate as a spam control. `verification_settings.grace_days`
-  // remains for display/legacy only.
+  // Product policy: approval unlocks writes, with an admin-set grace window
+  // measured from signup (verification_settings.new_account_grace_days). Once
+  // the window closes, the account is read-only apart from the explicitly-
+  // opted-in actions (browsing, likes, reporting, account and verification
+  // management, account deletion). The legacy grace value is not consulted.
   if (state.verification_status === "approved" || options?.allowUnverified) {
     return;
   }
-  throw verificationRequiredResponse(state.verification_status);
+
+  // Lazy import keeps this module edge-compatible.
+  const { getNewAccountGraceDays, isVerificationRestricted } = await import(
+    "@/lib/verification/settings"
+  );
+  const graceDays = await getNewAccountGraceDays();
+  if (
+    isVerificationRestricted({
+      status: state.verification_status,
+      createdAt: state.created_at,
+      graceDays,
+    })
+  ) {
+    throw verificationRequiredResponse(state.verification_status);
+  }
 }
 
 /**

@@ -8,7 +8,7 @@ import { UndoToast } from "@/components/ui/UndoToast";
 import { AppBodyScrollLock } from "@/components/AppBodyScrollLock";
 import { VerificationBanner } from "@/components/verification/VerificationBanner";
 import {
-  getVerificationGraceDays,
+  getNewAccountGraceDays,
   isVerificationBannerVisible,
 } from "@/lib/verification/settings";
 import { Topbar } from "./Topbar";
@@ -38,7 +38,7 @@ export default async function DashboardLayout({
       )
       .eq("user_id", session.userId!)
       .maybeSingle(),
-    getVerificationGraceDays(),
+    getNewAccountGraceDays(),
   ]);
 
   // A deleted or blocked account must not render the dashboard shell. Clearing

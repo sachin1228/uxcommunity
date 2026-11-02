@@ -2,7 +2,9 @@ name: Deploy to Cloudflare
 
 # Releases the exact approved main SHA through the protected Production environment.
 # Public build settings use dotenv; runtime/build secrets use private JSON files
-# and structured process environment. No main-push deployment or DB migration.
+# and structured process environment. No main-push deployment. Pending reviewed
+# migrations are applied before the Workers are released; the one-time baseline
+# ledger adoption stays a separate, explicitly approved operation.
 on:
   workflow_dispatch:
     inputs:
@@ -44,12 +46,13 @@ jobs:
         shell: bash
         run: |
           # Every name here is pushed onto a Worker by this workflow (the
-          # "Set … secrets" steps) or read by a verify step below. The push
-          # writes .production-runtime.json verbatim, so a missing GitHub secret would
-          # overwrite a working Worker secret with an empty value — it has to
-          # stop the run here instead, naming the secret to add.
+          # "Set … secrets" steps), read by a verify step below or consumed by
+          # the database migration step. The push writes .production-runtime.json
+          # verbatim, so a missing GitHub secret would overwrite a working Worker
+          # secret with an empty value — it has to stop the run here instead,
+          # naming the secret to add.
           for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID \
-            SESSION_SECRET SUPABASE_SERVICE_ROLE_KEY \
+            SESSION_SECRET SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_URL \
             REALTIME_URL REALTIME_PUBLISH_SECRET \
             API_URL API_SECRET \
             UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN \
@@ -67,6 +70,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           REALTIME_URL: ${{ secrets.REALTIME_URL }}
           REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
           API_URL: ${{ secrets.API_URL }}
@@ -262,6 +266,37 @@ jobs:
           # these are the guards that decide what a shared project is allowed to
           # receive (e2e/seed-member.mjs). No database, no browser.
           node --test e2e/seed-member.test.mjs
+
+      # ── Database ───────────────────────────────────────────────────────────
+      # Apply reviewed migrations after every check has passed and before either
+      # Worker is released, so the new code never runs against an old schema.
+      # The dry run proves the pending set first; the baseline guard keeps the
+      # one-time ledger adoption (docs/database-baseline.md step 5) manual —
+      # replaying the baseline against populated production must stay impossible.
+      # Migrations that ship here must be additive/backward compatible so the
+      # previously deployed Worker keeps working if this run is rolled back.
+      - name: Apply pending database migrations
+        shell: bash
+        # SUPABASE_DB_URL is the project's session-pooler Postgres URI, which is
+        # IPv4-safe on GitHub runners. The value is masked and never logged.
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          cli_version=$(tr -d '[:space:]' < supabase/cli-version)
+          supabase() { npx --yes "supabase@${cli_version}" "$@"; }
+
+          if ! supabase db push --db-url "$SUPABASE_DB_URL" --skip-vault --dry-run \
+            | tee /tmp/pending-migrations.txt; then
+            echo "::error::The migration dry run failed. If it reports remote versions missing from the local directory, production still needs the one-time baseline ledger adoption (docs/database-baseline.md step 5)."
+            exit 1
+          fi
+          if grep -q '20261031163000' /tmp/pending-migrations.txt; then
+            echo "::error::Production still needs the one-time baseline ledger adoption (docs/database-baseline.md step 5). Refusing to replay the baseline."
+            exit 1
+          fi
+
+          supabase db push --db-url "$SUPABASE_DB_URL" --skip-vault --yes
 
       - name: Deploy web worker
         working-directory: apps/web

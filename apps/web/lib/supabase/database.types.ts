@@ -2950,16 +2950,19 @@ export type Database = {
         Row: {
           grace_days: number;
           id: boolean;
+          new_account_grace_days: number;
           updated_at: string;
         };
         Insert: {
           grace_days?: number;
           id?: boolean;
+          new_account_grace_days?: number;
           updated_at?: string;
         };
         Update: {
           grace_days?: number;
           id?: boolean;
+          new_account_grace_days?: number;
           updated_at?: string;
         };
         Relationships: [];

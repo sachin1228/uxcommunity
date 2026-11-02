@@ -33,6 +33,7 @@
   ],
   "verification_settings": {
     "id": true,
-    "grace_days": 0
+    "grace_days": 0,
+    "new_account_grace_days": 0
   }
 }
