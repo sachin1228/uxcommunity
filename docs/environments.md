@@ -142,16 +142,12 @@ account. The script stops on a failed command; it does not delete/recreate an
 existing bucket or change public-access settings automatically.
 
 After authenticated resource review, create a GitHub `staging` environment with
-`STAGING_CONFIGURATION` (the completed manifest JSON),
-`CLOUDFLARE_STAGING_API_TOKEN`, `CLOUDFLARE_STAGING_ACCOUNT_ID`,
-`STAGING_DATABASE_PASSWORD` and `STAGING_SUPABASE_ACCESS_TOKEN`. Every merge to
-`main` plans and applies pending migrations, then deploys staging automatically
-through **Deploy isolated staging**, which remains manually dispatchable for
-re-runs. The migration wrapper refuses the production project; it can only touch
-the independent staging database. It validates the manifest, tests
-isolation and targets only staging configurations. Existing DO migration tags
-are preserved; the staging monitor class uses its own v4 migration. Inspect live
-namespace IDs and existing migration state before the first deployment.
+the five secrets listed in [Deployment](DEPLOYMENT.md). Every merge to `main`
+migrates and deploys staging automatically; the workflow remains manually
+dispatchable for re-runs. It validates the manifest and isolation tests and
+targets only staging configurations. Existing DO migration tags are preserved;
+the staging monitor class uses its own v4 migration. Inspect live namespace IDs
+and existing migration state before the first deployment.
 
 The workflow does not create a Supabase project, domain, Redis service or test
 accounts. The separately provisioned staging D1 database is empty and unbound;
@@ -166,9 +162,11 @@ project reference rather than a shared linked project. Use staging-scoped
 Supabase operator credentials for ongoing automation. In CI, supply the separate
 `STAGING_SUPABASE_ACCESS_TOKEN`; no production token is a fallback.
 
+The deploy workflow runs `staging-db.mjs plan` and `migrate` before deploying, so
+manual migration application is not part of the normal flow (see
+[Deployment](DEPLOYMENT.md)). Fixtures and smoke remain manual:
+
 ```sh
-node --import tsx scripts/environments/staging-db.mjs plan
-node --import tsx scripts/environments/staging-db.mjs migrate
 node --import tsx scripts/environments/staging-db.mjs seed
 node --import tsx scripts/environments/smoke.mjs --staging
 ```
@@ -201,37 +199,20 @@ and production Firebase configuration are unchanged by the nonproduction config.
 
 ## Production release and recovery
 
-Main pushes and PR merges no longer deploy. Production requires the manual
-**Deploy to Cloudflare** workflow, `confirmation=DEPLOY_PRODUCTION`, and
-`approved_sha` equal to the exact main revision. The job references `Production`.
-Configure its required reviewers, branch policy, bypass restrictions and
-environment-scoped secrets in GitHub before enabling releases. Remove production
-credentials from repository-wide preview/development scopes; code alone cannot
-change that account setting. The PR preview workflow deploys no resources and
-reads no secrets. Supported direct npm deploy/upload commands refuse to publish.
+Staging deploys automatically on every merge to `main`; production releases are
+manual and approved. The workflow, migration order, secrets and rollback rules
+are in [Deployment](DEPLOYMENT.md). Keep the `Production` environment's
+reviewers, branch policy, bypass restrictions and secrets configured before
+enabling releases. Remove production credentials from repository-wide
+preview/development scopes; code alone cannot change that account setting. The
+PR preview workflow deploys no resources and reads no secrets. Supported direct
+npm deploy/upload commands refuse to publish.
 
 Production secret values pass through structured step environment variables and
 private JSON files, not interpolated shell code. Build secrets are inherited by
 the build process; only public settings are written to its dotenv file. Worker
 secret updates use JSON bulk operations. This preserves quote, dollar and
 backslash characters. Deployment remains an explicitly approved operation.
-
-Production deploys apply pending reviewed migrations before the Workers are
-released. The release workflow authenticates with one Production-environment
-`SUPABASE_DB_URL` secret (the project's session-pooler Postgres URI), runs the
-pinned CLI's `db push --dry-run` first, refuses to continue while the baseline
-or unknown remote history is still pending, then applies with `db push --yes`.
-Staging stays a manual step through `staging-db.mjs`; the local migration
-wrapper rejects remote operations. The one-time baseline ledger adoption and the
-protection DDL still require the separate explicit approval and backup
-procedure in [database adoption review](database-adoption-review.md); the
-workflow never repairs or replays the ledger. Never apply the fresh baseline, a
-local reset, fixture seed, or D1 migration to existing production.
-
-Migrations that ship through the deploy must be additive and backward compatible
-(expand/contract): the previously deployed Worker can keep serving while the
-schema moves, and a failed release must not strand the live app. Destructive
-drops belong in a later release, after the new code is live.
 
 Before any separately approved production schema operation, record the target,
 SQL/checksum and Git SHA; confirm backup/PITR coverage and RPO/RTO; secure a

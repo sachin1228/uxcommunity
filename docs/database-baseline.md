@@ -1,5 +1,9 @@
 # Production-derived Supabase baseline
 
+**Status (2026-11-03):** the one-time production ledger adoption and its two
+protection changes were completed. Later pending migrations apply through the
+production release workflow; see [Deployment](DEPLOYMENT.md).
+
 The active migration system starts at `20261031163000_production_schema_baseline.sql`.
 Its source is a fresh **read-only production catalog capture**, not any historical
 migration, partial schema, data export, or seed. The source snapshot was captured
