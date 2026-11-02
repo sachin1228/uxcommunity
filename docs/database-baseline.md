@@ -362,7 +362,10 @@ After explicit approval for production adoption:
    `statements` or the baseline file. Never test production with the fixture SQL
    used by CI. Only then enable future reviewed, uniquely timestamped migrations;
    inspect the pending list/dry run before every future remote application.
-   Rehearse one future migration on the disposable adopted ledger first. Future
+   After adoption, the production release workflow runs that dry run and applies
+   later files automatically; it refuses to run while the baseline is pending
+   and never adopts the ledger. Rehearse one future migration on the disposable
+   adopted ledger first. Future
    files must sort strictly after `20261031163000`, with no duplicate versions.
 
 The DELETE is intentionally destructive **to migration metadata**. Before COMMIT
