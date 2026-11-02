@@ -17,6 +17,7 @@ class LocalCommandPolicy(unittest.TestCase):
             validate(['migration','up','--local','--yes'],root)
             validate(['--workdir',root,'status','--output-format','json'],'/unused')
             validate(['db','reset','--local'],root)
+            validate(['--workdir',root,'stack','destroy','--yes'],'/unused')
 
     def test_stale_production_link_blocks_local_commands(self):
         with tempfile.TemporaryDirectory() as root:

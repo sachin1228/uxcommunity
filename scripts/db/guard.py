@@ -18,9 +18,10 @@ def validate(arguments, root):
     allowed = args and (args[0] in ('start', 'stop', 'status') or
         (args[:2] == ['migration','new']) or
         (args[:2] == ['migration','up'] and '--local' in args) or
-        (args[:2] == ['db','reset'] and '--local' in args))
+        (args[:2] == ['db','reset'] and '--local' in args) or
+        (args[:2] == ['stack','destroy'] and '--yes' in args))
     if not allowed:
-        raise ValueError('Only local start/stop/status, new migrations and explicitly local apply/reset are supported')
+        raise ValueError('Only local start/stop/status, stack teardown, new migrations and explicitly local apply/reset are supported')
 
 if __name__ == '__main__':
     validate(sys.argv[2:], sys.argv[1])
