@@ -1,0 +1,21 @@
+{
+  "captured_at": "2026-11-02T05:14:04.511629+00:00",
+  "sources": [
+    "https://app.uxcommunity.in/api/data/cities",
+    "https://app.uxcommunity.in/api/data/sectors",
+    "https://app.uxcommunity.in/api/data/job-titles",
+    "https://app.uxcommunity.in/api/data/experience-levels"
+  ],
+  "included_fields": [
+    "name",
+    "slug"
+  ],
+  "counts": {
+    "cities": 28,
+    "design_sectors": 19,
+    "job_titles": 6,
+    "experience_levels": 5
+  },
+  "sha256": "17d11c2852e6a2558a6c2b601d06780ec091c65ffd893d99d27ace16bf7ce873",
+  "purpose": "Offline nonproduction reference catalog; independent IDs, no production asset URLs, credentials or member data."
+}

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { assertWebEnvironment } from '../../packages/shared/src/environment.ts';
 import { seedFixtures } from './fixtures.mjs';
+import { syncReferenceCatalogs } from './catalogs.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const env=JSON.parse(await readFile(process.env.STAGING_MANIFEST ?? resolve(root,'.local/staging/environment.json'),'utf8'));
@@ -21,7 +22,8 @@ if(action==='plan' || action==='migrate') {
   run('npx',['--yes',`supabase@${cliVersion}`,'db','push','--project-ref',ref,'--skip-vault',...(action==='plan'?['--dry-run']:['--yes'])],{SUPABASE_DB_PASSWORD:process.env.STAGING_DATABASE_PASSWORD});
 } else if(action==='seed') {
   const sql=resolve(root,'.local/staging/initialization.sql');
-  run('python3',['scripts/db/initialize.py','--catalogs','config/environments/development-catalogs.json','--include-default-experience-levels','--sql-output',sql]);
+  run('python3',['scripts/db/initialize.py','--catalogs','config/environments/reference-catalogs.json','--sql-output',sql]);
+  await syncReferenceCatalogs(env);
   run('npx',['--yes',`supabase@${cliVersion}`,'db','query','--linked','--project-ref',ref,'--file',sql]);
   await seedFixtures(env);
 } else throw new Error('Use plan, migrate or seed; production databases are never accepted');

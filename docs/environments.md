@@ -47,7 +47,7 @@ database; stop its development supervisor with Ctrl-C first.
 
 The seeded users are `designer@development.invalid` and `peer@development.invalid`. Its random password and the
 separate dummy admin credentials are in `.local/development/environment.json`.
-Fixtures include signup catalogs, a profile, a private community, message,
+Fixtures include the original reference catalogs, a profile, a private community, message,
 thread, event, company and job. Seeding inserts missing fixture IDs and preserves
 existing content. Cleanup/reset is never automatic. Local migration tooling
 refuses remote links, DB URLs, push/repair operations and resets without an
@@ -88,7 +88,7 @@ cron endpoints. It refuses a nonlocal database before any request.
 Use a **new Supabase project** compatible with the existing baseline and current
 REST/RPC contract. Do not reuse the production project or apply D1 SQL. Apply the
 baseline only to the new empty database through its separately reviewed
-provisioning process; initialize synthetic catalogs and test users. The ordinary
+provisioning process; initialize reference catalogs and test users. The ordinary
 local CLI wrapper deliberately cannot perform remote migration operations.
 
 Copy `config/environments/staging.example.json` to the ignored
@@ -164,7 +164,7 @@ node --import tsx scripts/environments/staging-db.mjs seed
 node --import tsx scripts/environments/smoke.mjs --staging
 ```
 
-Seed initializes reviewed synthetic catalogs and fictional accounts only. It
+Seed loads the offline reference catalog snapshot and fictional accounts only. It
 rejects production before issuing any database request. Staging fixture logins
 are `designer@staging.invalid` and `peer@staging.invalid`; their random password
 is in the private staging manifest. The ordinary local wrapper continues to
@@ -221,3 +221,20 @@ Worker versions/secrets, domains/routes and DO state. R2 object backup and DO
 recovery require separate evidence; a database backup does not cover them. A code
 rollback does not restore deleted data. Preserve production data and stop when
 restore evidence or approval is absent.
+
+
+## Reference catalogs for realistic testing
+
+`config/environments/reference-catalogs.json` contains an offline snapshot of the
+application's public active catalog labels: 28 cities, 19 sectors, 6 job titles
+and 5 experience levels. The adjacent source manifest records provenance and a
+checksum. Seeding never fetches production; it reads this committed snapshot.
+Only names/slugs are included. Database IDs are generated independently in each
+environment, and production media URLs, users and credentials are excluded.
+
+Both `env:seed` and the staging `seed` command synchronize those labels and
+activate the reference options. They deactivate the old Development City,
+Development Design, Development Designer and superseded generic experience
+choices. Existing rows, IDs, profiles and user content are preserved. Fixture
+creation selects active catalog entries. A profile already saved with an old
+placeholder retains that selection until its owner chooses a new value.

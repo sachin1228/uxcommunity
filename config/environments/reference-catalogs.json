@@ -1,0 +1,195 @@
+{
+  "cities": [
+    {
+      "name": "Amsterdam"
+    },
+    {
+      "name": "Austin"
+    },
+    {
+      "name": "Barcelona"
+    },
+    {
+      "name": "Bengaluru"
+    },
+    {
+      "name": "Berlin"
+    },
+    {
+      "name": "Chennai"
+    },
+    {
+      "name": "Delhi"
+    },
+    {
+      "name": "Dubai"
+    },
+    {
+      "name": "Gurugram"
+    },
+    {
+      "name": "Hyderabad"
+    },
+    {
+      "name": "Lisbon"
+    },
+    {
+      "name": "London"
+    },
+    {
+      "name": "Los Angeles"
+    },
+    {
+      "name": "Melbourne"
+    },
+    {
+      "name": "Mumbai"
+    },
+    {
+      "name": "New York City"
+    },
+    {
+      "name": "Noida"
+    },
+    {
+      "name": "Other"
+    },
+    {
+      "name": "Paris"
+    },
+    {
+      "name": "Pune"
+    },
+    {
+      "name": "San Francisco"
+    },
+    {
+      "name": "Seattle"
+    },
+    {
+      "name": "Seoul"
+    },
+    {
+      "name": "Singapore"
+    },
+    {
+      "name": "Stockholm"
+    },
+    {
+      "name": "Sydney"
+    },
+    {
+      "name": "Tokyo"
+    },
+    {
+      "name": "Toronto"
+    }
+  ],
+  "design_sectors": [
+    {
+      "name": "Artificial Intelligence & ML"
+    },
+    {
+      "name": "Automotive & Mobility"
+    },
+    {
+      "name": "CleanTech & Sustainability"
+    },
+    {
+      "name": "Cybersecurity"
+    },
+    {
+      "name": "E-commerce & Retail"
+    },
+    {
+      "name": "Education & EdTech"
+    },
+    {
+      "name": "Finance & Fintech"
+    },
+    {
+      "name": "Food & Agritech"
+    },
+    {
+      "name": "Gaming & Esports"
+    },
+    {
+      "name": "Government & Public Sector"
+    },
+    {
+      "name": "Healthcare & MedTech"
+    },
+    {
+      "name": "Industrial & Manufacturing"
+    },
+    {
+      "name": "Logistics & Supply Chain"
+    },
+    {
+      "name": "Media & Entertainment"
+    },
+    {
+      "name": "Non-profit & Social Impact"
+    },
+    {
+      "name": "Other"
+    },
+    {
+      "name": "Real Estate & PropTech"
+    },
+    {
+      "name": "Telecom & Networking"
+    },
+    {
+      "name": "Travel & Hospitality"
+    }
+  ],
+  "job_titles": [
+    {
+      "slug": "design_engineer",
+      "name": "Design Engineer"
+    },
+    {
+      "slug": "graphic_designer",
+      "name": "Graphic Designer"
+    },
+    {
+      "slug": "motion_3d_designer",
+      "name": "Motion & 3D Designer"
+    },
+    {
+      "slug": "product_designer",
+      "name": "Product Designer"
+    },
+    {
+      "slug": "ui_visual_designer",
+      "name": "UI / Visual Designer"
+    },
+    {
+      "slug": "ux_designer",
+      "name": "UX Designer"
+    }
+  ],
+  "experience_levels": [
+    {
+      "slug": "senior",
+      "name": "Design Leadership (8–15+ years)"
+    },
+    {
+      "slug": "freelance_designers",
+      "name": "Freelance designers"
+    },
+    {
+      "slug": "junior",
+      "name": "Junior Designer (0-2 years)"
+    },
+    {
+      "slug": "mid_level",
+      "name": "Mid-level Designers (3-5 years)"
+    },
+    {
+      "slug": "principal",
+      "name": "Senior designers (5-8 years)"
+    }
+  ]
+}

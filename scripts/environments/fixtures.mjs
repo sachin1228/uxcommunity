@@ -10,7 +10,7 @@ const email=`designer@${env.APP_ENV}.invalid`;
 const {data:existing,error:findError}=await db.from('users').select('id').eq('email',email).maybeSingle();
 if(findError)throw findError;
 if(!existing){
-  const catalog=async table=>{const {data,error}=await db.from(table).select('*').limit(1).single();if(error)throw error;return data;};
+  const catalog=async table=>{const {data,error}=await db.from(table).select('*').eq('is_active',true).order('name').limit(1).single();if(error)throw error;return data;};
   const city=await catalog('cities'),sector=await catalog('design_sectors'),level=await catalog('experience_levels'),job=await catalog('job_titles');
   const {error}=await db.rpc('complete_signup',{p_name:'Development Designer',p_email:email,p_password_hash:await bcrypt.hash(env.DEV_USER_PASSWORD,12),p_city_id:city.id,p_sector_id:sector.id,p_experience_level:level.slug,p_job_title:job.slug,p_avatar_url:null,p_avatar_source:null});
   if(error)throw error;
@@ -30,7 +30,7 @@ if(memberError)throw memberError;
 await insertMissing('community_messages',{id:'de000000-0000-4000-8000-000000000002',community_id:community,user_id:user.id,content:'Welcome to the isolated development database.'});
 await insertMissing('community_threads',{id:'de000000-0000-4000-8000-000000000003',community_id:community,user_id:user.id,title:'A fictional design discussion',category:'discussion',is_public:false});
 await insertMissing('community_events',{id:'de000000-0000-4000-8000-000000000004',community_id:community,user_id:user.id,title:'Development design meetup',event_date:new Date(Date.now()+7*86400000).toISOString(),is_online:true,meet_link:'https://meet.example.invalid/development',is_public:false});
-const first=async table=>{const {data,error}=await db.from(table).select('*').limit(1).single();if(error)throw error;return data;};
+const first=async table=>{const {data,error}=await db.from(table).select('*').eq('is_active',true).order('name').limit(1).single();if(error)throw error;return data;};
 const city=await first('cities'),sector=await first('design_sectors'),level=await first('experience_levels'),job=await first('job_titles');
 const peerEmail=`peer@${env.APP_ENV}.invalid`;
 const {data:peerExisting,error:peerFindError}=await db.from('users').select('id').eq('email',peerEmail).maybeSingle();

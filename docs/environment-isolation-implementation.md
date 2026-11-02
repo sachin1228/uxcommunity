@@ -18,7 +18,7 @@ changed. Supabase PostgreSQL remains authoritative; D1 migration has not started
   sanitization; existing baseline and initializer remain intact.
 - Added a local S3 adapter backed by Miniflare R2 with signed private access,
   direct uploads, range reads, copy/list/delete and captured local mail.
-- Added repeatable fictional user/catalog/community/chat/thread/event/company/job
+- Added repeatable fictional user/community/chat/thread/event/company/job
   fixtures and a runnable web/API/storage/DO smoke check.
 - Disabled Expo/FCM sending, receipt cleanup and cron outside production, including
   internal manual job endpoints. Nonproduction email cannot reach Resend.
@@ -40,7 +40,7 @@ changed. Supabase PostgreSQL remains authoritative; D1 migration has not started
 
 | Service | Staging resource |
 | --- | --- |
-| PostgreSQL / REST / RPC | Supabase `aprsizlxezwauwilplbj`, Sydney; existing baseline independently applied and fictional catalogs/accounts seeded. |
+| PostgreSQL / REST / RPC | Supabase `aprsizlxezwauwilplbj`, Sydney; existing baseline independently applied and reference catalogs and fictional accounts seeded. |
 | Web | `https://uxcommunity-web-staging.patilsachin1228.workers.dev` |
 | Realtime | `https://uxcommunity-realtime-staging.patilsachin1228.workers.dev` |
 | Public/private media | `uxcommunity-staging-media` / `uxcommunity-staging-private`; both managed public endpoints disabled. |
@@ -60,7 +60,7 @@ build/runtime agreement without returning credentials.
 | Check | Result |
 | --- | --- |
 | Existing web unit suites with explicit production-mode dummy fixtures | 1,087 tests passed. |
-| New endpoint, bucket, delivery, maintenance and Miniflare R2 integration tests | 12 passed, including real R2/SDK tests, Worker-runtime redirect rejection and production secret serialization. |
+| New endpoint, bucket, delivery, maintenance and Miniflare R2 integration tests | 14 passed, including real R2/SDK tests, Worker-runtime redirect rejection and production secret serialization. |
 | Local Supabase setup | Passed in an isolated worktree; private manifest uses loopback database/API and independent credentials. |
 | Local fixture initialization and seeding | Passed; catalogs, signup RPC, user and fictional content created only locally. |
 | Realtime session, membership configuration and retention suites | 17 tests passed after final changes. |
@@ -114,3 +114,13 @@ GitHub protection policies, the remaining acceptance matrix and recovery evidenc
 are required before final isolation sign-off. See
 [operating instructions](environments.md) for the supported local and staging
 commands and release/backup boundaries.
+
+
+## Reference catalog correction
+
+Local and staging now contain the original public active city, sector, job-title
+and experience labels (28 / 19 / 6 / 5). The offline snapshot replaces the minimal
+Development placeholders and generic experience seed. Only catalog names/slugs
+were read from production's public GET endpoints; production was not modified.
+No runtime connection to production was introduced. Each database keeps its own
+IDs and user/content records; deprecated choices are inactive rather than deleted.
