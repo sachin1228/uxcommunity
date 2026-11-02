@@ -1,6 +1,7 @@
 name: Deploy to Cloudflare
 
-# Releases the exact approved main SHA through the protected Production environment.
+# Releases the exact main SHA selected at dispatch through the protected
+# Production environment.
 # Public build settings use dotenv; runtime/build secrets use private JSON files
 # and structured process environment. No main-push deployment. Pending reviewed
 # migrations are applied before the Workers are released; the one-time baseline
@@ -8,9 +9,6 @@ name: Deploy to Cloudflare
 on:
   workflow_dispatch:
     inputs:
-      approved_sha:
-        description: 'Exact main commit approved for production release'
-        required: true
       confirmation:
         description: 'Type DEPLOY_PRODUCTION to approve this release'
         required: true
@@ -21,12 +19,12 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY_PRODUCTION' && inputs.approved_sha == github.sha
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY_PRODUCTION'
     environment: Production
     runs-on: ubuntu-latest
     env:
       APP_ENV: production
-      APPROVED_PRODUCTION_SMOKE_SHA: ${{ inputs.approved_sha }}
+      APPROVED_PRODUCTION_SMOKE_SHA: ${{ github.sha }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:

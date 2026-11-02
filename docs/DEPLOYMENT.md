@@ -45,10 +45,9 @@ supabase migration repair --status applied <version> --project-ref <staging-ref>
 
 ## 3. Production: manual, approved release
 
-Production never deploys on merge. Run **Deploy to Cloudflare** with
-`approved_sha` equal to the exact `main` revision and
-`confirmation=DEPLOY_PRODUCTION`; the job waits on the `Production` environment.
-Its order is:
+Production never deploys on merge. Run **Deploy to Cloudflare** from `main` and
+type `confirmation=DEPLOY_PRODUCTION`; the workflow releases the exact `main`
+SHA selected at dispatch and waits on the `Production` environment. Its order is:
 
 1. credential guards, build, type check and unit tests,
 2. pending migrations: `db push --dry-run`, refuse if the baseline or unknown
