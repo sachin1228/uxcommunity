@@ -71,3 +71,6 @@ enabled = true
 [observability.logs]
 enabled = true
 invocation_logs = true
+
+[vars]
+APP_ENV = "production"

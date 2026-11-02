@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runRetentionSweep } from "../src/retention";
 import type { Env } from "../src/env";
 
-const ENV = { API_URL: "https://app.example", API_SECRET: "test-secret" } as unknown as Env;
+const ENV = { APP_ENV: "production", API_URL: "https://app.example", API_SECRET: "test-secret" } as unknown as Env;
 
 afterEach(() => {
   vi.unstubAllGlobals();

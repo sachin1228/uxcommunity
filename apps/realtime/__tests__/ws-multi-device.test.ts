@@ -23,7 +23,7 @@ const devVars = readFileSync(resolve(__dirname, "../.dev.vars"), "utf-8");
 const vars = Object.fromEntries(
   devVars.split("\n").filter(Boolean).map((l) => {
     const [k, ...v] = l.split("=");
-    return [k.trim(), v.join("=").trim()];
+    return [k.trim(), v.join("=").trim().replace(/^["']|["']$/g, "")];
   })
 );
 const REALTIME_SECRET = vars.SESSION_SECRET;

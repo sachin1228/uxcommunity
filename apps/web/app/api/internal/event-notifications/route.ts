@@ -1,3 +1,4 @@
+import { jobsEnabled } from "@uxcommunity/shared";
 import { NextRequest, NextResponse } from "next/server";
 import { runEventLifecycleNotifications } from "@/lib/events/lifecycle-notifications";
 
@@ -18,6 +19,7 @@ import { runEventLifecycleNotifications } from "@/lib/events/lifecycle-notificat
 export const dynamic = "force-dynamic";
 
 function authorized(req: NextRequest): boolean {
+  if (!jobsEnabled(process.env)) return false;
   const apiSecret = process.env.API_SECRET;
   if (!apiSecret) return false;
   return req.headers.get("authorization") === `Bearer ${apiSecret}`;

@@ -30,7 +30,7 @@ const vars = Object.fromEntries(
     .filter(Boolean)
     .map((line) => {
       const [k, ...v] = line.split("=");
-      return [k.trim(), v.join("=").trim()];
+      return [k.trim(), v.join("=").trim().replace(/^["']|["']$/g, "")];
     }),
 );
 const SESSION_SECRET = vars.SESSION_SECRET;

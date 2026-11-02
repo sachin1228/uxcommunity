@@ -1,3 +1,4 @@
+import { deliveryEnabled } from "@uxcommunity/shared";
 /**
  * Direct FCM v1 sender for Android data-only messages.
  *
@@ -310,7 +311,7 @@ export async function sendFcmDataMessages(
   deps: FcmSendDeps = {},
 ): Promise<FcmDeliveryReport> {
   const report: FcmDeliveryReport = { outcomes: [], requestError: null };
-  if (messages.length === 0) return report;
+  if (!deliveryEnabled(process.env) || messages.length === 0) return report;
 
   const account = deps.serviceAccount ?? loadFcmServiceAccount();
   if (!account) {

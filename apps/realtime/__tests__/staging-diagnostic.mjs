@@ -7,13 +7,17 @@
  * and tracing what happens at each step.
  */
 
+import { assertStagingTarget } from "../../../k6/lib/realtime-fanout.mjs";
 import { SignJWT } from "jose";
 import WebSocket from "ws";
 import { performance } from "perf_hooks";
 
-const STAGING_URL = "https://uxcommunity-realtime-staging.patilsachin1228.workers.dev";
-const SESSION_SECRET = "IC62JvYXHhdaHVnLUI4tR0JIKiUcZxUGzjL7+V65EBc=";
-const PUBLISH_SECRET = "2be34006e8e98f5dc3f9e8276b35283bc02e2571087c009f";
+const STAGING_URL = process.env.STAGING_URL;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const PUBLISH_SECRET = process.env.REALTIME_PUBLISH_SECRET;
+if (!STAGING_URL || !assertStagingTarget(STAGING_URL).ok || !SESSION_SECRET || !PUBLISH_SECRET) {
+  throw new Error('Explicit isolated test target and secrets are required');
+}
 const SECRET_KEY = new TextEncoder().encode(SESSION_SECRET);
 
 async function createToken(userId) {

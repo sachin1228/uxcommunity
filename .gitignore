@@ -52,6 +52,10 @@ yarn-error.log*
 .open-next/
 .wrangler/
 .dev.vars*
+.production-secrets.json
+.production-runtime.json
+.production-build-env.json
+.local/
 .fcm-service-account.json
 
 # =========================

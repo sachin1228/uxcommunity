@@ -1,3 +1,4 @@
+import { requireLocalDatabase } from "./environments/maintenance.mjs";
 /**
  * Fills in auto-generated descriptions for communities that have none.
  * Auto-created communities (city, sector, experience_level, job_title)
@@ -20,6 +21,7 @@ if (!url || !key) {
   process.exit(1);
 }
 
+requireLocalDatabase(url);
 const db = createClient(url, key, { auth: { persistSession: false } });
 
 // Fetch communities without descriptions

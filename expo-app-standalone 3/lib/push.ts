@@ -1,3 +1,4 @@
+import { mobileEnvironmentKey, mobilePushEnabled } from "./environment";
 /**
  * Push notifications — Expo push tokens, Android channels, badge and the
  * presentation rules for a notification that arrives while the app is open.
@@ -36,13 +37,13 @@ import { settleAbandonedRegistration } from './pushRegistrationState';
 import { timedOutMessage, withTimeout } from './withTimeout';
 
 /** Where this device's Expo push token is remembered for logout cleanup. */
-const PUSH_TOKEN_KEY = '@push/expo_token';
+const PUSH_TOKEN_KEY = mobileEnvironmentKey('@push/expo_token');
 
 /** Raw FCM token (Android) — the direct-chat-push channel, for logout cleanup. */
-const FCM_TOKEN_KEY = '@push/fcm_token';
+const FCM_TOKEN_KEY = mobileEnvironmentKey('@push/fcm_token');
 
 /** Last registration outcome, so the settings screen can explain a failure. */
-const PUSH_STATE_KEY = '@push/last_state';
+const PUSH_STATE_KEY = mobileEnvironmentKey('@push/last_state');
 
 /** Communities this member muted, mirroring the server list. */
 const MUTED_KEY = '@push/muted_communities';
@@ -441,6 +442,7 @@ export function subscribeNotificationPermissionStatus(
  * already described in the diagnostics.
  */
 async function acquirePushTokenPair(): Promise<PushTokenPair | null> {
+  if (!mobilePushEnabled) return null;
   await ensureNotificationChannels();
 
   const existing = await Notifications.getPermissionsAsync();
@@ -648,6 +650,7 @@ export function getObservedDeviceToken(): string | null {
  * offer a Settings shortcut after a denial without waiting for a refetch.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (!mobilePushEnabled) return null;
   try {
     return await pushRegistration.register();
   } catch (error) {
@@ -731,6 +734,7 @@ export async function sendServerPushTestAsync(): Promise<ServerPushTestResult> {
     failure: null,
   };
 
+  if (!mobilePushEnabled) return { ...empty, requestError: "Push is disabled outside production" };
   try {
     const { data } = await apiFetch<ServerPushTestResult>('/api/push/test', {
       method: 'POST',

@@ -1,3 +1,4 @@
+import { validateMobileEnvironment } from "./environment";
 /**
  * Base API client for the web app backend.
  *
@@ -16,6 +17,8 @@ import {
   readStoredSessionToken,
   writeStoredSessionToken,
 } from './sessionStorage';
+
+validateMobileEnvironment();
 
 const SESSION_COOKIE_NAME = 'uxcommunity_session';
 

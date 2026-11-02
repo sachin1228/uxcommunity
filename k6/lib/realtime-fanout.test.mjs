@@ -200,17 +200,17 @@ test("userIdForIndex produces distinct v4-shaped uuids", () => {
   assert.throws(() => userIdForIndex(-1), /non-negative integer/);
 });
 
-test("assertStagingTarget refuses a production host unless explicitly overridden", () => {
+test("assertStagingTarget refuses production including overrides and requires exact staging origins", () => {
   assert.equal(assertStagingTarget("wss://rt.uxcommunity.in").ok, false);
   assert.equal(
-    assertStagingTarget("https://acme-staging.example.com").ok,
+    assertStagingTarget("https://acme-staging.example.com", { allowedOrigins: ["https://acme-staging.example.com"] }).ok,
     true,
   );
   assert.equal(
-    assertStagingTarget("wss://uxcommunity-realtime-staging.patilsachin1228.workers.dev").ok,
+    assertStagingTarget("wss://uxcommunity-realtime-staging.patilsachin1228.workers.dev", { allowedOrigins: ["https://uxcommunity-realtime-staging.patilsachin1228.workers.dev"] }).ok,
     true,
   );
   assert.equal(assertStagingTarget("ws://localhost:8787").ok, true);
-  assert.equal(assertStagingTarget("wss://rt.uxcommunity.in", { allowNonStaging: true }).ok, true);
+  assert.equal(assertStagingTarget("wss://rt.uxcommunity.in", { allowNonStaging: true }).ok, false);
   assert.equal(assertStagingTarget("not-a-url").ok, false);
 });

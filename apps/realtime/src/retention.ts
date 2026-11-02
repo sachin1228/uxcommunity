@@ -1,3 +1,4 @@
+import { jobsEnabled } from "../../../packages/shared/src/environment";
 import { logEvent } from "./log";
 import type { Env } from "./env";
 
@@ -24,6 +25,7 @@ import type { Env } from "./env";
  *   returning.
  */
 export async function runRetentionSweep(env: Env): Promise<void> {
+  if (!jobsEnabled({ APP_ENV: env.APP_ENV })) return;
   if (!env.API_URL || !env.API_SECRET) {
     logEvent("error", { event: "realtime.retention.config_missing" });
     return;

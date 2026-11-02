@@ -132,11 +132,11 @@ export function resolveSeedTarget({ env = process.env, envText = "" } = {}) {
 
 /** The reason seeding must not run, or null when it may. */
 export function remoteSeedRefusal(target, env = process.env) {
-  if (target.local || env.E2E_SEED_ALLOW_REMOTE === "1") return null;
+  if (target.local) return null;
   return (
     `refusing to write into ${target.host}: it is not a local database. The seeder inserts a member, ` +
     "its communities and their memberships into whatever project apps/web/.env.local points at, which is " +
-    "usually the shared project the deployed app uses. Re-run with E2E_SEED_ALLOW_REMOTE=1 to allow it — " +
+    "usually the shared project the deployed app uses. Use the isolated local development stack — " +
     "the rows are removed again when the run finishes."
   );
 }

@@ -19,7 +19,25 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  APP_ENV: production # Existing suites verify production behavior with dummy fixtures.
+
 jobs:
+  isolation:
+    name: Environment isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:environments
+      - run: node --test apps/web/e2e/seed-member.test.mjs
+      - run: node --test k6/lib/realtime-fanout.test.mjs
+      - run: python3 scripts/db/test_guard.py
+
   typecheck:
     name: TypeScript
     runs-on: ubuntu-latest

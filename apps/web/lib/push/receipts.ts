@@ -1,3 +1,4 @@
+import { deliveryEnabled } from "@uxcommunity/shared";
 /**
  * Expo push *receipt* processing.
  *
@@ -183,6 +184,7 @@ export async function processExpoPushReceipts(
   refs: ExpoPushTicketRef[],
   deps: ReceiptProcessingDeps = {},
 ): Promise<ReceiptProcessingReport> {
+  if (!deliveryEnabled(process.env)) refs = [];
   const cfg = clampPushDeliveryConfig({ ...loadPushDeliveryConfig(), ...deps.config });
   const clock = deps.clock ?? (() => Date.now());
   const doFetch = deps.fetch ?? ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args));

@@ -1,3 +1,4 @@
+import { fetchWebService } from "./web-service";
 /**
  * Community membership authorization for the realtime room DO — fail-closed.
  *
@@ -193,7 +194,7 @@ export class MembershipAuthorizer {
 
     metrics.membershipChecks += 1;
     try {
-      const response = await fetch(
+      const response = await fetchWebService(env,
         `${config.apiUrl}/api/communities/${this.deps.communityId}/members/${userId}/check`,
         {
           method: "GET",

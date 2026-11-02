@@ -1,3 +1,4 @@
+import { mobileEnvironmentKey } from "./environment";
 /**
  * Encrypted session-token storage.
  *
@@ -18,9 +19,9 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 /** SecureStore keys allow only alphanumerics, ".", "-" and "_". */
-const SECURE_SESSION_KEY = 'uxcommunity_session';
-const LEGACY_SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
-const LEGACY_DRAFT_STORAGE_KEY = '@auth/draft_session';
+const SECURE_SESSION_KEY = mobileEnvironmentKey('uxcommunity_session');
+const LEGACY_SESSION_STORAGE_KEY = mobileEnvironmentKey('@auth/uxcommunity_session');
+const LEGACY_DRAFT_STORAGE_KEY = mobileEnvironmentKey('@auth/draft_session');
 
 const isWeb = Platform.OS === 'web';
 let availability: Promise<boolean> | null = null;

@@ -1,3 +1,4 @@
+import { jobsEnabled } from "../../../packages/shared/src/environment";
 import { DurableObject } from "cloudflare:workers";
 import { decideAlert, type DependencyReportLite, type MonitorState } from "./alert-policy";
 import { logEvent } from "./log";
@@ -34,6 +35,7 @@ import type { Env } from "./env";
 export class AlertMonitor extends DurableObject<Env> {
   /** One instance is used: `idFromName("dependency-monitor")`. */
   async fetch(request: Request): Promise<Response> {
+    if (!jobsEnabled({ APP_ENV: this.env.APP_ENV })) return new Response("Disabled", { status: 403 });
     const url = new URL(request.url);
 
     // Read-only view of what the monitor knows, for debugging and smoke tests.
