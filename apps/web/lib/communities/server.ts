@@ -38,7 +38,9 @@ export async function fetchCommunityMetaSSR(
 
   // The membership's mute state paints the header's menu label; the timed
   // column is read only once its migration is applied (see read-models.ts).
-  const muteUntilSupported = await canStoreMuteUntil(db);
+  const [muteUntilSupported, showcaseSupported] = await Promise.all([
+    canStoreMuteUntil(db), canStoreShowcaseFlag(db),
+  ]);
   const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
     (muteUntilSupported
       ? db
@@ -51,7 +53,7 @@ export async function fetchCommunityMetaSSR(
     // showcase_enabled is read only once the showcase-toggle migration has
     // added the column, so the first paint works before it is applied. Each
     // branch keeps a single string literal (see read-models.ts).
-    (await canStoreShowcaseFlag(db)
+    (showcaseSupported
       ? db
           .from("communities")
           .select(

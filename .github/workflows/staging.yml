@@ -5,11 +5,15 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Select staging deployment or the read-only chat timing benchmark
+        description: Deploy staging, benchmark it, or compare a baseline with the current revision
         type: choice
-        options: [deploy, benchmark]
+        options: [deploy, benchmark, compare]
         default: deploy
         required: true
+      baseline_ref:
+        description: Exact pre-fix commit SHA for compare mode (staging is restored afterward)
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -20,7 +24,7 @@ concurrency:
 
 jobs:
   staging:
-    if: github.ref == 'refs/heads/main' && inputs.mode != 'benchmark'
+    if: github.ref == 'refs/heads/main' && inputs.mode != 'benchmark' && inputs.mode != 'compare'
     environment: staging
     runs-on: ubuntu-latest
     steps:
@@ -75,11 +79,13 @@ jobs:
         run: node --import tsx scripts/environments/staging.mjs deploy
 
   chat-open-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'benchmark'
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'benchmark' || inputs.mode == 'compare')
     environment: staging
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -135,12 +141,51 @@ jobs:
             '',
           ].join('\n'), { mode: 0o600 });
           NODE
+      - name: Prepare pre-fix staging worktree
+        if: inputs.mode == 'compare'
+        env:
+          BENCHMARK_BASELINE_REF: ${{ inputs.baseline_ref }}
+        run: node scripts/environments/chat-baseline.mjs
+      - name: Install baseline dependencies
+        if: inputs.mode == 'compare'
+        working-directory: .local/staging/chat-baseline
+        run: npm ci
+      - name: Deploy baseline to staging
+        if: inputs.mode == 'compare'
+        env:
+          CLOUDFLARE_STAGING_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_STAGING_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+        working-directory: .local/staging/chat-baseline
+        run: node --import tsx scripts/environments/staging.mjs deploy
+      - name: Measure before
+        id: before
+        if: inputs.mode == 'compare'
+        env:
+          E2E_CHAT_TIMING_OUT: .local/staging/chat-open-before.json
+          E2E_TARGET_SHA: ${{ inputs.baseline_ref }}
+        run: npm run bench:community-chat-open
+      - name: Restore merged staging revision
+        id: restore
+        if: always() && inputs.mode == 'compare'
+        env:
+          CLOUDFLARE_STAGING_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_STAGING_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+        run: node --import tsx scripts/environments/staging.mjs deploy
+      - name: Measure after
+        if: inputs.mode == 'compare' && steps.before.outcome == 'success' && steps.restore.outcome == 'success'
+        env:
+          E2E_CHAT_TIMING_OUT: .local/staging/chat-open-after.json
+          E2E_TARGET_SHA: ${{ github.sha }}
+        run: npm run bench:community-chat-open
       - name: Measure community chat opening time
+        if: inputs.mode == 'benchmark'
+        env:
+          E2E_TARGET_SHA: ${{ github.sha }}
         run: npm run bench:community-chat-open
       - name: Upload timing report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: staging-community-chat-open-timing
-          path: .local/staging/chat-open-timing.json
+          path: .local/staging/chat-open-*.json
           if-no-files-found: ignore

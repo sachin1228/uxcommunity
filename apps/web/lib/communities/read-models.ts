@@ -62,7 +62,9 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   // The membership's mute state feeds the header's Mute notifications menu.
   // The timed column is selected only once its migration is applied; each
   // branch keeps a single string literal (see the note below).
-  const muteUntilSupported = await canStoreMuteUntil(db);
+  const [muteUntilSupported, showcaseSupported] = await Promise.all([
+    canStoreMuteUntil(db), canStoreShowcaseFlag(db),
+  ]);
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
     (muteUntilSupported
       ? db
@@ -77,7 +79,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     // list matters here. Each branch keeps its column list a single string
     // literal: the query builder parses that literal into a row type, and a
     // union of column lists collapses into a parse error.
-    (await canStoreShowcaseFlag(db)
+    (showcaseSupported
       ? db
           .from("communities")
           .select(

@@ -29,6 +29,7 @@ interface UseRealtimeChatOptions {
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
   /** "<name> created a …" cards (threads/showcase/resources/events). */
   setContentEvents: React.Dispatch<React.SetStateAction<CachedContentEvent[]>>;
+  onDeleteContentEvent: (id: string) => void;
   membersRef: MutableRefObject<Member[]>;
   pendingProfileFetchRef: MutableRefObject<Map<string, Promise<void>>>;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
@@ -44,6 +45,7 @@ export function useRealtimeChat({
   setMessages,
   setThreadEvents,
   setContentEvents,
+  onDeleteContentEvent,
   membersRef,
   pendingProfileFetchRef,
   scrollContainerRef,
@@ -468,7 +470,7 @@ export function useRealtimeChat({
         if (!row.id) return;
         setThreadEvents((prev) => prev.filter((e) => e.id !== row.id));
         // The unified content card for this thread goes too.
-        setContentEvents((prev) => prev.filter((e) => e.id !== row.id));
+        onDeleteContentEvent(row.id);
       }),
     );
 
@@ -512,7 +514,7 @@ export function useRealtimeChat({
       realtimeClient.on(chatRoom, "content-delete", (data) => {
         const row = data as { id?: string };
         if (!row.id) return;
-        setContentEvents((prev) => prev.filter((e) => e.id !== row.id));
+        onDeleteContentEvent(row.id);
       }),
     );
 

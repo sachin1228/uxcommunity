@@ -189,8 +189,12 @@ node --import tsx scripts/environments/smoke.mjs --staging
 
 To measure browser-visible community chat opening time, run the read-only
 benchmark against the staging web Worker. Each sample uses a fresh browser
-context and reports the time until the composer is visible and initial message
-loading has settled, plus the messages API timing. It does not send a message
+context and reports the time until the positioned timeline (or confirmed empty
+state) and enabled composer have painted. Request durations and bootstrap
+`Server-Timing` phases are reported separately; background catch-up never gates
+the visible-readiness metric. Reports use `metricVersion: 2`; earlier reports
+waited for a messages response and are not a comparable first-paint baseline.
+The benchmark does not send a message
 or write to the database.
 
 ```sh
@@ -207,6 +211,15 @@ generated report in ignored `.local/staging/` files; do not commit them.
 For the protected GitHub Actions path, run **Deploy isolated staging** with
 `mode=benchmark`; it seeds only the documented idempotent test fixture and
 uploads the report without deploying Workers.
+
+For a matched before/after run, select `mode=compare` and supply the exact
+pre-fix commit SHA as `baseline_ref`. The staging-only job deploys that revision
+with readiness DOM annotations, runs the current benchmark, restores the merged
+revision even if the baseline test fails, then measures it on the same runner.
+It uploads separate before/after reports with commit and browser versions.
+
+Run `npm run test:community-chat-open` for the route and browser readiness
+regressions (install Chromium with `npx playwright install chromium` first).
 
 Seed loads the offline reference catalog snapshot and fictional accounts only. It
 rejects production before issuing any database request. Staging fixture logins

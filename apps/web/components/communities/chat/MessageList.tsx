@@ -241,6 +241,11 @@ export const MessageList = memo(function MessageList({
   return (
     <div
       className="min-h-full flex flex-col justify-end py-4 space-y-1"
+      role="log"
+      aria-label="Community messages"
+      aria-live="off"
+      data-community-id={communityId}
+      data-chat-ready={initialPositionResolved && (mergedGroups.length > 0 || (threadsReady && contentEventsReady))}
       style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
     >
       {/* Load-older slot. A single fixed-height row that is present the whole

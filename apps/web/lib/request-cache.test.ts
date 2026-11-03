@@ -5,6 +5,7 @@ import {
   canonicalRequestKey,
   clearRequestCache,
   fetchAndHydrateCommunityBootstrap,
+  fetchAndHydrateCommunityContentEvents,
   fetchJsonCached,
   getCachedRequest,
   initRequestCache,
@@ -15,6 +16,86 @@ import {
 } from "./request-cache"
 
 const originalFetch = globalThis.fetch
+
+test("chat bootstrap requests only the critical web snapshot", async () => {
+  let headers: Headers | undefined
+  globalThis.fetch = (async (_url, options) => {
+    headers = new Headers(options?.headers)
+    return Response.json({ community: {}, messages: { messages: [] }, permissions: {}, unreadCount: 0 })
+  }) as typeof fetch
+  await fetchAndHydrateCommunityBootstrap("a", "user-a")
+  assert.equal(headers?.get("X-Community-Bootstrap"), "chat")
+})
+
+test("slow timeline history does not block the message snapshot", async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const calls: string[] = []
+  globalThis.fetch = (async (url) => {
+    calls.push(String(url))
+    if (String(url).includes("section=content-events")) {
+      await gate
+      return Response.json({ "content-events": { events: [{ id: "event-a" }] } })
+    }
+    return Response.json({ community: {}, messages: { messages: [{ id: "message-a" }] }, permissions: {}, unreadCount: 0 })
+  }) as typeof fetch
+  const history = fetchAndHydrateCommunityContentEvents("a", "user-a")
+  const snapshot = await fetchAndHydrateCommunityBootstrap("a", "user-a")
+  assert.deepEqual(snapshot.messages, { messages: [{ id: "message-a" }] })
+  release()
+  assert.deepEqual(await history, { events: [{ id: "event-a" }] })
+  assert.deepEqual(calls, ["/api/communities/a/bootstrap", "/api/communities/a/bootstrap?section=content-events"])
+
+  // Mutations patch this canonical snapshot; a later visit must see the patch.
+  patchCachedRequest("/api/communities/a/bootstrap", (value: typeof snapshot) => ({
+    ...value, "content-events": { events: [] },
+  }), "user-a")
+  assert.deepEqual(await fetchAndHydrateCommunityContentEvents("a", "user-a"), { events: [] })
+  assert.equal(calls.length, 2)
+
+  invalidateRequest("/api/communities/a/bootstrap", "user-a")
+  await fetchAndHydrateCommunityContentEvents("a", "user-a")
+  assert.equal(calls.length, 4, "a new core snapshot must not reuse old secondary history")
+})
+
+test("a delete while history is pending survives hydration and a later cached visit", async () => {
+  let release!: () => void
+  let started!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const secondaryStarted = new Promise<void>((resolve) => { started = resolve })
+  globalThis.fetch = (async (url) => {
+    if (String(url).includes("section=content-events")) {
+      started()
+      await gate
+      return Response.json({ "content-events": { events: [{ id: "deleted" }] } })
+    }
+    return Response.json({ community: {}, messages: { messages: [] }, permissions: {}, unreadCount: 0 })
+  }) as typeof fetch
+  const pending = fetchAndHydrateCommunityContentEvents("a", "user-a")
+  await secondaryStarted
+  patchCachedRequest("/api/communities/a/bootstrap", (current) => ({
+    ...current as object, contentEventChanges: { deleted: null },
+  }), "user-a")
+  release()
+  assert.deepEqual(await pending, { events: [] })
+  assert.deepEqual(await fetchAndHydrateCommunityContentEvents("a", "user-a"), { events: [] })
+  assert.deepEqual(getCachedRequest("/api/communities/a/content-events", "user-a"), { events: [] })
+})
+
+test("a local mutation before history starts is not mistaken for complete history", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (url) => {
+    calls.push(String(url))
+    return Response.json({ "content-events": { events: [{ id: "keep" }, { id: "deleted" }] } })
+  }) as typeof fetch
+  setCachedRequest("/api/communities/a/bootstrap", {
+    community: {}, messages: { messages: [] }, permissions: {}, unreadCount: 0,
+    "content-events": { events: [] }, contentEventsLoaded: false,
+    contentEventChanges: { deleted: null },
+  }, "user-a")
+  assert.deepEqual(await fetchAndHydrateCommunityContentEvents("a", "user-a"), { events: [{ id: "keep" }] })
+  assert.deepEqual(calls, ["/api/communities/a/bootstrap?section=content-events"])
+})
 
 afterEach(() => {
   clearRequestCache()

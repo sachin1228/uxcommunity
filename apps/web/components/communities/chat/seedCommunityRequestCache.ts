@@ -29,7 +29,7 @@ export function seedCommunityRequestCache({
     [`${base}/showcase`, sections.showcase],
     [`${base}/members?page=0`, sections.members],
     [`${base}/rules`, sections.rules],
-    [`${base}/content-events`, { events: contentEvents }],
+    [`${base}/content-events`, contentEvents === undefined ? undefined : { events: contentEvents }],
   ];
   for (const [url, value] of urls) {
     if (value !== undefined) setCachedRequest(url, value, currentUserId);
@@ -50,6 +50,7 @@ export function seedCommunityRequestCache({
       permissions: undefined,
       unreadCount: 0,
       failures: [],
+      ...(contentEvents === undefined ? {} : { "content-events": { events: contentEvents } }),
     };
     setCachedRequest(`${base}/bootstrap`, bootstrap, currentUserId);
   }
