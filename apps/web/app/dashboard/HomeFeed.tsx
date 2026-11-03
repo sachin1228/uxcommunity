@@ -6,7 +6,7 @@ import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "@/components/feeds/types";
 import { Spinner } from "@/components/ui/Spinner";
-import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { fetchJsonCached, getCachedRequest, initRequestCache, invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
@@ -39,10 +39,11 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   // straight from the request cache when it has one; otherwise the standard
   // loader shows until the fetch lands.
   const cached = getCachedRequest<{ items?: FeedItem[] }>(feedUrl, currentUserId);
-  const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
-  const [loading, setLoading] = useState(() => !cached);
+  const cachedItems = Array.isArray(cached?.items) ? cached.items : undefined;
+  const [items, setItems] = useState<FeedItem[]>(() => cachedItems ?? []);
+  const [loading, setLoading] = useState(() => !cachedItems);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= FEED_PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(() => (cachedItems?.length ?? 0) >= FEED_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   /** Non-member community preview popup, opened from a card's "posted in …" label. */
   const [previewCommunityId, setPreviewCommunityId] = useState<string | null>(null);
@@ -55,8 +56,12 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
         { staleMs: 30_000, force },
         currentUserId,
       );
-      setItems(data.items ?? []);
-      setHasMore((data.items?.length ?? 0) >= FEED_PAGE_SIZE);
+      if (!Array.isArray(data?.items)) {
+        invalidateRequest(feedUrl, currentUserId);
+        throw new Error("The feed response was incomplete. Please try again.");
+      }
+      setItems(data.items);
+      setHasMore(data.items.length >= FEED_PAGE_SIZE);
       setError(null);
     } catch (fetchError: unknown) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load the feed.");
@@ -110,7 +115,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
       );
       if (!response.ok) return;
       const data = await response.json() as { items?: FeedItem[] };
-      const incoming = data.items ?? [];
+      if (!Array.isArray(data?.items)) return;
+      const incoming = data.items;
       updateItems((prev) => {
         const ids = new Set(prev.map((item) => item.id));
         return [...prev, ...incoming.filter((item) => !ids.has(item.id))];
@@ -138,6 +144,13 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
       <div role="alert" className="flex flex-col items-center justify-center gap-2 py-20 text-center">
         <p className="font-body text-sm font-medium text-red-400">Couldn&apos;t load your feed</p>
         <p className="max-w-sm font-body text-xs text-foreground-subtle">{error}</p>
+        <button
+          type="button"
+          onClick={() => void fetchFeed(false, true)}
+          className="mt-2 rounded-full border border-border px-4 py-2 font-body text-xs font-medium text-foreground hover:bg-background-subtle"
+        >
+          Try again
+        </button>
       </div>
     );
   }
