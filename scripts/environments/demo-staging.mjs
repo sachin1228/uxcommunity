@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { assertWebEnvironment } from '../../packages/shared/src/environment.ts';
 import { createClient } from '@supabase/supabase-js';
-import { migrateDemoMedia, cleanupDemoMedia } from './demo-media.mjs';
+import { migrateDemoMedia, cleanupDemoMedia, addDemoVideos } from './demo-media.mjs';
 import { root } from './local.mjs';
 
 export async function stagingDemoEnvironment() {
@@ -51,7 +51,7 @@ async function main() {
   }
   const metadata = JSON.parse(await readFile(resolve(dir,'manifest.json'),'utf8'));
   if (metadata.database !== env.NEXT_PUBLIC_SUPABASE_URL || metadata.run !== run) throw new Error('Demo cleanup project/run mismatch');
-  if (action === 'media') { await migrateDemoMedia(env,resolve(dir,'manifest.json')); return; }
+  if (action === 'media') { await migrateDemoMedia(env,resolve(dir,'manifest.json')); await addDemoVideos(env,resolve(dir,'manifest.json')); return; }
   const version = (await readFile(resolve(root,'supabase/cli-version'),'utf8')).trim();
   const childEnv = Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('PG') && !k.startsWith('SUPABASE_')));
   if (!process.env.STAGING_SUPABASE_ACCESS_TOKEN?.trim()) throw new Error('STAGING_SUPABASE_ACCESS_TOKEN required');
