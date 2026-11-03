@@ -108,6 +108,7 @@ try {
     await page.getByRole("status", { name: "Loading messages" }).waitFor({ state: "hidden", timeout: 60_000 });
 
     const ready = await page.evaluate(() => ({
+      responseStart: performance.getEntriesByType("navigation")[0]?.responseStart ?? null,
       domContentLoaded: performance.getEntriesByType("navigation")[0]?.domContentLoadedEventEnd ?? null,
     }));
     const chatReadyMs = Math.round(performance.now() - startedAt);
@@ -116,7 +117,7 @@ try {
       chatReadyMs,
       messageApiMs: messageApiAt === null ? null : Math.round(messageApiAt - startedAt),
       messageApiStatus,
-      navigationTtfbMs: Math.round(navigation.timing().responseStart - navigation.timing().startTime),
+      navigationTtfbMs: ready.responseStart === null ? null : Math.round(ready.responseStart),
       domContentLoadedMs: ready.domContentLoaded === null ? null : Math.round(ready.domContentLoaded),
     });
     await context.close();
