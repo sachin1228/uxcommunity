@@ -32,13 +32,24 @@ export async function GET(request: NextRequest) {
   }
 
   const db = createServiceClient();
-  const { data: user } = await db
-    .from("users")
-    .select(
-      "id, name, email, created_at, verification_status, verification_reapply_at, verification_rejection_reason, email_verified_at",
-    )
-    .eq("id", session.userId!)
-    .maybeSingle();
+  // The user row and its 1:1 profile are keyed by the same session id, so all
+  // three reads leave in one round trip instead of stacking the profile and
+  // grace lookup behind the users select.
+  const [{ data: user }, { data: profile }, graceDays] = await Promise.all([
+    db
+      .from("users")
+      .select(
+        "id, name, email, created_at, verification_status, verification_reapply_at, verification_rejection_reason, email_verified_at",
+      )
+      .eq("id", session.userId!)
+      .maybeSingle(),
+    db
+      .from("designer_profiles")
+      .select("id, avatar_url")
+      .eq("user_id", session.userId!)
+      .maybeSingle(),
+    getNewAccountGraceDays(),
+  ]);
 
   if (!user) {
     // M-5: User row was deleted — clear the stale cookie so the client
@@ -47,15 +58,6 @@ export async function GET(request: NextRequest) {
     clearSessionCookie(response, request.nextUrl.hostname);
     return response;
   }
-
-  const [{ data: profile }, graceDays] = await Promise.all([
-    db
-      .from("designer_profiles")
-      .select("id, avatar_url")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    getNewAccountGraceDays(),
-  ]);
 
   const verificationStatus =
     (user as { verification_status?: string }).verification_status ?? "unverified";
