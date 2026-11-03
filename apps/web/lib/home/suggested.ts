@@ -42,6 +42,44 @@ export interface SuggestedCommunity {
 }
 
 /**
+ * The columns the rail's catalog query reads. The catalog is member-independent,
+ * so it can be cached once for everyone; only `joined` varies per member.
+ */
+export interface CommunityCatalogRow {
+  id: string;
+  name: string;
+  type: string;
+  image_url: string | null;
+  description: string | null;
+  is_private: boolean | null;
+  member_count: number | null;
+}
+
+/**
+ * Combine the shared catalog with the member's own memberships.
+ *
+ * Every row is a member-led community (`type = 'user'`), which `get_all_communities`
+ * has always treated as joinable regardless of the member's profile, so
+ * `can_join` is true here. Private communities still drop out in the picker.
+ */
+export function toSuggestedSources(
+  catalog: readonly CommunityCatalogRow[],
+  joinedIds: ReadonlySet<string>,
+): SuggestedCommunitySource[] {
+  return catalog.map((row) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    image_url: row.image_url,
+    description: row.description,
+    is_private: Boolean(row.is_private),
+    member_count: row.member_count ?? 0,
+    joined: joinedIds.has(row.id),
+    can_join: true,
+  }));
+}
+
+/**
  * Picks the communities to suggest, biggest first.
  *
  * Only open, joinable communities the member is not already in are eligible —
