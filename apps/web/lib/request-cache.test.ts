@@ -18,6 +18,61 @@ import {
 const originalFetch = globalThis.fetch
 const originalAnimationFrame = globalThis.requestAnimationFrame
 
+for (const [name, body] of [
+  ["empty", ""],
+  ["HTML", "<!doctype html><html>Temporarily unavailable</html>"],
+  ["truncated JSON", '{"items":'],
+  ["null JSON", "null"],
+]) {
+  test(`rejects a successful ${name} response without caching it and allows a fresh retry`, async () => {
+    const url = "/api/home/feed?scope=all"
+    const page = { items: [{ id: "post-a" }] }
+    let calls = 0
+    globalThis.fetch = (async () => {
+      calls += 1
+      return calls === 1 ? new Response(body, { status: 200 }) : Response.json(page)
+    }) as typeof fetch
+
+    await assert.rejects(fetchJsonCached(url, {}, "user-a"), /invalid response/i)
+    assert.equal(getCachedRequest(url, "user-a"), undefined)
+    assert.deepEqual(await fetchJsonCached(url, {}, "user-a"), page)
+    assert.deepEqual(await fetchJsonCached(url, {}, "user-a"), page)
+    assert.equal(calls, 2, "only the valid response should be reused")
+  })
+}
+
+test("a failed response parse preserves the last valid cached feed", async () => {
+  const url = "/api/home/feed?scope=all"
+  const page = { items: [{ id: "post-a" }] }
+  setCachedRequest(url, page, "user-a")
+  globalThis.fetch = (async () => new Response("", { status: 200 })) as typeof fetch
+
+  await assert.rejects(fetchJsonCached(url, { force: true }, "user-a"), /invalid response/i)
+  assert.deepEqual(getCachedRequest(url, "user-a"), page)
+})
+
+test("a valid empty feed is cached and reused", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return Response.json({ items: [] })
+  }) as typeof fetch
+
+  assert.deepEqual(await fetchJsonCached("/api/home/feed", {}, "user-a"), { items: [] })
+  assert.deepEqual(await fetchJsonCached("/api/home/feed", {}, "user-a"), { items: [] })
+  assert.equal(calls, 1)
+})
+
+test("preserves HTTP error messages and status even when the error body is not JSON", async () => {
+  const url = "/api/home/feed"
+  globalThis.fetch = (async () => Response.json({ error: "Sign in required" }, { status: 401 })) as typeof fetch
+  await assert.rejects(fetchJsonCached(url, {}, "user-a"), { message: "Sign in required", status: 401 })
+
+  globalThis.fetch = (async () => new Response("Bad Gateway", { status: 502 })) as typeof fetch
+  await assert.rejects(fetchJsonCached(url, {}, "user-a"), { message: "Request failed (502)", status: 502 })
+  assert.equal(getCachedRequest(url, "user-a"), undefined)
+})
+
 test("partial chat snapshots cannot satisfy full metadata or permission reads", async () => {
   const partial = { community: { id: "a", details_loaded: false }, members: [] }
   globalThis.fetch = (async () => Response.json({

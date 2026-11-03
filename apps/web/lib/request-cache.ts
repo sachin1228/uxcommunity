@@ -172,6 +172,11 @@ export async function fetchJsonCached<T>(
         error.status = response.status
         throw error
       }
+      // A successful status can still carry an empty or non-JSON body (for
+      // example, an upstream HTML page). Never cache that as usable data.
+      if (body === null) {
+        throw new Error("The server returned an invalid response. Please try again.")
+      }
       entries.delete(key)
       entries.set(key, { value: body as T, fetchedAt: Date.now() })
       while (entries.size > MAX_ENTRIES) entries.delete(entries.keys().next().value!)
