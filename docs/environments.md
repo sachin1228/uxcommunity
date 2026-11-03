@@ -26,9 +26,12 @@ rotate or alter production credentials. `.local/` and generated credential files
 must stay ignored by Git. Startup logs and manifests contain local secrets and
 are written with owner-only permissions.
 
-The development launcher checks the stack identity and loopback endpoints before
-starting Next, the local realtime Worker and Miniflare-backed R2. It does not
-inherit production service variables or a Cloudflare deployment token. Missing
+The launcher pins this checkout to its existing local stack by stack id, so
+switching Git branches resumes the same database; without the pin the CLI treats
+each branch as a new, empty stack. It checks the stack identity and loopback
+endpoints before starting Next, the local realtime Worker and Miniflare-backed
+R2. It does not inherit production service variables or a Cloudflare deployment
+token. Missing
 configuration is an error. Re-running setup preserves an existing valid local
 manifest rather than rotating application credentials or resetting data. It restarts
 the native stack and refreshes its loopback API port/service key when necessary.

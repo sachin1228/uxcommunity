@@ -20,12 +20,28 @@ const run = (command,args,options={}) => {
   return result.stdout;
 };
 const db = args => run('npx',['--yes',`supabase@${cliVersion}`,'--workdir',work,...args]);
+// The CLI keys stacks by project root *and* Git branch; pin this checkout to
+// one stack so switching branches does not look for a different, empty stack.
+let stackIdCache;
+function stackId() {
+  if (stackIdCache !== undefined) return stackIdCache;
+  const { stacks = [] } = JSON.parse(db(['stack','list','--output-format','json']));
+  const owned = stacks.filter(stack => stack.project_root === work && stack.name === 'default');
+  let branch = null;
+  try { branch = execFileSync('git',['symbolic-ref','--short','HEAD'],{ cwd:root, encoding:'utf8' }).trim(); } catch {}
+  const preferred = pool => pool.find(stack => branch && stack.branch_context === `refs/heads/${branch}`)
+    ?? pool.find(stack => stack.branch_context === 'refs/heads/main') ?? pool[0];
+  const chosen = preferred(owned.filter(stack => stack.owner === 'reachable')) ?? preferred(owned);
+  stackIdCache = chosen?.id ?? null;
+  return stackIdCache;
+}
+const stackArgs = () => { const id = stackId(); return id ? ['--stack-id',id] : []; };
 export async function localStatus() {
   if (existsSync(resolve(work,'supabase/.temp/project-ref')) || existsSync(resolve(work,'supabase/.link.json'))) throw new Error('Local stack has a remote project link');
-  const status = JSON.parse(db(['status','--output-format','json']));
+  const status = JSON.parse(db(['status','--output-format','json',...stackArgs()]));
   if (resolve(status.identity.project_root) !== work) throw new Error('Different local project identity');
   if (status.readiness !== 'ready') throw new Error('Local Supabase is not ready; run npm run env:setup to restart it');
-  const env = JSON.parse(db(['status','--env','--output-format','json']));
+  const env = JSON.parse(db(['status','--env','--output-format','json',...stackArgs()]));
   for (const key of ['DB_URL','API_URL']) if (!['localhost','127.0.0.1','[::1]'].includes(new URL(env[key]).hostname)) throw new Error('Nonlocal Supabase endpoint');
   return env;
 }
@@ -57,7 +73,7 @@ async function setup() {
   // Startup output contains local keys: keep it in an owner-only file, never logs/CI.
   const log=resolve(work,'startup.private.log');
   await writeFile(log,'',{mode:0o600});
-  const result=spawnSync('npx',['--yes',`supabase@${cliVersion}`,'--workdir',work,'start','--runtime','native','--exclude','studio,mail,analytics,pooler,functions','--eager','--frozen'],{cwd:root,env:safeProcess(),encoding:'utf8',maxBuffer:8*1024*1024});
+  const result=spawnSync('npx',['--yes',`supabase@${cliVersion}`,'--workdir',work,'start',...stackArgs(),'--runtime','native','--exclude','studio,mail,analytics,pooler,functions','--eager','--frozen'],{cwd:root,env:safeProcess(),encoding:'utf8',maxBuffer:8*1024*1024});
   await writeFile(log,(result.stdout??'')+(result.stderr??''),{mode:0o600});
   if(result.status!==0)throw new Error('Local Supabase startup failed; inspect .local/development/startup.private.log');
   const status=await localStatus();
@@ -124,6 +140,6 @@ if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url))
   const action=process.argv[2];
   if(action==='setup')await setup();
   else if(action==='dev')await dev();
-  else if(action==='stop')db(['stop']);
+  else if(action==='stop')db(['stop',...stackArgs()]);
   else throw new Error('Use setup, dev or stop');
 }
