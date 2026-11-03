@@ -140,7 +140,8 @@
     "mail:local": "node scripts/environments/show-mail.mjs",
     "env:seed": "node --import tsx scripts/environments/seed.mjs",
     "test:environments": "node --import tsx --test scripts/environments/*.test.mjs",
-    "env:smoke": "node --import tsx scripts/environments/smoke.mjs"
+    "env:smoke": "node --import tsx scripts/environments/smoke.mjs",
+    "seed:demo": "node --import tsx scripts/environments/demo.mjs"
   },
   "engines": {
     "node": ">=22.0.0",

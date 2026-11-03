@@ -1,0 +1,525 @@
+{
+  "communities": [
+    {
+      "name": "The Product Design Room",
+      "description": "Product thinking, interaction patterns, and thoughtful critique for people shipping digital products.",
+      "focus": "product onboarding",
+      "tags": [
+        "product-design",
+        "interaction"
+      ]
+    },
+    {
+      "name": "Design Systems Collective",
+      "description": "A practical space for tokens, components, documentation, and adoption across teams.",
+      "focus": "design system adoption",
+      "tags": [
+        "design-systems",
+        "figma"
+      ]
+    },
+    {
+      "name": "Research Together",
+      "description": "Research plans, field notes, synthesis methods, and stories from talking with customers.",
+      "focus": "research recruitment",
+      "tags": [
+        "research",
+        "discovery"
+      ]
+    },
+    {
+      "name": "Portfolio Review Circle",
+      "description": "A private, supportive critique room for case studies, storytelling, and career transitions.",
+      "focus": "portfolio storytelling",
+      "tags": [
+        "portfolio",
+        "careers"
+      ]
+    },
+    {
+      "name": "Bengaluru Design Social",
+      "description": "Local studio visits, coffee conversations, and meetups for the Bengaluru design community.",
+      "focus": "community meetups",
+      "tags": [
+        "bengaluru",
+        "community"
+      ]
+    },
+    {
+      "name": "Type & Identity",
+      "description": "Explore typography, editorial layouts, visual identities, and the details that make brands memorable.",
+      "focus": "brand typography",
+      "tags": [
+        "typography",
+        "branding"
+      ]
+    },
+    {
+      "name": "Motion Makers",
+      "description": "Timing, transitions, storyboards, and experiments in motion and 3D. Share the process behind the polish.",
+      "focus": "motion feedback",
+      "tags": [
+        "motion",
+        "3d"
+      ]
+    },
+    {
+      "name": "Design Leads Roundtable",
+      "description": "Private conversations about growing teams, healthy critique, hiring, and design strategy.",
+      "focus": "team critique rituals",
+      "tags": [
+        "leadership",
+        "strategy"
+      ]
+    },
+    {
+      "name": "Accessible by Design",
+      "description": "Make inclusive design part of everyday practice: keyboard flows, content, contrast, and testing.",
+      "focus": "accessible navigation",
+      "tags": [
+        "accessibility",
+        "inclusive-design"
+      ]
+    },
+    {
+      "name": "AI & Human Experience",
+      "description": "Explore useful AI interactions, uncertainty, trust, and human control with a critical design lens.",
+      "focus": "AI onboarding",
+      "tags": [
+        "ai",
+        "trust"
+      ]
+    },
+    {
+      "name": "Early Career Designers",
+      "description": "A friendly place for first roles, practice projects, mentoring, and questions you have been saving.",
+      "focus": "first design interviews",
+      "tags": [
+        "careers",
+        "mentorship"
+      ]
+    },
+    {
+      "name": "Independent Studio Club",
+      "description": "Private peer support for proposals, scope, client communication, and sustainable freelance practice.",
+      "focus": "client handoff",
+      "tags": [
+        "freelance",
+        "business"
+      ]
+    }
+  ],
+  "topics": [
+    {
+      "open": "What is one thing you would change about {focus}?",
+      "body": "We mapped the journey before touching the interface. The biggest friction was the gap between what people expected and what the next step asked of them. How would you validate this before committing to a redesign?",
+      "category": "question"
+    },
+    {
+      "open": "A small experiment with {focus} that changed our direction",
+      "body": "We ran five short sessions with a paper prototype. People could explain the concept, but hesitated when asked to take the next action. We are rewriting the labels and reducing the number of choices before another round.",
+      "category": "discussion"
+    },
+    {
+      "open": "Looking for critique: a clearer approach to {focus}",
+      "body": "The first version tried to explain everything at once. This iteration uses a single primary action and puts supporting detail where people need it. I would especially value feedback on what feels missing.",
+      "category": "feedback"
+    },
+    {
+      "open": "What does good handoff look like for {focus}?",
+      "body": "We started recording decisions alongside the component states: loading, empty, error, and recovery. The conversations with engineering have become much more useful. What do you document beyond the happy path?",
+      "category": "question"
+    },
+    {
+      "open": "An idea for making {focus} easier to understand",
+      "body": "Instead of another introductory tour, we are trying an example people can edit immediately. It gives them a safe way to understand the model before adding their own information. Has anyone tested a similar approach?",
+      "category": "idea"
+    },
+    {
+      "open": "How we bring evidence into conversations about {focus}",
+      "body": "Our critique format is now context, evidence, decision, and open question. Starting with the customer problem has helped us avoid spending the whole session debating visual preferences. Curious how other teams structure this.",
+      "category": "discussion"
+    },
+    {
+      "open": "The overlooked edge cases in {focus}",
+      "body": "We checked long names, translated content, reduced motion, and keyboard-only use this week. A few assumptions broke immediately. Sharing this as a reminder to stress-test the content as early as the layout.",
+      "category": "discussion"
+    },
+    {
+      "open": "Would you simplify this approach to {focus}?",
+      "body": "We have two viable directions: a guided sequence with fewer choices per step, or one page with a clear overview. Returning users prefer the overview, while first-time participants want more guidance. What would you measure?",
+      "category": "feedback"
+    },
+    {
+      "open": "A useful lesson from our latest {focus} session",
+      "body": "Silence during testing was more revealing than the ratings afterwards. We stopped filling in the gaps for participants and found the wording was doing less work than we assumed. The next iteration focuses on comprehension.",
+      "category": "discussion"
+    },
+    {
+      "open": "Sharing our working checklist for {focus}",
+      "body": "Before review we check purpose, hierarchy, contrast, keyboard access, error recovery, and the smallest supported screen. It is deliberately short enough to use every week. What would you add or remove?",
+      "category": "idea"
+    }
+  ],
+  "resources": [
+    {
+      "title": "Material Design resources",
+      "description": "Official kits and guidance for exploring components, layout, and interaction patterns.",
+      "resource_type": "figma",
+      "url": "https://m2.material.io/resources/"
+    },
+    {
+      "title": "Figma variables: a practical walkthrough",
+      "description": "A video walkthrough to watch before discussing token structure and component modes.",
+      "resource_type": "video",
+      "url": "https://www.youtube.com/watch?v=L-tpK7Eeuow"
+    },
+    {
+      "title": "Apple Human Interface Guidelines",
+      "description": "Platform guidance to use when reviewing navigation, feedback, and interaction conventions.",
+      "resource_type": "article",
+      "url": "https://developer.apple.com/design/human-interface-guidelines/"
+    },
+    {
+      "title": "IBM Carbon Design System",
+      "description": "A reference for accessible enterprise components and detailed usage documentation.",
+      "resource_type": "tool",
+      "url": "https://carbondesignsystem.com/"
+    },
+    {
+      "title": "WCAG quick reference",
+      "description": "Keep this beside your accessibility review notes to connect observations to criteria.",
+      "resource_type": "article",
+      "url": "https://www.w3.org/WAI/WCAG22/quickref/"
+    },
+    {
+      "title": "Google Fonts",
+      "description": "Compare type families and explore options before narrowing a brand direction.",
+      "resource_type": "font",
+      "url": "https://fonts.google.com/"
+    },
+    {
+      "title": "Lucide icons",
+      "description": "A consistent open source icon library for interface exploration.",
+      "resource_type": "icon_pack",
+      "url": "https://lucide.dev/"
+    },
+    {
+      "title": "Unsplash design references",
+      "description": "Photography references for studio spaces, process boards, and creative practice.",
+      "resource_type": "inspiration",
+      "url": "https://unsplash.com/s/photos/design-system"
+    },
+    {
+      "title": "Blender Studio open films",
+      "description": "Explore animation, visual development, and the process behind open films.",
+      "resource_type": "video",
+      "url": "https://studio.blender.org/films/"
+    },
+    {
+      "title": "Design systems video library",
+      "description": "A watchlist for the next design systems learning session.",
+      "resource_type": "video",
+      "url": "https://designsystems.media/"
+    },
+    {
+      "title": "Figma learning hub",
+      "description": "Tutorials to work through together during a community study session.",
+      "resource_type": "figma",
+      "url": "https://help.figma.com/"
+    },
+    {
+      "title": "The Design System Guide",
+      "description": "Browse practical resources on establishing and maintaining a shared system.",
+      "resource_type": "article",
+      "url": "https://thedesignsystem.guide/resources"
+    },
+    {
+      "title": "Nielsen Norman Group articles",
+      "description": "A starting point for research methods, usability principles, and evidence-led discussion.",
+      "resource_type": "article",
+      "url": "https://www.nngroup.com/articles/"
+    },
+    {
+      "title": "WebAIM contrast checker",
+      "description": "Check text and background combinations during a quick interface audit.",
+      "resource_type": "tool",
+      "url": "https://webaim.org/resources/contrastchecker/"
+    },
+    {
+      "title": "Penpot",
+      "description": "An open source design tool to explore collaborative interface workflows.",
+      "resource_type": "tool",
+      "url": "https://penpot.app/"
+    },
+    {
+      "title": "Coolors palette exploration",
+      "description": "Try palette directions before testing contrast and real content.",
+      "resource_type": "color",
+      "url": "https://coolors.co/"
+    },
+    {
+      "title": "The A11Y Project checklist",
+      "description": "A practical checklist for building accessibility into everyday reviews.",
+      "resource_type": "article",
+      "url": "https://www.a11yproject.com/checklist/"
+    },
+    {
+      "title": "Storybook component documentation",
+      "description": "Reference for documenting component states close to implementation.",
+      "resource_type": "tool",
+      "url": "https://storybook.js.org/"
+    },
+    {
+      "title": "GOV.UK Design System",
+      "description": "Study clear content and service patterns for complex real-world tasks.",
+      "resource_type": "article",
+      "url": "https://design-system.service.gov.uk/"
+    },
+    {
+      "title": "Figma design systems learning session",
+      "description": "Watch together and discuss which practices suit a small team.",
+      "resource_type": "video",
+      "url": "https://www.youtube.com/watch?v=lsgVRCJ4fko"
+    },
+    {
+      "title": "Open source illustrations from unDraw",
+      "description": "Explore illustration directions for supportive empty states.",
+      "resource_type": "inspiration",
+      "url": "https://undraw.co/"
+    },
+    {
+      "title": "Pexels creative footage",
+      "description": "Footage references for moodboards and motion direction.",
+      "resource_type": "video",
+      "url": "https://www.pexels.com/search/videos/design/"
+    },
+    {
+      "title": "Primer by GitHub",
+      "description": "Examine patterns and components for complex developer workflows.",
+      "resource_type": "tool",
+      "url": "https://primer.style/"
+    },
+    {
+      "title": "Microsoft Fluent",
+      "description": "Explore cross-platform components and inclusive design guidance.",
+      "resource_type": "tool",
+      "url": "https://fluent2.microsoft.design/"
+    }
+  ],
+  "photos": [
+    "photo-1581291518857-4e27b48ff24e",
+    "photo-1558655146-9f40138edfeb",
+    "photo-1559028012-481c04fa702d",
+    "photo-1545235617-9465d2a55698",
+    "photo-1523726491678-bf852e717f6a",
+    "photo-1553877522-43269d4ea984",
+    "photo-1522071820081-009f0129c71c",
+    "photo-1497366754035-f200968a6e72",
+    "photo-1516321318423-f06f85e504b3",
+    "photo-1522202176988-66273c2fd55f",
+    "photo-1559136555-9303baea8ebd",
+    "photo-1531403009284-440f080d1e12"
+  ],
+  "studios": [
+    "Northstar Studio",
+    "Forma Labs",
+    "Common Ground",
+    "Parallel Works",
+    "Outline Digital",
+    "Fieldwork Studio",
+    "Daylight Products",
+    "Kindred Design",
+    "Monograph Labs",
+    "Good Measure"
+  ],
+  "bios": [
+    "Product designer exploring clear, approachable tools for everyday work. Usually sketching before opening Figma.",
+    "Researcher interested in the gap between what people say and what they do. Happy to swap discussion guides.",
+    "Building design systems with thoughtful defaults, clear documentation, and room for teams to experiment.",
+    "Independent designer working across identity and digital experiences. Here for honest critique and good typography.",
+    "Early-career designer turning research notes into prototypes. Currently refining a case study and learning motion.",
+    "Design lead focused on healthy collaboration, accessible products, and helping people do their best work."
+  ],
+  "rules": [
+    "Share the context and a specific question when asking for critique.",
+    "Be generous, specific, and respectful. Critique the work and explain your reasoning.",
+    "Credit references and collaborators. Keep private client information out of shared work."
+  ],
+  "projects": [
+    "Wayfinder — a calmer travel planning direction",
+    "Kinfolk — visual identity for a neighbourhood cafe",
+    "Tempo — finding focus without another dashboard",
+    "Open Shelf — a clearer reading discovery journey",
+    "Bloom — an approachable plant care concept",
+    "Stride — making movement feel achievable",
+    "Gather — a warmer community welcome",
+    "Ledger — simplifying a small business overview",
+    "Field Notes — an editorial exploration",
+    "Orbit — a component library visual direction",
+    "Still — reduced motion interaction study",
+    "Local Loop — discovering independent places"
+  ],
+  "projectNotes": [
+    "Sharing the moodboard and visual references for this direction. I am exploring softer contrast, generous spacing, and a clearer primary action. Photography references: Unsplash; these are process references rather than final screens.",
+    "A second look at the visual direction after critique. The aim is to make the next step easier to find without adding more explanation. Sharing the photography and workshop references that informed the exploration.",
+    "Process references from an early concept exploration. I am comparing two approaches to hierarchy and would love thoughts on which details make the direction feel more approachable. Photo references via Unsplash.",
+    "A visual research update before the next prototype session. We are checking the direction against readability, tone, and the smallest screen. These references are part of the exploration, not shipped product work."
+  ],
+  "domains": [
+    "Personal finance",
+    "Learning tools",
+    "Healthcare access",
+    "Creative collaboration",
+    "Sustainable commerce",
+    "Local discovery"
+  ],
+  "events": [
+    "Design critique night: bring one unfinished flow",
+    "Tokens and tea: design systems working session",
+    "Research synthesis without the sticky-note overload",
+    "Portfolio storytelling: from screens to decisions",
+    "Bengaluru designers: Saturday coffee and sketchbooks",
+    "Type pairing clinic: finding a useful contrast",
+    "Motion study club: timing, easing, and intent",
+    "Design leadership: building a useful critique culture",
+    "Accessibility lab: keyboard journeys together",
+    "Designing AI experiences people can question",
+    "First portfolio review: a supportive small group",
+    "Independent studio office hours: scoping the next project"
+  ],
+  "chat": [
+    "Morning! What is everyone working on around {focus} this week?",
+    "I am mapping the current journey before sketching. Already found two places where the wording makes the task harder.",
+    "Would you be open to sharing the flow in the critique session? A little context about the audience would help.",
+    "Absolutely. I will bring the before version and the assumptions we want to test.",
+    "Small reminder: the next community session is on the Events tab. Bring something unfinished.",
+    "I tried the resource shared above. The examples helped me explain the tradeoff to our engineering partner.",
+    "How do you capture decisions after critique? We keep losing the reason behind the changes.",
+    "We use three lines: what we learned, what we changed, and what still needs testing. Happy to share the format.",
+    "The keyboard pass caught an issue we missed in the visual review. Worth doing before the next session.",
+    "Thanks for the thoughtful feedback yesterday. I simplified the first step and the prototype already feels clearer."
+  ],
+  "comments": [
+    "I would test the wording with someone who has not seen the project. The next action feels clear to us because we know the context.",
+    "Could you share what happens when there is no data yet? That state might be the best place to explain the model.",
+    "The hierarchy feels much clearer. I would check the secondary text on a smaller screen before calling this done.",
+    "We ran into something similar. A short prototype session helped us choose between the two directions without another week of debate.",
+    "I like the focus on recovery. What does the person see after they make a mistake?",
+    "Have you tried using real content lengths? Longer titles changed our layout decisions quite a bit.",
+    "The context behind the decision is useful. I would bring this to the next critique and ask people to describe the journey back to you.",
+    "Worth checking with keyboard navigation too. The visual order and focus order should tell the same story.",
+    "This reminds me to document the tradeoff instead of only sharing the finished screen. Thanks for walking through the process.",
+    "For the next iteration I would isolate one assumption and test that first. It will make the feedback easier to act on."
+  ],
+  "sources": [
+    {
+      "url": "https://m2.material.io/resources/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=L-tpK7Eeuow",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://developer.apple.com/design/human-interface-guidelines/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://carbondesignsystem.com/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://www.w3.org/WAI/WCAG22/quickref/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://fonts.google.com/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://lucide.dev/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://unsplash.com/s/photos/design-system",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://studio.blender.org/films/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://designsystems.media/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://help.figma.com/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://thedesignsystem.guide/resources",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://www.nngroup.com/articles/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://webaim.org/resources/contrastchecker/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://penpot.app/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://coolors.co/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://www.a11yproject.com/checklist/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://storybook.js.org/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://design-system.service.gov.uk/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=lsgVRCJ4fko",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://undraw.co/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://www.pexels.com/search/videos/design/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://primer.style/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://fluent2.microsoft.design/",
+      "purpose": "External resource; original descriptions written for this demo"
+    },
+    {
+      "url": "https://unsplash.com/license",
+      "purpose": "Remote photography references credited in showcase captions"
+    },
+    {
+      "url": "https://i.pravatar.cc/",
+      "purpose": "Stock avatar service; fictional member identities"
+    },
+    {
+      "url": "https://www.dicebear.com/licenses/",
+      "purpose": "Geometric studio icons"
+    }
+  ]
+}
