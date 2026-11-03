@@ -39,7 +39,6 @@ const origin = new URL(APP_URL).origin;
 
 async function getStorageState() {
   const context = await browser.newContext();
-  const page = await context.newPage();
 
   if (SESSION_COOKIE) {
     await context.addCookies([{
@@ -51,20 +50,16 @@ async function getStorageState() {
       sameSite: "Lax",
     }]);
   } else {
-    await page.goto(`${APP_URL}/login`, { waitUntil: "domcontentloaded" });
-    await page.locator('input[type="email"]').fill(EMAIL);
-    await page.locator('input[type="password"]').fill(PASSWORD);
-    const loginResponsePromise = page.waitForResponse((response) => {
-      const url = new URL(response.url());
-      return url.origin === origin && url.pathname === "/api/auth/login" && response.request().method() === "POST";
-    }, { timeout: 30_000 });
-    await page.getByRole("button", { name: /sign in|log in/i }).click();
-    const loginResponse = await loginResponsePromise;
+    // Authentication is outside the timed navigation. Use the real login API
+    // and its browser-context cookie jar so form hydration cannot lose input.
+    const loginResponse = await context.request.post(`${APP_URL}/api/auth/login`, {
+      headers: { Origin: origin },
+      data: { email: EMAIL, password: PASSWORD },
+    });
     if (!loginResponse.ok()) {
       const body = await loginResponse.json().catch(() => ({}));
       throw new Error(`Staging fixture login failed (${loginResponse.status()}): ${body.error ?? "unknown login error"}`);
     }
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
   }
 
   const state = await context.storageState();
