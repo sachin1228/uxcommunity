@@ -187,6 +187,24 @@ node --import tsx scripts/environments/staging-db.mjs seed
 node --import tsx scripts/environments/smoke.mjs --staging
 ```
 
+To measure browser-visible community chat opening time, run the read-only
+benchmark against the staging web Worker. Each sample uses a fresh browser
+context and reports the time until the composer is visible and initial message
+loading has settled, plus the messages API timing. It does not send a message
+or write to the database.
+
+```sh
+E2E_APP_URL=https://uxcommunity-web-staging.patilsachin1228.workers.dev \
+E2E_COMMUNITY_ID=<community-uuid> \
+E2E_EMAIL=<staging-member-email> E2E_PASSWORD=<staging-member-password> \
+E2E_SAMPLES=10 E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json \
+  npm run bench:community-chat-open
+```
+
+An existing `uxcommunity_session` cookie can be supplied as
+`E2E_SESSION_COOKIE` instead of email and password. Keep credentials and the
+generated report in ignored `.local/staging/` files; do not commit them.
+
 Seed loads the offline reference catalog snapshot and fictional accounts only. It
 rejects production before issuing any database request. Staging fixture logins
 are `designer@staging.invalid` and `peer@staging.invalid`; their random password
