@@ -5,35 +5,22 @@ const SERVICE_UNAVAILABLE_PAGE = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#000000">
-<title>503 — This page isn't working · uxcommunity</title>
+<meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)">
+<title>503 — Temporarily unavailable · uxcommunity</title>
 <style>
   :root {
     color-scheme: light dark;
     --background: #FAFAFA;
-    --surface: #FFFFFF;
     --foreground: #0A0A0A;
-    --muted: #525252;
-    --border: #EAEAEA;
-    --accent-soft: #EBEBEB;
-    --accent: #0A0A0A;
-    --accent-hover: #333333;
-    --accent-foreground: #FFFFFF;
-    --shadow-card: 0 0 0 1px var(--border), 0 2px 4px rgb(0 0 0 / 0.04);
+    --muted: #737373;
     --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --background: #09090B;
-      --surface: #121214;
       --foreground: #EDEDED;
       --muted: #737373;
-      --border: #202024;
-      --accent-soft: #1F1F23;
-      --accent: #FFFFFF;
-      --accent-hover: #CCCCCC;
-      --accent-foreground: #000000;
     }
   }
   *, *::before, *::after { box-sizing: border-box; }
@@ -44,95 +31,95 @@ const SERVICE_UNAVAILABLE_PAGE = `<!doctype html>
     min-height: 100dvh;
     display: grid;
     place-items: center;
-    padding: 48px 24px;
+    padding: 48px 24px 88px;
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font);
     -webkit-font-smoothing: antialiased;
   }
-  .brand {
-    position: fixed;
-    top: 24px;
-    left: 24px;
-    display: inline-flex;
+  main {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    color: var(--foreground);
-  }
-  .brand svg { width: 32px; height: 32px; }
-  .card {
-    width: 100%;
-    max-width: 32rem;
-    padding: 32px;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
     text-align: center;
   }
-  .code {
-    display: grid;
-    place-items: center;
-    width: 56px;
+  .planet {
+    width: 78px;
     height: 56px;
-    margin: 0 auto 20px;
-    border-radius: 9999px;
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-family: var(--mono);
-    font-size: 14px;
-    font-weight: 600;
+    margin-bottom: 26px;
+    color: var(--foreground);
+    opacity: 0.9;
   }
   h1 {
     margin: 0;
-    font-size: 24px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--foreground);
+    font-size: clamp(112px, 27vw, 208px);
+    font-weight: 800;
+    line-height: 0.78;
+    letter-spacing: -0.055em;
   }
   p {
-    margin: 12px 0 0;
-    color: var(--muted);
+    margin: 24px 0 0;
     font-size: 14px;
-    line-height: 1.5rem;
+    line-height: 1.6;
+    color: var(--foreground);
   }
-  .actions { margin-top: 28px; }
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     height: 40px;
-    padding: 0 20px;
-    border-radius: 6px;
-    background: var(--accent);
-    color: var(--accent-foreground);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1;
+    margin-top: 32px;
+    padding: 0 26px;
+    border: 1px solid var(--foreground);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
     text-decoration: none;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: background-color 150ms ease;
+    transition: background-color 150ms ease, color 150ms ease;
   }
-  .btn:hover { background: var(--accent-hover); }
-  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  @media (max-width: 480px) {
-    .card { padding: 28px 22px; }
+  .btn:hover { background: var(--foreground); color: var(--background); }
+  .btn:focus-visible { outline: 2px solid var(--foreground); outline-offset: 3px; }
+  .brand {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.01em;
   }
+  .brand svg { width: 16px; height: 16px; }
 </style>
 </head>
 <body>
-  <span class="brand" aria-label="uxcommunity">
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" transform="translate(-0.8 -0.8) scale(1.1)" d="M14.666 7C14.666 3.667 11.999 2 7.999 2C3.999 2 1.332 3.667 1.332 7C1.332 10.333 3.999 12 7.999 12V14C7.999 14 14.666 12 14.666 7Z M4.583 7a0.75 0.75 0 1 0 1.5 0a0.75 0.75 0 1 0-1.5 0Z M7.25 7a0.75 0.75 0 1 0 1.5 0a0.75 0.75 0 1 0-1.5 0Z M9.917 7a0.75 0.75 0 1 0 1.5 0a0.75 0.75 0 1 0-1.5 0Z"/>
+  <main>
+    <svg class="planet" viewBox="0 0 120 84" fill="none" aria-hidden="true">
+      <circle cx="60" cy="42" r="21" stroke="currentColor" stroke-width="1.5"/>
+      <ellipse cx="60" cy="42" rx="43" ry="10.5" transform="rotate(-18 60 42)" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="51" cy="34" r="2.5" fill="currentColor" opacity="0.7"/>
     </svg>
-  </span>
 
-  <main class="card">
-    <div class="code" aria-hidden="true">503</div>
-    <h1>This page isn't working</h1>
-    <p>Something went wrong on our side. Give it a moment, then reload.</p>
-    <div class="actions">
-      <a class="btn" href="">Reload</a>
-    </div>
+    <h1 aria-label="Error 503">503</h1>
+    <p>The server is temporarily busy.<br>Please try again later.</p>
+    <a class="btn" href="">Try again</a>
   </main>
+
+  <footer class="brand" aria-label="uxcommunity">
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" transform="translate(-0.8 -0.8) scale(1.1)" d="M14.666 7C14.666 3.667 11.999 2 7.999 2C3.999 2 1.332 3.667 1.332 7C1.332 10.333 3.999 12 7.999 12V14C7.999 14 14.666 12 14.666 7Z M4.583 7a0.75 0.75 0 1 0 1.5 0a0.75 0.75 0 1 0-1.5 0Z M7.25 7a0.75.75 0 1 0 1.5 0a0.75 0.75 0 1 0-1.5 0Z M9.917 7a0.75.75 0 1 0 1.5 0a0.75.75 0 1 0-1.5 0Z"/>
+    </svg>
+    <span>uxcommunity</span>
+  </footer>
 </body>
 </html>
 `;

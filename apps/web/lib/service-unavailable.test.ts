@@ -45,8 +45,9 @@ test("serves the branded page for a document request", async () => {
   assert.equal(response.headers.get("retry-after"), "30")
 
   const html = await response.text()
-  assert.match(html, /This page isn't working/)
-  assert.match(html, /Something went wrong on our side/)
+  assert.match(html, /Error 503/)
+  assert.match(html, /The server is temporarily busy/)
+  assert.match(html, /Please try again later/)
   assert.match(html, /href=""/)
   assert.match(html, /aria-label="uxcommunity"/)
 })
@@ -89,7 +90,7 @@ test("replaces an empty 503 document response with the branded page", async () =
 
   assert.equal(response.status, 503)
   assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8")
-  assert.match(await response.text(), /This page isn't working/)
+  assert.match(await response.text(), /The server is temporarily busy/)
 })
 
 test("leaves successful and non-document responses untouched", async () => {
@@ -121,7 +122,7 @@ test("turns a thrown handler into the branded page", async () => {
       Promise.reject(new Error("boom")),
     )
     assert.equal(page.status, 503)
-    assert.match(await page.text(), /This page isn't working/)
+    assert.match(await page.text(), /The server is temporarily busy/)
 
     const api = await withServiceUnavailableFallback(apiRequest(), () =>
       Promise.reject(new Error("boom")),
