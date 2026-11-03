@@ -54,3 +54,7 @@ Dispatch the staging workflow with `demo_action=media`, the existing dataset ID,
 The media run uploads an updated inventory artifact. Use **that media workflow run ID** for cleanup, so both the database records and copied R2 keys are removed. Download the updated artifact locally too. Interrupted copies retain pending keys in the inventory; resume using the failed media run's artifact. Signed DELETE is required for removal; unsigned deletion is refused. Cleanup never uses a bucket-wide deletion or an unscoped prefix search.
 
 The three video attachments cover approximately 3.9 MB, 4.4 MB, and 11.1 MB downloads. The media action verifies full-file checksums and byte ranges at the start and midpoint before attaching them. Staging serves `Accept-Ranges`, `Content-Range`, and accurate content lengths for buffering and seeking. Video posts appear near the top of the feed. These are delivery checks; perceived startup time still needs manual browser testing.
+
+### 25 video posts
+
+The media action now creates 25 distinct bucket-backed video assets: the three trailers plus 22 different 8–24 second excerpts from Big Buck Bunny. Excerpts are trimmed and remuxed with FFmpeg, retain original picture/audio encoding, and have MP4 metadata moved to the front. Each post credits Blender Foundation, links CC BY 3.0, and identifies the excerpt. Source footage is downloaded once on the runner and removed afterwards. Public seed showcase posts receive one video each; private posts remain private. The same inventory tracks all 25 files for cleanup.

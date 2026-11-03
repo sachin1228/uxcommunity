@@ -1,5 +1,11 @@
 import {createHash} from 'node:crypto';
-import {readFile,writeFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdtemp,rm,stat} from 'node:fs/promises';
+import {createWriteStream} from 'node:fs';
+import {Readable,Transform} from 'node:stream';
+import {pipeline} from 'node:stream/promises';
+import {spawnSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {createClient} from '@supabase/supabase-js';
 import {S3Client,PutObjectCommand,DeleteObjectCommand} from '@aws-sdk/client-s3';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
@@ -96,23 +102,50 @@ export const demoVideos = [
  {source:'https://media.w3.org/2010/05/sintel/trailer.mp4',name:'Sintel — trailer',credit:'© 2010 Blender Foundation / durian.blender.org',study:'Animation study: lighting and visual storytelling'},
  {source:'https://media.w3.org/2010/05/bunny/trailer.mp4',name:'Big Buck Bunny — higher bitrate trailer',credit:'© 2008 Blender Foundation / www.bigbuckbunny.org',study:'Motion study: comparing detail and streaming quality'},
 ];
+const clipTopics=['Character posing','Environmental lighting','Expressive silhouettes','Camera framing','Anticipation','Visual rhythm','Secondary motion','Material contrast','Colour storytelling','Staging a scene','Gesture and expression','Timing a reaction','Depth and composition','Action continuity','Weight and momentum','Readable movement','Shape language','Texture detail','Focus and attention','Light and shadow','Scene transitions','Animation polish'];
+for(let i=0;i<22;i++) {
+ const start=12+i*22,duration=[8,12,18,24][i%4];
+ demoVideos.push({source:`https://media.w3.org/2010/05/bunny/movie.mp4#clip=${start}-${duration}`,movie:'https://media.w3.org/2010/05/bunny/movie.mp4',start,duration,name:`Big Buck Bunny — ${clipTopics[i].toLowerCase()}`,credit:'© 2008 Blender Foundation / www.bigbuckbunny.org',study:`Motion study: ${clipTopics[i].toLowerCase()}`});
+}
+export const videoPostIndices=[6,18,30,...Array.from({length:48},(_,i)=>i).filter(i=>i%4!==3 && ![6,18,30].includes(i)).slice(0,22)];
+
 export async function addDemoVideos(env,manifestPath) {
  const metadata=JSON.parse(await readFile(manifestPath,'utf8'));
  if(metadata.database!==env.NEXT_PUBLIC_SUPABASE_URL)throw new Error('Video inventory database mismatch');
  const db=createClient(env.NEXT_PUBLIC_SUPABASE_URL,env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
  const client=storage(env);
+ const temp=await mkdtemp(join(tmpdir(),'uxc-demo-video-'));
+ let moviePath;
  try {
   for(const [i,video] of demoVideos.entries()) {
-   const postId=metadata.verify.community_showcase_posts[6+i*12];
+   const postId=metadata.verify.community_showcase_posts[videoPostIndices[i]];
    const {data:post,error}=await db.from('community_showcase_posts').select('id,attachments').eq('id',postId).single();
    if(error)throw error;
    metadata.media??=[];
    let entry=metadata.media.find(m=>m.source===video.source);
    if(!entry?.uploaded) {
-    const response=await fetch(video.source,{redirect:'error',signal:AbortSignal.timeout(60000)});
-    if(!response.ok||!['video/mp4','video/x-m4v'].includes((response.headers.get('content-type')??'').split(';')[0]))throw new Error('Video source unavailable or wrong type');
-    if(Number(response.headers.get('content-length'))>50*1024*1024)throw new Error('Video exceeds staging demo limit');
-    const body=Buffer.from(await response.arrayBuffer());
+    let body;
+    if(video.movie) {
+     if(!moviePath) {
+      const response=await fetch(video.movie,{redirect:'error',signal:AbortSignal.timeout(120000)});
+      if(!response.ok)throw new Error('Animation source unavailable');
+      moviePath=join(temp,'source.mp4');
+      let size=0;
+      await pipeline(Readable.fromWeb(response.body),new Transform({transform(chunk,encoding,callback){size+=chunk.length;callback(size>300*1024*1024?new Error('Source exceeds 300MB'):null,chunk);}}),createWriteStream(moviePath));
+     }
+     const output=join(temp,`clip-${i}.mp4`);
+     const result=spawnSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-ss',String(video.start),'-i',moviePath,'-t',String(video.duration),'-map','0:v:0','-map','0:a:0?','-c','copy','-avoid_negative_ts','make_zero','-movflags','+faststart',output],{encoding:'utf8',timeout:60000});
+     if(result.status!==0)throw new Error(`Clip extraction failed: ${result.stderr??'ffmpeg unavailable'}`);
+     if((await stat(output)).size>50*1024*1024)throw new Error('Clip exceeds staging upload limit');
+     body=await readFile(output);
+     const probe=spawnSync('ffprobe',['-v','error','-show_entries','format=duration','-of','json',output],{encoding:'utf8'});
+     if(probe.status!==0||Number(JSON.parse(probe.stdout).format.duration)<1)throw new Error('Clip media metadata invalid');
+    } else {
+     const response=await fetch(video.source,{redirect:'error',signal:AbortSignal.timeout(60000)});
+     if(!response.ok||!['video/mp4','video/x-m4v'].includes((response.headers.get('content-type')??'').split(';')[0]))throw new Error('Video source unavailable or wrong type');
+     if(Number(response.headers.get('content-length'))>50*1024*1024)throw new Error('Video exceeds staging demo limit');
+     body=Buffer.from(await response.arrayBuffer());
+    }
     if(body.length>50*1024*1024)throw new Error('Video exceeds staging demo limit');
     const key=`demo/${metadata.run}/media/${digest(video.source)}.mp4`;
     const recorded=Boolean(entry);
@@ -134,11 +167,11 @@ export async function addDemoVideos(env,manifestPath) {
    entry.uploaded=true;
    await writeFile(manifestPath,JSON.stringify(metadata,null,2),{mode:0o600});
    const attachment={name:video.name,url:entry.url,type:'video/mp4',size:entry.size};
-   const patch={title:`${video.study}\n\n${video.name}. ${video.credit}. Licensed CC BY 3.0: ${entry.license}. Shared as a motion and 3D design reference, with credit to the original artists.`,category:'motion_design',is_public:true,attachments:[attachment,...(post.attachments??[]).filter(a=>a.type?.startsWith('image/'))],created_at:new Date(Date.now()-i*180000).toISOString()};
+   const patch={title:`${video.study}\n\n${video.name}. ${video.credit}. Licensed CC BY 3.0: ${entry.license}. Shared as a motion and 3D design reference, with credit to the original artists.${video.movie?` Excerpt starting around ${video.start}s, approximately ${video.duration}s long, trimmed and remuxed for this demo.`:''}`,category:'motion_design',is_public:true,attachments:[attachment,...(post.attachments??[]).filter(a=>a.type?.startsWith('image/'))],created_at:new Date(Date.now()-i*180000).toISOString()};
    const {error:updateError}=await db.from('community_showcase_posts').update(patch).eq('id',postId);if(updateError)throw updateError;
    const {data:check,error:checkError}=await db.from('community_showcase_posts').select('attachments').eq('id',postId).single();
    if(checkError||check.attachments[0]?.url!==entry.url)throw new Error('Video attachment database verification failed');
    console.info(`Video verified for playback and seeking: ${video.name} (${entry.size} bytes)`);
   }
- } finally {client.destroy();}
+ } finally {client.destroy();await rm(temp,{recursive:true,force:true});}
 }
