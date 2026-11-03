@@ -2,21 +2,26 @@
 import bcrypt from 'bcryptjs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { readLocalEnvironment, localStatus, work } from './local.mjs';
+import { stagingDemoEnvironment, demoRun, cleanupStatement } from './demo-staging.mjs';
+import { readLocalEnvironment, localStatus, work, root } from './local.mjs';
 
-const env = await readLocalEnvironment(); // verifies stack identity and loopback URLs
-if (env.APP_ENV !== 'development') throw new Error('Demo data is local development only');
-const status = await localStatus();
+const stagingPlan = process.argv.includes('--staging-plan');
+const run = stagingPlan ? demoRun(process.argv[process.argv.indexOf('--run')+1]) : null;
+const sqlPlan = [], cleanupPlan = [];
+const env = stagingPlan ? await stagingDemoEnvironment() : await readLocalEnvironment(); // verifies stack identity and loopback URLs
+if (!stagingPlan && env.APP_ENV !== 'development') throw new Error('Demo data is local development only');
+const status = stagingPlan ? null : await localStatus();
 const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-const id = key => { const h = createHash('sha256').update(`uxc-video-demo-v1:${key}`).digest('hex'); return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`; };
+const id = key => { const h = createHash('sha256').update(`uxc-video-demo-${run ?? 'v1'}:${key}`).digest('hex'); return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`; };
 const ago = hours => new Date(Date.now() - hours * 3600000).toISOString();
 const future = days => ago(-days * 24);
 const counts = {};
 async function put(table, rows, onConflict = 'id') {
   if (!rows.length) return;
+  if (stagingPlan) cleanupPlan.unshift(cleanupStatement(table,rows,onConflict));
   // The existing fixture bypass is transaction scoped; normal application limits stay active.
   if (!/^[a-z_]+$/.test(table)) throw new Error('Invalid table');
   for (let i = 0; i < rows.length; i += 100) {
@@ -25,6 +30,7 @@ async function put(table, rows, onConflict = 'id') {
     if (columns.some(c => !/^[a-z_]+$/.test(c))) throw new Error('Invalid column');
     const payload = JSON.stringify(batch).replaceAll("'", "''");
     const sql = `BEGIN; SET LOCAL app.bypass_creation_limits = 'on'; INSERT INTO public.${table} (${columns.join(',')}) SELECT ${columns.join(',')} FROM jsonb_populate_recordset(NULL::public.${table}, '${payload}'::jsonb) ON CONFLICT DO NOTHING; COMMIT;`;
+    if (stagingPlan) { sqlPlan.push(sql); continue; }
     const result = spawnSync('psql', ['-X','-q','-v','ON_ERROR_STOP=1','--dbname',status.DB_URL], { input:sql, encoding:'utf8', env:Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('PG'))) });
     if (result.status !== 0) throw new Error(`${table}: ${result.stderr}`);
   }
@@ -37,12 +43,12 @@ const photo = n => `https://images.unsplash.com/${content.photos[n % content.pho
 const first = ['Aarav','Maya','Priya','Oliver','Ananya','Leo','Zara','Arjun','Sofia','Kabir','Emma','Rohan','Amelia','Ishaan','Noor','Liam','Diya','Ethan','Meera','Lucas'];
 const last = ['Shah','Chen','Patel','Williams','Mehta','Kim','Rao','Martinez','Singh','Anderson','Nair','Park','Kapoor','Wilson','Das','Nguyen','Iyer','Garcia','Malik','Thompson'];
 const passwordHash = await bcrypt.hash(env.DEV_USER_PASSWORD, 12);
-const users = Array.from({ length: 100 }, (_, i) => ({ id: id(`user:${i}`), name: `${first[i % 20]} ${last[(i * 7 + Math.floor(i / 20)) % 20]}`, email: `designer.${i + 1}@demo.invalid`, password_hash: passwordHash, verification_status: 'approved', email_verified_at: ago(1000), age_confirmed_at: ago(1000), terms_accepted_at: ago(1000), created_at: ago(1000 - i * 5) }));
+const users = Array.from({ length: 100 }, (_, i) => ({ id: id(`user:${i}`), name: `${first[i % 20]} ${last[(i * 7 + Math.floor(i / 20)) % 20]}`, email: `designer.${i + 1}${run ? `.${run}` : ''}@demo.invalid`, password_hash: passwordHash, verification_status: 'approved', email_verified_at: ago(1000), age_confirmed_at: ago(1000), terms_accepted_at: ago(1000), created_at: ago(1000 - i * 5) }));
 await put('users', users);
-const companies = content.studios.map((name, i) => ({ id: id(`company:${i}`), name, slug: `demo-${name.toLowerCase().replaceAll(' ', '-')}`, industry: 'Design and technology', logo_url: `https://api.dicebear.com/9.x/shapes/svg?seed=${encodeURIComponent(name)}`, created_by: users[i].id }));
+const companies = content.studios.map((name, i) => ({ id: id(`company:${i}`), name, slug: `demo-${run ? `${run}-` : ''}${name.toLowerCase().replaceAll(' ', '-')}`, industry: 'Design and technology', logo_url: `https://api.dicebear.com/9.x/shapes/svg?seed=${encodeURIComponent(name)}`, created_by: users[i].id }));
 await put('companies', companies);
 await put('designer_profiles', users.map((u, i) => ({ id: id(`profile:${i}`), user_id: u.id, city_id: cities[i % cities.length].id, sector_id: sectors[i % sectors.length].id, experience_level: levels[i % levels.length].slug, job_title: roles[i % roles.length].slug, company_id: companies[i % companies.length].id, avatar_url: `https://i.pravatar.cc/160?img=${1 + i % 70}`, avatar_source: 'upload', bio: content.bios[i % content.bios.length], communities_auto_joined: true })), 'user_id');
-const { data: existingUsers, error: usersError } = await db.from('users').select('id,email').not('email','like','%@demo.invalid').eq('is_blocked',false);
+const { data: existingUsers, error: usersError } = stagingPlan ? {data:[],error:null} : await db.from('users').select('id,email').not('email','like','%@demo.invalid').eq('is_blocked',false);
 if (usersError) throw usersError;
 const viewers = existingUsers.map(u => u.id);
 const communities = content.communities.map((c, i) => ({ id: id(`community:${i}`), name: c.name, description: c.description, type: 'user', owner_id: users[i].id, is_private: i % 4 === 3, is_public: i % 4 !== 3, enabled_tabs: ['chat','threads','events','resources'], image_url: photo(i), created_at: ago(800 - i * 10) }));
@@ -125,6 +131,16 @@ for (const user_id of [...viewers, users[0].id]) {
  await put('event_saves', events.slice(0,4).map(e => ({ event_id:e.id,user_id })), 'event_id,user_id');
  await put('notifications', jobs.slice(0,3).map((j,i) => ({ id:id(`notification:${user_id}:${i}`),user_id,type:'job_match',entity_type:'job',entity_id:j.id,title:'A new role for your next chapter',body:`${j.title} at ${companies[i % companies.length].name}`,href:'/dashboard/jobs',created_at:ago(0.5+i) })));
 }
+if (stagingPlan) {
+ const dir = resolve(root,'.local/staging/demo',run);
+ await mkdir(dir,{recursive:true,mode:0o700});
+ const wrap = sql => `BEGIN; SET LOCAL app.bypass_creation_limits = 'on';\n${sql}\nCOMMIT;\n`;
+ // Exclusive creation preserves the original cleanup inventory if a run is reused.
+ await writeFile(resolve(dir,'manifest.json'),JSON.stringify({run,database:env.NEXT_PUBLIC_SUPABASE_URL,counts,created_at:new Date().toISOString()},null,2),{mode:0o600,flag:'wx'});
+ await writeFile(resolve(dir,'cleanup.sql'),wrap(cleanupPlan.join('\n')),{mode:0o600,flag:'wx'});
+ await writeFile(resolve(dir,'seed.sql'),wrap(sqlPlan.map(sql=>sql.replace(/^BEGIN; /,'').replace(/ COMMIT;$/,'')).join('\n')),{mode:0o600,flag:'wx'});
+ console.info('Staging plan and cleanup inventory saved. Demo login email: '+users[0].email);
+} else {
 // Verify persisted seed identities, not the number of attempted inserts.
 for (const [table, rows] of Object.entries({ users,communities,community_threads:threads,community_showcase_posts:showcases,job_posts:jobs,community_resources:resources,community_events:events })) {
  const { count,error } = await db.from(table).select('id',{count:'exact',head:true}).in('id',rows.map(r=>r.id));
@@ -141,3 +157,5 @@ for (const p of viewerProfiles ?? []) {
 }
 await writeFile(resolve(work,'demo-summary.json'),JSON.stringify({ generated_at:new Date().toISOString(),counts,login:'designer.1@demo.invalid',password:'Use DEV_USER_PASSWORD from environment.json',sources:content.sources },null,2),{mode:0o600});
 console.info(JSON.stringify({ counts, login:'designer.1@demo.invalid', note:'Use your existing local account, or the demo login with DEV_USER_PASSWORD from the private local manifest.' },null,2));
+
+}

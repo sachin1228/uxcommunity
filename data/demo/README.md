@@ -31,3 +31,18 @@ Suggested tour: Feed → a photo showcase → poll and replies → private Portf
 Photos are remote Unsplash references credited in showcase captions. Studio marks use DiceBear shapes; fictional members use stock Pravatar portraits. The native animation reference includes creator and license attribution in its post. External media requires internet access; check playback and allow images to load before recording. See `editorial.json` for the resource/source manifest and original editorial copy. No third-party articles or job listings are copied into the dataset.
 
 The seed verifies the persisted IDs and exact counts for users, communities, posts, showcases, jobs, resources, and events before reporting success. The full script was executed twice locally to exercise conflict handling.
+
+## Temporary staging test
+
+Use the manual **Temporary staging demo data** Actions workflow, with action `seed` and a unique run ID such as `staging-video-20261103`. It reuses the staging environment's existing secrets and verifies the live application/database identity before any write. This does not deploy the website. All inserts commit in one transaction. Existing staging accounts are not modified; use `designer.1.<run-id>@demo.invalid` with staging's `DEV_USER_PASSWORD`, or join a public demo community from an existing account. Private demo rooms are accessible to their demo members.
+
+Keep the seed Actions run URL. After testing, dispatch the same workflow with action `cleanup`, the same dataset ID, and the numeric seed Actions run ID. It restores that run's exact cleanup inventory from an artifact and verifies the staging project again. The artifact is retained for 90 days; download and retain it if testing lasts longer. Cleanup is manual, so data stays available until testing is finished. Cleanup removes seeded rows and cascading activity inside those demo-owned records, including interactions you add while testing. It does not delete unrelated staging accounts or content. Media uses external URLs, so this run creates no R2 objects to remove.
+
+Local equivalent (requires the staging settings and operator token):
+
+```
+node --import tsx scripts/environments/demo-staging.mjs seed --run staging-video-20261103
+node --import tsx scripts/environments/demo-staging.mjs cleanup --run staging-video-20261103
+```
+
+The staging lifecycle has guard/unit checks, but has not been executed against staging yet. A dataset makes network and database latency more representative for manual testing. It does not simulate concurrent traffic; images and video are hosted externally, so their timing is not an R2 upload/delivery benchmark.

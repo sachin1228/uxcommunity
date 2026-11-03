@@ -1,0 +1,76 @@
+name: Temporary staging demo data
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Seed now or clean up after testing
+        type: choice
+        options: [seed, cleanup]
+        required: true
+      run_id:
+        description: Unique dataset ID (e.g. staging-video-20261103)
+        type: string
+        required: true
+      seed_workflow_run:
+        description: For cleanup, the numeric Actions run ID of the seed run
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+jobs:
+  demo:
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate lifecycle helpers
+        run: node --import tsx --test scripts/environments/demo-staging.test.mjs
+      - name: Prepare staging settings
+        env:
+          STAGING_CONFIGURATION: ${{ secrets.STAGING_CONFIGURATION }}
+          DEMO_RUN: ${{ inputs.run_id }}
+          DEMO_ACTION: ${{ inputs.action }}
+          SEED_RUN: ${{ inputs.seed_workflow_run }}
+        run: |
+          node --input-type=module <<'JS'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          if (!/^[a-z0-9][a-z0-9-]{7,47}$/.test(process.env.DEMO_RUN ?? '')) throw new Error('Invalid dataset ID');
+          if (process.env.DEMO_ACTION === 'cleanup' && !/^\d+$/.test(process.env.SEED_RUN ?? '')) throw new Error('Cleanup requires seed workflow run ID');
+          await mkdir('.local/staging',{recursive:true,mode:0o700});
+          await writeFile('.local/staging/environment.json',process.env.STAGING_CONFIGURATION,{mode:0o600});
+          JS
+      - name: Restore exact cleanup inventory
+        if: inputs.action == 'cleanup'
+        uses: actions/download-artifact@v4
+        with:
+          name: staging-demo-${{ inputs.run_id }}
+          path: .local/staging/demo/${{ inputs.run_id }}
+          run-id: ${{ inputs.seed_workflow_run }}
+          github-token: ${{ github.token }}
+      - name: Seed or clean staging demo
+        env:
+          STAGING_SUPABASE_ACCESS_TOKEN: ${{ secrets.STAGING_SUPABASE_ACCESS_TOKEN }}
+          DEMO_RUN: ${{ inputs.run_id }}
+          DEMO_ACTION: ${{ inputs.action }}
+        run: node --import tsx scripts/environments/demo-staging.mjs "$DEMO_ACTION" --run "$DEMO_RUN"
+      - name: Preserve cleanup inventory even if seeding fails
+        if: always() && inputs.action == 'seed'
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-demo-${{ inputs.run_id }}
+          path: |
+            .local/staging/demo/${{ inputs.run_id }}/cleanup.sql
+            .local/staging/demo/${{ inputs.run_id }}/manifest.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90
