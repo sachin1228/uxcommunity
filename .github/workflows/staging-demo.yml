@@ -16,12 +16,22 @@ on:
         type: string
         required: false
 
+  workflow_call:
+    inputs:
+      action:
+        type: string
+        required: true
+      run_id:
+        type: string
+        required: true
+      seed_workflow_run:
+        type: string
+        default: ''
+        required: false
+
 permissions:
   contents: read
   actions: read
-concurrency:
-  group: staging-deployment
-  cancel-in-progress: false
 jobs:
   demo:
     environment: staging
