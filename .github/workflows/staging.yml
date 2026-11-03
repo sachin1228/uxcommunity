@@ -3,6 +3,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Select staging deployment or the read-only chat timing benchmark
+        type: choice
+        options: [deploy, benchmark]
+        default: deploy
+        required: true
 
 permissions:
   contents: read
@@ -13,7 +20,7 @@ concurrency:
 
 jobs:
   staging:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.mode != 'benchmark'
     environment: staging
     runs-on: ubuntu-latest
     steps:
@@ -66,3 +73,51 @@ jobs:
           CLOUDFLARE_STAGING_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_STAGING_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
         run: node --import tsx scripts/environments/staging.mjs deploy
+
+  chat-open-benchmark:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'benchmark'
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare private staging manifest
+        env:
+          STAGING_CONFIGURATION: ${{ secrets.STAGING_CONFIGURATION }}
+        run: |
+          umask 077
+          mkdir -p .local/staging
+          printf '%s' "$STAGING_CONFIGURATION" > .local/staging/environment.json
+      - name: Seed idempotent staging fixture
+        env:
+          STAGING_SUPABASE_ACCESS_TOKEN: ${{ secrets.STAGING_SUPABASE_ACCESS_TOKEN }}
+        run: node --import tsx scripts/environments/staging-db.mjs seed
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Measure community chat opening time
+        run: |
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          import { readFile } from 'node:fs/promises';
+          const env = JSON.parse(await readFile('.local/staging/environment.json', 'utf8'));
+          if (env.APP_ENV !== 'staging' || !env.NEXT_PUBLIC_APP_URL.includes('staging')) {
+            throw new Error('Refusing to benchmark an unverified staging target');
+          }
+          console.log(`E2E_APP_URL=${env.NEXT_PUBLIC_APP_URL}`);
+          console.log('E2E_EMAIL=designer@staging.invalid');
+          console.log(`E2E_PASSWORD=${env.DEV_USER_PASSWORD}`);
+          console.log('E2E_COMMUNITY_ID=de000000-0000-4000-8000-000000000001');
+          console.log('E2E_SAMPLES=10');
+          console.log('E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json');
+          NODE
+          npm run bench:community-chat-open
+      - name: Upload timing report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-community-chat-open-timing
+          path: .local/staging/chat-open-timing.json
+          if-no-files-found: ignore
