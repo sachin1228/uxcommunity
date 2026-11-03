@@ -5,7 +5,7 @@ on:
       action:
         description: Seed now or clean up after testing
         type: choice
-        options: [seed, cleanup]
+        options: [seed, media, cleanup]
         required: true
       run_id:
         description: Unique dataset ID (e.g. staging-video-20261103)
@@ -55,12 +55,12 @@ jobs:
           node --input-type=module <<'JS'
           import {mkdir,writeFile} from 'node:fs/promises';
           if (!/^[a-z0-9][a-z0-9-]{7,47}$/.test(process.env.DEMO_RUN ?? '')) throw new Error('Invalid dataset ID');
-          if (process.env.DEMO_ACTION === 'cleanup' && !/^\d+$/.test(process.env.SEED_RUN ?? '')) throw new Error('Cleanup requires seed workflow run ID');
+          if (['cleanup','media'].includes(process.env.DEMO_ACTION) && !/^\d+$/.test(process.env.SEED_RUN ?? '')) throw new Error('Cleanup requires seed workflow run ID');
           await mkdir('.local/staging',{recursive:true,mode:0o700});
           await writeFile('.local/staging/environment.json',process.env.STAGING_CONFIGURATION,{mode:0o600});
           JS
       - name: Restore exact cleanup inventory
-        if: inputs.action == 'cleanup'
+        if: inputs.action == 'cleanup' || inputs.action == 'media'
         uses: actions/download-artifact@v4
         with:
           name: staging-demo-${{ inputs.run_id }}
@@ -74,7 +74,7 @@ jobs:
           DEMO_ACTION: ${{ inputs.action }}
         run: node --import tsx scripts/environments/demo-staging.mjs "$DEMO_ACTION" --run "$DEMO_RUN"
       - name: Preserve cleanup inventory even if seeding fails
-        if: always() && inputs.action == 'seed'
+        if: always() && (inputs.action == 'seed' || inputs.action == 'media')
         uses: actions/upload-artifact@v4
         with:
           name: staging-demo-${{ inputs.run_id }}

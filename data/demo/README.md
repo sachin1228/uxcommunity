@@ -46,3 +46,9 @@ node --import tsx scripts/environments/demo-staging.mjs cleanup --run staging-vi
 ```
 
 The staging lifecycle has guard/unit checks, but has not been executed against staging yet. A dataset makes network and database latency more representative for manual testing. It does not simulate concurrent traffic; images and video are hosted externally, so their timing is not an R2 upload/delivery benchmark.
+
+### Copy demo images to the staging bucket
+
+Dispatch the staging workflow with `demo_action=media`, the existing dataset ID, and `demo_seed_workflow_run` pointing to its latest inventory artifact. This copies external demo photography, portraits, and studio icons into `uxcommunity-staging-media` under `demo/<run-id>/media/`. It verifies object bytes through the staging public media route before updating the seeded database image URLs. Text attribution and external resource links remain. The animation video remains external.
+
+The media run uploads an updated inventory artifact. Use **that media workflow run ID** for cleanup, so both the database records and copied R2 keys are removed. Download the updated artifact locally too. Interrupted copies retain pending keys in the inventory; resume using the failed media run's artifact. Signed DELETE is required for removal; unsigned deletion is refused. Cleanup never uses a bucket-wide deletion or an unscoped prefix search.
