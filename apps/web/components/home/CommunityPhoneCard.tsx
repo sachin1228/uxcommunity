@@ -183,7 +183,7 @@ export function CommunityPhoneCard() {
         id={headingId}
         className="relative px-4 pt-5 text-center font-display text-[15px] font-semibold leading-snug text-overlay-foreground"
       >
-        Mobile app launching soon!
+        Join our mobile app beta!
       </h2>
 
       <p className="relative mx-auto mt-2 max-w-[248px] px-4 text-center font-body text-xs leading-relaxed text-overlay-foreground/70">
