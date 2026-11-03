@@ -4,6 +4,7 @@ type TimingDetails = Record<string, number>
 
 const encoder = new TextEncoder()
 const round = (value: number) => Math.round(value * 100) / 100
+export const MIDDLEWARE_TIMING_HEADER = "x-uxc-middleware-timing"
 
 export function estimateJsonBytes(value: unknown) {
   try {
@@ -27,7 +28,7 @@ export function estimateJsonBytes(value: unknown) {
  *      want to surface the timings to the browser can attach it with
  *      `response.headers.set("Server-Timing", timing)`.
  */
-export function createServerTimer(label: string) {
+export function createServerTimer(label: string, prefix = "") {
   const startedAt = performance.now()
   let checkpointAt = startedAt
   const details: TimingDetails = {}
@@ -35,10 +36,10 @@ export function createServerTimer(label: string) {
 
   /** `name;dur=1.23` pairs, `total` first so a tailer sees the headline number. */
   const toServerTiming = (): string => {
-    const parts: string[] = [`total;dur=${details.total ?? round(performance.now() - startedAt)}`]
+    const parts: string[] = [`${prefix}total;dur=${details.total ?? round(performance.now() - startedAt)}`]
     for (const [name, value] of Object.entries(details)) {
-      if (name === "total") continue
-      parts.push(`${name};dur=${value}`)
+      if (["total", "status", "query_count", "returned_rows", "response_bytes"].includes(name)) continue
+      parts.push(`${prefix}${name};dur=${value}`)
     }
     return parts.join(", ")
   }

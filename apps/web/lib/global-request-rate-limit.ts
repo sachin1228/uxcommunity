@@ -1,5 +1,11 @@
 import type { NextRequest } from "next/server";
 import { rateLimit, type RateLimitResult } from "@/lib/auth/rate-limit";
+import type { createServerTimer } from "@/lib/server-timing";
+
+type LimitOptions = {
+  limit?: typeof rateLimit;
+  timer?: Pick<ReturnType<typeof createServerTimer>, "measure">;
+};
 
 /**
  * Global request protection is intentionally generous for normal page loads,
@@ -24,7 +30,7 @@ const SUSTAINED_VERDICT_MAX_ENTRIES = 5_000;
 
 const sustainedVerdicts = new Map<string, { resetAt: number; checkedAt: number }>();
 
-async function checkSustainedLimit(key: string): Promise<RateLimitResult> {
+async function checkSustainedLimit(key: string, limit: typeof rateLimit): Promise<RateLimitResult> {
   const now = Date.now();
   const cached = sustainedVerdicts.get(key);
   if (cached && now - cached.checkedAt < SUSTAINED_VERDICT_TTL_MS) {
@@ -32,7 +38,7 @@ async function checkSustainedLimit(key: string): Promise<RateLimitResult> {
     return { success: true, remaining: -1, resetAt: cached.resetAt };
   }
 
-  const result = await rateLimit(
+  const result = await limit(
     `global-request:sustained:${key}`,
     GLOBAL_REQUEST_LIMITS.sustained.limit,
     GLOBAL_REQUEST_LIMITS.sustained.windowS
@@ -89,14 +95,20 @@ export function getGlobalRequestKey(
 }
 
 export async function checkGlobalRequestRateLimit(
-  key: string
+  key: string,
+  { limit = rateLimit, timer }: LimitOptions = {},
 ): Promise<GlobalRequestRateLimitResult> {
-  // Burst window: strict, checked on every request.
-  const burst = await rateLimit(
-    `global-request:burst:${key}`,
-    GLOBAL_REQUEST_LIMITS.burst.limit,
-    GLOBAL_REQUEST_LIMITS.burst.windowS
-  );
+  const measure = <T>(name: string, operation: () => Promise<T>) =>
+    timer ? timer.measure(name, operation) : operation();
+  // Independent windows share one network wait. Neither quota is weakened.
+  const [burst, sustained] = await Promise.all([
+    measure("global_burst", () => limit(
+      `global-request:burst:${key}`,
+      GLOBAL_REQUEST_LIMITS.burst.limit,
+      GLOBAL_REQUEST_LIMITS.burst.windowS,
+    )),
+    measure("global_sustained", () => checkSustainedLimit(key, limit)),
+  ]);
   if (!burst.success) {
     sustainedVerdicts.delete(key);
     return {
@@ -106,8 +118,6 @@ export async function checkGlobalRequestRateLimit(
     };
   }
 
-  // Sustained window: verified against Redis at most every TTL per worker.
-  const sustained = await checkSustainedLimit(key);
   if (!sustained.success) {
     return {
       success: false,

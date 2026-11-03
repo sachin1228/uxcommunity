@@ -3,6 +3,8 @@ import test, { afterEach } from "node:test"
 
 import {
   DEFAULT_HOME_FEED_SCOPE,
+  HOME_FEED_SCOPE_COOKIE,
+  homeFeedScopeFromCookie,
   HOME_FEED_FILTER_SCOPES,
   HOME_FEED_SCOPE_STORAGE_KEY,
   HOME_FEED_SCOPES,
@@ -28,7 +30,24 @@ function stubStorage(initial: Record<string, string> = {}) {
 
 afterEach(() => {
   delete (globalThis as unknown as { window?: unknown }).window
+  delete (globalThis as unknown as { document?: unknown }).document
 })
+
+test("server filter accepts only the two UI scopes", () => {
+  assert.equal(homeFeedScopeFromCookie("communities"), "communities");
+  for (const invalid of [undefined, "all", "public", "unknown"]) assert.equal(homeFeedScopeFromCookie(invalid), "all");
+});
+
+test("filter is mirrored to a host cookie even when localStorage is blocked", () => {
+  (globalThis as unknown as { window: unknown }).window = {
+    location: { protocol: "https:" },
+    get localStorage() { throw new Error("blocked"); },
+  };
+  const document = { cookie: "" };
+  (globalThis as unknown as { document: unknown }).document = document;
+  storeHomeFeedScope("communities");
+  assert.equal(document.cookie, `${HOME_FEED_SCOPE_COOKIE}=communities; Path=/; Max-Age=31536000; SameSite=Lax; Secure`);
+});
 
 test("the feed opens on all posts and offers two filters", () => {
   assert.equal(DEFAULT_HOME_FEED_SCOPE, "all")

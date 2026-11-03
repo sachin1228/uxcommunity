@@ -6,13 +6,15 @@ import { createSession, getAdminEpoch, setSessionCookie } from "@/lib/auth/sessi
 import {
   AccountUnavailableError,
   createAuthSession,
-  revokeAuthSession,
+  createLoginSession,
+  PasswordChangedError,
 } from "@/lib/auth/session-registry";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
 import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
 import { secureEqual } from "@/lib/auth/secure-compare";
 import { isSignupIncomplete } from "@/lib/auth/signup-status";
+import { createServerTimer, MIDDLEWARE_TIMING_HEADER } from "@/lib/server-timing";
 import {
   getNewAccountGraceDays,
   isVerificationBannerVisible,
@@ -32,6 +34,22 @@ type LoginUserRow = {
 };
 
 export async function POST(request: NextRequest) {
+  const timer = createServerTimer("POST /api/auth/login");
+  try {
+    const response = await login(request, timer);
+    response.headers.set("Server-Timing", [
+      request.headers.get(MIDDLEWARE_TIMING_HEADER),
+      timer.finish({ status: response.status }),
+    ].filter(Boolean).join(", "));
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  } catch (error) {
+    timer.finish({ status: 500 });
+    throw error;
+  }
+}
+
+async function login(request: NextRequest, timer: ReturnType<typeof createServerTimer>) {
   const ip = getRequestClientIp(request);
 
   let body: unknown;
@@ -55,10 +73,10 @@ export async function POST(request: NextRequest) {
   // IP-level gate (10 per 15 min per IP) and per-account gate (20 per 15 min
   // per account) run concurrently — both were previously awaited sequentially,
   // adding one extra external Redis round trip to every login attempt.
-  const [rlIp, rlEmail] = await Promise.all([
+  const [rlIp, rlEmail] = await timer.measure("login_limits", () => Promise.all([
     rateLimit(`login:ip:${ip}`, 10, 900),
     rateLimit(`login:email:${normalizedEmail}`, 20, 900),
-  ]);
+  ]));
   if (!rlIp.success) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again later." },
@@ -97,16 +115,16 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const { sessionId } = await createAuthSession({
+      const { sessionId } = await timer.measure("session_create", () => createAuthSession({
         role: "admin",
         userAgent: request.headers.get("user-agent"),
-      });
-      const token = await createSession({
+      }));
+      const token = await timer.measure("sign", () => createSession({
         email: adminEmail,
         role: "admin",
         sid: sessionId,
         adm,
-      });
+      }));
       const response = NextResponse.json({ success: true, redirect: "/admin" });
       setSessionCookie(response, token, request.nextUrl.hostname);
       return response;
@@ -132,13 +150,13 @@ export async function POST(request: NextRequest) {
   // check: an uploaded picture is optional at signup (see
   // lib/auth/signup-status.ts). It rides the same embed only so the mobile
   // client can paint the signed-in member without a second /me round trip.
-  const { data: rawUser } = await db
+  const { data: rawUser } = await timer.measure("account_lookup", async () => db
     .from("users")
     .select(
       "id, name, email, password_hash, is_blocked, created_at, verification_status, verification_reapply_at, verification_rejection_reason, designer_profiles!user_id(id, avatar_url)",
     )
     .eq("email", normalizedEmail)
-    .maybeSingle();
+    .maybeSingle());
   const row = rawUser as unknown as LoginUserRow | null;
   const profile = row?.designer_profiles ?? null;
 
@@ -150,7 +168,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const passwordMatch = await bcrypt.compare(password, row.password_hash);
+  const passwordMatch = await timer.measure("password_compare", () => bcrypt.compare(password, row.password_hash));
   if (!passwordMatch) {
     return NextResponse.json(
       { error: "Invalid email or password." },
@@ -176,6 +194,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Start noncritical settings alongside the remaining login work.
+  const graceDaysPromise = row.verification_status === "approved"
+    ? Promise.resolve(0)
+    : timer.measure("verification_settings", getNewAccountGraceDays);
+
   // Rehash-on-login: hashes created at the old cost 12 make every login pay
   // ~350ms of pure-JS bcrypt CPU. On a successful login, downgrade the stored
   // hash to the current cost so the NEXT login is ~4x cheaper. New signups and
@@ -183,15 +206,15 @@ export async function POST(request: NextRequest) {
   let verifiedHash = row.password_hash;
   if (needsPasswordRehash(row.password_hash)) {
     try {
-      const upgradedHash = await hashPassword(password);
+      const upgradedHash = await timer.measure("password_rehash", () => hashPassword(password));
       // Optimistic: only rehash the exact hash this login verified. A reset
       // that landed in between must not be overwritten with the old password.
-      const { data: rehashed, error: rehashError } = await db
+      const { data: rehashed, error: rehashError } = await timer.measure("rehash_write", async () => db
         .from("users")
         .update({ password_hash: upgradedHash })
         .eq("id", row.id)
         .eq("password_hash", row.password_hash)
-        .select("id");
+        .select("id"));
       if (!rehashError && rehashed && rehashed.length === 1) {
         verifiedHash = upgradedHash;
       }
@@ -203,12 +226,18 @@ export async function POST(request: NextRequest) {
 
   let issued: { sessionId: string; sessionVersion: number };
   try {
-    issued = await createAuthSession({
+    issued = await timer.measure("session_create_password_guard", () => createLoginSession({
       userId: row.id,
-      role: "user",
+      expectedPasswordHash: verifiedHash,
       userAgent: request.headers.get("user-agent"),
-    });
+    }));
   } catch (err) {
+    if (err instanceof PasswordChangedError) {
+      return NextResponse.json(
+        { error: "Your password changed. Please sign in again." },
+        { status: 401 },
+      );
+    }
     if (err instanceof AccountUnavailableError) {
       return NextResponse.json(
         { error: "Your account is unavailable. Please contact support." },
@@ -219,32 +248,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sign-in failed. Please try again." }, { status: 500 });
   }
 
-  // Password reset/change may have committed between the bcrypt compare and
-  // the session insert. If the stored hash is no longer the one this login
-  // verified, revoke the just-created row and refuse the token. This also
-  // catches a reset that lands after the insert but before this read.
-  const { data: current } = await db
-    .from("users")
-    .select("password_hash")
-    .eq("id", row.id)
-    .maybeSingle();
-  if (!current || current.password_hash !== verifiedHash) {
-    await revokeAuthSession(issued.sessionId, "password_changed_during_login");
-    return NextResponse.json(
-      { error: "Your password changed. Please sign in again." },
-      { status: 401 },
-    );
-  }
-
-  const token = await createSession({
+  // The RPC checks the verified hash and issues the session atomically. A
+  // later password reset revokes this row through the existing registry.
+  const token = await timer.measure("sign", () => createSession({
     userId: row.id,
     email: row.email,
     role: "user",
     sid: issued.sessionId,
     sv: issued.sessionVersion,
-  });
+  }));
 
-  const graceDays = await getNewAccountGraceDays();
+  const graceDays = await graceDaysPromise;
   const verificationBannerVisible = isVerificationBannerVisible({
     status: row.verification_status,
     createdAt: row.created_at,

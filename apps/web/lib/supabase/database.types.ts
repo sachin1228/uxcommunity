@@ -3097,6 +3097,15 @@ export type Database = {
           user_id: string | null;
         }[];
       };
+      create_login_session: {
+        Args: {
+          p_user_id: string;
+          p_expected_password_hash: string;
+          p_expires_at: string;
+          p_user_agent?: string | null;
+        };
+        Returns: { session_id: string; session_version: number }[];
+      };
       create_auth_session: {
         Args: {
           p_user_id: string | null;

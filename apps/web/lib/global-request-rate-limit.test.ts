@@ -1,10 +1,43 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  checkGlobalRequestRateLimit,
   getGlobalRequestKey,
   getRateLimitHeaders,
   retryAfterSeconds,
 } from "./global-request-rate-limit";
+
+test("both global windows start before either external check completes", async () => {
+  const calls: string[] = [];
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const result = checkGlobalRequestRateLimit("parallel-test", { limit: async key => {
+    calls.push(key);
+    await pending;
+    return { success: true, remaining: 4, resetAt: Date.now() + 1000 };
+  } });
+  assert.equal(calls.length, 2, "a sequential implementation starts only one window");
+  release();
+  assert.equal((await result).success, true);
+});
+
+test("either exhausted quota blocks a request, including a cached sustained allowance", async () => {
+  for (const denied of ["burst", "sustained"]) {
+    const result = await checkGlobalRequestRateLimit(`denied-${denied}`, { limit: async key => ({
+      success: !key.includes(`:${denied}:`), remaining: 0, resetAt: Date.now() + 1000,
+    }) });
+    assert.equal(result.success, false);
+  }
+  const key = "cached-allowance-denied-burst";
+  await checkGlobalRequestRateLimit(key, { limit: async () => ({ success: true, remaining: 2, resetAt: Date.now() + 1000 }) });
+  const calls: string[] = [];
+  const result = await checkGlobalRequestRateLimit(key, { limit: async name => {
+    calls.push(name);
+    return { success: false, remaining: 0, resetAt: Date.now() + 1000 };
+  } });
+  assert.equal(calls.length, 1);
+  assert.equal(result.success, false);
+});
 
 test("uses the authenticated user as the global limiter identity", () => {
   const request = { headers: new Headers() };

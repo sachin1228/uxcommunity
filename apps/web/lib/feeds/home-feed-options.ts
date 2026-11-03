@@ -30,6 +30,21 @@ export const DEFAULT_HOME_FEED_SCOPE: HomeFeedFilterScope = "all";
 
 /** The chosen filter is stored per browser so returning visits keep it. */
 export const HOME_FEED_SCOPE_STORAGE_KEY = "uxcommunity:home-feed-scope";
+export const HOME_FEED_SCOPE_COOKIE = "uxcommunity_feed_scope";
+const SCOPE_CHANGED = "uxcommunity:home-feed-scope-changed";
+
+export function subscribeHomeFeedScope(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener(SCOPE_CHANGED, listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener(SCOPE_CHANGED, listener);
+  };
+}
+
+export function homeFeedScopeFromCookie(value?: string): HomeFeedFilterScope {
+  return value === "communities" ? value : DEFAULT_HOME_FEED_SCOPE;
+}
 
 export function isHomeFeedScope(value: unknown): value is HomeFeedScope {
   return typeof value === "string" && (HOME_FEED_SCOPES as readonly string[]).includes(value);
@@ -57,4 +72,8 @@ export function storeHomeFeedScope(scope: HomeFeedFilterScope): void {
   } catch {
     // Storage unavailable — the choice just won't persist.
   }
+  try {
+    document.cookie = `${HOME_FEED_SCOPE_COOKIE}=${scope}; Path=/; Max-Age=31536000; SameSite=Lax${window.location?.protocol === "https:" ? "; Secure" : ""}`;
+  } catch { /* Cookies may be disabled independently of localStorage. */ }
+  try { window.dispatchEvent(new Event(SCOPE_CHANGED)); } catch { /* Optional storage notification. */ }
 }

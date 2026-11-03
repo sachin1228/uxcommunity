@@ -8,9 +8,9 @@ import { JOIN_LIMIT, loadJoinSlots } from "./join-slots";
  * The catch-all "Other" options (cities / sectors named "Other")
  * intentionally do NOT produce a dedicated community.
  *
- * Runs server-side (service role) at signup completion and again, once per
- * member, as a dashboard repair for accounts created before this logic was
- * added. Idempotent: communities are upserted on (type, reference_id) and
+ * Runs server-side (service role) at signup completion and explicit retries.
+ * Legacy repair runs in a migration, outside dashboard rendering.
+ * Idempotent: communities are upserted on (type, reference_id) and
  * memberships are upserted on (community_id, user_id).
  */
 export async function autoJoinCommunities(userId: string): Promise<string[]> {

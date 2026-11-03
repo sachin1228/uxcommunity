@@ -1,40 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { DashboardSingleColumn } from "./ContentLoader";
 import { HomeFeed } from "./HomeFeed";
 import { HomeFeedFilters } from "./HomeFeedFilters";
+import { DeferredHomeRail } from "./DeferredHomeRail";
+import type { FeedItem } from "@/components/feeds/types";
 import {
   DEFAULT_HOME_FEED_SCOPE,
   HOME_FEED_FILTER_SCOPES,
   type HomeFeedFilterScope,
   readStoredHomeFeedScope,
   storeHomeFeedScope,
+  subscribeHomeFeedScope,
 } from "@/lib/feeds/home-feed-options";
 
 interface DashboardHomeProps {
   userId: string;
-  /**
-   * The sidebar rail, rendered on the server (HomeRail) and slotted in here so
-   * this client shell can own the two-column layout without owning the data.
-   */
-  rail?: ReactNode;
+  initialScope?: HomeFeedFilterScope;
+  initialItems?: FeedItem[];
 }
 
-export function DashboardHome({ userId, rail }: DashboardHomeProps) {
-  const [refreshToken, setRefreshToken] = useState(0);
+export function DashboardHome({ userId, initialScope = DEFAULT_HOME_FEED_SCOPE, initialItems }: DashboardHomeProps) {
+  const [bootstrap, setBootstrap] = useState(initialItems);
 
   // Feed source choice. The server cannot see localStorage, so the scope
   // starts on the default and swaps to the stored choice right after
   // hydration — a hydration-safe pattern.
-  const [scope, setScope] = useState<HomeFeedFilterScope>(DEFAULT_HOME_FEED_SCOPE);
+  const storedScope = useSyncExternalStore(
+    subscribeHomeFeedScope,
+    () => readStoredHomeFeedScope() ?? initialScope,
+    () => initialScope,
+  );
+  const [selectedScope, setScope] = useState<HomeFeedFilterScope | null>(null);
+  const scope = selectedScope ?? storedScope;
 
   useEffect(() => {
-    setScope(readStoredHomeFeedScope() ?? DEFAULT_HOME_FEED_SCOPE);
-  }, []);
+    const stored = readStoredHomeFeedScope();
+    // Migrate older localStorage-only preferences for the next server render.
+    storeHomeFeedScope(stored ?? initialScope);
+  }, [initialScope]);
 
   const handleScopeChange = useCallback((next: HomeFeedFilterScope) => {
     if (!(HOME_FEED_FILTER_SCOPES as readonly string[]).includes(next)) return;
+    setBootstrap(undefined);
     setScope(next);
     storeHomeFeedScope(next);
   }, []);
@@ -49,11 +58,11 @@ export function DashboardHome({ userId, rail }: DashboardHomeProps) {
         <HomeFeed
           key={scope}
           currentUserId={userId}
-          refreshToken={refreshToken}
           scope={scope}
+          initialItems={scope === initialScope ? bootstrap : undefined}
         />
       </DashboardSingleColumn>
-      {rail}
+      <DeferredHomeRail userId={userId} />
     </div>
   );
 }

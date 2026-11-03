@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { CommunityFeedList } from "@/components/feeds/CommunityFeedList";
 import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "@/components/feeds/types";
 import { Spinner } from "@/components/ui/Spinner";
-import { fetchJsonCached, getCachedRequest, initRequestCache, invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
+import { fetchJsonCached, getCachedRequest, initRequestCache, invalidateRequest, patchCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { afterDashboardPaint, markDashboardPaint } from "@/lib/login-performance";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
@@ -17,6 +18,7 @@ interface HomeFeedProps {
   refreshToken?: number;
   /** Feed source — the unified default or joined communities only. */
   scope: HomeFeedFilterScope;
+  initialItems?: FeedItem[];
 }
 
 /** Empty-state copy per feed source — the filters partition the same cards. */
@@ -31,7 +33,8 @@ const EMPTY_STATE_DESCRIPTION: Record<HomeFeedFilterScope, string> = {
  * hands it to the shared CommunityFeedList, which renders the same cards (and
  * the same mutations) as the profile activity tabs.
  */
-export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedProps) {
+export function HomeFeed({ currentUserId, refreshToken = 0, scope, initialItems }: HomeFeedProps) {
+  const bootstrap = useRef(initialItems);
   initRequestCache(currentUserId);
   const feedUrl = `/api/home/feed?scope=${encodeURIComponent(scope)}`;
 
@@ -39,7 +42,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   // straight from the request cache when it has one; otherwise the standard
   // loader shows until the fetch lands.
   const cached = getCachedRequest<{ items?: FeedItem[] }>(feedUrl, currentUserId);
-  const cachedItems = Array.isArray(cached?.items) ? cached.items : undefined;
+  const cachedItems = Array.isArray(cached?.items) ? cached.items : initialItems;
   const [items, setItems] = useState<FeedItem[]>(() => cachedItems ?? []);
   const [loading, setLoading] = useState(() => !cachedItems);
   const [error, setError] = useState<string | null>(null);
@@ -71,11 +74,20 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   }, [currentUserId, feedUrl]);
 
   useEffect(() => {
+    const initial = bootstrap.current;
+    bootstrap.current = undefined;
+    if (initial && refreshToken === 0 && !getCachedRequest(feedUrl, currentUserId)) {
+      setCachedRequest(feedUrl, { items: initial }, currentUserId);
+    }
     const initialFetch = window.setTimeout(() => void fetchFeed(true, refreshToken > 0), 0);
     return () => {
       window.clearTimeout(initialFetch);
     };
-  }, [fetchFeed, refreshToken]);
+  }, [fetchFeed, refreshToken, feedUrl, currentUserId]);
+
+  useEffect(() => {
+    if (!loading && !error) return afterDashboardPaint(() => markDashboardPaint("feed"));
+  }, [loading, error]);
 
   // Refetch when returning after a real absence (no realtime subscription keeps
   // the feed current); brief alt-tabs no longer fire a request each.

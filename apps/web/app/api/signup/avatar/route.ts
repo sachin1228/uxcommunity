@@ -162,8 +162,8 @@ export async function POST(request: NextRequest) {
   // Join every profile-based community (city, sector, experience level, job
   // title) server-side
   // so the sidebar shows the full list the first time the dashboard loads.
-  // Non-fatal if it fails — the dashboard layout retries exactly once via the
-  // designer_profiles.communities_auto_joined flag.
+  // Non-fatal if it fails; pending profiles remain eligible for an explicit
+  // auto-join retry. Legacy profiles are backfilled by migration, not page load.
   let joinedCommunities = 0;
   try {
     const joined = await autoJoinCommunities(userId);

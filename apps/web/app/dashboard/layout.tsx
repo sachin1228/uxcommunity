@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
-import { createServiceClient } from "@/lib/supabase/service";
-import { autoJoinCommunities } from "@/lib/communities/auto-join";
+import { Suspense } from "react";
+import { getSessionContext } from "@/lib/auth/session";
+import { createServerTimer } from "@/lib/server-timing";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { SidebarRouteGate } from "@/components/sidebar/SidebarRouteGate";
 import { UndoToast } from "@/components/ui/UndoToast";
@@ -12,81 +12,42 @@ import {
   isVerificationBannerVisible,
 } from "@/lib/verification/settings";
 import { Topbar } from "./Topbar";
+import { DashboardStartup, DeferredDashboard } from "./DashboardStartup";
+import { DashboardSkeleton, SidebarSkeleton } from "./DashboardSkeleton";
 
 
-export default async function DashboardLayout({
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<DashboardSkeleton />}><AuthenticatedDashboard>{children}</AuthenticatedDashboard></Suspense>;
+}
+
+async function AuthenticatedDashboard({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
-  if (!session || session.role !== "user") {
+  const timer = createServerTimer("dashboard shell");
+  const [context, graceDays] = await Promise.all([
+    timer.measure("session_identity", () => getSessionContext()),
+    timer.measure("verification_settings", getNewAccountGraceDays),
+  ]);
+  if (!context || context.session.role !== "user" || !context.user || !context.member) {
+    timer.finish({ status: 401 });
     redirect("/login");
   }
-
-  const db = createServiceClient();
-  const [{ data: user }, { data: profile }, graceDays] = await Promise.all([
-    db
-      .from("users")
-      .select("name, email, is_blocked, verification_status, created_at")
-      .eq("id", session.userId!)
-      .maybeSingle(),
-    db
-      .from("designer_profiles")
-      .select(
-        "avatar_url, city_id, sector_id, experience_level, job_title, communities_auto_joined"
-      )
-      .eq("user_id", session.userId!)
-      .maybeSingle(),
-    getNewAccountGraceDays(),
-  ]);
-
-  // A deleted or blocked account must not render the dashboard shell. Clearing
-  // the stale cookie needs a route handler, so hand off before using identity.
-  if (!user || user.is_blocked) {
-    redirect("/api/auth/session-ended");
-  }
-
-  const name = user?.name ?? session.email ?? "User";
-  const email = user?.email ?? session.email ?? "";
-  const avatarUrl =
-    (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null;
+  const { session, user, member } = context;
   const userId = session.userId!;
-
-  // One-time repair for members whose profile communities were never joined at
-  // signup (accounts created before auto-join ran server-side). Once the flag is
-  // set, memberships are left alone so leaving a community still sticks.
-  const profileRow = profile as {
-    avatar_url?: string | null;
-    city_id?: string | null;
-    sector_id?: string | null;
-    experience_level?: string | null;
-    job_title?: string | null;
-    communities_auto_joined?: boolean | null;
-  } | null;
-  const autoJoined = Boolean(profileRow?.communities_auto_joined);
-  const hasProfilePicks = Boolean(
-    profileRow?.city_id || profileRow?.sector_id || profileRow?.experience_level || profileRow?.job_title
-  );
-  if (!autoJoined && hasProfilePicks) {
-    try {
-      await autoJoinCommunities(userId);
-    } catch (error) {
-      console.error("[dashboard layout] auto-join repair failed:", error);
-    }
-  }
-
-  const sidebarUser = { name, email, avatarUrl };
-  const verificationStatus =
-    (user as { verification_status?: string } | null)?.verification_status ?? null;
+  const sidebarUser = { ...member, name: member.name ?? "User" };
+  const verificationStatus = user.verification_status;
   const showVerificationBanner = isVerificationBannerVisible({
     status: verificationStatus,
-    createdAt: (user as { created_at?: string | null } | null)?.created_at ?? null,
+    createdAt: user.created_at,
     graceDays,
   });
 
+  timer.finish({ status: 200 });
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-background-subtle text-foreground">
+    <DashboardStartup>
+    <div data-dashboard-shell className="fixed inset-0 flex flex-col overflow-hidden bg-background-subtle text-foreground">
       <AppBodyScrollLock />
       {showVerificationBanner ? <VerificationBanner status={verificationStatus} /> : null}
 
@@ -97,7 +58,7 @@ export default async function DashboardLayout({
       <div className="flex min-h-0 min-w-0 flex-1">
         <SidebarRouteGate>
           <div className="hidden h-full min-[500px]:block">
-            <GlobalSidebar userId={userId} />
+            <DeferredDashboard fallback={<SidebarSkeleton />}><GlobalSidebar userId={userId} /></DeferredDashboard>
           </div>
         </SidebarRouteGate>
 
@@ -110,5 +71,6 @@ export default async function DashboardLayout({
           the shell so the offer outlives the card that raised it. */}
       <UndoToast />
     </div>
+    </DashboardStartup>
   );
 }

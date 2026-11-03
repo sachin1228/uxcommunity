@@ -120,7 +120,7 @@ test("the profile, applications and dashboard surfaces reject revoked accounts",
     const source = read(relativePath);
     assert.match(
       source,
-      /\bgetSession\(/,
+      /\b(getSession|getSessionContext)\(/,
       `${relativePath} must use the registry-backed getSession()`,
     );
     assert.doesNotMatch(

@@ -85,6 +85,29 @@ export async function createAuthSession(input: {
   };
 }
 
+/** Verify the password generation and issue its session under one row lock. */
+export async function createLoginSession(input: {
+  userId: string;
+  expectedPasswordHash: string;
+  userAgent?: string | null;
+}): Promise<IssuedSession> {
+  const expiresAt = expiryFromNow();
+  const { data, error } = await createServiceClient().rpc("create_login_session", {
+    p_user_id: input.userId,
+    p_expected_password_hash: input.expectedPasswordHash,
+    p_expires_at: expiresAt,
+    p_user_agent: input.userAgent?.slice(0, 512) ?? null,
+  });
+  if (error) {
+    if (error.message.includes("password_changed")) throw new PasswordChangedError();
+    if (error.message.includes("account_unavailable")) throw new AccountUnavailableError();
+    throw new Error(`create_login_session failed: ${error.message}`);
+  }
+  const row = data?.[0];
+  if (!row?.session_id) throw new Error("create_login_session returned no session");
+  return { sessionId: row.session_id, sessionVersion: row.session_version, expiresAt };
+}
+
 /** Revoke exactly one registry row. Missing/already-revoked rows are a no-op. */
 export async function revokeAuthSession(
   sessionId: string,

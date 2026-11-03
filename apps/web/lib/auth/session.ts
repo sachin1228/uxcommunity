@@ -52,6 +52,7 @@ export interface SessionContext {
   session: SessionPayload;
   /** Live account row for user tokens; null for admin tokens. */
   user: ActiveUserState | null;
+  member: { name: string | null; email: string; avatarUrl: string | null } | null;
 }
 
 function secretKey(): Uint8Array {
@@ -157,6 +158,9 @@ interface RegistryUserRow {
   session_version: number;
   verification_status: string | null;
   created_at: string | null;
+  name: string | null;
+  email: string;
+  designer_profiles: { avatar_url: string | null } | { avatar_url: string | null }[] | null;
 }
 
 /**
@@ -178,7 +182,7 @@ export async function validateSessionPayload(
     const { data, error } = await db
       .from("auth_sessions")
       .select(
-        "id, user_id, role, session_version, revoked_at, expires_at, users!auth_sessions_user_id_fkey(id, is_blocked, suspended_until, session_version, verification_status, created_at)",
+        "id, user_id, role, session_version, revoked_at, expires_at, users!auth_sessions_user_id_fkey(id, is_blocked, suspended_until, session_version, verification_status, created_at, name, email, designer_profiles!user_id(avatar_url))",
       )
       .eq("id", session.sid)
       .maybeSingle();
@@ -196,7 +200,7 @@ export async function validateSessionPayload(
     });
     if (!validity.active) return null;
 
-    if (!validity.user) return { session, user: null };
+    if (!validity.user) return { session, user: null, member: null };
 
     const verification = row?.users as unknown as
       | RegistryUserRow
@@ -208,6 +212,12 @@ export async function validateSessionPayload(
 
     return {
       session,
+      member: details ? {
+        name: details.name,
+        email: details.email,
+        avatarUrl: (Array.isArray(details.designer_profiles)
+          ? details.designer_profiles[0] : details.designer_profiles)?.avatar_url ?? null,
+      } : null,
       user: {
         id: validity.user.id,
         is_blocked: validity.user.is_blocked,

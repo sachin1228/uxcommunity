@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { useDashboardSecondaryReady } from "./DashboardStartup";
 
 /**
  * The creation budgets, as a ring beside the bell.
@@ -42,6 +43,7 @@ const RADIUS = 7;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function LimitsRing() {
+  const ready = useDashboardSecondaryReady();
   const [open, setOpen] = useState(false);
   const [payload, setPayload] = useState<Payload | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -56,11 +58,12 @@ export function LimitsRing() {
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
     // One turn deferred, the way the notification fetch is: the mount effect
     // itself must not set state.
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [load, ready]);
 
   const rows = (payload?.limits ?? [])
     .filter((row) => LABELS[row.kind])

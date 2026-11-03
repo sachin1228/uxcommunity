@@ -5,6 +5,7 @@ import type { SuggestedCommunity } from "@/lib/home/suggested";
 
 interface HomeSidebarProps {
   suggested: SuggestedCommunity[];
+  loading?: boolean;
 }
 
 /**
@@ -18,7 +19,7 @@ interface HomeSidebarProps {
  * Data is loaded on the server by the dashboard page (see
  * lib/home/home-sidebar-server.ts) so the rail paints with the page.
  */
-export function HomeSidebar({ suggested }: HomeSidebarProps) {
+export function HomeSidebar({ suggested, loading = false }: HomeSidebarProps) {
   return (
     <aside
       aria-label="Homepage suggestions"
@@ -30,7 +31,7 @@ export function HomeSidebar({ suggested }: HomeSidebarProps) {
           top-4 keeps the same gap as the feed's floating switcher. */}
       <div className="sticky top-4 flex flex-col gap-4">
         <CommunityPhoneCard />
-        <SuggestedCommunitiesCard communities={suggested} />
+        {loading ? <div role="status" aria-label="Loading suggested communities" className="h-40 animate-pulse rounded-xl border border-border bg-surface" /> : <SuggestedCommunitiesCard communities={suggested} />}
       </div>
     </aside>
   );

@@ -1,0 +1,530 @@
+{
+  "date": "2026-11-03",
+  "revision": "9f9efe61",
+  "scope": "Website member login",
+  "limits": [
+    "No successful production login or production database access",
+    "Production Redis and bcrypt phases are not individually instrumented",
+    "Local optimized Node server with local database and in-memory rate limiting; not Cloudflare runtime",
+    "Small samples; not load testing or percentile SLO validation",
+    "Rapid local repetition produced one HTTP 429 feed response; excluded from successful-flow timings, then samples paced 11 seconds apart",
+    "Feed server cache was warm during the five reported successful browser runs; no cold feed RPC timing"
+  ],
+  "localMachine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.18.0"
+  },
+  "production": {
+    "browserNavigation": {
+      "domContentLoadedMs": 1803,
+      "loadMs": 1853.2999999998135,
+      "paint": [
+        {
+          "ms": 1820,
+          "name": "first-paint"
+        },
+        {
+          "ms": 1820,
+          "name": "first-contentful-paint"
+        }
+      ],
+      "transferBytes": 5046,
+      "ttfbMs": 1447.8999999999069
+    },
+    "nonexistentAccountRequests": [
+      {
+        "ms": 1396.5,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 401
+      },
+      {
+        "ms": 1333.3999999999069,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 401
+      },
+      {
+        "ms": 1331.7000000001865,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 401
+      }
+    ],
+    "publicPageRequests": [
+      {
+        "ms": 1189.7999999998135,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      },
+      {
+        "ms": 932.3999999999068,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      },
+      {
+        "ms": 1187,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      },
+      {
+        "ms": 1195.7000000001865,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      },
+      {
+        "ms": 931.6000000000932,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      }
+    ],
+    "recordedAt": "2026-11-03T18:22:33.317Z",
+    "resources": [
+      {
+        "bytes": 29588,
+        "ms": 168,
+        "path": "/_next/static/media/geist_latin-s.p.0wgildi0cnwt9.woff2"
+      },
+      {
+        "bytes": 39104,
+        "ms": 197.10000000009313,
+        "path": "/_next/static/media/playfair_display_italic_latin-s.p.3wz967ibaache.woff2"
+      },
+      {
+        "bytes": 23408,
+        "ms": 331,
+        "path": "/_next/static/media/geist_mono_latin-s.p.0r6juujl39pe6.woff2"
+      },
+      {
+        "bytes": 6033,
+        "ms": 171.1999999997206,
+        "path": "/_next/static/chunks/1dveuv0o6fc3i.js"
+      },
+      {
+        "bytes": 4372,
+        "ms": 189.5,
+        "path": "/_next/static/chunks/1wopjve09kdat.js"
+      },
+      {
+        "bytes": 4925,
+        "ms": 196.10000000009313,
+        "path": "/_next/static/chunks/turbopack-2c3mg3r-05n1w.js"
+      },
+      {
+        "bytes": 9064,
+        "ms": 203,
+        "path": "/_next/static/chunks/3srfjz42u14tx.js"
+      },
+      {
+        "bytes": 8138,
+        "ms": 307.1999999997206,
+        "path": "/_next/static/chunks/3y22yw35u3z8y.js"
+      },
+      {
+        "bytes": 19283,
+        "ms": 319.29999999981374,
+        "path": "/_next/static/chunks/0c6hdgvfqz6nh.css"
+      },
+      {
+        "bytes": 45486,
+        "ms": 351.6999999997206,
+        "path": "/_next/static/chunks/075mxs726ez30.js"
+      },
+      {
+        "bytes": 74011,
+        "ms": 363.6999999997206,
+        "path": "/_next/static/chunks/3rje85x3xnh5t.js"
+      }
+    ],
+    "target": "https://app.uxcommunity.in",
+    "noDependencyHealthRequests": [
+      {
+        "ms": 676,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      },
+      {
+        "ms": 555.2999999998137,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      },
+      {
+        "ms": 505.1999999997206,
+        "placement": "remote-SYD",
+        "serverTiming": "cfExtPri",
+        "status": 200
+      }
+    ]
+  },
+  "local": {
+    "coldServerHttp": {
+      "startedAt": 1793730190137,
+      "status": 200,
+      "loginMs": 325.181583,
+      "dashboardHttpMs": 145.53166599999997,
+      "dashboardStatus": 200,
+      "htmlBytes": 37209
+    },
+    "browserRuns": [
+      {
+        "sample": 1,
+        "apiMs": 231,
+        "afterApiBeforeNavigationMs": 4.199951171875,
+        "dashboardTtfbMs": 24.699999999720603,
+        "shellPaintAfterSubmitMs": 332,
+        "feedReadyAfterSubmitMs": 463.699951171875,
+        "feedItems": 4,
+        "loginDatabaseFetchMs": 149.40241700001934,
+        "loginQueries": [
+          {
+            "path": "/rest/v1/users",
+            "ms": 114.42399999999907,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/rpc/create_auth_session",
+            "ms": 26.59558300000208,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/users",
+            "ms": 3.1317090000084136,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/verification_settings",
+            "ms": 5.251125000009779,
+            "status": 200
+          }
+        ],
+        "dashboardApiRequests": [
+          {
+            "path": "/api/dm/unread",
+            "ms": 66.89999999990687
+          },
+          {
+            "path": "/api/communities",
+            "ms": 170.60000000009313
+          },
+          {
+            "path": "/api/limits",
+            "ms": 155
+          },
+          {
+            "path": "/api/notifications",
+            "ms": 140.60000000009313
+          },
+          {
+            "path": "/api/home/feed",
+            "ms": 55.799999999813735
+          }
+        ]
+      },
+      {
+        "sample": 2,
+        "apiMs": 90.7998046875,
+        "afterApiBeforeNavigationMs": 0.7001953125,
+        "dashboardTtfbMs": 17.800000000279397,
+        "shellPaintAfterSubmitMs": 135.7001953125,
+        "feedReadyAfterSubmitMs": 248.2001953125,
+        "feedItems": 4,
+        "loginDatabaseFetchMs": 12.588499999998021,
+        "loginQueries": [
+          {
+            "path": "/rest/v1/users",
+            "ms": 4.176083999991533,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/rpc/create_auth_session",
+            "ms": 5.423290999999153,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/users",
+            "ms": 2.989125000007334,
+            "status": 200
+          }
+        ],
+        "dashboardApiRequests": [
+          {
+            "path": "/api/dm/unread",
+            "ms": 30.700000000186265
+          },
+          {
+            "path": "/api/communities",
+            "ms": 70.79999999981374
+          },
+          {
+            "path": "/api/limits",
+            "ms": 55.8000000002794
+          },
+          {
+            "path": "/api/notifications",
+            "ms": 57.89999999990687
+          },
+          {
+            "path": "/api/home/feed",
+            "ms": 31.59999999962747
+          }
+        ]
+      },
+      {
+        "sample": 3,
+        "apiMs": 233.39990234375,
+        "afterApiBeforeNavigationMs": 0.800048828125,
+        "dashboardTtfbMs": 22.899999999906868,
+        "shellPaintAfterSubmitMs": 287,
+        "feedReadyAfterSubmitMs": 380.800048828125,
+        "feedItems": 4,
+        "loginDatabaseFetchMs": 150.44420900002297,
+        "loginQueries": [
+          {
+            "path": "/rest/v1/users",
+            "ms": 116.87795800001186,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/rpc/create_auth_session",
+            "ms": 26.725042000005487,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/users",
+            "ms": 2.7200420000008307,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/verification_settings",
+            "ms": 4.121167000004789,
+            "status": 200
+          }
+        ],
+        "dashboardApiRequests": [
+          {
+            "path": "/api/dm/unread",
+            "ms": 33.1999999997206
+          },
+          {
+            "path": "/api/communities",
+            "ms": 80.20000000018626
+          },
+          {
+            "path": "/api/limits",
+            "ms": 60.6999999997206
+          },
+          {
+            "path": "/api/notifications",
+            "ms": 63.700000000186265
+          },
+          {
+            "path": "/api/home/feed",
+            "ms": 30.399999999906868
+          }
+        ]
+      },
+      {
+        "sample": 4,
+        "apiMs": 91.5,
+        "afterApiBeforeNavigationMs": 0.7998046875,
+        "dashboardTtfbMs": 14.799999999813735,
+        "shellPaintAfterSubmitMs": 132.599853515625,
+        "feedReadyAfterSubmitMs": 248.099853515625,
+        "feedItems": 4,
+        "loginDatabaseFetchMs": 15.1177509999834,
+        "loginQueries": [
+          {
+            "path": "/rest/v1/users",
+            "ms": 6.187959000002593,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/rpc/create_auth_session",
+            "ms": 6.125834000005852,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/users",
+            "ms": 2.803957999974955,
+            "status": 200
+          }
+        ],
+        "dashboardApiRequests": [
+          {
+            "path": "/api/dm/unread",
+            "ms": 36.5
+          },
+          {
+            "path": "/api/communities",
+            "ms": 82.5
+          },
+          {
+            "path": "/api/limits",
+            "ms": 52.700000000186265
+          },
+          {
+            "path": "/api/notifications",
+            "ms": 74.39999999990687
+          },
+          {
+            "path": "/api/home/feed",
+            "ms": 31.5
+          }
+        ]
+      },
+      {
+        "sample": 5,
+        "apiMs": 102.900146484375,
+        "afterApiBeforeNavigationMs": 0.7998046875,
+        "dashboardTtfbMs": 18.799999999813735,
+        "shellPaintAfterSubmitMs": 148,
+        "feedReadyAfterSubmitMs": 299.5,
+        "feedItems": 4,
+        "loginDatabaseFetchMs": 22.23362599997199,
+        "loginQueries": [
+          {
+            "path": "/rest/v1/users",
+            "ms": 14.135374999983469,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/rpc/create_auth_session",
+            "ms": 5.687541999999667,
+            "status": 200
+          },
+          {
+            "path": "/rest/v1/users",
+            "ms": 2.410708999988856,
+            "status": 200
+          }
+        ],
+        "dashboardApiRequests": [
+          {
+            "path": "/api/dm/unread",
+            "ms": 107.29999999981374
+          },
+          {
+            "path": "/api/communities",
+            "ms": 149
+          },
+          {
+            "path": "/api/limits",
+            "ms": 126.70000000018626
+          },
+          {
+            "path": "/api/notifications",
+            "ms": 106.10000000009312
+          },
+          {
+            "path": "/api/home/feed",
+            "ms": 79.60000000009313
+          }
+        ]
+      }
+    ],
+    "summaryMs": {
+      "api": {
+        "min": 90.7998046875,
+        "median": 102.900146484375,
+        "max": 233.39990234375
+      },
+      "clickToShellPaint": {
+        "min": 132.599853515625,
+        "median": 148,
+        "max": 332
+      },
+      "clickToFeedReady": {
+        "min": 248.099853515625,
+        "median": 299.5,
+        "max": 463.699951171875
+      },
+      "dashboardTtfb": {
+        "min": 14.799999999813735,
+        "median": 18.799999999813735,
+        "max": 24.699999999720603
+      }
+    }
+  },
+  "bcrypt": {
+    "runs": [
+      {
+        "cost": 10,
+        "ms": 69.5715
+      },
+      {
+        "cost": 10,
+        "ms": 68.21029200000001
+      },
+      {
+        "cost": 10,
+        "ms": 68.84829099999996
+      },
+      {
+        "cost": 10,
+        "ms": 73.931333
+      },
+      {
+        "cost": 10,
+        "ms": 73.66300000000001
+      },
+      {
+        "cost": 10,
+        "ms": 75.03870800000004
+      },
+      {
+        "cost": 10,
+        "ms": 71.22662500000001
+      },
+      {
+        "cost": 12,
+        "ms": 283.09608300000014
+      },
+      {
+        "cost": 12,
+        "ms": 272.7305000000001
+      },
+      {
+        "cost": 12,
+        "ms": 290.56950000000006
+      },
+      {
+        "cost": 12,
+        "ms": 287.5115420000002
+      },
+      {
+        "cost": 12,
+        "ms": 279.2157500000003
+      },
+      {
+        "cost": 12,
+        "ms": 309.9614999999999
+      },
+      {
+        "cost": 12,
+        "ms": 292.0986250000001
+      }
+    ],
+    "summaryMs": [
+      {
+        "cost": 10,
+        "min": 68.21029200000001,
+        "median": 71.22662500000001,
+        "max": 75.03870800000004
+      },
+      {
+        "cost": 12,
+        "min": 272.7305000000001,
+        "median": 287.5115420000002,
+        "max": 309.9614999999999
+      }
+    ]
+  }
+}

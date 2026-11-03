@@ -12,6 +12,9 @@ import { LimitsRing } from "./LimitsRing";
 import { DmTopbarButton } from "@/components/direct-messages/DmTopbarButton";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { isApplePlatform } from "@/lib/dashboard/topbar";
+import { DeferredDashboard } from "./DashboardStartup";
+import { DmIcon } from "@/components/ui/DmIcon";
+import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
 
 /**
  * The dashboard's topbar — the app's header, spanning the full window.
@@ -121,9 +124,13 @@ export function Topbar({ userId, user }: Props) {
       {/* Messages, bell, then profile: the account controls stay pinned to the
           right edge at every width. */}
       <div className="order-4 ml-auto flex min-w-0 items-center gap-2">
-        <DmTopbarButton userId={userId} />
+        <DeferredDashboard fallback={<Link href="/dashboard/messages" prefetch={false} aria-label="Messages" className="flex h-8 w-8 items-center justify-center text-foreground-muted"><DmIcon size={18} /></Link>}>
+          <DmTopbarButton userId={userId} />
+        </DeferredDashboard>
         <LimitsRing />
-        <NotificationBell userId={userId} />
+        <DeferredDashboard fallback={<Link href="/dashboard/notifications" prefetch={false} aria-label="Notifications" className="flex h-8 w-8 items-center justify-center text-foreground-muted"><NotificationBellIcon size={18} /></Link>}>
+          <NotificationBell userId={userId} />
+        </DeferredDashboard>
         <ProfileDropdown name={user.name} email={user.email} avatarUrl={user.avatarUrl} />
       </div>
 

@@ -1,22 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
+import { DashboardSkeleton } from "@/app/dashboard/DashboardSkeleton";
+import { loadLoginCleanup, preloadLoginAssets } from "@/lib/login-preload";
+import { recordLoginPhase } from "@/lib/login-performance";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [openingDashboard, setOpeningDashboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(preloadLoginAssets, { timeout: 1_500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(preloadLoginAssets, 300);
+    return () => clearTimeout(id);
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setOpeningDashboard(false);
+    recordLoginPhase("submit");
     setError(null);
 
     try {
@@ -35,15 +50,17 @@ export default function LoginPage() {
         return;
       }
 
+      recordLoginPhase("authenticated");
+      setOpeningDashboard(data.redirect !== "/admin");
+
       // Drop the previous session's caches, then leave with a FULL document
       // navigation (not router.push). Next's client Router Cache is keyed by
       // URL and never sees the session cookie, so a client-side navigation to
       // /dashboard is served the payload rendered for whoever was signed in
       // before — the "second account shows the first account's data until you
       // refresh" bug. A hard navigation always renders for the cookie the
-      // browser now holds. The "Logging in" overlay stays up until the new
-      // document paints, so there is still no flash back to the form.
-      const { resetClientSessionCaches } = await import("@/lib/session-cache");
+      // browser now holds. Show the generic dashboard skeleton during this hop.
+      const { resetClientSessionCaches } = await loadLoginCleanup();
       resetClientSessionCaches();
       window.location.assign(data.redirect ?? "/dashboard");
     } catch {
@@ -54,7 +71,7 @@ export default function LoginPage() {
 
   return (
     <main className="grid min-h-screen place-items-center bg-background px-6 py-12">
-      {loading && <BrandedLoadingScreen label="Logging in" />}
+      {loading && (openingDashboard ? <DashboardSkeleton /> : <BrandedLoadingScreen label="Signing in" />)}
 
       <BrandLogo
         className="fixed left-6 top-6 z-20"
@@ -67,7 +84,7 @@ export default function LoginPage() {
             Log in to your account
           </h1>
 
-          <form className="mt-7 flex flex-col gap-5" onSubmit={handleLogin}>
+          <form className="mt-7 flex flex-col gap-5" onSubmit={handleLogin} onFocusCapture={preloadLoginAssets}>
             {error && (
               <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
                 <p className="font-body text-sm text-red-500">{error}</p>
@@ -125,7 +142,7 @@ export default function LoginPage() {
             <PendingButton
               type="submit"
               pending={loading}
-              pendingLabel="Logging in…"
+              pendingLabel="Signing in…"
               spinnerSize={16}
               className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
