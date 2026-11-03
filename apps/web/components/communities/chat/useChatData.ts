@@ -63,6 +63,7 @@ const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export interface Community {
+  details_loaded?: boolean;
   id: string;
   name: string;
   type: string;
@@ -160,7 +161,7 @@ export function useChatData({
     } else if (initialMeta) {
       metaCache.set(communityId, { ...initialMeta, fetchedAt: Date.now() });
       setCachedRequest(
-        `/api/communities/${communityId}`,
+        `/api/communities/${communityId}${initialMeta.community.details_loaded === false ? "/chat" : ""}`,
         { community: initialMeta.community, members: initialMeta.members },
         currentUserId,
       );
@@ -447,11 +448,16 @@ export function useChatData({
         community: Community;
         members?: Member[];
       }>(`/api/communities/${communityId}`, currentUserId);
+      const summary = getCachedRequest<{ community: Community; members?: Member[] }>(
+        `/api/communities/${communityId}/chat`, currentUserId,
+      );
       const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages;
-      const cachedMeta = metaCache.get(communityId) ?? (canonicalMeta
+      const knownMeta = canonicalMeta ?? summary;
+      const storedMeta = metaCache.get(communityId);
+      const cachedMeta = (canonicalMeta ? undefined : storedMeta) ?? (knownMeta
         ? {
-            community: canonicalMeta.community,
-            members: canonicalMeta.members ?? [],
+            community: knownMeta.community,
+            members: knownMeta.members ?? [],
             fetchedAt: Date.now(),
           }
         : undefined);
@@ -503,6 +509,9 @@ export function useChatData({
       if (!cancelled) {
         setLoading(false);
         setInitialMessagesReady(true);
+        // Populate About, member previews and controls after the first paint.
+        // A slow/failed details request cannot keep messages on the spinner.
+        void fetchMeta().catch(() => undefined);
       }
 
       // A network failure used to be swallowed and rendered as the "Be the
@@ -555,6 +564,7 @@ export function useChatData({
     loadingOlder,
     setMessages,
     fetchMessages,
+    fetchMeta,
     catchUpMessages,
     fetchOlderMessages,
     communityIdRef,

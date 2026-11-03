@@ -199,6 +199,7 @@ export function CommunityChat({
     loadingOlder,
     setMessages,
     catchUpMessages,
+    fetchMeta,
     fetchOlderMessages,
     communityIdRef,
     membersRef,
@@ -812,6 +813,7 @@ export function CommunityChat({
     () => community ?? (sidebarEntry
       ? {
           id: communityId,
+          details_loaded: false,
           name: sidebarEntry.name,
           type: sidebarEntry.type,
           member_count: sidebarEntry.member_count,
@@ -826,7 +828,7 @@ export function CommunityChat({
           event_date: sidebarEntry.event_date,
           pinned_until: sidebarEntry.pinned_until,
           event_end: sidebarEntry.event_end,
-          // Same for the mute state: the menu works before meta arrives.
+          // Cached mute state can decorate the header; actions wait for details.
           notifications_muted: sidebarEntry.notifications_muted,
           notifications_muted_until: sidebarEntry.notifications_muted_until,
         }
@@ -854,11 +856,12 @@ export function CommunityChat({
   const roomHasContent =
     messages.length > 0 || threadEvents.length > 0 || contentEvents.length > 0;
 
-  const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+  const detailsReady = !!community && community.details_loaded !== false;
+  const isOwner = detailsReady && community.owner_id === currentUserId;
   // Role and grants only exist on the loaded read model; the sidebar fallback
   // never carries them, so read them from `community` directly.
-  const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
-  const myPerms = community?.current_user_permissions;
+  const myRole = detailsReady ? community.current_user_role ?? (isOwner ? "owner" : null) : null;
+  const myPerms = detailsReady ? community.current_user_permissions : undefined;
   // The manager tier that appoints moderators and audits manager activity: the
   // owner of a member-created community, or the platform-appointed admin of an
   // app-created community (which never has an owner; `admin` rows only exist
@@ -970,6 +973,7 @@ export function CommunityChat({
           showActivityTab={canManageModerators}
           communityId={communityId}
           onMuteChanged={handleMuteChanged}
+          onLoadDetails={fetchMeta}
           tabDots={tabDots}
         />
 

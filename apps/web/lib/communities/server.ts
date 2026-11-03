@@ -1,124 +1,23 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { DEFAULT_ENABLED_TABS } from "./areas";
-import { resolveCommunityDp } from "./dp";
-import { canStoreMuteUntil, canStoreShowcaseFlag } from "./showcase-flag";
-import { EVENT_CHAT_COMMUNITY_TYPE } from "./event-chat-rules";
-import { loadEventRoomMeta } from "./event-chat";
 import type { CachedMeta } from "./cache";
+import { loadCommunityChatReadModel } from "./chat-read-model";
 
-/**
- * Lightweight server snapshot for the community chat page: just the community
- * read model — enough to paint the header (name, DP, member count) on the
- * first server render. Members, permissions and messages hydrate client-side
- * from the request cache (revisits) or a fresh bootstrap fetch, so navigation
- * never blocks on secondary data.
- *
- * The DP is resolved through the master-data resolver, exactly like the read
- * model and the sidebar projection. The raw `communities.image_url` column is
- * not the display value for a master-backed community: the linked master row
- * wins. Painting the column here showed the pre-replacement picture in the
- * header while every other surface showed the master row's, and the snapshot
- * is copied into the client meta cache, so the mismatch outlived the fetch
- * that would have corrected it.
- *
- * Latency profile: exactly TWO database round trips, issued in parallel — plus
- * a best-effort pair more, and only for an event's group chat, for the date
- * and pin deadline its header DP wears (see loadEventRoomMeta).
- * The pre-slim version ran ~10 queries across four sequential waves
- * (top-member profiles → experience levels → manager status) and embedded the
- * Lottie animation payload into the RSC response; all of that arrives with the
- * client-side /bootstrap fetch instead.
- */
+/** Access-checked header and read marker only. Full community details hydrate
+ * after messages paint, including member previews, About, grants and mute. */
 export async function fetchCommunityMetaSSR(
   communityId: string,
   userId: string,
 ): Promise<SSRCommunityMeta | null> {
   const db = createServiceClient();
-
-  // The membership's mute state paints the header's menu label; the timed
-  // column is read only once its migration is applied (see read-models.ts).
-  const [muteUntilSupported, showcaseSupported] = await Promise.all([
-    canStoreMuteUntil(db), canStoreShowcaseFlag(db),
-  ]);
-  const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
-    (muteUntilSupported
-      ? db
-          .from("community_members")
-          .select("joined_at, last_read_at, notifications_muted, notifications_muted_until")
-      : db.from("community_members").select("joined_at, last_read_at"))
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    // showcase_enabled is read only once the showcase-toggle migration has
-    // added the column, so the first paint works before it is applied. Each
-    // branch keeps a single string literal (see read-models.ts).
-    (showcaseSupported
-      ? db
-          .from("communities")
-          .select(
-            "id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id, showcase_enabled",
-          )
-      : db
-          .from("communities")
-          .select(
-            "id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id",
-          ))
-      .eq("id", communityId)
-      .maybeSingle(),
+  const [snapshot, { data: currentUser }] = await Promise.all([
+    loadCommunityChatReadModel(communityId, userId),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
   ]);
-
-  if (!membership || !community) return null;
-
-  // An event group chat's DP carries its event's date from the first paint, so
-  // the header never shows a badge-less face first and then grows one — and the
-  // pin deadline comes with it, so a room that is on right now already reads
-  // LIVE before the client fetches anything. (The cast matches this file's
-  // untyped supabase-js baseline.)
-  const eventRoom = (community as any).type === EVENT_CHAT_COMMUNITY_TYPE
-    ? await loadEventRoomMeta(db, communityId).catch(() => null)
-    : null;
-
-  // The DP the API and sidebar serve: the master row's image when the
-  // community is master-backed (a cached lookup — see dp.ts).
-  const dp = await resolveCommunityDp({
-    type: community.type,
-    reference_id: (community as any).reference_id ?? null,
-    image_url: (community as any).image_url ?? null,
-  });
-
-  const meta: CachedMeta = {
-    community: {
-      id: community.id, name: community.name, type: community.type,
-      // member_count streams in with /bootstrap; omitting it here lets the
-      // header fall back to the sidebar entry's count for the first paint.
-      member_count: 0,
-      image_url: dp.image_url,
-      description: (community as any).description ?? null,
-      created_at: (community as any).created_at ?? undefined,
-      owner_id: (community as any).owner_id ?? null,
-      is_private: (community as any).is_private ?? false,
-      enabled_tabs: (community as any).enabled_tabs ?? [...DEFAULT_ENABLED_TABS],
-      // Absent pre-migration; the tab bar reads that as "Showcase is on".
-      showcase_enabled: (community as any).showcase_enabled ?? null,
-      event_date: eventRoom?.eventDate ?? null,
-      pinned_until: eventRoom?.pinnedUntil ?? null,
-      event_end: eventRoom?.eventEnd ?? null,
-      // Role/permissions are not fetched server-side any more; bootstrap
-      // overwrites them client-side moments later.
-      current_user_role: null,
-      current_user_permissions: null,
-      notifications_muted: (membership as unknown as { notifications_muted?: boolean | null }).notifications_muted ?? false,
-      notifications_muted_until: (membership as unknown as { notifications_muted_until?: string | null }).notifications_muted_until ?? null,
-    },
-    members: [],
-    fetchedAt: Date.now(),
-  };
-
+  if (!snapshot.ok) return null;
   return {
-    meta,
-    lastReadAt: (membership as unknown as { last_read_at: string | null }).last_read_at ?? null,
+    meta: { community: snapshot.data.community, members: [], fetchedAt: Date.now() },
+    lastReadAt: snapshot.data.lastReadAt,
     currentUserName: currentUser?.name ?? null,
   };
 }

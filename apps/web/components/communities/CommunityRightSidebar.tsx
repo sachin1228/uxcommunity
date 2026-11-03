@@ -11,7 +11,7 @@
  *
  * Data strategy mirrors CommunityPageShell: pre-seed from the shared
  * metaCache, fall back to the sidebarStore for a fast first paint, then fetch
- * /api/communities/[id] once (deduped through inFlightMetaFetch). Rules use the
+ * /api/communities/[id] after the chat snapshot (shared with the chat). Rules use the
  * cached rules endpoint and stay live via the realtime rules room.
  */
 
@@ -21,12 +21,11 @@ import { useParams } from "next/navigation";
 import { Calendar, Flag, MapPin } from "lucide-react";
 import {
   metaCache,
-  inFlightMetaFetch,
   META_STALE_MS,
   sidebarStore,
   type CachedMeta,
 } from "@/lib/communities/cache";
-import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
+import { fetchJsonCached, getCachedRequest, patchCachedRequest, subscribeToRequest } from "@/lib/request-cache";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -87,7 +86,7 @@ function fmtCreatedAt(iso?: string | null): string {
 
 // ─── Data hooks ────────────────────────────────────────────────────────────────
 
-function useCommunityMeta(communityId: string | null) {
+function useCommunityMeta(communityId: string | null, currentUserId: string) {
   const [community, setCommunity] = useState<Community | null>(() => {
     if (!communityId) return null;
     const cached = metaCache.get(communityId);
@@ -100,6 +99,7 @@ function useCommunityMeta(communityId: string | null) {
     return sidebarEntry
       ? {
           id: sidebarEntry.id,
+          details_loaded: false,
           name: sidebarEntry.name,
           type: sidebarEntry.type,
           member_count: sidebarEntry.member_count,
@@ -133,13 +133,14 @@ function useCommunityMeta(communityId: string | null) {
     const cached = metaCache.get(communityId);
     if (cached) {
       applyCached();
-      if (Date.now() - cached.fetchedAt < META_STALE_MS) return;
+      if (cached.community.details_loaded !== false && Date.now() - cached.fetchedAt < META_STALE_MS) return;
     } else {
       const sidebarEntry = sidebarStore.data?.communities.find((c) => c.id === communityId);
       setCommunity(
         sidebarEntry
           ? {
               id: sidebarEntry.id,
+              details_loaded: false,
               name: sidebarEntry.name,
               type: sidebarEntry.type,
               member_count: sidebarEntry.member_count,
@@ -154,35 +155,30 @@ function useCommunityMeta(communityId: string | null) {
       setMembers([]);
     }
 
-    const existing = inFlightMetaFetch.get(communityId);
-    if (existing) {
-      existing.then(applyCached);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const promise = fetch(`/api/communities/${communityId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { community: Community; members: Member[] } | null) => {
-        if (!data) return;
-        metaCache.set(communityId, {
-          community: data.community,
-          members: data.members,
-          fetchedAt: Date.now(),
-        });
-        applyCached();
-      })
-      .catch(() => {})
-      .finally(() => {
-        inFlightMetaFetch.delete(communityId);
+    const url = `/api/communities/${communityId}`;
+    const applyDetails = (data: { community: Community; members: Member[] }) => {
+      if (cancelled) return;
+      metaCache.set(communityId, {
+        community: data.community,
+        members: data.members,
+        fetchedAt: Date.now(),
       });
-    inFlightMetaFetch.set(communityId, promise);
+      applyCached();
+    };
+    // A header retry also updates the info panel if the first request failed.
+    const unsubscribe = subscribeToRequest(url, () => {
+      const data = getCachedRequest<{ community: Community; members: Member[] }>(url, currentUserId);
+      if (data) applyDetails(data);
+    }, currentUserId);
+    void fetchJsonCached<{ community: Community; members: Member[] }>(
+      url, { staleMs: META_STALE_MS }, currentUserId,
+    ).then(applyDetails).catch(() => {});
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, [communityId]);
+  }, [communityId, currentUserId]);
 
   return { community, members };
 }
@@ -259,7 +255,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(false);
 
-  const { community, members } = useCommunityMeta(communityId);
+  const { community, members } = useCommunityMeta(communityId, currentUserId);
   const rules = useCommunityRules(communityId, currentUserId);
   const { onlineCount } = useOnlinePresence({
     communityId: communityId ?? "",
@@ -270,6 +266,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
   if (!communityId) return null;
 
   const type = community?.type;
+  const detailsReady = !!community && community.details_loaded !== false;
   const referenceName = community?.reference_name ?? null;
   const description = community?.description ?? fallbackDescription(type, referenceName);
   const memberCount = community?.member_count ?? members.length;
@@ -294,7 +291,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
               id="sidebar-members-heading"
               className="font-display text-[15px] font-semibold text-foreground"
             >
-              Members{community ? ` (${memberCount})` : ""}
+              Members{detailsReady ? ` (${memberCount})` : ""}
             </h2>
             <span
               className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted"
@@ -377,7 +374,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
           >
             About
           </h2>
-          {community ? (
+          {detailsReady && community ? (
             <>
               <p className="mt-3 font-body text-sm leading-relaxed text-foreground-muted">
                 {description}

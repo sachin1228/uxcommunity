@@ -16,6 +16,7 @@ type CacheEvent = "hit" | "miss" | "dedup" | "revalidate" | "invalidate"
 type BootstrapBackedRequest = {
   communityId: string
   isInitialRead: boolean
+  section?: string
 }
 
 const DEFAULT_STALE_MS = 60_000
@@ -106,6 +107,7 @@ function getBootstrapBackedRequest(url: string): BootstrapBackedRequest | null {
   return {
     communityId: match[1],
     isInitialRead: !hasPaginationOrSearch && isPageZeroMembers,
+    section,
   }
 }
 
@@ -138,6 +140,14 @@ export async function fetchJsonCached<T>(
     if (fresh && cached) {
       log("hit", key)
       return cached.value
+    }
+    // Full metadata must start after the critical snapshot has had a paint
+    // opportunity. All callers (chat and right sidebar) share this path.
+    if (!bootstrapBacked.section && typeof requestAnimationFrame === "function") {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      // Another consumer may have completed the shared read during that paint.
+      cached = entries.get(key) as CacheEntry<T> | undefined
+      if (cached && Date.now() - cached.fetchedAt < staleMs) return cached.value
     }
   }
 
@@ -214,7 +224,7 @@ export function invalidateRequestPrefix(prefix: string, userId = activeUserId ??
 export type CommunityBootstrap = {
   community: unknown
   messages: unknown
-  permissions: unknown
+  permissions?: unknown
   unreadCount: number
   /** Permanent "John created a …" chat cards for threads/showcase/resources/events. */
   "content-events"?: { events?: CachedContentEvent[] }
@@ -241,7 +251,9 @@ export async function fetchAndHydrateCommunityBootstrap(
     userId,
   )
   const sections: Array<[string, unknown]> = [
-    [base, data.community],
+    // A partial header snapshot must never satisfy a full metadata request.
+    [(data.community as { community?: { details_loaded?: boolean } })?.community?.details_loaded === false
+      ? `${base}/chat` : base, data.community],
     [`${base}/messages`, data.messages],
     [`${base}/permissions`, data.permissions],
     [`${base}/unread`, { unreadCount: data.unreadCount }],

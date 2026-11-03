@@ -117,6 +117,8 @@ export type ClientCommunityPermissions = Partial<Record<CommunityPermission, boo
 
 export interface CachedMeta {
   community: {
+    /** False while only a header snapshot or sidebar preview is available. */
+    details_loaded?: boolean;
     id: string;
     name: string;
     type: string;
