@@ -34,6 +34,7 @@ assert.equal(new URL(APP_URL).protocol, "https:", "Refusing to benchmark a non-H
 assert.match(new URL(APP_URL).hostname, /staging/i, "Refusing to benchmark a host without 'staging' in its name");
 
 const browser = await chromium.launch({ headless: true });
+const browserVersion = browser.version();
 const origin = new URL(APP_URL).origin;
 
 async function getStorageState() {
@@ -147,6 +148,8 @@ const readyTimes = samples.map(({ chatReadyMs }) => chatReadyMs);
 
 const result = {
   metricVersion: 2,
+  targetRevision: process.env.E2E_TARGET_SHA ?? null,
+  browserVersion,
   target: origin,
   communityId: COMMUNITY_ID,
   samples: samples.length,

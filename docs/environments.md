@@ -212,6 +212,12 @@ For the protected GitHub Actions path, run **Deploy isolated staging** with
 `mode=benchmark`; it seeds only the documented idempotent test fixture and
 uploads the report without deploying Workers.
 
+For a matched before/after run, select `mode=compare` and supply the exact
+pre-fix commit SHA as `baseline_ref`. The staging-only job deploys that revision
+with readiness DOM annotations, runs the current benchmark, restores the merged
+revision even if the baseline test fails, then measures it on the same runner.
+It uploads separate before/after reports with commit and browser versions.
+
 Run `npm run test:community-chat-open` for the route and browser readiness
 regressions (install Chromium with `npx playwright install chromium` first).
 
