@@ -1,19 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CONTENT_EVENT_CHANGED_EVENT,
-  metaCache,
-  msgCache,
-  msgFetchedAt,
   type CachedContentEvent,
-  type CachedMessage,
   type CachedMeta,
   type CachedThreadEvent,
   type MessageReaction,
 } from "@/lib/communities/cache";
-import { fetchAndHydrateCommunityBootstrap, initRequestCache } from "@/lib/request-cache";
+import { fetchAndHydrateCommunityContentEvents, initRequestCache } from "@/lib/request-cache";
 import type { CommunityThread } from "@/lib/communities/models/threads";
+import { mergeContentEventSnapshot } from "@/lib/communities/content-event-snapshot";
 
 type ContentReactionRow = { content_id: string; kind: string; reactions: MessageReaction[] };
 
@@ -38,28 +35,29 @@ function sameReactions(current: MessageReaction[], next: MessageReaction[]) {
 /**
  * The "John created a …" cards interleaved with chat messages.
  *
- * Cards for threads AND the other three areas. Seeded from /bootstrap
+ * Cards for threads AND the other three areas. Loaded after the chat snapshot
  * (history) and kept current by the chat room's content-insert / content-delete
  * realtime topics — so a card lives as long as the chat window shows it, not a
  * session-only bubble. They are notifications: the server hands back only the
  * cards created after this member joined (and inside the 15-day window), while
- * the thread/post/resource/event itself keeps its own page. This hook also
- * primes the community meta/message caches, because the same bootstrap request
- * carries both.
+ * the thread/post/resource/event itself keeps its own page.
  */
 export function useContentTimeline({
   communityId,
   currentUserId,
-  initialMeta,
-  initialMessages,
 }: {
   communityId: string;
   currentUserId: string;
-  initialMeta?: CachedMeta;
-  initialMessages?: CachedMessage[];
 }) {
   const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
   const [contentEvents, setContentEvents] = useState<CachedContentEvent[]>([]);
+  const deletedContentIds = useRef(new Set<string>());
+  const handleContentDeleted = useCallback((id: string) => {
+    // History can have been read just before this delete. Keep its tombstone
+    // even if the card has not arrived in local state yet.
+    deletedContentIds.current.add(id);
+    setContentEvents((prev) => prev.filter((event) => event.id !== id));
+  }, []);
   /** True once the initial threads fetch for the current community has settled. */
   const [threadsReady, setThreadsReady] = useState(false);
   /** True once the content-events history (bootstrap section) has settled. */
@@ -89,8 +87,8 @@ export function useContentTimeline({
   const handleThreadDeleted = useCallback((threadId: string) => {
     setThreadEvents((prev) => prev.filter((event) => event.id !== threadId));
     // The unified content-event card is the one the timeline renders now.
-    setContentEvents((prev) => prev.filter((event) => event.id !== threadId));
-  }, []);
+    handleContentDeleted(threadId);
+  }, [handleContentDeleted]);
 
   // Reaction groups that arrive with each message page (the RPC attaches them
   // for the timeline's notification cards) are folded into the content events.
@@ -126,6 +124,7 @@ export function useContentTimeline({
   // endpoints when mounted, so their work cannot delay the chat shell.
   useEffect(() => {
     let cancelled = false;
+    deletedContentIds.current.clear();
     queueMicrotask(() => {
       if (!cancelled) {
         setThreadEvents([]);
@@ -136,42 +135,14 @@ export function useContentTimeline({
     });
     initRequestCache(currentUserId);
 
-    // A server-rendered snapshot is authoritative for this navigation. Seed
-    // the shared client caches and avoid immediately requesting the same page
-    // data again after hydration.
-    if (initialMeta && initialMessages) {
-      const fetchedAt = Date.now();
-      metaCache.set(communityId, { ...initialMeta, fetchedAt });
-      msgCache.set(communityId, initialMessages);
-      msgFetchedAt.set(communityId, fetchedAt);
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setThreadsReady(true);
-          setContentEventsReady(true);
-        }
-      });
-      return () => { cancelled = true; };
-    }
-
-    void fetchAndHydrateCommunityBootstrap(communityId, currentUserId)
-      .then((data) => {
+    // The helper shares the critical bootstrap, then loads only timeline
+    // history. Message readiness never waits for these secondary reads.
+    void fetchAndHydrateCommunityContentEvents(communityId, currentUserId)
+      .then((section) => {
         if (cancelled) return;
-        const communityData = data.community as {
-          community: CachedMeta["community"];
-          members: CachedMeta["members"];
-        };
-        const messageData = data.messages as { messages: CachedMessage[] };
-        const contentData = data["content-events"] as { events?: CachedContentEvent[] } | undefined;
-        const fetchedAt = Date.now();
-
-        metaCache.set(communityId, {
-          community: communityData.community,
-          members: communityData.members,
-          fetchedAt,
-        });
-        msgCache.set(communityId, messageData.messages ?? []);
-        msgFetchedAt.set(communityId, fetchedAt);
-        if (contentData) setContentEvents(contentData.events ?? []);
+        setContentEvents((current) => mergeContentEventSnapshot(
+          (section.events ?? []) as CachedContentEvent[], current, deletedContentIds.current,
+        ));
       })
       .catch(() => {})
       .finally(() => {
@@ -182,7 +153,7 @@ export function useContentTimeline({
       });
 
     return () => { cancelled = true; };
-  }, [communityId, currentUserId, initialMessages, initialMeta]);
+  }, [communityId, currentUserId]);
 
   return {
     threadEvents,
@@ -193,6 +164,7 @@ export function useContentTimeline({
     contentEventsReady,
     handleThreadCreated,
     handleThreadDeleted,
+    handleContentDeleted,
     mergeContentReactions,
     applyContentReactions,
   };
@@ -221,18 +193,20 @@ export function useLocalContentEventMirror({
   currentUserId,
   members,
   setContentEvents,
+  onDeleteContentEvent,
 }: {
   communityId: string;
   currentUserId: string;
   members: CachedMeta["members"];
   setContentEvents: React.Dispatch<React.SetStateAction<CachedContentEvent[]>>;
+  onDeleteContentEvent: (id: string) => void;
 }) {
   useEffect(() => {
     const onContentEvent = (change: Event) => {
       const detail = (change as CustomEvent<ContentEventChange>).detail;
       if (!detail || detail.event.community_id !== communityId) return;
       if (detail.kind === "delete") {
-        setContentEvents((prev) => prev.filter((event) => event.id !== detail.event.id));
+        onDeleteContentEvent(detail.event.id);
         return;
       }
       const row = detail.event;
@@ -254,5 +228,5 @@ export function useLocalContentEventMirror({
     };
     window.addEventListener(CONTENT_EVENT_CHANGED_EVENT, onContentEvent);
     return () => window.removeEventListener(CONTENT_EVENT_CHANGED_EVENT, onContentEvent);
-  }, [communityId, currentUserId, members, setContentEvents]);
+  }, [communityId, currentUserId, members, setContentEvents, onDeleteContentEvent]);
 }

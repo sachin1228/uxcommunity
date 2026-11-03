@@ -35,6 +35,7 @@ jobs:
       - run: npm ci
       - run: npm run test:environments
       - run: node --test apps/web/e2e/seed-member.test.mjs
+      - run: node --test apps/web/e2e/community-bootstrap.test.mjs
       - run: node --test k6/lib/realtime-fanout.test.mjs
       - run: python3 scripts/db/test_guard.py
 

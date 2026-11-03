@@ -13,10 +13,8 @@ type Params = { params: Promise<{ id: string }> };
 type Section = "community" | "messages" | "content-events" | "rules";
 
 /**
- * Sections that gate the whole response. Rules are a cheap extra bundled so
- * the client's info panel reads them from the hydrated request cache instead
- * of firing a separate fetch; if rules fail, bootstrap still succeeds and
- * the client falls back to the individual endpoint.
+ * The web chat asks for just the critical snapshot. Legacy callers still get
+ * the bundled rules and timeline cards; the web loads those after messages.
  */
 const CRITICAL = new Set<Section>(["community", "messages"]);
 
@@ -90,18 +88,21 @@ export async function GET(request: NextRequest, context: Params) {
   }
 
   const db = createServiceClient();
+  // Share explicitly: route handlers do not run in the RSC cache scope.
+  const readModel = loadCommunityReadModel(communityId, userId);
+  const chatOnly = request.headers.get("X-Community-Bootstrap") === "chat";
   const operations: Array<[Section, () => Promise<unknown>]> = [
-    ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
+    ["community", async () => unwrapReadResult(await readModel)],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
     [
       "content-events",
       async () => {
-        const readModel = await loadCommunityReadModel(communityId, userId);
-        if (!readModel.ok) return { events: [] };
+        const model = await readModel;
+        if (!model.ok) return { events: [] };
         const events = await loadCommunityContentEvents(
           communityId,
           userId,
-          contentAreaLimits(readModel.data.community as Record<string, unknown>),
+          contentAreaLimits(model.data.community as Record<string, unknown>),
         );
         return { events };
       },
@@ -119,16 +120,18 @@ export async function GET(request: NextRequest, context: Params) {
       return { rules: data ?? [] };
     }],
   ];
+  // Filter before invoking operations: optional reads cannot hold messages up.
+  const requested = operations.filter(([name]) => !chatOnly || CRITICAL.has(name));
 
   const settled = await Promise.allSettled(
-    operations.map(([name, operation]) => readSection(name, operation)),
+    requested.map(([name, operation]) => readSection(name, operation)),
   );
   const data: Record<string, unknown> = {};
   const failures: Array<{ section: Section; message: string }> = [];
   const timings: string[] = [`auth;dur=${authDuration.toFixed(1)}`];
 
   settled.forEach((result, index) => {
-    const section = operations[index][0];
+    const section = requested[index][0];
     if (result.status === "fulfilled") {
       data[section] = result.value.value;
       timings.push(`${section};dur=${result.value.duration.toFixed(1)}`);
@@ -171,6 +174,7 @@ export async function GET(request: NextRequest, context: Params) {
   return NextResponse.json(body, {
     headers: {
       "Cache-Control": "private, no-store",
+      "Vary": "X-Community-Bootstrap",
       "Server-Timing": timings.join(", "),
       "X-Response-Bytes": String(responseBytes),
     },

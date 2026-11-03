@@ -527,10 +527,10 @@ export function useChatData({
       // alive, so no reconnect fires when they switch back — without this the
       // window would show stale history until the next focus event.
       //
-      // A client that holds NO message yet needs no drain: the bootstrap or the
-      // first-page fetch above has just delivered the newest page, which is the
-      // only page a cursor-less catch-up could return. Skipping it there saves a
-      // duplicate request per first visit.
+      // Keep this background drain even after a fresh bootstrap: it closes
+      // the gap between the server's snapshot and the socket subscription.
+      // Loading/initialMessagesReady are already settled above, so neither
+      // rendering nor the visible-readiness benchmark waits for this request.
       if (!cancelled && communityIdRef.current === communityId) {
         const from = newestRealCursor(msgCache.get(communityId) ?? []);
         if (from) void catchUpMessages(from).catch(() => undefined);

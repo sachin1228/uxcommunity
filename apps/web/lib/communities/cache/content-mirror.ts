@@ -23,6 +23,8 @@ export const CONTENT_EVENT_CHANGED_EVENT = "uxcommunity:content-event-changed";
 
 type CachedBootstrapShape = {
   "content-events"?: { events?: CachedContentEvent[] };
+  contentEventChanges?: Record<string, CachedContentEvent | null>;
+  contentEventsLoaded?: boolean;
 };
 
 /** The creator's display identity, read from the community meta cache. */
@@ -77,7 +79,16 @@ function patchCachedBootstrap(detail: Parameters<typeof notifyContentEvent>[0]):
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
       }
-      return { ...current, "content-events": { ...section, events: next } };
+      return {
+        ...current,
+        "content-events": { ...section, events: next },
+        // A mutation alone is not a complete history snapshot.
+        contentEventsLoaded: current.contentEventsLoaded ?? current["content-events"] !== undefined,
+        contentEventChanges: {
+          ...current.contentEventChanges,
+          [detail.event.id]: detail.kind === "delete" ? null : next.find((event) => event.id === detail.event.id)!,
+        },
+      };
     },
     userId,
   );

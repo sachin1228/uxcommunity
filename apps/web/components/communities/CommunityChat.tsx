@@ -153,9 +153,10 @@ export function CommunityChat({
     contentEventsReady,
     handleThreadCreated,
     handleThreadDeleted,
+    handleContentDeleted,
     mergeContentReactions,
     applyContentReactions,
-  } = useContentTimeline({ communityId, currentUserId, initialMeta, initialMessages });
+  } = useContentTimeline({ communityId, currentUserId });
 
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
@@ -212,7 +213,7 @@ export function CommunityChat({
     onContentReactions: mergeContentReactions,
   });
 
-  useLocalContentEventMirror({ communityId, currentUserId, members, setContentEvents });
+  useLocalContentEventMirror({ communityId, currentUserId, members, setContentEvents, onDeleteContentEvent: handleContentDeleted });
 
   // ── Pending @mention jumps (the "@" pill) ─────────────────────────────────
   // Read straight off the loaded messages: any message that mentions the
@@ -448,6 +449,7 @@ export function CommunityChat({
     setMessages,
     setThreadEvents,
     setContentEvents,
+    onDeleteContentEvent: handleContentDeleted,
     membersRef,
     pendingProfileFetchRef,
     scrollContainerRef,

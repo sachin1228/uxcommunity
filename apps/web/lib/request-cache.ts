@@ -1,3 +1,5 @@
+import type { CachedContentEvent } from "./communities/cache/types"
+
 type CacheEntry<T> = {
   value: T
   fetchedAt: number
@@ -6,6 +8,7 @@ type CacheEntry<T> = {
 type CacheOptions = {
   staleMs?: number
   force?: boolean
+  headers?: HeadersInit
 }
 
 type CacheEvent = "hit" | "miss" | "dedup" | "revalidate" | "invalidate"
@@ -145,7 +148,7 @@ export async function fetchJsonCached<T>(
   }
 
   if (!loggedLookup) log(cached ? "revalidate" : "miss", key)
-  const request = fetch(url, { cache: "no-store" })
+  const request = fetch(url, { cache: "no-store", headers: options.headers })
     .then(async (response) => {
       const body = await response.json().catch(() => null)
       if (!response.ok) {
@@ -214,7 +217,10 @@ export type CommunityBootstrap = {
   permissions: unknown
   unreadCount: number
   /** Permanent "John created a …" chat cards for threads/showcase/resources/events. */
-  "content-events"?: { events?: unknown[] }
+  "content-events"?: { events?: CachedContentEvent[] }
+  /** Local mutations that must win over history still in flight. */
+  contentEventChanges?: Record<string, CachedContentEvent | null>
+  contentEventsLoaded?: boolean
   threads?: unknown
   events?: unknown
   resources?: unknown
@@ -231,7 +237,7 @@ export async function fetchAndHydrateCommunityBootstrap(
   const base = `/api/communities/${communityId}`
   const data = await fetchJsonCached<CommunityBootstrap>(
     `${base}/bootstrap`,
-    { staleMs: COMMUNITY_BOOTSTRAP_STALE_MS },
+    { staleMs: COMMUNITY_BOOTSTRAP_STALE_MS, headers: { "X-Community-Bootstrap": "chat" } },
     userId,
   )
   const sections: Array<[string, unknown]> = [
@@ -251,6 +257,34 @@ export async function fetchAndHydrateCommunityBootstrap(
     if (value !== undefined) setCachedRequest(url, value, userId)
   }
   return data
+}
+
+/** Load timeline cards after the critical message snapshot, and keep local
+ * create/delete mirrors on the same canonical bootstrap cache entry. */
+export async function fetchAndHydrateCommunityContentEvents(communityId: string, userId: string) {
+  const base = `/api/communities/${communityId}`
+  const bootstrap = await fetchAndHydrateCommunityBootstrap(communityId, userId)
+  const cached = bootstrap.contentEventsLoaded === false ? undefined : bootstrap["content-events"]
+  const section = cached ?? (await fetchJsonCached<CommunityBootstrap>(
+    `${base}/bootstrap?section=content-events`,
+    // A missing section means the canonical bootstrap was never completed or
+    // was invalidated by a mutation. Do not replay an older secondary snapshot.
+    { force: true },
+    userId,
+  ))["content-events"]
+  if (!section) throw new Error("Community timeline unavailable")
+  let hydrated = section
+  patchCachedRequest<CommunityBootstrap>(`${base}/bootstrap`, (current) => {
+    const events = new Map((section.events ?? []).map((event) => [event.id, event]))
+    for (const [id, change] of Object.entries(current.contentEventChanges ?? {})) {
+      if (change === null) events.delete(id)
+      else events.set(id, change)
+    }
+    hydrated = { ...section, events: [...events.values()].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)) }
+    return { ...current, "content-events": hydrated, contentEventsLoaded: true }
+  }, userId)
+  setCachedRequest(`${base}/content-events`, hydrated, userId)
+  return hydrated
 }
 
 export function subscribeToRequest(url: string, listener: () => void, userId?: string) {

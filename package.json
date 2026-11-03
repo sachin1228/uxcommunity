@@ -30,6 +30,7 @@
     "test:verify-fcm": "node --test scripts/verify-fcm-credentials.test.mjs",
     "test:e2e-realtime": "node apps/web/e2e/realtime-sockets.test.mjs",
     "bench:community-chat-open": "node apps/web/e2e/community-chat-open-timing.mjs",
+    "test:community-chat-open": "node --test apps/web/e2e/community-bootstrap.test.mjs apps/web/e2e/chat-readiness.test.mjs",
     "test:e2e-event-host-going": "node apps/web/e2e/event-host-going.test.mjs",
     "test:e2e-seed-member": "node --test apps/web/e2e/seed-member.test.mjs",
     "seed:e2e-member": "node apps/web/e2e/seed-member.mjs",

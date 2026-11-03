@@ -16,6 +16,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { observeCommunityChatReady } from "./lib/chat-readiness.mjs";
 
 const APP_URL = (process.env.E2E_APP_URL ?? "").replace(/\/+$/, "");
 const COMMUNITY_ID = process.env.E2E_COMMUNITY_ID ?? "";
@@ -24,8 +25,7 @@ const EMAIL = process.env.E2E_EMAIL ?? "";
 const PASSWORD = process.env.E2E_PASSWORD ?? "";
 const SAMPLES = Math.max(1, Math.min(50, Number(process.env.E2E_SAMPLES ?? 10)));
 const OUTPUT = process.env.E2E_CHAT_TIMING_OUT ?? "";
-const COMPOSER = 'textarea[placeholder="Type a message…"], input[placeholder="Type a message…"]';
-const MESSAGE_API = `/api/communities/${COMMUNITY_ID}/messages`;
+const API_BASE = `/api/communities/${COMMUNITY_ID}`;
 
 assert(APP_URL, "E2E_APP_URL must point to the staging web app");
 assert(COMMUNITY_ID, "E2E_COMMUNITY_ID must be a community the test member belongs to");
@@ -71,27 +71,33 @@ async function getStorageState() {
   return state;
 }
 
-const state = await getStorageState();
 const samples = [];
 
 try {
+  const state = await getStorageState();
   for (let index = 0; index < SAMPLES; index += 1) {
     const context = await browser.newContext({ storageState: state });
     const page = await context.newPage();
-    let messageApiAt = null;
-    let messageApiStatus = null;
-    const startedAt = performance.now();
-    const messagesResponsePromise = page.waitForResponse((response) => {
-      const url = new URL(response.url());
-      return url.origin === origin && url.pathname === MESSAGE_API;
-    }, { timeout: 60_000 });
-
-    page.on("response", (response) => {
-      const url = new URL(response.url());
-      if (url.origin === origin && url.pathname === MESSAGE_API && !messageApiAt) {
-        messageApiAt = performance.now();
-        messageApiStatus = response.status();
-      }
+    await page.addInitScript(observeCommunityChatReady, COMMUNITY_ID);
+    const requests = [];
+    const recordings = [];
+    page.on("requestfinished", (request) => {
+      const url = new URL(request.url());
+      if (url.origin !== origin || ![`${API_BASE}/bootstrap`, `${API_BASE}/messages`].includes(url.pathname)) return;
+      const timing = request.timing();
+      recordings.push((async () => {
+        const response = await request.response();
+        const headers = await response.allHeaders();
+        requests.push({
+          endpoint: url.pathname,
+          section: url.searchParams.get("section"),
+          catchUp: url.searchParams.has("after"),
+          status: response.status(),
+          startedAt: timing.startTime,
+          durationMs: Math.round(timing.responseEnd),
+          serverTiming: headers["server-timing"] ?? null,
+        });
+      })().catch(() => {}));
     });
 
     const navigation = await page.goto(`${APP_URL}/dashboard/communities/${COMMUNITY_ID}`, {
@@ -101,27 +107,32 @@ try {
     assert(navigation, `Sample ${index + 1}: navigation did not return a response`);
     assert.equal(navigation.status(), 200, `Sample ${index + 1}: chat page returned HTTP ${navigation.status()}`);
 
-    const messagesResponse = await messagesResponsePromise;
-    messageApiStatus = messagesResponse.status();
-    assert.equal(messageApiStatus, 200, `Sample ${index + 1}: messages API returned HTTP ${messageApiStatus}`);
-    await page.locator(COMPOSER).first().waitFor({ state: "visible", timeout: 60_000 });
-    await page.getByRole("status", { name: "Loading messages" }).waitFor({ state: "hidden", timeout: 60_000 });
-
-    const ready = await page.evaluate(() => ({
-      responseStart: performance.getEntriesByType("navigation")[0]?.responseStart ?? null,
-      domContentLoaded: performance.getEntriesByType("navigation")[0]?.domContentLoadedEventEnd ?? null,
-    }));
-    const chatReadyMs = Math.round(performance.now() - startedAt);
+    await page.waitForFunction(() => performance.getEntriesByName("community-chat-ready").length > 0,
+      undefined, { timeout: 60_000 });
+    const ready = await page.evaluate(() => {
+      const navigation = performance.getEntriesByType("navigation")[0];
+      return {
+        timeOrigin: performance.timeOrigin,
+        chatReadyMs: performance.getEntriesByName("community-chat-ready")[0].startTime,
+        navigationTtfbMs: navigation.responseStart,
+        domContentLoadedMs: navigation.domContentLoadedEventEnd,
+      };
+    });
+    // Only inspect requests already finished when chat painted; background
+    // catch-up or secondary cards never extend the visible-readiness metric.
+    await Promise.all(recordings.slice());
+    const chatReadyMs = Math.round(ready.chatReadyMs);
     samples.push({
       sample: index + 1,
       chatReadyMs,
-      messageApiMs: messageApiAt === null ? null : Math.round(messageApiAt - startedAt),
-      messageApiStatus,
-      navigationTtfbMs: ready.responseStart === null ? null : Math.round(ready.responseStart),
-      domContentLoadedMs: ready.domContentLoaded === null ? null : Math.round(ready.domContentLoaded),
+      navigationTtfbMs: Math.round(ready.navigationTtfbMs),
+      domContentLoadedMs: Math.round(ready.domContentLoadedMs),
+      requests: requests.map(({ startedAt, ...request }) => ({
+        ...request, startedAfterNavigationMs: Math.round(startedAt - ready.timeOrigin),
+      })),
     });
     await context.close();
-    console.log(`sample ${index + 1}/${SAMPLES}: chat ready ${chatReadyMs} ms; messages API ${samples.at(-1).messageApiMs ?? "not observed"} ms`);
+    console.log(`sample ${index + 1}/${SAMPLES}: visible chat ready ${chatReadyMs} ms`);
   }
 } finally {
   await browser.close();
@@ -133,23 +144,19 @@ function percentile(values, p) {
 }
 
 const readyTimes = samples.map(({ chatReadyMs }) => chatReadyMs);
-const apiTimes = samples.map(({ messageApiMs }) => messageApiMs).filter(Number.isFinite);
+
 const result = {
+  metricVersion: 2,
   target: origin,
   communityId: COMMUNITY_ID,
   samples: samples.length,
-  metric: "fresh-context direct navigation to visible composer and settled initial message loading",
+  metric: "fresh-context navigation to painted, positioned message timeline (or confirmed empty state) and enabled composer",
   chatReadyMs: {
     min: Math.min(...readyTimes),
     median: percentile(readyTimes, 50),
     p95: percentile(readyTimes, 95),
     max: Math.max(...readyTimes),
   },
-  messageApiMs: apiTimes.length ? {
-    samples: apiTimes.length,
-    median: percentile(apiTimes, 50),
-    p95: percentile(apiTimes, 95),
-  } : null,
   runs: samples,
 };
 
