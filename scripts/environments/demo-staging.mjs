@@ -56,8 +56,10 @@ async function main() {
   childEnv.SUPABASE_ACCESS_TOKEN = process.env.STAGING_SUPABASE_ACCESS_TOKEN.trim();
   const result = spawnSync('npx',['--yes',`supabase@${version}`,'db','query','--linked','--project-ref',env.STAGING_DATABASE_REF,'--file',action==='seed'?plan:cleanup],{cwd:root,env:childEnv,encoding:'utf8'});
   if (result.status !== 0) throw new Error('Staging demo SQL failed; cleanup files preserved. Inspect database state before retrying.');
-  const {count,error} = await db.from('users').select('id',{count:'exact',head:true}).like('email',`designer.%.${run}@demo.invalid`);
-  if (error || count !== (action === 'seed' ? 100 : 0)) throw new Error('Staging demo account count verification failed');
+  for (const [table,ids] of Object.entries(metadata.verify)) {
+    const {count,error} = await db.from(table).select('id',{count:'exact',head:true}).in('id',ids);
+    if (error || count !== (action === 'seed' ? ids.length : 0)) throw new Error(`Staging demo verification failed: ${table}`);
+  }
   await writeFile(resolve(dir,`${action}-completed.json`),JSON.stringify({run,database:metadata.database,completed_at:new Date().toISOString()}),{mode:0o600});
   console.info(`Staging demo ${action} completed for ${run}. Cleanup files: ${dir}`);
 }

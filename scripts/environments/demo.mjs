@@ -56,6 +56,7 @@ await put('communities', communities);
 const memberships = communities.flatMap((c, ci) => users.filter((_, i) => i === ci || (i + ci) % 3 === 0 || (i * 3 + ci) % 7 === 0).map(u => ({ community_id: c.id, user_id: u.id, role: u.id === c.owner_id ? 'owner' : 'member', joined_at: ago(700) })));
 // Existing local accounts can immediately record every community, including private rooms.
 for (const c of communities) for (const user_id of viewers) memberships.push({ community_id: c.id, user_id, role: 'member', joined_at: ago(600) });
+if (stagingPlan) for (const c of communities) if (!memberships.some(m => m.community_id === c.id && m.user_id === users[0].id)) memberships.push({community_id:c.id,user_id:users[0].id,role:'member',joined_at:ago(600)});
 await put('community_members', memberships, 'community_id,user_id');
 const members = c => memberships.filter(m => m.community_id === c.id).map(m => m.user_id);
 const author = (c, i) => members(c)[i % members(c).length];
@@ -82,7 +83,7 @@ const jobs = Array.from({ length: 30 }, (_, i) => ({ id: id(`job:${i}`), poster_
 // Make the recording accounts' exact profile criteria visible in both job tabs.
 const { data: viewerProfiles, error: profileError } = viewers.length
   ? await db.from('designer_profiles').select('user_id,city_id,sector_id,job_title,experience_level').in('user_id',viewers)
-  : { data: [], error: null };
+  : { data: stagingPlan ? [{user_id:users[0].id,city_id:cities[0].id,sector_id:sectors[0].id,job_title:roles[0].slug,experience_level:levels[0].slug}] : [], error: null };
 if (profileError) throw profileError;
 const matchedJobs = (viewerProfiles ?? []).filter(p => p.job_title && p.experience_level).flatMap(p =>
   Array.from({length:8}, (_,i) => {
@@ -136,7 +137,7 @@ if (stagingPlan) {
  await mkdir(dir,{recursive:true,mode:0o700});
  const wrap = sql => `BEGIN; SET LOCAL app.bypass_creation_limits = 'on';\n${sql}\nCOMMIT;\n`;
  // Exclusive creation preserves the original cleanup inventory if a run is reused.
- await writeFile(resolve(dir,'manifest.json'),JSON.stringify({run,database:env.NEXT_PUBLIC_SUPABASE_URL,counts,created_at:new Date().toISOString()},null,2),{mode:0o600,flag:'wx'});
+ await writeFile(resolve(dir,'manifest.json'),JSON.stringify({run,database:env.NEXT_PUBLIC_SUPABASE_URL,counts,verify:Object.fromEntries(Object.entries({users,communities,community_threads:threads,community_showcase_posts:showcases,job_posts:jobs,community_resources:resources,community_events:events}).map(([table,rows])=>[table,rows.map(r=>r.id)])),created_at:new Date().toISOString()},null,2),{mode:0o600,flag:'wx'});
  await writeFile(resolve(dir,'cleanup.sql'),wrap(cleanupPlan.join('\n')),{mode:0o600,flag:'wx'});
  await writeFile(resolve(dir,'seed.sql'),wrap(sqlPlan.map(sql=>sql.replace(/^BEGIN; /,'').replace(/ COMMIT;$/,'')).join('\n')),{mode:0o600,flag:'wx'});
  console.info('Staging plan and cleanup inventory saved. Demo login email: '+users[0].email);
