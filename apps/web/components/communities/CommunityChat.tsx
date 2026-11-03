@@ -149,8 +149,6 @@ export function CommunityChat({
     setThreadEvents,
     contentEvents,
     setContentEvents,
-    threadsReady,
-    contentEventsReady,
     handleThreadCreated,
     handleThreadDeleted,
     handleContentDeleted,
@@ -1115,7 +1113,6 @@ export function CommunityChat({
               grouped={grouped}
               threadEvents={threadEvents}
               contentEvents={contentEvents}
-              contentEventsReady={contentEventsReady}
               currentUserId={currentUserId}
               firstUnreadMsgId={firstUnreadMsgId}
               unreadDisplayCount={unreadDisplayCount}
@@ -1126,7 +1123,6 @@ export function CommunityChat({
               loading={loading}
               loadingOlder={loadingOlder}
               hasMoreAbove={hasMoreAbove}
-              threadsReady={threadsReady}
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}

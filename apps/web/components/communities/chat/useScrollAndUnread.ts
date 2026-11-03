@@ -100,6 +100,19 @@ export function useScrollAndUnread({
     if (!initialMessagesReady) return;
     if (snapshotReady) return;
 
+    const realMsgs = messages.filter((m) => !m.id.startsWith("temp-"));
+    if (realMsgs.length === 0) {
+      // Nothing needs an unread divider or a read-marker lookup. Preserve any
+      // known marker for later messages without waiting for the panel.
+      setLastReadAt(lastReadAtOnOpen.has(communityId)
+        ? lastReadAtOnOpen.get(communityId) ?? null
+        : initialLastReadAtFromSSR ?? null);
+      lastReadAtOnOpen.delete(communityId);
+      unreadAtOpenRef.current = { firstMsgId: null, count: 0 };
+      setSnapshotReady(true);
+      return;
+    }
+
     if (lastReadAt === undefined) {
       // Check if panel already wrote lastReadAt to the shared map
       if (lastReadAtOnOpen.has(communityId)) {
@@ -124,7 +137,6 @@ export function useScrollAndUnread({
       return () => clearTimeout(timer);
     }
 
-    const realMsgs    = messages.filter((m) => !m.id.startsWith("temp-"));
     const lastReadTime = lastReadAt === null ? -Infinity : new Date(lastReadAt).getTime();
     const unreadMsgs  = realMsgs.filter(
       (m) =>
@@ -137,7 +149,7 @@ export function useScrollAndUnread({
     };
     setSnapshotReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessagesReady, lastReadAt, communityId, snapshotReady]);
+  }, [initialMessagesReady, lastReadAt, communityId, snapshotReady, messages]);
 
   // ── Effect 2: Initial scroll to unread boundary ───────────────────────────
   useIsomorphicLayoutEffect(() => {

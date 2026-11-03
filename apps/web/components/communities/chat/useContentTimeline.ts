@@ -58,10 +58,6 @@ export function useContentTimeline({
     deletedContentIds.current.add(id);
     setContentEvents((prev) => prev.filter((event) => event.id !== id));
   }, []);
-  /** True once the initial threads fetch for the current community has settled. */
-  const [threadsReady, setThreadsReady] = useState(false);
-  /** True once the content-events history (bootstrap section) has settled. */
-  const [contentEventsReady, setContentEventsReady] = useState(false);
 
   const handleThreadCreated = useCallback((thread: CommunityThread) => {
     setThreadEvents((prev) => {
@@ -128,9 +124,7 @@ export function useContentTimeline({
     queueMicrotask(() => {
       if (!cancelled) {
         setThreadEvents([]);
-        setThreadsReady(false);
         setContentEvents([]);
-        setContentEventsReady(false);
       }
     });
     initRequestCache(currentUserId);
@@ -144,13 +138,7 @@ export function useContentTimeline({
           (section.events ?? []) as CachedContentEvent[], current, deletedContentIds.current,
         ));
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) {
-          setThreadsReady(true);
-          setContentEventsReady(true);
-        }
-      });
+      .catch(() => {});
 
     return () => { cancelled = true; };
   }, [communityId, currentUserId]);
@@ -160,8 +148,6 @@ export function useContentTimeline({
     setThreadEvents,
     contentEvents,
     setContentEvents,
-    threadsReady,
-    contentEventsReady,
     handleThreadCreated,
     handleThreadDeleted,
     handleContentDeleted,
