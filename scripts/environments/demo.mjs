@@ -73,6 +73,32 @@ await put('community_resources', resources);
 const events = content.events.map((title, i) => { const c = communities[i % communities.length]; return { id: id(`event:${i}`), community_id: c.id, user_id: c.owner_id, title, description: `Bring one work in progress and a specific question. We will start with a short walkthrough, work in small critique groups, and finish with practical next steps. ${content.communities[i % communities.length].description}`, event_date: future(i + 1), end_date: ago(-(i + 1) * 24 - 1.5), is_online: i % 3 !== 0, location: i % 3 === 0 ? 'Design studio · Bengaluru' : null, cover_image_url: photo(i + 2), max_attendees: 40, is_public: !c.is_private, host_timezone: 'Asia/Kolkata', host_utc_offset_minutes: 330, created_at: ago(100 + i) }; });
 await put('community_events', events);
 const jobs = Array.from({ length: 30 }, (_, i) => ({ id: id(`job:${i}`), poster_id: users[i].id, company_id: companies[i % companies.length].id, title: `${['Senior Product Designer','UX Researcher','Design Systems Designer','Brand Designer','Motion Designer','Product Design Intern'][i % 6]} — ${content.domains[i % content.domains.length]}`, kind: i % 5 === 0 ? 'referral' : 'hiring', city_id: cities[i % cities.length].id, sector_id: sectors[i % sectors.length].id, job_title: roles.find(r => r.slug === 'product-designer')?.slug ?? roles[i % roles.length].slug, experience_level: levels[i % levels.length].slug, work_mode: ['remote','hybrid','onsite'][i % 3], employment_type: i % 6 === 5 ? 'internship' : 'full_time', salary: i % 6 === 5 ? '₹35,000–₹50,000 / month' : ['₹24–36 LPA','₹18–28 LPA','₹32–45 LPA'][i % 3], description: `Join ${companies[i % companies.length].name} to make ${content.domains[i % content.domains.length].toLowerCase()} easier to use. You will work with a small cross-functional team, talk directly with customers, and own the journey from discovery to implementation. We value clear thinking, accessible interactions, and evidence over presentation polish.`, responsibilities: ['Map customer journeys with research and product partners','Prototype interaction patterns and test with customers','Partner with engineers on accessible, responsive implementation'], requirements: ['A portfolio explaining decisions, constraints, and outcomes','Experience giving and incorporating constructive critique','Strong interaction design and communication skills'], skills: ['Figma','Prototyping','User research','Accessibility'], created_at: ago(i * 4), closes_at: future(30 + i) }));
+// Make the recording accounts' exact profile criteria visible in both job tabs.
+const { data: viewerProfiles, error: profileError } = viewers.length
+  ? await db.from('designer_profiles').select('user_id,city_id,sector_id,job_title,experience_level').in('user_id',viewers)
+  : { data: [], error: null };
+if (profileError) throw profileError;
+const matchedJobs = (viewerProfiles ?? []).filter(p => p.job_title && p.experience_level).flatMap(p =>
+  Array.from({length:8}, (_,i) => {
+    const role = roles.find(r => r.slug === p.job_title)?.name ?? 'Designer';
+    const motion = /motion|3d/i.test(role);
+    return {
+      ...jobs[i], id:id(`profile-job:${p.user_id}:${p.job_title}:${p.experience_level}:${p.city_id}:${p.sector_id}:${i}`),
+      title:`${role} — ${['AI product storytelling','Interactive learning','Creative tools','Brand experiences','Product explainers','Spatial interfaces','Launch campaigns','Design experiments'][i]}`,
+      job_title:p.job_title, experience_level:p.experience_level,
+      city_id:i%3===0?null:p.city_id, sector_id:i%3===0?null:p.sector_id,
+      kind:i<6?'hiring':'referral', work_mode:['remote','hybrid','onsite'][i%3],
+      employment_type:i===5?'internship':i===4?'contract':'full_time',
+      salary:i===5?'$25–$32 / hour':'$65,000–$85,000 / year',
+      description:`Join ${companies[i % companies.length].name} to make AI-powered tools easier to understand. ${motion?'Create short product animations, explore 3D visual directions, and prototype clear transitions for complex workflows.':'Turn customer problems into clear, accessible product experiences.'} Work alongside an experienced design mentor, with regular critique and time to develop your craft. We welcome early-career portfolios that explain the process behind the work.`,
+      responsibilities:motion?['Storyboard short explainers for AI features','Build motion studies and 3D assets with the product team','Test timing, readability, and reduced-motion alternatives']:jobs[i].responsibilities,
+      requirements:['A portfolio showing your process and a few thoughtful projects','Comfort sharing work in progress and responding to critique','Interest in AI products and accessible communication'],
+      skills:motion?['Blender','After Effects','Storyboarding','Motion design','Figma']:jobs[i].skills,
+      created_at:ago(i*0.1), closes_at:future(30+i)
+    };
+  })
+);
+jobs.push(...matchedJobs);
 await put('job_posts', jobs);
 await put('company_members', users.map((u,i) => ({ company_id: companies[i % companies.length].id, user_id: u.id })), 'company_id,user_id');
 await put('community_messages', communities.flatMap((c, ci) => Array.from({ length: 30 }, (_, i) => ({ id: id(`message:${ci}:${i}`), community_id: c.id, user_id: author(c, i), content: content.chat[i % content.chat.length].replace('{focus}',content.communities[ci].focus), created_at: ago((30 - i) * 0.3 + ci * 0.01), reply_to_id: i % 4 === 1 ? id(`message:${ci}:${i - 1}`) : null }))));
@@ -103,6 +129,15 @@ for (const user_id of [...viewers, users[0].id]) {
 for (const [table, rows] of Object.entries({ users,communities,community_threads:threads,community_showcase_posts:showcases,job_posts:jobs,community_resources:resources,community_events:events })) {
  const { count,error } = await db.from(table).select('id',{count:'exact',head:true}).in('id',rows.map(r=>r.id));
  if (error || count !== rows.length) throw new Error(`Verification failed for ${table}: expected ${rows.length}, got ${count}`);
+}
+for (const p of viewerProfiles ?? []) {
+ const expected = matchedJobs.filter(j => j.job_title === p.job_title && j.experience_level === p.experience_level && (j.city_id === null || j.city_id === p.city_id) && (j.sector_id === null || j.sector_id === p.sector_id));
+ if (!expected.length) continue;
+ const {data,error} = await db.rpc('get_job_feed',{p_viewer_id:p.user_id,p_limit:100});
+ if (error) throw error;
+ const visible = (data ?? []).map(r => r.item).filter(j => j.can_apply && expected.some(e => e.id === j.id));
+ if (visible.length !== expected.length) throw new Error(`Matching jobs missing from feed for local viewer: expected ${expected.length}, got ${visible.length}`);
+ console.info(`Verified local viewer feed: ${visible.filter(j=>j.kind==='hiring').length} hiring and ${visible.filter(j=>j.kind==='referral').length} referral roles available to apply.`);
 }
 await writeFile(resolve(work,'demo-summary.json'),JSON.stringify({ generated_at:new Date().toISOString(),counts,login:'designer.1@demo.invalid',password:'Use DEV_USER_PASSWORD from environment.json',sources:content.sources },null,2),{mode:0o600});
 console.info(JSON.stringify({ counts, login:'designer.1@demo.invalid', note:'Use your existing local account, or the demo login with DEV_USER_PASSWORD from the private local manifest.' },null,2));

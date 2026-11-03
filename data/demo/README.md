@@ -9,7 +9,7 @@ The database fixture bypass is scoped to each insert transaction to accommodate 
 ## Included
 
 - 100 fictional members with profiles, stock portraits, varied cities and design roles
-- 10 fictional studios and 30 realistic vacancies with salaries, skills, responsibilities, and requirements
+- 10 fictional studios and 30 general vacancies plus 8 matching vacancies per existing local profile with salaries, skills, responsibilities, and requirements
 - 12 communities: 9 public and 3 private, with rules and connected membership
 - 120 discussion posts, including 12 polls, and 48 visual showcases
 - 24 real external design resources, including tutorial videos
@@ -17,6 +17,8 @@ The database fixture bypass is scoped to each insert transaction to accommodate 
 - 12 upcoming events with attendees, comments, and covers
 - 360 chat messages, 420 thread comments, likes, poll votes, and showcase comments
 - Saved content, 8 curated library resources, direct conversations, job applications, and job notifications
+
+Matching vacancies use each existing account’s actual role and experience level, with matching or unrestricted city and sector criteria. Each profile receives six hiring and two referral roles; the seed checks their `can_apply` status through `get_job_feed`. Motion and 3D roles include relevant responsibilities and skills.
 
 Existing unblocked local accounts are joined to all 12 rooms and receive saved items, a conversation, and job notifications. Normal privacy boundaries still apply to other accounts. Demo jobs and people are fictional; external learning resources and media are real. No emails or push messages are sent by this script.
 
