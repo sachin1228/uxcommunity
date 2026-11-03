@@ -103,7 +103,7 @@ jobs:
           NODE
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Measure community chat opening time
+      - name: Prepare benchmark environment
         run: |
           node --input-type=module <<'NODE' >> "$GITHUB_ENV"
           import { readFile } from 'node:fs/promises';
@@ -118,7 +118,8 @@ jobs:
           console.log('E2E_SAMPLES=10');
           console.log('E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json');
           NODE
-          npm run bench:community-chat-open
+      - name: Measure community chat opening time
+        run: npm run bench:community-chat-open
       - name: Upload timing report
         if: always()
         uses: actions/upload-artifact@v4
