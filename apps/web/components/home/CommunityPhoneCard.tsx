@@ -201,7 +201,7 @@ export function CommunityPhoneCard() {
       <div
         ref={stageRef}
         aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-[144px] h-[288px] w-[calc(var(--device-w)_+_8px)] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_52px),transparent)]"
+        className="pointer-events-none absolute left-1/2 top-[168px] h-[264px] w-[calc(var(--device-w)_+_8px)] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_52px),transparent)]"
         style={{ "--device-w": `${DEVICE_WIDTH}px` } as CSSProperties}
       >
         <div
