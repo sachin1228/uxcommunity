@@ -137,6 +137,7 @@
     "db:init": "python3 scripts/db/initialize.py",
     "env:setup": "node --import tsx scripts/environments/local.mjs setup",
     "env:stop": "node --import tsx scripts/environments/local.mjs stop",
+    "mail:local": "node scripts/environments/show-mail.mjs",
     "env:seed": "node --import tsx scripts/environments/seed.mjs",
     "test:environments": "node --import tsx --test scripts/environments/*.test.mjs",
     "env:smoke": "node --import tsx scripts/environments/smoke.mjs"

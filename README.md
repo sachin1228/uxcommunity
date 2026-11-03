@@ -111,7 +111,8 @@ uxcommunity/
 
 Run `npm ci`, `npm run env:setup`, `npm run env:seed`, then `npm run dev`.
 Setup creates an unlinked local Supabase stack and independent credentials. The
-launcher starts web, realtime and local R2/mail capture together. See
+launcher starts web, realtime and local R2/mail capture together. Read captured
+email and verification codes with `npm run mail:local`. See
 `docs/environments.md` for prerequisites, worktree ports,
 mobile builds and staging. Do not copy production credentials into local files.
 

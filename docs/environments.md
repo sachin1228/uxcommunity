@@ -66,10 +66,23 @@ readable locally; private objects require a valid signature. Uploads, copies,
 list/head/get/range operations and deletes operate on Miniflare state. No account
 S3 endpoint is contacted. This adapter is for local development only.
 
-Emails are captured in the local mailbox, never sent through Resend. Inspect
-`GET <R2_ENDPOINT>/__mail` using the local `API_SECRET` bearer credential from
-the private manifest. The mailbox retains up to 100 messages in memory and
-resets on restart. Do not expose it on a LAN or tunnel it publicly.
+Emails are captured in the local mailbox, never sent through Resend. The
+storage/mailbox service is part of `npm run dev`; it starts automatically on
+port **8788** next to web and realtime. Read captured email and verification
+codes with:
+
+```sh
+npm run mail:local
+```
+
+The viewer reads the private manifest, prints messages newest first, and shows
+6-digit codes and links. If the service is not running it names the port and
+tells you to start `npm run dev`. The mailbox only exists inside that supervisor;
+a web or realtime process started on its own does not provide it, so stop it and
+restart the full stack. Raw access is `GET <R2_ENDPOINT>/__mail` with
+`Authorization: Bearer <API_SECRET>` from `.local/development/environment.json`.
+The mailbox retains up to 100 messages in memory and resets on restart. Do not
+expose it on a LAN or tunnel it publicly.
 
 Expo sends, FCM sends, receipt processing and native push registration are
 disabled outside production. Supplying a production-looking key or device token
