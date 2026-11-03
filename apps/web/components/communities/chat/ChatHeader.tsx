@@ -22,6 +22,7 @@ interface Community {
   name: string;
   type: string;
   member_count: number;
+  details_loaded?: boolean;
   image_url: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
@@ -46,6 +47,8 @@ interface ChatHeaderProps {
   onlineCount?: number;
   currentUserId?: string;
   onSettingsClick?: () => void;
+  /** Retry deferred details without holding up the chat. */
+  onLoadDetails?: () => Promise<void>;
   /** Owner or admin with "edit community settings" permission. */
   canOpenSettings?: boolean;
   /** Manager tier only: shows the Activity (management audit) tab after Members. */
@@ -160,6 +163,7 @@ export const ChatHeader = memo(function ChatHeader({
   onlineCount = 0,
   currentUserId,
   onSettingsClick,
+  onLoadDetails,
   canOpenSettings = false,
   showActivityTab = false,
   communityId,
@@ -183,6 +187,7 @@ export const ChatHeader = memo(function ChatHeader({
   // Timed mutes lapse on their own without the row being rewritten, so the
   // state is computed from the deadline, never from the column's presence.
   const muted = isCommunityMuted(community);
+  const detailsReady = !!community && community.details_loaded !== false;
 
   // The second line of the muted dropdown: when the mute lapses, or that it
   // never does. Computed here but rendered only while the dropdown is open
@@ -375,10 +380,10 @@ export const ChatHeader = memo(function ChatHeader({
                     </span>
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
-                    <span className="inline-flex items-center gap-1">
+                    {detailsReady && <span className="inline-flex items-center gap-1">
                       <Users strokeWidth={2.5} size={10} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
-                    </span>
+                    </span>}
                     {onlineCount > 0 && (
                       <span className="inline-flex items-center gap-1" aria-label={`${onlineCount} online`}>
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
@@ -408,15 +413,18 @@ export const ChatHeader = memo(function ChatHeader({
                 <div className="relative">
                   <button
                     type="button"
-                    aria-label={muted ? "Unmute notifications" : "Mute notifications"}
-                    title={muted ? "Unmute notifications" : "Mute notifications"}
+                    aria-label={!detailsReady ? "Load notification settings" : muted ? "Unmute notifications" : "Mute notifications"}
+                    title={!detailsReady ? "Load notification settings" : muted ? "Unmute notifications" : "Mute notifications"}
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "mute"}
                     disabled={muteBusy}
-                    onClick={() => setOpenMenu(openMenu === "mute" ? null : "mute")}
+                    onClick={() => {
+                      if (!detailsReady) { void onLoadDetails?.().catch(() => {}); return; }
+                      setOpenMenu(openMenu === "mute" ? null : "mute");
+                    }}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                   >
-                    {muted ? (
+                    {!detailsReady ? <Spinner size={15} /> : muted ? (
                       <BellOff strokeWidth={2.5} size={15} />
                     ) : (
                       <Bell strokeWidth={2.5} size={15} />
@@ -469,13 +477,16 @@ export const ChatHeader = memo(function ChatHeader({
                 <div className="relative">
                   <button
                     type="button"
-                    aria-label="Community options"
+                    aria-label={detailsReady ? "Community options" : "Load community options"}
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "more"}
-                    onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
+                    onClick={() => {
+                      if (!detailsReady) { void onLoadDetails?.().catch(() => {}); return; }
+                      setOpenMenu(openMenu === "more" ? null : "more");
+                    }}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    <MoreHorizontal strokeWidth={2.5} size={16} />
+                    {detailsReady ? <MoreHorizontal strokeWidth={2.5} size={16} /> : <Spinner size={15} />}
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">

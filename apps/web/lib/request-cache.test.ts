@@ -16,6 +16,81 @@ import {
 } from "./request-cache"
 
 const originalFetch = globalThis.fetch
+const originalAnimationFrame = globalThis.requestAnimationFrame
+
+test("partial chat snapshots cannot satisfy full metadata or permission reads", async () => {
+  const partial = { community: { id: "a", details_loaded: false }, members: [] }
+  globalThis.fetch = (async () => Response.json({
+    community: partial, messages: { messages: [{ id: "message-a" }] }, unreadCount: 0,
+  })) as typeof fetch
+  await fetchAndHydrateCommunityBootstrap("a", "user-a")
+  assert.deepEqual(getCachedRequest("/api/communities/a/chat", "user-a"), partial)
+  assert.equal(getCachedRequest("/api/communities/a", "user-a"), undefined)
+  assert.equal(getCachedRequest("/api/communities/a/permissions", "user-a"), undefined)
+  assert.deepEqual(getCachedRequest("/api/communities/a/messages", "user-a"), { messages: [{ id: "message-a" }] })
+})
+
+test("chat and sidebar share a details request after the snapshot has a paint opportunity", async () => {
+  const calls: string[] = []
+  const frames: FrameRequestCallback[] = []
+  globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length }
+  const full = { community: { id: "a", details_loaded: true, member_count: 12 }, members: [{ user_id: "member" }] }
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  globalThis.fetch = (async (url) => {
+    calls.push(String(url))
+    if (String(url).endsWith("/bootstrap")) return Response.json({
+      community: { community: { id: "a", details_loaded: false }, members: [] },
+      messages: { messages: [{ id: "message-a" }] }, unreadCount: 0,
+    })
+    await gate
+    return Response.json(full)
+  }) as typeof fetch
+  const chat = fetchJsonCached("/api/communities/a", {}, "user-a")
+  const sidebar = fetchJsonCached("/api/communities/a", {}, "user-a")
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(calls, ["/api/communities/a/bootstrap"])
+  assert.deepEqual(getCachedRequest("/api/communities/a/messages", "user-a"), { messages: [{ id: "message-a" }] })
+  frames.splice(0).forEach((callback) => callback(0))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(calls.length, 1, 'details cannot begin in the first pre-paint callback')
+  frames.splice(0).forEach((callback) => callback(0))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(calls, ["/api/communities/a/bootstrap", "/api/communities/a"])
+  release()
+  assert.deepEqual(await chat, full)
+  assert.deepEqual(await sidebar, full)
+  assert.deepEqual(getCachedRequest("/api/communities/a", "user-a"), full)
+})
+
+test("replaying a partial bootstrap preserves already loaded details", async () => {
+  const full = { community: { id: "a", details_loaded: true, member_count: 12 }, members: [] }
+  setCachedRequest("/api/communities/a", full, "user-a")
+  globalThis.fetch = (async () => Response.json({
+    community: { community: { id: "a", details_loaded: false }, members: [] },
+    messages: { messages: [] }, unreadCount: 0,
+  })) as typeof fetch
+  await fetchAndHydrateCommunityBootstrap("a", "user-a")
+  assert.deepEqual(getCachedRequest("/api/communities/a", "user-a"), full)
+})
+
+test("failed deferred details leave the critical snapshot usable and can be retried", async () => {
+  const partial = { community: { id: "a", details_loaded: false }, members: [] }
+  let failDetails = true
+  globalThis.fetch = (async (url) => {
+    if (String(url).endsWith("/bootstrap")) return Response.json({
+      community: partial, messages: { messages: [{ id: "message-a" }] }, unreadCount: 0,
+    })
+    return failDetails ? Response.json({ error: "Unavailable" }, { status: 502 })
+      : Response.json({ community: { id: "a", details_loaded: true }, members: [] })
+  }) as typeof fetch
+  await assert.rejects(fetchJsonCached("/api/communities/a", {}, "user-a"), /Unavailable/)
+  assert.deepEqual(getCachedRequest("/api/communities/a/chat", "user-a"), partial)
+  assert.deepEqual(getCachedRequest("/api/communities/a/messages", "user-a"), { messages: [{ id: "message-a" }] })
+  failDetails = false
+  const result = await fetchJsonCached<{ community: { details_loaded: boolean } }>("/api/communities/a", {}, "user-a")
+  assert.equal(result.community.details_loaded, true)
+})
 
 test("chat bootstrap requests only the critical web snapshot", async () => {
   let headers: Headers | undefined
@@ -100,6 +175,7 @@ test("a local mutation before history starts is not mistaken for complete histor
 afterEach(() => {
   clearRequestCache()
   globalThis.fetch = originalFetch
+  globalThis.requestAnimationFrame = originalAnimationFrame
 })
 
 test("uses dashboard-specific stale windows", () => {

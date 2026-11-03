@@ -24,8 +24,8 @@ export default async function CommunityPage({ params, searchParams }: Props) {
     tab === "showcase" || tab === "threads" || tab === "events" || tab === "resources" || tab === "members" ? tab : "chat";
   const userId = (session as { userId: string }).userId;
 
-  // Lightweight server snapshot: community read model + top members only, so
-  // the header and info panel paint immediately. Messages and tab sections
+  // Access-checked header snapshot only. Member previews, About, grants and
+  // mute settings hydrate after the first chat paint. Messages and tab sections
   // hydrate client-side (cached + realtime with the Lottie loader while the
   // first message page loads) — navigation never blocks on the full read model.
   const ssrData = await fetchCommunityMetaSSR(id, userId).catch(() => null);

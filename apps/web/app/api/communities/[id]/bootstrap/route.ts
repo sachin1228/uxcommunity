@@ -8,13 +8,14 @@ import {
   type ReadResult,
 } from "@/lib/communities/read-models";
 import { loadCommunityContentEvents } from "@/lib/communities/content-events";
+import { loadCommunityChatReadModel } from "@/lib/communities/chat-read-model";
 import { NO_COMMUNITY_PERMISSIONS, hasAnyCommunityPermission } from "@/lib/communities/permissions";
 type Params = { params: Promise<{ id: string }> };
 type Section = "community" | "messages" | "content-events" | "rules";
 
 /**
- * The web chat asks for just the critical snapshot. Legacy callers still get
- * the bundled rules and timeline cards; the web loads those after messages.
+ * The web chat asks for an access-checked header and messages. Legacy callers
+ * still get full metadata, rules and timeline cards in one response.
  */
 const CRITICAL = new Set<Section>(["community", "messages"]);
 
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest, context: Params) {
   // snapshot. Let it refresh only the timeline cards instead of downloading
   // the bootstrap's latest message page again.
   if (request.nextUrl.searchParams.get('section') === 'content-events') {
-    const readModel = await loadCommunityReadModel(communityId, userId);
+    const readModel = await loadCommunityChatReadModel(communityId, userId);
     if (!readModel.ok) {
       return NextResponse.json(
         { error: readModel.error },
@@ -88,9 +89,11 @@ export async function GET(request: NextRequest, context: Params) {
   }
 
   const db = createServiceClient();
-  // Share explicitly: route handlers do not run in the RSC cache scope.
-  const readModel = loadCommunityReadModel(communityId, userId);
   const chatOnly = request.headers.get("X-Community-Bootstrap") === "chat";
+  // Share explicitly: route handlers do not run in the RSC cache scope.
+  const readModel = chatOnly
+    ? loadCommunityChatReadModel(communityId, userId)
+    : loadCommunityReadModel(communityId, userId);
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await readModel)],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
@@ -107,9 +110,7 @@ export async function GET(request: NextRequest, context: Params) {
         return { events };
       },
     ],
-    // Cheap rules are bundled into the same request so the info panel never
-    // needs its own network round trip. The shape matches the standalone
-    // /rules endpoint, so the hydrated request-cache entries are interchangeable.
+    // Legacy callers keep bundled rules in the standalone /rules shape.
     ["rules", async () => {
       const { data, error } = await db
         .from("community_rules")
@@ -159,11 +160,11 @@ export async function GET(request: NextRequest, context: Params) {
   const permissions = { ...NO_COMMUNITY_PERMISSIONS, ...(community?.current_user_permissions ?? {}) };
   const body = {
     ...data,
-    permissions: {
+    ...(chatOnly ? {} : { permissions: {
       role,
       can_manage: hasAnyCommunityPermission(permissions),
       ...permissions,
-    },
+    } }),
     unreadCount: 0,
     failures,
   };

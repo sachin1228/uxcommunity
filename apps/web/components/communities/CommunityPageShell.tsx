@@ -74,7 +74,7 @@ export function CommunityPageShell({
 
   useEffect(() => {
     const cached = metaCache.get(communityId);
-    if (!cached) {
+    if (!cached || cached.community.details_loaded === false) {
       metaCache.set(communityId, { ...initialMeta, fetchedAt: Date.now() });
       return;
     }

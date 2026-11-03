@@ -21,6 +21,11 @@ before(async () => {
       globalThis.bootstrapTest.cardCalls++;
       return globalThis.bootstrapTest.cards;
     };`,
+    '@/lib/communities/chat-read-model': `export const loadCommunityChatReadModel = async () => {
+      globalThis.bootstrapTest.chatModelCalls++;
+      const model = globalThis.bootstrapTest.model;
+      return model.ok ? { ok: true, data: { community: { ...model.data.community, details_loaded: false }, members: [] } } : model;
+    };`,
     '@/lib/communities/permissions': 'export const NO_COMMUNITY_PERMISSIONS = {}; export const hasAnyCommunityPermission = () => false;',
   };
   const result = await build({
@@ -38,7 +43,7 @@ before(async () => {
 });
 function setup() {
   const state = globalThis.bootstrapTest = {
-    modelCalls: 0, cardCalls: 0, ruleCalls: 0,
+    modelCalls: 0, chatModelCalls: 0, cardCalls: 0, ruleCalls: 0,
     model: { ok: true, data: { community: { enabled_tabs: ['chat'] } } },
     cards: [{ id: 'card' }],
   };
@@ -65,7 +70,10 @@ test('critical chat response never starts rules or timeline reads', async () => 
   assert.equal(body.rules, undefined);
   assert.equal(state.cardCalls, 0);
   assert.equal(state.ruleCalls, 0);
-  assert.equal(state.modelCalls, 1);
+  assert.equal(state.modelCalls, 0, 'full metadata cannot hold up the critical snapshot');
+  assert.equal(state.chatModelCalls, 1);
+  assert.equal(body.community.community.details_loaded, false);
+  assert.equal(body.permissions, undefined, 'unknown grants must not be cached as denied');
   assert.match(response.headers.get('server-timing'), /messages;dur=/);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
 });
@@ -78,6 +86,8 @@ test('legacy bootstrap retains all sections and shares the community read', asyn
   assert.equal(state.cardCalls, 1);
   assert.equal(state.ruleCalls, 1);
   assert.equal(state.modelCalls, 1);
+  assert.equal(state.chatModelCalls, 0);
+  assert.ok(body.permissions);
 });
 test('secondary history and critical snapshot still require membership', async () => {
   const state = setup();

@@ -42,8 +42,6 @@ interface MessageListProps {
   threadEvents: CachedThreadEvent[];
   /** Permanent "<name> created a …" cards for threads/showcase/resources/events. */
   contentEvents: CachedContentEvent[];
-  /** True once the content-event history fetch has settled. */
-  contentEventsReady: boolean;
   currentUserId: string;
   firstUnreadMsgId: string | null;
   unreadDisplayCount: number;
@@ -57,8 +55,6 @@ interface MessageListProps {
   loadingOlder: boolean;
   /** False once we know there are no more messages above the current window. */
   hasMoreAbove: boolean;
-  /** True once the initial threads fetch for the current community has settled. */
-  threadsReady: boolean;
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
@@ -93,7 +89,6 @@ export const MessageList = memo(function MessageList({
   grouped,
   threadEvents,
   contentEvents,
-  contentEventsReady,
   currentUserId,
   firstUnreadMsgId,
   unreadDisplayCount,
@@ -104,7 +99,6 @@ export const MessageList = memo(function MessageList({
   loading,
   loadingOlder,
   hasMoreAbove,
-  threadsReady,
   displayCommunity,
   communityId,
   highlightedMsgId,
@@ -245,7 +239,7 @@ export const MessageList = memo(function MessageList({
       aria-label="Community messages"
       aria-live="off"
       data-community-id={communityId}
-      data-chat-ready={initialPositionResolved && (mergedGroups.length > 0 || (threadsReady && contentEventsReady))}
+      data-chat-ready={initialPositionResolved}
       style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
     >
       {/* Load-older slot. A single fixed-height row that is present the whole
@@ -268,16 +262,14 @@ export const MessageList = memo(function MessageList({
         </div>
       )}
 
-      {/* Empty state — only shown once threads and content events have loaded
-          too, so we don't flash "Be the first to say something" in communities
-          whose only activity is a thread or a showcase post while those fetches
-          are still in flight.
+      {/* The message page is confirmed empty. Show a neutral welcome while
+          activity cards hydrate, then replace it if any cards arrive.
 
           No disappearing-messages notice here: a fresh room opens on the
           welcome copy alone, exactly like the mobile app. The notice belongs to
           the history, so it arrives with the first message rather than sitting
           at the start of an otherwise empty chat. */}
-      {mergedGroups.length === 0 && threadsReady && contentEventsReady && (
+      {mergedGroups.length === 0 && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
           <CommunityDp
             imageUrl={displayCommunity?.image_url ?? null}
@@ -291,7 +283,7 @@ export const MessageList = memo(function MessageList({
               {displayCommunity?.name ?? ""}
             </span>
             !<br />
-            <span className="text-xs">Be the first to say something.</span>
+            <span className="text-xs">Say hello to the community.</span>
           </p>
         </div>
       )}
