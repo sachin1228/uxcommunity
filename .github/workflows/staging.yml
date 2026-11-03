@@ -105,9 +105,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Prepare benchmark environment
         run: |
-          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          node --input-type=module <<'NODE'
           import { randomBytes } from 'node:crypto';
-          import { readFile } from 'node:fs/promises';
+          import { appendFile, readFile } from 'node:fs/promises';
           import bcrypt from 'bcryptjs';
           import { createClient } from '@supabase/supabase-js';
           const env = JSON.parse(await readFile('.local/staging/environment.json', 'utf8'));
@@ -125,12 +125,15 @@ jobs:
           const { error: updateError } = await db.from('users')
             .update({ password_hash: await bcrypt.hash(password, 12) }).eq('id', user.id);
           if (updateError) throw updateError;
-          console.log(`E2E_APP_URL=${env.NEXT_PUBLIC_APP_URL}`);
-          console.log(`E2E_EMAIL=${email}`);
-          console.log(`E2E_PASSWORD=${password}`);
-          console.log('E2E_COMMUNITY_ID=de000000-0000-4000-8000-000000000001');
-          console.log('E2E_SAMPLES=10');
-          console.log('E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json');
+          await appendFile(process.env.GITHUB_ENV, [
+            `E2E_APP_URL=${env.NEXT_PUBLIC_APP_URL}`,
+            `E2E_EMAIL=${email}`,
+            `E2E_PASSWORD=${password}`,
+            'E2E_COMMUNITY_ID=de000000-0000-4000-8000-000000000001',
+            'E2E_SAMPLES=10',
+            'E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json',
+            '',
+          ].join('\n'), { mode: 0o600 });
           NODE
       - name: Measure community chat opening time
         run: npm run bench:community-chat-open
