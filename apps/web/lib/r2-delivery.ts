@@ -35,10 +35,6 @@ export async function serveStagingMedia(request: Request, env: MediaBindings & R
     } });
     return new Response(null, { headers: { ETag: object.httpEtag } });
   }
-  if (request.method === "DELETE" && !publicRead) {
-    await bucket.delete(key);
-    return new Response(null, { status: 204 });
-  }
   if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not allowed", { status: 405 });
   const rangeHeader = request.headers.get("Range");
   const rangeMatch = rangeHeader?.match(/^bytes=(\d+)-(\d*)$/);
@@ -51,12 +47,9 @@ export async function serveStagingMedia(request: Request, env: MediaBindings & R
   if (!object) return new Response("Not found", { status: 404 });
   const headers = new Headers({ ETag: object.httpEtag, "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
     "Cache-Control": publicRead ? "public, max-age=31536000, immutable" : "private, no-store" });
-  headers.set("Accept-Ranges", "bytes");
-  headers.set("Content-Length", String(object.size));
   let status = 200;
   if (request.headers.has("Range") && object.range && "offset" in object.range) {
     const offset = object.range.offset ?? 0, length = object.range.length ?? object.size - offset;
-    headers.set("Content-Length", String(length));
     status = 206; headers.set("Content-Range", `bytes ${offset}-${offset+length-1}/${object.size}`);
   }
   return new Response(request.method === "HEAD" ? null : object.body as ReadableStream, { status, headers });

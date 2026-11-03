@@ -3,24 +3,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      demo_action:
-        description: Deploy normally, or manage temporary demo data
-        type: choice
-        options: [deploy, seed, media, cleanup]
-        default: deploy
-      demo_run_id:
-        description: Unique demo dataset ID for seed/cleanup
-        type: string
-        default: ''
-      demo_seed_workflow_run:
-        description: Numeric seed Actions run ID for cleanup
-        type: string
-        default: ''
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
   group: staging-deployment
@@ -28,7 +13,7 @@ concurrency:
 
 jobs:
   staging:
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.demo_action == 'deploy')
+    if: github.ref == 'refs/heads/main'
     environment: staging
     runs-on: ubuntu-latest
     steps:
@@ -81,12 +66,3 @@ jobs:
           CLOUDFLARE_STAGING_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_STAGING_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
         run: node --import tsx scripts/environments/staging.mjs deploy
-
-  demo:
-    if: github.event_name == 'workflow_dispatch' && (inputs.demo_action == 'seed' || inputs.demo_action == 'cleanup' || inputs.demo_action == 'media')
-    uses: ./.github/workflows/staging-demo.yml
-    with:
-      action: ${{ inputs.demo_action }}
-      run_id: ${{ inputs.demo_run_id }}
-      seed_workflow_run: ${{ inputs.demo_seed_workflow_run }}
-    secrets: inherit
