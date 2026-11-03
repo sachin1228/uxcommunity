@@ -106,14 +106,28 @@ jobs:
       - name: Prepare benchmark environment
         run: |
           node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          import { randomBytes } from 'node:crypto';
           import { readFile } from 'node:fs/promises';
+          import bcrypt from 'bcryptjs';
+          import { createClient } from '@supabase/supabase-js';
           const env = JSON.parse(await readFile('.local/staging/environment.json', 'utf8'));
           if (env.APP_ENV !== 'staging' || !env.NEXT_PUBLIC_APP_URL.includes('staging')) {
             throw new Error('Refusing to benchmark an unverified staging target');
           }
+          const password = randomBytes(32).toString('base64url');
+          console.log(`::add-mask::${password}`);
+          const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          const email = 'designer@staging.invalid';
+          const { data: user, error: findError } = await db.from('users').select('id').eq('email', email).single();
+          if (findError) throw findError;
+          const { error: updateError } = await db.from('users')
+            .update({ password_hash: await bcrypt.hash(password, 12) }).eq('id', user.id);
+          if (updateError) throw updateError;
           console.log(`E2E_APP_URL=${env.NEXT_PUBLIC_APP_URL}`);
-          console.log('E2E_EMAIL=designer@staging.invalid');
-          console.log(`E2E_PASSWORD=${env.DEV_USER_PASSWORD}`);
+          console.log(`E2E_EMAIL=${email}`);
+          console.log(`E2E_PASSWORD=${password}`);
           console.log('E2E_COMMUNITY_ID=de000000-0000-4000-8000-000000000001');
           console.log('E2E_SAMPLES=10');
           console.log('E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json');
