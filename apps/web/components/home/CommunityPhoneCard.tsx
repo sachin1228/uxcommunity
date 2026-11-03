@@ -152,7 +152,7 @@ export function CommunityPhoneCard() {
     <section
       ref={panelRef}
       aria-labelledby={headingId}
-      className="relative h-[380px] overflow-hidden rounded-xl border border-white/10 bg-overlay"
+      className="relative h-[432px] overflow-hidden rounded-xl border border-white/10 bg-overlay"
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_100%_at_50%_0%,rgba(255,255,255,0.10),transparent_72%)]" />
 
@@ -186,10 +186,22 @@ export function CommunityPhoneCard() {
         Mobile app launching soon!
       </h2>
 
+      <p className="relative mx-auto mt-2 max-w-[248px] px-4 text-center font-body text-xs leading-relaxed text-overlay-foreground/70">
+        Want to help shape the app? Join our community to beta test it and be
+        among the first to try it.
+      </p>
+      <button
+        type="button"
+        disabled
+        className="relative mx-auto mt-3 flex h-9 items-center justify-center rounded-full bg-white px-5 font-body text-sm font-semibold text-black opacity-60 disabled:cursor-not-allowed"
+      >
+        Join the beta community
+      </button>
+
       <div
         ref={stageRef}
         aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-[56px] h-[324px] w-[calc(var(--device-w)_+_8px)] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_52px),transparent)]"
+        className="pointer-events-none absolute left-1/2 top-[144px] h-[288px] w-[calc(var(--device-w)_+_8px)] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_52px),transparent)]"
         style={{ "--device-w": `${DEVICE_WIDTH}px` } as CSSProperties}
       >
         <div
