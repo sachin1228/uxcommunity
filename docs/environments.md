@@ -204,6 +204,9 @@ E2E_SAMPLES=10 E2E_CHAT_TIMING_OUT=.local/staging/chat-open-timing.json \
 An existing `uxcommunity_session` cookie can be supplied as
 `E2E_SESSION_COOKIE` instead of email and password. Keep credentials and the
 generated report in ignored `.local/staging/` files; do not commit them.
+For the protected GitHub Actions path, run **Deploy isolated staging** with
+`mode=benchmark`; it seeds only the documented idempotent test fixture and
+uploads the report without deploying Workers.
 
 Seed loads the offline reference catalog snapshot and fictional accounts only. It
 rejects production before issuing any database request. Staging fixture logins
