@@ -47,16 +47,40 @@ const loadFeedPage = unstable_cache(
       .filter(isFeedCard)
       .map(normalizeFeedCard);
 
-    // Attach poll vote totals so feed thread cards show live counts.
+    // Attach poll vote totals so feed thread cards show live counts, and load
+    // the event extras for the same page. Nothing here depends on anything
+    // else — issue all of it together so the page costs one round trip after
+    // the RPC instead of stacking the poll reads behind the event reads.
     const threadObjects = items.filter((item): item is FeedCardObject =>
       isFeedCard(item) && item._type === "thread",
     );
-    if (threadObjects.length) {
-      const attached = await attachPollVotes(
-        db,
-        threadObjects as unknown as Array<Record<string, unknown>>,
-        userId,
-      );
+    const eventIds = items.flatMap((item) =>
+      typeof item === "object" && item !== null && !Array.isArray(item)
+        && item._type === "event" && typeof item.id === "string"
+        ? [item.id]
+        : [],
+    );
+
+    const [attached, eventBatches] = await Promise.all([
+      threadObjects.length
+        ? attachPollVotes(
+            db,
+            threadObjects as unknown as Array<Record<string, unknown>>,
+            userId,
+          )
+        : Promise.resolve(null),
+      eventIds.length
+        ? // Same attendee previews every other event surface uses, and the room
+          // behind each event — when one exists — for the card's Join/Open row
+          // (see EventChatPanel). Both are batched reads for the whole page.
+          Promise.all([
+            loadEventAttendeePreviews(eventIds),
+            loadEventChatCardLinks(eventIds, userId),
+          ])
+        : Promise.resolve(null),
+    ]);
+
+    if (attached) {
       const byId = new Map<string, FeedCardObject>();
       for (const row of attached) {
         if (typeof row.id === "string") byId.set(row.id, row as unknown as FeedCardObject);
@@ -68,21 +92,8 @@ const loadFeedPage = unstable_cache(
       );
     }
 
-    const eventIds = items.flatMap((item) =>
-      typeof item === "object" && item !== null && !Array.isArray(item)
-        && item._type === "event" && typeof item.id === "string"
-        ? [item.id]
-        : [],
-    );
-    if (!eventIds.length) return items;
-
-    // Same attendee previews every other event surface uses, and the room
-    // behind each event — when one exists — for the card's Join/Open row
-    // (see EventChatPanel). Both are batched reads for the whole page.
-    const [previewMap, chatLinks] = await Promise.all([
-      loadEventAttendeePreviews(eventIds),
-      loadEventChatCardLinks(eventIds, userId),
-    ]);
+    if (!eventBatches) return items;
+    const [previewMap, chatLinks] = eventBatches;
 
     return items.map((item) =>
       typeof item === "object" && item !== null && !Array.isArray(item)
