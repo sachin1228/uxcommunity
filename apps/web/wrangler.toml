@@ -1,7 +1,8 @@
 # OpenNext-on-Cloudflare config for the web app.
-# `main`/`assets` are produced by `opennextjs-cloudflare build` (.open-next/).
+# `worker.js` wraps the handler produced by `opennextjs-cloudflare build`
+# (.open-next/worker.js) to serve the branded 503 page.
 name = "uxcommunity-web"
-main = ".open-next/worker.js"
+main = "worker.js"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
