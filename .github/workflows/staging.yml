@@ -7,7 +7,7 @@ on:
       demo_action:
         description: Deploy normally, or manage temporary demo data
         type: choice
-        options: [deploy, seed, cleanup]
+        options: [deploy, seed, media, cleanup]
         default: deploy
       demo_run_id:
         description: Unique demo dataset ID for seed/cleanup
@@ -83,7 +83,7 @@ jobs:
         run: node --import tsx scripts/environments/staging.mjs deploy
 
   demo:
-    if: github.event_name == 'workflow_dispatch' && (inputs.demo_action == 'seed' || inputs.demo_action == 'cleanup')
+    if: github.event_name == 'workflow_dispatch' && (inputs.demo_action == 'seed' || inputs.demo_action == 'cleanup' || inputs.demo_action == 'media')
     uses: ./.github/workflows/staging-demo.yml
     with:
       action: ${{ inputs.demo_action }}

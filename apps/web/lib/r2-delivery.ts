@@ -35,6 +35,10 @@ export async function serveStagingMedia(request: Request, env: MediaBindings & R
     } });
     return new Response(null, { headers: { ETag: object.httpEtag } });
   }
+  if (request.method === "DELETE" && !publicRead) {
+    await bucket.delete(key);
+    return new Response(null, { status: 204 });
+  }
   if (request.method !== "GET" && request.method !== "HEAD") return new Response("Not allowed", { status: 405 });
   const rangeHeader = request.headers.get("Range");
   const rangeMatch = rangeHeader?.match(/^bytes=(\d+)-(\d*)$/);
