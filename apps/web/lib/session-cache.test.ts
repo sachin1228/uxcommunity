@@ -99,7 +99,7 @@ test("every session boundary leaves with a full document navigation", () => {
   // request at all.
   const boundaries = [
     "components/ui/useLogout.ts",
-    "app/login/page.tsx",
+    "app/login/LoginForm.tsx",
     "app/signup/page.tsx",
   ]
 

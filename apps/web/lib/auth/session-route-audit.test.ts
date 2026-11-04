@@ -131,6 +131,23 @@ test("the profile, applications and dashboard surfaces reject revoked accounts",
   }
 });
 
+test("the login page keeps a signed-in member signed in", () => {
+  const source = read("app/login/page.tsx");
+  assert.match(
+    source,
+    /\bgetSession\(\)/,
+    "the login page must use the registry-backed session",
+  );
+  assert.doesNotMatch(
+    source,
+    /\bgetRawSession\b|\bverifySession\b/,
+    "a signature-only check would bounce a revoked token between /login and /dashboard",
+  );
+  assert.match(source, /redirect\(/, "a live session must leave the login page");
+  assert.match(source, /"\/admin"/);
+  assert.match(source, /"\/dashboard"/);
+});
+
 test("registry lookups use the token's sid, so an old token cannot resolve a fresh row", () => {
   assert.match(
     read("lib/auth/session.ts"),
