@@ -126,7 +126,7 @@ export function useChatMessages(communityId: string) {
         userIdRef.current !== targetUserId
       ) return;
       // Image sizing warms opportunistically; it never holds a page off screen.
-      void warmChatMedia(older);
+      void warmChatMedia(older).catch(() => {});
       if (
         communityIdRef.current !== targetCommunityId ||
         userIdRef.current !== targetUserId

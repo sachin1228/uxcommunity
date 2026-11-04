@@ -8,7 +8,7 @@ import { readCommunityPushSnapshot } from './chatPushSnapshot';
 
 async function fetchMessages(communityId: string, after?: Parameters<typeof getMessages>[2]) {
   const rows = await getMessages(communityId, undefined, after);
-  void warmChatMedia(rows);
+  void warmChatMedia(rows).catch(() => {});
   return rows;
 }
 

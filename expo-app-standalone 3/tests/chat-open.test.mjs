@@ -175,7 +175,7 @@ async function runtime(t, disk = null) {
   const mocks = {
     './chatCacheStore': 'export const chatCache = globalThis.mobileCacheBoundary.chatCache;',
     './communities': 'export const getMessages = (...args) => globalThis.mobileCacheBoundary.getMessages(...args);',
-    './chatMediaPrefetch': 'export const warmChatMedia = () => new Promise(() => {});',
+    './chatMediaPrefetch': 'export const warmChatMedia = () => globalThis.mobileCacheBoundary.warmMedia?.() ?? new Promise(() => {});',
   };
   const module = await bundle('lib/communityMessageStoreRuntime.ts', [{ name: 'runtime-native-boundary', setup(builder) {
     builder.onResolve({ filter: /^\.\// }, ({ path, importer }) => importer.endsWith('communityMessageStoreRuntime.ts') && path in mocks
@@ -212,6 +212,14 @@ test('runtime sync commits a message-only read while image warming never resolve
   await h.communityMessageStore.sync('member', 'room');
   assert.equal(h.communityMessageStore.peek('member', 'room').messages[0].id, 'latest');
   assert.deepEqual(h.reads, [['room', undefined, undefined]]);
+});
+
+test('a rejected media prefetch cannot fail message loading or leak an unhandled rejection', async (t) => {
+  const h = await runtime(t);
+  globalThis.mobileCacheBoundary.warmMedia = async () => { throw new Error('image unavailable'); };
+  globalThis.mobileCacheBoundary.getMessages = async () => [{ ...message('latest'), created_at: new Date().toISOString() }];
+  await h.communityMessageStore.sync('member', 'room');
+  assert.equal(h.communityMessageStore.peek('member', 'room').messages[0].id, 'latest');
 });
 
 test('closed-chat edits, deletions and reactions update the window without a screen listener', async (t) => {
