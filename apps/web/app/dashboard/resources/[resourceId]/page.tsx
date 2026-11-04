@@ -5,6 +5,7 @@ import { ResourceDetailClient } from "@/components/communities/resources/Resourc
 import { HomeRail } from "@/app/dashboard/HomeRail";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
 
 interface Props {
@@ -57,6 +58,7 @@ async function getResource(
 async function getComments(
   db: ReturnType<typeof createServiceClient>,
   resourceId: string,
+  userId: string,
 ): Promise<ResourceComment[]> {
   const { data } = await db
     .from("resource_comments")
@@ -76,9 +78,11 @@ async function getComments(
     replies: [] as ResourceComment[],
   })) as ResourceComment[];
 
+  const withReactions = await attachCommentReactions(db, withUsers, userId, "resources");
+
   // Nest one level of replies under their parent (matches the shared CommentSection shape).
-  const topLevel = withUsers.filter((comment) => !comment.parent_id);
-  for (const reply of withUsers.filter((comment) => comment.parent_id)) {
+  const topLevel = withReactions.filter((comment) => !comment.parent_id);
+  for (const reply of withReactions.filter((comment) => comment.parent_id)) {
     const parent = topLevel.find((comment) => comment.id === reply.parent_id);
     if (parent) parent.replies.push(reply);
   }
@@ -107,7 +111,7 @@ export default async function ResourceDetailPage({ params }: Props) {
   const [membership, resource, comments, community] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     getResource(db, resourceId, userId),
-    getComments(db, resourceId),
+    getComments(db, resourceId, userId),
     db.from("communities").select("name, image_url, type, reference_id").eq("id", communityId).maybeSingle(),
   ]);
 

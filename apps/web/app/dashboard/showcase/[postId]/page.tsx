@@ -5,6 +5,7 @@ import { ShowcaseDetailClient } from "@/components/communities/showcase/Showcase
 import { HomeRail } from "@/app/dashboard/HomeRail";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import type { ShowcaseComment, ShowcasePost } from "@/components/communities/showcase/types";
 
 export default async function ShowcaseDetailPage({ params }: { params: Promise<{ postId: string }> }) {
@@ -20,7 +21,7 @@ export default async function ShowcaseDetailPage({ params }: { params: Promise<{
   // so the first paint matches the members list instead of popping the pill in
   // when the client refetch lands.
   const authors = await loadCommentAuthors(db, (rawComments ?? []).map((comment) => comment.user_id));
-  const enriched = (rawComments ?? []).map((comment) => ({ ...comment, users: authors[comment.user_id] ?? { name: "Community member", avatar_url: null, designation: null }, replies: [] })) as ShowcaseComment[]; const comments = enriched.filter((comment) => !comment.parent_id); for (const reply of enriched.filter((comment) => comment.parent_id)) comments.find((comment) => comment.id === reply.parent_id)?.replies.push(reply);
+  const enriched = (rawComments ?? []).map((comment) => ({ ...comment, users: authors[comment.user_id] ?? { name: "Community member", avatar_url: null, designation: null }, replies: [] })) as ShowcaseComment[]; const withReactions = await attachCommentReactions(db, enriched, userId, "showcase"); const comments = withReactions.filter((comment) => !comment.parent_id); for (const reply of withReactions.filter((comment) => comment.parent_id)) comments.find((comment) => comment.id === reply.parent_id)?.replies.push(reply);
   // Same DP rule as every other surface: app-created communities keep their
   // live picture on the master-data row, so resolve through reference_id.
   const communityData = community as unknown as {

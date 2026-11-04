@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ShowcaseDetailClient } from "@/components/communities/showcase/ShowcaseDetailClient";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 import type { ShowcaseComment, ShowcasePost } from "@/components/communities/showcase/types";
 
@@ -20,7 +21,7 @@ export default async function ShowcaseDetailPage({ params }: { params: Promise<{
   // so the first paint matches the members list instead of popping the pill in
   // when the client refetch lands.
   const authors = await loadCommentAuthors(db, (rawComments ?? []).map((comment) => comment.user_id));
-  const enriched = (rawComments ?? []).map((comment) => ({ ...comment, users: authors[comment.user_id] ?? { name: "Community member", avatar_url: null, designation: null }, replies: [] })) as ShowcaseComment[]; const comments = enriched.filter((comment) => !comment.parent_id); for (const reply of enriched.filter((comment) => comment.parent_id)) comments.find((comment) => comment.id === reply.parent_id)?.replies.push(reply);
+  const enriched = (rawComments ?? []).map((comment) => ({ ...comment, users: authors[comment.user_id] ?? { name: "Community member", avatar_url: null, designation: null }, replies: [] })) as ShowcaseComment[]; const withReactions = await attachCommentReactions(db, enriched, userId, "showcase"); const comments = withReactions.filter((comment) => !comment.parent_id); for (const reply of withReactions.filter((comment) => comment.parent_id)) comments.find((comment) => comment.id === reply.parent_id)?.replies.push(reply);
   const post = { ...row, author: { name: author?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: enriched.length, user_liked: Boolean(myLike), user_saved: Boolean(mySave) } as ShowcasePost;
   const canModerate = Boolean(managerStatus?.isOwner || managerStatus?.permissions.can_moderate_showcase);
   return <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={id} canModerate={canModerate}/>;
