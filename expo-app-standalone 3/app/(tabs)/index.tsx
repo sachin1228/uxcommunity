@@ -90,9 +90,9 @@ const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
 type ScopeRect = { x: number; width: number };
 
 /**
- * The feed switcher — a compact pill docked between the header and the list.
- * The active slot is a sliding capsule that eases between the two measured tab
- * widths, mirroring the web switcher.
+ * The feed switcher — a compact pill at the top of the feed that scrolls away
+ * with it. The active slot is a sliding capsule that eases between the two
+ * measured tab widths, mirroring the web switcher.
  */
 function FeedScopePill({
   scope,
@@ -603,35 +603,45 @@ function HomeTabSession({
     }, [load]),
   );
 
+  const scopeSwitcher = (
+    <View style={styles.switcherBar}>
+      <FeedScopePill scope={scope} onChange={handleScopeChange} />
+    </View>
+  );
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
-      <View style={styles.switcherBar}>
-        <FeedScopePill scope={scope} onChange={handleScopeChange} />
-      </View>
-
       <View style={styles.feedArea}>
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={colors.accent} />
-          </View>
+          <>
+            {scopeSwitcher}
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          </>
         ) : error && items.length === 0 ? (
-          <View style={styles.center}>
-            <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
-            <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t load your feed</Text>
-            <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
-            <Pressable onPress={() => void load(scopeRef.current, 'initial')} accessibilityRole="button">
-              <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
-            </Pressable>
-          </View>
+          <>
+            {scopeSwitcher}
+            <View style={styles.center}>
+              <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
+              <Text style={[styles.stateTitle, { color: colors.foreground }]}>Couldn&apos;t load your feed</Text>
+              <Text style={[styles.stateBody, { color: colors.foregroundSubtle }]}>{error}</Text>
+              <Pressable onPress={() => void load(scopeRef.current, 'initial')} accessibilityRole="button">
+                <Text style={[styles.retry, { color: colors.accent }]}>Try again</Text>
+              </Pressable>
+            </View>
+          </>
         ) : (
           <ContentPlaybackProvider enabled={!selected}>
             <FlatList
               data={items}
               keyExtractor={feedItemKey}
               renderItem={renderItem}
+              ListHeaderComponent={scopeSwitcher}
+              ListHeaderComponentStyle={styles.listSwitcher}
               initialNumToRender={FEED_LIST_PERFORMANCE.initialNumToRender}
               maxToRenderPerBatch={FEED_LIST_PERFORMANCE.maxToRenderPerBatch}
               windowSize={FEED_LIST_PERFORMANCE.windowSize}
@@ -718,13 +728,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   feedArea: { flex: 1 },
 
-  // The switcher sits in flow beneath the header; the list starts under it.
+  // The switcher rides at the top of the scroll content; cards follow it up.
   switcherBar: {
     flexGrow: 0,
     paddingTop: 8,
     paddingBottom: 2,
     alignItems: 'center',
   },
+  // Cancel the list's content padding so the pill keeps its header gap.
+  listSwitcher: { marginTop: -12 },
   scopePill: {
     flexDirection: 'row',
     alignItems: 'center',
