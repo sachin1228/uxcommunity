@@ -1582,7 +1582,7 @@ export default function CommunityChat() {
 
             <Animated.View
               pointerEvents="box-none"
-              style={[styles.chatDock, imeLayout.dockStyle]}
+              style={[styles.chatDock, imeLayout.dockStyle, { backgroundColor: colors.background }]}
             >
               {!atBottom && !isLoading && (
                 <Pressable
