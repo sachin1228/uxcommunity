@@ -63,7 +63,7 @@ configuration may use `NEXT_PUBLIC_*` / `EXPO_PUBLIC_*` prefixes.
 | Cron `0 */6 * * *` | Community message retention → web internal API → DB and R2 deletion. |
 | Cron `* * * * *` | Event lifecycle notifications plus verification-reapply email → web internal API. |
 | Staging triggers | None declared; live trigger list and manual route isolation unverified. |
-| D1 / KV / queues | No current application bindings found. D1 is future work; Redis is the present remote rate-limit dependency. |
+| KV / queues | No current application bindings found. Redis is the present remote rate-limit dependency. |
 
 ## Named reads and workflow references
 

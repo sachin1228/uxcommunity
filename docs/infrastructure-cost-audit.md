@@ -153,7 +153,7 @@ problem. Both are fixable in application code, and §9 puts a number on each fix
 
 12. **Nothing else is a surprise.** No AI/LLM API, no embeddings, no vector
     database, no moderation service, no error-tracking or analytics SDK (no
-    Sentry/PostHog/Datadog/Logtail), no queue, no D1, no container, no
+    Sentry/PostHog/Datadog/Logtail), no queue, no container, no
     third-party SMS, no paid CMS, and no Vercel. The complete list of *actual*
     vendors is 8 items long (§2) plus the two app-store fees (§5.7).
 
@@ -226,7 +226,7 @@ of cost this application does not carry.
 | Analytics, error tracking, APM | **none** | repo-wide search for sentry/posthog/datadog/logtail/axiom/newrelic/bugsnag/amplitude/mixpanel/segment/hotjar/clarity returned only unrelated `Segmented`/`segment` UI identifiers |
 | Job queue / background worker platform | **none** | no Queues binding; deferred work uses `after()` → `waitUntil` |
 | Vercel / Netlify / alternate host | **removed** | `package.json` has `audit:vercel`, and `ci.yml` runs a **blocking** `scripts/audit-vercel.mjs` that fails if one returns |
-| Cloudflare D1 / KV / Hyperdrive / Containers | **none** | not in either `wrangler.toml` |
+| Cloudflare KV / Hyperdrive / Containers | **none** | not in either `wrangler.toml` |
 | Docker / self-hosted CI runners | **none** | all workflows are `runs-on: ubuntu-latest` |
 | Cloudflare Workers Builds | **not used** | deploys run in GitHub Actions; `README.md` explains Cloudflare's Git integration is disconnected |
 

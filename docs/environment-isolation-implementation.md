@@ -4,7 +4,7 @@ This records work following the [Phase 1 audit](environment-isolation-audit.md).
 Local isolation and the dedicated staging resources are implemented and smoke-tested.
 GitHub account protection settings, full browser/native-device acceptance and
 recovery rehearsals remain open. Production infrastructure and data were not
-changed. Supabase PostgreSQL remains authoritative; D1 migration has not started.
+changed. Supabase PostgreSQL remains authoritative.
 
 ## Implemented
 
@@ -47,7 +47,6 @@ changed. Supabase PostgreSQL remains authoritative; D1 migration has not started
 | Public/private media | `uxcommunity-staging-media` / `uxcommunity-staging-private`; both managed public endpoints disabled. |
 | Next cache | `uxcommunity-staging-next-cache`; managed public endpoint disabled. |
 | Community / user / monitor DOs | `d8dcc08268534002965007797c6ed408` / `377a0e52b5144664a8f1493e9036e83f` / `f51dc2ed46194cb79cd60d1154d37f05`; all differ from production. |
-| Future D1 | `uxcommunity-staging-db`, `5373dc97-384d-4c16-9f82-6d6d8ca08bb1`; empty, unbound and unused by the application. |
 
 The staging manifest and new credentials are owner-only ignored files under
 `.local/staging`. Runtime secrets contain no production provider credentials.
