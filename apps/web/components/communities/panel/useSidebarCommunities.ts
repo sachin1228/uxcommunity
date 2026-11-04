@@ -161,6 +161,10 @@ export function useSidebarCommunities(userId: string) {
   useEffect(() => {
     if (!overRealtimeLimit) return;
     const timer = window.setInterval(() => {
+      // A hidden tab has no reader. Paying a full sidebar read every minute in
+      // the background is pure egress; the regain catch-up above refetches once
+      // when the tab is visible again.
+      if (document.visibilityState === "hidden") return;
       void load();
     }, SIDEBAR_STALE_MS);
     return () => window.clearInterval(timer);

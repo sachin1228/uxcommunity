@@ -51,10 +51,11 @@ const MAX_CATCH_UP_PAGES = 20;
 
 /**
  * Passes one trigger may run before the remainder is deferred to a scheduled
- * pass. Together with MAX_CATCH_UP_PAGES this caps one trigger's request count
- * (4 × 20 pages) while still draining a longer backlog without a new trigger.
+ * pass. One pass (20 pages) bounds a single trigger's burst; the deferred
+ * continuation still drains a longer backlog without a new user trigger. The
+ * mobile client already works this way (one 20-page pass per run).
  */
-const MAX_CATCH_UP_PASSES_PER_DRAIN = 4;
+const MAX_CATCH_UP_PASSES_PER_DRAIN = 1;
 
 /** Bounded transient-failure retries inside a single drain. */
 const MAX_CATCH_UP_RETRIES = 2;

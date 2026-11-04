@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   pickSuggestedCommunities,
+  toSuggestedSources,
+  type CommunityCatalogRow,
   type SuggestedCommunitySource,
 } from "./suggested";
 
@@ -123,5 +125,88 @@ test("returns nothing when there is nothing eligible", () => {
   assert.deepEqual(
     pickSuggestedCommunities([community({ id: "mine", joined: true })]),
     [],
+  );
+});
+
+test("joins the shared catalog with the member's own memberships", () => {
+  const catalog: CommunityCatalogRow[] = [
+    {
+      id: "joined",
+      name: "Joined",
+      type: "user",
+      image_url: null,
+      description: null,
+      is_private: null,
+      member_count: null,
+    },
+    {
+      id: "open",
+      name: "Open",
+      type: "user",
+      image_url: "https://media.uxcommunity.in/c.webp",
+      description: "Open community",
+      is_private: true,
+      member_count: 42,
+    },
+  ];
+
+  const sources = toSuggestedSources(catalog, new Set(["joined"]));
+
+  assert.deepEqual(sources, [
+    {
+      id: "joined",
+      name: "Joined",
+      type: "user",
+      image_url: null,
+      description: null,
+      is_private: false,
+      member_count: 0,
+      joined: true,
+      can_join: true,
+    },
+    {
+      id: "open",
+      name: "Open",
+      type: "user",
+      image_url: "https://media.uxcommunity.in/c.webp",
+      description: "Open community",
+      is_private: true,
+      member_count: 42,
+      joined: false,
+      can_join: true,
+    },
+  ]);
+});
+
+test("a membership excludes the community from the shared catalog", () => {
+  const suggested = pickSuggestedCommunities(
+    toSuggestedSources(
+      [
+        {
+          id: "mine",
+          name: "Mine",
+          type: "user",
+          image_url: null,
+          description: null,
+          is_private: false,
+          member_count: 900,
+        },
+        {
+          id: "open",
+          name: "Open",
+          type: "user",
+          image_url: null,
+          description: null,
+          is_private: false,
+          member_count: 10,
+        },
+      ],
+      new Set(["mine"]),
+    ),
+  );
+
+  assert.deepEqual(
+    suggested.map((item) => item.id),
+    ["open"],
   );
 });
