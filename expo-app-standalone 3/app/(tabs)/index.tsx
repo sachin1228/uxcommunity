@@ -86,16 +86,13 @@ const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
     "Everything posted in the communities you've joined will appear here, whether or not it was shared publicly.",
 };
 
-/** Space the floating switcher reserves above the first card. */
-const FEED_TOP_INSET = 58;
-
 /** A tab's measured slot inside the track, used to glide the indicator. */
 type ScopeRect = { x: number; width: number };
 
 /**
- * The floating feed switcher — a compact pill that hovers over the list while
- * the cards scroll underneath it. The active slot is a sliding capsule that
- * eases between the two measured tab widths, mirroring the web switcher.
+ * The feed switcher — a compact pill docked between the header and the list.
+ * The active slot is a sliding capsule that eases between the two measured tab
+ * widths, mirroring the web switcher.
  */
 function FeedScopePill({
   scope,
@@ -611,6 +608,10 @@ function HomeTabSession({
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
+      <View style={styles.switcherBar}>
+        <FeedScopePill scope={scope} onChange={handleScopeChange} />
+      </View>
+
       <View style={styles.feedArea}>
         {loading ? (
           <View style={styles.center}>
@@ -637,9 +638,8 @@ function HomeTabSession({
               updateCellsBatchingPeriod={FEED_LIST_PERFORMANCE.updateCellsBatchingPeriod}
               contentContainerStyle={[
                 styles.list,
-                { paddingTop: FEED_TOP_INSET, paddingBottom: insets.bottom + 96 },
+                { paddingBottom: insets.bottom + 96 },
               ]}
-              scrollIndicatorInsets={{ top: FEED_TOP_INSET }}
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={viewabilityConfig}
               onEndReached={loadMore}
@@ -649,7 +649,6 @@ function HomeTabSession({
                   refreshing={refreshing}
                   onRefresh={() => void load(scopeRef.current, 'refresh')}
                   tintColor={colors.foregroundMuted}
-                  progressViewOffset={FEED_TOP_INSET}
                 />
               }
               ListFooterComponent={
@@ -689,11 +688,6 @@ function HomeTabSession({
             />
           </ContentPlaybackProvider>
         )}
-
-        {/* ── Floating source switcher — the cards scroll underneath it ── */}
-        <View pointerEvents="box-none" style={styles.floatingTabs}>
-          <FeedScopePill scope={scope} onChange={handleScopeChange} />
-        </View>
       </View>
 
       <ContentDetail
@@ -724,15 +718,12 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   feedArea: { flex: 1 },
 
-  // The switcher floats above the list; cards scroll beneath its shadow.
-  floatingTabs: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+  // The switcher sits in flow beneath the header; the list starts under it.
+  switcherBar: {
+    flexGrow: 0,
     paddingTop: 8,
+    paddingBottom: 2,
     alignItems: 'center',
-    zIndex: 10,
   },
   scopePill: {
     flexDirection: 'row',
@@ -741,11 +732,6 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#000000',
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
   },
   scopeIndicator: {
     position: 'absolute',
