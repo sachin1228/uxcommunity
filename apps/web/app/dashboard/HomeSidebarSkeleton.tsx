@@ -36,7 +36,7 @@ export function HomeSidebarSkeleton() {
             <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(58%_100%_at_50%_0%,rgba(255,255,255,0.12),transparent_72%)]" />
             <div className="relative px-4 pt-5 text-center motion-safe:animate-pulse">
               <div className="mx-auto mb-3 h-4 w-48 rounded bg-white/15" />
-              <div className="mb-4 h-9 w-full rounded-full bg-overlay-foreground" />
+              <div className="mb-4 h-9 w-full rounded-full bg-white/10" />
             </div>
             <div className="relative h-36 bg-white/[0.08] motion-safe:animate-pulse" />
           </div>
@@ -62,7 +62,7 @@ export function HomeSidebarSkeleton() {
                 <div className="mx-auto h-3 w-40 rounded bg-white/10" />
                 <div className="mx-auto h-3 w-32 rounded bg-white/10" />
               </div>
-              <div className="mx-auto mt-4 h-9 w-44 rounded-full bg-white/60" />
+              <div className="mx-auto mt-4 h-9 w-44 rounded-full bg-white/10" />
             </div>
             <div
               className="pointer-events-none absolute left-1/2 top-[168px] h-[264px] w-[228px] -translate-x-1/2 bg-white/[0.07] motion-safe:animate-pulse [mask-image:linear-gradient(to_bottom,#000_calc(100%-52px),transparent)]"

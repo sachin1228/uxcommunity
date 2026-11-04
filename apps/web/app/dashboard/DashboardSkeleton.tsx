@@ -90,18 +90,18 @@ export function SidebarSkeleton() {
 function TopbarSkeleton() {
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background pr-3 sm:pr-4">
-      <div className="flex min-w-0 items-center gap-2 pl-3 sm:pl-4 min-[500px]:w-[17rem] min-[500px]:shrink-0">
+      <div className="order-1 flex min-w-0 items-center gap-2 pl-3 sm:pl-4 min-[500px]:w-[17rem] min-[500px]:shrink-0">
         <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-sm" />
       </div>
       <div
         aria-hidden="true"
-        className="flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-full border border-border text-foreground-muted min-[500px]:order-2 sm:min-w-0 sm:flex-1 sm:max-w-[40rem] sm:justify-start sm:px-4"
+        className="order-3 flex h-8 w-8 shrink-0 items-center justify-center gap-2 rounded-full border border-border text-foreground-muted min-[500px]:order-2 sm:min-w-0 sm:flex-1 sm:max-w-[40rem] sm:justify-start sm:px-4"
       >
         <Search size={14} strokeWidth={2.5} className="shrink-0" />
         <span className="hidden min-w-0 flex-1 truncate text-left font-body text-xs sm:block">Search</span>
         <kbd className="hidden rounded border border-border px-1 py-0.5 font-mono text-[10px] leading-none sm:block">⌘K</kbd>
       </div>
-      <div aria-hidden="true" className="ml-auto flex items-center gap-2">
+      <div aria-hidden="true" className="order-4 ml-auto flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center text-foreground-muted">
           <DmIcon size={18} />
         </span>
