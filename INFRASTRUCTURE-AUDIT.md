@@ -74,7 +74,7 @@ User (Mobile/Expo)
 - **Web**: Cloudflare Workers via OpenNext (`apps/web/wrangler.toml`)
 - **Realtime**: Separate Cloudflare Worker (`apps/realtime/wrangler.toml`, owns the Durable Object classes)
 - **Durable Objects**: `Room` (per community, migration v1) and `UserDO` (per user, migration v2)
-- **CI**: GitHub Actions — `ci.yml` (types + unit tests), `preview.yml` (per-PR worker)
+- **CI**: GitHub Actions — `ci.yml` (types + unit tests)
 - **CD**: `.github/workflows/deploy.yml` on push to `main`
 
 ### Technology Inventory

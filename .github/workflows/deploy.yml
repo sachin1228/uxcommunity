@@ -119,7 +119,7 @@ jobs:
       #
       # — the web deploy's R2 check using the same dead token the realtime
       # deploy had already failed with, on the same run whose sibling job
-      # could not even delete a preview worker. The message reads like OpenNext
+      # could not even delete a Worker. The message reads like OpenNext
       # or R2; the cause was the credential. This step asks the credential to
       # prove itself (`/user/tokens/verify` — a rejection there can only be the
       # token), warns when its TTL is inside two weeks, and makes the same
@@ -313,7 +313,7 @@ jobs:
       # kept whatever values were last set by hand — so on 2026-10-11, after
       # the R2 credential was rotated, every upload route in production
       # answered a 401 the healthy repository secret could not explain, and
-      # no check in CI could see the drift. The preview workflow already had
+      # no check in CI could see the drift. The retired preview workflow had
       # the equivalent push for its ephemeral workers; this is the same idea
       # for the real one.
       #

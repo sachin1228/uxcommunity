@@ -17,8 +17,8 @@
  *   That message reads like an OpenNext or an R2 problem and is neither. It is
  *   `opennextjs-cloudflare deploy` checking the incremental-cache bucket with
  *   the same dead token the run had already failed to deploy the realtime
- *   worker with, and the same token the preview cleanup job could not delete a
- *   worker with. Three different Cloudflare calls, one credential, and no step
+ *   worker with, and the same token a cleanup job could not delete a worker
+ *   with. Three different Cloudflare calls, one credential, and no step
  *   anywhere in either workflow that asked the credential to prove it still
  *   works: the pipeline spent a full OpenNext build on the way to the first
  *   API call, then reported the symptom from the deepest layer (OpenNext's R2
@@ -297,8 +297,7 @@ export async function checkCloudflareCredentials({
   if (!token) {
     fail(
       `${TOKEN_SECRET} is not set. Both deploy workflows read it from the repository secret of the ` +
-        `same name (Settings → Secrets and variables → Actions). Pull requests from forks never ` +
-        `receive repository secrets, so a preview deploy of a fork cannot authenticate at all.`,
+        `same name (Settings → Secrets and variables → Actions).`,
     );
   }
   if (!accountId) {
