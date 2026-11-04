@@ -36,7 +36,9 @@ async function enrichThread(
     { data: allLikes },
     { data: myLike },
     { data: mySave },
-    { data: commentCount },
+    // `head: true` returns the total in `count`, not `data` — reading `data`
+    // here reported every thread detail as having zero comments.
+    { count: commentCount },
   ] = await Promise.all([
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
