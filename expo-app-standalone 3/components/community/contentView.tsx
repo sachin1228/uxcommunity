@@ -2188,7 +2188,6 @@ function InlineVideo({
         <VideoPlayerModal
           url={entry.url}
           poster={entry.poster}
-          title={entry.name}
           onClose={() => setShowPlayer(false)}
         />
       ) : null}
