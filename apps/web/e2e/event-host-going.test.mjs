@@ -77,10 +77,10 @@ const DEFAULT_APP = "http://localhost:3000";
 const DEV_PORT = 3119;
 
 /**
- * The app's session lifetime (7 days, lib/auth/session.ts). Deliberately NOT
- * the smoke test's 120-second token: that TTL exists because its token lands in
- * the realtime Worker's logs, while this run may spend a minute compiling the
- * routes on a cold `next dev` before its requests go out.
+ * The test token's lifetime. Deliberately NOT the smoke test's 120-second
+ * token: that TTL exists because its token lands in the realtime Worker's logs,
+ * while this run may spend a minute compiling the routes on a cold `next dev`
+ * before its requests go out.
  */
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 

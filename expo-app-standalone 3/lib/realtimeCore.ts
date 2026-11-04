@@ -49,7 +49,7 @@
  * Authentication: the session cookie rides in the WebSocket handshake's
  * `Cookie` header. React Native's WebSocket accepts request headers through a
  * non-standard third constructor argument (`{ headers }`), which is how the
- * JWT left the URL: a 7-day credential in a query string is recorded by any
+ * JWT left the URL: a long-lived credential in a query string is recorded by any
  * proxy or access log and lands in the app's own logs; a handshake header does
  * not. The server already authenticated the same `uxcommunity_session` cookie
  * for browsers (`apps/realtime/src/index.ts`), so no server change is needed.

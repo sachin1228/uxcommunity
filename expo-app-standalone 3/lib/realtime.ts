@@ -46,8 +46,8 @@ const REALTIME_URL = process.env.EXPO_PUBLIC_REALTIME_URL ?? '';
 /**
  * Build a WebSocket URL for a connection key.
  *
- * Deliberately token-free: the session JWT is a 7-day credential and used to
- * ride in this query string, where it is captured by proxies, access logs and
+ * Deliberately token-free: the session JWT is a long-lived credential and used
+ * to ride in this query string, where it is captured by proxies, access logs and
  * the app's own analytics. It now goes in the handshake headers instead.
  */
 async function buildSocketUrl(socketKey: string): Promise<string> {

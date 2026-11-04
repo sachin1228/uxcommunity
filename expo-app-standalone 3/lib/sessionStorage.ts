@@ -2,8 +2,9 @@ import { mobileEnvironmentKey } from "./environment";
 /**
  * Encrypted session-token storage.
  *
- * The JWT is a bearer credential for 7 days. AsyncStorage is plaintext and is
- * included in device backups, so the token now lives in Expo SecureStore
+ * The JWT is a long-lived bearer credential that slides forward on use, so an
+ * active member is never signed out by the clock. AsyncStorage is plaintext and
+ * is included in device backups, so the token now lives in Expo SecureStore
  * (Keychain on iOS, Keystore-encrypted SharedPreferences on Android).
  *
  * Existing installs keep working: the first read migrates the token from the
@@ -102,7 +103,7 @@ export async function writeStoredSessionToken(token: string): Promise<void> {
 
   // Only the web build keeps the old fallback. A native device without a
   // working Keystore/Keychain must fail the write rather than silently
-  // downgrade a 7-day bearer token to plaintext AsyncStorage.
+  // downgrade a long-lived bearer token to plaintext AsyncStorage.
   if (!isWeb) {
     throw new Error('Secure storage is unavailable on this device.');
   }
