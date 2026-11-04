@@ -182,7 +182,7 @@ vendor actually meters — that is the number that scales.
 | 12 | **Expo Push Service** | Mobile chat notifications (FCM/APNs underneath) | `apps/web/lib/push/expo.ts` → `https://exp.host/--/api/v2/push/send` | free | **Free**, capped at 600 notifications/sec/project |
 | 13 | **Expo EAS (Build/Submit/Update)** | Mobile release pipeline | `expo-app-standalone 3/eas.json` (development/preview/production profiles) | Free tier | Builds (15/platform/mo), then credits |
 | 14 | **Apple Developer / Google Play** | Store presence for the mobile app | implied by `eas.json` `submit.production` | required | $99/yr + $25 once |
-| 15 | **GitHub Actions** | CI (types, tests, audits), deploy, per-PR preview workers | `.github/workflows/{ci,deploy,preview}.yml` | Free | Runner minutes — **$0 if public**, $0.006/min if private past 2,000 |
+| 15 | **GitHub Actions** | CI (types, tests, audits), deploy, per-PR preview workers (since retired) | `.github/workflows/{ci,deploy}.yml` | Free | Runner minutes — **$0 if public**, $0.006/min if private past 2,000 |
 
 ### 2.1 What a request actually costs (end-to-end)
 
@@ -571,11 +571,11 @@ becomes the slowest part of sending a message. That is a §8 wall, not a §6 lin
 
 ### 5.10 GitHub Actions
 
-**Evidence.** Three workflows: `ci.yml` (typecheck, full web unit suite, mobile
+**Evidence.** At audit time, three workflows: `ci.yml` (typecheck, full web unit suite, mobile
 realtime/cache suites, comment audit, Vercel-drift audit, credential-guard
 tests, advisory ESLint), `deploy.yml` (`npm ci` → credential guards → realtime
 deploy → realtime smoke test → OpenNext build → typecheck → unit tests → web
-deploy → secret push), `preview.yml` (a per-PR Worker).
+deploy → secret push), and a per-PR preview Worker (since retired).
 
 **Billing.** Standard GitHub-hosted runners are **free for public
 repositories**. For private repositories the Free plan includes **2,000

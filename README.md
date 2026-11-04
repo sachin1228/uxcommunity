@@ -6,7 +6,7 @@ then `npm run dev`. Existing production-linked files are quarantined outside the
 repository by setup. Never copy production credentials into local configuration.
 See `docs/environments.md` and the
 `docs/environment-isolation-implementation.md`. Production
-releases require the manual approval workflow; PR previews are disabled.
+releases require the manual approval workflow; pull requests run CI only.
 
 A platform for UI/UX, product, and social media designers. Designers sign up directly, complete their profile, and get access to real-time community chat; admins review applications, manage members and master data, and moderate communities
 
@@ -193,7 +193,7 @@ npm run test:smoke-realtime                             # the harness's own help
 
 The approved production workflow authenticates to Cloudflare with two production secrets (`Settings → Secrets and variables → Actions`): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Either kind of token works — a user token (My Profile → API Tokens) or an account-owned one (Manage account → Account API tokens) — as long as it is scoped to the account in `CLOUDFLARE_ACCOUNT_ID`; the guard proves both kinds, because `/user/tokens/verify` answers `401 code 1000 Invalid API Token` for a healthy account-owned token, and only `/accounts/:id/tokens/verify` recognizes it. The **Edit Cloudflare Workers** template covers the two Worker deploys; the web deploy additionally needs **Workers R2 Storage: Edit**, because `opennextjs-cloudflare deploy` reads — and, when it is missing, creates — the incremental-cache bucket before it publishes.
 
-Give the token **no expiry**, or rotate it before its TTL lapses. An expired token does not degrade gracefully: on 2026-10-08 the credential stopped being accepted between 19:33 UTC and 09:02 UTC, and every Cloudflare call in CI answered `401 {"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}`. What surfaced first was the web deploy failing with `Failed to provision remote R2 bucket "uxcommunity-web-next-cache" ... Authentication error` — a message that reads like an OpenNext or R2 problem and is neither: the realtime deploy one step before it had failed on the same token, and the preview cleanup job could not even `wrangler delete` a worker. Nothing in either workflow had asked the credential to prove it still worked.
+Give the token **no expiry**, or rotate it before its TTL lapses. An expired token does not degrade gracefully: on 2026-10-08 the credential stopped being accepted between 19:33 UTC and 09:02 UTC, and every Cloudflare call in CI answered `401 {"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}`. What surfaced first was the web deploy failing with `Failed to provision remote R2 bucket "uxcommunity-web-next-cache" ... Authentication error` — a message that reads like an OpenNext or R2 problem and is neither: the realtime deploy one step before it had failed on the same token, and a cleanup job could not even `wrangler delete` a worker. Nothing in either workflow had asked the credential to prove it still worked.
 
 Both workflows now do, before they build: `node scripts/verify-cloudflare-credentials.mjs` (the **Verify Cloudflare credentials** step) checks that the token is live, that its expiry is not inside two weeks, and that the bucket `NEXT_INC_CACHE_R2_BUCKET` binds in `apps/web/wrangler.toml` is readable with it — the same read OpenNext makes before publishing. It fails in seconds, naming the secret to rotate or the permission to add. Run it by hand, and test its helpers, with:
 
@@ -399,8 +399,7 @@ emails: a bucket that has grown is a cleanup job, not an outage.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `.github/workflows/ci.yml` | PR + push to `main` | Blocking TypeScript check and the full web unit suite; ESLint advisory |
-| `.github/workflows/preview.yml` | PR opened/updated | Builds a per-PR Cloudflare worker (`uxcommunity-web-preview-pr<N>`) and comments the URL; realtime is disabled in previews |
-| `.github/workflows/deploy.yml` | Push to `main` | Deploys the web worker (OpenNext) and the realtime worker to Cloudflare |
+| `.github/workflows/deploy.yml` | Manual dispatch (`DEPLOY_PRODUCTION`) | Deploys the web worker (OpenNext) and the realtime worker to Cloudflare |
 
 Both deploy workflows run three credential guards before they build: the Cloudflare API token the deploy itself needs (`scripts/verify-cloudflare-credentials.mjs`), the R2 media credential every upload route uses (`scripts/verify-r2-credentials.mjs`), and every other service secret the deploy pushes (`scripts/verify-service-credentials.mjs`). Each one names the repository secret to fix instead of letting a dead key surface later as an auth error from a deeper layer of the stack.
 
@@ -408,7 +407,7 @@ Both deploy workflows run three credential guards before they build: the Cloudfl
 
 - **Admin auth is a single env-var credential** (`ADMIN_EMAIL` + `ADMIN_PASSWORD`). There is no multi-admin system, no admin user records in the database, and no per-admin audit log.
 - **Rate limiter fails open.** If Upstash Redis is unreachable, the rate limiter allows requests through and logs an error. This keeps the app available during Redis outages but means rate limits won't be enforced in that window.
-- **The `main` branch deploys on merge.** Both workers ship from `deploy.yml`; the PR preview worker is the only pre-merge environment.
+- **Merges do not reach production.** Both workers ship from `deploy.yml`; a merge to `main` deploys only the isolated staging environment.
 - **Health alerts are email-only, and the monitor lives in the realtime Worker.** Alerts go to `ADMIN_EMAIL` through Resend (no Slack, PagerDuty or SMS), and the schedule that runs them is the realtime Worker's cron — if that worker is down altogether, checks stop with it. The admin page still answers whenever the web app does.
 
 ## Rebrand notes

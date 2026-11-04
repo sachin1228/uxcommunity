@@ -254,8 +254,8 @@ manual and approved. The workflow, migration order, secrets and rollback rules
 are in [Deployment](DEPLOYMENT.md). Keep the `Production` environment's
 reviewers, branch policy, bypass restrictions and secrets configured before
 enabling releases. Remove production credentials from repository-wide
-preview/development scopes; code alone cannot change that account setting. The
-PR preview workflow deploys no resources and reads no secrets. Supported direct
+preview/development scopes; code alone cannot change that account setting. Pull
+requests run CI only and deploy no resources. Supported direct
 npm deploy/upload commands refuse to publish.
 
 Production secret values pass through structured step environment variables and

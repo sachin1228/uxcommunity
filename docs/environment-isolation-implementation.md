@@ -8,8 +8,9 @@ changed. Supabase PostgreSQL remains authoritative; D1 migration has not started
 
 ## Implemented
 
-- Retired production-backed preview deployment and cleanup. PR jobs read no
-  production secrets and provision no preview Worker or bucket.
+- Retired production-backed preview deployment and cleanup; the placeholder
+  workflow has been deleted. PR jobs read no production secrets and provision
+  no preview Worker or bucket.
 - Added explicit application/build environment identity, loopback-only local
   endpoints, exact HTTPS staging allowlists, production-domain/alias rejection,
   dedicated nonproduction bucket names and database redirect rejection.

@@ -148,7 +148,6 @@ new logins use `uxcommunity_session`.
 ## Deployment
 
 - **Cloudflare Workers** via OpenNext (`wrangler.toml`, `npm run deploy`) — the only deployment target.
-- **Previews:** `.github/workflows/preview.yml` builds a per-PR worker with realtime disabled.
 
 ## Environment variables
 
