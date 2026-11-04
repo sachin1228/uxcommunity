@@ -2,7 +2,7 @@ import { Spinner } from "./Spinner";
 
 /**
  * Centered page-level loading spinner used by route loading.tsx boundaries.
- * Plain accent-blue spinner — no skeletons anywhere in the app.
+ * Routes with a known content layout provide their own skeleton instead.
  */
 export function RouteLoader() {
   return (

@@ -9,7 +9,7 @@ import { communityNameBadges } from "@/lib/communities/community-badges";
 import { JoinCommunityModal } from "@/components/communities/JoinCommunityModal";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { Spinner } from "@/components/ui/Spinner";
+import { ExploreCardsSkeleton } from "@/components/dashboard/PageSkeletons";
 import {
   exploreStore,
   EXPLORE_STALE_MS,
@@ -320,9 +320,7 @@ export default function CommunitiesIndexPage() {
       {/* ── Community lists ───────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5" />
-          </div>
+          <ExploreCardsSkeleton />
         ) : isRequestsTab ? (
           visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">

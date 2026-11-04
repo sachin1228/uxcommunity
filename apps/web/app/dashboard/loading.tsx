@@ -1,6 +1,6 @@
-import { HomeFeedSkeleton } from "./DashboardSkeleton";
+import { DashboardRouteSkeleton } from "./DashboardRouteSkeleton";
 
-/** Keeps both homepage columns visible while the route streams. */
+/** Uses the destination's layout while the route streams. */
 export default function DashboardLoading() {
-  return <HomeFeedSkeleton />;
+  return <DashboardRouteSkeleton />;
 }

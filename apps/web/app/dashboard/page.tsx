@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { DashboardHome } from "./DashboardHome";
-import { HomeFeedSkeleton } from "./DashboardSkeleton";
+import { HomeFeedSkeleton } from "./HomeFeedSkeleton";
 import { loadHomeFeedPage } from "@/lib/home/home-feed-server";
 import { createServerTimer } from "@/lib/server-timing";
 import { HOME_FEED_SCOPE_COOKIE, homeFeedScopeFromCookie } from "@/lib/feeds/home-feed-options";
