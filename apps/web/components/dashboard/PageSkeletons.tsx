@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 
-function Block({ className }: { className: string }) {
-  return <div className={`bg-surface-raised ${className.includes("rounded") ? "" : "rounded-md"} ${className}`} />;
+function Block({ className, tone = "bg-surface-raised" }: { className: string; tone?: string }) {
+  return <div className={`${tone} ${className.includes("rounded") ? "" : "rounded-md"} ${className}`} />;
 }
 
 function LoadingContent({ label, children }: { label: string; children: ReactNode }) {
@@ -49,21 +49,41 @@ export function SavedPageSkeleton() {
   );
 }
 
+function ExploreCard() {
+  // The real card sits on bg-surface-raised, so its placeholder bars take the
+  // page tone instead — the same inversion the other direction uses elsewhere.
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-surface-raised p-3">
+      <div className="flex items-center gap-2.5">
+        <Block className="h-9 w-9 shrink-0 rounded-full" tone="bg-background-subtle" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Block className="h-3 w-3/4" tone="bg-background-subtle" />
+          <Block className="h-2 w-1/2" tone="bg-background-subtle" />
+        </div>
+        <Block className="h-6 w-12 shrink-0 rounded-full" tone="bg-background-subtle" />
+      </div>
+      <div className="space-y-2 pl-[46px]">
+        <Block className="h-2 w-full" tone="bg-background-subtle" />
+        <Block className="h-2 w-3/4" tone="bg-background-subtle" />
+      </div>
+    </div>
+  );
+}
+
 export function ExploreCardsSkeleton() {
   return (
     <LoadingContent label="Loading communities">
-      <Block className="mb-3 h-4 w-40" />
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="space-y-3 rounded-xl border border-border bg-background-subtle p-3">
-            <div className="flex items-center gap-2.5">
-              <Block className="h-9 w-9 shrink-0 rounded-full" />
-              <div className="min-w-0 flex-1 space-y-2"><Block className="h-3 w-3/4" /><Block className="h-2 w-1/2" /></div>
-              <Block className="h-6 w-12 shrink-0 rounded-full" />
-            </div>
-            <div className="space-y-2 pl-[46px]"><Block className="h-2 w-full" /><Block className="h-2 w-3/4" /></div>
-          </div>
-        ))}
+      {/* The page lists two sections ("Recommended for you", then the rest) —
+          same spacing, same grid. */}
+      <div className="space-y-6">
+        <section>
+          <Block className="mb-3 h-5 w-44" />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map(i => <ExploreCard key={i} />)}</div>
+        </section>
+        <section>
+          <Block className="mb-3 h-5 w-36" />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map(i => <ExploreCard key={i} />)}</div>
+        </section>
       </div>
     </LoadingContent>
   );
@@ -74,7 +94,28 @@ export function ExplorePageSkeleton() {
     <div className="flex h-full flex-col">
       <div className="shrink-0 px-6 pb-4 pt-6">
         <h1 className="mb-4 font-display text-xl font-semibold text-foreground">Explore Communities</h1>
-        <div aria-hidden="true" className="space-y-4 pb-1 motion-safe:animate-pulse"><Block className="h-10 w-full" /><Pills /></div>
+        <div aria-hidden="true" className="space-y-4 pb-1 motion-safe:animate-pulse">
+          {/* Search field: the real one is a 32px `.field` with a 13px
+              magnifier — not a 40px block. */}
+          <div className="relative">
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted"
+              width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <Block className="h-8 w-full" />
+          </div>
+          {/* Tab pills: All / Public / Private / Requests sent widths. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Block className="h-8 w-14 shrink-0 rounded-full" />
+            <Block className="h-8 w-20 shrink-0 rounded-full" />
+            <Block className="h-8 w-20 shrink-0 rounded-full" />
+            <Block className="h-8 w-28 shrink-0 rounded-full" />
+          </div>
+        </div>
       </div>
       <div className="flex-1 overflow-hidden px-6 pb-6"><ExploreCardsSkeleton /></div>
     </div>
