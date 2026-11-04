@@ -16,8 +16,6 @@ isolation has **not** been implemented. See the
 **Development and PR previews can currently reach production data and services.**
 Staging is incomplete, and production deployment has no explicit approval gate
 in its workflow. Keep Supabase PostgreSQL authoritative during isolation work.
-The current app has no D1 adapter or D1 binding; provisioning D1 alone cannot
-provide its database functionality.
 
 No infrastructure, application code, workflow, local secret file, database,
 bucket, namespace, domain, or deployment was changed by this audit. No seed,
@@ -33,7 +31,7 @@ identify configuration and compare copies; none are included in these documents.
 | Ignored environment files in this checkout | Inspected variable names, configured hosts, bucket names, presence and equality of copies. A configured credential is not proof that it is still valid. |
 | GitHub public repository metadata, read-only API | Repository is public; all four checked-in workflows are active. Environments `Preview`, `Preview – uxcommunity`, and `Production` each report `protection_rules: []` and no deployment branch policy. Repository ruleset listing is empty. |
 | GitHub secret metadata and classic main-branch protection | Requests returned HTTP 401; `gh` is unauthenticated. Secret scopes/values, classic branch protection, and historical run artifacts were not verified. The connected GitHub tool can read this PR, but write attempts return HTTP 403 and it does not expose those administration endpoints. |
-| Cloudflare live inventory, GET requests only | Saved Wrangler OAuth credential expired on 30 October 2026. Inventory requests returned HTTP 401; other requests in the same read-only batch returned HTTP 429. Stopped without refresh or retry. Live Worker bindings, DO namespace IDs, buckets, D1 databases, routes, schedules, deployments and token policies remain unverified. |
+| Cloudflare live inventory, GET requests only | Saved Wrangler OAuth credential expired on 30 October 2026. Inventory requests returned HTTP 401; other requests in the same read-only batch returned HTTP 429. Stopped without refresh or retry. Live Worker bindings, DO namespace IDs, buckets, routes, schedules, deployments and token policies remain unverified. |
 | Supabase live project and production data | No database queries or management calls made. Current configuration and the committed 31 October schema artifacts were inspected. Those artifacts are historical evidence, not a new production check. |
 | Vercel, Resend, Upstash, Firebase/Expo dashboards | No live account inventory obtained. Repository inspection identifies consumers; dashboard-side integration status, credentials and policies remain open items. |
 
@@ -81,7 +79,6 @@ private upload functionality is incomplete rather than demonstrably isolated.
 | Push | Uses tokens in whichever DB is configured; Expo transport needs no FCM secret | No nonproduction transport kill switch or recipient allowlist | Direct FCM plus Expo fallback, token/receipt cleanup in DB |
 | Cron | Local manual scheduled testing can call configured API | Staging config has no triggers; manual internal calls remain possible | Every minute: lifecycle push and verification email; every 5 min: dependency monitor; every 6 hours: destructive chat retention |
 | Mobile | Ignored `.env` targets production API and realtime | EAS development and preview profiles both target production API | Same static app identifiers/Firebase configuration and EAS project; production API profile |
-| D1 | No app implementation | No app implementation or binding | No app implementation or binding; PostgreSQL remains authoritative |
 
 ## Findings
 

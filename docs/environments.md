@@ -1,7 +1,7 @@
 # Running isolated environments
 
 The application still uses Supabase PostgreSQL, REST and SQL RPCs. This setup
-does not implement D1, copy production data, or adopt production's migration ledger.
+does not copy production data or adopt production's migration ledger.
 See [implementation status](environment-isolation-implementation.md) for live
 provisioning and verification that remain outstanding.
 
@@ -107,7 +107,7 @@ cron endpoints. It refuses a nonlocal database before any request.
 ## Staging
 
 Use a **new Supabase project** compatible with the existing baseline and current
-REST/RPC contract. Do not reuse the production project or apply D1 SQL. Apply the
+REST/RPC contract. Do not reuse the production project. Apply the
 baseline only to the new empty database through its separately reviewed
 provisioning process; initialize reference catalogs and test users. The ordinary
 local CLI wrapper deliberately cannot perform remote migration operations.
@@ -166,8 +166,7 @@ the staging monitor class uses its own v4 migration. Inspect live namespace IDs
 and existing migration state before the first deployment.
 
 The workflow does not create a Supabase project, domain, Redis service or test
-accounts. The separately provisioned staging D1 database is empty and unbound;
-PostgreSQL remains the application's database. A passing manifest check alone
+accounts. PostgreSQL remains the application's database. A passing manifest check alone
 does not prove live isolation.
 
 Staging SQL migration operations use the explicit `STAGING_DATABASE_REF` in the

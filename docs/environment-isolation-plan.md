@@ -3,7 +3,6 @@
 **For review after Phase 1; no steps below have been executed.** This plan follows
 the [audit](environment-isolation-audit.md) at revision `48215d4f`. It establishes
 three environments while preserving the current Supabase application contract.
-It does not start the Supabase-to-D1 migration.
 
 ## Target resource contract
 
@@ -16,7 +15,6 @@ final names or reusing the existing staging realtime Worker.
 | Application identity | `APP_ENV=development`, local public build marker | `APP_ENV=staging`, matching public build marker | Preserve current public URLs and runtime behavior; introduce production identity only through reviewed changes |
 | Web/API | Local Next/OpenNext runtime, loopback or explicitly approved device LAN origin | `uxcommunity-web-staging` | Existing `uxcommunity-web` |
 | Database now | Unlinked local Supabase PostgreSQL stack from current baseline | **New dedicated Supabase project** with its own keys/ledger; target compatible PostgreSQL/locale and current REST/RPC contract | Existing authoritative Supabase PostgreSQL, unchanged |
-| Future D1 | Dedicated local D1 state, only when migration work is separately approved | Reserve `uxcommunity-staging` identity; optional empty dedicated D1 resource after approval, never wired as the current DB | Future dedicated production D1 belongs to the later migration; no provisioning/binding/cutover now |
 | Public media | Local Miniflare R2, distinct local bucket/state | Proposed `uxcommunity-staging-media`, separate delivery host | Existing production public bucket and domain |
 | Private media | Separate local R2 bucket, authorization-gated reads | Proposed `uxcommunity-staging-private`, public access disabled | Existing private bucket |
 | Next incremental cache | Local R2 cache/state | Proposed `uxcommunity-staging-next-cache` | Existing `uxcommunity-web-next-cache` |
@@ -125,7 +123,7 @@ external HTTP are separate mechanisms and must be checked explicitly.
    realtime namespaces and dedicated Redis. Apply the baseline only to the new
    empty staging database and initialize synthetic configuration/catalogs/data.
    Record its independent migration ledger. Rehearse current SQL RPCs, grants,
-   RLS, custom JWT registry and locale-sensitive behavior; no D1 substitution.
+   RLS, custom JWT registry and locale-sensitive behavior.
 3. Add explicit staging web and realtime configuration, including self-reference
    pointing to staging web, staging cache/media resources, distinct secrets,
    public URLs and `API_URL`. Reconcile DO class migrations with deployed state;
@@ -222,5 +220,4 @@ resource IDs, exact commit, commands, results and limitations for each gate.
 Before infrastructure work, review the account/permission boundary, staging DB
 project/region/locale, staging domain ownership, tester allowlists and backup
 owner/targets. Values unavailable during Phase 1 remain explicit inputs; no
-placeholder may silently resolve to production. Defer D1 schema, adapters, data
-copy and cutover to the separately approved migration task.
+placeholder may silently resolve to production.
