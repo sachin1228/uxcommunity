@@ -11,6 +11,7 @@ import {
   type RouterLike,
   NAVIGATION_LOCK_MS,
   BACK_LOCK_MS,
+  REFRESH_ON_RECLICK_ATTR,
 } from "./navigation-guard"
 
 // Every test runs against module-level guard state — reset it so tests are
@@ -165,7 +166,10 @@ test("settleNavigation releases the lock once the route settles", () => {
   clock.restore()
 })
 
-test("link click guard refreshes the page when its own route's link is clicked", () => {
+/** Minimal DOM stand-in so the click guard's document listener can be
+ *  exercised. `pathname` is optional: without a `window` the guard cannot tell
+ *  it is on the link's route. */
+function mountClickGuard(pathname?: string) {
   const listeners: Array<{ type: string; fn: (e: unknown) => void; capture: boolean }> = []
   ;(globalThis as { document?: unknown }).document = {
     addEventListener: (type: string, fn: (e: unknown) => void, capture: boolean) => {
@@ -174,20 +178,27 @@ test("link click guard refreshes the page when its own route's link is clicked",
     removeEventListener: () => undefined,
     querySelector: () => null,
   }
+
   const assigned: string[] = []
-  const windowLike = {
-    location: {
-      pathname: "/dashboard/communities",
-      assign: (url: string) => assigned.push(url),
-    },
+  if (pathname !== undefined) {
+    ;(globalThis as unknown as { window?: unknown }).window = {
+      location: {
+        pathname,
+        assign: (url: string) => assigned.push(url),
+      },
+    }
   }
-  ;(globalThis as unknown as { window?: unknown }).window = windowLike
   ;(globalThis as unknown as { history?: unknown }).history = { scrollRestoration: "auto" }
 
   const cleanup = installLinkClickGuard(800)
   const handler = listeners.find((l) => l.type === "click")!.fn
 
-  const makeClick = (href: string) => {
+  function click(href: string, options: { refreshOnReclick?: boolean } = {}) {
+    const anchor = {
+      getAttribute: (name: string) => (name === "href" ? href : null),
+      hasAttribute: (name: string) =>
+        name === REFRESH_ON_RECLICK_ATTR && options.refreshOnReclick === true,
+    }
     const event: Record<string, unknown> = {
       button: 0,
       metaKey: false,
@@ -195,84 +206,69 @@ test("link click guard refreshes the page when its own route's link is clicked",
       shiftKey: false,
       altKey: false,
       defaultPrevented: false,
-      target: { closest: () => ({ getAttribute: () => href }) },
+      target: { closest: (selector: string) => (selector === "a[href]" ? anchor : null) },
     }
     event.preventDefault = () => { event.defaultPrevented = true }
     event.stopImmediatePropagation = () => { event.stopped = true }
+    handler(event)
     return event
   }
 
-  const sameRoute = makeClick("/dashboard/communities")
-  handler(sameRoute)
+  return {
+    assigned,
+    click,
+    teardown() {
+      cleanup()
+      delete (globalThis as { document?: unknown }).document
+      delete (globalThis as unknown as { window?: unknown }).window
+      delete (globalThis as unknown as { history?: unknown }).history
+    },
+  }
+}
+
+test("re-clicking a link for the current route is a silent no-op without opt-in", () => {
+  const dom = mountClickGuard("/dashboard/library")
+
+  const sameRoute = dom.click("/dashboard/library")
   assert.equal(sameRoute.defaultPrevented, true, "the guard owns the click")
-  assert.deepEqual(assigned, ["/dashboard/communities"], "current-route click refreshes the page")
+  assert.deepEqual(dom.assigned, [], "a non-opt-in link never reloads the page")
+
+  dom.teardown()
+})
+
+test("re-clicking an opt-in link for the current route reloads the page once", () => {
+  const dom = mountClickGuard("/dashboard")
+
+  const first = dom.click("/dashboard", { refreshOnReclick: true })
+  assert.equal(first.defaultPrevented, true, "the guard owns the click")
+  assert.deepEqual(dom.assigned, ["/dashboard"], "the current-route click reloads the page")
   assert.equal(
     (globalThis as unknown as { history: { scrollRestoration: string } }).history.scrollRestoration,
     "manual",
     "scroll restoration is off so the refresh lands at the top",
   )
 
-  const burst = makeClick("/dashboard/communities")
-  handler(burst)
+  const burst = dom.click("/dashboard", { refreshOnReclick: true })
   assert.equal(burst.defaultPrevented, true, "the burst click is swallowed")
-  assert.deepEqual(assigned, ["/dashboard/communities"], "the burst does not restart the load")
+  assert.deepEqual(dom.assigned, ["/dashboard"], "the burst does not restart the load")
 
-  const otherRoute = makeClick("/dashboard/communities/c1")
-  handler(otherRoute)
+  const otherRoute = dom.click("/dashboard/messages", { refreshOnReclick: true })
   assert.equal(otherRoute.defaultPrevented, false, "different destination is allowed")
 
-  cleanup()
-  delete (globalThis as { document?: unknown }).document
-  delete (globalThis as unknown as { window?: unknown }).window
-  delete (globalThis as unknown as { history?: unknown }).history
+  dom.teardown()
 })
 
 test("link click guard swallows rapid duplicate clicks on the same internal link", () => {
-  // Minimal DOM stand-in so the guard's document listener can be exercised.
-  const listeners: Array<{ type: string; fn: (e: unknown) => void; capture: boolean }> = []
-  ;(globalThis as { document?: unknown }).document = {
-    addEventListener: (type: string, fn: (e: unknown) => void, capture: boolean) => {
-      listeners.push({ type, fn, capture })
-    },
-    removeEventListener: () => undefined,
-  }
+  const dom = mountClickGuard()
 
-  const cleanup = installLinkClickGuard(800)
-  const handler = listeners.find((l) => l.type === "click")!.fn
-
-  const makeClick = () => {
-    const event: Record<string, unknown> = {
-      button: 0,
-      metaKey: false,
-      ctrlKey: false,
-      shiftKey: false,
-      altKey: false,
-      defaultPrevented: false,
-      target: {
-        closest: (selector: string) =>
-          selector === "a[href]"
-            ? { getAttribute: () => "/dashboard/communities/c1" }
-            : null,
-      },
-    }
-    event.preventDefault = () => { event.defaultPrevented = true }
-    event.stopImmediatePropagation = () => { event.stopped = true }
-    return event
-  }
-
-  const first = makeClick()
-  handler(first)
+  const first = dom.click("/dashboard/communities/c1")
   assert.equal(first.defaultPrevented, false, "first click starts navigation")
 
-  const duplicate = makeClick()
-  handler(duplicate)
+  const duplicate = dom.click("/dashboard/communities/c1")
   assert.equal(duplicate.defaultPrevented, true, "duplicate click is swallowed")
 
-  const otherHref = makeClick()
-  otherHref.target = { closest: () => ({ getAttribute: () => "/dashboard/communities/c2" }) }
-  handler(otherHref)
+  const otherHref = dom.click("/dashboard/communities/c2")
   assert.equal(otherHref.defaultPrevented, false, "different destination is allowed")
 
-  cleanup()
-  delete (globalThis as { document?: unknown }).document
+  dom.teardown()
 })

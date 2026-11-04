@@ -108,6 +108,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard"
+              data-refresh-on-reclick
               className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
