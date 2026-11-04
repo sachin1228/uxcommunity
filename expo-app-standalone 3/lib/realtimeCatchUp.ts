@@ -62,12 +62,12 @@ export interface CatchUpSchedulerOptions {
  */
 export function createCatchUpScheduler(
   run: () => void | Promise<void>,
-  options: CatchUpSchedulerOptions = {},
+  {
+    debounceMs = CATCH_UP_DEBOUNCE_MS,
+    setTimeoutFn = setTimeout,
+    clearTimeoutFn = clearTimeout,
+  }: CatchUpSchedulerOptions = {},
 ): CatchUpScheduler {
-  const debounceMs = options.debounceMs ?? CATCH_UP_DEBOUNCE_MS;
-  const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
-  const clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
-
   let timer: ReturnType<typeof setTimeout> | null = null;
   let inFlight = false;
   let trailing = false;
