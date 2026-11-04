@@ -35,6 +35,7 @@ interface Props {
   /** The list's slow clock — pin and mute marks lapse against it (see useCommunities). */
   nowMs: number;
   onPress: () => void;
+  onPressIn?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ function previewText(
 // CommunityRow
 // ---------------------------------------------------------------------------
 
-export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) {
+export function CommunityRow({ community, typingLabel, nowMs, onPress, onPressIn }: Props) {
   const colors = useColors();
 
   // A content item newer than the newest message takes over the preview line
@@ -195,6 +196,7 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress }: Props) 
         { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
       ]}
       onPress={onPress}
+      onPressIn={onPressIn}
     >
       {/* Avatar — start aligned. An event's group chat wears its event date
           as a calendar tile over the same face everywhere (web parity), and a

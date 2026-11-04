@@ -1,6 +1,7 @@
 /**
- * One shared read of the community bootstrap — the mobile counterpart of the
- * web client's fetchAndHydrateCommunityBootstrap.
+ * Timeline-card caching plus the legacy bundled bootstrap cache. The chat's
+ * critical message path now uses communityMessageStore and the messages-only
+ * API; it never waits for this module's secondary content reads.
  *
  * WHY THIS EXISTS
  *   The chat needs messages AND the "created a …" content-event window at

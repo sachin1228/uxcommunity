@@ -127,6 +127,31 @@ test('a saved community window is read back in timeline order', async () => {
   assert.equal(loaded?.[0].content, 'message m1');
 });
 
+test('community sync checkpoints round-trip independently of newer live rows', async () => {
+  const cache = cacheOn(memoryStorage());
+  const older = message('m1');
+  await cache.saveCommunityWindow('user-a', 'room', {
+    messages: [older, message('m3', at(0, 1))], syncedThrough: { ts: older.created_at, id: older.id },
+  });
+  const loaded = await cache.loadCommunityWindow('user-a', 'room');
+  assert.equal(loaded?.syncedThrough?.id, 'm1');
+  assert.deepEqual(loaded?.messages.map((row) => row.id), ['m1', 'm3']);
+});
+
+test('legacy community windows infer a checkpoint and live-only windows retain null', async () => {
+  const cache = cacheOn(memoryStorage());
+  await cache.saveCommunityMessages('user-a', 'legacy', [message('m1')]);
+  assert.equal((await cache.loadCommunityWindow('user-a', 'legacy'))?.syncedThrough?.id, 'm1');
+  await cache.saveCommunityWindow('user-a', 'live', { messages: [message('m3')], syncedThrough: null });
+  assert.equal((await cache.loadCommunityWindow('user-a', 'live'))?.syncedThrough, null);
+});
+
+test('a confirmed empty community window can be restored', async () => {
+  const cache = cacheOn(memoryStorage());
+  await cache.saveCommunityWindow('user-a', 'room', { messages: [], syncedThrough: null });
+  assert.deepEqual(await cache.loadCommunityWindow('user-a', 'room'), { messages: [], syncedThrough: null });
+});
+
 test('windows are scoped per member and per room', async () => {
   const storage = memoryStorage();
   const cache = cacheOn(storage);

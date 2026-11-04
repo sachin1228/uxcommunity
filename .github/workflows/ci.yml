@@ -23,6 +23,25 @@ env:
   APP_ENV: production # Existing suites verify production behavior with dummy fixtures.
 
 jobs:
+  mobile-chat:
+    name: Mobile chat loading
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            expo-app-standalone 3/package-lock.json
+      - run: npm ci
+      - run: npm ci --ignore-scripts
+        working-directory: expo-app-standalone 3
+      - run: npm run typecheck
+        working-directory: expo-app-standalone 3
+      - run: npm run test:mobile-chat-open
+
   isolation:
     name: Environment isolation
     runs-on: ubuntu-latest

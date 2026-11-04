@@ -22,6 +22,13 @@ import { CHAT_MESSAGE_RETENTION_DAYS } from './chat';
 import type { ChatContentEvent } from './chatContentEvents';
 import type { Community, Message } from './communities';
 import type { DmConversation, DmMessage } from './dm';
+import { latestMessageCursor, type MessageCursor } from './realtimeCatchUp';
+
+/** Live arrivals can be ahead of a missed gap. Only API pages advance this cursor. */
+export interface CommunityMessageWindow {
+  messages: Message[];
+  syncedThrough: MessageCursor | null;
+}
 
 export const COMMUNITY_MESSAGE_CACHE_LIMIT = 120;
 export const COMMUNITY_EVENT_CACHE_LIMIT = 60;
@@ -65,6 +72,7 @@ interface CachedWindow<T> {
   version: number;
   savedAt: number;
   rows: T[];
+  syncedThrough?: MessageCursor | null;
 }
 
 interface TimedRow {
@@ -204,6 +212,8 @@ export interface ChatCache {
   activateUser(userId: string | null): void;
   loadCommunityMessages(userId: string, communityId: string): Promise<Message[] | null>;
   saveCommunityMessages(userId: string, communityId: string, messages: readonly Message[]): Promise<void>;
+  loadCommunityWindow(userId: string, communityId: string): Promise<CommunityMessageWindow | null>;
+  saveCommunityWindow(userId: string, communityId: string, window: CommunityMessageWindow): Promise<void>;
   loadCommunityEvents(userId: string, communityId: string): Promise<ChatContentEvent[] | null>;
   saveCommunityEvents(
     userId: string,
@@ -348,7 +358,7 @@ export function createChatCache(
     limit: number,
     isRow: (value: unknown) => value is T,
     retention: boolean,
-    options: { allowEmpty?: boolean; maxAgeMs?: number } = {},
+    options: { allowEmpty?: boolean; maxAgeMs?: number; metadata?: (value: Record<string, unknown>) => void } = {},
   ): Promise<T[] | null> {
     try {
       const raw = await storage.getItem(key);
@@ -366,6 +376,7 @@ export function createChatCache(
       if (options.maxAgeMs !== undefined && now() - parsed.savedAt > options.maxAgeMs) {
         return null;
       }
+      options.metadata?.(parsed);
       const rows = prepareWindow(
         parsed.rows.filter(isRow),
         limit,
@@ -387,6 +398,7 @@ export function createChatCache(
     limit: number,
     retention: boolean,
     allowEmpty = false,
+    syncedThrough?: MessageCursor | null,
   ): Promise<void> {
     if (!isUserActive(userId)) return Promise.resolve();
     const prepared = prepareWindow(rows, limit, now(), retention);
@@ -400,6 +412,7 @@ export function createChatCache(
       version: CACHE_VERSION,
       savedAt: now(),
       rows: prepared,
+      ...(syncedThrough !== undefined ? { syncedThrough } : {}),
     };
     let serialized: string;
     try {
@@ -487,6 +500,32 @@ export function createChatCache(
         COMMUNITY_MESSAGE_CACHE_LIMIT,
         true,
       );
+    },
+
+    async loadCommunityWindow(userId, communityId) {
+      if (!userId || !communityId || !isUserActive(userId)) return null;
+      let checkpoint: unknown = undefined;
+      const messages = await readWindow(
+        communityMessagesCacheKey(userId, communityId),
+        COMMUNITY_MESSAGE_CACHE_LIMIT, isMessageRow, true,
+        { allowEmpty: true, metadata: (value) => { checkpoint = value.syncedThrough; } },
+      );
+      if (!messages || !isUserActive(userId)) return null;
+      // Old snapshots contain only complete fetched windows. New snapshots
+      // explicitly preserve null for a window made solely from live arrivals.
+      const syncedThrough = checkpoint === undefined
+        ? latestMessageCursor(messages) ?? null
+        : isRecord(checkpoint) && typeof checkpoint.ts === 'string' &&
+            Number.isFinite(Date.parse(checkpoint.ts)) && typeof checkpoint.id === 'string'
+          ? { ts: checkpoint.ts, id: checkpoint.id }
+          : null;
+      return { messages, syncedThrough };
+    },
+
+    saveCommunityWindow(userId, communityId, window) {
+      if (!userId || !communityId) return Promise.resolve();
+      return saveWindow(userId, communityMessagesCacheKey(userId, communityId),
+        window.messages, COMMUNITY_MESSAGE_CACHE_LIMIT, true, true, window.syncedThrough);
     },
 
     loadCommunityEvents(userId, communityId) {

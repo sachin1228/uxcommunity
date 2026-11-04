@@ -22,7 +22,8 @@ import { validateMobileEnvironment } from "./environment";
  */
 
 import { AppState, AppStateStatus } from 'react-native';
-import { readStoredSessionToken } from './sessionStorage';
+import { peekSessionToken, getStoredSession } from './api';
+import { cacheCommunityMessageEvent } from './communityMessageStoreRuntime';
 import {
   RealtimeClient,
   buildRealtimeSocketUrl,
@@ -59,12 +60,11 @@ async function buildSocketUrl(socketKey: string): Promise<string> {
 }
 
 /**
- * Handshake headers for a socket: the session cookie replayed from SecureStore,
- * read on every open attempt so a renewed session is picked up without an app
- * restart.
+ * Resolve the current session on every open attempt. The API client's memory
+ * copy includes rotations and avoids a SecureStore round trip per room.
  */
 async function buildSocketHeaders(): Promise<Record<string, string> | undefined> {
-  const token = await readStoredSessionToken().catch(() => null);
+  const token = peekSessionToken() ?? await getStoredSession().catch(() => null);
   return sessionCookieHeaders(token);
 }
 
@@ -110,6 +110,9 @@ export const realtimeClient = new RealtimeClient({
   buildSocketUrl,
   buildSocketHeaders,
   createSocket: createReactNativeSocket,
+  onEvent: (room, topic, data, userId) => {
+    if (userId) cacheCommunityMessageEvent(userId, room, topic, data);
+  },
   onForeground: (handler) => {
     const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') handler();

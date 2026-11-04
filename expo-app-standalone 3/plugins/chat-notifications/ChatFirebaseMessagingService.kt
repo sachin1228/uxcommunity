@@ -127,6 +127,14 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
       return
     }
 
+    if (mode == "community" && communityId != null) {
+      try {
+        ChatNotificationStateModule.recordCommunityMessage(applicationContext, communityId, data)
+      } catch (_: Exception) {
+        // A sync hint must never interfere with displaying the notification.
+      }
+    }
+
     // The conversation already on screen gets no notification. The prefs are
     // written by JS when the screen is focused and cleared when it leaves; the
     // foreground check keeps a stale value from suppressing while backgrounded.

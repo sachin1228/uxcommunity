@@ -95,7 +95,8 @@ before(() => {
   };
   (globalThis as Record<string, unknown>).fetch = async (input: RequestInfo | URL) => {
     fetchCalls += 1;
-    fetchUrls.push(String(input));
+    const url = new URL(String(input), 'http://localhost');
+    fetchUrls.push(url.pathname + url.search);
     return new Response(JSON.stringify(nextPayload), {
       status: 200,
       headers: { 'content-type': 'application/json' },

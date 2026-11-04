@@ -30,6 +30,8 @@ import {
   shouldRetryPushRegistrationOnForeground,
 } from '@/lib/pushRegistrationGate';
 import { createPushRotationFollowUp } from '@/lib/pushRotationFollowUp';
+import { cacheCommunityPushSnapshot, prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
+import { consumePendingCommunityNotifications, subscribeCommunityNotificationHints } from '@/lib/chatNotificationState';
 
 export function usePushNotifications() {
   const { user } = useAuth();
@@ -37,6 +39,21 @@ export function usePushNotifications() {
   const registrationRef = useRef<Promise<string | null> | null>(null);
   const lastRegistrationAtRef = useRef(0);
   const userIdRef = useRef<string | null>(user?.id ?? null);
+  const pendingCommunityRef = useRef<{ communityId: string; data: Record<string, unknown> } | null>(null);
+
+  const warmCommunity = useCallback((communityId: string, data: Record<string, unknown> = {}) => {
+    if (userIdRef.current) {
+      cacheCommunityPushSnapshot(userIdRef.current, data);
+      prefetchCommunityMessages(userIdRef.current, communityId);
+    } else pendingCommunityRef.current = { communityId, data };
+  }, []);
+
+  const receiveCommunity = useCallback((communityId: string, data: Record<string, unknown>) => {
+    // A complete snapshot already warms the local window. A busy foreground
+    // chat must not issue one HTTP request per push in addition to realtime.
+    if (userIdRef.current && cacheCommunityPushSnapshot(userIdRef.current, data)) return;
+    warmCommunity(communityId, data);
+  }, [warmCommunity]);
 
   const register = useCallback(() => {
     if (registrationRef.current) return registrationRef.current;
@@ -54,7 +71,40 @@ export function usePushNotifications() {
 
   useEffect(() => {
     userIdRef.current = user?.id ?? null;
-  }, [user?.id]);
+    if (user?.id && pendingCommunityRef.current) {
+      warmCommunity(pendingCommunityRef.current.communityId, pendingCommunityRef.current.data);
+      pendingCommunityRef.current = null;
+    }
+  }, [user?.id, warmCommunity]);
+
+  // Receipt can precede navigation by seconds. Start the same deduped read now.
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.type === 'community_message' && typeof data.communityId === 'string') receiveCommunity(data.communityId, data);
+    });
+    return () => subscription.remove();
+  }, [receiveCommunity]);
+
+  useEffect(() => {
+    const owner = user?.id;
+    if (!owner) return;
+    let active = true;
+    const recover = async () => {
+      const hints = await consumePendingCommunityNotifications(owner);
+      if (active && userIdRef.current === owner) {
+        for (const hint of hints) warmCommunity(hint.communityId, { ...hint });
+      }
+    };
+    void recover();
+    const unsubscribe = subscribeCommunityNotificationHints((hint) => {
+      if (hint.userId === owner) receiveCommunity(hint.communityId, { ...hint });
+    });
+    const lifecycle = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void recover();
+    });
+    return () => { active = false; unsubscribe(); lifecycle.remove(); };
+  }, [user?.id, warmCommunity, receiveCommunity]);
 
   // A token rotation that lands while the old token's registration is still
   // in flight gets one bounded follow-up after that request settles, rather
@@ -166,10 +216,11 @@ export function usePushNotifications() {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = pushDataFrom(response);
       if (!data) return;
+      if (data.type === 'community_message') warmCommunity(data.communityId, { ...data });
       router.push(routeForPush(data));
     });
     return () => subscription.remove();
-  }, []);
+  }, [warmCommunity]);
 
   // A tap that launched the app from cold, delivered before this mounted.
   useEffect(() => {
@@ -177,10 +228,13 @@ export function usePushNotifications() {
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (cancelled) return;
       const data = pushDataFrom(response);
-      if (data) router.push(routeForPush(data));
+      if (data) {
+        if (data.type === 'community_message') warmCommunity(data.communityId, { ...data });
+        router.push(routeForPush(data));
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [warmCommunity]);
 }

@@ -212,6 +212,22 @@ function connectionKeys(client: RealtimeClient): string[] {
   return [...internals(client).connections.keys()];
 }
 
+test('community events reach the shared cache without depending on a mounted chat', async () => {
+  const { client, platform } = createClient();
+  const received: unknown[][] = [];
+  (platform as RealtimePlatform).onEvent = (...args) => received.push(args);
+  client.init(ALICE);
+  const room = realtimeRooms.chat('room');
+  client.connect(room);
+  await flush();
+  const socket = platform.current!;
+  socket.open();
+  const row = { id: 'message', community_id: 'room' };
+  socket.onmessage?.({ data: JSON.stringify({ t: 'event', room, topic: 'message', data: row }) });
+  assert.deepEqual(received, [[room, 'message', row, ALICE.id]]);
+  client.destroy();
+});
+
 function connection(client: RealtimeClient, key: string): ConnectionView | undefined {
   return internals(client).connections.get(key);
 }

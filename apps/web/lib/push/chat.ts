@@ -26,6 +26,7 @@ import {
   type PushBudgetState,
 } from "./preferences";
 import { logEvent } from "@/lib/observability/log";
+import { buildChatPushSnapshot, withChatPushSnapshot } from './chat-snapshot';
 
 /**
  * Chat notifications are only drawn by the app (community DP in the avatar
@@ -630,6 +631,7 @@ export async function sendChatMessagePush(
     content: string | null;
     hasImage: boolean;
     isReply: boolean;
+    snapshot?: NonNullable<Parameters<typeof buildChatPushSnapshot>[0]['snapshot']>;
   },
   deps: ChatPushDeps = {},
 ): Promise<ChatPushReport> {
@@ -643,6 +645,8 @@ export async function sendChatMessagePush(
     hasImage,
     isReply,
   } = params;
+
+  const messageSnapshot = buildChatPushSnapshot(params);
 
   const db = deps.db ?? createServiceClient();
   const send =
@@ -1000,8 +1004,12 @@ export async function sendChatMessagePush(
             messageId,
             badge,
             silent: !audible,
+            recipientId: userId,
           },
         };
+
+        const expoSnapshot = withChatPushSnapshot(expoMessage, messageSnapshot).chatMessage;
+        if (expoSnapshot) expoMessage.data!.chatMessage = expoSnapshot;
 
         for (const { token, platform } of userTokens) {
           const message = { ...expoMessage, to: token };
@@ -1028,6 +1036,7 @@ export async function sendChatMessagePush(
             silent: audible ? "0" : "1",
             badge: String(badge),
             messageId,
+            recipientId: userId,
             timestamp: String(nowDate.getTime()),
             channelId: audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
             senderAvatarInitials: senderInitials,
@@ -1037,6 +1046,8 @@ export async function sendChatMessagePush(
           if (senderAvatarUrl) directData.senderAvatarUrl = senderAvatarUrl;
           directData.avatarInitials = nameInitials(communityName);
           directData.avatarColor = avatarBackground(communityName);
+          const directSnapshot = withChatPushSnapshot(directData, messageSnapshot).chatMessage;
+          if (directSnapshot) directData.chatMessage = directSnapshot;
 
           for (const token of userFcmTokens) {
             fcmMessages.push({
