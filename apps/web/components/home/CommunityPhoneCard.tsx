@@ -188,7 +188,7 @@ export function CommunityPhoneCard() {
       </h2>
 
       <p className="relative mx-auto mt-2 max-w-[248px] px-4 text-center font-body text-xs leading-relaxed text-overlay-foreground/70">
-        Want to help shape the app? Join our community to beta test it and be
+        Join our community to beta test it and be
         among the first to try it.
       </p>
       <Link
