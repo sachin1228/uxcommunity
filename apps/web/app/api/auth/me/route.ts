@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, clearSessionCookie } from "@/lib/auth/session";
+import {
+  getSession,
+  clearSessionCookie,
+  createSession,
+  setSessionCookie,
+  type SessionPayload,
+} from "@/lib/auth/session";
+import { extendAuthSession } from "@/lib/auth/session-registry";
+import {
+  USER_SESSION_EXPIRY_SECONDS,
+  shouldRenewSession,
+} from "@/lib/auth/session-lifetime";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { getRequestClientIp } from "@/lib/global-request-rate-limit";
@@ -7,6 +18,33 @@ import {
   getNewAccountGraceDays,
   isVerificationBannerVisible,
 } from "@/lib/verification/settings";
+
+/**
+ * Sliding member sessions: once the token is inside its final month, extend the
+ * registry row and hand back a freshly signed token. Mobile and web both call
+ * this route on launch/foreground, so an active member is never signed out by
+ * the clock.
+ */
+async function renewSessionIfExpiring(session: SessionPayload): Promise<string | null> {
+  const now = Date.now();
+  if (!shouldRenewSession(session.exp, Math.floor(now / 1000))) return null;
+
+  const expiresAt = new Date(now + USER_SESSION_EXPIRY_SECONDS * 1000).toISOString();
+  if (!(await extendAuthSession(session.sid, expiresAt))) return null;
+
+  try {
+    return await createSession({
+      userId: session.userId!,
+      email: session.email,
+      role: "user",
+      sid: session.sid,
+      sv: session.sv!,
+    });
+  } catch (error) {
+    console.error("[auth/me] session renewal failed:", error);
+    return null;
+  }
+}
 
 export async function GET(request: NextRequest) {
   // L-7: Rate-limit /me to prevent aggressive polling from hammering the DB
@@ -67,7 +105,7 @@ export async function GET(request: NextRequest) {
     graceDays,
   });
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     user: {
       ...user,
       role: "user",
@@ -82,4 +120,9 @@ export async function GET(request: NextRequest) {
       emailVerifiedAt: (user as { email_verified_at?: string | null }).email_verified_at ?? null,
     },
   });
+
+  response.headers.set("Cache-Control", "no-store");
+  const renewedToken = await renewSessionIfExpiring(session);
+  if (renewedToken) setSessionCookie(response, renewedToken, request.nextUrl.hostname);
+  return response;
 }

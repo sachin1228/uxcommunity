@@ -122,7 +122,7 @@ function isCommunityRoom(room: string): boolean {
  * The session JWT is NEVER placed in the URL (audit M-7): browsers send the
  * `uxcommunity_session` cookie on the handshake automatically, and the realtime
  * Worker authenticates from that cookie. A query token is therefore neither
- * needed nor accepted here — a 7-day credential in a URL is logged by every
+ * needed nor accepted here — a long-lived credential in a URL is logged by every
  * intermediary on the way.
  */
 function buildWebSocketUrl(baseUrl: string, room: string): string {

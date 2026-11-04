@@ -7,11 +7,14 @@ import {
   evaluateSession,
   type SessionRegistryRow,
 } from "@/lib/auth/session-validity";
+import {
+  USER_SESSION_EXPIRY_SECONDS,
+  sessionExpirySeconds,
+} from "@/lib/auth/session-lifetime";
 import type { NextResponse } from "next/server";
 
 export const SESSION_COOKIE = "uxcommunity_session";
 export const LEGACY_SESSION_COOKIE = "draft_session";
-const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 /**
  * The JWT is a signed pointer, not the source of truth.
@@ -37,6 +40,8 @@ export interface SessionPayload {
   sv?: number;
   /** Admin epoch digest. Absent on user tokens. */
   adm?: string;
+  /** JWT expiry, seconds since epoch. Read from the signed token. */
+  exp?: number;
 }
 
 export interface ActiveUserState {
@@ -75,7 +80,7 @@ export async function createSession(payload: SessionPayload): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${EXPIRY_SECONDS}s`)
+    .setExpirationTime(`${sessionExpirySeconds(payload.role)}s`)
     .sign(secretKey());
 }
 
@@ -284,7 +289,7 @@ export function setSessionCookie(res: NextResponse, token: string, host?: string
       host,
       appUrl: process.env.NEXT_PUBLIC_APP_URL,
       secure: process.env.NODE_ENV === "production" && process.env.APP_ENV !== "development",
-      maxAge: EXPIRY_SECONDS,
+      maxAge: USER_SESSION_EXPIRY_SECONDS,
     }),
   );
 }

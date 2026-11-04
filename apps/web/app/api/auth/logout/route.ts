@@ -11,7 +11,7 @@ import { logEvent } from "@/lib/observability/log";
  * Logout revokes the current registry row before clearing the cookie.
  *
  * The cookie is only a cache of the token; clearing it without the row update
- * would leave a copied JWT valid for the rest of its 7-day life.
+ * would leave a copied JWT valid for the rest of its life.
  */
 export async function POST(request: NextRequest) {
   const session = await getRawSession();

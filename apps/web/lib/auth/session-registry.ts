@@ -1,6 +1,10 @@
 import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  USER_SESSION_EXPIRY_SECONDS,
+  sessionExpirySeconds,
+} from "@/lib/auth/session-lifetime";
 
 /**
  * Server-side session registry operations.
@@ -13,8 +17,6 @@ import { createServiceClient } from "@/lib/supabase/service";
  * route handlers cannot forget the version bump or accidentally update only the
  * cookie.
  */
-
-export const SESSION_EXPIRY_SECONDS = 60 * 60 * 24 * 7;
 
 export class AccountUnavailableError extends Error {
   constructor() {
@@ -39,8 +41,8 @@ export interface IssuedSession {
 
 export type SessionRole = "user" | "admin";
 
-function expiryFromNow(): string {
-  return new Date(Date.now() + SESSION_EXPIRY_SECONDS * 1000).toISOString();
+function expiryFromNow(seconds: number): string {
+  return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
 /**
@@ -57,7 +59,7 @@ export async function createAuthSession(input: {
   expiresAt?: string;
 }): Promise<IssuedSession> {
   const db = createServiceClient();
-  const expiresAt = input.expiresAt ?? expiryFromNow();
+  const expiresAt = input.expiresAt ?? expiryFromNow(sessionExpirySeconds(input.role));
 
   const { data, error } = await db.rpc("create_auth_session", {
     p_user_id: input.role === "user" ? (input.userId ?? null) : null,
@@ -91,7 +93,7 @@ export async function createLoginSession(input: {
   expectedPasswordHash: string;
   userAgent?: string | null;
 }): Promise<IssuedSession> {
-  const expiresAt = expiryFromNow();
+  const expiresAt = expiryFromNow(USER_SESSION_EXPIRY_SECONDS);
   const { data, error } = await createServiceClient().rpc("create_login_session", {
     p_user_id: input.userId,
     p_expected_password_hash: input.expectedPasswordHash,
@@ -106,6 +108,28 @@ export async function createLoginSession(input: {
   const row = data?.[0];
   if (!row?.session_id) throw new Error("create_login_session returned no session");
   return { sessionId: row.session_id, sessionVersion: row.session_version, expiresAt };
+}
+
+/**
+ * Slide a live session forward. Returns false when the row was revoked or is
+ * gone, so the caller must not reissue a token for it.
+ */
+export async function extendAuthSession(
+  sessionId: string,
+  expiresAt: string,
+): Promise<boolean> {
+  const { data, error } = await createServiceClient()
+    .from("auth_sessions")
+    .update({ expires_at: expiresAt })
+    .eq("id", sessionId)
+    .is("revoked_at", null)
+    .select("id");
+
+  if (error) {
+    console.error("[session-registry] extend failed:", error.message);
+    return false;
+  }
+  return (data?.length ?? 0) === 1;
 }
 
 /** Revoke exactly one registry row. Missing/already-revoked rows are a no-op. */
