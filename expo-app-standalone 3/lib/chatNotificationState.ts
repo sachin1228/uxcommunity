@@ -1,8 +1,11 @@
-import { NativeModules, Platform } from 'react-native';
+import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
+import type { CommunityNotificationHint } from './chatPushSnapshot';
 
 interface ChatNotificationStateNative {
   setActiveCommunity(communityId: string | null): void;
   setActiveDmConversation(conversationId: string | null): void;
+  setCurrentUser?(userId: string | null): void;
+  consumePendingCommunities?(userId: string): Promise<CommunityNotificationHint[]>;
 }
 
 /**
@@ -14,6 +17,23 @@ const nativeModule =
   Platform.OS === 'android'
     ? (NativeModules.ChatNotificationState as ChatNotificationStateNative | undefined)
     : undefined;
+
+export function setNotificationUser(userId: string | null): void {
+  try { nativeModule?.setCurrentUser?.(userId); }
+  catch { /* Older native builds still warm on navigation and Expo receipt. */ }
+}
+
+/** Native direct FCM bypasses Expo's JS receipt listener. A hint may carry a
+ * complete server snapshot; notification preview text is never a message row. */
+export function subscribeCommunityNotificationHints(listener: (hint: CommunityNotificationHint) => void): () => void {
+  const subscription = DeviceEventEmitter.addListener('community-message-received', listener);
+  return () => subscription.remove();
+}
+
+export async function consumePendingCommunityNotifications(userId: string): Promise<CommunityNotificationHint[]> {
+  try { return await nativeModule?.consumePendingCommunities?.(userId) ?? []; }
+  catch { return []; }
+}
 
 export function setActiveCommunityForNotifications(communityId: string | null): void {
   try {

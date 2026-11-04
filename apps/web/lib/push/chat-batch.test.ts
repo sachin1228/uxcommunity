@@ -1076,7 +1076,10 @@ test("Android FCM devices get the direct chat push; iOS and older builds stay on
     const fcmMessages: FcmDataMessage[] = [];
 
     const report = await sendChatMessagePush(
-      { ...BASE_PARAMS, senderAvatarUrl: "https://media.example/arun.webp" },
+      { ...BASE_PARAMS, senderAvatarUrl: "https://media.example/arun.webp", snapshot: {
+        created_at: '2026-11-04T12:00:00Z', image_url: null, reply_to_id: null, mentions: [],
+        reply_to_content_id: null, reply_content_kind: null, reply_content_title: null,
+      } },
       deps(db, {
         send: async (messages) => {
           expoMessages.push(...messages);
@@ -1118,6 +1121,13 @@ test("Android FCM devices get the direct chat push; iOS and older builds stay on
     assert.equal(data.avatarInitials, "D");
     assert.equal(data.silent, "0");
     assert.equal(data.badge, "5");
+    assert.equal(data.recipientId, userId(1));
+    assert.equal(JSON.parse(data.chatMessage!).id, BASE_PARAMS.messageId);
+    assert.equal(JSON.parse(data.chatMessage!).created_at, '2026-11-04T12:00:00Z');
+    for (const message of expoMessages) {
+      assert.equal(message.data?.recipientId, message.to === 'expo-ios' ? userId(1) : userId(2));
+      assert.equal(JSON.parse(message.data!.chatMessage as string).content, BASE_PARAMS.content);
+    }
     assert.equal(report.deliveries, 3);
   });
 });

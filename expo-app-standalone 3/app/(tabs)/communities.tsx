@@ -24,6 +24,8 @@ import { useColors } from '@/hooks/useColors';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { Community } from '@/lib/communities';
+import { useAuth } from '@/context/AuthContext';
+import { prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
 import {
   COMMUNITY_REALTIME_LIMIT,
   HIBERNATED_LIST_REFRESH_MS,
@@ -38,6 +40,7 @@ import {
 const FOCUS_CATCH_UP_MIN_AWAY_MS = 5_000;
 
 export default function CommunitiesScreen() {
+  const { user } = useAuth();
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -126,6 +129,7 @@ export default function CommunitiesScreen() {
 
   const handleCommunityPress = useCallback(
     (community: Community) => {
+      prefetchCommunityMessages(user?.id, community.id);
       markCommunityRead(community.id);
       const imageParam = community.image_url
         ? `&image=${encodeURIComponent(community.image_url)}`
@@ -155,7 +159,7 @@ export default function CommunitiesScreen() {
         `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${showcaseParam}${ownerParam}${unreadParam}${readParam}${membersParam}${typeParam}${privateParam}`
       );
     },
-    [router, markCommunityRead]
+    [router, markCommunityRead, user?.id]
   );
 
   const renderItem = useCallback(
@@ -165,9 +169,10 @@ export default function CommunitiesScreen() {
         typingLabel={getTypingLabel(item.id)}
         nowMs={nowMs}
         onPress={() => handleCommunityPress(item)}
+        onPressIn={() => prefetchCommunityMessages(user?.id, item.id)}
       />
     ),
-    [getTypingLabel, handleCommunityPress, nowMs]
+    [getTypingLabel, handleCommunityPress, nowMs, user?.id]
   );
 
   return (

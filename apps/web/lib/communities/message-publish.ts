@@ -84,6 +84,12 @@ export async function announceNewChatMessage(
       content: inserted.content ?? null,
       hasImage: !!inserted.image_url,
       isReply: !!inserted.reply_to_id,
+      snapshot: {
+        created_at: inserted.created_at, image_url: inserted.image_url,
+        reply_to_id: inserted.reply_to_id, mentions: inserted.mentions,
+        reply_to_content_id: inserted.reply_to_content_id,
+        reply_content_kind: input.replyContentKind, reply_content_title: input.replyContentTitle,
+      },
     },
     { warmup: input.pushWarmup },
   );

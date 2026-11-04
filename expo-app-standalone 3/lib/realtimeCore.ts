@@ -111,6 +111,8 @@ export interface RealtimePlatform {
    * state, not merely reconnect.
    */
   onSessionRevoked?(): void;
+  /** Persist received events independently of which screen is mounted. */
+  onEvent?(room: string, topic: string, data: unknown, userId?: string): void;
 }
 
 /** Name of the session cookie the web backend issues and the realtime Worker reads. */
@@ -657,6 +659,7 @@ export class RealtimeClient {
         // Connection established
       } else if (msg.t === 'event' && msg.topic && room) {
         this.dispatchToRoom(room, msg.topic, msg.data, msg.sender);
+        this.platform.onEvent?.(room, msg.topic, msg.data, conn.user?.id);
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
       } else if (msg.t === 'presence' && room) {
         const presence: RealtimePresence = {

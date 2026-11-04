@@ -43,6 +43,8 @@ import {
 } from '@/lib/authSnapshot';
 import { resolveSessionRestore, type SessionProbe } from '@/lib/authRestore';
 import { chatCache } from '@/lib/chatCacheStore';
+import { communityMessageStore } from '@/lib/communityMessageStoreRuntime';
+import { setNotificationUser } from '@/lib/chatNotificationState';
 import {
   clearCommunitiesSnapshot,
   peekCommunitiesSnapshot,
@@ -138,6 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     realtimeUserIdRef.current = next?.id ?? null;
     activateScreenDataSession(next?.id ?? null, sessionClock.current());
     chatCache.activateUser(next?.id ?? null);
+    communityMessageStore.activateUser(next?.id ?? null);
+    setNotificationUser(next?.id ?? null);
     setCommunitiesActiveUser(next?.id ?? null);
     setDmConversationsActiveUser(next?.id ?? null);
     setUser(next);
@@ -247,8 +251,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       if (!peekCommunitiesSnapshot()) {
         const rows = await chatCache.loadCommunityList(userId).catch(() => null);
-        if (active && rows && rows.length > 0 && !peekCommunitiesSnapshot()) {
-          seedCommunitiesSnapshotFromDisk(rows);
+        if (active && rows && rows.length > 0) {
+          if (!peekCommunitiesSnapshot()) seedCommunitiesSnapshotFromDisk(rows);
+          // Disk-only warming keeps the most likely chats available before a tap.
+          for (const row of rows.slice(0, 3)) void communityMessageStore.hydrate(userId, row.id);
         }
       }
       if (!peekDmConversations()) {
@@ -386,6 +392,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active' && userRef.current) void refresh();
+      if (state !== 'active') communityMessageStore.flush();
     });
     return () => subscription.remove();
   }, [refresh]);

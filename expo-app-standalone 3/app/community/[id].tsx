@@ -78,7 +78,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatImeLayout } from '@/hooks/useChatImeLayout';
-import { useScreenTransitionSettled } from '@/hooks/useScreenTransitionSettled';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
@@ -141,13 +140,6 @@ export default function CommunityChat() {
   const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused, {
     bottom: COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET,
   });
-  /**
-   * The message list waits for the push animation to finish. Its first rows —
-   * and the cached window behind them — are the most expensive thing this
-   * screen mounts, and creating them while the native slide runs is what made
-   * the open stutter (see hooks/useScreenTransitionSettled).
-   */
-  const listSettled = useScreenTransitionSettled();
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -186,6 +178,7 @@ export default function CommunityChat() {
   );
 
   useEffect(() => {
+    if (!user?.id) return;
     let cancelled = false;
     setMemberCountLoading(true);
 
@@ -218,12 +211,13 @@ export default function CommunityChat() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, user?.id]);
 
   // Role + grants for the ⋯ menu's settings row and the info screen's
   // management actions. Shares the one read with the info screen and the
   // count fallback above (see lib/communityDetailCache).
   useEffect(() => {
+    if (!user?.id) return;
     let cancelled = false;
     loadCommunityDetail(id)
       .then((row) => {
@@ -235,7 +229,7 @@ export default function CommunityChat() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, user?.id]);
 
   // Settings saved on the pushed screen patch the list through the store;
   // the header listens to the same channel so it repaints in the same frame.
@@ -344,6 +338,16 @@ export default function CommunityChat() {
     updateReactions,
     softDeleteMessage,
   } = useChatMessages(id);
+  // A quick disk read should paint directly, without a flashing spinner.
+  const [showLoading, setShowLoading] = useState(false);
+  useEffect(() => {
+    if (!isLoading || messages.length > 0) {
+      setShowLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoading(true), 150);
+    return () => clearTimeout(timer);
+  }, [isLoading, messages.length]);
 
   // Handler-stable mirrors of the timeline. Reaction and reply handlers read
   // these instead of closing over `messages`/`rows`, so a new page or a
@@ -749,10 +753,6 @@ export default function CommunityChat() {
   // re-position the reader.
   useEffect(() => {
     if (error) return;
-    // The list is not mounted before the transition settles (see listSettled),
-    // and this anchor is one-shot: running it against an unmounted list would
-    // burn its only chance.
-    if (!listSettled) return;
     if (!initialPositionReady || isLoading || !contentEventsReady) return;
     if (initialScrollDoneRef.current) return;
     initialScrollDoneRef.current = true;
@@ -794,7 +794,6 @@ export default function CommunityChat() {
     firstUnreadId,
     rows,
     error,
-    listSettled,
   ]);
 
   const handleScroll = useCallback(
@@ -1260,7 +1259,7 @@ export default function CommunityChat() {
         </View>
       )}
 
-      {(!listSettled || (isLoading && messages.length === 0)) && (
+      {showLoading && isLoading && rows.length === 0 && (
         <View style={styles.center}>
           {/* The UI accent, like every other loading state in the app — the
               own-bubble blue reads at ~3.5:1 against the chat background in the
@@ -1269,13 +1268,13 @@ export default function CommunityChat() {
         </View>
       )}
 
-      {listSettled && !isLoading && error && messages.length === 0 && (
+      {!isLoading && error && messages.length === 0 && (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
         </View>
       )}
 
-      {listSettled && (messages.length > 0 || (!isLoading && !error)) && (
+      {(rows.length > 0 || (!isLoading && !error)) && (
         <FlatList
           ref={listRef}
           inverted
@@ -1287,9 +1286,9 @@ export default function CommunityChat() {
           windowSize={CHAT_LIST_PERFORMANCE.windowSize}
           updateCellsBatchingPeriod={CHAT_LIST_PERFORMANCE.updateCellsBatchingPeriod}
           // A cached window is already the right thing to look at: show it at
-          // once and let the bootstrap anchor it when the network settles (the
+          // once and resolve its unread anchor independently (the
           // inverted list starts at offset 0 = the newest row).
-          style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
+          style={[styles.flex, { opacity: initialPositionResolved || rows.length > 0 ? 1 : 0 }]}
           contentContainerStyle={[styles.messagesList, { paddingTop: 8 }]}
           // Reading old messages means the user is done picking emoji —
           // close the inline panel so it doesn't eat half the screen.

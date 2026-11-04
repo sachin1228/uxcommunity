@@ -60,6 +60,8 @@ export interface CommunityMessagePushData {
   type: 'community_message';
   communityId: string;
   messageId: string;
+  recipientId?: string;
+  chatMessage?: string;
   /** Total unread across all communities at send time. */
   badge?: number;
   /** True when the server chose not to buzz for this one. */

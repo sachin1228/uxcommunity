@@ -4,10 +4,9 @@
  * the content-event half of useRealtimeChat:
  *
  * - History: account-scoped disk snapshots paint first. A cold chat without a
- *   message window shares one /bootstrap request with useChatMessages; when
- *   messages are cached but cards expired, a content-only bootstrap section
- *   avoids downloading the latest message page again. Card snapshots expire
- *   after 15 minutes because their missed updates have no message cursor.
+ *   card window uses a content-only bootstrap section independently of
+ *   messages, so author/count queries never delay the first message paint.
+ *   Card snapshots expire after 15 minutes; their updates have no message cursor.
  *   Reconnects and foregrounds do not refetch the card window.
  * - Realtime: the chat room's content-insert / content-delete / content-comment
  *   / content-reaction-* topics, so a card stays current while it lives in the
@@ -20,9 +19,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
-import { getMemberBrief, markRead, type Message } from '@/lib/communities';
+import { getMemberBrief, markRead } from '@/lib/communities';
 import {
-  fetchCommunityBootstrap,
   fetchCommunityContentEvents,
   getCachedCommunityContentEvents,
   patchCachedBootstrapContentEvents,
@@ -81,7 +79,6 @@ export function useChatContentEvents(communityId: string) {
     communityId: string;
     userId: string | undefined;
     events: Promise<ChatContentEvent[] | null>;
-    messages: Promise<Message[] | null>;
   } | null>(null);
   useLayoutEffect(() => {
     const changed =
@@ -112,7 +109,6 @@ export function useChatContentEvents(communityId: string) {
         communityId,
         userId,
         events: Promise.resolve(memoryEvents),
-        messages: Promise.resolve(null),
       };
       setEvents(memoryEvents);
       setReady(true);
@@ -123,10 +119,7 @@ export function useChatContentEvents(communityId: string) {
     const eventsPromise = userId
       ? chatCache.loadCommunityEvents(userId, communityId).catch(() => null)
       : Promise.resolve(null);
-    const messagesPromise = userId
-      ? chatCache.loadCommunityMessages(userId, communityId).catch(() => null)
-      : Promise.resolve(null);
-    cacheReadRef.current = { communityId, userId, events: eventsPromise, messages: messagesPromise };
+    cacheReadRef.current = { communityId, userId, events: eventsPromise };
     if (!userId) {
       setCacheHydrated(true);
       return undefined;
@@ -166,6 +159,7 @@ export function useChatContentEvents(communityId: string) {
   const pendingAuthors = useRef(new Set<string>());
 
   const load = useCallback(async () => {
+    if (!user?.id) return;
     try {
       const userId = user?.id;
       const memoryEvents = userId
@@ -183,9 +177,8 @@ export function useChatContentEvents(communityId: string) {
       }
       const cacheRead = cacheReadRef.current;
       let diskEvents: ChatContentEvent[] | null = null;
-      let diskMessages: Message[] | null = null;
       if (cacheRead?.communityId === communityId && cacheRead.userId === userId) {
-        [diskEvents, diskMessages] = await Promise.all([cacheRead.events, cacheRead.messages]);
+        diskEvents = await cacheRead.events;
       }
       if (
         communityIdRef.current !== communityId ||
@@ -199,36 +192,15 @@ export function useChatContentEvents(communityId: string) {
         return;
       }
 
-      if (diskMessages?.length) {
-        const contentEvents = await fetchCommunityContentEvents(communityId, userId);
-        if (
-          communityIdRef.current !== communityId ||
-          userIdRef.current !== userId
-        ) return;
-        networkSettledRef.current = true;
-        for (const row of contentEvents) {
-          if (row.users) authors.current.set(row.user_id, row.users);
-        }
-        setEvents(contentEvents);
-        return;
-      }
-
-      // The shared bootstrap (see lib/communityBootstrap.ts) — the same
-      // request the messages hook reads, so the two sections come from one
-      // Worker invocation.
-      const bootstrap = await fetchCommunityBootstrap(communityId, userId);
-      // The user switched communities while the page was in flight.
-      if (
-        communityIdRef.current !== communityId ||
-        userIdRef.current !== userId
-      ) return;
-      // Only a successful answer is authoritative; a failed fetch must leave
-      // a still-pending disk read free to paint the cached cards.
+      // Cards are secondary to messages. Always use the section-only endpoint;
+      // a slow author/count query cannot delay the chat's first message page.
+      const contentEvents = await fetchCommunityContentEvents(communityId, userId);
+      if (communityIdRef.current !== communityId || userIdRef.current !== userId) return;
       networkSettledRef.current = true;
-      for (const row of bootstrap.contentEvents) {
+      for (const row of contentEvents) {
         if (row.users) authors.current.set(row.user_id, row.users);
       }
-      setEvents(bootstrap.contentEvents);
+      setEvents(contentEvents);
     } catch {
       // Keep whatever is on screen; realtime and the next open reconcile.
     } finally {
