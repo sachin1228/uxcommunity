@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { loadEventForViewer } from "@/lib/communities/event-access";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
-import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import {
   canJoinEventChat,
   ensureEventChatCommunity,
@@ -87,7 +85,6 @@ export async function POST(
     if (deleteError) {
       return NextResponse.json({ error: "Failed to update RSVP. Please try again." }, { status: 500 });
     }
-    revalidateTag(HOME_FEED_TAG, { expire: 0 });
 
     // Not going any more means leaving the event's group chat with the RSVP:
     // the room is for the people going. The creator keeps their own group.
@@ -164,10 +161,6 @@ export async function POST(
   } catch (error) {
     console.error("[event RSVP] group chat join failed:", error);
   }
-
-  // Drop the cached home feed so it no longer serves the pre-RSVP snapshot
-  // (user_rsvped: false / stale rsvp_count) right after a successful RSVP.
-  revalidateTag(HOME_FEED_TAG, { expire: 0 });
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },

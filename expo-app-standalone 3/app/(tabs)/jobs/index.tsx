@@ -140,10 +140,6 @@ function JobsTabSession({
           cacheReadyRef.current = true;
           commitJobs(memory.data.jobs, memory.data.hasMore, false);
           setLoading(false);
-          if (memory.isFresh) {
-            setError(null);
-            return;
-          }
         } else {
           setLoading(true);
         }

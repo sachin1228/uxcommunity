@@ -51,7 +51,19 @@ export function CommunityContentView({
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const query = useCommunityContent(communityId, kind, currentUserId);
-  const actions = useContentActions();
+  // Confirmed card mutations (including the comment thread's absolute total)
+  // are written into this tab's query cache, so a tab switch or remount inside
+  // React Query's stale window still renders the post-mutation card.
+  const writeThrough = useCallback(
+    (item: CommunityContent, patch: Record<string, unknown>) => {
+      queryClient.setQueryData<CommunityContent[]>(
+        communityContentKey(communityId, kind),
+        (old = []) => old.map((entry) => (entry.id === item.id ? { ...entry, ...patch } : entry)),
+      );
+    },
+    [communityId, kind, queryClient],
+  );
+  const actions = useContentActions(writeThrough);
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);

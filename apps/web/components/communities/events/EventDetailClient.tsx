@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
@@ -12,6 +12,7 @@ import { EventCard } from "./EventCard";
 import { EventChatPanel } from "./EventChatPanel";
 import { CommentSection } from "../CommentSection";
 import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { publishContentChange } from "@/lib/communities/content-sync";
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -73,6 +74,11 @@ export function EventDetailClient({
   const cachedComments = getCachedRequest<{ comments?: EventComment[] }>(commentsUrl, currentUserId);
   const [comments, setComments] = useState<EventComment[]>(cachedComments?.comments ?? []);
   const [commentsLoading, setCommentsLoading] = useState(!cachedComments);
+  const commentsRef = useRef(comments);
+
+  useEffect(() => {
+    commentsRef.current = comments;
+  }, [comments]);
 
 
   useEffect(() => {
@@ -124,13 +130,35 @@ export function EventDetailClient({
 
   // ── Comment actions passed to CommentSection ──
 
-  const handleCommentPosted = useCallback((comment: EventComment) => {
-    setComments((prev) => [...prev, comment]);
-  }, []);
+  // The discussion sits inside this page's event card, and the events tab,
+  // home feed and profile tabs keep their own cached copy of that card. Mirror
+  // each confirmed mutation's absolute total into both, so a comment here
+  // can't leave a stale count behind for the client cache's lifetime.
+  const publishCommentCount = useCallback((total: number) => {
+    setEvent((current) =>
+      (current.comment_count ?? 0) === total ? current : { ...current, comment_count: total },
+    );
+    publishContentChange({ kind: "event", id: event.id, patch: { comment_count: total } });
+  }, [event.id]);
 
-  const handleDeleteComment = useCallback((id: string, _parentId: string | null) => {
-    setComments((prev) => prev.filter((c) => c.id !== id));
-  }, []);
+  const handleCommentPosted = useCallback((comment: EventComment) => {
+    const next = [...commentsRef.current, comment];
+    commentsRef.current = next;
+    setComments(next);
+    publishCommentCount(next.length);
+  }, [publishCommentCount]);
+
+  const handleDeleteComment = useCallback((id: string, parentId: string | null) => {
+    // Deleting a top-level comment cascades to its replies in the database, so
+    // the local list must drop them too — otherwise the mirrored total counts
+    // rows the server already removed.
+    const next = commentsRef.current.filter((c) =>
+      parentId ? c.id !== id : c.id !== id && c.parent_id !== id,
+    );
+    commentsRef.current = next;
+    setComments(next);
+    publishCommentCount(next.length);
+  }, [publishCommentCount]);
 
   // ── Flat list built into a tree for the shared comment section ──
   const commentTree = useMemo(() => {

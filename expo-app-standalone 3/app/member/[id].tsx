@@ -254,10 +254,6 @@ function MemberProfileSession({
           commitFeed(memory.data.items, memory.data.hasMore, false);
           setFeedLoading(false);
           resetActions();
-          if (memory.isFresh) {
-            setFeedError(null);
-            return;
-          }
         } else {
           setFeedLoading(true);
         }

@@ -179,7 +179,12 @@ export interface ContentActionsApi {
   isActive: (item: CommunityContent, kind: ContentKind, action: ContentAction) => boolean;
   countFor: (item: CommunityContent, kind: ContentKind, action: ContentAction) => number;
   commentCountFor: (item: CommunityContent) => number;
-  setCommentCount: (itemId: string, total: number) => void;
+  /**
+   * The discussion's absolute total, reported by the comment thread. Stored as
+   * a local override AND written through to the screen's cache so the count
+   * survives a tab remount inside React Query's stale window.
+   */
+  setCommentCount: (item: CommunityContent, total: number) => void;
   /**
    * Write one interaction's state into the card from outside the tap path —
    * the RSVP, whose dialog owns the request, its spinner and its error, and so
@@ -349,8 +354,10 @@ export function useContentActions(
   );
 
   const setCommentCount = useCallback(
-    (itemId: string, total: number) =>
-      setCommentCounts((current) => ({ ...current, [itemId]: total })),
+    (item: CommunityContent, total: number) => {
+      setCommentCounts((current) => ({ ...current, [item.id]: total }));
+      onCacheMutationRef.current?.(item, { comment_count: total });
+    },
     [],
   );
 
@@ -1397,7 +1404,7 @@ export function ContentDetail({
               allowReplies={allowReplies}
               replyTarget={replyTarget}
               onReplyTargetChange={setReplyTarget}
-              onCountChange={(total) => actions.setCommentCount(item.id, total)}
+              onCountChange={(total) => actions.setCommentCount(item, total)}
             />
           </View>
           </ScrollView>

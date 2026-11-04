@@ -14,6 +14,7 @@ import { updateCommentReactions } from "@/lib/communities/comment-tree";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
+import { publishContentChange } from "@/lib/communities/content-sync";
 import {
   fetchThreadResource,
   invalidateThreadResources,
@@ -71,6 +72,17 @@ export function ThreadDetailClient({
   const threadRef = useRef(thread);
   const commentsRef = useRef(comments);
   const isVisible = useDocumentVisible();
+
+  // The community tab, home feed and profile tabs hold their own cached copy
+  // of this card. Publish the absolute total so a comment or delete here can't
+  // leave those copies showing the pre-comment count until their TTL expires.
+  useEffect(() => {
+    publishContentChange({
+      kind: "thread",
+      id: thread.id,
+      patch: { comment_count: thread.comment_count },
+    });
+  }, [thread.id, thread.comment_count]);
 
   const applyComments = useCallback((nextComments: ThreadComment[]) => {
     commentsRef.current = nextComments;
