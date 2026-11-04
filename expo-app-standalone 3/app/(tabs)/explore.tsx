@@ -140,10 +140,6 @@ function ExploreTabSession({
         rowsRef.current = memory.data;
         setRows(memory.data);
         setLoading(false);
-        if (memory.isFresh) {
-          setError(null);
-          return;
-        }
       } else {
         setLoading(true);
       }

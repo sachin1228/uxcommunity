@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
-import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { loadEventForViewer } from "@/lib/communities/event-access";
 
 export async function POST(
@@ -61,10 +59,6 @@ export async function POST(
   if (stateError || countError || Boolean(persisted) !== body.saved) {
     return NextResponse.json({ error: "Save state could not be confirmed." }, { status: 500 });
   }
-
-  // Drop the cached home feed so its user_saved snapshot doesn't predate this
-  // mutation (otherwise the bookmark reverts to its pre-click state on refresh).
-  revalidateTag(HOME_FEED_TAG, { expire: 0 });
 
   return NextResponse.json({ saved: body.saved, save_count: count ?? 0 });
 }

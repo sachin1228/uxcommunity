@@ -318,11 +318,6 @@ function HomeTabSession({
           commitFeed(targetScope, memory.data.items, memory.data.hasMore, false);
           prefetchFeedImages(memory.data.items);
           resetActions();
-          if (memory.isFresh) {
-            setError(null);
-            setLoading(false);
-            return;
-          }
           setLoading(false);
         } else {
           setLoading(true);
