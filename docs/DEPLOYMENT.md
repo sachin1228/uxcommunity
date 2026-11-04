@@ -73,6 +73,11 @@ The workflow never adopts, repairs or replays the ledger; see
 
 ## Migration rules
 
+- Migrations change schema, not reference catalogs. Cities, design sectors, job
+  titles and experience levels are operator-managed master data: create and
+  edit them in Admin, never as a row in a migration. Fresh installations seed
+  catalogs through the explicit initializer instead
+  ([fresh initialization](database-initialization.md)).
 - Additive and backward compatible (expand/contract): the currently deployed
   app must keep working during the migration and after a failed release.
 - Destructive drops belong in a later release, after the new code is live.
