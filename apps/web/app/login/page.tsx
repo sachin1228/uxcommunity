@@ -71,7 +71,7 @@ export default function LoginPage() {
 
   return (
     <main className="grid min-h-screen place-items-center bg-background px-6 py-12">
-      {loading && (openingDashboard ? <DashboardSkeleton /> : <BrandedLoadingScreen label="Signing in" />)}
+      {loading && (openingDashboard ? <DashboardSkeleton /> : <BrandedLoadingScreen label="Logging in" />)}
 
       <BrandLogo
         className="fixed left-6 top-6 z-20"
@@ -142,7 +142,7 @@ export default function LoginPage() {
             <PendingButton
               type="submit"
               pending={loading}
-              pendingLabel="Signing in…"
+              pendingLabel="Logging in…"
               spinnerSize={16}
               className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
             >

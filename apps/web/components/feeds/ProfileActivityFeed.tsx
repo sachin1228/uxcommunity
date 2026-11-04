@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { SavedCardsSkeleton } from "@/components/dashboard/PageSkeletons";
 import {
   Bookmark,
   LayoutGrid,
@@ -135,10 +136,12 @@ export function ProfileActivityScope({
   scope,
   currentUserId,
   subject,
+  loadingFallback,
 }: {
   scope: ProfileActivityTab;
   currentUserId: string;
   subject: { id: string; name: string } | null;
+  loadingFallback?: ReactNode;
 }) {
   initRequestCache(currentUserId);
   const requestUrl = subject
@@ -272,7 +275,7 @@ export function ProfileActivityScope({
   }, [items, loadingMore, requestUrl, updateItems]);
 
   if (loading) {
-    return (
+    return loadingFallback ?? (
       <div className="flex items-center justify-center py-20" role="status" aria-label="Loading posts">
         <Spinner size={28} />
       </div>
@@ -428,5 +431,5 @@ export function ProfileActivityFeed({
  * payload (and saving/unsaving from either surface updates both).
  */
 export function SavedFeed({ currentUserId }: { currentUserId: string }) {
-  return <ProfileActivityScope scope="saved" currentUserId={currentUserId} subject={null} />;
+  return <ProfileActivityScope scope="saved" currentUserId={currentUserId} subject={null} loadingFallback={<SavedCardsSkeleton />} />;
 }

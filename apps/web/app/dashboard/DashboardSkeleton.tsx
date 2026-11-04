@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { DashboardRouteSkeleton } from "./DashboardRouteSkeleton";
 
 export function SidebarSkeleton() {
   return (
@@ -16,18 +17,6 @@ export function SidebarSkeleton() {
   );
 }
 
-export function FeedSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-[40rem] space-y-4 px-4 pt-8" role="status" aria-label="Loading feed">
-      <span className="sr-only">Loading your feed</span>
-      <div aria-hidden className="animate-pulse space-y-4">
-        <div className="h-8 w-40 rounded-md bg-surface-raised" />
-        {[0, 1].map(i => <div key={i} className="h-56 rounded-xl border border-border bg-surface" />)}
-      </div>
-    </div>
-  );
-}
-
 /** Contains no member data and may stream before registry validation finishes. */
 export function DashboardSkeleton() {
   return (
@@ -35,7 +24,7 @@ export function DashboardSkeleton() {
       <header className="flex h-12 shrink-0 items-center border-b border-border px-4"><BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-sm" /></header>
       <div className="flex min-h-0 flex-1">
         <div className="hidden min-[500px]:block"><SidebarSkeleton /></div>
-        <div className="min-w-0 flex-1"><FeedSkeleton /></div>
+        <div className="min-w-0 flex-1 overflow-hidden"><DashboardRouteSkeleton /></div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-import { RouteLoader } from "@/components/ui/RouteLoader";
+import { DashboardRouteSkeleton } from "../DashboardRouteSkeleton";
 
 export default function CommunitiesLoading() {
-  return <RouteLoader />;
+  return <DashboardRouteSkeleton />;
 }

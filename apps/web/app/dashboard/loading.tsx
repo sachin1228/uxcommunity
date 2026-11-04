@@ -1,6 +1,6 @@
-import { FeedSkeleton } from "./DashboardSkeleton";
+import { DashboardRouteSkeleton } from "./DashboardRouteSkeleton";
 
-/** Dashboard home loading boundary — only the centered feed spinner is shown. */
+/** Uses the destination's layout while the route streams. */
 export default function DashboardLoading() {
-  return <FeedSkeleton />;
+  return <DashboardRouteSkeleton />;
 }
