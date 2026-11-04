@@ -17,13 +17,12 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type ScrollViewProps,
 } from 'react-native';
-import { KeyboardEvents } from 'react-native-keyboard-controller';
 import Animated from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -36,6 +35,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { DmComposer } from '@/components/dm/DmComposer';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
+import { ChatScrollView } from '@/components/chat/ChatScrollView';
 import type { ChatComposerHandle } from '@/components/chat/ChatInput';
 import { DmReportModal } from '@/components/dm/DmReportModal';
 import { PersonAvatar } from '@/components/PersonAvatar';
@@ -176,7 +176,11 @@ export default function DmThreadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const imeLayout = useChatImeLayout(isFocused);
+  const imeLayout = useChatImeLayout(isFocused, { nativeListInsets: true });
+  const { listInset, listTransition } = imeLayout;
+  const renderChatScrollView = useCallback((props: ScrollViewProps) => (
+    <ChatScrollView {...props} bottomInset={listInset} transition={listTransition} followThreshold={24} />
+  ), [listInset, listTransition]);
   /**
    * The thread waits for the push animation to finish before it mounts its
    * rows — creating them mid-slide is what made the open stutter (see
@@ -553,16 +557,6 @@ export default function DmThreadScreen() {
   const scrollToLatest = useCallback((animated = true) => {
     listRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
-
-  // Keep the newest message visible when the IME opens, while the shared chat
-  // layout controller moves the dock and list viewport together.
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
-      if (atBottomRef.current) scrollToLatest(true);
-    });
-    return () => subscription.remove();
-  }, [scrollToLatest]);
 
   const {
     handleSend,
@@ -1401,6 +1395,7 @@ export default function DmThreadScreen() {
               <FlatList
                 ref={listRef}
                 inverted
+                renderScrollComponent={renderChatScrollView}
                 data={rows}
                 keyExtractor={(row) => row.key}
                 // A cached window paints at once; the anchor runs when the page
@@ -1408,7 +1403,7 @@ export default function DmThreadScreen() {
                 style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
                 contentContainerStyle={styles.list}
                 keyboardDismissMode="on-drag"
-                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                maintainVisibleContentPosition={atBottom ? undefined : { minIndexForVisible: 0 }}
                 onScroll={(event) => {
                   const next = event.nativeEvent.contentOffset.y <= 24;
                   atBottomRef.current = next;
@@ -1722,12 +1717,6 @@ export default function DmThreadScreen() {
   );
 }
 
-/**
- * Keyboard avoidance, wired exactly like the community chat: iOS uses the RN
- * KAV with the header's measured height as its offset (the KAV starts below
- * the header); Android uses keyboard-controller's height wrapper, since the
- * screen is resized rather than padded.
- */
 /** Header ⋯ menu — Report, plus Block or Unblock depending on the state. */
 function ThreadOptionsSheet({
   visible,

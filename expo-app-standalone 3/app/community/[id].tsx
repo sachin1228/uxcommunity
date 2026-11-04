@@ -6,6 +6,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  type ScrollViewProps,
   StyleSheet,
   Text,
   View,
@@ -24,6 +25,7 @@ import { ContentActionsSheet } from '@/components/chat/ContentActionsSheet';
 import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, ChatComposerHandle, PendingImage } from '@/components/chat/ChatInput';
+import { ChatScrollView } from '@/components/chat/ChatScrollView';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
@@ -139,7 +141,12 @@ export default function CommunityChat() {
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
   const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused, {
     bottom: COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET,
+    nativeListInsets: true,
   });
+  const { listInset, listTransition } = imeLayout;
+  const renderChatScrollView = useCallback((props: ScrollViewProps) => (
+    <ChatScrollView {...props} bottomInset={listInset} transition={listTransition} followThreshold={JUMP_PILL_THRESHOLD} />
+  ), [listInset, listTransition]);
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
   /**
@@ -1278,6 +1285,7 @@ export default function CommunityChat() {
         <FlatList
           ref={listRef}
           inverted
+          renderScrollComponent={renderChatScrollView}
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}

@@ -11,10 +11,12 @@ import {
   Easing,
   runOnJS,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withTiming,
   runOnUI,
   type AnimatedStyle,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 const DEFAULT_PANEL_HEIGHT = 320;
@@ -39,6 +41,10 @@ export interface ChatImeLayout {
   panelInteractive: boolean;
   /** Space reserved below the messages while the composer/IME dock is active. */
   listSpacerStyle: AnimatedStyle<ViewStyle>;
+  /** Native Android scroll inset; never changes the message list's Yoga size. */
+  listInset: SharedValue<number>;
+  /** Captures the reader's position once at the start of each dock transition. */
+  listTransition: SharedValue<number>;
   /** Moves the composer dock with the IME while the screen itself stays fixed. */
   dockStyle: AnimatedStyle<ViewStyle>;
   onComposerStackLayout: (event: LayoutChangeEvent) => void;
@@ -62,7 +68,7 @@ export interface ChatImeLayout {
  */
 export function useChatImeLayout(
   enabled: boolean,
-  composerSpacing: { top?: number; bottom?: number } = {},
+  composerSpacing: { top?: number; bottom?: number; nativeListInsets?: boolean } = {},
 ): ChatImeLayout {
   const insets = useSafeAreaInsets();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -79,6 +85,7 @@ export function useChatImeLayout(
   // older tap harmless if a faster tap reaches the UI runtime first.
   const modeRequestId = useSharedValue(0);
   const imeInset = useSharedValue(0);
+  const listTransition = useSharedValue(0);
   const panelExtent = useSharedValue(0);
   const targetPanelHeight = useSharedValue(panelHeight);
   const composerBaseHeight = useSharedValue(0);
@@ -93,6 +100,7 @@ export function useChatImeLayout(
   const ownerEnabled = useSharedValue(enabled);
   const composerTopSpacing = composerSpacing.top ?? CHAT_COMPOSER_TOP_INSET;
   const composerBottomSpacing = composerSpacing.bottom ?? CHAT_COMPOSER_BOTTOM_INSET;
+  const nativeListInsets = Platform.OS === 'android' && composerSpacing.nativeListInsets === true;
 
   const panelOpenRef = useRef(false);
   const panelRequestedRef = useRef(false);
@@ -215,6 +223,7 @@ export function useChatImeLayout(
 
     if (!ownerEnabled.value || requestId < modeRequestId.value) return;
     modeRequestId.value = requestId;
+    listTransition.value += 1;
     panelDismissPending.value =
       keyboardShowPending.value || keyboardTargetVisible.value || imeInset.value > 1;
     keyboardShowPending.value = false;
@@ -271,6 +280,7 @@ export function useChatImeLayout(
     imeAnimationRunning,
     keyboardShowPending,
     keyboardTargetVisible,
+    listTransition,
     modeRequestId,
     ownerEnabled,
     panelDismissPending,
@@ -285,6 +295,7 @@ export function useChatImeLayout(
 
     if (!ownerEnabled.value || requestId < modeRequestId.value) return;
     modeRequestId.value = requestId;
+    listTransition.value += 1;
     restoreKeyboardAfterPanelDismiss.value = panelDismissPending.value;
     keyboardShowPending.value = true;
     panelRequested.value = false;
@@ -309,6 +320,7 @@ export function useChatImeLayout(
     imeInset,
     keyboardTargetVisible,
     keyboardShowPending,
+    listTransition,
     modeRequestId,
     ownerEnabled,
     panelDismissPending,
@@ -323,6 +335,7 @@ export function useChatImeLayout(
 
     if (!ownerEnabled.value || requestId < modeRequestId.value) return;
     modeRequestId.value = requestId;
+    listTransition.value += 1;
     keyboardShowPending.value = false;
     panelDismissPending.value = false;
     restoreKeyboardAfterPanelDismiss.value = false;
@@ -340,6 +353,7 @@ export function useChatImeLayout(
     imeInset,
     keyboardShowPending,
     keyboardTargetVisible,
+    listTransition,
     modeRequestId,
     ownerEnabled,
     panelDismissPending,
@@ -355,6 +369,7 @@ export function useChatImeLayout(
         if (!ownerEnabled.value) return;
 
         imeAnimationRunning.value = true;
+        listTransition.value += 1;
         keyboardTargetVisible.value = event.progress > 0.5;
         if (event.progress > 0.5) {
           // If a panel tap arrives while the keyboard is entering, preserve
@@ -459,6 +474,7 @@ export function useChatImeLayout(
       imeAnimationRunning,
       keyboardShowPending,
       keyboardTargetVisible,
+      listTransition,
       keepKeyboardHiddenForPanel,
       ownerEnabled,
       panelDismissPending,
@@ -589,8 +605,13 @@ export function useChatImeLayout(
     height:
       composerBaseHeight.value +
       typingIndicatorHeight.value +
-      Math.max(imeInset.value, panelExtent.value),
-  }), [composerBaseHeight, imeInset, panelExtent, typingIndicatorHeight]);
+      // Android reserves IME/panel space natively in ChatScrollView. Keeping
+      // this spacer independent of animation avoids a Yoga/FlatList layout
+      // pass on every keyboard frame. iOS retains its existing avoidance.
+      (nativeListInsets ? 0 : Math.max(imeInset.value, panelExtent.value)),
+  }), [composerBaseHeight, imeInset, nativeListInsets, panelExtent, typingIndicatorHeight]);
+
+  const listInset = useDerivedValue(() => Math.max(imeInset.value, panelExtent.value));
 
   return {
     composerBottomSpacing,
@@ -600,6 +621,8 @@ export function useChatImeLayout(
     panelStyle,
     panelInteractive,
     listSpacerStyle,
+    listInset,
+    listTransition,
     dockStyle,
     onComposerStackLayout,
     onFixedDockLayout,

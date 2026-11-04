@@ -41,6 +41,7 @@ jobs:
       - run: npm run typecheck
         working-directory: expo-app-standalone 3
       - run: npm run test:mobile-chat-open
+      - run: node --test "expo-app-standalone 3/tests/chat-keyboard.test.mjs"
 
   isolation:
     name: Environment isolation
