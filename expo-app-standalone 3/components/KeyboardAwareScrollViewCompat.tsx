@@ -30,7 +30,10 @@ export const KeyboardAwareScrollViewCompat = React.forwardRef<ScrollView, Props>
     }
     return (
       <KeyboardAwareScrollView
-        ref={ref}
+        ref={(instance) => {
+          if (typeof ref === 'function') ref(instance);
+          else if (ref) ref.current = instance;
+        }}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
         {...props}
       >
