@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useRef, type CSSProperties } from "react";
 
 /**
@@ -190,13 +191,12 @@ export function CommunityPhoneCard() {
         Want to help shape the app? Join our community to beta test it and be
         among the first to try it.
       </p>
-      <button
-        type="button"
-        disabled
-        className="relative mx-auto mt-3 flex h-9 items-center justify-center rounded-full bg-white px-5 font-body text-sm font-semibold text-black opacity-60 disabled:cursor-not-allowed"
+      <Link
+        href="/join/ux-community-mobile-app-beta-testers-62d60602005e440b9409cbfbb609e2b1"
+        className="relative mx-auto mt-3 flex h-9 w-fit items-center justify-center rounded-full bg-white px-5 font-body text-sm font-semibold text-black transition-colors hover:bg-white/90"
       >
         Join the beta community
-      </button>
+      </Link>
 
       <div
         ref={stageRef}
