@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, memo } from "react";
-import Lottie, { type LottieRefCurrentProps } from "lottie-react";
+import { Suspense, lazy, useState, useEffect, useRef, memo } from "react";
+import type { LottieRefCurrentProps } from "lottie-react";
 import { emojiToCodepoint, lottieUrlForCodepoint } from "@/lib/noto-emoji";
 import { NotoEmojiSvg } from "./NotoEmojiSvg";
+
+// Lazy-load the Lottie player (~77 KB gzipped) so it is not part of the
+// community route bundle. The static SVG renders as the Suspense fallback
+// until the player chunk arrives.
+const Lottie = lazy(() => import("lottie-react"));
 
 interface AnimatedEmojiProps {
   /** The emoji character to render */
@@ -126,13 +131,19 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
       onMouseLeave={() => setIsHovered(false)}
     >
       {animationData ? (
-        <Lottie
-          lottieRef={lottieRef}
-          animationData={animationData}
-          style={{ width: size, height: size }}
-          loop
-          autoplay={shouldPlay}
-        />
+        <Suspense
+          fallback={
+            <NotoEmojiSvg emoji={emoji} size={size} className={className} />
+          }
+        >
+          <Lottie
+            lottieRef={lottieRef}
+            animationData={animationData}
+            style={{ width: size, height: size }}
+            loop
+            autoplay={shouldPlay}
+          />
+        </Suspense>
       ) : (
         // Fallback to SVG image (not system font)
         <NotoEmojiSvg
