@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
 import type { CommunityResource, ResourceComment } from "@/lib/communities/models/resources";
@@ -58,6 +59,7 @@ async function getResource(
 async function getComments(
   db: ReturnType<typeof createServiceClient>,
   resourceId: string,
+  userId: string,
 ): Promise<ResourceComment[]> {
   const { data } = await db
     .from("resource_comments")
@@ -77,9 +79,11 @@ async function getComments(
     replies: [] as ResourceComment[],
   })) as ResourceComment[];
 
+  const withReactions = await attachCommentReactions(db, withUsers, userId, "resources");
+
   // Nest one level of replies under their parent (matches the shared CommentSection shape).
-  const topLevel = withUsers.filter((comment) => !comment.parent_id);
-  for (const reply of withUsers.filter((comment) => comment.parent_id)) {
+  const topLevel = withReactions.filter((comment) => !comment.parent_id);
+  for (const reply of withReactions.filter((comment) => comment.parent_id)) {
     const parent = topLevel.find((comment) => comment.id === reply.parent_id);
     if (parent) parent.replies.push(reply);
   }
@@ -106,7 +110,7 @@ export default async function ResourceDetailPage({ params }: Props) {
 
   const [resource, comments, community, managerStatus] = await Promise.all([
     getResource(db, communityId, resourceId, userId),
-    getComments(db, resourceId),
+    getComments(db, resourceId, userId),
     db.from("communities").select("name").eq("id", communityId).maybeSingle(),
     loadCommunityManagerStatus(db, communityId, userId),
   ]);

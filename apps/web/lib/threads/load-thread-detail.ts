@@ -4,6 +4,7 @@ import type { CommunityThread, ThreadComment } from "@/lib/communities/models/th
 import { attachPollVotes } from "@/lib/threads/poll-votes"
 import { createServiceClient } from "@/lib/supabase/service"
 import { loadCommentAuthors } from "@/lib/communities/comment-authors"
+import { attachCommentReactions } from "@/lib/communities/comment-reactions"
 
 type Database = ReturnType<typeof createServiceClient>
 
@@ -44,7 +45,7 @@ async function loadThread(db: Database, options: LoadOptions): Promise<Community
   }
 }
 
-async function loadComments(db: Database, threadId: string): Promise<ThreadComment[]> {
+async function loadComments(db: Database, threadId: string, userId: string): Promise<ThreadComment[]> {
   const { data } = await db
     .from("thread_comments")
     .select("id, thread_id, user_id, parent_id, body, created_at, updated_at")
@@ -64,8 +65,11 @@ async function loadComments(db: Database, threadId: string): Promise<ThreadComme
     users: authors[(comment as { user_id: string }).user_id] ?? null,
     replies: [],
   }))
-  const roots = enriched.filter((comment) => !comment.parent_id)
-  for (const reply of enriched.filter((comment) => comment.parent_id)) {
+  // Match the comments API: the server-rendered payload must carry the viewer's
+  // reactions, otherwise a refresh paints them away until a client refetch.
+  const withReactions = await attachCommentReactions(db, enriched, userId, "threads")
+  const roots = withReactions.filter((comment) => !comment.parent_id)
+  for (const reply of withReactions.filter((comment) => comment.parent_id)) {
     roots.find((comment) => comment.id === reply.parent_id)?.replies.push(reply)
   }
   return roots
@@ -75,7 +79,7 @@ export async function loadThreadDetail(options: LoadOptions) {
   const db = createServiceClient()
   const [thread, comments] = await Promise.all([
     loadThread(db, options),
-    loadComments(db, options.threadId),
+    loadComments(db, options.threadId, options.userId),
   ])
   let threadWithVotes = thread
   if (thread) {
