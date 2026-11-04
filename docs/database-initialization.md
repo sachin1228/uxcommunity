@@ -118,6 +118,25 @@ local Supabase service key, R2, Redis, email etc.). These are external service
 configuration, never database seed rows. Admin login uses its existing
 environment-based credentials; this initializer does not fabricate an admin.
 
+## Adding catalog options to an existing installation
+
+Catalog rows are operator-owned master data, not schema. Add them through
+Admin → Cities / Sectors / Job titles / Experience levels, or run the committed
+city importer against the environment:
+
+```sh
+npm run cities:import -- --dry-run                       # sign in, report only
+npm run cities:import -- --base-url https://app.uxcommunity.in
+```
+
+It prompts for an environment admin email and password (echo off);
+`ADMIN_EMAIL` / `ADMIN_PASSWORD` are supported for automation.
+
+`data/cities/global-design-hubs.json` holds the approved list. The importer
+signs in through `/api/auth/login` with an environment admin account, skips
+names that already exist, and is safe to re-run. Attach photos afterwards with
+Admin → Cities → Fetch images. Catalog rows never belong in a migration.
+
 ## Verification
 
 `npm run test:db` first proves every application table and `storage.buckets` is

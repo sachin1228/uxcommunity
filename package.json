@@ -81,6 +81,7 @@
     "test:companies-import": "node --test scripts/import-company-directory.test.mjs",
     "companies:v2": "node scripts/generate-company-directory-v2.mjs",
     "companies:import": "node scripts/import-company-directory.mjs",
+    "cities:import": "node scripts/import-cities.mjs",
     "companies:import:dry": "node scripts/import-company-directory.mjs --dry-run data/company-directory/prototype",
     "bench:companies": "psql -v n=100000 -f scripts/bench-company-search.sql",
     "bench:companies-import": "node scripts/bench-company-directory-import.mjs --n 500000",
