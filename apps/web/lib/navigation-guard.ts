@@ -10,9 +10,11 @@
  *
  *   - A push/replace to a destination seen within the lock window is ignored.
  *   - A push/replace to the route you're already on is a no-op for programmatic
- *     navigation. A link CLICK is different: clicking the link for the page
- *     you're on refreshes the page (see `refreshPage`) — the LinkedIn-style
- *     "re-open the current section" gesture — rather than being dropped.
+ *     navigation. A link CLICK to the current route never navigates either. It
+ *     reloads the page only when the link opts in with
+ *     `data-refresh-on-reclick` (the feed and messages links) — the "re-open
+ *     the current section" gesture; every other same-route link is a silent
+ *     no-op.
  *   - The lock expires automatically (default 800 ms) or as soon as the route
  *     settles via `settleNavigation`, after which the same destination can be
  *     navigated to again.
@@ -35,6 +37,13 @@ export interface RouterLike {
 
 export const NAVIGATION_LOCK_MS = 800;
 export const BACK_LOCK_MS = 300;
+
+/**
+ * Marks a link whose current-route click should reload the page. Only surfaces
+ * with live content that the user may want to re-fetch — the feed and the
+ * messages list — carry it; every other link just swallows a same-route click.
+ */
+export const REFRESH_ON_RECLICK_ATTR = "data-refresh-on-reclick";
 
 const pendingNavigations = new Map<string, number>();
 let lastBackAt = 0;
@@ -61,9 +70,9 @@ function samePath(a: string, b: string): boolean {
  *   1. Already here — `currentPath` equals `href`. The biggest source of
  *      duplicate GETs: re-clicking the sidebar link for the page you're on
  *      used to fire another RSC request for no reason. Still a no-op —
- *      link clicks never reach here, because the click guard turns a click
- *      on the current route into a page refresh instead
- *      (see `installLinkClickGuard` and `refreshPage`).
+ *      link clicks never reach here, because the click guard swallows a click
+ *      on the current route (or reloads it for opt-in links;
+ *      see `installLinkClickGuard`).
  *   2. A transition to the same destination is already pending within the lock
  *      window. The lock is released early by `settleNavigation` once the route
  *      actually changes, so a legit re-click right after settling works.
@@ -123,7 +132,7 @@ function isInternalHref(href: string): boolean {
 }
 
 /**
- * Reloads `href` as a full document load — the refresh a click on the link for
+ * Reloads `href` as a full document load — what re-clicking an opt-in link for
  * the page you're already on performs. A real load rather than a router push,
  * so every cached list and feed on the page re-fetches; scroll restoration is
  * switched off first, so the page comes back at the top the way re-opening a
@@ -146,8 +155,9 @@ export function refreshPage(href: string): void {
  * single RSC request) instead of 10.
  *
  * A click on a link whose destination is the route already on screen is
- * special-cased: instead of the old silent no-op it refreshes the page (see
- * `refreshPage`), while a burst of such clicks during the load stays swallowed.
+ * swallowed — never a second transition — and reloads the page only when the
+ * link opted in with `data-refresh-on-reclick` (see `refreshPage`), while a
+ * burst of such clicks during the load stays swallowed.
  *
  * Returns a cleanup function. Idempotent: installing twice is a no-op.
  */
@@ -169,13 +179,13 @@ export function installLinkClickGuard(lockMs = NAVIGATION_LOCK_MS): () => void {
     const currentPath =
       typeof window === "undefined" ? undefined : window.location.pathname;
     if (currentPath && samePath(currentPath, href)) {
-      // Re-clicking the link for the page you're on refreshes it. Swallow the
-      // click either way so Next.js' own handler can't also start a client-side
-      // transition on top of the load, and swallow the burst after the first
-      // refresh so a click storm doesn't restart the load over and over.
+      // A link to the page you're on never starts another transition. Only
+      // opt-in links reload the surface (feed, messages); everything else is a
+      // silent no-op. Swallow the burst after the first refresh so a click
+      // storm doesn't restart the load over and over.
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!refreshing) {
+      if (target.hasAttribute(REFRESH_ON_RECLICK_ATTR) && !refreshing) {
         refreshing = true;
         refreshPage(href);
       }

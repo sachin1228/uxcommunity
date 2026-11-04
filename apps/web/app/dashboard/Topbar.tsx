@@ -94,6 +94,7 @@ export function Topbar({ userId, user }: Props) {
         </SidebarRouteGate>
         <Link
           href="/dashboard"
+          data-refresh-on-reclick
           className="flex min-w-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-sm" />
@@ -124,7 +125,7 @@ export function Topbar({ userId, user }: Props) {
       {/* Messages, bell, then profile: the account controls stay pinned to the
           right edge at every width. */}
       <div className="order-4 ml-auto flex min-w-0 items-center gap-2">
-        <DeferredDashboard fallback={<Link href="/dashboard/messages" prefetch={false} aria-label="Messages" className="flex h-8 w-8 items-center justify-center text-foreground-muted"><DmIcon size={18} /></Link>}>
+        <DeferredDashboard fallback={<Link href="/dashboard/messages" data-refresh-on-reclick prefetch={false} aria-label="Messages" className="flex h-8 w-8 items-center justify-center text-foreground-muted"><DmIcon size={18} /></Link>}>
           <DmTopbarButton userId={userId} />
         </DeferredDashboard>
         <LimitsRing />
